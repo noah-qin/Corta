@@ -19,11 +19,30 @@ final class TerminalView: NSView, CALayerDelegate {
     /// zero-size layer) means the frame is silently skipped.
     var onRenderFrame: ((MTLRenderPassDescriptor, CGSize, CAMetalDrawable) -> Void)?
 
+    /// Asked before each vsync's drawable is acquired; a `false` answer
+    /// skips the frame entirely — no drawable, no command buffer, no present
+    /// — and parks the display link until `setNeedsRedraw()` is called, so a
+    /// static screen does not even pay for the vsync wakeups (`PERFORMANCE.md`
+    /// §3: idle CPU ~0%). The check must happen *before* `nextDrawable()`:
+    /// an acquired drawable that is never presented is not recycled, so
+    /// acquiring one per skipped frame would exhaust the pool and block the
+    /// main thread.
+    var shouldRenderFrame: (() -> Bool)?
+
     /// Called with raw bytes to write to the PTY for one key event.
     var onKeyBytes: (([UInt8]) -> Void)?
 
     /// Called for a scroll gesture, a page key or ⌘↑/⌘↓ (`M1.20`).
     var onScroll: ((ScrollGesture) -> Void)?
+
+    /// Called for a paste request — ⌘V or the Edit menu's Paste. Reading the
+    /// pasteboard, sanitising and warning is the shell's job
+    /// (`SECURITY.md` §2.3).
+    var onPaste: (() -> Void)?
+
+    /// Called when a live window resize ends, so the shell can deliver the
+    /// final size to the child without waiting out the debounce (M2.9).
+    var onLiveResizeEnded: (() -> Void)?
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
@@ -66,6 +85,17 @@ final class TerminalView: NSView, CALayerDelegate {
         updateDrawableSize()
     }
 
+    override func viewDidEndLiveResize() {
+        super.viewDidEndLiveResize()
+        onLiveResizeEnded?()
+    }
+
+    /// Wakes the parked display link; the next vsync asks
+    /// `shouldRenderFrame`. Main thread only, like everything on a view.
+    func setNeedsRedraw() {
+        displayLink?.isPaused = false
+    }
+
     private func updateDrawableSize() {
         let scale = window?.backingScaleFactor ?? 1
         metalLayer.contentsScale = scale
@@ -73,6 +103,12 @@ final class TerminalView: NSView, CALayerDelegate {
     }
 
     @objc private func frameTick() {
+        if let shouldRenderFrame, !shouldRenderFrame() {
+            // Nothing to draw: park the link. The shell un-parks it via
+            // `setNeedsRedraw()` when output arrives or the viewport changes.
+            displayLink?.isPaused = true
+            return
+        }
         guard let drawable = metalLayer.nextDrawable() else { return }
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = drawable.texture
@@ -89,11 +125,104 @@ final class TerminalView: NSView, CALayerDelegate {
             onScroll?(gesture)
             return
         }
+        if Self.isPasteShortcut(event) {
+            onPaste?()
+            return
+        }
         guard let bytes = Self.bytes(for: event) else {
             super.keyDown(with: event)
             return
         }
         onKeyBytes?(bytes)
+    }
+
+    /// ⌘V — checked before `bytes(for:)`, which would otherwise deliver a
+    /// bare "v" to the child.
+    static func isPasteShortcut(_ event: NSEvent) -> Bool {
+        event.modifierFlags.contains(.command)
+            && event.charactersIgnoringModifiers?.lowercased() == "v"
+    }
+
+    /// The Edit menu's Paste item lands here; ⌘V arrives via `keyDown`.
+    /// (`paste(_:)` comes from `NSStandardKeyBindingProviding`, so it is not
+    /// an `NSResponder` override.)
+    func paste(_ sender: Any?) {
+        onPaste?()
+    }
+
+    // MARK: - Mouse reporting (M2.7, SGR ?1006)
+
+    /// Whether the child application has asked for mouse reports; the shell
+    /// answers from the core's mode flags. When off, mouse events keep their
+    /// normal meaning (scrolling the scrollback).
+    var isMouseReportingEnabled: (() -> Bool)?
+
+    /// Called with the SGR report bytes for one mouse event.
+    var onMouseBytes: (([UInt8]) -> Void)?
+
+    /// Set by the shell from the renderer's metrics; needed to turn a view
+    /// point into a cell.
+    var cellSize: CGSize = .zero
+
+    override func mouseDown(with event: NSEvent) {
+        guard report(event, phase: .press(.left)) else { super.mouseDown(with: event); return }
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard report(event, phase: .release(.left)) else { super.mouseUp(with: event); return }
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        guard report(event, phase: .press(.right)) else { super.rightMouseDown(with: event); return }
+    }
+
+    override func rightMouseUp(with event: NSEvent) {
+        guard report(event, phase: .release(.right)) else { super.rightMouseUp(with: event); return }
+    }
+
+    override func otherMouseDown(with event: NSEvent) {
+        guard report(event, phase: .press(.middle)) else { super.otherMouseDown(with: event); return }
+    }
+
+    override func otherMouseUp(with event: NSEvent) {
+        guard report(event, phase: .release(.middle)) else { super.otherMouseUp(with: event); return }
+    }
+
+    private enum MousePhase {
+        case press(SGRMouse.Button)
+        case release(SGRMouse.Button)
+    }
+
+    /// Sends the SGR report for one event; returns false when mouse reporting
+    /// is off and the event should follow its normal path.
+    private func report(_ event: NSEvent, phase: MousePhase) -> Bool {
+        guard isMouseReportingEnabled?() == true, cellSize.width > 0, cellSize.height > 0
+        else { return false }
+        let (column, row) = cellUnder(event)
+        let modifiers = Self.mouseModifiers(of: event)
+        let bytes: [UInt8]
+        switch phase {
+        case .press(let button):
+            bytes = SGRMouse.press(button: button, column: column, row: row, modifiers: modifiers)
+        case .release(let button):
+            bytes = SGRMouse.release(button: button, column: column, row: row, modifiers: modifiers)
+        }
+        onMouseBytes?(bytes)
+        return true
+    }
+
+    /// The cell under the event, in grid coordinates.
+    private func cellUnder(_ event: NSEvent) -> (column: Int, row: Int) {
+        let point = convert(event.locationInWindow, from: nil)
+        return SGRMouse.cell(for: point, cellWidth: cellSize.width, cellHeight: cellSize.height)
+    }
+
+    static func mouseModifiers(of event: NSEvent) -> SGRMouse.Modifiers {
+        var modifiers = SGRMouse.Modifiers()
+        modifiers.shift = event.modifierFlags.contains(.shift)
+        modifiers.meta = event.modifierFlags.contains(.option)
+        modifiers.control = event.modifierFlags.contains(.control)
+        return modifiers
     }
 
     /// ⌘↑ / ⌘↓ jump to the top and bottom of scrollback, the same gesture
@@ -151,6 +280,16 @@ final class TerminalView: NSView, CALayerDelegate {
 
     override func scrollWheel(with event: NSEvent) {
         guard event.scrollingDeltaY != 0 else { return }
+        // With mouse reporting on, the wheel belongs to the child (SGR 64/65
+        // per notch), not to the scrollback.
+        if isMouseReportingEnabled?() == true, cellSize.width > 0, cellSize.height > 0 {
+            let (column, row) = cellUnder(event)
+            onMouseBytes?(
+                SGRMouse.wheel(
+                    up: event.scrollingDeltaY > 0, column: column, row: row,
+                    modifiers: Self.mouseModifiers(of: event)))
+            return
+        }
         // Natural or not, up-scroll (content moves down, deltaY negative in
         // AppKit's convention for a flipped view scrolling content upward)
         // reveals older lines — one line per ~10pt, which feels right for a

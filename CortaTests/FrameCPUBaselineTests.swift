@@ -9,8 +9,10 @@ import Testing
 
 /// M1.21's baseline: frame CPU time, measured against a representative
 /// window (120×40, a typical terminal size) with the screen full of text —
-/// the worst case damage tracking (not yet implemented) would otherwise
-/// hide. Not an assertion — `docs/PERFORMANCE.md`'s < 4 ms target is a
+/// the worst case, which damage tracking would otherwise hide: every
+/// iteration calls `invalidate()` so the whole instance buffer is rebuilt,
+/// exactly what a full-screen scroll (vim paging, `cat` of a large file)
+/// costs. Not an assertion — `docs/PERFORMANCE.md`'s < 4 ms target is a
 /// design constraint to defend later, not a CI gate this early. The result
 /// is written to a file so it survives outside the ephemeral test log.
 struct FrameCPUBaselineTests {
@@ -54,6 +56,7 @@ struct FrameCPUBaselineTests {
             pass.colorAttachments[0].storeAction = .store
 
             let commandBuffer = queue.makeCommandBuffer()!
+            renderer.invalidate()  // force the full-rebuild worst case
             let start = DispatchTime.now()
             renderer.render(
                 grid: grid, rect: CGRect(x: 0, y: 0, width: width, height: height),

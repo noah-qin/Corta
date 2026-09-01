@@ -9,6 +9,7 @@ import Cocoa
 import CoreText
 import CortaTerminal
 import Metal
+import Synchronization
 
 /// Owns one `TerminalSession` and the `TerminalRenderer`/`TerminalView` that
 /// draw it — the unit a split (M5) will multiply, not a global (`DESIGN.md`
@@ -20,6 +21,26 @@ class ViewController: NSViewController {
     private var commandQueue: MTLCommandQueue!
     private var scrollOffset = 0
     private var didSizeWindow = false
+    /// Set by layout changes the damage diff cannot see (drawable size,
+    /// backing scale) and by local actions that change what is drawn without
+    /// touching the grid (scrolling); consumed by `updateDamage`.
+    private var needsRedraw = true
+    /// Set from the reader thread's `onOutput` (every parse batch); the
+    /// vsync gate checks this one flag and only snapshots and diffs the grid
+    /// when it is set, so a truly idle frame costs a boolean check rather
+    /// than a line-by-line comparison.
+    private let outputPending = Mutex(false)
+    /// Coalesces `session.resize` during a live drag (M2.9); the last size
+    /// actually requested, so no-op layouts don't re-send the same winsize.
+    private var resizeDebouncer: ResizeDebouncer!
+    private var lastRequestedSize: TerminalSize?
+
+    /// The drag is over — the child should see the final size now, not after
+    /// the debounce window expires. Wired to `TerminalView`'s
+    /// `viewDidEndLiveResize` (live-resize notifications live on the view).
+    func endLiveResize() {
+        resizeDebouncer.flush()
+    }
 
     /// Initial and minimum grid sizes. The window's content size is derived
     /// from these and the font's cell metrics, never from hardcoded points,
@@ -49,18 +70,43 @@ class ViewController: NSViewController {
         terminalView = view
 
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let initialSize = TerminalSize(rows: UInt16(defaultRows), columns: UInt16(defaultColumns))
         session = try! TerminalSession(
             executable: shell, arguments: ["-l"],
-            size: TerminalSize(rows: UInt16(defaultRows), columns: UInt16(defaultColumns)))
+            size: initialSize)
+        lastRequestedSize = initialSize
+        resizeDebouncer = ResizeDebouncer { [weak self] size in
+            self?.session.resize(to: size)
+        }
+        // Fires on the reader thread after every parse batch.
+        session.onOutput = { [weak self] in
+            self?.noteOutput()
+        }
 
         view.onRenderFrame = { [weak self] pass, drawableSize, drawable in
             self?.render(into: pass, drawableSize: drawableSize, drawable: drawable)
+        }
+        view.shouldRenderFrame = { [weak self] in
+            self?.updateDamage() ?? false
         }
         view.onKeyBytes = { [weak self] bytes in
             self?.session.write(bytes)
         }
         view.onScroll = { [weak self] gesture in
             self?.scroll(gesture)
+        }
+        view.onLiveResizeEnded = { [weak self] in
+            self?.endLiveResize()
+        }
+        view.onPaste = { [weak self] in
+            self?.pasteFromClipboard()
+        }
+        view.cellSize = CGSize(width: metrics.cellWidth, height: metrics.cellHeight)
+        view.isMouseReportingEnabled = { [weak self] in
+            self?.mouseReportingEnabled() ?? false
+        }
+        view.onMouseBytes = { [weak self] bytes in
+            self?.session.write(bytes)
         }
     }
 
@@ -82,17 +128,101 @@ class ViewController: NSViewController {
 
     override func viewDidLayout() {
         super.viewDidLayout()
+        // Layout can change the drawable's size or backing scale without any
+        // grid change the damage diff would notice — force one frame.
+        invalidateDisplay()
         resizeSessionToFitView()
+    }
+
+    /// Runs at vsync before a drawable is acquired. Cheap path: nothing
+    /// arrived and nothing local changed, so no snapshot, no diff, no frame —
+    /// and the display link parks itself (`TerminalView.frameTick`), which is
+    /// what lets a static screen idle at ~0% CPU (`PERFORMANCE.md` §3). When
+    /// output did arrive, the snapshot is diffed against the renderer's
+    /// line-granular cache and the frame happens only on damage.
+    private func updateDamage() -> Bool {
+        let hasOutput = outputPending.withLock { pending -> Bool in
+            let was = pending
+            pending = false
+            return was
+        }
+        guard needsRedraw || hasOutput else { return false }
+        let forced = needsRedraw
+        needsRedraw = false
+        let grid = session.snapshot()
+        // The rebuilt rows land in the renderer's cache; `render` diffs once
+        // more when it draws and picks up anything that arrived since.
+        let damaged = terminalRenderer.updateInstances(
+            grid: grid, scrollOffset: scrollOffset,
+            cursorVisible: scrollOffset == 0, selection: nil)
+        return forced || damaged
+    }
+
+    /// Called from the reader thread after each parse batch: record that the
+    /// grid may have changed and wake the (possibly parked) display link.
+    nonisolated private func noteOutput() {
+        outputPending.withLock { $0 = true }
+        Task { @MainActor [weak self] in
+            self?.terminalView.setNeedsRedraw()
+        }
+    }
+
+    /// Marks the display dirty and wakes the display link — for local changes
+    /// (layout, scrolling) that produce no PTY output.
+    private func invalidateDisplay() {
+        needsRedraw = true
+        terminalView.setNeedsRedraw()
     }
 
     private func resizeSessionToFitView() {
         guard let session, let terminalRenderer else { return }
         let columns = UInt16(max(1, view.bounds.width / terminalRenderer.metrics.cellWidth))
         let rows = UInt16(max(1, view.bounds.height / terminalRenderer.metrics.cellHeight))
-        session.resize(to: TerminalSize(rows: rows, columns: columns))
+        let size = TerminalSize(rows: rows, columns: columns)
+        guard size != lastRequestedSize else { return }
+        lastRequestedSize = size
+        // During a live drag, coalesce; otherwise (initial layout,
+        // programmatic resize) deliver immediately.
+        resizeDebouncer.resize(to: size, coalesce: view.window?.inLiveResize ?? false)
+    }
+
+    // MARK: - Paste (M2.6, app side)
+
+    private func pasteFromClipboard() {
+        guard let text = NSPasteboard.general.string(forType: .string) else { return }
+        let sanitized = Paste.sanitized(text)
+        guard !sanitized.isEmpty else { return }
+        if Paste.needsWarning(text: sanitized, bracketedPasteEnabled: bracketedPasteEnabled()) {
+            let alert = NSAlert()
+            alert.messageText = "Paste text containing newlines?"
+            alert.informativeText =
+                "The application in the terminal has not enabled bracketed paste mode, so each line will execute as if you typed it."
+            alert.addButton(withTitle: "Paste")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+        session.write(Paste.bytes(for: sanitized, bracketedPasteEnabled: bracketedPasteEnabled()))
+    }
+
+    /// INTEGRATION POINT — wire to the core's ?2004 mode once the core side
+    /// of M2.6 lands (another track; `Performer+Modes.swift` is still empty
+    /// in this tree). Defaults to off, the safe direction: it produces more
+    /// newline warnings, never fewer.
+    private func bracketedPasteEnabled() -> Bool {
+        false
+    }
+
+    /// INTEGRATION POINT — wire to the core's mouse-reporting mode (?1006
+    /// with a button-motion mode such as ?1000) once the core side of M2.7
+    /// lands (another track; `Performer+Modes.swift` is still empty in this
+    /// tree). Defaults to off: clicks and the wheel keep their normal
+    /// terminal behaviour until then.
+    private func mouseReportingEnabled() -> Bool {
+        false
     }
 
     private func scroll(_ gesture: ScrollGesture) {
+
         let historyDepth = session.snapshot().scrollback.count
         switch gesture {
         case .lines(let delta):
@@ -105,6 +235,9 @@ class ViewController: NSViewController {
         case .toBottom:
             scrollOffset = 0
         }
+        // Scrolling moves the viewport without any grid output, so the
+        // output flag alone would never trigger the redraw.
+        invalidateDisplay()
     }
 
     /// Runs at vsync, on the main thread — reads the latest grid without
