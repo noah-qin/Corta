@@ -88,7 +88,11 @@ nonisolated final class QuadRenderer {
             attachment.rgbBlendOperation = .add
             attachment.alphaBlendOperation = .add
             attachment.sourceRGBBlendFactor = .sourceAlpha
-            attachment.sourceAlphaBlendFactor = .sourceAlpha
+            // `.one`, not `.sourceAlpha`: the drawable is composited by Core
+            // Animation as premultiplied alpha, so the alpha channel must
+            // accumulate as src.a + dst.a*(1-src.a). Squaring it here made
+            // every translucent pixel report less coverage than it has.
+            attachment.sourceAlphaBlendFactor = .one
             attachment.destinationRGBBlendFactor = .oneMinusSourceAlpha
             attachment.destinationAlphaBlendFactor = .oneMinusSourceAlpha
             return try device.makeRenderPipelineState(descriptor: descriptor)

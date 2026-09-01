@@ -32,7 +32,7 @@ struct TerminalRendererTests {
         }
         let queue = device.makeCommandQueue()!
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
-        let renderer = try TerminalRenderer(device: device, font: font)
+        let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
 
         var terminal = Terminal(rows: 4, columns: 10)
         terminal.feed(Array("abc".utf8))  // cursor now sits at row 0, column 3
@@ -78,7 +78,7 @@ struct TerminalRendererTests {
         }
         let queue = device.makeCommandQueue()!
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
-        let renderer = try TerminalRenderer(device: device, font: font)
+        let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
 
         let terminal = Terminal(rows: 4, columns: 10)
         let grid = terminal.grid
@@ -125,7 +125,7 @@ struct TerminalRendererTests {
         }
         let queue = device.makeCommandQueue()!
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
-        let renderer = try TerminalRenderer(device: device, font: font)
+        let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
 
         // Fill a 4-row screen with enough lines to push "topline" into
         // scrollback, then leave the live screen showing later content.

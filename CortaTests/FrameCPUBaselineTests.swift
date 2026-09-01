@@ -23,7 +23,7 @@ struct FrameCPUBaselineTests {
         }
         let queue = device.makeCommandQueue()!
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
-        let renderer = try TerminalRenderer(device: device, font: font)
+        let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
 
         let columns = 120, rows = 40
         var terminal = Terminal(rows: rows, columns: columns)

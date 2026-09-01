@@ -69,7 +69,7 @@ final class TerminalView: NSView, CALayerDelegate {
         metalLayer.device = MTLCreateSystemDefaultDevice()
         metalLayer.pixelFormat = QuadRenderer.pixelFormat
         metalLayer.framebufferOnly = true
-        metalLayer.isOpaque = true
+        metalLayer.isOpaque = false
     }
 
     override func viewDidMoveToWindow() {
@@ -118,7 +118,9 @@ final class TerminalView: NSView, CALayerDelegate {
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = drawable.texture
         pass.colorAttachments[0].loadAction = .clear
-        pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1)
+        let bg = TerminalColorPalette.clearColor
+        pass.colorAttachments[0].clearColor = MTLClearColorMake(
+            Double(bg.x), Double(bg.y), Double(bg.z), Double(bg.w))
         pass.colorAttachments[0].storeAction = .store
         onRenderFrame?(pass, metalLayer.drawableSize, drawable)
     }

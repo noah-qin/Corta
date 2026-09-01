@@ -14,7 +14,7 @@ struct DamageTrackingTests {
     private static func makeRenderer() -> TerminalRenderer? {
         guard let device = MTLCreateSystemDefaultDevice() else { return nil }
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
-        return try? TerminalRenderer(device: device, font: font)
+        return try? TerminalRenderer(device: device, font: font, scale: 1)
     }
 
     @Test func staticScreenReportsNoDamageAfterFirstBuild() throws {
@@ -75,7 +75,7 @@ struct DamageTrackingTests {
         }
         let queue = device.makeCommandQueue()!
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
-        let renderer = try TerminalRenderer(device: device, font: font)
+        let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
 
         var terminal = Terminal(rows: 4, columns: 10)
         terminal.feed(Array("aaaa\r\nbbbb".utf8))

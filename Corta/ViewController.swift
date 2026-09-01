@@ -84,7 +84,10 @@ class ViewController: NSViewController {
         let initialSize = TerminalSize(rows: UInt16(defaultRows), columns: UInt16(defaultColumns))
         session = try! TerminalSession(
             executable: shell, arguments: ["-l"],
-            size: initialSize)
+            // Launched from Finder the app inherits "/" as its working
+            // directory, so the shell opened in the filesystem root. A
+            // terminal should start where a login shell would.
+            size: initialSize, workingDirectory: NSHomeDirectory())
         lastRequestedSize = initialSize
         resizeDebouncer = ResizeDebouncer { [weak self] size in
             self?.session.resize(to: size)
@@ -129,6 +132,10 @@ class ViewController: NSViewController {
         // Dragging snaps to whole cells, so a resize never leaves a partial
         // row or column.
         window.title = "Corta"
+        // The Metal layer clears to a translucent colour; the window has to
+        // stop painting its own opaque background for that to show through.
+        window.isOpaque = false
+        window.backgroundColor = .clear
         window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
         window.contentMinSize = NSSize(
             width: CGFloat(minimumColumns) * metrics.cellWidth,
