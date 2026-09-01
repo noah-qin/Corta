@@ -157,6 +157,17 @@ public final class TerminalSession: @unchecked Sendable {
         }
     }
 
+    /// Whether the child has enabled bracketed paste (`?2004`, M2.6).
+    public var isBracketedPasteEnabled: Bool {
+        state.withLock { $0.terminal.isBracketedPasteEnabled }
+    }
+
+    /// Whether the child has asked for SGR-encoded mouse reports (`?1006`,
+    /// M2.7).
+    public var isSgrMouseEncodingEnabled: Bool {
+        state.withLock { $0.terminal.isSgrMouseEncodingEnabled }
+    }
+
     public func resize(to size: TerminalSize) {
         try? pty.resize(to: size)
         state.withLock { current in

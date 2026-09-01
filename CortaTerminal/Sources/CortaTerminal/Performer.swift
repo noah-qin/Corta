@@ -45,8 +45,15 @@ public struct Performer: ParserPerformer, Sendable {
         // correct and safe default (`SECURITY.md` §3).
         if sequence.privateMarker != 0 {
             guard sequence.intermediates.count == 0 else { return }
-            if sequence.privateMarker == 0x3E, sequence.final == 0x63 {  // DA2 — CSI > c
+            switch (sequence.privateMarker, sequence.final) {
+            case (0x3E, 0x63):  // DA2 — CSI > c
                 reportSecondaryDeviceAttributes()
+            case (0x3F, 0x68):  // DECSET — CSI ? Pm h
+                applyPrivateModes(sequence.parameters, enabled: true)
+            case (0x3F, 0x6C):  // DECRST — CSI ? Pm l
+                applyPrivateModes(sequence.parameters, enabled: false)
+            default:
+                break
             }
             return
         }

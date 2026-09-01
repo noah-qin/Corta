@@ -34,6 +34,13 @@ public struct Terminal: Sendable {
     /// Whether query responses are queued for the child.
     public var hasPendingOutput: Bool { !performer.state.outputBuffer.isEmpty }
 
+    /// `?2004` — whether the child has enabled bracketed paste (M2.6).
+    public var isBracketedPasteEnabled: Bool { performer.state.bracketedPasteEnabled }
+
+    /// `?1006` — whether the child has asked for SGR-encoded mouse reports
+    /// (M2.7).
+    public var isSgrMouseEncodingEnabled: Bool { performer.state.sgrMouseEncodingEnabled }
+
     /// Drains the queued query responses. `TerminalSession` calls this after
     /// every `feed` and writes the bytes to the PTY; tests read them
     /// directly, without a PTY. The buffer carries fixed-format response
