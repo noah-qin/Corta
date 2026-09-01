@@ -13,6 +13,7 @@ let package = Package(
     products: [
         .library(name: "CortaTerminal", targets: ["CortaTerminal"]),
         .executable(name: "corta-dump", targets: ["corta-dump"]),
+        .executable(name: "corta-bench", targets: ["corta-bench"]),
     ],
     targets: [
         .target(
@@ -23,6 +24,13 @@ let package = Package(
         // checked by hand against a real program's output without a window.
         .executableTarget(
             name: "corta-dump",
+            dependencies: ["CortaTerminal"],
+            swiftSettings: [.defaultIsolation(nil)]
+        ),
+        // M1.21's baseline: parse throughput and scrollback memory,
+        // measured, not estimated. Run with `-c release` for real numbers.
+        .executableTarget(
+            name: "corta-bench",
             dependencies: ["CortaTerminal"],
             swiftSettings: [.defaultIsolation(nil)]
         ),

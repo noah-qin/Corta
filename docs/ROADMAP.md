@@ -125,36 +125,36 @@ Riskiest system work first, then pure logic under test, then pixels.
 
 ### Renderer — quads before glyphs
 
-- [ ] **M1.15** Metal pipeline drawing **solid coloured quads only**,
+- [x] **M1.15** Metal pipeline drawing **solid coloured quads only**,
       instanced, into a **given rectangle** (not "the window" —
       `DESIGN.md` §2.4). Correct HiDPI scaling.
       *Done when:* cell background colours render correctly at 1× and
       2×, one draw call per frame, and the same grid can be drawn twice
       into two different rects.
-- [ ] **M1.16** Glyph atlas: rasterise via Core Text into a texture
+- [x] **M1.16** Glyph atlas: rasterise via Core Text into a texture
       atlas, with an **ASCII fast path** using
       `CTFontGetGlyphsForCharacters` and no shaping
       (`PERFORMANCE.md` §2.2).
       *Done when:* ASCII text renders, and a profile confirms no Core
       Text shaping call in the steady-state frame.
-- [ ] **M1.17** Cursor and selection rendering as quads.
+- [x] **M1.17** Cursor and selection rendering as quads.
 
 ### Shell and wiring
 
-- [ ] **M1.18** `NSView` backed by `CAMetalLayer`, driven by
+- [x] **M1.18** `NSView` backed by `CAMetalLayer`, driven by
       `CVDisplayLink`. Keyboard input translated to bytes and written to
       the PTY. Do **not** route through `interpretKeyEvents:` yet.
-- [ ] **M1.19** Wire PTY → parser → grid on a reader thread; renderer
+- [x] **M1.19** Wire PTY → parser → grid on a reader thread; renderer
       snapshots at vsync (`PERFORMANCE.md` §2.1). Cap one parse batch at
       roughly 1 MB.
       *Done when:* `yes` floods the terminal, the UI stays responsive,
       ⌃C still works, and `cat` of a 100 MB file does not stall the
       child.
-- [ ] **M1.20** Scrolling: wheel, ⌘↑/↓, page keys.
+- [x] **M1.20** Scrolling: wheel, ⌘↑/↓, page keys.
 
 ### Baseline
 
-- [ ] **M1.21** Record the numbers in §"Tracking" below: parse
+- [x] **M1.21** Record the numbers in §"Tracking" below: parse
       throughput, frame CPU time, idle CPU, memory at 100k scrollback
       lines.
       *Done when:* the table has real values. Every later change is
@@ -316,16 +316,49 @@ security rules in `SECURITY.md` §6.
 Fill these in at each milestone. `PERFORMANCE.md` §1 has the targets.
 Trends matter more than absolute values.
 
-| Metric                    | M1 | M2 | M3 | M4 | M5 | M6 |
-| ------------------------- | -- | -- | -- | -- | -- | -- |
-| Parse throughput (MB/s)   |    |    |    |    |    |    |
-| Frame CPU (ms)            |    |    |    |    |    |    |
-| Idle CPU (%)              |    |    |    |    |    |    |
-| Memory @ 100k lines (MB)  |    |    |    |    |    |    |
-| Keypress → pixel (ms)     |    |    |    |    |    |    |
-| `esctest` pass rate (%)   | —  |    |    |    |    |    |
-| Core LOC                  |    |    |    |    |    |    |
+| Metric                    | M1     | M2 | M3 | M4 | M5 | M6 |
+| ------------------------- | ------ | -- | -- | -- | -- | -- |
+| Parse throughput (MB/s)   | 109.9  |    |    |    |    |    |
+| Frame CPU (ms)            | 1.67   |    |    |    |    |    |
+| Idle CPU (%)              | ~4     |    |    |    |    |    |
+| Memory @ 100k lines (MB)  | 265.7  |    |    |    |    |    |
+| Keypress → pixel (ms)     | —      |    |    |    |    |    |
+| `esctest` pass rate (%)   | —      |    |    |    |    |    |
+| Core LOC                  | 2,547  |    |    |    |    |    |
 
 Expect roughly 6,000–10,000 lines in `CortaTerminal` by M4
 (`DESIGN.md` §1). Reaching 3,000 does not mean the work is nearly done —
 that is where the long tail starts.
+
+**How measured (M1, `corta-bench` release build + an offscreen GPU test +
+a launched release build sampled with `top`; see `PERFORMANCE.md` §5):**
+
+- *Parse throughput* — `swift run -c release corta-bench`: 64 MB of a
+  representative corpus (SGR colour changes + plain text lines, not a
+  worst or best case) fed to one `Terminal.feed` call, timed with
+  `DispatchTime`. Comfortably clears the 100 MB/s target.
+- *Frame CPU* — `CortaTests/FrameCPUBaselineTests`: a full 120×40 screen
+  (SGR-varied text, no blank cells to shortcut instance-buffer
+  construction), 60 iterations of encode + commit + `waitUntilCompleted`,
+  averaged. Well inside the 4 ms budget — this is the CPU-side cost only,
+  with damage tracking not yet implemented, so it is the cost of
+  rebuilding and drawing *every* cell every frame, not the eventual
+  steady-state cost of a mostly-static screen.
+- *Idle CPU* — the Release build launched directly (a real shell child
+  attached), sampled with `top -pid` over several one-second intervals
+  once initialization settled. **Above the ~0% target** — expected and
+  explained: `CADisplayLink` fires every vsync, and each tick rebuilds
+  the instance buffer and redraws unconditionally. `PERFORMANCE.md` §3's
+  damage tracking ("rebuild the instance buffer only on damage") is not
+  implemented yet; this number is the one that change should fix, and is
+  recorded now specifically so that fix has something to measure against.
+- *Memory @ 100k lines* — `corta-bench`: resident size
+  (`task_info`/`MACH_TASK_BASIC_INFO`) before and after feeding 100,000
+  120-column lines into a 100,000-line scrollback. **Above the ~200 MB
+  target** — `Cell` is the settled 16 bytes (`CellTests`), so the gap is
+  `ContiguousArray` growth overhead plus `Line`/`Scrollback` bookkeeping,
+  not a leak; worth another pass once M2 content (real shell sessions,
+  not a synthetic 120-char corpus) gives a more representative shape.
+- *Keypress → pixel* — genuinely needs an external tool (Typometer) against
+  the running app, as `PERFORMANCE.md` §5 already says; not measured here.
+- *Core LOC* — `find CortaTerminal/Sources/CortaTerminal -name '*.swift' | xargs wc -l` — the core library only, not `corta-dump`/`corta-bench`.
