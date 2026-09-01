@@ -24,6 +24,17 @@ extension Performer {
         return true
     }
 
+    /// ESC sequences. Only DECSC/DECRC are implemented; charset selection
+    /// and everything else are ignored cleanly (`SECURITY.md` §3).
+    public mutating func escapeDispatch(intermediates: Intermediates, final: UInt8) {
+        guard intermediates.count == 0 else { return }
+        switch final {
+        case 0x37: grid.saveCursor()     // DECSC — VT510 §DECSC
+        case 0x38: grid.restoreCursor()  // DECRC — VT510 §DECRC
+        default: break
+        }
+    }
+
     /// DECSET/DECRST with the `?` private marker (xterm ctlseqs, "DEC
     /// Private Mode Set/Reset"). Returns false when none of the parameters
     /// is a mode this handler owns.
