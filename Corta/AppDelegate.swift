@@ -6,6 +6,7 @@
 //
 
 import Cocoa
+import CortaTerminal
 
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -27,4 +28,3 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
 
 }
-
