@@ -20,6 +20,9 @@ class ViewController: NSViewController {
     private var commandQueue: MTLCommandQueue!
     private var scrollOffset = 0
     private var didSizeWindow = false
+    /// Set by layout changes the damage diff cannot see (drawable size,
+    /// backing scale); consumed by `updateDamage`.
+    private var needsRedraw = true
 
     /// Initial and minimum grid sizes. The window's content size is derived
     /// from these and the font's cell metrics, never from hardcoded points,
@@ -56,6 +59,9 @@ class ViewController: NSViewController {
         view.onRenderFrame = { [weak self] pass, drawableSize, drawable in
             self?.render(into: pass, drawableSize: drawableSize, drawable: drawable)
         }
+        view.shouldRenderFrame = { [weak self] in
+            self?.updateDamage() ?? false
+        }
         view.onKeyBytes = { [weak self] bytes in
             self?.session.write(bytes)
         }
@@ -82,7 +88,25 @@ class ViewController: NSViewController {
 
     override func viewDidLayout() {
         super.viewDidLayout()
+        // Layout can change the drawable's size or backing scale without any
+        // grid change the damage diff would notice — force one frame.
+        needsRedraw = true
         resizeSessionToFitView()
+    }
+
+    /// Runs at vsync before a drawable is acquired: diffs the latest snapshot
+    /// against the renderer's line-granular cache so a static screen costs no
+    /// frame at all (`PERFORMANCE.md` §3).
+    private func updateDamage() -> Bool {
+        let grid = session.snapshot()
+        let damaged = terminalRenderer.updateInstances(
+            grid: grid, scrollOffset: scrollOffset,
+            cursorVisible: scrollOffset == 0, selection: nil)
+        if needsRedraw {
+            needsRedraw = false
+            return true
+        }
+        return damaged
     }
 
     private func resizeSessionToFitView() {

@@ -19,6 +19,14 @@ final class TerminalView: NSView, CALayerDelegate {
     /// zero-size layer) means the frame is silently skipped.
     var onRenderFrame: ((MTLRenderPassDescriptor, CGSize, CAMetalDrawable) -> Void)?
 
+    /// Asked before each vsync's drawable is acquired; a `false` answer
+    /// skips the frame entirely — no drawable, no command buffer, no present.
+    /// This is what lets a static screen idle at ~0% CPU (`PERFORMANCE.md`
+    /// §3). The check must happen *before* `nextDrawable()`: an acquired
+    /// drawable that is never presented is not recycled, so acquiring one per
+    /// skipped frame would exhaust the pool and block the main thread.
+    var shouldRenderFrame: (() -> Bool)?
+
     /// Called with raw bytes to write to the PTY for one key event.
     var onKeyBytes: (([UInt8]) -> Void)?
 
@@ -73,6 +81,7 @@ final class TerminalView: NSView, CALayerDelegate {
     }
 
     @objc private func frameTick() {
+        if let shouldRenderFrame, !shouldRenderFrame() { return }
         guard let drawable = metalLayer.nextDrawable() else { return }
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = drawable.texture
