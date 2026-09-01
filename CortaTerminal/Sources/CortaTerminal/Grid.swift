@@ -51,6 +51,9 @@ public struct Grid: Sendable {
     /// (`DESIGN.md` §2.3). Unused until M2.1 adds character widths.
     public var graphemes: GraphemeTable
 
+    /// Rows that have scrolled off the top.
+    public var scrollback: Scrollback
+
     /// The deferred-wrap state of a real VT: printing into the last column
     /// leaves the cursor *on* that column and arms this flag. The next
     /// printable character wraps first, and only then is the row marked
@@ -58,13 +61,14 @@ public struct Grid: Sendable {
     /// and then moves the cursor would scroll the screen by one row.
     public private(set) var pendingWrap: Bool
 
-    public init(rows: Int = 24, columns: Int = 80) {
+    public init(rows: Int = 24, columns: Int = 80, scrollbackLimit: Int = Scrollback.defaultLimit) {
         self.rows = min(max(1, rows), Self.maxRows)
         self.columns = min(max(1, columns), Self.maxColumns)
         self.lines = ContiguousArray(repeating: Line(), count: self.rows)
         self.cursor = Cursor()
         self.pen = Pen()
         self.graphemes = GraphemeTable()
+        self.scrollback = Scrollback(limit: scrollbackLimit)
         self.pendingWrap = false
     }
 
@@ -218,13 +222,18 @@ public struct Grid: Sendable {
 
     // MARK: - Scrolling
 
-    /// Moves the screen up by `count` rows, discarding what falls off the
-    /// top and opening blank rows at the bottom.
+    /// Moves the screen up by `count` rows, giving what falls off the top to
+    /// the scrollback and opening blank rows at the bottom.
     ///
-    /// M1.14 gives the discarded rows to the scrollback.
+    /// The rows keep their `wrapped` flag on the way into history, so a
+    /// command that soft-wrapped before it scrolled is still one logical
+    /// line to selection and search (`DESIGN.md` §2.1).
     public mutating func scrollUp(_ count: Int) {
         let count = min(max(0, count), rows)
         guard count > 0 else { return }
+        for row in 0..<count {
+            scrollback.push(lines[row])
+        }
         lines.removeFirst(count)
         for _ in 0..<count {
             lines.append(Line())

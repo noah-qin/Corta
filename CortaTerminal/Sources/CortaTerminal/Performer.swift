@@ -58,7 +58,10 @@ public struct Performer: ParserPerformer, Sendable {
             case 0: grid.eraseDisplay(.toEnd)
             case 1: grid.eraseDisplay(.toStart)
             case 2: grid.eraseDisplay(.all)
-            default: break  // ED 3 erases the scrollback; M1.14.
+            // ED 3 (xterm): erase the scrollback. Not in ECMA-48, but tmux
+            // and clear(1) both send it.
+            case 3: grid.scrollback.removeAll()
+            default: break
             }
         case 0x6D:  // SGR
             applyGraphicRendition(parameters)

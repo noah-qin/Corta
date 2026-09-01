@@ -19,11 +19,22 @@ enum Golden {
         let name: String
         let rows: Int
         let columns: Int
+        let scrollbackLimit: Int
+        /// Dump the history above the screen as well.
+        let showScrollback: Bool
 
-        init(_ name: String, rows: Int = 24, columns: Int = 80) {
+        init(
+            _ name: String,
+            rows: Int = 24,
+            columns: Int = 80,
+            scrollbackLimit: Int = Scrollback.defaultLimit,
+            showScrollback: Bool = false
+        ) {
             self.name = name
             self.rows = rows
             self.columns = columns
+            self.scrollbackLimit = scrollbackLimit
+            self.showScrollback = showScrollback
         }
 
         var description: String { name }
@@ -43,7 +54,11 @@ enum Golden {
     static func run(_ testCase: Case) throws -> Terminal {
         let url = directory.appendingPathComponent("\(testCase.name).in")
         let source = try String(contentsOf: url, encoding: .utf8)
-        var terminal = Terminal(rows: testCase.rows, columns: testCase.columns)
+        var terminal = Terminal(
+            rows: testCase.rows,
+            columns: testCase.columns,
+            scrollbackLimit: testCase.scrollbackLimit
+        )
         terminal.feed(try decode(source))
         return terminal
     }
@@ -53,7 +68,9 @@ enum Golden {
         _ testCase: Case,
         sourceLocation: SourceLocation = #_sourceLocation
     ) throws {
-        let actual = try run(testCase).dump()
+        let actual = try run(testCase).dump(
+            options: DumpOptions(includeScrollback: testCase.showScrollback)
+        )
         let url = directory.appendingPathComponent("\(testCase.name).txt")
 
         if isUpdating {

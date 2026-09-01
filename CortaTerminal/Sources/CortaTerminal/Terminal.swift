@@ -9,8 +9,14 @@ public struct Terminal: Sendable {
     private var parser = Parser()
     private var performer: Performer
 
-    public init(rows: Int = 24, columns: Int = 80) {
-        self.performer = Performer(grid: Grid(rows: rows, columns: columns))
+    public init(
+        rows: Int = 24,
+        columns: Int = 80,
+        scrollbackLimit: Int = Scrollback.defaultLimit
+    ) {
+        self.performer = Performer(
+            grid: Grid(rows: rows, columns: columns, scrollbackLimit: scrollbackLimit)
+        )
     }
 
     public var grid: Grid {
@@ -25,7 +31,7 @@ public struct Terminal: Sendable {
         parser.parse(bytes, performer: &performer)
     }
 
-    public func dump() -> String {
-        performer.grid.dump()
+    public func dump(options: DumpOptions = .default) -> String {
+        performer.grid.dump(options: options)
     }
 }

@@ -1,0 +1,6 @@
+# Scrollback. A line feed on the last row scrolls the screen and pushes the
+# top row into history (VT100 User Guide: LF at the bottom margin scrolls the
+# page up by one line). With a two-line cap, the third push evicts the first.
+# Rows are trimmed of trailing blanks on the way into history, and keep the
+# text they had.
+one\r\ntwo\r\nthree\r\nfour\r\nfive\r\nsix

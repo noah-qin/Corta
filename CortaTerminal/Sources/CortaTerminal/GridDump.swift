@@ -8,6 +8,17 @@
 /// inline, so the character layer stays readable.
 ///
 /// This is not a hot path: it allocates freely and works in `String`.
+public struct DumpOptions: Sendable {
+    /// Include the scrollback above the screen, numbered backwards from it.
+    public var includeScrollback: Bool
+
+    public init(includeScrollback: Bool = false) {
+        self.includeScrollback = includeScrollback
+    }
+
+    public static let `default` = DumpOptions()
+}
+
 extension Grid {
     /// A plain-text rendering of the grid.
     ///
@@ -21,7 +32,7 @@ extension Grid {
     ///        1 |..........|
     ///        2 |..........|
     ///        A = fg:1 bg:default attrs:bold
-    public func dump() -> String {
+    public func dump(options: DumpOptions = .default) -> String {
         var styles = StyleLegend()
         var text = ""
 
@@ -29,14 +40,30 @@ extension Grid {
         text += "cursor: row \(cursor.row) column \(cursor.column)"
         text += pendingWrap ? " wrap-pending\n" : "\n"
 
+        var history: [Line] = []
+        if options.includeScrollback {
+            history = scrollback.lines
+            text += "scrollback: \(scrollback.count) lines"
+            text += scrollback.isFull ? " (full)\n" : "\n"
+        }
+
+        // History is numbered backwards from the screen, so the row just
+        // above row 0 is -1 whatever the history length is.
+        for (offset, line) in history.enumerated() {
+            text += Self.characterRow(line, number: offset - history.count, columns: columns)
+        }
         for row in 0..<rows {
             text += Self.characterRow(lines[row], number: row, columns: columns)
         }
 
+        for line in history { styles.scan(line, columns: columns) }
         for row in 0..<rows { styles.scan(lines[row], columns: columns) }
 
         if !styles.isEmpty {
             text += "styles:\n"
+            for (offset, line) in history.enumerated() {
+                text += styles.row(line, number: offset - history.count, columns: columns)
+            }
             for row in 0..<rows {
                 text += styles.row(lines[row], number: row, columns: columns)
             }

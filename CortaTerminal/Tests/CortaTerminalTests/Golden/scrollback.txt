@@ -1,0 +1,8 @@
+rows: 3 columns: 8
+cursor: row 2 column 3
+scrollback: 2 lines (full)
+  -2 |two     |
+  -1 |three   |
+   0 |four    |
+   1 |five    |
+   2 |six     |
