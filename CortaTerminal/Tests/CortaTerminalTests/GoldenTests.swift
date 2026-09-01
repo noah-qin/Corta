@@ -20,6 +20,7 @@ struct GoldenTests {
         Golden.Case("alt-screen", rows: 4, columns: 12),
         Golden.Case("alt-screen-active", rows: 3, columns: 10, showScrollback: true),
         Golden.Case("alt-screen-scrollback", rows: 3, columns: 8, scrollbackLimit: 5, showScrollback: true),
+        Golden.Case("scroll-region", rows: 5, columns: 10, showScrollback: true),
     ]
 
     @Test("golden files match", arguments: cases)

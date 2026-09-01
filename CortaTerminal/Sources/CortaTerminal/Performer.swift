@@ -46,6 +46,7 @@ public struct Performer: ParserPerformer, Sendable {
         let parameters = sequence.parameters
         if performCursorControl(final: sequence.final, parameters: parameters) { return }
         if performErase(final: sequence.final, parameters: parameters) { return }
+        if performEditing(final: sequence.final, parameters: parameters) { return }
         switch sequence.final {
         case 0x6D:  // SGR
             applyGraphicRendition(parameters)

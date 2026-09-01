@@ -7,6 +7,23 @@ extension Performer {
     // track implementing M2.6/M2.7; keeping it here avoids two tracks
     // editing one file. The integrator can move it wholesale.
 
+    /// Editing and scroll-region sequences — ECMA-48 §8.3 and VT510.
+    ///
+    /// Returns false when `final` is not one of these, so the dispatch table
+    /// in `Performer.swift` can fall through to the next category.
+    mutating func performEditing(final: UInt8, parameters: Parameters) -> Bool {
+        switch final {
+        case 0x72:  // DECSTBM — VT510 §DECSTBM; one-based on the wire
+            grid.setScrollRegion(
+                top: parameters.value(0, default: 1) - 1,
+                bottom: parameters.value(1, default: grid.rows) - 1
+            )
+        default:
+            return false
+        }
+        return true
+    }
+
     /// DECSET/DECRST with the `?` private marker (xterm ctlseqs, "DEC
     /// Private Mode Set/Reset"). Returns false when none of the parameters
     /// is a mode this handler owns.

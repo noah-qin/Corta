@@ -72,6 +72,12 @@ public struct Grid: Sendable {
     /// The parked main screen while the alternate screen is live.
     private var suspendedMain: SuspendedScreen?
 
+    /// The scroll region (DECSTBM), zero-based and inclusive: the rows that
+    /// scrolling moves. Everything outside the margins stays put. Defaults
+    /// to the whole screen.
+    public private(set) var marginTop: Int = 0
+    public private(set) var marginBottom: Int
+
     public init(rows: Int = 24, columns: Int = 80, scrollbackLimit: Int = Scrollback.defaultLimit) {
         self.rows = min(max(1, rows), Self.maxRows)
         self.columns = min(max(1, columns), Self.maxColumns)
@@ -86,6 +92,7 @@ public struct Grid: Sendable {
         self.savedPendingWrap = false
         self.isAlternateScreenActive = false
         self.suspendedMain = nil
+        self.marginBottom = self.rows - 1
     }
 
     // MARK: - Reading
@@ -184,11 +191,13 @@ public struct Grid: Sendable {
     }
 
     private mutating func lineFeedWithoutClearingWrap() {
-        if cursor.row + 1 >= rows {
+        if cursor.row == marginBottom {
             scrollUp(1)
-        } else {
+        } else if cursor.row < rows - 1 {
             cursor.row += 1
         }
+        // Below the bottom margin a line feed neither scrolls nor wraps
+        // around: the cursor just stops at the last row.
     }
 
     // MARK: - Erasing
@@ -258,25 +267,54 @@ public struct Grid: Sendable {
         cursor.row = min(cursor.row, rows - 1)
         cursor.column = min(cursor.column, columns - 1)
         pendingWrap = false
+        marginTop = min(marginTop, rows - 1)
+        marginBottom = min(marginBottom, rows - 1)
+        if marginTop >= marginBottom {
+            // The region no longer fits; fall back to the whole screen.
+            marginTop = 0
+            marginBottom = rows - 1
+        }
+    }
+
+    // MARK: - Scroll region
+
+    /// DECSTBM — VT510 §DECSTBM: sets the top and bottom margins, zero-based
+    /// and inclusive here (the wire is one-based; that is the performer's
+    /// problem), then homes the cursor. A region is at least two rows;
+    /// `top >= bottom` after clamping is ignored, margins unchanged.
+    public mutating func setScrollRegion(top: Int, bottom: Int) {
+        let top = max(0, top)
+        let bottom = min(bottom, rows - 1)
+        guard top < bottom else { return }
+        marginTop = top
+        marginBottom = bottom
+        moveCursor(row: 0, column: 0)
     }
 
     // MARK: - Scrolling
 
-    /// Moves the screen up by `count` rows, giving what falls off the top to
-    /// the scrollback and opening blank rows at the bottom.
+    /// Moves the scroll region up by `count` rows, opening blank rows at the
+    /// bottom margin. Rows above the top margin and below the bottom margin
+    /// stay put.
     ///
-    /// The rows keep their `wrapped` flag on the way into history, so a
+    /// What falls off the top goes to the scrollback only when the region is
+    /// the whole screen — a partial region belongs to an application (a tmux
+    /// status line, a vim window), and its scrolled-off rows are not the
+    /// user's history. The rows that do go keep their `wrapped` flag, so a
     /// command that soft-wrapped before it scrolled is still one logical
     /// line to selection and search (`DESIGN.md` §2.1).
     public mutating func scrollUp(_ count: Int) {
-        let count = min(max(0, count), rows)
+        let count = min(max(0, count), marginBottom - marginTop + 1)
         guard count > 0 else { return }
-        for row in 0..<count {
-            scrollback.push(lines[row])
+        let saveToHistory = marginTop == 0 && marginBottom == rows - 1
+        for row in marginTop..<(marginBottom - count + 1) {
+            if saveToHistory, row < marginTop + count {
+                scrollback.push(lines[row])
+            }
+            lines[row] = lines[row + count]
         }
-        lines.removeFirst(count)
-        for _ in 0..<count {
-            lines.append(Line())
+        for row in (marginBottom - count + 1)...marginBottom {
+            lines[row] = Line()
         }
     }
 
@@ -322,6 +360,8 @@ public struct Grid: Sendable {
             // A second `?1049 h` while already active re-saves the cursor and
             // clears again; the parked screen stays the original main one.
             eraseDisplay(.all)
+            marginTop = 0
+            marginBottom = rows - 1
             moveCursor(row: 0, column: 0)
             return
         }
@@ -329,6 +369,8 @@ public struct Grid: Sendable {
         lines = ContiguousArray(repeating: Line(), count: rows)
         scrollback = Scrollback(limit: 0)
         graphemes = GraphemeTable()
+        marginTop = 0
+        marginBottom = rows - 1
         isAlternateScreenActive = true
         moveCursor(row: 0, column: 0)
     }

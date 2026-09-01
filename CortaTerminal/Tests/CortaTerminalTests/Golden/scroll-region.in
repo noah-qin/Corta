@@ -1,0 +1,12 @@
+# DECSTBM — VT510 §DECSTBM (DEC private; xterm ctlseqs "Set Scrolling
+# Region"): CSI Pt ; Pb r sets the top and bottom margins, one-based on the
+# wire, and homes the cursor — which is why "x" overwrites the T of "TOP".
+# A line feed at the bottom margin scrolls only within the margins (VT100
+# User Guide, "Scrolling Region"): TOP above and BOTTOM below stay put, and
+# nothing goes to the scrollback because the region is not the whole screen.
+TOP
+\e[5;1HBOTTOM
+\e[2;4r
+x
+\e[2;1H
+aa\r\nbb\r\ncc\r\ndd
