@@ -33,6 +33,11 @@ final class TerminalView: NSView, CALayerDelegate {
     /// Called for a scroll gesture, a page key or ⌘↑/⌘↓ (`M1.20`).
     var onScroll: ((ScrollGesture) -> Void)?
 
+    /// Called for a paste request — ⌘V or the Edit menu's Paste. Reading the
+    /// pasteboard, sanitising and warning is the shell's job
+    /// (`SECURITY.md` §2.3).
+    var onPaste: (() -> Void)?
+
     /// Called when a live window resize ends, so the shell can deliver the
     /// final size to the child without waiting out the debounce (M2.9).
     var onLiveResizeEnded: (() -> Void)?
@@ -107,11 +112,29 @@ final class TerminalView: NSView, CALayerDelegate {
             onScroll?(gesture)
             return
         }
+        if Self.isPasteShortcut(event) {
+            onPaste?()
+            return
+        }
         guard let bytes = Self.bytes(for: event) else {
             super.keyDown(with: event)
             return
         }
         onKeyBytes?(bytes)
+    }
+
+    /// ⌘V — checked before `bytes(for:)`, which would otherwise deliver a
+    /// bare "v" to the child.
+    static func isPasteShortcut(_ event: NSEvent) -> Bool {
+        event.modifierFlags.contains(.command)
+            && event.charactersIgnoringModifiers?.lowercased() == "v"
+    }
+
+    /// The Edit menu's Paste item lands here; ⌘V arrives via `keyDown`.
+    /// (`paste(_:)` comes from `NSStandardKeyBindingProviding`, so it is not
+    /// an `NSResponder` override.)
+    func paste(_ sender: Any?) {
+        onPaste?()
     }
 
     /// ⌘↑ / ⌘↓ jump to the top and bottom of scrollback, the same gesture

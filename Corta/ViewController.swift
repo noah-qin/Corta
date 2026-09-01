@@ -87,6 +87,9 @@ class ViewController: NSViewController {
         view.onLiveResizeEnded = { [weak self] in
             self?.endLiveResize()
         }
+        view.onPaste = { [weak self] in
+            self?.pasteFromClipboard()
+        }
     }
 
     override func viewDidAppear() {
@@ -140,7 +143,34 @@ class ViewController: NSViewController {
         resizeDebouncer.resize(to: size, coalesce: view.window?.inLiveResize ?? false)
     }
 
+    // MARK: - Paste (M2.6, app side)
+
+    private func pasteFromClipboard() {
+        guard let text = NSPasteboard.general.string(forType: .string) else { return }
+        let sanitized = Paste.sanitized(text)
+        guard !sanitized.isEmpty else { return }
+        if Paste.needsWarning(text: sanitized, bracketedPasteEnabled: bracketedPasteEnabled()) {
+            let alert = NSAlert()
+            alert.messageText = "Paste text containing newlines?"
+            alert.informativeText =
+                "The application in the terminal has not enabled bracketed paste mode, so each line will execute as if you typed it."
+            alert.addButton(withTitle: "Paste")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+        session.write(Paste.bytes(for: sanitized, bracketedPasteEnabled: bracketedPasteEnabled()))
+    }
+
+    /// INTEGRATION POINT — wire to the core's ?2004 mode once the core side
+    /// of M2.6 lands (another track; `Performer+Modes.swift` is still empty
+    /// in this tree). Defaults to off, the safe direction: it produces more
+    /// newline warnings, never fewer.
+    private func bracketedPasteEnabled() -> Bool {
+        false
+    }
+
     private func scroll(_ gesture: ScrollGesture) {
+
         let historyDepth = session.snapshot().scrollback.count
         switch gesture {
         case .lines(let delta):
