@@ -22,7 +22,7 @@ is a bug regardless of what it improves.
 | Frame budget (CPU)         | **< 4 ms**                    | 120 Hz ProMotion is an 8.3 ms frame            |
 | Parser throughput          | **> 100 MB/s** single-thread  | `cat` of a large file must not be the slow part |
 | Keypress → pixel latency   | **< 1 frame + input latency** | The metric a user actually feels               |
-| Scrollback memory          | **100k lines within ~200 MB** | Log-heavy ML workloads are a target use case   |
+| Scrollback memory          | **100k 120-column lines within ~200 MB** | Log-heavy ML workloads are a target use case; unstated column count made this unfalsifiable — 120 matches the M1 baseline measurement below |
 | Idle CPU                   | **~0%**                       | No redraw when nothing changed                  |
 
 Numbers are recorded at M1 and re-measured at every milestone. "It feels
