@@ -72,7 +72,7 @@ public final class PTY: @unchecked Sendable {
                 executable: executable,
                 arguments: arguments,
                 environment: environment,
-                replica: replica,
+                replicaPath: path,
                 workingDirectory: workingDirectory
             )
         } catch {
@@ -127,6 +127,11 @@ public final class PTY: @unchecked Sendable {
     ) {
         let primary = posix_openpt(O_RDWR | O_NOCTTY)
         guard primary >= 0 else { throw .openFailed(code: errno) }
+        // `Spawn.child` uses `fork()`, which (unlike `posix_spawn`'s
+        // `POSIX_SPAWN_CLOEXEC_DEFAULT`) duplicates every open descriptor
+        // into the child, including this one — `FD_CLOEXEC` is what makes
+        // `execve` close it again before the child's own code ever runs.
+        _ = fcntl(primary, F_SETFD, FD_CLOEXEC)
 
         guard grantpt(primary) == 0, unlockpt(primary) == 0 else {
             let code = errno
@@ -151,6 +156,7 @@ public final class PTY: @unchecked Sendable {
             Darwin.close(primary)
             throw .openFailed(code: code)
         }
+        _ = fcntl(replica, F_SETFD, FD_CLOEXEC)
         return (primary, replica, path)
     }
 

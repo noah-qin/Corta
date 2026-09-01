@@ -220,6 +220,30 @@ public struct Grid: Sendable {
         }
     }
 
+    // MARK: - Resizing
+
+    /// Changes the visible dimensions without reflowing content — rows are
+    /// truncated or padded, and columns beyond the new width are simply not
+    /// read (`Line` stores only up to its last written column already).
+    /// Reflow (`DESIGN.md` §2.1, roadmap M4.1) rewraps history to the new
+    /// width; that is deliberately not this method's job.
+    public mutating func resize(rows newRows: Int, columns newColumns: Int) {
+        let newRows = min(max(1, newRows), Self.maxRows)
+        let newColumns = min(max(1, newColumns), Self.maxColumns)
+        guard newRows != rows || newColumns != columns else { return }
+
+        if newRows < rows {
+            lines.removeLast(rows - newRows)
+        } else if newRows > rows {
+            lines.append(contentsOf: repeatElement(Line(), count: newRows - rows))
+        }
+        rows = newRows
+        columns = newColumns
+        cursor.row = min(cursor.row, rows - 1)
+        cursor.column = min(cursor.column, columns - 1)
+        pendingWrap = false
+    }
+
     // MARK: - Scrolling
 
     /// Moves the screen up by `count` rows, giving what falls off the top to

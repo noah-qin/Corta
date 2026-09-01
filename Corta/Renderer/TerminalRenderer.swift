@@ -43,8 +43,12 @@ nonisolated final class TerminalRenderer {
 
     /// Draws `grid` into `rect` of `renderPassDescriptor`. `cursorVisible`
     /// lets the shell blink the cursor without touching the grid.
+    /// - Parameter scrollOffset: lines of scrollback above the screen to
+    ///   show instead of it, clamped to what history actually holds. `0` is
+    ///   the live screen (`M1.20`).
     func render(
         grid: Grid,
+        scrollOffset: Int = 0,
         rect: CGRect,
         drawableSize: CGSize,
         cursorVisible: Bool,
@@ -61,8 +65,9 @@ nonisolated final class TerminalRenderer {
         let cellHeight = Float(metrics.cellHeight)
         let baseline = Float(metrics.baselineOffset)
 
+        let offset = min(max(0, scrollOffset), grid.scrollback.count)
         for row in 0..<grid.rows {
-            let line = grid.line(row)
+            let line = Self.visibleLine(grid: grid, row: row, offset: offset)
             for column in 0..<line.count {
                 let cell = line[column]
                 let reversed = cell.attributes.contains(.reverse)
@@ -119,6 +124,20 @@ nonisolated final class TerminalRenderer {
         quadRenderer.drawGlyphQuads(
             glyphInstances, atlas: glyphAtlas.texture, rect: rect, drawableSize: drawableSize,
             renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
+    }
+
+    /// The line shown at viewport row `row` when scrolled `offset` lines
+    /// into history. `offset == 0` is just `grid.line(row)`; a positive
+    /// offset slides the whole screen's worth of rows up through
+    /// `scrollback`, oldest line first, exactly as if the ring buffer and
+    /// the live screen were one contiguous array.
+    private static func visibleLine(grid: Grid, row: Int, offset: Int) -> Line {
+        guard offset > 0 else { return grid.line(row) }
+        let combinedIndex = grid.scrollback.count + row - offset
+        if combinedIndex < grid.scrollback.count {
+            return grid.scrollback[combinedIndex]
+        }
+        return grid.line(combinedIndex - grid.scrollback.count)
     }
 
     private func selectionQuads(
