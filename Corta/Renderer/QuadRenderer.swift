@@ -112,10 +112,14 @@ nonisolated final class QuadRenderer {
         renderPassDescriptor: MTLRenderPassDescriptor,
         commandBuffer: MTLCommandBuffer
     ) {
-        guard !instances.isEmpty,
-            let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)
+        // Even with zero instances, the encoder still has to run: a `.clear`
+        // load action must happen so a frame that draws nothing (an all-
+        // default-colour blank grid) doesn't leave the previous frame on
+        // screen.
+        guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)
         else { return }
         defer { encoder.endEncoding() }
+        guard !instances.isEmpty else { return }
 
         // Clipping to `rect` via the scissor is what makes "renders into a
         // rect, not the window" true rather than aspirational: nothing an
