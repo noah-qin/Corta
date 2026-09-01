@@ -1,0 +1,5 @@
+rows: 3 columns: 10
+cursor: row 0 column 0
+   0 | cdefgh   |
+   1 |          |
+   2 |          |

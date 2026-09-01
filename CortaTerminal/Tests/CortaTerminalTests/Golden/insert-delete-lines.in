@@ -1,0 +1,11 @@
+# IL / DL — ECMA-48 §8.3.67 / §8.3.32. IL inserts erased rows at the cursor
+# row and shifts the rows below it down within the scroll region; what is
+# pushed past the bottom margin is lost. DL deletes rows at the cursor and
+# erased rows open at the bottom margin. Neither moves the cursor, and both
+# leave the rows outside the margins alone.
+TOP
+\e[5;1HBOTTOM
+\e[2;4r\e[2;1H
+aa\r\nbb\r\ncc
+\e[2;1H\e[L
+\e[3;1H\e[M

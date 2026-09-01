@@ -1,0 +1,8 @@
+# ?1049 — the alternate screen (xterm ctlseqs, "DEC Private Mode Set":
+# Ps = 1049). On set: save the cursor as in DECSC, switch to the alternate
+# screen and clear it. On reset: switch back and restore the saved cursor.
+# The main screen's contents come back exactly as they were.
+one\r\ntwo
+\e[2;5H\e[?1049h
+ALTERNATE
+\e[?1049l

@@ -33,14 +33,29 @@ public struct Performer: ParserPerformer, Sendable {
 
     public mutating func csiDispatch(_ sequence: CSISequence) {
         // A private marker or an intermediate makes it a different sequence
-        // with the same final byte — `CSI ? 25 h` is not `CSI 25 h`. None of
-        // those are implemented yet, and guessing would be worse than
-        // ignoring them.
-        guard sequence.privateMarker == 0, sequence.intermediates.count == 0 else { return }
+        // with the same final byte — `CSI ? 25 h` is not `CSI 25 h`.
+        // Private-mode set/reset (`CSI ? … h/l`, xterm ctlseqs) is routed
+        // separately; anything else unrecognised is ignored cleanly, and
+        // guessing would be worse than ignoring it.
+        if sequence.privateMarker == UInt8(ascii: "?") {
+            _ = performAlternateScreenMode(final: sequence.final, parameters: sequence.parameters)
+            return
+        }
+        // DECSCUSR (`CSI Ps SP q`) and its kin carry an intermediate byte.
+        if sequence.intermediates.count > 0 {
+            _ = performIntermediate(
+                final: sequence.final,
+                intermediates: sequence.intermediates,
+                parameters: sequence.parameters
+            )
+            return
+        }
+        guard sequence.privateMarker == 0 else { return }
 
         let parameters = sequence.parameters
         if performCursorControl(final: sequence.final, parameters: parameters) { return }
         if performErase(final: sequence.final, parameters: parameters) { return }
+        if performEditing(final: sequence.final, parameters: parameters) { return }
         switch sequence.final {
         case 0x6D:  // SGR
             applyGraphicRendition(parameters)

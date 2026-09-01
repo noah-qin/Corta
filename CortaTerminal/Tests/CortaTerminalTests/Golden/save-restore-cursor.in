@@ -1,0 +1,7 @@
+# DECSC / DECRC — VT510 §DECSC / §DECRC: ESC 7 saves the cursor and the
+# current rendition, ESC 8 restores both. "Z" therefore lands where "c" was
+# written, in the default rendition saved with the cursor, while "XY" keeps
+# the red that was set after the save.
+ab\e7cd
+\e[31mXY
+\e8Z

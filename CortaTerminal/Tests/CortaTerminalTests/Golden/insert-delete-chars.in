@@ -1,0 +1,7 @@
+# ICH / DCH — ECMA-48 §8.3.64 / §8.3.26. ICH inserts erased cells at the
+# cursor, shifting the row right; cells pushed past the right margin are
+# lost. DCH deletes cells at the cursor, shifting the tail left and erasing
+# what opens at the right. Neither moves the cursor.
+abcdefgh
+\e[1;3H\e[2@
+\e[1;1H\e[3P

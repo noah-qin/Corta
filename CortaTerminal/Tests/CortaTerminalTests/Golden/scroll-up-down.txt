@@ -1,0 +1,8 @@
+rows: 5 columns: 10
+cursor: row 3 column 2
+scrollback: 0 lines
+   0 |TOP       |
+   1 |          |
+   2 |          |
+   3 |bb        |
+   4 |BOTTOM    |

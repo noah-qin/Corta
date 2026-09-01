@@ -87,6 +87,45 @@ public struct Line: Equatable, Sendable {
         if end < cells.count { cells.removeSubrange(end...) }
     }
 
+    /// ICH — ECMA-48 §8.3.64: inserts `count` copies of `template` at
+    /// `column`, shifting the rest right; cells pushed past `width` are
+    /// lost. Editing a row breaks any continuation onto the next one, so
+    /// the wrap flag is cleared.
+    public mutating func insertCells(_ count: Int, at column: Int, template: Cell, width: Int) {
+        guard column >= 0, column < width else { return }
+        let count = min(max(0, count), width - column)
+        guard count > 0 else { return }
+        grow(to: width)
+        var col = width - 1
+        while col >= column + count {
+            cells[col] = cells[col - count]
+            col -= 1
+        }
+        while col >= column {
+            cells[col] = template
+            col -= 1
+        }
+        wrapped = false
+        if template.isBlank { trimTrailingBlanks() }
+    }
+
+    /// DCH — ECMA-48 §8.3.26: deletes `count` cells at `column`, shifting
+    /// the rest left; the tail is filled with `template`.
+    public mutating func deleteCells(_ count: Int, at column: Int, template: Cell, width: Int) {
+        guard column >= 0, column < width else { return }
+        let count = min(max(0, count), width - column)
+        guard count > 0 else { return }
+        grow(to: width)
+        for col in column..<(width - count) {
+            cells[col] = cells[col + count]
+        }
+        for col in (width - count)..<width {
+            cells[col] = template
+        }
+        wrapped = false
+        if template.isBlank { trimTrailingBlanks() }
+    }
+
     @inline(__always)
     private mutating func grow(to length: Int) {
         while cells.count < length {

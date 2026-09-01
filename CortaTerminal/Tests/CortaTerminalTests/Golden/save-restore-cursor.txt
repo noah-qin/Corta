@@ -1,0 +1,10 @@
+rows: 3 columns: 10
+cursor: row 0 column 3
+   0 |abZdXY    |
+   1 |          |
+   2 |          |
+styles:
+   0 |....AA....|
+   1 |..........|
+   2 |..........|
+   A = fg:1 bg:default attrs:none

@@ -1,0 +1,9 @@
+# ?1049 (xterm ctlseqs, Ps = 1049): lines scrolled while the alternate
+# screen is live are discarded — its ring has no capacity — and the main
+# screen's scrollback comes back exactly as it was parked. The erasure and
+# the five written lines below exist only on the alternate screen.
+aaa\r\nbbb\r\nccc\r\nddd
+\e[?1049h
+\e[2J
+x\r\ny\r\nz\r\nw\r\nv
+\e[?1049l

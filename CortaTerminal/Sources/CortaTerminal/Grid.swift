@@ -9,6 +9,17 @@ public struct Cursor: Equatable, Sendable {
     }
 }
 
+/// DECSCUSR (xterm ctlseqs, `CSI Ps SP q`): the cursor's shape and blink.
+/// The core stores it; drawing it is the renderer's concern.
+public enum CursorStyle: Equatable, Sendable {
+    case blinkingBlock
+    case block
+    case blinkingUnderline
+    case underline
+    case blinkingBar
+    case bar
+}
+
 public enum LineEraseMode: Sendable {
     /// EL 0 — the cursor and everything right of it.
     case toEnd
@@ -47,6 +58,10 @@ public struct Grid: Sendable {
     public var cursor: Cursor
     public var pen: Pen
 
+    /// DECSCUSR state (xterm ctlseqs). Global to the terminal rather than
+    /// per screen: it survives an alternate-screen round trip.
+    public var cursorStyle: CursorStyle = .blinkingBlock
+
     /// Grapheme clusters too large for a cell's single scalar
     /// (`DESIGN.md` §2.3). Unused until M2.1 adds character widths.
     public var graphemes: GraphemeTable
@@ -61,15 +76,39 @@ public struct Grid: Sendable {
     /// and then moves the cursor would scroll the screen by one row.
     public private(set) var pendingWrap: Bool
 
+    /// DECSC's slot — cursor, pen and wrap state (VT510 §DECSC).
+    private var savedCursor: Cursor?
+    private var savedPen: Pen?
+    private var savedPendingWrap: Bool = false
+
+    /// True while the alternate screen is live (roadmap M2.3).
+    public private(set) var isAlternateScreenActive: Bool = false
+
+    /// The parked main screen while the alternate screen is live.
+    private var suspendedMain: SuspendedScreen?
+
+    /// The scroll region (DECSTBM), zero-based and inclusive: the rows that
+    /// scrolling moves. Everything outside the margins stays put. Defaults
+    /// to the whole screen.
+    public private(set) var marginTop: Int = 0
+    public private(set) var marginBottom: Int
+
     public init(rows: Int = 24, columns: Int = 80, scrollbackLimit: Int = Scrollback.defaultLimit) {
         self.rows = min(max(1, rows), Self.maxRows)
         self.columns = min(max(1, columns), Self.maxColumns)
         self.lines = ContiguousArray(repeating: Line(), count: self.rows)
         self.cursor = Cursor()
         self.pen = Pen()
+        self.cursorStyle = .blinkingBlock
         self.graphemes = GraphemeTable()
         self.scrollback = Scrollback(limit: scrollbackLimit)
         self.pendingWrap = false
+        self.savedCursor = nil
+        self.savedPen = nil
+        self.savedPendingWrap = false
+        self.isAlternateScreenActive = false
+        self.suspendedMain = nil
+        self.marginBottom = self.rows - 1
     }
 
     // MARK: - Reading
@@ -168,11 +207,13 @@ public struct Grid: Sendable {
     }
 
     private mutating func lineFeedWithoutClearingWrap() {
-        if cursor.row + 1 >= rows {
+        if cursor.row == marginBottom {
             scrollUp(1)
-        } else {
+        } else if cursor.row < rows - 1 {
             cursor.row += 1
         }
+        // Below the bottom margin a line feed neither scrolls nor wraps
+        // around: the cursor just stops at the last row.
     }
 
     // MARK: - Erasing
@@ -242,25 +283,230 @@ public struct Grid: Sendable {
         cursor.row = min(cursor.row, rows - 1)
         cursor.column = min(cursor.column, columns - 1)
         pendingWrap = false
+        marginTop = min(marginTop, rows - 1)
+        marginBottom = min(marginBottom, rows - 1)
+        if marginTop >= marginBottom {
+            // The region no longer fits; fall back to the whole screen.
+            marginTop = 0
+            marginBottom = rows - 1
+        }
+    }
+
+    // MARK: - Scroll region
+
+    /// DECSTBM — VT510 §DECSTBM: sets the top and bottom margins, zero-based
+    /// and inclusive here (the wire is one-based; that is the performer's
+    /// problem), then homes the cursor. A region is at least two rows;
+    /// `top >= bottom` after clamping is ignored, margins unchanged.
+    public mutating func setScrollRegion(top: Int, bottom: Int) {
+        let top = max(0, top)
+        let bottom = min(bottom, rows - 1)
+        guard top < bottom else { return }
+        marginTop = top
+        marginBottom = bottom
+        moveCursor(row: 0, column: 0)
     }
 
     // MARK: - Scrolling
 
-    /// Moves the screen up by `count` rows, giving what falls off the top to
-    /// the scrollback and opening blank rows at the bottom.
+    /// Moves the scroll region up by `count` rows, opening blank rows at the
+    /// bottom margin. Rows above the top margin and below the bottom margin
+    /// stay put.
     ///
-    /// The rows keep their `wrapped` flag on the way into history, so a
+    /// What falls off the top goes to the scrollback only when the region is
+    /// the whole screen — a partial region belongs to an application (a tmux
+    /// status line, a vim window), and its scrolled-off rows are not the
+    /// user's history. The rows that do go keep their `wrapped` flag, so a
     /// command that soft-wrapped before it scrolled is still one logical
     /// line to selection and search (`DESIGN.md` §2.1).
     public mutating func scrollUp(_ count: Int) {
-        let count = min(max(0, count), rows)
+        let count = min(max(0, count), marginBottom - marginTop + 1)
         guard count > 0 else { return }
-        for row in 0..<count {
-            scrollback.push(lines[row])
+        let saveToHistory = marginTop == 0 && marginBottom == rows - 1
+        for row in marginTop..<(marginBottom - count + 1) {
+            if saveToHistory, row < marginTop + count {
+                scrollback.push(lines[row])
+            }
+            lines[row] = lines[row + count]
         }
-        lines.removeFirst(count)
-        for _ in 0..<count {
-            lines.append(Line())
+        for row in (marginBottom - count + 1)...marginBottom {
+            lines[row] = Line()
         }
+    }
+
+    /// SD — ECMA-48 §8.3.113: moves the scroll region down by `count` rows,
+    /// opening blank rows at the top margin. Rows outside the margins stay
+    /// put, and nothing enters the scrollback — scrolling down revisits
+    /// content, it does not create history.
+    public mutating func scrollDown(_ count: Int) {
+        let count = min(max(0, count), marginBottom - marginTop + 1)
+        guard count > 0 else { return }
+        var row = marginBottom
+        while row >= marginTop + count {
+            lines[row] = lines[row - count]
+            row -= 1
+        }
+        while row >= marginTop {
+            lines[row] = Line()
+            row -= 1
+        }
+    }
+
+    // MARK: - Editing
+
+    /// IL — ECMA-48 §8.3.67: inserts `count` erased rows at the cursor row,
+    /// shifting rows below it down within the scroll region; rows pushed
+    /// past the bottom margin are lost. Ignored when the cursor is outside
+    /// the region. The cursor does not move.
+    public mutating func insertLines(_ count: Int) {
+        guard cursor.row >= marginTop, cursor.row <= marginBottom else { return }
+        let count = min(max(0, count), marginBottom - cursor.row + 1)
+        guard count > 0 else { return }
+        var row = marginBottom
+        while row >= cursor.row + count {
+            lines[row] = lines[row - count]
+            row -= 1
+        }
+        while row >= cursor.row {
+            lines[row] = erasedLine()
+            row -= 1
+        }
+        pendingWrap = false
+    }
+
+    /// DL — ECMA-48 §8.3.32: deletes `count` rows at the cursor row,
+    /// shifting rows below it up within the scroll region; erased rows open
+    /// at the bottom margin. Deleted rows are application content, never
+    /// history. Ignored when the cursor is outside the region. The cursor
+    /// does not move.
+    public mutating func deleteLines(_ count: Int) {
+        guard cursor.row >= marginTop, cursor.row <= marginBottom else { return }
+        let count = min(max(0, count), marginBottom - cursor.row + 1)
+        guard count > 0 else { return }
+        var row = cursor.row
+        while row + count <= marginBottom {
+            lines[row] = lines[row + count]
+            row += 1
+        }
+        while row <= marginBottom {
+            lines[row] = erasedLine()
+            row += 1
+        }
+        pendingWrap = false
+    }
+
+    /// ICH — ECMA-48 §8.3.64: inserts `count` erased cells at the cursor.
+    /// The cursor does not move.
+    public mutating func insertCharacters(_ count: Int) {
+        lines[cursor.row].insertCells(count, at: cursor.column, template: pen.eraseCell, width: columns)
+        pendingWrap = false
+    }
+
+    /// DCH — ECMA-48 §8.3.26: deletes `count` cells at the cursor. The
+    /// cursor does not move.
+    public mutating func deleteCharacters(_ count: Int) {
+        lines[cursor.row].deleteCells(count, at: cursor.column, template: pen.eraseCell, width: columns)
+        pendingWrap = false
+    }
+
+    /// A cleared row: blank, or filled with the erase background when one is
+    /// set (BCE — an erased cell under a colour is visible, so it is stored).
+    private func erasedLine() -> Line {
+        let template = pen.eraseCell
+        guard !template.isBlank else { return Line() }
+        var line = Line()
+        line.fill(template, in: 0..<columns)
+        return line
+    }
+
+    // MARK: - Save and restore
+
+    /// DECSC — VT510 §DECSC: saves the cursor position, the pen and the
+    /// pending-wrap state. The origin-mode and character-set state the full
+    /// spec lists are not implemented (DECOM is out of scope for M2; the
+    /// parser never selects a character set).
+    public mutating func saveCursor() {
+        savedCursor = cursor
+        savedPen = pen
+        savedPendingWrap = pendingWrap
+    }
+
+    /// DECRC — VT510 §DECRC. With nothing saved, the spec restores the
+    /// factory settings: home position and the default rendition.
+    public mutating func restoreCursor() {
+        guard let savedCursor, let savedPen else {
+            moveCursor(row: 0, column: 0)
+            pen.reset()
+            return
+        }
+        moveCursor(row: savedCursor.row, column: savedCursor.column)
+        pen = savedPen
+        pendingWrap = savedPendingWrap
+    }
+
+    // MARK: - Alternate screen
+
+    /// `?1049` set (xterm ctlseqs, DEC Private Mode Set): save the cursor,
+    /// switch to the alternate screen, clear it.
+    ///
+    /// The alternate screen is a second screen swapped in, not a flag on
+    /// this one's storage: the main screen — lines, scrollback, margins,
+    /// pen — is parked whole in `suspendedMain` and put back untouched on
+    /// the way out. The alternate screen itself is blank, has full-screen
+    /// margins, and has **no scrollback** (a zero-limit ring whose push is
+    /// a no-op): history scrolled while it is live is discarded.
+    public mutating func enterAlternateScreen() {
+        saveCursor()
+        guard suspendedMain == nil else {
+            // A second `?1049 h` while already active re-saves the cursor and
+            // clears again; the parked screen stays the original main one.
+            eraseDisplay(.all)
+            marginTop = 0
+            marginBottom = rows - 1
+            moveCursor(row: 0, column: 0)
+            return
+        }
+        suspendedMain = SuspendedScreen(self)
+        lines = ContiguousArray(repeating: Line(), count: rows)
+        scrollback = Scrollback(limit: 0)
+        graphemes = GraphemeTable()
+        marginTop = 0
+        marginBottom = rows - 1
+        isAlternateScreenActive = true
+        moveCursor(row: 0, column: 0)
+    }
+
+    /// `?1049` reset: switch back to the main screen and restore the cursor
+    /// that was saved on the way in. Ignored when the main screen is live.
+    ///
+    /// If the screen was resized while the alternate screen was live, the
+    /// parked main screen adopts the new dimensions on its way back — the
+    /// size belongs to the window, not to a screen.
+    public mutating func exitAlternateScreen() {
+        guard let suspended = suspendedMain else { return }
+        suspendedMain = nil
+        var main = suspended.grid
+        main.cursorStyle = cursorStyle  // the style is global, not per screen
+        if main.rows != rows || main.columns != columns {
+            main.resize(rows: rows, columns: columns)
+        }
+        self = main
+        restoreCursor()
+    }
+}
+
+/// The parked main screen of a grid whose alternate screen is live.
+///
+/// A value type cannot store another instance of itself inline, so the one
+/// parked screen sits behind a single reference. It is written once on the
+/// way into the alternate screen and only ever read on the way out, so the
+/// snapshots the renderer may be holding can share it without ever
+/// observing a mutation — that is what makes the `Sendable` conformance
+/// honest.
+private final class SuspendedScreen: @unchecked Sendable {
+    let grid: Grid
+
+    init(_ grid: Grid) {
+        self.grid = grid
     }
 }
