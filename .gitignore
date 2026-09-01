@@ -1,0 +1,56 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# Xcode — build products and user state
+build/
+DerivedData/
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+# Per-user Xcode state. Schemes marked "Shared" live in xcshareddata and
+# are tracked; everything else here is local to one developer's machine.
+xcuserdata/
+**/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/configuration/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+Package.resolved
+*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+
+# Instruments / profiling
+*.trace
+*.dSYM.zip
+*.dSYM
+
+# Signing and secrets — never commit
+*.mobileprovision
+*.provisionprofile
+*.p12
+*.cer
+.env
+.env.*
+
+# Editors
+.idea/
+*.swp
+*~
+.vscode/
