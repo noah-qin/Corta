@@ -13,7 +13,7 @@ nonisolated enum TerminalColorPalette {
     /// over a window full of text, and the terminal has to stay readable
     /// over anything. Lowering this constant is all it takes to bring it
     /// back; the window and layer already permit it.
-    static let backgroundOpacity: Float = 1.0
+    static let backgroundOpacity: Float = 0.72
     static let defaultBackground = SIMD4<Float>(
         40.0 / 255, 42.0 / 255, 47.0 / 255, backgroundOpacity)
     static var clearColor: SIMD4<Float> {

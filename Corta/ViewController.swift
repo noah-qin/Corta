@@ -47,6 +47,22 @@ class ViewController: NSViewController {
     /// so it follows a font or size change.
     private let defaultColumns = 120
     private let defaultRows = 30
+    /// Breathing room between the grid and the window edge, in points. The
+    /// grid used to start at x=0, which clipped the left column's glyphs
+    /// against the window frame.
+    ///
+    /// The top is larger because the window uses `.fullSizeContentView`: the
+    /// background runs the full height so there is no seam at the titlebar,
+    /// and the grid starts below where the traffic lights sit.
+    static let titlebarHeight: CGFloat = 28
+    /// Matches the window's own curvature so the glass and the drawable end
+    /// on the same arc.
+    static let windowCornerRadius: CGFloat = 12
+    static let contentInsets = NSEdgeInsets(
+        top: 8 + titlebarHeight, left: 10, bottom: 8, right: 10)
+    static var insetWidth: CGFloat { contentInsets.left + contentInsets.right }
+    static var insetHeight: CGFloat { contentInsets.top + contentInsets.bottom }
+
     private let minimumColumns = 20
     private let minimumRows = 5
 
@@ -63,8 +79,8 @@ class ViewController: NSViewController {
 
         let metrics = terminalRenderer.pointMetrics
         let contentSize = NSSize(
-            width: CGFloat(defaultColumns) * metrics.cellWidth,
-            height: CGFloat(defaultRows) * metrics.cellHeight)
+            width: CGFloat(defaultColumns) * metrics.cellWidth + Self.insetWidth,
+            height: CGFloat(defaultRows) * metrics.cellHeight + Self.insetHeight)
         // Size the container to the target content size *before* the first
         // layout. Otherwise the storyboard's 480x270 produces a transient
         // 53x15 session, the shell's early output is laid out against that,
@@ -84,7 +100,21 @@ class ViewController: NSViewController {
         // visible content, so row 0 — the only row with anything on it in a
         // fresh shell — was drawn entirely inside the clipped strip and the
         // window looked black. `viewDidLayout` sets the frame outright.
-        self.view.addSubview(view)
+        // Liquid Glass (macOS 26). `NSGlassEffectView` embeds its content in
+        // the system's glass material — the refraction, blur and specular
+        // response are the platform's, not a blur we approximate. The
+        // terminal draws its background translucent on top so the glass
+        // reads through it; an alpha over an unblurred desktop is just a
+        // dimmer desktop.
+        let glass = NSGlassEffectView()
+        glass.style = .regular
+        glass.cornerRadius = Self.windowCornerRadius
+        // Tinted toward the terminal's own background so the glass stays a
+        // dark surface whatever is behind the window.
+        glass.tintColor = NSColor(srgbRed: 40 / 255, green: 42 / 255, blue: 47 / 255, alpha: 1)
+        glass.contentView = view
+        glass.translatesAutoresizingMaskIntoConstraints = false
+        self.view.addSubview(glass)
         // Constraints, not a frame set from a layout callback. The view is
         // born at the target content size while the storyboard's view is
         // still its own smaller size, and `viewDidAppear`'s `setContentSize`
@@ -93,12 +123,11 @@ class ViewController: NSViewController {
         // not: the view stayed 480x270 inside a 1080x510 superview, so the
         // drawable was half size and the grid came out 53x15 instead of
         // 120x30. AppKit maintains constraints regardless of callback order.
-        view.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            view.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
-            view.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
-            view.topAnchor.constraint(equalTo: self.view.topAnchor),
-            view.bottomAnchor.constraint(equalTo: self.view.bottomAnchor),
+            glass.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
+            glass.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
+            glass.topAnchor.constraint(equalTo: self.view.topAnchor),
+            glass.bottomAnchor.constraint(equalTo: self.view.bottomAnchor),
         ])
         terminalView = view
 
@@ -154,17 +183,26 @@ class ViewController: NSViewController {
         // Dragging snaps to whole cells, so a resize never leaves a partial
         // row or column.
         window.title = "Corta"
+        // A terminal is a dark surface whatever the system appearance is.
+        // Following the system turned the glass light and washed the grey
+        // background out with it.
+        window.appearance = NSAppearance(named: .darkAqua)
+        // Content runs the full height with a transparent titlebar, so the
+        // background is one continuous surface instead of a titlebar butted
+        // against a differently-shaded grid.
+        window.styleMask.insert(.fullSizeContentView)
+        window.titlebarAppearsTransparent = true
         // The Metal layer clears to a translucent colour; the window has to
         // stop painting its own opaque background for that to show through.
         window.isOpaque = false
         window.backgroundColor = .clear
         window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
         window.contentMinSize = NSSize(
-            width: CGFloat(minimumColumns) * metrics.cellWidth,
-            height: CGFloat(minimumRows) * metrics.cellHeight)
+            width: CGFloat(minimumColumns) * metrics.cellWidth + Self.insetWidth,
+            height: CGFloat(minimumRows) * metrics.cellHeight + Self.insetHeight)
         window.setContentSize(NSSize(
-            width: CGFloat(defaultColumns) * metrics.cellWidth,
-            height: CGFloat(defaultRows) * metrics.cellHeight))
+            width: CGFloat(defaultColumns) * metrics.cellWidth + Self.insetWidth,
+            height: CGFloat(defaultRows) * metrics.cellHeight + Self.insetHeight))
     }
 
     override func viewDidLayout() {
@@ -216,9 +254,19 @@ class ViewController: NSViewController {
     }
 
     private func resizeSessionToFitView() {
-        guard let session, let terminalRenderer else { return }
-        let columns = UInt16(max(1, view.bounds.width / terminalRenderer.pointMetrics.cellWidth))
-        let rows = UInt16(max(1, view.bounds.height / terminalRenderer.pointMetrics.cellHeight))
+        // Nothing reaches the child until `viewDidAppear` has settled the
+        // window. The storyboard lays out at the content-layout height first
+        // (the frame less the titlebar) and only reaches full height once
+        // `.fullSizeContentView` applies, so an early layout produced a
+        // 28-row session that the shell laid its first output out against,
+        // stranding two blank rows under the prompt once the grid grew to 30.
+        // The session is constructed at the target size already.
+        guard didSizeWindow, session != nil, let terminalRenderer else { return }
+        let usable = CGSize(
+            width: view.bounds.width - Self.insetWidth,
+            height: view.bounds.height - Self.insetHeight)
+        let columns = UInt16(max(1, usable.width / terminalRenderer.pointMetrics.cellWidth))
+        let rows = UInt16(max(1, usable.height / terminalRenderer.pointMetrics.cellHeight))
         let size = TerminalSize(rows: rows, columns: columns)
         guard size != lastRequestedSize else { return }
         lastRequestedSize = size
@@ -264,7 +312,8 @@ class ViewController: NSViewController {
         case .lines(let delta):
             scrollOffset = min(max(0, scrollOffset + delta), historyDepth)
         case .page(let up):
-            let rows = Int(view.bounds.height / terminalRenderer.pointMetrics.cellHeight)
+            let usableHeight = view.bounds.height - Self.insetHeight
+            let rows = Int(usableHeight / terminalRenderer.pointMetrics.cellHeight)
             scrollOffset = min(max(0, scrollOffset + (up ? rows : -rows)), historyDepth)
         case .toTop:
             scrollOffset = historyDepth
@@ -285,11 +334,32 @@ class ViewController: NSViewController {
         let grid = session.snapshot()
         terminalRenderer.render(
             grid: grid, scrollOffset: scrollOffset,
-            rect: CGRect(origin: .zero, size: drawableSize), drawableSize: drawableSize,
+            rect: Self.contentRect(
+                in: drawableSize, scale: terminalRenderer.scale,
+                gridHeight: CGFloat(grid.rows) * terminalRenderer.metrics.cellHeight),
+            drawableSize: drawableSize,
             cursorVisible: scrollOffset == 0, selection: nil,
             renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
         commandBuffer.present(drawable)
         commandBuffer.commit()
+    }
+
+    /// The grid's rectangle inside the drawable, in pixels.
+    ///
+    /// Pixel space has its origin at the drawable's top-left
+    /// (`Shaders.metal`). The grid is anchored to the *bottom*: rounding rows
+    /// down leaves a remainder, and at the bottom that reads as a gap under
+    /// the prompt — the one place a terminal's spacing gets noticed. At the
+    /// top it lands in the titlebar band instead.
+    static func contentRect(
+        in drawableSize: CGSize, scale: CGFloat, gridHeight: CGFloat
+    ) -> CGRect {
+        let bottom = drawableSize.height - contentInsets.bottom * scale
+        return CGRect(
+            x: contentInsets.left * scale,
+            y: max(contentInsets.top * scale, bottom - gridHeight),
+            width: max(0, drawableSize.width - insetWidth * scale),
+            height: gridHeight)
     }
 
     override var representedObject: Any? {
