@@ -137,6 +137,81 @@ final class TerminalView: NSView, CALayerDelegate {
         onPaste?()
     }
 
+    // MARK: - Mouse reporting (M2.7, SGR ?1006)
+
+    /// Whether the child application has asked for mouse reports; the shell
+    /// answers from the core's mode flags. When off, mouse events keep their
+    /// normal meaning (scrolling the scrollback).
+    var isMouseReportingEnabled: (() -> Bool)?
+
+    /// Called with the SGR report bytes for one mouse event.
+    var onMouseBytes: (([UInt8]) -> Void)?
+
+    /// Set by the shell from the renderer's metrics; needed to turn a view
+    /// point into a cell.
+    var cellSize: CGSize = .zero
+
+    override func mouseDown(with event: NSEvent) {
+        guard report(event, phase: .press(.left)) else { super.mouseDown(with: event); return }
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard report(event, phase: .release(.left)) else { super.mouseUp(with: event); return }
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        guard report(event, phase: .press(.right)) else { super.rightMouseDown(with: event); return }
+    }
+
+    override func rightMouseUp(with event: NSEvent) {
+        guard report(event, phase: .release(.right)) else { super.rightMouseUp(with: event); return }
+    }
+
+    override func otherMouseDown(with event: NSEvent) {
+        guard report(event, phase: .press(.middle)) else { super.otherMouseDown(with: event); return }
+    }
+
+    override func otherMouseUp(with event: NSEvent) {
+        guard report(event, phase: .release(.middle)) else { super.otherMouseUp(with: event); return }
+    }
+
+    private enum MousePhase {
+        case press(SGRMouse.Button)
+        case release(SGRMouse.Button)
+    }
+
+    /// Sends the SGR report for one event; returns false when mouse reporting
+    /// is off and the event should follow its normal path.
+    private func report(_ event: NSEvent, phase: MousePhase) -> Bool {
+        guard isMouseReportingEnabled?() == true, cellSize.width > 0, cellSize.height > 0
+        else { return false }
+        let (column, row) = cellUnder(event)
+        let modifiers = Self.mouseModifiers(of: event)
+        let bytes: [UInt8]
+        switch phase {
+        case .press(let button):
+            bytes = SGRMouse.press(button: button, column: column, row: row, modifiers: modifiers)
+        case .release(let button):
+            bytes = SGRMouse.release(button: button, column: column, row: row, modifiers: modifiers)
+        }
+        onMouseBytes?(bytes)
+        return true
+    }
+
+    /// The cell under the event, in grid coordinates.
+    private func cellUnder(_ event: NSEvent) -> (column: Int, row: Int) {
+        let point = convert(event.locationInWindow, from: nil)
+        return SGRMouse.cell(for: point, cellWidth: cellSize.width, cellHeight: cellSize.height)
+    }
+
+    static func mouseModifiers(of event: NSEvent) -> SGRMouse.Modifiers {
+        var modifiers = SGRMouse.Modifiers()
+        modifiers.shift = event.modifierFlags.contains(.shift)
+        modifiers.meta = event.modifierFlags.contains(.option)
+        modifiers.control = event.modifierFlags.contains(.control)
+        return modifiers
+    }
+
     /// ⌘↑ / ⌘↓ jump to the top and bottom of scrollback, the same gesture
     /// most terminals and pagers use — checked before `bytes(for:)` so a
     /// held ⌘ never leaks an arrow escape sequence to the child.
@@ -192,6 +267,16 @@ final class TerminalView: NSView, CALayerDelegate {
 
     override func scrollWheel(with event: NSEvent) {
         guard event.scrollingDeltaY != 0 else { return }
+        // With mouse reporting on, the wheel belongs to the child (SGR 64/65
+        // per notch), not to the scrollback.
+        if isMouseReportingEnabled?() == true, cellSize.width > 0, cellSize.height > 0 {
+            let (column, row) = cellUnder(event)
+            onMouseBytes?(
+                SGRMouse.wheel(
+                    up: event.scrollingDeltaY > 0, column: column, row: row,
+                    modifiers: Self.mouseModifiers(of: event)))
+            return
+        }
         // Natural or not, up-scroll (content moves down, deltaY negative in
         // AppKit's convention for a flipped view scrolling content upward)
         // reveals older lines — one line per ~10pt, which feels right for a

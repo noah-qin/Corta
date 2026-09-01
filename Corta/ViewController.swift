@@ -90,6 +90,13 @@ class ViewController: NSViewController {
         view.onPaste = { [weak self] in
             self?.pasteFromClipboard()
         }
+        view.cellSize = CGSize(width: metrics.cellWidth, height: metrics.cellHeight)
+        view.isMouseReportingEnabled = { [weak self] in
+            self?.mouseReportingEnabled() ?? false
+        }
+        view.onMouseBytes = { [weak self] bytes in
+            self?.session.write(bytes)
+        }
     }
 
     override func viewDidAppear() {
@@ -166,6 +173,15 @@ class ViewController: NSViewController {
     /// in this tree). Defaults to off, the safe direction: it produces more
     /// newline warnings, never fewer.
     private func bracketedPasteEnabled() -> Bool {
+        false
+    }
+
+    /// INTEGRATION POINT — wire to the core's mouse-reporting mode (?1006
+    /// with a button-motion mode such as ?1000) once the core side of M2.7
+    /// lands (another track; `Performer+Modes.swift` is still empty in this
+    /// tree). Defaults to off: clicks and the wheel keep their normal
+    /// terminal behaviour until then.
+    private func mouseReportingEnabled() -> Bool {
         false
     }
 
