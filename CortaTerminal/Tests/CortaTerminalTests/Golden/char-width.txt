@@ -1,0 +1,5 @@
+rows: 3 columns: 10
+cursor: row 1 column 2
+   0 |ab中 🙂 ex  |
+   1 |ok        |
+   2 |          |

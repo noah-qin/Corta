@@ -55,14 +55,15 @@ struct PerformerTests {
     }
 
     /// A UTF-8 character split across two chunks is one character, and the
-    /// cursor advances once.
+    /// cursor advances once. (Narrow on purpose — é is a two-byte width-1
+    /// scalar; the wide case lives in the character-width tests.)
     @Test("a character split across two feeds is one cell")
     func splitCharacter() throws {
         var terminal = Terminal(rows: 2, columns: 10)
-        terminal.feed([0xE4, 0xBD])
+        terminal.feed([0xC3])
         #expect(terminal.grid.cursor == Cursor(row: 0, column: 0))
-        terminal.feed([0xA0])
-        #expect(terminal.grid[0, 0].scalar == 0x4F60)
+        terminal.feed([0xA9])
+        #expect(terminal.grid[0, 0].scalar == 0xE9)
         #expect(terminal.grid.cursor == Cursor(row: 0, column: 1))
     }
 

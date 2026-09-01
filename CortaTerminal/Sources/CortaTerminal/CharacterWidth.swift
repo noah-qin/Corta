@@ -534,11 +534,14 @@ let characterWidthRanges: [CharacterWidthRange] = [
 /// emoji with default emoji presentation. Everything else is 1, including
 /// East Asian Ambiguous and unassigned scalars.
 ///
-/// Pure and allocation-free: a binary search over `characterWidthRanges`.
+/// Pure and allocation-free: a binary search over `characterWidthRanges`,
+/// behind a printable-ASCII fast path — the hot corpus is ASCII, and the
+/// first two ranges already exclude C0 and DEL/C1.
 public func displayWidth(of scalar: Unicode.Scalar) -> Int {
+    let value = scalar.value
+    if value >= 0x20, value < 0x7F { return 1 }
     var low = 0
     var high = characterWidthRanges.count
-    let value = scalar.value
     while low < high {
         let mid = (low + high) / 2
         let range = characterWidthRanges[mid]

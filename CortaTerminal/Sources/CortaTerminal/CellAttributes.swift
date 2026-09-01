@@ -19,6 +19,17 @@ public struct CellAttributes: OptionSet, Hashable, Sendable {
     public static let invisible = CellAttributes(rawValue: 1 << 6)
     public static let strikethrough = CellAttributes(rawValue: 1 << 7)
 
-    /// Bits 8–15 are reserved for the width flags that M2.1 adds (wide cell,
-    /// wide-cell spacer). Naming them now keeps the layout stable.
+    /// M2.1 width flags. These are structural, not rendition: SGR never sets
+    /// them, the grid sets them as it writes, and the dump's style layer
+    /// masks them out.
+    ///
+    /// The lead cell of a double-width pair (`wcwidth`/xterm convention: a
+    /// wide scalar occupies two columns).
+    public static let wide = CellAttributes(rawValue: 1 << 8)
+    /// The second cell of a double-width pair. Distinguishable from a real
+    /// blank so erase and editing operations can keep pairs consistent —
+    /// touching either half blanks both.
+    public static let wideSpacer = CellAttributes(rawValue: 1 << 9)
+
+    /// Bits 10–15 remain reserved.
 }

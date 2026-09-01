@@ -23,9 +23,8 @@ public struct GraphemeID: Equatable, Hashable, Sendable {
 /// input needs a cap (`SECURITY.md` §3), and this one is fed directly by the
 /// byte stream.
 ///
-/// M1 never populates this table — the performer writes single scalars.
-/// Combining marks and ZWJ sequences arrive with M2.1 and M3.6; the mechanism
-/// exists now because `Cell`'s layout depends on it.
+/// M2.1 populates this table as zero-width scalars join the previously
+/// written cell's cluster; ZWJ sequences arrive with M3.6.
 public struct GraphemeTable: Sendable {
     public static let capacity = Int(UInt16.max) - 1
 

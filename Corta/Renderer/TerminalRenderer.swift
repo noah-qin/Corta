@@ -258,7 +258,12 @@ nonisolated final class TerminalRenderer {
                     QuadInstance(origin: origin, size: .init(cellWidth, cellHeight), color: bg))
             }
 
-            guard !cell.attributes.contains(.invisible), cell.scalar != 0x20,
+            // A wide pair's spacer holds a space scalar and draws nothing;
+            // the flag check keeps that true even if the scalar ever
+            // changes. Double-width *glyph* drawing is beyond M2.1 — the
+            // lead's glyph is drawn into a single cell for now.
+            guard !cell.attributes.contains(.invisible),
+                !cell.attributes.contains(.wideSpacer), cell.scalar != 0x20,
                 let scalar = Unicode.Scalar(cell.scalar)
             else { continue }
             let bold = cell.attributes.contains(.bold)

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4F2E2B293047183A0037705B /* corta-exec in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000730465E2000E8DD20 /* corta-exec */; };
 		C07A000130465E2000E8DD20 /* CortaTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000530465E2000E8DD20 /* CortaTerminal */; };
 		C07A000230465E2000E8DD20 /* CortaTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000630465E2000E8DD20 /* CortaTerminal */; };
 		C07A000830465E2000E8DD20 /* corta-exec in Embed corta-exec */ = {isa = PBXBuildFile; productRef = C07A000730465E2000E8DD20 /* corta-exec */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
@@ -28,6 +29,20 @@
 			remoteInfo = Corta;
 		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		C07A000930465E2000E8DD20 /* Embed corta-exec */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 6;
+			files = (
+				C07A000830465E2000E8DD20 /* corta-exec in Embed corta-exec */,
+			);
+			name = "Embed corta-exec";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		4F17769F30465E1F00E8DD20 /* Corta.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Corta.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -58,6 +73,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4F2E2B293047183A0037705B /* corta-exec in Frameworks */,
 				C07A000130465E2000E8DD20 /* CortaTerminal in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -78,20 +94,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-		C07A000930465E2000E8DD20 /* Embed corta-exec */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 6;
-			files = (
-				C07A000830465E2000E8DD20 /* corta-exec in Embed corta-exec */,
-			);
-			name = "Embed corta-exec";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXGroup section */
 		4F17769630465E1F00E8DD20 = {

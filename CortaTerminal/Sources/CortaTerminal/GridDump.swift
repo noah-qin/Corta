@@ -7,6 +7,13 @@
 /// misaligned `|`. Styles go in a parallel layer with a legend rather than
 /// inline, so the character layer stays readable.
 ///
+/// Wide pairs (M2.1) occupy two dump columns exactly as they occupy two grid
+/// columns: the lead cell shows its scalar and the spacer cell shows a
+/// space. A cell carrying a grapheme cluster shows only its base scalar —
+/// the dump is about column accounting, not shaping. The style layer masks
+/// the structural width flags (`.wide`, `.wideSpacer`), which are not
+/// rendition.
+///
 /// This is not a hot path: it allocates freely and works in `String`.
 public struct DumpOptions: Sendable {
     /// Include the scrollback above the screen, numbered backwards from it.
@@ -110,11 +117,14 @@ private struct StyleLegend {
     var isEmpty: Bool { order.isEmpty }
 
     /// Renditions compare equal regardless of which character carries them.
+    /// The width flags are structural (which columns a pair occupies), not
+    /// rendition, so they are masked out — a spacer in the default colours
+    /// is a default cell.
     private static func rendition(_ cell: Cell) -> Cell {
         Cell(
             foreground: cell.foreground,
             background: cell.background,
-            attributes: cell.attributes
+            attributes: cell.attributes.subtracting([.wide, .wideSpacer])
         )
     }
 

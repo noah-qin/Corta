@@ -26,6 +26,7 @@ struct GoldenTests {
         Golden.Case("insert-delete-chars", rows: 3, columns: 10),
         Golden.Case("scroll-up-down", rows: 5, columns: 10, showScrollback: true),
         Golden.Case("cursor-style", rows: 3, columns: 10),
+        Golden.Case("char-width", rows: 3, columns: 10),
     ]
 
     @Test("golden files match", arguments: cases)

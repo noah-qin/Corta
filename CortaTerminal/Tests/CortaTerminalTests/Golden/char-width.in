@@ -1,0 +1,7 @@
+# M2.1 — character widths (wcwidth/xterm conventions, from the Unicode 17
+# data cited in CharacterWidth.swift): 中 is EastAsianWidth W -> 2 columns,
+# 🙂 (U+1F642) has Emoji_Presentation=Yes -> 2 columns, U+0301 is a
+# combining mark (Mn) -> 0 columns and joins the previous cell's cluster.
+# A wide scalar occupies a lead cell plus a spacer; the combining mark
+# never advances the cursor. What must not drift is the columns.
+ab\xE4\xB8\xAD\xF0\x9F\x99\x82e\xCC\x81x\r\nok
