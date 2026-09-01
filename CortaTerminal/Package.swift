@@ -11,11 +11,19 @@ let package = Package(
     name: "CortaTerminal",
     platforms: [.macOS("26.5")],
     products: [
-        .library(name: "CortaTerminal", targets: ["CortaTerminal"])
+        .library(name: "CortaTerminal", targets: ["CortaTerminal"]),
+        .executable(name: "corta-dump", targets: ["corta-dump"]),
     ],
     targets: [
         .target(
             name: "CortaTerminal",
+            swiftSettings: [.defaultIsolation(nil)]
+        ),
+        // Feeds stdin to a terminal and prints the grid, so the core can be
+        // checked by hand against a real program's output without a window.
+        .executableTarget(
+            name: "corta-dump",
+            dependencies: ["CortaTerminal"],
             swiftSettings: [.defaultIsolation(nil)]
         ),
         .testTarget(
