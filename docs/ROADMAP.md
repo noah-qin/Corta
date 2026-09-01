@@ -58,23 +58,23 @@ Riskiest system work first, then pure logic under test, then pixels.
 
 ### Grid (pure logic — no parser yet)
 
-- [ ] **M1.3** `Cell` (a `UInt32` scalar plus attributes) and `Line`
+- [x] **M1.3** `Cell` (a `UInt32` scalar plus attributes) and `Line`
       (variable-length, carrying the **`wrapped` flag** — `DESIGN.md`
       §2.1). Fixed-size cells, `ContiguousArray` storage.
       *Done when:* `MemoryLayout<Cell>.stride` is recorded in the test
       and asserted, so an accidental size regression fails CI.
-- [ ] **M1.4** `Grid`: dimensions, cursor, write, erase, line feed,
+- [x] **M1.4** `Grid`: dimensions, cursor, write, erase, line feed,
       scroll up. No escape sequences — direct API only.
       *Done when:* unit tests drive the API directly and assert cursor
       and cell state.
 
 ### The test harness — build it now, not later
 
-- [ ] **M1.5** Grid serialiser: dump a grid to plain text (characters,
+- [x] **M1.5** Grid serialiser: dump a grid to plain text (characters,
       plus a parallel attribute layer).
       *Done when:* a dump round-trips a known grid into a readable,
       diffable string.
-- [ ] **M1.6** Golden-file test helper: feed a byte stream to a session,
+- [x] **M1.6** Golden-file test helper: feed a byte stream to a session,
       dump, diff against a checked-in expectation, with an env var to
       regenerate expectations.
       *Done when:* one golden test passes and deliberately breaking a
@@ -84,19 +84,26 @@ Riskiest system work first, then pure logic under test, then pixels.
 > subsequent CSI handler is written against it. Skipping it here means
 > discovering in M2 that a cursor fix broke `vim`, with no way to tell
 > which change did it.
+>
+> Cases live in `CortaTerminal/Tests/CortaTerminalTests/Golden/`, as a
+> `.in` byte stream and a hand-written `.txt` expectation citing the
+> specification it comes from. `CORTA_UPDATE_GOLDEN=1` regenerates the
+> expectations; it is for propagating a format change, not for authoring
+> one. `swift run corta-dump` feeds stdin to a terminal and prints the
+> same dump, for checking the core by hand.
 
 ### Parser
 
-- [ ] **M1.7** UTF-8 decoder over a byte buffer. Incremental — a
+- [x] **M1.7** UTF-8 decoder over a byte buffer. Incremental — a
       multi-byte sequence may be split across two PTY reads.
       *Done when:* tests cover split sequences, overlong encodings and
       invalid bytes; invalid input yields U+FFFD and never traps.
-- [ ] **M1.8** VT500 state machine (Ground / Escape / CSI entry / CSI
+- [x] **M1.8** VT500 state machine (Ground / Escape / CSI entry / CSI
       param / CSI intermediate / OSC string), emitting actions. No
       screen knowledge. Follow the Paul Williams state diagram.
       *Done when:* table-driven tests map byte streams to expected
       action sequences.
-- [ ] **M1.9** Parameter parsing: `;` separators, `?` private prefix,
+- [x] **M1.9** Parameter parsing: `;` separators, `?` private prefix,
       defaults, **and the caps from `SECURITY.md` §3** — max 16
       parameters, clamped values.
       *Done when:* a test feeds 10,000 parameters and asserts bounded
@@ -104,14 +111,14 @@ Riskiest system work first, then pure logic under test, then pixels.
 
 ### Performer — the M1 sequence set
 
-- [ ] **M1.10** Printable characters, `\r` `\n` `\t` `\b`.
-- [ ] **M1.11** Cursor: `CUU` `CUD` `CUF` `CUB` `CUP`.
-- [ ] **M1.12** Erase: `ED`, `EL`.
-- [ ] **M1.13** `SGR`: 16 colour, 256 colour, 24-bit true colour, bold,
+- [x] **M1.10** Printable characters, `\r` `\n` `\t` `\b`.
+- [x] **M1.11** Cursor: `CUU` `CUD` `CUF` `CUB` `CUP`.
+- [x] **M1.12** Erase: `ED`, `EL`.
+- [x] **M1.13** `SGR`: 16 colour, 256 colour, 24-bit true colour, bold,
       underline, reverse.
       *Done when:* each has golden tests; `ls --color` and
       `git log --color` dumps match expectations.
-- [ ] **M1.14** Scrollback ring buffer; line feed at the bottom margin
+- [x] **M1.14** Scrollback ring buffer; line feed at the bottom margin
       scrolls and pushes into history.
       *Done when:* a test writes 10,000 lines into a 1,000-line
       scrollback and asserts O(1) eviction and a bounded memory ceiling.
