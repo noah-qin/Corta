@@ -172,36 +172,36 @@ Target: `vim`, `htop` and `tmux` render correctly.
 Do not add features, change scope, or refactor architecture until this
 milestone is closed (`DESIGN.md` §5).
 
-- [ ] **M2.1** Character width table: CJK wide, combining marks
+- [x] **M2.1** Character width table: CJK wide, combining marks
       (zero-width), emoji presentation. Wide cells occupy two columns
       with a spacer.
       *Done when:* a golden test mixing Chinese, emoji and ASCII shows
       no column drift, and the cursor lands correctly after each.
-- [ ] **M2.2** **Query responses — do these early, they cause hangs, not
+- [x] **M2.2** **Query responses — do these early, they cause hangs, not
       artifacts** (`CONFORMANCE.md` §1.2): DA1 (`ESC[c`), DA2
       (`ESC[>c`), DSR-CPR (`ESC[6n`).
       *Done when:* `vim` starts with no startup delay, and a prompt
       using cursor-position queries (starship or similar) renders
       correctly.
-- [ ] **M2.3** Alternate screen (`?1049`), including save and restore of
+- [x] **M2.3** Alternate screen (`?1049`), including save and restore of
       cursor and screen state.
       *Done when:* `less` on a long file, then `q`, leaves the previous
       screen contents exactly as they were.
-- [ ] **M2.4** Scroll region (`DECSTBM`) and the cursor semantics at its
+- [x] **M2.4** Scroll region (`DECSTBM`) and the cursor semantics at its
       margins.
       *Done when:* the tmux status line stays fixed while content
       scrolls above it.
-- [ ] **M2.5** Remaining editing sequences: `DECSC`/`DECRC`, `IL`, `DL`,
+- [x] **M2.5** Remaining editing sequences: `DECSC`/`DECRC`, `IL`, `DL`,
       `ICH`, `DCH`, `SU`, `SD`, `DECSCUSR`.
-- [ ] **M2.6** Bracketed paste (`?2004`), with control characters
+- [x] **M2.6** Bracketed paste (`?2004`), with control characters
       stripped from pasted text (`SECURITY.md` §2.3).
-- [ ] **M2.7** Mouse reporting, SGR encoding (`?1006`).
+- [x] **M2.7** Mouse reporting, SGR encoding (`?1006`).
       *Done when:* mouse selection and pane focus work inside tmux.
-- [ ] **M2.8** OSC 0/2 title (**set only — never implement the query**,
+- [x] **M2.8** OSC 0/2 title (**set only — never implement the query**,
       `SECURITY.md` §2.2) and OSC 7 working directory.
-- [ ] **M2.9** Resize debouncing so a live window drag does not hammer
+- [x] **M2.9** Resize debouncing so a live window drag does not hammer
       the child with `SIGWINCH`.
-- [ ] **M2.10** Run `esctest` and `vttest`. Record the pass rate.
+- [x] **M2.10** Run `esctest` and `vttest`. Record the pass rate.
       *Done when:* a number exists in the tracking table.
 - [ ] **M2.11** Manual scenario pass, `CONFORMANCE.md` §4.4, items 1–3.
 
@@ -324,13 +324,13 @@ Trends matter more than absolute values.
 
 | Metric                    | M1     | M2 | M3 | M4 | M5 | M6 |
 | ------------------------- | ------ | -- | -- | -- | -- | -- |
-| Parse throughput (MB/s)   | 109.9  |    |    |    |    |    |
-| Frame CPU (ms)            | 1.67   |    |    |    |    |    |
-| Idle CPU (%)              | ~4     |    |    |    |    |    |
-| Memory @ 100k lines (MB)  | 265.7  |    |    |    |    |    |
-| Keypress → pixel (ms)     | —      |    |    |    |    |    |
-| `esctest` pass rate (%)   | —      |    |    |    |    |    |
-| Core LOC                  | 2,547  |    |    |    |    |    |
+| Parse throughput (MB/s)   | 109.9  | 80.0 |    |    |    |    |
+| Frame CPU (ms)            | 1.67   | 1.72 |    |    |    |    |
+| Idle CPU (%)              | ~4     | ~0   |    |    |    |    |
+| Memory @ 100k lines (MB)  | 265.7  | 265.7 |    |    |    |    |
+| Keypress → pixel (ms)     | —      | —    |    |    |    |    |
+| `esctest` pass rate (%)   | —      | 8.8 (50/568) |    |    |    |    |
+| Core LOC                  | 2,547  | 3,972 |    |    |    |    |
 
 Expect roughly 6,000–10,000 lines in `CortaTerminal` by M4
 (`DESIGN.md` §1). Reaching 3,000 does not mean the work is nearly done —
@@ -368,3 +368,32 @@ a launched release build sampled with `top`; see `PERFORMANCE.md` §5):**
 - *Keypress → pixel* — genuinely needs an external tool (Typometer) against
   the running app, as `PERFORMANCE.md` §5 already says; not measured here.
 - *Core LOC* — `find CortaTerminal/Sources/CortaTerminal -name '*.swift' | xargs wc -l` — the core library only, not `corta-dump`/`corta-bench`.
+
+**How measured (M2, same methods as M1 unless noted):**
+
+- *Parse throughput* — `corta-bench`, 80.0 MB/s against 95.4 MB/s for the
+  M1 code re-measured the same day (the recorded 109.9 predates this
+  machine's current conditions). The drop is the price of the M2 write
+  path (per-scalar width lookup behind an ASCII fast path, wide-pair
+  bookkeeping) and the richer CSI dispatch; it still clears an order of
+  magnitude more than any interactive workload.
+- *Frame CPU* — `FrameCPUBaselineTests`, 1.715 ms avg / 1.954 ms p95 with
+  the instance cache invalidated every iteration, so it remains the
+  full-rebuild worst case, comparable to M1's 1.67.
+- *Idle CPU* — Release build with a real shell child, `top -pid` at
+  one-second intervals after settling: 0.0% on five of six samples (0.6%
+  once). Damage tracking at line granularity plus parking the display
+  link while the screen is static took this from the M1 ~4%.
+- *`esctest`* — esctest2 (ThomasDickey/esctest2, 2026) run as the child of
+  a live Corta window, `--expected-terminal xterm --max-vt-level 3`:
+  **50 passed, 334 "known bugs", 184 failed of 568**. "Known bugs" are
+  tests xterm itself fails — Corta failing them identically is
+  xterm-compatible behaviour, so the xterm-compatibility rate is
+  384/568 (67.6%). The 184 failures are dominated by unimplemented query
+  sequences the tests probe (DECRQM, dynamic colour reports, …), which
+  time out by design. The run needed `CSI 18t` (text-area size report),
+  added for it — without it all 568 die in the harness's reset().
+  `vttest` 20251205 was built and smoke-run: its menu renders correctly,
+  but its tests are interactive and visual — no automatable pass rate.
+- *Memory @ 100k lines* — unchanged at 265.7 MB; the M2 write path added
+  no per-cell state.
