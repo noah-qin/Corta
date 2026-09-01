@@ -45,10 +45,9 @@ struct CellTests {
         #expect(Color.indexed(0) != Color.default)
 
         let rgb = Color.rgb(0x12, 0x34, 0x56)
-        let components = try? #require(rgb.components)
-        #expect(components?.red == 0x12)
-        #expect(components?.green == 0x34)
-        #expect(components?.blue == 0x56)
+        #expect(rgb.components?.red == 0x12)
+        #expect(rgb.components?.green == 0x34)
+        #expect(rgb.components?.blue == 0x56)
         #expect(rgb.index == nil)
     }
 
