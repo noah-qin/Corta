@@ -6,14 +6,16 @@ import simd
 /// the 24-step greyscale ramp that `Color.indexed` describes.
 nonisolated enum TerminalColorPalette {
     static let defaultForeground = SIMD4<Float>(0.898, 0.898, 0.898, 1)
-    /// A soft black rather than pure black, slightly translucent — the look
-    /// Terminal.app's dark profiles have. Cells with the default background
-    /// emit no quad at all, so this reaches the screen as the render pass's
-    /// clear colour; `clearColor` is the premultiplied form CAMetalLayer
-    /// expects.
-    static let backgroundOpacity: Float = 0.97
+    /// A soft black rather than pure black — the tone Terminal.app's dark
+    /// profiles have, without the hard contrast of pure #000.
+    ///
+    /// Opaque. Translucency reads as depth on an empty desktop and as noise
+    /// over a window full of text, and the terminal has to stay readable
+    /// over anything. Lowering this constant is all it takes to bring it
+    /// back; the window and layer already permit it.
+    static let backgroundOpacity: Float = 1.0
     static let defaultBackground = SIMD4<Float>(
-        28.0 / 255, 28.0 / 255, 32.0 / 255, backgroundOpacity)
+        40.0 / 255, 42.0 / 255, 47.0 / 255, backgroundOpacity)
     static var clearColor: SIMD4<Float> {
         let c = defaultBackground
         return SIMD4<Float>(c.x * c.w, c.y * c.w, c.z * c.w, c.w)

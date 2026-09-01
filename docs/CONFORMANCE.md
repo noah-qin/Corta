@@ -157,7 +157,31 @@ The parser consumes untrusted bytes and must never crash, hang, or
 allocate without bound. Fuzz it (SwiftPM supports libFuzzer via
 `-sanitize=fuzzer`) with the resource caps in `SECURITY.md` §3 asserted.
 
-### 4.4 Manual scenario pass
+### 4.4 App-layer verification requires a launched app
+
+Offscreen render tests assert pixel coverage: that a cell with a known
+background produces that colour, that a glyph produces non-background
+pixels inside its cell. Every one of the following passed those tests
+and still shipped a blank or unusable window:
+
+- a view whose frame did not track its superview, so most of the grid
+  was drawn outside the visible area,
+- glyphs rasterised upside down,
+- the grid laid out in points against a pixel coordinate space, so
+  everything rendered at half size on a Retina display,
+- a transient window size at startup that the shell laid its early
+  output out against.
+
+These are properties of the live view hierarchy, of orientation, and of
+startup ordering — none of which a texture readback can see. Any change
+under `Corta/` is therefore verified by launching the app and checking:
+
+1. the window's content size matches columns x rows x point metrics,
+2. `stty size` in the child agrees with it,
+3. a screenshot shows text upright, full size, and filling the window,
+4. output longer than the screen scrolls and uses every row.
+
+### 4.5 Manual scenario pass
 
 Run at every milestone, because these are the actual workload:
 

@@ -177,4 +177,21 @@ struct TerminalRendererTests {
             mipmapLevel: 0)
         #expect(liveBytes != scrolledBytes)
     }
+
+    /// The defect this guards: the renderer laid the grid out in point units
+    /// while the shader's coordinate space is the drawable, which is pixels.
+    /// On a 2x display everything rendered at half size. Pixel metrics must
+    /// be exactly the point metrics times the scale, or the grid drifts out
+    /// of the drawable it is being measured against.
+    @Test func pixelMetricsArePointMetricsTimesScale() throws {
+        guard let device = MTLCreateSystemDefaultDevice() else { return }
+        let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
+        for scale in [CGFloat(1), 2, 3] {
+            let renderer = try TerminalRenderer(device: device, font: font, scale: scale)
+            #expect(renderer.metrics.cellWidth == renderer.pointMetrics.cellWidth * scale)
+            #expect(renderer.metrics.cellHeight == renderer.pointMetrics.cellHeight * scale)
+            #expect(renderer.metrics.baselineOffset == renderer.pointMetrics.baselineOffset * scale)
+            #expect(renderer.scale == scale)
+        }
+    }
 }

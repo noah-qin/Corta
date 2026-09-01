@@ -65,6 +65,13 @@ class ViewController: NSViewController {
         let contentSize = NSSize(
             width: CGFloat(defaultColumns) * metrics.cellWidth,
             height: CGFloat(defaultRows) * metrics.cellHeight)
+        // Size the container to the target content size *before* the first
+        // layout. Otherwise the storyboard's 480x270 produces a transient
+        // 53x15 session, the shell's early output is laid out against that,
+        // and growing the window afterwards leaves that output stranded in
+        // the top half with fifteen blank rows below it.
+        self.view.setFrameSize(contentSize)
+
         let view = TerminalView(frame: NSRect(origin: .zero, size: contentSize))
         // Deliberately no autoresizing mask. The mask applies the superview's
         // resize *delta*, and this view is born at the target content size
@@ -78,6 +85,21 @@ class ViewController: NSViewController {
         // fresh shell — was drawn entirely inside the clipped strip and the
         // window looked black. `viewDidLayout` sets the frame outright.
         self.view.addSubview(view)
+        // Constraints, not a frame set from a layout callback. The view is
+        // born at the target content size while the storyboard's view is
+        // still its own smaller size, and `viewDidAppear`'s `setContentSize`
+        // then grows the superview — but a frame assigned in `viewDidLayout`
+        // only tracks if that callback runs again afterwards, which it did
+        // not: the view stayed 480x270 inside a 1080x510 superview, so the
+        // drawable was half size and the grid came out 53x15 instead of
+        // 120x30. AppKit maintains constraints regardless of callback order.
+        view.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            view.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
+            view.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
+            view.topAnchor.constraint(equalTo: self.view.topAnchor),
+            view.bottomAnchor.constraint(equalTo: self.view.bottomAnchor),
+        ])
         terminalView = view
 
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
@@ -147,8 +169,6 @@ class ViewController: NSViewController {
 
     override func viewDidLayout() {
         super.viewDidLayout()
-        // Set outright rather than accumulating autoresizing deltas.
-        if terminalView.frame != view.bounds { terminalView.frame = view.bounds }
         // Layout can change the drawable's size or backing scale without any
         // grid change the damage diff would notice — force one frame.
         invalidateDisplay()

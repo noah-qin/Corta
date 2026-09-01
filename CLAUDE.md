@@ -64,6 +64,18 @@ attacker-supplied text back to the child's stdin. Some capabilities are
 deliberately absent (title query, OSC 52 read) — do not add them as
 "missing features". See `docs/SECURITY.md` §6 for the eight-rule summary.
 
+**App-layer changes are verified by launching the app.** Offscreen render
+tests assert pixel coverage and cannot see view-hierarchy, orientation or
+startup-ordering defects — four such bugs shipped a blank window while
+those tests stayed green. See `docs/CONFORMANCE.md` §4.4 for the
+four-point check.
+
+**App-layer changes are verified by launching the app.** Offscreen render
+tests assert pixel coverage and cannot see view-hierarchy, orientation,
+startup-ordering or gesture defects — six such bugs shipped a blank or
+unusable window while those tests stayed green. `docs/CONFORMANCE.md`
+§4.4 has the five-point check.
+
 **Testing.** Golden-file grid tests are built during M1, not later:
 feed a byte stream, serialise the grid to text, diff against a checked-in
 expectation. Record `esctest` pass rate and benchmark numbers at each

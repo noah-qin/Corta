@@ -70,6 +70,12 @@ final class TerminalView: NSView, CALayerDelegate {
         metalLayer.pixelFormat = QuadRenderer.pixelFormat
         metalLayer.framebufferOnly = true
         metalLayer.isOpaque = false
+        // A layer-hosting view is not clipped by the window's rounded
+        // corners, so the drawable painted square corners past the frame.
+        // Round the two bottom corners to match; the titlebar covers the top.
+        metalLayer.cornerRadius = 10
+        metalLayer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        metalLayer.masksToBounds = true
     }
 
     override func viewDidMoveToWindow() {
@@ -297,11 +303,13 @@ final class TerminalView: NSView, CALayerDelegate {
                     modifiers: Self.mouseModifiers(of: event)))
             return
         }
-        // Natural or not, up-scroll (content moves down, deltaY negative in
-        // AppKit's convention for a flipped view scrolling content upward)
-        // reveals older lines — one line per ~10pt, which feels right for a
-        // trackpad's momentum scroll without a config knob.
-        let lines = Int((-event.scrollingDeltaY / 10).rounded())
+        // Two fingers down reveals older lines, which is what every other
+        // terminal does. AppKit has already applied the user's natural-
+        // scrolling preference to `scrollingDeltaY`, so the raw sign is the
+        // one to follow — negating it here inverted the gesture for everyone.
+        // One line per ~10pt keeps momentum scrolling proportionate without
+        // needing a config knob.
+        let lines = Int((event.scrollingDeltaY / 10).rounded())
         guard lines != 0 else { return }
         onScroll?(.lines(lines))
     }
