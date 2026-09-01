@@ -11,7 +11,7 @@ nonisolated enum TerminalColorPalette {
     /// emit no quad at all, so this reaches the screen as the render pass's
     /// clear colour; `clearColor` is the premultiplied form CAMetalLayer
     /// expects.
-    static let backgroundOpacity: Float = 0.92
+    static let backgroundOpacity: Float = 0.97
     static let defaultBackground = SIMD4<Float>(
         28.0 / 255, 28.0 / 255, 32.0 / 255, backgroundOpacity)
     static var clearColor: SIMD4<Float> {
