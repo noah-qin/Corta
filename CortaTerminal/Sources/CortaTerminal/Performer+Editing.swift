@@ -18,6 +18,14 @@ extension Performer {
                 top: parameters.value(0, default: 1) - 1,
                 bottom: parameters.value(1, default: grid.rows) - 1
             )
+        case 0x40:  // ICH — ECMA-48 §8.3.64
+            grid.insertCharacters(parameters.value(0, default: 1))
+        case 0x4C:  // IL — ECMA-48 §8.3.67
+            grid.insertLines(parameters.value(0, default: 1))
+        case 0x4D:  // DL — ECMA-48 §8.3.32
+            grid.deleteLines(parameters.value(0, default: 1))
+        case 0x50:  // DCH — ECMA-48 §8.3.26
+            grid.deleteCharacters(parameters.value(0, default: 1))
         default:
             return false
         }

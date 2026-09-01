@@ -318,6 +318,73 @@ public struct Grid: Sendable {
         }
     }
 
+    // MARK: - Editing
+
+    /// IL — ECMA-48 §8.3.67: inserts `count` erased rows at the cursor row,
+    /// shifting rows below it down within the scroll region; rows pushed
+    /// past the bottom margin are lost. Ignored when the cursor is outside
+    /// the region. The cursor does not move.
+    public mutating func insertLines(_ count: Int) {
+        guard cursor.row >= marginTop, cursor.row <= marginBottom else { return }
+        let count = min(max(0, count), marginBottom - cursor.row + 1)
+        guard count > 0 else { return }
+        var row = marginBottom
+        while row >= cursor.row + count {
+            lines[row] = lines[row - count]
+            row -= 1
+        }
+        while row >= cursor.row {
+            lines[row] = erasedLine()
+            row -= 1
+        }
+        pendingWrap = false
+    }
+
+    /// DL — ECMA-48 §8.3.32: deletes `count` rows at the cursor row,
+    /// shifting rows below it up within the scroll region; erased rows open
+    /// at the bottom margin. Deleted rows are application content, never
+    /// history. Ignored when the cursor is outside the region. The cursor
+    /// does not move.
+    public mutating func deleteLines(_ count: Int) {
+        guard cursor.row >= marginTop, cursor.row <= marginBottom else { return }
+        let count = min(max(0, count), marginBottom - cursor.row + 1)
+        guard count > 0 else { return }
+        var row = cursor.row
+        while row + count <= marginBottom {
+            lines[row] = lines[row + count]
+            row += 1
+        }
+        while row <= marginBottom {
+            lines[row] = erasedLine()
+            row += 1
+        }
+        pendingWrap = false
+    }
+
+    /// ICH — ECMA-48 §8.3.64: inserts `count` erased cells at the cursor.
+    /// The cursor does not move.
+    public mutating func insertCharacters(_ count: Int) {
+        lines[cursor.row].insertCells(count, at: cursor.column, template: pen.eraseCell, width: columns)
+        pendingWrap = false
+    }
+
+    /// DCH — ECMA-48 §8.3.26: deletes `count` cells at the cursor. The
+    /// cursor does not move.
+    public mutating func deleteCharacters(_ count: Int) {
+        lines[cursor.row].deleteCells(count, at: cursor.column, template: pen.eraseCell, width: columns)
+        pendingWrap = false
+    }
+
+    /// A cleared row: blank, or filled with the erase background when one is
+    /// set (BCE — an erased cell under a colour is visible, so it is stored).
+    private func erasedLine() -> Line {
+        let template = pen.eraseCell
+        guard !template.isBlank else { return Line() }
+        var line = Line()
+        line.fill(template, in: 0..<columns)
+        return line
+    }
+
     // MARK: - Save and restore
 
     /// DECSC — VT510 §DECSC: saves the cursor position, the pen and the
