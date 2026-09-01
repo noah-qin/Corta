@@ -73,4 +73,15 @@ struct QueryResponseTests {
         let bytes = try output("\\e]2;rm -rf /\\a\\e[c\\e[6n")
         #expect(bytes == Array("\u{1B}[?62;1;22c\u{1B}[1;1R".utf8))
     }
+
+    /// `CSI 18 t` (ctlseqs "Window manipulation": report the size of the
+    /// text area in characters) answers `CSI 8 ; rows ; columns t`. Every
+    /// other window manipulation — including `CSI 21 t`, the title report
+    /// — stays silent.
+    @Test("the text-area size report is fixed-format")
+    func textAreaSizeReport() throws {
+        #expect(try output("\\e[18t") == Array("\u{1B}[8;24;80t".utf8))
+        #expect(try output("\\e[14t").isEmpty)
+        #expect(try output("\\e[19t").isEmpty)
+    }
 }

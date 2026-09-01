@@ -64,4 +64,17 @@ extension Performer {
             contentsOf: Array("\u{1B}[\(grid.cursor.row + 1);\(grid.cursor.column + 1)R".utf8)
         )
     }
+
+    /// Window manipulation — `CSI Ps t` (ctlseqs "Window manipulation").
+    /// Only Ps = 18, "report the size of the text area in characters", is
+    /// implemented, answered `CSI 8 ; rows ; columns t`: esctest's harness
+    /// asks it before every test, and the response is fixed-format numeric
+    /// state. The title report (Ps = 21) is a command-injection vector and
+    /// is never implemented (`SECURITY.md` §2.2).
+    mutating func reportWindowManipulation(_ parameters: Parameters) {
+        guard parameters.value(0, default: 0) == 18 else { return }
+        state.outputBuffer.append(
+            contentsOf: Array("\u{1B}[8;\(grid.rows);\(grid.columns)t".utf8)
+        )
+    }
 }

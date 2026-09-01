@@ -81,6 +81,8 @@ public struct Performer: ParserPerformer, Sendable {
             applyGraphicRendition(parameters)
         case 0x6E:  // DSR
             reportDeviceStatus(parameters)
+        case 0x74:  // CSI Ps t — window manipulation; only the size report
+            reportWindowManipulation(parameters)
         default:
             break
         }
