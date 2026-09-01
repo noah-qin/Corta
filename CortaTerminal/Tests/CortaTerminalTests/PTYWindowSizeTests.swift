@@ -6,7 +6,10 @@ import Testing
 @testable import CortaTerminal
 
 /// M1.2 — `TIOCSWINSZ`, and child-exit reporting.
-@Suite("PTY window size and child lifecycle")
+///
+/// `.serialized`: every test here forks a real child process — see the
+/// `.serialized` note on `TerminalSessionTests`.
+@Suite("PTY window size and child lifecycle", .serialized)
 struct PTYWindowSizeTests {
     @Test("the child sees the window size it was spawned with")
     func childSeesTheInitialWindowSize() throws {

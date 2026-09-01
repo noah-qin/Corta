@@ -5,7 +5,10 @@ import Testing
 @testable import CortaTerminal
 
 /// M1.1 — open a pty pair, spawn a child, read, write, close.
-@Suite("PTY")
+///
+/// `.serialized`: every test here forks a real child process — see the
+/// `.serialized` note on `TerminalSessionTests`.
+@Suite("PTY", .serialized)
 struct PTYTests {
     @Test("spawns /bin/echo and reads its output back")
     func spawnsEchoAndReadsOutput() throws {

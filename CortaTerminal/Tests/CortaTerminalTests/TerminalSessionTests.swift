@@ -3,13 +3,22 @@ import Testing
 
 @testable import CortaTerminal
 
-@Suite struct TerminalSessionTests {
+// `.serialized`: every test here forks a real child process, and `fork()`
+// in a heavily multithreaded process carries a real, if small, per-call
+// risk (see `Spawn.swift`'s `forkLockStorage` comment) that scales with how
+// many threads are doing how much concurrently. Running this suite's own
+// spawns one at a time removes this suite's contribution to that risk
+// during a parallel test run; it does not eliminate the underlying hazard.
+@Suite(.serialized) struct TerminalSessionTests {
     @Test func readsChildOutputIntoTheGrid() throws {
         let session = try TerminalSession(executable: "/bin/echo", arguments: ["hello"])
         defer { session.stop() }
 
+        // A generous budget, not a tight one: under a parallel test run
+        // sharing the machine with other spawns (including this file's own
+        // 100 MB `cat`), scheduling this child promptly is not guaranteed.
         var text = ""
-        for _ in 0..<200 {
+        for _ in 0..<1_000 {
             text = session.snapshot().dump()
             if text.contains("hello") { break }
             Thread.sleep(forTimeInterval: 0.01)
@@ -74,7 +83,7 @@ import Testing
         session.write(Array("hi\n".utf8))
 
         var text = ""
-        for _ in 0..<200 {
+        for _ in 0..<1_000 {
             text = session.snapshot().dump()
             if text.contains("hi") { break }
             Thread.sleep(forTimeInterval: 0.01)
