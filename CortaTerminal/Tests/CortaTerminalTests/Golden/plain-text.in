@@ -1,0 +1,10 @@
+# Printable text and the C0 controls of M1.10, plus one soft wrap.
+# VT100 User Guide, "Cursor Control": BS moves the cursor one column left,
+# HT advances to the next tab stop (every eight columns by default), CR
+# returns to column 1, LF moves down one line without changing the column.
+# DEC STD 070: a character printed in the last column arms a deferred wrap;
+# the next printable character starts a new row and the old row is soft
+# wrapped.
+hello\tworld\r\n
+abcXY\b\b\bdef\r\n
+wrap-around-x

@@ -21,6 +21,10 @@ let package = Package(
         .testTarget(
             name: "CortaTerminalTests",
             dependencies: ["CortaTerminal"],
+            // Golden-file inputs and expectations. Read from the source
+            // directory through `#filePath`, so they are neither compiled
+            // nor copied into a bundle.
+            exclude: ["Golden"],
             swiftSettings: [.defaultIsolation(nil)]
         ),
     ]

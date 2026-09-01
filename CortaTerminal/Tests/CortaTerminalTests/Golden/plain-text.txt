@@ -1,0 +1,7 @@
+rows: 5 columns: 12
+cursor: row 4 column 1
+   0 |hello   worl| wrapped
+   1 |d           |
+   2 |abdef       |
+   3 |wrap-around-| wrapped
+   4 |x           |
