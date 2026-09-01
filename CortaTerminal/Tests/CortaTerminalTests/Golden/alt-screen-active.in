@@ -1,0 +1,7 @@
+# ?1049 set (xterm ctlseqs, Ps = 1049): while the alternate screen is live,
+# what renders is the alternate screen — blank except what was written
+# there — and the scrollback is empty, because an alternate screen has no
+# history. The main screen and its history are parked, untouched.
+main\r\nscreen\r\nmore\r\nlines
+\e[?1049h
+ALT

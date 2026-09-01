@@ -1,0 +1,7 @@
+rows: 3 columns: 8
+cursor: row 2 column 3
+scrollback: 1 lines
+  -1 |aaa     |
+   0 |bbb     |
+   1 |ccc     |
+   2 |ddd     |

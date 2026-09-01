@@ -1,0 +1,6 @@
+rows: 3 columns: 10
+cursor: row 0 column 3
+scrollback: 0 lines (full)
+   0 |ALT       |
+   1 |          |
+   2 |          |

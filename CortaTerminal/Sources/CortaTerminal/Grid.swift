@@ -61,6 +61,17 @@ public struct Grid: Sendable {
     /// and then moves the cursor would scroll the screen by one row.
     public private(set) var pendingWrap: Bool
 
+    /// DECSC's slot — cursor, pen and wrap state (VT510 §DECSC).
+    private var savedCursor: Cursor?
+    private var savedPen: Pen?
+    private var savedPendingWrap: Bool = false
+
+    /// True while the alternate screen is live (roadmap M2.3).
+    public private(set) var isAlternateScreenActive: Bool = false
+
+    /// The parked main screen while the alternate screen is live.
+    private var suspendedMain: SuspendedScreen?
+
     public init(rows: Int = 24, columns: Int = 80, scrollbackLimit: Int = Scrollback.defaultLimit) {
         self.rows = min(max(1, rows), Self.maxRows)
         self.columns = min(max(1, columns), Self.maxColumns)
@@ -70,6 +81,11 @@ public struct Grid: Sendable {
         self.graphemes = GraphemeTable()
         self.scrollback = Scrollback(limit: scrollbackLimit)
         self.pendingWrap = false
+        self.savedCursor = nil
+        self.savedPen = nil
+        self.savedPendingWrap = false
+        self.isAlternateScreenActive = false
+        self.suspendedMain = nil
     }
 
     // MARK: - Reading
@@ -262,5 +278,91 @@ public struct Grid: Sendable {
         for _ in 0..<count {
             lines.append(Line())
         }
+    }
+
+    // MARK: - Save and restore
+
+    /// DECSC — VT510 §DECSC: saves the cursor position, the pen and the
+    /// pending-wrap state. The origin-mode and character-set state the full
+    /// spec lists are not implemented (DECOM is out of scope for M2; the
+    /// parser never selects a character set).
+    public mutating func saveCursor() {
+        savedCursor = cursor
+        savedPen = pen
+        savedPendingWrap = pendingWrap
+    }
+
+    /// DECRC — VT510 §DECRC. With nothing saved, the spec restores the
+    /// factory settings: home position and the default rendition.
+    public mutating func restoreCursor() {
+        guard let savedCursor, let savedPen else {
+            moveCursor(row: 0, column: 0)
+            pen.reset()
+            return
+        }
+        moveCursor(row: savedCursor.row, column: savedCursor.column)
+        pen = savedPen
+        pendingWrap = savedPendingWrap
+    }
+
+    // MARK: - Alternate screen
+
+    /// `?1049` set (xterm ctlseqs, DEC Private Mode Set): save the cursor,
+    /// switch to the alternate screen, clear it.
+    ///
+    /// The alternate screen is a second screen swapped in, not a flag on
+    /// this one's storage: the main screen — lines, scrollback, margins,
+    /// pen — is parked whole in `suspendedMain` and put back untouched on
+    /// the way out. The alternate screen itself is blank, has full-screen
+    /// margins, and has **no scrollback** (a zero-limit ring whose push is
+    /// a no-op): history scrolled while it is live is discarded.
+    public mutating func enterAlternateScreen() {
+        saveCursor()
+        guard suspendedMain == nil else {
+            // A second `?1049 h` while already active re-saves the cursor and
+            // clears again; the parked screen stays the original main one.
+            eraseDisplay(.all)
+            moveCursor(row: 0, column: 0)
+            return
+        }
+        suspendedMain = SuspendedScreen(self)
+        lines = ContiguousArray(repeating: Line(), count: rows)
+        scrollback = Scrollback(limit: 0)
+        graphemes = GraphemeTable()
+        isAlternateScreenActive = true
+        moveCursor(row: 0, column: 0)
+    }
+
+    /// `?1049` reset: switch back to the main screen and restore the cursor
+    /// that was saved on the way in. Ignored when the main screen is live.
+    ///
+    /// If the screen was resized while the alternate screen was live, the
+    /// parked main screen adopts the new dimensions on its way back — the
+    /// size belongs to the window, not to a screen.
+    public mutating func exitAlternateScreen() {
+        guard let suspended = suspendedMain else { return }
+        suspendedMain = nil
+        var main = suspended.grid
+        if main.rows != rows || main.columns != columns {
+            main.resize(rows: rows, columns: columns)
+        }
+        self = main
+        restoreCursor()
+    }
+}
+
+/// The parked main screen of a grid whose alternate screen is live.
+///
+/// A value type cannot store another instance of itself inline, so the one
+/// parked screen sits behind a single reference. It is written once on the
+/// way into the alternate screen and only ever read on the way out, so the
+/// snapshots the renderer may be holding can share it without ever
+/// observing a mutation — that is what makes the `Sendable` conformance
+/// honest.
+private final class SuspendedScreen: @unchecked Sendable {
+    let grid: Grid
+
+    init(_ grid: Grid) {
+        self.grid = grid
     }
 }
