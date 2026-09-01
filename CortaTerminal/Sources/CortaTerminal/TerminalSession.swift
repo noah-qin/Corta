@@ -120,7 +120,16 @@ public final class TerminalSession: @unchecked Sendable {
             }
 
             if !batch.isEmpty {
-                state.withLock { $0.terminal.feed(batch) }
+                let responses = state.withLock { current -> [UInt8] in
+                    current.terminal.feed(batch)
+                    return current.terminal.takeOutput()
+                }
+                // Query responses (M2.2). Fixed-format bytes only — never
+                // attacker-supplied text (`SECURITY.md` §2.1) — so they do
+                // not go through `write`, which is for keyboard input.
+                if !responses.isEmpty {
+                    responses.withUnsafeBytes { _ = try? pty.writeAll($0) }
+                }
                 onOutput?()
             }
 

@@ -31,6 +31,19 @@ public struct Terminal: Sendable {
         parser.parse(bytes, performer: &performer)
     }
 
+    /// Whether query responses are queued for the child.
+    public var hasPendingOutput: Bool { !performer.state.outputBuffer.isEmpty }
+
+    /// Drains the queued query responses. `TerminalSession` calls this after
+    /// every `feed` and writes the bytes to the PTY; tests read them
+    /// directly, without a PTY. The buffer carries fixed-format response
+    /// bytes only — never stream-supplied text (`SECURITY.md` §2.1).
+    public mutating func takeOutput() -> [UInt8] {
+        let output = performer.state.outputBuffer
+        performer.state.outputBuffer = []
+        return output
+    }
+
     public func dump(options: DumpOptions = .default) -> String {
         performer.grid.dump(options: options)
     }

@@ -8,6 +8,13 @@
 public struct Performer: ParserPerformer, Sendable {
     public var grid: Grid
 
+    /// State that is not the grid: queued query responses, DEC mode flags,
+    /// and the OSC-set title and working directory. The handlers live in the
+    /// `Performer+Report/Modes/OSC` extensions; keeping the storage in one
+    /// property keeps this struct's declaration — a file shared with other
+    /// M2 tracks — out of their way.
+    public var state = PerformerState()
+
     public init(grid: Grid) {
         self.grid = grid
     }
@@ -32,18 +39,29 @@ public struct Performer: ParserPerformer, Sendable {
     // MARK: - CSI dispatch
 
     public mutating func csiDispatch(_ sequence: CSISequence) {
-        // A private marker or an intermediate makes it a different sequence
-        // with the same final byte — `CSI ? 25 h` is not `CSI 25 h`. None of
-        // those are implemented yet, and guessing would be worse than
-        // ignoring them.
-        guard sequence.privateMarker == 0, sequence.intermediates.count == 0 else { return }
+        // A private marker makes a different sequence with the same final
+        // byte — `CSI > c` is not `CSI c`. The ones M2 answers route here;
+        // every other marker or intermediate form is ignored, which is the
+        // correct and safe default (`SECURITY.md` §3).
+        if sequence.privateMarker != 0 {
+            guard sequence.intermediates.count == 0 else { return }
+            if sequence.privateMarker == 0x3E, sequence.final == 0x63 {  // DA2 — CSI > c
+                reportSecondaryDeviceAttributes()
+            }
+            return
+        }
+        guard sequence.intermediates.count == 0 else { return }
 
         let parameters = sequence.parameters
         if performCursorControl(final: sequence.final, parameters: parameters) { return }
         if performErase(final: sequence.final, parameters: parameters) { return }
         switch sequence.final {
+        case 0x63:  // DA1
+            reportPrimaryDeviceAttributes()
         case 0x6D:  // SGR
             applyGraphicRendition(parameters)
+        case 0x6E:  // DSR
+            reportDeviceStatus(parameters)
         default:
             break
         }
