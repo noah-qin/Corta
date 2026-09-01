@@ -19,6 +19,15 @@ class ViewController: NSViewController {
     private var session: TerminalSession!
     private var commandQueue: MTLCommandQueue!
     private var scrollOffset = 0
+    private var didSizeWindow = false
+
+    /// Initial and minimum grid sizes. The window's content size is derived
+    /// from these and the font's cell metrics, never from hardcoded points,
+    /// so it follows a font or size change.
+    private let defaultColumns = 80
+    private let defaultRows = 24
+    private let minimumColumns = 20
+    private let minimumRows = 5
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -30,17 +39,19 @@ class ViewController: NSViewController {
         terminalRenderer = try! TerminalRenderer(device: device, font: font)
         commandQueue = device.makeCommandQueue()
 
-        let view = TerminalView(frame: self.view.bounds)
+        let metrics = terminalRenderer.metrics
+        let contentSize = NSSize(
+            width: CGFloat(defaultColumns) * metrics.cellWidth,
+            height: CGFloat(defaultRows) * metrics.cellHeight)
+        let view = TerminalView(frame: NSRect(origin: .zero, size: contentSize))
         view.autoresizingMask = [.width, .height]
         self.view.addSubview(view)
         terminalView = view
 
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        let initialColumns = UInt16(max(1, self.view.bounds.width / terminalRenderer.metrics.cellWidth))
-        let initialRows = UInt16(max(1, self.view.bounds.height / terminalRenderer.metrics.cellHeight))
         session = try! TerminalSession(
             executable: shell, arguments: ["-l"],
-            size: TerminalSize(rows: initialRows, columns: initialColumns))
+            size: TerminalSize(rows: UInt16(defaultRows), columns: UInt16(defaultColumns)))
 
         view.onRenderFrame = { [weak self] pass, drawableSize, drawable in
             self?.render(into: pass, drawableSize: drawableSize, drawable: drawable)
@@ -51,6 +62,22 @@ class ViewController: NSViewController {
         view.onScroll = { [weak self] gesture in
             self?.scroll(gesture)
         }
+    }
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        guard !didSizeWindow, let window = view.window else { return }
+        didSizeWindow = true
+        let metrics = terminalRenderer.metrics
+        // Dragging snaps to whole cells, so a resize never leaves a partial
+        // row or column.
+        window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
+        window.contentMinSize = NSSize(
+            width: CGFloat(minimumColumns) * metrics.cellWidth,
+            height: CGFloat(minimumRows) * metrics.cellHeight)
+        window.setContentSize(NSSize(
+            width: CGFloat(defaultColumns) * metrics.cellWidth,
+            height: CGFloat(defaultRows) * metrics.cellHeight))
     }
 
     override func viewDidLayout() {
