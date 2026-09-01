@@ -251,21 +251,27 @@ and aligns correctly, and copy/paste is trustworthy.
 
 ## M4 — Modern
 
-- [ ] **M4.1** **Reflow on resize.** The largest single feature in this
+- [ ] **M4.1** **Damage tracking.** Rebuild the instance buffer only on
+      damage, tracked at line granularity (`PERFORMANCE.md` §3). M1's idle
+      CPU baseline is ~4% against the ~0% target specifically because this
+      is missing — `CADisplayLink` fires every vsync and each tick rebuilds
+      and redraws unconditionally. *Done when:* idle CPU on a static screen
+      drops to ~0%, measured the same way as the M1 baseline.
+- [ ] **M4.2** **Reflow on resize.** The largest single feature in this
       milestone. Must be incremental or lazy — a live window drag fires
       continuously and cannot re-wrap 100k lines per event.
       *Done when:* narrowing the window preserves scrollback content,
       and dragging the window edge stays smooth with a full scrollback.
-- [ ] **M4.2** Synchronized output (`?2026`).
+- [ ] **M4.3** Synchronized output (`?2026`).
       *Done when:* Neovim scrolling shows no tearing.
-- [ ] **M4.3** Scrollback search (⌘F), matching across soft-wrapped
+- [ ] **M4.4** Scrollback search (⌘F), matching across soft-wrapped
       lines, with match highlighting and next/previous navigation.
-- [ ] **M4.4** Runtime font scaling (⌘+ / ⌘−), including atlas rebuild.
-- [ ] **M4.5** URL detection and ⌘-click, with an **allowlist of
+- [ ] **M4.5** Runtime font scaling (⌘+ / ⌘−), including atlas rebuild.
+- [ ] **M4.6** URL detection and ⌘-click, with an **allowlist of
       `http`/`https`/`mailto`**, target shown, never auto-opened
       (`SECURITY.md` §2.4).
-- [ ] **M4.6** Tabs.
-- [ ] **M4.7** Bell: audible, visual, muted.
+- [ ] **M4.7** Tabs.
+- [ ] **M4.8** Bell: audible, visual, muted.
 
 ---
 
