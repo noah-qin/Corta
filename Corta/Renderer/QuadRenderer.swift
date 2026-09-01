@@ -29,6 +29,39 @@ nonisolated final class QuadRenderer {
     private let glyphPipeline: MTLRenderPipelineState
     private let sampler: MTLSamplerState
 
+    /// A small ring of GPU-visible instance buffers per pipeline kind
+    /// (`PERFORMANCE.md` §3: "triple-buffer the Metal instance buffer,
+    /// avoids a CPU/GPU stall waiting on the previous frame"). Each call to
+    /// `drawSolidQuads`/`drawGlyphQuads` writes into the next slot in its
+    /// own ring rather than the last one a command buffer may still be
+    /// reading from.
+    private final class InstanceBufferRing {
+        private var buffers: [MTLBuffer?] = [nil, nil, nil]
+        private var next = 0
+
+        /// A buffer sized for `byteCount`, with `bytes` already written to
+        /// it. Grows a ring slot (never shrinks) rather than allocating a
+        /// fresh buffer whenever the previous one is already big enough —
+        /// the steady state for an unchanging window size is zero
+        /// allocation per frame (`PERFORMANCE.md` §3).
+        func buffer(bytes: UnsafeRawPointer, byteCount: Int, device: MTLDevice) -> MTLBuffer? {
+            guard byteCount > 0 else { return nil }
+            let slot = next
+            next = (next + 1) % buffers.count
+            if let existing = buffers[slot], existing.length >= byteCount {
+                existing.contents().copyMemory(from: bytes, byteCount: byteCount)
+                return existing
+            }
+            guard let fresh = device.makeBuffer(bytes: bytes, length: byteCount, options: .storageModeShared)
+            else { return nil }
+            buffers[slot] = fresh
+            return fresh
+        }
+    }
+
+    private let solidBufferRing = InstanceBufferRing()
+    private let glyphBufferRing = InstanceBufferRing()
+
     /// The pixel format every render target passed to this renderer must
     /// use — the pipelines are built against it up front.
     static let pixelFormat: MTLPixelFormat = .bgra8Unorm
@@ -83,7 +116,7 @@ nonisolated final class QuadRenderer {
         commandBuffer: MTLCommandBuffer
     ) {
         draw(
-            instances, pipeline: solidPipeline, atlas: nil, rect: rect,
+            instances, ring: solidBufferRing, pipeline: solidPipeline, atlas: nil, rect: rect,
             drawableSize: drawableSize, renderPassDescriptor: renderPassDescriptor,
             commandBuffer: commandBuffer)
     }
@@ -98,13 +131,14 @@ nonisolated final class QuadRenderer {
         commandBuffer: MTLCommandBuffer
     ) {
         draw(
-            instances, pipeline: glyphPipeline, atlas: atlas, rect: rect,
+            instances, ring: glyphBufferRing, pipeline: glyphPipeline, atlas: atlas, rect: rect,
             drawableSize: drawableSize, renderPassDescriptor: renderPassDescriptor,
             commandBuffer: commandBuffer)
     }
 
     private func draw(
         _ instances: [QuadInstance],
+        ring: InstanceBufferRing,
         pipeline: MTLRenderPipelineState,
         atlas: MTLTexture?,
         rect: CGRect,
@@ -145,9 +179,18 @@ nonisolated final class QuadRenderer {
             rectSize: SIMD2<Float>(Float(rect.width), Float(rect.height)),
             drawableSize: SIMD2<Float>(Float(drawableSize.width), Float(drawableSize.height))
         )
-        var mutableInstances = instances
-        encoder.setVertexBytes(
-            &mutableInstances, length: MemoryLayout<QuadInstance>.stride * instances.count, index: 0)
+        // `setVertexBytes` is documented for small, transient data only —
+        // Metal enforces a 4 KB cap, and a full screen of instances (up to
+        // ~200×64 cells × 48 bytes) is routinely 20-40x that. A real
+        // `MTLBuffer` has no such limit.
+        let instanceByteCount = MemoryLayout<QuadInstance>.stride * instances.count
+        guard
+            let instanceBuffer = instances.withUnsafeBytes({ raw -> MTLBuffer? in
+                guard let base = raw.baseAddress else { return nil }
+                return ring.buffer(bytes: base, byteCount: instanceByteCount, device: device)
+            })
+        else { return }
+        encoder.setVertexBuffer(instanceBuffer, offset: 0, index: 0)
         encoder.setVertexBytes(&uniforms, length: MemoryLayout<QuadUniforms>.stride, index: 1)
 
         if let atlas {
