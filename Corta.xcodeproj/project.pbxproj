@@ -204,11 +204,11 @@
 			);
 			mainGroup = 4F17769630465E1F00E8DD20;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
-			productRefGroup = 4F1776A030465E1F00E8DD20 /* Products */;
 			packageReferences = (
 				C07A000430465E2000E8DD20 /* XCLocalSwiftPackageReference "CortaTerminal" */,
 			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 4F1776A030465E1F00E8DD20 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -547,26 +547,6 @@
 		};
 /* End XCBuildConfiguration section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		C07A000430465E2000E8DD20 /* XCLocalSwiftPackageReference "CortaTerminal" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = CortaTerminal;
-		};
-/* End XCLocalSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		C07A000530465E2000E8DD20 /* CortaTerminal */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C07A000430465E2000E8DD20 /* XCLocalSwiftPackageReference "CortaTerminal" */;
-			productName = CortaTerminal;
-		};
-		C07A000630465E2000E8DD20 /* CortaTerminal */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C07A000430465E2000E8DD20 /* XCLocalSwiftPackageReference "CortaTerminal" */;
-			productName = CortaTerminal;
-		};
-/* End XCSwiftPackageProductDependency section */
-
 /* Begin XCConfigurationList section */
 		4F17769A30465E1F00E8DD20 /* Build configuration list for PBXProject "Corta" */ = {
 			isa = XCConfigurationList;
@@ -605,6 +585,26 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		C07A000430465E2000E8DD20 /* XCLocalSwiftPackageReference "CortaTerminal" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = CortaTerminal;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C07A000530465E2000E8DD20 /* CortaTerminal */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C07A000430465E2000E8DD20 /* XCLocalSwiftPackageReference "CortaTerminal" */;
+			productName = CortaTerminal;
+		};
+		C07A000630465E2000E8DD20 /* CortaTerminal */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C07A000430465E2000E8DD20 /* XCLocalSwiftPackageReference "CortaTerminal" */;
+			productName = CortaTerminal;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 4F17769730465E1F00E8DD20 /* Project object */;
 }
