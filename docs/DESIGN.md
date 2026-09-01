@@ -218,9 +218,23 @@ Ordered by how badly they are usually underestimated.
 
 2. **`fork` in a Cocoa process.** Between `fork` and `exec` only
    async-signal-safe functions are legal, and the Swift runtime is not —
-   touching `String`, allocating, or retaining can deadlock. Use
-   `posix_spawn` with file actions and `POSIX_SPAWN_SETSID`, or
-   pre-marshal every argument into C buffers before forking.
+   touching `String`, allocating, or retaining can deadlock. Resolved by
+   not calling `fork()` at all: `CortaTerminal/Spawn.swift` `posix_spawn`s
+   a small helper executable (`corta-exec`, its own SwiftPM product) onto
+   the pty replica, with `POSIX_SPAWN_SETSID` and file actions dup'ing the
+   replica to fds 0/1/2. `posix_spawn_file_actions_t` cannot express
+   `ioctl(TIOCSCTTY)` — required on Darwin because a session leader does
+   not acquire a controlling terminal merely by having the tty on fd 0 —
+   so `corta-exec` does that one call and then `execve`s over itself into
+   the real shell. Because `corta-exec` is a freshly `execve`'d image
+   rather than a forked one, there is no fork-in-a-multithreaded-process
+   hazard to mitigate: ordinary Swift throughout, no C helper, no FFI.
+   This replaced an earlier `fork`-based implementation that pre-marshalled
+   every argument into C buffers before forking and still `SIGKILL`ed the
+   child roughly 8% of the time under test — a hazard serializing this
+   process's own `fork()` calls could not remove, because it came from
+   locks other threads held at the moment of the call, not from this
+   process's own concurrency.
 
 3. **Ligatures conflict with a one-glyph-per-cell atlas.** A Fira Code
    ligature spans cells and does not align to the grid, and a cursor

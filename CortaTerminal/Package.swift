@@ -14,10 +14,19 @@ let package = Package(
         .library(name: "CortaTerminal", targets: ["CortaTerminal"]),
         .executable(name: "corta-dump", targets: ["corta-dump"]),
         .executable(name: "corta-bench", targets: ["corta-bench"]),
+        .executable(name: "corta-exec", targets: ["corta-exec"]),
     ],
     targets: [
         .target(
             name: "CortaTerminal",
+            swiftSettings: [.defaultIsolation(nil)]
+        ),
+        // The spawn helper `Spawn.swift` posix_spawns and then execve's over
+        // — see that file's doc comment for why this replaced `fork()`.
+        // A separate target, not a source file inside `CortaTerminal`: it
+        // must become its own Mach-O image so `posix_spawn` can launch it.
+        .executableTarget(
+            name: "corta-exec",
             swiftSettings: [.defaultIsolation(nil)]
         ),
         // Feeds stdin to a terminal and prints the grid, so the core can be

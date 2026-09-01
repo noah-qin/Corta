@@ -56,16 +56,19 @@ public final class PTY: @unchecked Sendable {
         terminationHandler: (@Sendable (ChildExit) -> Void)? = nil
     ) throws(PTYError) -> PTY {
         let (primary, replica, path) = try openPair()
-        // The replica is only needed until the child owns it.
-        defer { Darwin.close(replica) }
 
         var windowSize = size.winsize
         guard ioctl(replica, TIOCSWINSZ, &windowSize) == 0 else {
             let code = errno
+            Darwin.close(replica)
             Darwin.close(primary)
             throw .resizeFailed(code: code)
         }
-
+        // `replica` itself (as opposed to the window size just set through
+        // it, which lives on the pty, not the fd) is handed to `Spawn.child`
+        // to close once — and exactly once — `corta-exec` is guaranteed to
+        // have its own reference; see the close site there for why the
+        // timing matters.
         let pid: pid_t
         do {
             pid = try Spawn.child(
@@ -73,6 +76,7 @@ public final class PTY: @unchecked Sendable {
                 arguments: arguments,
                 environment: environment,
                 replicaPath: path,
+                parentReplica: replica,
                 workingDirectory: workingDirectory
             )
         } catch {

@@ -1,150 +1,142 @@
 import Darwin
 
-// Darwin's Swift overlay marks `fork()` `unavailable` ("Please use threads
-// or posix_spawn*()") — sound general advice, and exactly why the type
-// comment below justifies not taking it here. This binds the real libSystem
-// symbol directly, bypassing that annotation; the C function itself is
-// unchanged and exactly as async-signal-safe as ever.
-@_silgen_name("fork")
-private func rawFork() -> pid_t
-
-/// `fork` + a strictly async-signal-safe child body, then `execve`.
+/// Launches a child on a pty replica via `posix_spawn` of the `corta-exec`
+/// helper — see `corta-exec/main.swift` for the other half of this.
 ///
-/// `DESIGN.md` §7.2 prefers `posix_spawn`, but this needs one thing
-/// `posix_spawn_file_actions` cannot express: `ioctl(TIOCSCTTY)`.
+/// This file used to `fork()` the app process directly and run
+/// hand-marshalled, async-signal-safe-only code in the forked child before
+/// `execve`. That was measured to `SIGKILL` the child roughly 8% of the
+/// time under a fully serialized test run (`.serialized` on both PTY test
+/// suites, plus a `forkLockStorage` around every `fork()` call — the flake
+/// persisted regardless): `fork()` in a heavily multithreaded Cocoa/Swift
+/// process is only as safe as whatever lock some *other* thread happens to
+/// be holding at the instant of the call, and that hazard cannot be
+/// mitigated from inside this process, only avoided by not calling `fork()`
+/// at all (`DESIGN.md` §7.2).
 ///
-/// A session leader does **not** automatically acquire a controlling
-/// terminal by having a tty `dup2`'d onto its stdin, nor — empirically, on
-/// Darwin — by *opening* the tty device itself post-`setsid()` the way
-/// SVR4/Linux allow. Without an explicit `TIOCSCTTY`, the line discipline
-/// has no foreground process group and `^C` never reaches the child
-/// (verified by `TerminalSessionTests.controlCStopsAFloodingChild`, which
-/// failed against a `posix_spawn`-only implementation that relied on the
-/// open-acquires-ctty assumption). `login_tty()` in libutil does exactly
-/// this sequence for the same reason; this is that sequence written out by
-/// hand rather than linked.
-///
-/// `DESIGN.md` §7.2's own words: "pre-marshal every argument into C buffers
-/// before forking" is the sanctioned alternative to `posix_spawn`, and is
-/// taken *literally* here: `childBody` below receives only raw pointers and
-/// `Int32`s — never a Swift `Array`, `String`, or closure capturing one.
-/// An early version of this file passed `[UnsafeMutablePointer<CChar>?]`
-/// (a Swift `Array`, which is a reference-counted, copy-on-write box) as a
-/// parameter to the post-`fork` function; that one line intermittently
-/// produced impossible-looking failures under a parallel test run —
-/// `pty I/O failed: EIO` on a `write` to a *different* test's pty entirely
-/// — because passing an `Array` retains it, and a retain touches the
-/// allocator's lock. If another thread held that lock at the instant this
-/// thread called `fork()`, only this thread survives into the child, and
-/// the lock is inherited already held and never released: the classic
-/// fork-in-a-multithreaded-process deadlock `DESIGN.md` §7.2 names. Every
-/// argument below is a raw `UnsafeMutablePointer`, allocated with `malloc`
-/// before `fork()` and walked with pointer arithmetic after it — nothing
-/// between `fork()` and `execve()` can touch Swift's allocator.
-///
-/// **Reporting a failed `exec`.** `fork()` itself almost never fails, so
-/// unlike `posix_spawn` (which reports a bad executable path synchronously)
-/// a plain `fork`+`execve` would report success even when the child is about
-/// to `_exit(127)`. The classic fix — a `CLOEXEC` pipe — is used here: the
-/// write end closes itself on a successful `execve` (that is what `CLOEXEC`
-/// means) and stays open, with an errno written into it, on any failure
-/// before or during `execve`. The parent blocks on a read of that pipe,
-/// which resolves the instant one or the other happens.
+/// `posix_spawn` cannot express the one thing this needs —
+/// `ioctl(TIOCSCTTY)`, required because a session leader does not acquire a
+/// controlling terminal merely by having the tty `dup2`'d onto its stdin
+/// (`corta-exec/main.swift` has the empirical detail, confirmed by
+/// `TerminalSessionTests.controlCStopsAFloodingChild`). `corta-exec` exists
+/// to do that one call and then `execve` over itself with the real shell —
+/// its own `posix_spawn` already made it a session leader
+/// (`POSIX_SPAWN_SETSID`) with the pty replica on fds 0/1/2
+/// (`posix_spawn_file_actions_t`), so nothing about this needs `fork()`.
+/// Because `corta-exec` is a freshly `execve`'d image, not a forked one,
+/// there is no fork-in-a-multithreaded-process hazard here to mitigate —
+/// this is pure Swift end to end (`DESIGN.md` §1), not FFI to a hand-rolled
+/// C helper.
 enum Spawn {
-    /// Serializes every `fork()` this process makes.
-    ///
-    /// `fork()` in a multithreaded process is only as safe as whatever
-    /// every *other* thread happens to be doing at that instant — a lock
-    /// this file never touches (inside Dispatch, the allocator, the Swift
-    /// concurrency runtime) can still be held by some unrelated thread at
-    /// the moment of the call, and is inherited held-forever in the child.
-    /// Two threads forking at once multiplies that already non-zero risk;
-    /// under a test suite spawning many ptys concurrently, that multiplied
-    /// risk was observed directly — `swiftpm-testing-helper` occasionally
-    /// killed outright by the kernel (`SIGKILL`) partway through a spawn,
-    /// confirmed by reverting to `posix_spawn` (no `fork()` at all) and
-    /// finding the flake gone. Serializing this process's own `fork()`
-    /// calls does not eliminate the underlying hazard — a lock held by a
-    /// thread we don't control is still a lock held by a thread we don't
-    /// control — but it removes *our* contribution to the odds, and the
-    /// real app calls this rarely and at human pace (opening a window, a
-    /// split), not the dozens-per-second a parallel test run does.
-    ///
-    /// A raw `os_unfair_lock`, not `Synchronization.Mutex`: `Mutex.withLock`
-    /// is scoped, so *both* the parent and the child would run its unlock
-    /// on return from the closure — but `os_unfair_lock` requires unlocking
-    /// from the same thread that locked it, and a forked child's thread
-    /// identity is not that thread as far as the kernel is concerned. That
-    /// combination hung the entire test run outright. Locking and
-    /// unlocking are two explicit, separate calls here specifically so the
-    /// child branch — which is about to `_exit` anyway — can skip the
-    /// unlock rather than be forced through it.
-    nonisolated(unsafe) private static var forkLockStorage = os_unfair_lock()
-
     /// Launches `executable` with the pty replica as its controlling
     /// terminal and standard streams.
     ///
     /// - Parameters:
     ///   - replicaPath: the pty replica's device path, e.g. `/dev/ttys004`.
+    ///   - parentReplica: the caller's own open reference to that same
+    ///     replica (used only to set the initial window size before this
+    ///     call). Closed here, the instant `corta-exec` has its own — see
+    ///     the note at the close site.
     ///   - workingDirectory: absolute path, or `nil` to inherit ours.
     static func child(
         executable: String,
         arguments: [String],
         environment: [String: String],
         replicaPath: String,
+        parentReplica: Int32,
         workingDirectory: String?
     ) throws(PTYError) -> pid_t {
+        // Covers every early-throw path below; the intentional close at the
+        // real close site (once `corta-exec` has its own reference) marks
+        // this so the deferred one becomes a no-op instead of a double
+        // close.
+        var parentReplicaClosed = false
+        defer { if !parentReplicaClosed { close(parentReplica) } }
+
         guard executable.hasPrefix("/") else { throw .executablePathNotAbsolute }
 
+        guard let helperPath = locateHelperExecutable() else {
+            throw .spawnFailed(code: ENOENT)
+        }
+
+        // Reports a failed `execve` of `executable` inside `corta-exec` back
+        // to us — `posix_spawn`'s return value only covers launching
+        // `corta-exec` itself, which always exists and always succeeds.
         var errorPipe: [Int32] = [0, 0]
         guard pipe(&errorPipe) == 0 else { throw .spawnFailed(code: errno) }
         let readEnd = errorPipe[0]
         let writeEnd = errorPipe[1]
-        // Inherited across `fork`, honoured at `execve`: a successful exec
-        // closes this automatically, which is the parent's "it worked"
-        // signal.
-        _ = fcntl(writeEnd, F_SETFD, FD_CLOEXEC)
         _ = fcntl(readEnd, F_SETFD, FD_CLOEXEC)
+        // Kept open across `corta-exec`'s own exec by `addinherit_np` below,
+        // despite `POSIX_SPAWN_CLOEXEC_DEFAULT`; `FD_CLOEXEC` here is what
+        // then closes it automatically the moment `corta-exec` succeeds at
+        // `execve`-ing `executable` — the parent's "it worked" signal.
+        _ = fcntl(writeEnd, F_SETFD, FD_CLOEXEC)
 
-        // Every argument the child needs, as a raw, `malloc`'d C buffer —
-        // see the type comment on why this is not a Swift `Array`.
-        let executableC = strdup(executable)
-        let replicaPathC = strdup(replicaPath)
-        let workingDirectoryC = workingDirectory.map { strdup($0) } ?? nil
-        let argv = CStringVector([executable] + arguments)
-        let envp = CStringVector(environment.map { "\($0.key)=\($0.value)" }.sorted())
-        defer {
-            free(executableC)
-            free(replicaPathC)
-            if let workingDirectoryC { free(workingDirectoryC) }
-            argv.deallocate()
-            envp.deallocate()
+        var fileActions: posix_spawn_file_actions_t?
+        posix_spawn_file_actions_init(&fileActions)
+        defer { posix_spawn_file_actions_destroy(&fileActions) }
+        posix_spawn_file_actions_addopen(&fileActions, 0, replicaPath, O_RDWR, 0)
+        posix_spawn_file_actions_adddup2(&fileActions, 0, 1)
+        posix_spawn_file_actions_adddup2(&fileActions, 0, 2)
+        posix_spawn_file_actions_addinherit_np(&fileActions, writeEnd)
+
+        var attributes: posix_spawnattr_t?
+        posix_spawnattr_init(&attributes)
+        defer { posix_spawnattr_destroy(&attributes) }
+        posix_spawnattr_setflags(
+            &attributes,
+            Int16(
+                POSIX_SPAWN_SETSID | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK)
+        )
+        // `corta-exec` inherits neither our handlers nor our blocked set
+        // (`SECURITY.md` §4.3): every signal reset to its default action,
+        // nothing blocked. `execve`-ing `executable` afterwards does not
+        // change either, so this covers the real shell too.
+        var allSignals = sigset_t()
+        sigfillset(&allSignals)
+        posix_spawnattr_setsigdefault(&attributes, &allSignals)
+        var noSignals = sigset_t()
+        sigemptyset(&noSignals)
+        posix_spawnattr_setsigmask(&attributes, &noSignals)
+        // Only the descriptors above — the pty replica on 0/1/2 and the
+        // error pipe's write end — survive into `corta-exec`. Everything
+        // else this process happens to have open (sockets, XPC connections,
+        // other sessions' ptys) is closed automatically, without needing a
+        // hand-written close-everything loop.
+
+        var childArguments = [helperPath, String(writeEnd), workingDirectory ?? "", executable]
+        childArguments.append(contentsOf: arguments)
+        let environmentLines = environment.map { "\($0.key)=\($0.value)" }.sorted()
+
+        var pid: pid_t = 0
+        let spawnResult = withCStringArray(childArguments) { argv in
+            withCStringArray(environmentLines) { envp in
+                posix_spawn(&pid, helperPath, &fileActions, &attributes, argv, envp)
+            }
         }
-
-        os_unfair_lock_lock(&forkLockStorage)
-        let pid = rawFork()
-
-        if pid == 0 {
-            // Deliberately never unlocks `forkLockStorage` — see its doc
-            // comment. This process is about to `_exit`; nothing here will
-            // ever contend on it again.
-            childBody(
-                executable: executableC, replicaPath: replicaPathC,
-                workingDirectory: workingDirectoryC, argv: argv.pointer, envp: envp.pointer,
-                errorPipeWriteEnd: writeEnd)
-            // `childBody` only returns on failure and always reports before
-            // returning; `_exit` never runs the Swift runtime's normal
-            // teardown, unlike `exit`.
-            _exit(127)
-        }
-
-        os_unfair_lock_unlock(&forkLockStorage)
-        guard pid >= 0 else {
-            let code = errno
+        guard spawnResult == 0 else {
             close(readEnd)
             close(writeEnd)
-            throw .spawnFailed(code: code)
+            throw .spawnFailed(code: spawnResult)
         }
+
+        // `corta-exec`'s own reference to the replica (opened via
+        // `posix_spawn_file_actions_addopen` above) exists the instant
+        // `posix_spawn` returns — file actions run as part of spawning,
+        // before the call reports success. `parentReplica` can safely go
+        // now, and must: waiting any longer (for the pipe read below, which
+        // blocks until `corta-exec` finishes `execve`-ing `executable` —
+        // arbitrarily long for a child that never exits) risks this being
+        // the *last* close of the replica instead of a redundant second
+        // one. Empirically, on Darwin, a slave's last close performed by
+        // the process that also holds the primary side discards whatever
+        // the child had already written and not yet been read. Closing the
+        // instant a second reference is guaranteed to exist avoids ever
+        // being last, without ever leaving a gap with *no* reference open
+        // (a gap here was observed to reset the pty's window size to 0×0).
+        close(parentReplica)
+        parentReplicaClosed = true
 
         close(writeEnd)
         defer { close(readEnd) }
@@ -155,111 +147,71 @@ enum Spawn {
         if read > 0 {
             throw .spawnFailed(code: reportedErrno)
         }
-        // EOF with nothing written: the write end closed because `execve`
-        // succeeded.
+        // EOF with nothing written: the write end closed because `corta-exec`
+        // exec'd `executable` successfully.
         return pid
     }
 
-    /// Everything that runs in the child, between `fork()` and `execve()`.
-    /// Async-signal-safe Darwin calls only, on raw pointers — no `String`,
-    /// no `Array`, no allocation, no retain (see the type comment).
-    private static func childBody(
-        executable: UnsafeMutablePointer<CChar>?,
-        replicaPath: UnsafeMutablePointer<CChar>?,
-        workingDirectory: UnsafeMutablePointer<CChar>?,
-        argv: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>,
-        envp: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>,
-        errorPipeWriteEnd: Int32
-    ) {
-        // A child inherits neither our handlers nor our blocked set
-        // (`SECURITY.md` §4.3) — `posix_spawn`'s SETSIGDEF/SETSIGMASK,
-        // reproduced by hand.
-        for signalNumber in Int32(1)..<NSIG {
-            signal(signalNumber, SIG_DFL)
+    /// `corta-exec`'s path, found next to wherever *this module's own code*
+    /// is loaded from.
+    ///
+    /// SwiftPM builds every product of a package into the same directory
+    /// (`corta-dump`, `corta-bench`, the `.xctest` bundle, `corta-exec`
+    /// itself). `_NSGetExecutablePath()` would name the wrong binary under
+    /// `swift test`: `swift-testing`'s runner (`swiftpm-testing-helper`,
+    /// outside the package entirely, in the toolchain) `dlopen`s the
+    /// `.xctest` bundle rather than being it, so the *process's* own path
+    /// is not where `CortaTerminal` — or `corta-exec` beside it — actually
+    /// lives. `dladdr` on an address inside this module reports the image
+    /// `dlopen` (or the OS loader) actually mapped it from, which is right
+    /// in every case: the bare executable itself for `corta-dump`,
+    /// `corta-bench` and a future app, the `.xctest` bundle under
+    /// `swift test`.
+    private static func locateHelperExecutable() -> String? {
+        var info = Dl_info()
+        let addressInThisModule = unsafeBitCast(
+            addressAnchor, to: UnsafeMutableRawPointer.self)
+        guard dladdr(addressInThisModule, &info) != 0, let fname = info.dli_fname else {
+            return nil
         }
-        var emptyMask = sigset_t()
-        sigemptyset(&emptyMask)
-        sigprocmask(SIG_SETMASK, &emptyMask, nil)
-
-        guard setsid() >= 0 else { reportFailureAndExit(errorPipeWriteEnd) }
-
-        guard let replicaPath else {
-            errno = ENOENT
-            reportFailureAndExit(errorPipeWriteEnd)
-        }
-        let fd = open(replicaPath, O_RDWR)
-        guard fd >= 0 else { reportFailureAndExit(errorPipeWriteEnd) }
-
-        // The step `posix_spawn_file_actions` cannot express — see the type
-        // comment.
-        guard ioctl(fd, TIOCSCTTY, 0) == 0 else { reportFailureAndExit(errorPipeWriteEnd) }
-
-        guard dup2(fd, 0) >= 0, dup2(fd, 1) >= 0, dup2(fd, 2) >= 0 else {
-            reportFailureAndExit(errorPipeWriteEnd)
-        }
-        if fd > 2 { close(fd) }
-
-        if let workingDirectory, chdir(workingDirectory) != 0 {
-            reportFailureAndExit(errorPipeWriteEnd)
+        var path = String(cString: fname)
+        if let resolved = realpath(path, nil) {
+            path = String(cString: resolved)
+            free(resolved)
         }
 
-        // `fork()` — unlike `posix_spawn`'s `POSIX_SPAWN_CLOEXEC_DEFAULT` —
-        // duplicates every descriptor the host process happens to have open
-        // (sockets, XPC connections, other sessions' ptys), not just ours.
-        // `FD_CLOEXEC` on our own descriptors (`PTY.openPair`, the error
-        // pipe above) covers the ones we control; this closes everything
-        // else above stdio as a blanket defence against the ones we don't
-        // (`SECURITY.md` process safety) rather than trusting every
-        // framework in the host process to have marked its own descriptors
-        // close-on-exec. The error pipe's write end is skipped — it still
-        // has a job to do if `execve` itself fails below — and closes
-        // itself on success via its own `CLOEXEC` flag regardless.
-        for candidate in Int32(3)..<1024 where candidate != errorPipeWriteEnd {
-            close(candidate)
+        var directory = path
+        for _ in 0..<6 {
+            guard let slash = directory.lastIndex(of: "/"), slash != directory.startIndex else {
+                break
+            }
+            directory = String(directory[directory.startIndex..<slash])
+            let candidate = directory + "/corta-exec"
+            if access(candidate, X_OK) == 0 { return candidate }
         }
-
-        guard let executable else {
-            errno = ENOENT
-            reportFailureAndExit(errorPipeWriteEnd)
-        }
-        execve(executable, argv, envp)
-        // `execve` only returns on failure.
-        reportFailureAndExit(errorPipeWriteEnd)
-    }
-
-    /// Writes the current `errno` to the parent's error pipe and exits. A
-    /// plain top-level function, not a closure — a closure that captures
-    /// anything can be heap-allocated under ARC, which is exactly the thing
-    /// nothing between `fork()` and `execve()` may do.
-    private static func reportFailureAndExit(_ errorPipeWriteEnd: Int32) -> Never {
-        var code = errno
-        _ = withUnsafeBytes(of: &code) { buffer in
-            Darwin.write(errorPipeWriteEnd, buffer.baseAddress, buffer.count)
-        }
-        _exit(127)
+        return nil
     }
 }
 
-/// A null-terminated `char *[]`, as a raw `malloc`'d buffer rather than a
-/// Swift `Array` — see the warning in `Spawn`'s documentation on why an
-/// `Array` must never cross into the forked child.
-private struct CStringVector {
-    let pointer: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>
-    private let count: Int
+/// An address inside `CortaTerminal`'s own code, for `dladdr` to resolve
+/// back to the image this module was loaded from — see
+/// `Spawn.locateHelperExecutable`. `@convention(c)`, not a plain Swift
+/// closure: a Swift function value can be a fat pointer (code plus a
+/// context), and only a C function pointer is guaranteed to be the single
+/// pointer `dladdr` needs.
+private let addressAnchor: @convention(c) () -> Void = {}
 
-    init(_ strings: [String]) {
-        count = strings.count
-        pointer = .allocate(capacity: count + 1)
-        for (index, string) in strings.enumerated() {
-            pointer[index] = strdup(string)
-        }
-        pointer[count] = nil
-    }
-
-    func deallocate() {
-        for index in 0..<count {
-            free(pointer[index])
-        }
-        pointer.deallocate()
+/// Builds a null-terminated `char *[]` from `strings`, valid for the
+/// duration of `body`. `posix_spawn` copies everything it needs from `argv`
+/// and `envp` before returning, so — unlike the old forked-child path —
+/// nothing here needs to outlive this call.
+private func withCStringArray<Result>(
+    _ strings: [String], _ body: (UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>) -> Result
+) -> Result {
+    var pointers = strings.map { strdup($0) }
+    pointers.append(nil)
+    defer { for pointer in pointers { free(pointer) } }
+    return pointers.withUnsafeMutableBufferPointer { buffer in
+        body(buffer.baseAddress!)
     }
 }

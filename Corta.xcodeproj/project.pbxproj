@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		C07A000130465E2000E8DD20 /* CortaTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000530465E2000E8DD20 /* CortaTerminal */; };
 		C07A000230465E2000E8DD20 /* CortaTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000630465E2000E8DD20 /* CortaTerminal */; };
+		C07A000830465E2000E8DD20 /* corta-exec in Embed corta-exec */ = {isa = PBXBuildFile; productRef = C07A000730465E2000E8DD20 /* corta-exec */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -78,6 +79,20 @@
 		};
 /* End PBXFrameworksBuildPhase section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		C07A000930465E2000E8DD20 /* Embed corta-exec */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 6;
+			files = (
+				C07A000830465E2000E8DD20 /* corta-exec in Embed corta-exec */,
+			);
+			name = "Embed corta-exec";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXGroup section */
 		4F17769630465E1F00E8DD20 = {
 			isa = PBXGroup;
@@ -109,6 +124,7 @@
 				4F17769B30465E1F00E8DD20 /* Sources */,
 				4F17769C30465E1F00E8DD20 /* Frameworks */,
 				4F17769D30465E1F00E8DD20 /* Resources */,
+				C07A000930465E2000E8DD20 /* Embed corta-exec */,
 			);
 			buildRules = (
 			);
@@ -120,6 +136,7 @@
 			name = Corta;
 			packageProductDependencies = (
 				C07A000530465E2000E8DD20 /* CortaTerminal */,
+				C07A000730465E2000E8DD20 /* corta-exec */,
 			);
 			productName = Corta;
 			productReference = 4F17769F30465E1F00E8DD20 /* Corta.app */;
@@ -606,6 +623,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C07A000430465E2000E8DD20 /* XCLocalSwiftPackageReference "CortaTerminal" */;
 			productName = CortaTerminal;
+		};
+		C07A000730465E2000E8DD20 /* corta-exec */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C07A000430465E2000E8DD20 /* XCLocalSwiftPackageReference "CortaTerminal" */;
+			productName = "corta-exec";
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
