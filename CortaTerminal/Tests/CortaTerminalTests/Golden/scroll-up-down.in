@@ -1,0 +1,11 @@
+# SU / SD — ECMA-48 §8.3.147 / §8.3.113: scroll the region up (down) by Ps
+# rows. Only the rows between the margins move; blank rows open at the
+# opposite margin and nothing enters the scrollback. The cursor stays put.
+# After "cc" the screen holds TOP / aa / bb / cc / BOTTOM; SU drops "aa",
+# then SD 2 pushes what remains back down, leaving only "bb" at row 3.
+TOP
+\e[5;1HBOTTOM
+\e[2;4r\e[2;1H
+aa\r\nbb\r\ncc
+\e[S
+\e[2T

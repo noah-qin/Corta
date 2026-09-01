@@ -26,6 +26,14 @@ extension Performer {
             grid.deleteLines(parameters.value(0, default: 1))
         case 0x50:  // DCH — ECMA-48 §8.3.26
             grid.deleteCharacters(parameters.value(0, default: 1))
+        case 0x53:  // SU — ECMA-48 §8.3.147
+            grid.scrollUp(parameters.value(0, default: 1))
+        case 0x54:  // SD — ECMA-48 §8.3.113
+            // More than one parameter is xterm's highlight-tracking
+            // sequence sharing the final byte; that is not scrolling.
+            if parameters.count <= 1 {
+                grid.scrollDown(parameters.value(0, default: 1))
+            }
         default:
             return false
         }

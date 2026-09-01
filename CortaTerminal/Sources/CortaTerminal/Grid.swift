@@ -318,6 +318,24 @@ public struct Grid: Sendable {
         }
     }
 
+    /// SD — ECMA-48 §8.3.113: moves the scroll region down by `count` rows,
+    /// opening blank rows at the top margin. Rows outside the margins stay
+    /// put, and nothing enters the scrollback — scrolling down revisits
+    /// content, it does not create history.
+    public mutating func scrollDown(_ count: Int) {
+        let count = min(max(0, count), marginBottom - marginTop + 1)
+        guard count > 0 else { return }
+        var row = marginBottom
+        while row >= marginTop + count {
+            lines[row] = lines[row - count]
+            row -= 1
+        }
+        while row >= marginTop {
+            lines[row] = Line()
+            row -= 1
+        }
+    }
+
     // MARK: - Editing
 
     /// IL — ECMA-48 §8.3.67: inserts `count` erased rows at the cursor row,

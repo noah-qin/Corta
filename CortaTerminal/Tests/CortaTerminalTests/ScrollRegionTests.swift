@@ -134,4 +134,45 @@ struct ScrollRegionTests {
         #expect(grid.marginTop == 1)
         #expect(grid.marginBottom == 4)
     }
+
+    // MARK: - SU / SD
+
+    /// SD — ECMA-48 §8.3.113: the region shifts down, blank rows open at
+    /// the top margin, rows outside the margins stay put.
+    @Test("scrolling down opens blank rows at the top margin")
+    func scrollDownWithinTheRegion() {
+        var grid = Grid(rows: 5, columns: 8)
+        write("top", to: &grid)
+        grid.moveCursor(row: 4, column: 0)
+        write("bot", to: &grid)
+        grid.setScrollRegion(top: 1, bottom: 3)
+        grid.moveCursor(row: 1, column: 0)
+        write("aa", to: &grid)
+
+        grid.scrollDown(2)
+
+        #expect(grid[0, 0].scalar == 0x74)  // "top" untouched
+        #expect(grid[3, 0].scalar == 0x61)  // "aa" pushed down two
+        #expect(grid.line(1).isEmpty)
+        #expect(grid.line(2).isEmpty)
+        #expect(grid[4, 0].scalar == 0x62)  // "bot" untouched
+        #expect(grid.scrollback.isEmpty)
+    }
+
+    /// SU/SD by the region's whole height blanks the region.
+    @Test("scrolling by the region's height blanks it")
+    func scrollingByTheRegionHeightBlanksIt() {
+        var grid = Grid(rows: 4, columns: 8)
+        for row in 1...2 {
+            grid.moveCursor(row: row, column: 0)
+            write("xx", to: &grid)
+        }
+        grid.setScrollRegion(top: 1, bottom: 2)
+        grid.scrollUp(2)
+        #expect(grid.line(1).isEmpty)
+        #expect(grid.line(2).isEmpty)
+        grid.scrollDown(99)  // clamped, not a crash
+        #expect(grid.line(1).isEmpty)
+        #expect(grid.line(2).isEmpty)
+    }
 }
