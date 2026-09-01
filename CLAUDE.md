@@ -14,6 +14,7 @@ source of truth; this file is an index.
 | Document                | Covers                                                     |
 | ----------------------- | ---------------------------------------------------------- |
 | `docs/DESIGN.md`        | Goals, locked decisions, architecture, modules, milestones, non-goals |
+| `docs/ROADMAP.md`       | The ordered step-by-step plan — start here when implementing |
 | `docs/CONFORMANCE.md`   | Feature priorities (P0/P1/P2), the daily-driver checklist, test strategy |
 | `docs/PERFORMANCE.md`   | Targets, the two decisions that matter, hot-path rules, benchmarks |
 | `docs/SECURITY.md`      | Threat model, escape-sequence injection, resource caps, process safety |
@@ -42,6 +43,9 @@ Do not reopen these without a concrete new reason. Each is explained in
   features, no settings GUI.** See `docs/DESIGN.md` §6.
 
 ## Working Rules
+
+**Where to start.** `docs/ROADMAP.md` is the working checklist. Steps
+are ordered deliberately; do not start one before the previous is done.
 
 **Scope.** M2 (`vim`/`tmux`/`htop` render correctly) is the checkpoint.
 Before M2, do not add features, change scope, or refactor architecture.
