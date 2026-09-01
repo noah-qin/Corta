@@ -1,0 +1,6 @@
+# ED — ECMA-48 §8.3.39. Parameter 0 erases from the active position to the
+# end of the page, 1 from the start of the page to the active position, and
+# 2 the whole page. Inclusive of the active position; the cursor stays put.
+abcdefghij\r\nklmnopqrst\r\nuvwxyzABCD\r\nEFGHIJ
+\e[2;3H\e[1J
+\e[3;8H\e[0J

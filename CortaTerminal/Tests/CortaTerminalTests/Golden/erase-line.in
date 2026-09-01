@@ -1,0 +1,8 @@
+# EL — ECMA-48 §8.3.41. Parameter 0 erases from the active position to the
+# end of the line, 1 from the start of the line to the active position, and
+# 2 the whole line. All three are inclusive of the active position, and none
+# of them moves the cursor.
+abcdefghij\r\nklmnopqrst\r\nuvwxyzABCD
+\e[1;4H\e[0K
+\e[2;7H\e[1K
+\e[3;1H\e[2K

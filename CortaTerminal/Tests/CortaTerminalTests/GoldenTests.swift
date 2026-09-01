@@ -10,7 +10,10 @@ import Testing
 @Suite("Golden files")
 struct GoldenTests {
     static let cases: [Golden.Case] = [
-        Golden.Case("plain-text", rows: 5, columns: 12)
+        Golden.Case("plain-text", rows: 5, columns: 12),
+        Golden.Case("cursor-movement", rows: 4, columns: 10),
+        Golden.Case("erase-line", rows: 4, columns: 10),
+        Golden.Case("erase-display", rows: 4, columns: 10),
     ]
 
     @Test("golden files match", arguments: cases)

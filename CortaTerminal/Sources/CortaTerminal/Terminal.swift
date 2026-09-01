@@ -6,29 +6,26 @@
 ///
 /// Nonisolated: it runs on the reader thread (`DESIGN.md` §2.2).
 public struct Terminal: Sendable {
-    public var grid: Grid
+    private var parser = Parser()
+    private var performer: Performer
 
     public init(rows: Int = 24, columns: Int = 80) {
-        self.grid = Grid(rows: rows, columns: columns)
+        self.performer = Performer(grid: Grid(rows: rows, columns: columns))
+    }
+
+    public var grid: Grid {
+        get { performer.grid }
+        set { performer.grid = newValue }
     }
 
     /// Consumes a chunk of PTY output. A chunk boundary may fall anywhere —
-    /// in the middle of a UTF-8 sequence or an escape sequence — so all
+    /// in the middle of a UTF-8 character or an escape sequence — so all
     /// decoding state lives in the terminal, not in a call.
     public mutating func feed(_ bytes: some Sequence<UInt8>) {
-        for byte in bytes {
-            switch byte {
-            case 0x08: grid.backspace()
-            case 0x09: grid.tab()
-            case 0x0A, 0x0B, 0x0C: grid.lineFeed()
-            case 0x0D: grid.carriageReturn()
-            case 0x20...0x7E: grid.write(UInt32(byte))
-            default: break  // The parser takes over in M1.8.
-            }
-        }
+        parser.parse(bytes, performer: &performer)
     }
 
     public func dump() -> String {
-        grid.dump()
+        performer.grid.dump()
     }
 }

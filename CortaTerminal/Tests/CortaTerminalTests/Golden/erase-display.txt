@@ -1,0 +1,6 @@
+rows: 4 columns: 10
+cursor: row 2 column 7
+   0 |          |
+   1 |   nopqrst|
+   2 |uvwxyzA   |
+   3 |          |

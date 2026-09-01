@@ -1,0 +1,6 @@
+rows: 4 columns: 10
+cursor: row 0 column 1
+   0 |q         |
+   1 |    zy    |
+   2 |    x     |
+   3 |         *|

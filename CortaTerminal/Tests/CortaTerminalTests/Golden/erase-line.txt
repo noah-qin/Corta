@@ -1,0 +1,6 @@
+rows: 4 columns: 10
+cursor: row 2 column 0
+   0 |abc       |
+   1 |       rst|
+   2 |          |
+   3 |          |

@@ -1,0 +1,12 @@
+# CUP, CUU, CUB — ECMA-48 §8.3.21 (CUP), §8.3.22 (CUU), §8.3.18 (CUB).
+# Parameters are one-based on the wire: ESC[3;5H is row 3 column 5, which is
+# row 2 column 4 here. An omitted parameter takes the sequence's default,
+# which is 1 for all of these.
+# Movement stops at the edges of the screen; ESC[99;99H on a 4x10 screen is
+# the bottom right cell, not an error.
+\e[3;5Hx
+\e[Ay
+\e[2Dz
+\e[Hq
+\e[99;99H*
+\e[1;2H
