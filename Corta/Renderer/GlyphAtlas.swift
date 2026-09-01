@@ -125,13 +125,13 @@ nonisolated final class GlyphAtlas {
         context.setShouldAntialias(true)
         context.setShouldSmoothFonts(false)  // no subpixel AA since Mojave
         context.setFillColor(gray: 1, alpha: 1)
-        // A `CGContext`'s pixel buffer is always stored top-down in memory,
-        // but its default drawing coordinate system is y-up with the origin
-        // at the bottom-left. Flip the CTM so glyph-space "up" (towards the
-        // cap height) matches buffer-space "up" (towards row 0) — otherwise
-        // every glyph rasterises upside down relative to the atlas texture.
-        context.translateBy(x: 0, y: CGFloat(height))
-        context.scaleBy(x: 1, y: -1)
+        // No CTM flip. A `CGContext`'s pixel buffer is stored top-down in
+        // memory while its drawing coordinates are y-up from the bottom-left,
+        // and those two cancel: a glyph drawn normally lands with its cap
+        // height in row 0. The shader then maps quad corner (0,0) — the
+        // quad's top-left, since pixel space is y-down — straight onto the
+        // atlas region's top row, so no flip belongs anywhere in this path.
+        // Flipping the CTM here rasterised every glyph upside down.
         var position = CGPoint(x: -bbox.minX, y: -bbox.minY)
         CTFontDrawGlyphs(font, &glyph, &position, 1, context)
 

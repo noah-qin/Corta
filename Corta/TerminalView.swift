@@ -58,8 +58,13 @@ final class TerminalView: NSView, CALayerDelegate {
     }
 
     private func commonInit() {
-        wantsLayer = true
+        // Order matters, and getting it wrong is silent. A layer-HOSTING view
+        // is made by assigning `layer` first and only then setting
+        // `wantsLayer`. The other order makes the view layer-BACKED: AppKit
+        // creates and owns a backing layer, and the CAMetalLayer assigned
+        // afterwards never joins the compositing tree.
         layer = metalLayer
+        wantsLayer = true
         metalLayer.delegate = self
         metalLayer.device = MTLCreateSystemDefaultDevice()
         metalLayer.pixelFormat = QuadRenderer.pixelFormat

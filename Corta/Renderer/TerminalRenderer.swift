@@ -73,10 +73,26 @@ nonisolated final class TerminalRenderer {
     /// Test hook: how many viewport rows the last `updateInstances` rebuilt.
     private(set) var lastRebuiltRowCount = 0
 
-    init(device: MTLDevice, font: CTFont) throws {
+    /// Cell geometry in points — what the window, the grid size and mouse
+    /// coordinates are expressed in.
+    let pointMetrics: CellMetrics
+    /// The backing scale this renderer's atlas was rasterised for.
+    let scale: CGFloat
+
+    /// - Parameter scale: the display's backing scale factor. Glyphs are
+    ///   rasterised at `font size * scale` so they are sharp at device
+    ///   resolution, and `metrics` is in pixels to match the shader, whose
+    ///   coordinate space is the drawable — pixels, not points. Rasterising
+    ///   at 1x and laying out in point units on a 2x display is what made the
+    ///   text render at half size and look soft.
+    init(device: MTLDevice, font: CTFont, scale: CGFloat) throws {
+        let atlasFont = CTFontCreateCopyWithAttributes(
+            font, CTFontGetSize(font) * scale, nil, nil)
         self.quadRenderer = try QuadRenderer(device: device)
-        self.glyphAtlas = GlyphAtlas(device: device, font: font)
-        self.metrics = CellMetrics(font: font)
+        self.glyphAtlas = GlyphAtlas(device: device, font: atlasFont)
+        self.pointMetrics = CellMetrics(font: font)
+        self.metrics = CellMetrics(font: font).scaled(by: scale)
+        self.scale = scale
     }
 
     /// Marks every row damaged, so the next `updateInstances` rebuilds the

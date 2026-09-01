@@ -45,8 +45,8 @@ class ViewController: NSViewController {
     /// Initial and minimum grid sizes. The window's content size is derived
     /// from these and the font's cell metrics, never from hardcoded points,
     /// so it follows a font or size change.
-    private let defaultColumns = 80
-    private let defaultRows = 24
+    private let defaultColumns = 120
+    private let defaultRows = 30
     private let minimumColumns = 20
     private let minimumRows = 5
 
@@ -57,15 +57,26 @@ class ViewController: NSViewController {
         guard let device = MTLCreateSystemDefaultDevice() else {
             fatalError("Metal is required")
         }
-        terminalRenderer = try! TerminalRenderer(device: device, font: font)
+        let scale = NSScreen.main?.backingScaleFactor ?? 2
+        terminalRenderer = try! TerminalRenderer(device: device, font: font, scale: scale)
         commandQueue = device.makeCommandQueue()
 
-        let metrics = terminalRenderer.metrics
+        let metrics = terminalRenderer.pointMetrics
         let contentSize = NSSize(
             width: CGFloat(defaultColumns) * metrics.cellWidth,
             height: CGFloat(defaultRows) * metrics.cellHeight)
         let view = TerminalView(frame: NSRect(origin: .zero, size: contentSize))
-        view.autoresizingMask = [.width, .height]
+        // Deliberately no autoresizing mask. The mask applies the superview's
+        // resize *delta*, and this view is born at the target content size
+        // while the storyboard's view is still its own smaller size. The
+        // `setContentSize` in `viewDidAppear` then grew the superview by
+        // (240, 138) and the mask added that delta on top of a view already
+        // at the target — leaving it 960x546 inside a 720x408 superview.
+        //
+        // In AppKit's bottom-left coordinates the overflow sits above the
+        // visible content, so row 0 — the only row with anything on it in a
+        // fresh shell — was drawn entirely inside the clipped strip and the
+        // window looked black. `viewDidLayout` sets the frame outright.
         self.view.addSubview(view)
         terminalView = view
 
@@ -101,7 +112,7 @@ class ViewController: NSViewController {
         view.onPaste = { [weak self] in
             self?.pasteFromClipboard()
         }
-        view.cellSize = CGSize(width: metrics.cellWidth, height: metrics.cellHeight)
+        view.cellSize = CGSize(width: terminalRenderer.pointMetrics.cellWidth, height: terminalRenderer.pointMetrics.cellHeight)
         view.isMouseReportingEnabled = { [weak self] in
             self?.mouseReportingEnabled() ?? false
         }
@@ -114,9 +125,10 @@ class ViewController: NSViewController {
         super.viewDidAppear()
         guard !didSizeWindow, let window = view.window else { return }
         didSizeWindow = true
-        let metrics = terminalRenderer.metrics
+        let metrics = terminalRenderer.pointMetrics
         // Dragging snaps to whole cells, so a resize never leaves a partial
         // row or column.
+        window.title = "Corta"
         window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
         window.contentMinSize = NSSize(
             width: CGFloat(minimumColumns) * metrics.cellWidth,
@@ -128,6 +140,8 @@ class ViewController: NSViewController {
 
     override func viewDidLayout() {
         super.viewDidLayout()
+        // Set outright rather than accumulating autoresizing deltas.
+        if terminalView.frame != view.bounds { terminalView.frame = view.bounds }
         // Layout can change the drawable's size or backing scale without any
         // grid change the damage diff would notice — force one frame.
         invalidateDisplay()
@@ -176,8 +190,8 @@ class ViewController: NSViewController {
 
     private func resizeSessionToFitView() {
         guard let session, let terminalRenderer else { return }
-        let columns = UInt16(max(1, view.bounds.width / terminalRenderer.metrics.cellWidth))
-        let rows = UInt16(max(1, view.bounds.height / terminalRenderer.metrics.cellHeight))
+        let columns = UInt16(max(1, view.bounds.width / terminalRenderer.pointMetrics.cellWidth))
+        let rows = UInt16(max(1, view.bounds.height / terminalRenderer.pointMetrics.cellHeight))
         let size = TerminalSize(rows: rows, columns: columns)
         guard size != lastRequestedSize else { return }
         lastRequestedSize = size
@@ -223,7 +237,7 @@ class ViewController: NSViewController {
         case .lines(let delta):
             scrollOffset = min(max(0, scrollOffset + delta), historyDepth)
         case .page(let up):
-            let rows = Int(view.bounds.height / terminalRenderer.metrics.cellHeight)
+            let rows = Int(view.bounds.height / terminalRenderer.pointMetrics.cellHeight)
             scrollOffset = min(max(0, scrollOffset + (up ? rows : -rows)), historyDepth)
         case .toTop:
             scrollOffset = historyDepth
