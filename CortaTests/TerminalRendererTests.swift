@@ -117,4 +117,64 @@ struct TerminalRendererTests {
         let outside = Self.pixel(of: texture, x: outsideX, y: insideY)
         #expect(inside.b > outside.b, "expected the selection tint inside the range")
     }
+
+    @Test func scrollOffsetShowsHistoryInsteadOfTheLiveScreen() throws {
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            Issue.record("No Metal device available in this environment")
+            return
+        }
+        let queue = device.makeCommandQueue()!
+        let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
+        let renderer = try TerminalRenderer(device: device, font: font)
+
+        // Fill a 4-row screen with enough lines to push "topline" into
+        // scrollback, then leave the live screen showing later content.
+        var terminal = Terminal(rows: 4, columns: 10, scrollbackLimit: 100)
+        terminal.feed(Array("topline\r\n".utf8))
+        for i in 0..<10 { terminal.feed(Array("row\(i)\r\n".utf8)) }
+        let grid = terminal.grid
+        #expect(grid.scrollback.count > 0)
+
+        let width = Int(renderer.metrics.cellWidth * 10)
+        let height = Int(renderer.metrics.cellHeight * 4)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: QuadRenderer.pixelFormat, width: width, height: height, mipmapped: false)
+        descriptor.usage = [.renderTarget, .shaderRead]
+        descriptor.storageMode = .managed
+        let liveTexture = device.makeTexture(descriptor: descriptor)!
+        let scrolledTexture = device.makeTexture(descriptor: descriptor)!
+
+        func draw(into texture: MTLTexture, scrollOffset: Int) {
+            let pass = MTLRenderPassDescriptor()
+            pass.colorAttachments[0].texture = texture
+            pass.colorAttachments[0].loadAction = .clear
+            pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1)
+            pass.colorAttachments[0].storeAction = .store
+            let commandBuffer = queue.makeCommandBuffer()!
+            renderer.render(
+                grid: grid, scrollOffset: scrollOffset,
+                rect: CGRect(x: 0, y: 0, width: width, height: height),
+                drawableSize: CGSize(width: width, height: height), cursorVisible: false,
+                selection: nil, renderPassDescriptor: pass, commandBuffer: commandBuffer)
+            commandBuffer.commit()
+            commandBuffer.waitUntilCompleted()
+            Self.synchronize(texture, queue: queue)
+        }
+
+        draw(into: liveTexture, scrollOffset: 0)
+        draw(into: scrolledTexture, scrollOffset: grid.scrollback.count)
+
+        // Two different renders of the same grid must differ somewhere —
+        // scrolling to the very top of history shows different text than
+        // the live screen.
+        var liveBytes = [UInt8](repeating: 0, count: width * height * 4)
+        var scrolledBytes = [UInt8](repeating: 0, count: width * height * 4)
+        liveTexture.getBytes(
+            &liveBytes, bytesPerRow: width * 4, from: MTLRegionMake2D(0, 0, width, height),
+            mipmapLevel: 0)
+        scrolledTexture.getBytes(
+            &scrolledBytes, bytesPerRow: width * 4, from: MTLRegionMake2D(0, 0, width, height),
+            mipmapLevel: 0)
+        #expect(liveBytes != scrolledBytes)
+    }
 }

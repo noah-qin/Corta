@@ -22,9 +22,8 @@ final class TerminalView: NSView, CALayerDelegate {
     /// Called with raw bytes to write to the PTY for one key event.
     var onKeyBytes: (([UInt8]) -> Void)?
 
-    /// Called with a signed line delta for a scroll gesture or page key
-    /// (`M1.20`) — positive scrolls back into history.
-    var onScroll: ((Int) -> Void)?
+    /// Called for a scroll gesture, a page key or ⌘↑/⌘↓ (`M1.20`).
+    var onScroll: ((ScrollGesture) -> Void)?
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
@@ -86,11 +85,27 @@ final class TerminalView: NSView, CALayerDelegate {
     // MARK: - Keyboard
 
     override func keyDown(with event: NSEvent) {
+        if let gesture = Self.scrollGesture(for: event) {
+            onScroll?(gesture)
+            return
+        }
         guard let bytes = Self.bytes(for: event) else {
             super.keyDown(with: event)
             return
         }
         onKeyBytes?(bytes)
+    }
+
+    /// ⌘↑ / ⌘↓ jump to the top and bottom of scrollback, the same gesture
+    /// most terminals and pagers use — checked before `bytes(for:)` so a
+    /// held ⌘ never leaks an arrow escape sequence to the child.
+    static func scrollGesture(for event: NSEvent) -> ScrollGesture? {
+        guard event.modifierFlags.contains(.command) else { return nil }
+        switch event.specialKey {
+        case .some(.upArrow): return .toTop
+        case .some(.downArrow): return .toBottom
+        default: return nil
+        }
     }
 
     /// Translates one key event directly to the bytes a real terminal would
@@ -142,9 +157,21 @@ final class TerminalView: NSView, CALayerDelegate {
         // trackpad's momentum scroll without a config knob.
         let lines = Int((-event.scrollingDeltaY / 10).rounded())
         guard lines != 0 else { return }
-        onScroll?(lines)
+        onScroll?(.lines(lines))
     }
 
-    override func scrollPageUp(_ sender: Any?) { onScroll?(Int(bounds.height / 20)) }
-    override func scrollPageDown(_ sender: Any?) { onScroll?(-Int(bounds.height / 20)) }
+    override func scrollPageUp(_ sender: Any?) { onScroll?(.page(up: true)) }
+    override func scrollPageDown(_ sender: Any?) { onScroll?(.page(up: false)) }
+}
+
+/// One scroll input, already resolved to what it means for the scrollback
+/// viewport — the shell decides how far `.lines` clamps against actual
+/// history, and how many lines one `.page` is (it knows the cell height);
+/// this type doesn't know the scrollback depth or the font metrics.
+enum ScrollGesture {
+    /// A relative line delta; positive scrolls back into history.
+    case lines(Int)
+    case page(up: Bool)
+    case toTop
+    case toBottom
 }

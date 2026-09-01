@@ -50,4 +50,34 @@ struct TerminalViewKeyEncodingTests {
         let event = Self.keyEvent(characters: "中")
         #expect(TerminalView.bytes(for: event) == Array("中".utf8))
     }
+
+    @Test func commandUpArrowScrollsToTop() throws {
+        let event = NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [.command, .numericPad, .function],
+            timestamp: 0, windowNumber: 0, context: nil, characters: "\u{F700}",
+            charactersIgnoringModifiers: "\u{F700}", isARepeat: false, keyCode: 126)!
+        guard case .toTop = TerminalView.scrollGesture(for: event) else {
+            Issue.record("expected .toTop")
+            return
+        }
+    }
+
+    @Test func commandDownArrowScrollsToBottom() throws {
+        let event = NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [.command, .numericPad, .function],
+            timestamp: 0, windowNumber: 0, context: nil, characters: "\u{F701}",
+            charactersIgnoringModifiers: "\u{F701}", isARepeat: false, keyCode: 125)!
+        guard case .toBottom = TerminalView.scrollGesture(for: event) else {
+            Issue.record("expected .toBottom")
+            return
+        }
+    }
+
+    @Test func plainArrowIsNotAScrollGesture() throws {
+        let event = NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [.numericPad, .function], timestamp: 0,
+            windowNumber: 0, context: nil, characters: "\u{F700}",
+            charactersIgnoringModifiers: "\u{F700}", isARepeat: false, keyCode: 126)!
+        #expect(TerminalView.scrollGesture(for: event) == nil)
+    }
 }

@@ -48,8 +48,8 @@ class ViewController: NSViewController {
         view.onKeyBytes = { [weak self] bytes in
             self?.session.write(bytes)
         }
-        view.onScroll = { [weak self] delta in
-            self?.scroll(by: delta)
+        view.onScroll = { [weak self] gesture in
+            self?.scroll(gesture)
         }
     }
 
@@ -65,9 +65,19 @@ class ViewController: NSViewController {
         session.resize(to: TerminalSize(rows: rows, columns: columns))
     }
 
-    private func scroll(by delta: Int) {
-        let grid = session.snapshot()
-        scrollOffset = min(max(0, scrollOffset + delta), grid.scrollback.count)
+    private func scroll(_ gesture: ScrollGesture) {
+        let historyDepth = session.snapshot().scrollback.count
+        switch gesture {
+        case .lines(let delta):
+            scrollOffset = min(max(0, scrollOffset + delta), historyDepth)
+        case .page(let up):
+            let rows = Int(view.bounds.height / terminalRenderer.metrics.cellHeight)
+            scrollOffset = min(max(0, scrollOffset + (up ? rows : -rows)), historyDepth)
+        case .toTop:
+            scrollOffset = historyDepth
+        case .toBottom:
+            scrollOffset = 0
+        }
     }
 
     /// Runs at vsync, on the main thread — reads the latest grid without
