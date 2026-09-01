@@ -21,15 +21,15 @@ The core cannot live in the app target: the Xcode project sets
 PTY reader all run off the main thread (`DESIGN.md` §2.2). Fixing this
 after code exists means annotating every type by hand.
 
-- [ ] **M0.1** Create a local SwiftPM package `CortaTerminal` at the repo
+- [x] **M0.1** Create a local SwiftPM package `CortaTerminal` at the repo
       root, with default actor isolation disabled:
       `swiftSettings: [.defaultIsolation(nil)]`.
       *Done when:* the package builds and a test in it can hold mutable
       state across an `await` without a concurrency diagnostic.
-- [ ] **M0.2** Add the package to `Corta.xcodeproj` as a local package
+- [x] **M0.2** Add the package to `Corta.xcodeproj` as a local package
       dependency; link it to the app and unit-test targets.
       *Done when:* `import CortaTerminal` compiles in both.
-- [ ] **M0.3** Confirm `CortaTerminal` imports neither AppKit nor Metal,
+- [x] **M0.3** Confirm `CortaTerminal` imports neither AppKit nor Metal,
       and add a test asserting the package builds for the core alone.
       *Done when:* `swift build` succeeds from the package directory
       without Xcode.
@@ -44,14 +44,14 @@ Riskiest system work first, then pure logic under test, then pixels.
 
 ### PTY (highest system risk — do it headless first)
 
-- [ ] **M1.1** `PTY` type: open a pty pair, spawn a child, read, write,
+- [x] **M1.1** `PTY` type: open a pty pair, spawn a child, read, write,
       close. Use `posix_spawn` with file actions and
       `POSIX_SPAWN_SETSID` — **not** `fork` + Swift code before `exec`
       (`DESIGN.md` §7.2). Reset signals, close inherited descriptors,
       establish the controlling terminal.
       *Done when:* a unit test spawns `/bin/echo hello`, reads `hello`
       back, and observes clean child exit. No UI involved.
-- [ ] **M1.2** Window size: `TIOCSWINSZ`, and `SIGCHLD` handling for
+- [x] **M1.2** Window size: `TIOCSWINSZ`, and `SIGCHLD` handling for
       child exit.
       *Done when:* a test spawns `stty size`, sets 80×24, and reads
       `24 80` back.
