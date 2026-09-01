@@ -51,6 +51,28 @@ extension Performer {
         }
     }
 
+    /// CSI sequences carrying an intermediate byte. Only DECSCUSR is
+    /// implemented; everything else is ignored cleanly.
+    mutating func performIntermediate(
+        final: UInt8,
+        intermediates: Intermediates,
+        parameters: Parameters
+    ) -> Bool {
+        // DECSCUSR — xterm ctlseqs: `CSI Ps SP q` sets the cursor style.
+        // The grid stores it; drawing it is the renderer's concern.
+        guard intermediates.count == 1, intermediates[0] == 0x20, final == 0x71 else { return false }
+        switch parameters[0] {
+        case 0, 1: grid.cursorStyle = .blinkingBlock
+        case 2: grid.cursorStyle = .block
+        case 3: grid.cursorStyle = .blinkingUnderline
+        case 4: grid.cursorStyle = .underline
+        case 5: grid.cursorStyle = .blinkingBar
+        case 6: grid.cursorStyle = .bar
+        default: break
+        }
+        return true
+    }
+
     /// DECSET/DECRST with the `?` private marker (xterm ctlseqs, "DEC
     /// Private Mode Set/Reset"). Returns false when none of the parameters
     /// is a mode this handler owns.

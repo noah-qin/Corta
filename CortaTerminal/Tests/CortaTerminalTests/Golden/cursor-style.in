@@ -1,0 +1,8 @@
+# DECSCUSR — xterm ctlseqs: CSI Ps SP q sets the cursor style (0/1 blinking
+# block, 2 steady block, 3/4 blinking/steady underline, 5/6 blinking/steady
+# bar). It touches no cell, so the grid is exactly the text that was
+# written; the style itself is core state, asserted by the CursorStyle
+# tests. The last sequence returns the cursor to the blinking-block default.
+ab
+\e[1 q\e[6 q\e[0 q
+cd

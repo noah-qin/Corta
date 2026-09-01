@@ -9,6 +9,17 @@ public struct Cursor: Equatable, Sendable {
     }
 }
 
+/// DECSCUSR (xterm ctlseqs, `CSI Ps SP q`): the cursor's shape and blink.
+/// The core stores it; drawing it is the renderer's concern.
+public enum CursorStyle: Equatable, Sendable {
+    case blinkingBlock
+    case block
+    case blinkingUnderline
+    case underline
+    case blinkingBar
+    case bar
+}
+
 public enum LineEraseMode: Sendable {
     /// EL 0 — the cursor and everything right of it.
     case toEnd
@@ -47,6 +58,10 @@ public struct Grid: Sendable {
     public var cursor: Cursor
     public var pen: Pen
 
+    /// DECSCUSR state (xterm ctlseqs). Global to the terminal rather than
+    /// per screen: it survives an alternate-screen round trip.
+    public var cursorStyle: CursorStyle = .blinkingBlock
+
     /// Grapheme clusters too large for a cell's single scalar
     /// (`DESIGN.md` §2.3). Unused until M2.1 adds character widths.
     public var graphemes: GraphemeTable
@@ -84,6 +99,7 @@ public struct Grid: Sendable {
         self.lines = ContiguousArray(repeating: Line(), count: self.rows)
         self.cursor = Cursor()
         self.pen = Pen()
+        self.cursorStyle = .blinkingBlock
         self.graphemes = GraphemeTable()
         self.scrollback = Scrollback(limit: scrollbackLimit)
         self.pendingWrap = false
@@ -470,6 +486,7 @@ public struct Grid: Sendable {
         guard let suspended = suspendedMain else { return }
         suspendedMain = nil
         var main = suspended.grid
+        main.cursorStyle = cursorStyle  // the style is global, not per screen
         if main.rows != rows || main.columns != columns {
             main.resize(rows: rows, columns: columns)
         }

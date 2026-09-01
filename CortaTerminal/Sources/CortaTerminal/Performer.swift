@@ -41,7 +41,16 @@ public struct Performer: ParserPerformer, Sendable {
             _ = performAlternateScreenMode(final: sequence.final, parameters: sequence.parameters)
             return
         }
-        guard sequence.privateMarker == 0, sequence.intermediates.count == 0 else { return }
+        // DECSCUSR (`CSI Ps SP q`) and its kin carry an intermediate byte.
+        if sequence.intermediates.count > 0 {
+            _ = performIntermediate(
+                final: sequence.final,
+                intermediates: sequence.intermediates,
+                parameters: sequence.parameters
+            )
+            return
+        }
+        guard sequence.privateMarker == 0 else { return }
 
         let parameters = sequence.parameters
         if performCursorControl(final: sequence.final, parameters: parameters) { return }
