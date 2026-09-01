@@ -31,6 +31,33 @@ public struct Terminal: Sendable {
         parser.parse(bytes, performer: &performer)
     }
 
+    /// Whether query responses are queued for the child.
+    public var hasPendingOutput: Bool { !performer.state.outputBuffer.isEmpty }
+
+    /// `?2004` — whether the child has enabled bracketed paste (M2.6).
+    public var isBracketedPasteEnabled: Bool { performer.state.bracketedPasteEnabled }
+
+    /// `?1006` — whether the child has asked for SGR-encoded mouse reports
+    /// (M2.7).
+    public var isSgrMouseEncodingEnabled: Bool { performer.state.sgrMouseEncodingEnabled }
+
+    /// The window title set by OSC 0/2 (M2.8). Set-only: the title query is
+    /// never answered (`SECURITY.md` §2.2).
+    public var windowTitle: String? { performer.state.windowTitle }
+
+    /// The working directory reported by OSC 7 (M2.8).
+    public var workingDirectory: String? { performer.state.workingDirectory }
+
+    /// Drains the queued query responses. `TerminalSession` calls this after
+    /// every `feed` and writes the bytes to the PTY; tests read them
+    /// directly, without a PTY. The buffer carries fixed-format response
+    /// bytes only — never stream-supplied text (`SECURITY.md` §2.1).
+    public mutating func takeOutput() -> [UInt8] {
+        let output = performer.state.outputBuffer
+        performer.state.outputBuffer = []
+        return output
+    }
+
     public func dump(options: DumpOptions = .default) -> String {
         performer.grid.dump(options: options)
     }

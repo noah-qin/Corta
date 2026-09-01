@@ -120,7 +120,16 @@ public final class TerminalSession: @unchecked Sendable {
             }
 
             if !batch.isEmpty {
-                state.withLock { $0.terminal.feed(batch) }
+                let responses = state.withLock { current -> [UInt8] in
+                    current.terminal.feed(batch)
+                    return current.terminal.takeOutput()
+                }
+                // Query responses (M2.2). Fixed-format bytes only — never
+                // attacker-supplied text (`SECURITY.md` §2.1) — so they do
+                // not go through `write`, which is for keyboard input.
+                if !responses.isEmpty {
+                    responses.withUnsafeBytes { _ = try? pty.writeAll($0) }
+                }
                 onOutput?()
             }
 
@@ -146,6 +155,28 @@ public final class TerminalSession: @unchecked Sendable {
         bytes.withUnsafeBytes { raw in
             _ = try? pty.writeAll(raw)
         }
+    }
+
+    /// Whether the child has enabled bracketed paste (`?2004`, M2.6).
+    public var isBracketedPasteEnabled: Bool {
+        state.withLock { $0.terminal.isBracketedPasteEnabled }
+    }
+
+    /// Whether the child has asked for SGR-encoded mouse reports (`?1006`,
+    /// M2.7).
+    public var isSgrMouseEncodingEnabled: Bool {
+        state.withLock { $0.terminal.isSgrMouseEncodingEnabled }
+    }
+
+    /// The window title set by the child via OSC 0/2 (M2.8). Set-only — the
+    /// title query is never answered (`SECURITY.md` §2.2).
+    public var windowTitle: String? {
+        state.withLock { $0.terminal.windowTitle }
+    }
+
+    /// The working directory reported via OSC 7 (M2.8).
+    public var workingDirectory: String? {
+        state.withLock { $0.terminal.workingDirectory }
     }
 
     public func resize(to size: TerminalSize) {
