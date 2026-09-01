@@ -9,6 +9,7 @@ import Cocoa
 import CoreText
 import CortaTerminal
 import Metal
+import Synchronization
 
 /// Owns one `TerminalSession` and the `TerminalRenderer`/`TerminalView` that
 /// draw it — the unit a split (M5) will multiply, not a global (`DESIGN.md`
@@ -21,8 +22,14 @@ class ViewController: NSViewController {
     private var scrollOffset = 0
     private var didSizeWindow = false
     /// Set by layout changes the damage diff cannot see (drawable size,
-    /// backing scale); consumed by `updateDamage`.
+    /// backing scale) and by local actions that change what is drawn without
+    /// touching the grid (scrolling); consumed by `updateDamage`.
     private var needsRedraw = true
+    /// Set from the reader thread's `onOutput` (every parse batch); the
+    /// vsync gate checks this one flag and only snapshots and diffs the grid
+    /// when it is set, so a truly idle frame costs a boolean check rather
+    /// than a line-by-line comparison.
+    private let outputPending = Mutex(false)
     /// Coalesces `session.resize` during a live drag (M2.9); the last size
     /// actually requested, so no-op layouts don't re-send the same winsize.
     private var resizeDebouncer: ResizeDebouncer!
@@ -70,6 +77,10 @@ class ViewController: NSViewController {
         lastRequestedSize = initialSize
         resizeDebouncer = ResizeDebouncer { [weak self] size in
             self?.session.resize(to: size)
+        }
+        // Fires on the reader thread after every parse batch.
+        session.onOutput = { [weak self] in
+            self?.noteOutput()
         }
 
         view.onRenderFrame = { [weak self] pass, drawableSize, drawable in
@@ -119,23 +130,48 @@ class ViewController: NSViewController {
         super.viewDidLayout()
         // Layout can change the drawable's size or backing scale without any
         // grid change the damage diff would notice — force one frame.
-        needsRedraw = true
+        invalidateDisplay()
         resizeSessionToFitView()
     }
 
-    /// Runs at vsync before a drawable is acquired: diffs the latest snapshot
-    /// against the renderer's line-granular cache so a static screen costs no
-    /// frame at all (`PERFORMANCE.md` §3).
+    /// Runs at vsync before a drawable is acquired. Cheap path: nothing
+    /// arrived and nothing local changed, so no snapshot, no diff, no frame —
+    /// and the display link parks itself (`TerminalView.frameTick`), which is
+    /// what lets a static screen idle at ~0% CPU (`PERFORMANCE.md` §3). When
+    /// output did arrive, the snapshot is diffed against the renderer's
+    /// line-granular cache and the frame happens only on damage.
     private func updateDamage() -> Bool {
+        let hasOutput = outputPending.withLock { pending -> Bool in
+            let was = pending
+            pending = false
+            return was
+        }
+        guard needsRedraw || hasOutput else { return false }
+        let forced = needsRedraw
+        needsRedraw = false
         let grid = session.snapshot()
+        // The rebuilt rows land in the renderer's cache; `render` diffs once
+        // more when it draws and picks up anything that arrived since.
         let damaged = terminalRenderer.updateInstances(
             grid: grid, scrollOffset: scrollOffset,
             cursorVisible: scrollOffset == 0, selection: nil)
-        if needsRedraw {
-            needsRedraw = false
-            return true
+        return forced || damaged
+    }
+
+    /// Called from the reader thread after each parse batch: record that the
+    /// grid may have changed and wake the (possibly parked) display link.
+    nonisolated private func noteOutput() {
+        outputPending.withLock { $0 = true }
+        Task { @MainActor [weak self] in
+            self?.terminalView.setNeedsRedraw()
         }
-        return damaged
+    }
+
+    /// Marks the display dirty and wakes the display link — for local changes
+    /// (layout, scrolling) that produce no PTY output.
+    private func invalidateDisplay() {
+        needsRedraw = true
+        terminalView.setNeedsRedraw()
     }
 
     private func resizeSessionToFitView() {
@@ -199,6 +235,9 @@ class ViewController: NSViewController {
         case .toBottom:
             scrollOffset = 0
         }
+        // Scrolling moves the viewport without any grid output, so the
+        // output flag alone would never trigger the redraw.
+        invalidateDisplay()
     }
 
     /// Runs at vsync, on the main thread — reads the latest grid without
