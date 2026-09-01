@@ -33,6 +33,10 @@ final class TerminalView: NSView, CALayerDelegate {
     /// Called for a scroll gesture, a page key or ⌘↑/⌘↓ (`M1.20`).
     var onScroll: ((ScrollGesture) -> Void)?
 
+    /// Called when a live window resize ends, so the shell can deliver the
+    /// final size to the child without waiting out the debounce (M2.9).
+    var onLiveResizeEnded: (() -> Void)?
+
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
 
@@ -72,6 +76,11 @@ final class TerminalView: NSView, CALayerDelegate {
     override func layout() {
         super.layout()
         updateDrawableSize()
+    }
+
+    override func viewDidEndLiveResize() {
+        super.viewDidEndLiveResize()
+        onLiveResizeEnded?()
     }
 
     private func updateDrawableSize() {
