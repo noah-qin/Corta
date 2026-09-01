@@ -8,7 +8,7 @@ import simd
 /// size and alignment on arm64 as Metal's `float2`/`float4`, so the two
 /// structs line up byte-for-byte with no packing directives needed — but
 /// only as long as a field added on one side is mirrored on the other.
-struct QuadInstance {
+nonisolated struct QuadInstance {
     var origin: SIMD2<Float>
     var size: SIMD2<Float>
     var color: SIMD4<Float>
@@ -16,7 +16,7 @@ struct QuadInstance {
 }
 
 /// Per-draw-call uniforms. Mirrors `QuadUniforms` in `Shaders.metal`.
-struct QuadUniforms {
+nonisolated struct QuadUniforms {
     var rectOrigin: SIMD2<Float>
     var rectSize: SIMD2<Float>
     var drawableSize: SIMD2<Float>
