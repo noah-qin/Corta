@@ -14,6 +14,8 @@ struct GoldenTests {
         Golden.Case("cursor-movement", rows: 4, columns: 10),
         Golden.Case("erase-line", rows: 4, columns: 10),
         Golden.Case("erase-display", rows: 4, columns: 10),
+        Golden.Case("sgr", rows: 4, columns: 20),
+        Golden.Case("ls-color", rows: 4, columns: 24),
     ]
 
     @Test("golden files match", arguments: cases)

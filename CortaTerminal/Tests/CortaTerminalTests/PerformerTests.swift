@@ -146,3 +146,94 @@ struct PerformerTests {
         #expect(terminal.grid.cursor == Cursor(row: 0, column: 2))
     }
 }
+
+/// M1.13 — SGR, asserted on the cell rather than through a dump.
+///
+/// ECMA-48 §8.3.117 for the base codes; xterm's ctlseqs "Character
+/// Attributes" for 90–107 and the 38/48 extended forms.
+@Suite("SGR")
+struct SGRTests {
+    private func cell(_ source: String, row: Int = 0, column: Int = 0) throws -> Cell {
+        var terminal = Terminal(rows: 4, columns: 20)
+        terminal.feed(try Golden.decode(source))
+        return terminal.grid[row, column]
+    }
+
+    @Test("the ANSI colours set the foreground and background")
+    func ansiColours() throws {
+        #expect(try cell("\\e[31mx").foreground == .indexed(1))
+        #expect(try cell("\\e[37mx").foreground == .indexed(7))
+        #expect(try cell("\\e[44mx").background == .indexed(4))
+        // 90–97 and 100–107 are the bright halves of the same palette.
+        #expect(try cell("\\e[91mx").foreground == .indexed(9))
+        #expect(try cell("\\e[107mx").background == .indexed(15))
+    }
+
+    @Test("256-colour and 24-bit forms set the exact colour")
+    func extendedColours() throws {
+        #expect(try cell("\\e[38;5;208mx").foreground == .indexed(208))
+        #expect(try cell("\\e[48;5;16mx").background == .indexed(16))
+        #expect(try cell("\\e[38;2;10;20;30mx").foreground == .rgb(10, 20, 30))
+        #expect(try cell("\\e[48;2;255;0;127mx").background == .rgb(255, 0, 127))
+        // Components are clamped, not truncated by wrapping.
+        #expect(try cell("\\e[38;2;999;999;999mx").foreground == .rgb(255, 255, 255))
+        #expect(try cell("\\e[38;5;999mx").foreground == .indexed(255))
+    }
+
+    @Test("attributes accumulate and turn off individually")
+    func attributes() throws {
+        #expect(try cell("\\e[1mx").attributes == .bold)
+        #expect(try cell("\\e[1;4;7mx").attributes == [.bold, .underline, .reverse])
+        #expect(try cell("\\e[1;4m\\e[24mx").attributes == .bold)
+        #expect(try cell("\\e[1;2m\\e[22mx").attributes == [])
+        #expect(try cell("\\e[3;9m\\e[23mx").attributes == .strikethrough)
+    }
+
+    /// SGR 0 and the empty-parameter form `CSI m`, which `git log --color`
+    /// emits, both reset everything.
+    @Test("reset clears colours and attributes")
+    func reset() throws {
+        #expect(try cell("\\e[1;31;44m\\e[0mx") == Cell(scalar: 0x78))
+        #expect(try cell("\\e[1;31;44m\\e[mx") == Cell(scalar: 0x78))
+        // 39 and 49 reset one channel each, leaving the other and the
+        // attributes alone.
+        let partial = try cell("\\e[1;31;44m\\e[39mx")
+        #expect(partial.foreground == .default)
+        #expect(partial.background == .indexed(4))
+        #expect(partial.attributes == .bold)
+    }
+
+    @Test("several codes in one sequence apply left to right")
+    func codesApplyInOrder() throws {
+        let cell = try cell("\\e[31;1;38;5;99;4mx")
+        #expect(cell.foreground == .indexed(99))
+        #expect(cell.attributes == [.bold, .underline])
+    }
+
+    /// A truncated extended colour is missing the parameters that say what
+    /// the colour is. Reading the rest of the sequence as attribute codes
+    /// would paint whatever followed; stopping paints nothing.
+    @Test("a truncated extended colour is dropped, not misread")
+    func truncatedExtendedColour() throws {
+        #expect(try cell("\\e[38;5mx").foreground == .default)
+        #expect(try cell("\\e[38;2;1;2mx").foreground == .default)
+        #expect(try cell("\\e[38mx").foreground == .default)
+    }
+
+    @Test("an unknown SGR code is skipped and the rest still applies")
+    func unknownCodesAreSkipped() throws {
+        #expect(try cell("\\e[1;73;31mx").foreground == .indexed(1))
+        #expect(try cell("\\e[1;73;31mx").attributes == .bold)
+    }
+
+    /// The pen persists across rows and sequences until something changes
+    /// it — this is why a program that forgets to reset colours the rest of
+    /// the screen.
+    @Test("the pen persists until it is changed")
+    func penPersists() throws {
+        var terminal = Terminal(rows: 4, columns: 20)
+        terminal.feed(try Golden.decode("\\e[32ma\\r\\nb"))
+        #expect(terminal.grid[0, 0].foreground == .indexed(2))
+        #expect(terminal.grid[1, 0].foreground == .indexed(2))
+    }
+}

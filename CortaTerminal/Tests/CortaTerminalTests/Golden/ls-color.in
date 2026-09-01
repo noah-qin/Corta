@@ -1,0 +1,8 @@
+# Real-world SGR, as the two programs the roadmap names emit it.
+# GNU `ls --color=always` writes SGR 0 before each entry, then `01;34` for a
+# directory and `01;32` for an executable, and resets after it.
+# `git log --color` writes `\e[33m` for the commit line and resets with the
+# empty-parameter form `\e[m`, which ECMA-48 §8.3.117 defines as SGR 0.
+\e[0m\e[01;34mdocs\e[0m  \e[01;32mbuild.sh\e[0m\r\n
+\e[33mcommit 09514d3\e[m\r\n
+Author: someone

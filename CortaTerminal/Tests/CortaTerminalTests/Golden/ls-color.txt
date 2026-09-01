@@ -1,0 +1,14 @@
+rows: 4 columns: 24
+cursor: row 2 column 15
+   0 |docs  build.sh          |
+   1 |commit 09514d3          |
+   2 |Author: someone         |
+   3 |                        |
+styles:
+   0 |AAAA..BBBBBBBB..........|
+   1 |CCCCCCCCCCCCCC..........|
+   2 |........................|
+   3 |........................|
+   A = fg:4 bg:default attrs:bold
+   B = fg:2 bg:default attrs:bold
+   C = fg:3 bg:default attrs:none

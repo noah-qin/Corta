@@ -60,6 +60,8 @@ public struct Performer: ParserPerformer, Sendable {
             case 2: grid.eraseDisplay(.all)
             default: break  // ED 3 erases the scrollback; M1.14.
             }
+        case 0x6D:  // SGR
+            applyGraphicRendition(parameters)
         case 0x4B:  // EL
             switch parameters[0] {
             case 0: grid.eraseLine(.toEnd)
@@ -69,6 +71,83 @@ public struct Performer: ParserPerformer, Sendable {
             }
         default:
             break
+        }
+    }
+
+    // MARK: - SGR
+
+    /// SGR — ECMA-48 §8.3.117, plus the xterm 256-colour and direct-colour
+    /// extensions.
+    ///
+    /// `CSI m` with no parameters is `CSI 0 m`: reset.
+    private mutating func applyGraphicRendition(_ parameters: Parameters) {
+        guard parameters.count > 0 else {
+            grid.pen.reset()
+            return
+        }
+
+        var index = 0
+        while index < parameters.count {
+            let code = parameters[index]
+            switch code {
+            case 0: grid.pen.reset()
+            case 1: grid.pen.attributes.insert(.bold)
+            case 2: grid.pen.attributes.insert(.dim)
+            case 3: grid.pen.attributes.insert(.italic)
+            case 4: grid.pen.attributes.insert(.underline)
+            case 5, 6: grid.pen.attributes.insert(.blink)
+            case 7: grid.pen.attributes.insert(.reverse)
+            case 8: grid.pen.attributes.insert(.invisible)
+            case 9: grid.pen.attributes.insert(.strikethrough)
+            // 21 is doubly-underlined in ECMA-48 and "not bold" in some
+            // terminals. Neither reading is safe to guess, so it is ignored
+            // until there is a double underline to turn on.
+            case 22: grid.pen.attributes.subtract([.bold, .dim])
+            case 23: grid.pen.attributes.remove(.italic)
+            case 24: grid.pen.attributes.remove(.underline)
+            case 25: grid.pen.attributes.remove(.blink)
+            case 27: grid.pen.attributes.remove(.reverse)
+            case 28: grid.pen.attributes.remove(.invisible)
+            case 29: grid.pen.attributes.remove(.strikethrough)
+            case 30...37: grid.pen.foreground = .indexed(UInt8(code - 30))
+            case 39: grid.pen.foreground = .default
+            case 40...47: grid.pen.background = .indexed(UInt8(code - 40))
+            case 49: grid.pen.background = .default
+            case 90...97: grid.pen.foreground = .indexed(UInt8(code - 90 + 8))
+            case 100...107: grid.pen.background = .indexed(UInt8(code - 100 + 8))
+            case 38, 48:
+                guard let (color, consumed) = Self.extendedColor(parameters, at: index) else {
+                    // Malformed: the parameters that would say which colour
+                    // are missing. Stop rather than read the rest of the
+                    // sequence as attribute codes.
+                    return
+                }
+                if code == 38 { grid.pen.foreground = color } else { grid.pen.background = color }
+                index += consumed - 1
+            default: break
+            }
+            index += 1
+        }
+    }
+
+    /// Reads `38;5;n` or `38;2;r;g;b` (and the `48` background forms),
+    /// returning the colour and how many parameters it spanned.
+    ///
+    /// The colon-separated form `38:2::r:g:b` needs sub-parameters, which the
+    /// parser sends to the ignore state until M2.
+    private static func extendedColor(_ parameters: Parameters, at index: Int) -> (Color, Int)? {
+        switch parameters[index + 1] {
+        case 5 where index + 2 < parameters.count:
+            return (.indexed(UInt8(min(parameters[index + 2], 255))), 3)
+        case 2 where index + 4 < parameters.count:
+            let color = Color.rgb(
+                UInt8(min(parameters[index + 2], 255)),
+                UInt8(min(parameters[index + 3], 255)),
+                UInt8(min(parameters[index + 4], 255))
+            )
+            return (color, 5)
+        default:
+            return nil
         }
     }
 }

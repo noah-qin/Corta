@@ -1,0 +1,17 @@
+rows: 4 columns: 20
+cursor: row 3 column 10
+   0 |red plain           |
+   1 |BG no-ul            |
+   2 |256rgb              |
+   3 |bright def          |
+styles:
+   0 |AAA.................|
+   1 |BBCCCCCC............|
+   2 |DDDEEE..............|
+   3 |FFFFFF..............|
+   A = fg:1 bg:default attrs:none
+   B = fg:2 bg:default attrs:bold,underline
+   C = fg:2 bg:default attrs:bold
+   D = fg:208 bg:default attrs:none
+   E = fg:208 bg:rgb(10,20,30) attrs:none
+   F = fg:9 bg:default attrs:none

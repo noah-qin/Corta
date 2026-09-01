@@ -1,0 +1,12 @@
+# SGR — ECMA-48 §8.3.117 for the base codes, and xterm's ctlseqs
+# "Character Attributes" for the rest: 30-37 ANSI foreground, 90-97 bright
+# foreground, 40-47 background, 38;5;n and 48;5;n a palette index,
+# 38;2;r;g;b and 48;2;r;g;b a direct colour. SGR 0 resets everything, 24
+# turns underline off without touching bold, and 39 restores the default
+# foreground.
+# A space written under a non-default rendition carries that rendition; it
+# is only blank when it is written under none.
+\e[31mred\e[0m plain\r\n
+\e[1;4;32mBG\e[24m no-ul\e[0m\r\n
+\e[38;5;208m256\e[48;2;10;20;30mrgb\e[0m\r\n
+\e[91mbright\e[39m def
