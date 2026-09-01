@@ -25,11 +25,11 @@ public struct Performer: ParserPerformer, Sendable {
         // LF, VT and FF all move down one row without changing the column.
         case 0x0A, 0x0B, 0x0C: grid.lineFeed()
         case 0x0D: grid.carriageReturn()
-        default: break  // BEL is M4.7; the rest have no effect on the grid.
+        default: break  // BEL is M4.8; the rest have no effect on the grid.
         }
     }
 
-    // MARK: - CSI
+    // MARK: - CSI dispatch
 
     public mutating func csiDispatch(_ sequence: CSISequence) {
         // A private marker or an intermediate makes it a different sequence
@@ -39,39 +39,11 @@ public struct Performer: ParserPerformer, Sendable {
         guard sequence.privateMarker == 0, sequence.intermediates.count == 0 else { return }
 
         let parameters = sequence.parameters
+        if performCursorControl(final: sequence.final, parameters: parameters) { return }
+        if performErase(final: sequence.final, parameters: parameters) { return }
         switch sequence.final {
-        case 0x41:  // CUU
-            grid.moveCursorUp(parameters.value(0, default: 1))
-        case 0x42:  // CUD
-            grid.moveCursorDown(parameters.value(0, default: 1))
-        case 0x43:  // CUF
-            grid.moveCursorRight(parameters.value(0, default: 1))
-        case 0x44:  // CUB
-            grid.moveCursorLeft(parameters.value(0, default: 1))
-        case 0x48, 0x66:  // CUP, HVP — one-based on the wire, zero-based here
-            grid.moveCursor(
-                row: parameters.value(0, default: 1) - 1,
-                column: parameters.value(1, default: 1) - 1
-            )
-        case 0x4A:  // ED
-            switch parameters[0] {
-            case 0: grid.eraseDisplay(.toEnd)
-            case 1: grid.eraseDisplay(.toStart)
-            case 2: grid.eraseDisplay(.all)
-            // ED 3 (xterm): erase the scrollback. Not in ECMA-48, but tmux
-            // and clear(1) both send it.
-            case 3: grid.scrollback.removeAll()
-            default: break
-            }
         case 0x6D:  // SGR
             applyGraphicRendition(parameters)
-        case 0x4B:  // EL
-            switch parameters[0] {
-            case 0: grid.eraseLine(.toEnd)
-            case 1: grid.eraseLine(.toStart)
-            case 2: grid.eraseLine(.all)
-            default: break
-            }
         default:
             break
         }
