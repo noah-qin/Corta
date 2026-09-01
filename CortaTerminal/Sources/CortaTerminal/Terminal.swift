@@ -41,6 +41,13 @@ public struct Terminal: Sendable {
     /// (M2.7).
     public var isSgrMouseEncodingEnabled: Bool { performer.state.sgrMouseEncodingEnabled }
 
+    /// The window title set by OSC 0/2 (M2.8). Set-only: the title query is
+    /// never answered (`SECURITY.md` §2.2).
+    public var windowTitle: String? { performer.state.windowTitle }
+
+    /// The working directory reported by OSC 7 (M2.8).
+    public var workingDirectory: String? { performer.state.workingDirectory }
+
     /// Drains the queued query responses. `TerminalSession` calls this after
     /// every `feed` and writes the bytes to the PTY; tests read them
     /// directly, without a PTY. The buffer carries fixed-format response

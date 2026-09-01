@@ -168,6 +168,17 @@ public final class TerminalSession: @unchecked Sendable {
         state.withLock { $0.terminal.isSgrMouseEncodingEnabled }
     }
 
+    /// The window title set by the child via OSC 0/2 (M2.8). Set-only — the
+    /// title query is never answered (`SECURITY.md` §2.2).
+    public var windowTitle: String? {
+        state.withLock { $0.terminal.windowTitle }
+    }
+
+    /// The working directory reported via OSC 7 (M2.8).
+    public var workingDirectory: String? {
+        state.withLock { $0.terminal.workingDirectory }
+    }
+
     public func resize(to size: TerminalSize) {
         try? pty.resize(to: size)
         state.withLock { current in
