@@ -41,6 +41,19 @@ public struct Terminal: Sendable {
     /// (M2.7).
     public var isSgrMouseEncodingEnabled: Bool { performer.state.sgrMouseEncodingEnabled }
 
+    /// `?2026` — whether synchronized output is active (M4.3). While true
+    /// the shell must present no frame; when it goes false, present once.
+    public var isSynchronizedOutputEnabled: Bool { performer.state.synchronizedOutputEnabled }
+
+    /// Consumes a pending BEL (M4.8): true at most once per bell, false
+    /// otherwise. The app decides what a bell does; the core only reports
+    /// that one happened.
+    public mutating func takeBell() -> Bool {
+        let requested = performer.state.bellRequested
+        performer.state.bellRequested = false
+        return requested
+    }
+
     /// The window title set by OSC 0/2 (M2.8). Set-only: the title query is
     /// never answered (`SECURITY.md` §2.2).
     public var windowTitle: String? { performer.state.windowTitle }

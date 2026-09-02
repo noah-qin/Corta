@@ -16,6 +16,16 @@ public struct PerformerState: Sendable {
     /// (`?1000` and friends) is the app layer's side of M2.7.
     public internal(set) var sgrMouseEncodingEnabled = false
 
+    /// `?2026` — synchronized output (M4.3). While set, the app must present
+    /// no frame; the core decides nothing about presentation, only tracks
+    /// the mode.
+    public internal(set) var synchronizedOutputEnabled = false
+
+    /// Set by a BEL (M4.8, core side). The core decides nothing about
+    /// audible, visual or muted — that is the app's business. `Terminal`
+    /// exposes this write-only-from-here via `takeBell()`.
+    public internal(set) var bellRequested = false
+
     /// The window title most recently set by OSC 0/2 (M2.8). Never reported
     /// back to the child — the title query is a command-injection vector
     /// (`SECURITY.md` §2.2) and stays unimplemented.

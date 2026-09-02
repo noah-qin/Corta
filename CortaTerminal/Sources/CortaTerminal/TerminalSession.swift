@@ -168,6 +168,17 @@ public final class TerminalSession: @unchecked Sendable {
         state.withLock { $0.terminal.isSgrMouseEncodingEnabled }
     }
 
+    /// Whether synchronized output is active (`?2026`, M4.3). While true the
+    /// shell must present no frame; when it goes false, present once.
+    public var isSynchronizedOutputEnabled: Bool {
+        state.withLock { $0.terminal.isSynchronizedOutputEnabled }
+    }
+
+    /// Consumes a pending BEL (M4.8): true at most once per bell.
+    public func takeBell() -> Bool {
+        state.withLock { $0.terminal.takeBell() }
+    }
+
     /// The window title set by the child via OSC 0/2 (M2.8). Set-only — the
     /// title query is never answered (`SECURITY.md` §2.2).
     public var windowTitle: String? {

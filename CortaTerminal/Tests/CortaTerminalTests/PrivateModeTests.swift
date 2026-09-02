@@ -66,4 +66,50 @@ struct PrivateModeTests {
         terminal.feed(try Golden.decode("\\e[?2004h\\e[?1006h\\e[?2004l"))
         #expect(terminal.takeOutput().isEmpty)
     }
+
+    // MARK: - M4.3 synchronized output
+
+    @Test("?2026 starts off, DECSET turns it on, DECRST turns it off")
+    func synchronizedOutputToggle() throws {
+        var terminal = Terminal()
+        #expect(!terminal.isSynchronizedOutputEnabled)
+        terminal.feed(try Golden.decode("\\e[?2026h"))
+        #expect(terminal.isSynchronizedOutputEnabled)
+        terminal.feed(try Golden.decode("\\e[?2026l"))
+        #expect(!terminal.isSynchronizedOutputEnabled)
+    }
+}
+
+/// M4.8, core side — BEL sets a flag the app reads and clears; the core
+/// decides nothing about audible, visual or muted.
+@Suite("Bell")
+struct BellTests {
+    @Test("BEL sets the flag; takeBell consumes it exactly once")
+    func bellIsConsumedOnce() {
+        var terminal = Terminal()
+        let none = terminal.takeBell()
+        #expect(!none)
+        terminal.feed([0x07])
+        let first = terminal.takeBell()
+        let second = terminal.takeBell()
+        #expect(first)
+        #expect(!second)
+    }
+
+    @Test("two bells before a read still read as pending once")
+    func repeatedBellsCollapse() {
+        var terminal = Terminal()
+        terminal.feed([0x07, 0x07])
+        let first = terminal.takeBell()
+        let second = terminal.takeBell()
+        #expect(first)
+        #expect(!second)
+    }
+
+    @Test("BEL produces no query output")
+    func bellProducesNoOutput() {
+        var terminal = Terminal()
+        terminal.feed([0x07])
+        #expect(terminal.takeOutput().isEmpty)
+    }
 }

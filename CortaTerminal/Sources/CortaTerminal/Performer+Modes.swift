@@ -10,6 +10,8 @@ extension Performer {
                 state.bracketedPasteEnabled = enabled
             case 1006:  // SGR mouse reporting (M2.7)
                 state.sgrMouseEncodingEnabled = enabled
+            case 2026:  // synchronized output (M4.3)
+                state.synchronizedOutputEnabled = enabled
             default:
                 break
             }

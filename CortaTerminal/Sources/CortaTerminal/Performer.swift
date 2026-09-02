@@ -32,7 +32,8 @@ public struct Performer: ParserPerformer, Sendable {
         // LF, VT and FF all move down one row without changing the column.
         case 0x0A, 0x0B, 0x0C: grid.lineFeed()
         case 0x0D: grid.carriageReturn()
-        default: break  // BEL is M4.8; the rest have no effect on the grid.
+        case 0x07: state.bellRequested = true  // BEL (M4.8, core side).
+        default: break  // The rest have no effect on the grid.
         }
     }
 
