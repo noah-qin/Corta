@@ -68,44 +68,96 @@ extension ViewController {
         }
         scrollOffsetBeforeSearch = scrollOffset
 
+        // Symbols, not text, and all at one weight and point size so the
+        // three of them read as a set rather than as three separate
+        // controls. `.small` scale keeps them subordinate to the query.
+        let symbols = NSImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+            .applying(.init(scale: .small))
+
+        let glass = NSImageView(
+            image: NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: nil)!)
+        glass.symbolConfiguration = symbols
+        glass.contentTintColor = .secondaryLabelColor
+
         let field = NSSearchField()
         field.placeholderString = "Find"
         field.sendsWholeSearchString = false
         field.sendsSearchStringImmediately = true
         field.delegate = self
         // The glass pill *is* the container. Left bezelled, the field drew a
-        // second rounded rect (and its own focus ring) inside the first.
+        // second rounded rect (and its own focus ring) inside the first —
+        // and its own magnifying glass and cancel button, which is why the
+        // search-button cell is emptied here in favour of the one above.
         field.isBezeled = false
         field.drawsBackground = false
         field.focusRingType = .none
+        field.font = .systemFont(ofSize: 13)
+        (field.cell as? NSSearchFieldCell)?.searchButtonCell = nil
+        (field.cell as? NSSearchFieldCell)?.cancelButtonCell = nil
         field.translatesAutoresizingMaskIntoConstraints = false
-        field.widthAnchor.constraint(equalToConstant: 160).isActive = true
+        field.widthAnchor.constraint(equalToConstant: 180).isActive = true
 
+        // Monospaced digits: without them "9/10" is narrower than "8/12" and
+        // the buttons to its right twitch sideways as the user types.
         let countLabel = NSTextField(labelWithString: "")
-        countLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-        countLabel.textColor = .secondaryLabelColor
+        countLabel.font = .monospacedDigitSystemFont(
+            ofSize: NSFont.smallSystemFontSize, weight: .regular)
+        countLabel.textColor = .tertiaryLabelColor
+        countLabel.alignment = .right
+        countLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        countLabel.translatesAutoresizingMaskIntoConstraints = false
+        countLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+
+        // A hairline, so the query and the controls that act on it are
+        // visibly two groups inside one pill.
+        let separator = NSBox()
+        separator.boxType = .separator
+        separator.translatesAutoresizingMaskIntoConstraints = false
+        separator.heightAnchor.constraint(equalToConstant: 16).isActive = true
 
         func button(_ symbolName: String, _ description: String, _ action: Selector) -> NSButton {
             let button = NSButton(
                 image: NSImage(systemSymbolName: symbolName, accessibilityDescription: description)!,
                 target: self, action: action)
             button.isBordered = false
+            button.symbolConfiguration = symbols
+            button.contentTintColor = .secondaryLabelColor
+            button.translatesAutoresizingMaskIntoConstraints = false
+            // Square, so the two chevrons and the close mark sit on an even
+            // rhythm instead of each hugging its own glyph's width.
+            button.widthAnchor.constraint(equalToConstant: 22).isActive = true
+            button.heightAnchor.constraint(equalToConstant: 22).isActive = true
             return button
         }
 
         let stack = NSStackView(views: [
-            field, countLabel,
+            glass, field, countLabel, separator,
             button("chevron.up", "Previous Match", #selector(searchBarPrevious(_:))),
             button("chevron.down", "Next Match", #selector(searchBarNext(_:))),
             button("xmark", "Close Find", #selector(searchBarClose(_:))),
         ])
         stack.orientation = .horizontal
+        stack.alignment = .centerY
         stack.spacing = 6
-        stack.edgeInsets = NSEdgeInsets(top: 5, left: 8, bottom: 5, right: 8)
+        // Tighter around the buttons than around the query: the buttons
+        // already carry 22pt of their own box.
+        stack.setCustomSpacing(8, after: glass)
+        stack.setCustomSpacing(10, after: countLabel)
+        stack.setCustomSpacing(10, after: separator)
+        stack.setCustomSpacing(2, after: stack.views[4])
+        stack.setCustomSpacing(6, after: stack.views[5])
+        stack.edgeInsets = NSEdgeInsets(top: 7, left: 12, bottom: 7, right: 8)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
+        // The search bar is where Liquid Glass belongs: a control floating
+        // over content, refracting the terminal underneath it. The container
+        // merges neighbouring glass surfaces and renders them as one batch
+        // rather than a pass each, which is what it is for — the header calls
+        // that out explicitly. One surface today; splits and any later
+        // floating control join the same container.
+        let container = NSGlassEffectContainerView()
         let bar = NSGlassEffectView()
-        bar.cornerRadius = 12
+        bar.style = .regular
         let content = NSView()
         content.addSubview(stack)
         NSLayoutConstraint.activate([
@@ -116,14 +168,44 @@ extension ViewController {
         ])
         bar.contentView = content
         bar.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(bar)
+        // The container merges *descendants* of its `contentView` — the
+        // header is explicit about that — so the glass goes inside a plain
+        // wrapper, not into `contentView` itself. Assigning the glass there
+        // directly left it with nothing to elevate and no merge to perform.
+        let wrapper = NSView()
+        wrapper.addSubview(bar)
         NSLayoutConstraint.activate([
-            bar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
-            bar.topAnchor.constraint(
-                equalTo: view.topAnchor, constant: windowChrome + 6),
+            bar.leadingAnchor.constraint(equalTo: wrapper.leadingAnchor),
+            bar.trailingAnchor.constraint(equalTo: wrapper.trailingAnchor),
+            bar.topAnchor.constraint(equalTo: wrapper.topAnchor),
+            bar.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor),
         ])
+        container.contentView = wrapper
+        container.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(container)
+        NSLayoutConstraint.activate([
+            container.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -14),
+            container.topAnchor.constraint(
+                equalTo: view.topAnchor, constant: windowChrome + 10),
+        ])
+        // A pill: half the bar's own height, resolved after layout rather
+        // than guessed. A fixed 12 on a 36pt bar is a rounded rectangle, and
+        // next to the window's own curvature it read as neither.
+        view.layoutSubtreeIfNeeded()
+        bar.cornerRadius = bar.bounds.height / 2
+
+        // Ease in. Appearing instantly at full size over a screen of text
+        // reads as a glitch; the glass wants to look like it rose out of the
+        // content.
+        container.alphaValue = 0
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.18
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            container.animator().alphaValue = 1
+        }
 
         searchBar = bar
+        searchBarContainer = container
         searchField = field
         searchKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             // Esc closes the bar from anywhere in the app — see the
@@ -138,7 +220,10 @@ extension ViewController {
     /// Dismisses the bar, clears the highlights and puts the viewport back
     /// where it was before the search opened.
     func closeSearchBar() {
-        searchBar?.removeFromSuperview()
+        // The container is what sits in the view hierarchy; removing only
+        // the glass would leave it behind empty.
+        searchBarContainer?.removeFromSuperview()
+        searchBarContainer = nil
         searchBar = nil
         searchField = nil
         if let searchKeyMonitor {

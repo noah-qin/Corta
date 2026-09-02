@@ -76,7 +76,7 @@ import Testing
     }
 
     @Test func primaryFontIsTheSystemMonospacedFontWithAPinnedCascade() {
-        let expected = NSFont.monospacedSystemFont(ofSize: 15, weight: .regular)
+        let expected = NSFont.monospacedSystemFont(ofSize: 15, weight: .medium)
         let primary = TerminalFont.primary(ofSize: 15)
         #expect(CTFontCopyPostScriptName(primary) as String == expected.fontName)
         let attributes = CTFontDescriptorCopyAttributes(CTFontCopyFontDescriptor(primary))

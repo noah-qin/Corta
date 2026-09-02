@@ -120,8 +120,8 @@ nonisolated final class TerminalRenderer {
             font, CTFontGetSize(font) * scale, nil, nil)
         self.quadRenderer = try QuadRenderer(device: device)
         self.glyphAtlas = GlyphAtlas(device: device, font: atlasFont, atlasPixelSize: atlasPixelSize)
-        self.pointMetrics = CellMetrics(font: font)
-        self.metrics = CellMetrics(font: font).scaled(by: scale)
+        self.pointMetrics = CellMetrics(font: font, scale: scale)
+        self.metrics = self.pointMetrics.scaled(by: scale)
         self.scale = scale
     }
 
@@ -134,7 +134,7 @@ nonisolated final class TerminalRenderer {
         let atlasFont = CTFontCreateCopyWithAttributes(
             font, CTFontGetSize(font) * newScale, nil, nil)
         glyphAtlas.reset(font: atlasFont)
-        pointMetrics = CellMetrics(font: font)
+        pointMetrics = CellMetrics(font: font, scale: newScale)
         metrics = pointMetrics.scaled(by: newScale)
         scale = newScale
         invalidate()
@@ -419,6 +419,24 @@ nonisolated final class TerminalRenderer {
             guard !cell.attributes.contains(.invisible),
                 !cell.attributes.contains(.wideSpacer)
             else { continue }
+            // Block elements are geometry, not glyphs: rounding the cell up
+            // from a fractional advance leaves every glyph a point short of
+            // its cell, which between block characters is a visible grid of
+            // gaps and a cell average well below the requested colour
+            // (`BlockElements`). Drawn as rects they meet exactly.
+            if let pieces = BlockElements.pieces(for: cell.scalar) {
+                for piece in pieces {
+                    background.append(
+                        QuadInstance(
+                            origin: .init(
+                                origin.x + piece.rect.x * cellWidth,
+                                origin.y + piece.rect.y * cellHeight),
+                            size: .init(piece.rect.z * cellWidth, piece.rect.w * cellHeight),
+                            color: .init(fg.x, fg.y, fg.z, fg.w * piece.alpha)))
+                }
+                continue
+            }
+
             let bold = cell.attributes.contains(.bold)
             let info: GlyphAtlas.GlyphInfo
             if !cell.grapheme.isNone,
@@ -459,6 +477,16 @@ nonisolated final class TerminalRenderer {
                     origin.x + (boxWidth - glyphSize.x) / 2,
                     origin.y + baseline - (info.bearing.y + info.size.y) * fit
                 )
+            }
+            // The atlas already contains Core Text's antialiasing. Sampling
+            // that bitmap from a fractional destination origin filters it a
+            // second time and makes 12pt ASCII look soft. Ordinary coverage
+            // glyphs are 1:1 with the drawable, so align their quads to the
+            // device-pixel grid. Wide/fallback and color glyphs may be
+            // intentionally scaled and keep linear sampling.
+            if !info.isColor && !cell.attributes.contains(.wide) {
+                glyphOrigin.x = glyphOrigin.x.rounded()
+                glyphOrigin.y = glyphOrigin.y.rounded()
             }
             // Color glyphs (Apple Color Emoji bitmaps in the RGBA atlas)
             // draw in the color pass, which ignores the tint — routing one

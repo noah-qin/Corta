@@ -29,7 +29,10 @@ import Testing
     /// The end of the chain: a real spawned child reports the variable.
     @Test func aSpawnedChildSeesTheLocale() throws {
         let session = try TerminalSession(
-            executable: "/usr/bin/env", size: TerminalSize(rows: 40, columns: 100))
+            // Leave room for the host's complete environment. Adding a
+            // legitimate variable such as COLORTERM must not scroll LANG
+            // out of the fixture before the assertion can observe it.
+            executable: "/usr/bin/env", size: TerminalSize(rows: 64, columns: 100))
         defer { session.stop() }
         var dump = ""
         for _ in 0..<3000 {

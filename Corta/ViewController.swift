@@ -33,7 +33,11 @@ class ViewController: NSViewController {
     /// The atlas is rasterised for one size, so a change rebuilds the
     /// renderer — see `setFontSize`.
     var fontSize: CGFloat = ViewController.defaultFontSize
-    static let defaultFontSize: CGFloat = 14
+    /// Matches the stock 120x30 Terminal profile on this Mac. Keeping the
+    /// terminal's default here (rather than compensating with narrower cell
+    /// geometry) preserves the font's real advance and makes TUIs such as
+    /// Claude Code occupy the same physical proportions in both apps.
+    static let defaultFontSize: CGFloat = 12
     var scrollOffset = 0
     /// The current text selection, owned by `ViewController+Selection.swift`
     /// (Track C) and read by the render loop. Stored here because extensions
@@ -66,6 +70,7 @@ class ViewController: NSViewController {
 
     /// The Liquid Glass search bar; `nil` when closed.
     var searchBar: NSGlassEffectView?
+    var searchBarContainer: NSGlassEffectContainerView?
     var searchField: NSTextField?
     /// Every current match, oldest first — recomputed on each query or grid
     /// change, not incrementally maintained.
@@ -144,34 +149,29 @@ class ViewController: NSViewController {
         // visible content, so row 0 — the only row with anything on it in a
         // fresh shell — was drawn entirely inside the clipped strip and the
         // window looked black. `viewDidLayout` sets the frame outright.
-        // Liquid Glass (macOS 26). `NSGlassEffectView` embeds its content in
-        // the system's glass material — the refraction, blur and specular
-        // response are the platform's, not a blur we approximate. The
-        // terminal draws its background translucent on top so the glass
-        // reads through it; an alpha over an unblurred desktop is just a
-        // dimmer desktop.
-        let glass = NSGlassEffectView()
-        glass.style = .regular
-        glass.cornerRadius = TerminalLayout.windowCornerRadius
-        // Tinted toward the terminal's own background so the glass stays a
-        // dark surface whatever is behind the window.
-        glass.tintColor = NSColor(srgbRed: 40 / 255, green: 42 / 255, blue: 47 / 255, alpha: 1)
-        glass.contentView = view
-        glass.translatesAutoresizingMaskIntoConstraints = false
-        self.view.addSubview(glass)
+        // The terminal canvas is the CONTENT layer, and content layers are
+        // opaque. Liquid Glass belongs to the navigation and control layer —
+        // a small surface floating *over* content, refracting what is behind
+        // it. Wrapping the whole canvas in `NSGlassEffectView` used it the
+        // wrong way round: there was nothing underneath worth refracting, and
+        // the material's own light raised the background's luminance, costing
+        // every colour about a fifth of its contrast ratio. The glass now
+        // lives where it is meant to — see `ViewController+Search`.
+        self.view.addSubview(view)
         // Constraints, not a frame set from a layout callback. The view is
         // born at the target content size while the storyboard's view is
-        // still its own smaller size, and `viewDidAppear`'s `setContentSize`
+        // still its own smaller size, and `viewWillAppear`'s `setContentSize`
         // then grows the superview — but a frame assigned in `viewDidLayout`
         // only tracks if that callback runs again afterwards, which it did
         // not: the view stayed 480x270 inside a 1080x510 superview, so the
         // drawable was half size and the grid came out 53x15 instead of
         // 120x30. AppKit maintains constraints regardless of callback order.
+        view.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            glass.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
-            glass.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
-            glass.topAnchor.constraint(equalTo: self.view.topAnchor),
-            glass.bottomAnchor.constraint(equalTo: self.view.bottomAnchor),
+            view.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
+            view.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
+            view.topAnchor.constraint(equalTo: self.view.topAnchor),
+            view.bottomAnchor.constraint(equalTo: self.view.bottomAnchor),
         ])
         terminalView = view
 
@@ -219,7 +219,7 @@ class ViewController: NSViewController {
         view.preeditFontProvider = { [weak self] in
             guard let self else {
                 return NSFont.monospacedSystemFont(
-                    ofSize: ViewController.defaultFontSize, weight: .regular)
+                    ofSize: ViewController.defaultFontSize, weight: .medium)
             }
             return TerminalFont.primary(ofSize: fontSize) as NSFont
         }

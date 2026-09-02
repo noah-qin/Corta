@@ -3,9 +3,9 @@ import CoreText
 
 /// The terminal's font stack.
 ///
-/// **Primary**: the system monospaced font (SF Mono), asked for through
-/// AppKit so the exact face tracks the OS. **Fallback**: a *pinned* cascade
-/// list — PingFang SC for CJK, Apple Color Emoji for emoji — set as
+/// **Latin / ASCII / code**: System Monospaced, asked for through AppKit so
+/// the exact face tracks the OS. **Chinese**: PingFang SC. **Emoji**: Apple
+/// Color Emoji. The two fallbacks are a *pinned* cascade list set as
 /// `kCTFontCascadeListAttribute` on the font's descriptor, so a scalar the
 /// primary lacks resolves deterministically instead of walking whatever
 /// cascade the system happens to pick for the current locale.
@@ -28,8 +28,11 @@ nonisolated enum TerminalFont {
     ]
 
     /// The primary font at `size` points, cascade list already pinned.
+    /// `.medium` matches Terminal.app's on-screen stem density at 12pt;
+    /// `.regular` rasterises roughly a quarter lighter through the grayscale
+    /// Metal atlas and reads soft even when its quads are pixel-aligned.
     static func primary(ofSize size: CGFloat) -> CTFont {
-        let system = NSFont.monospacedSystemFont(ofSize: size, weight: .regular) as CTFont
+        let system = NSFont.monospacedSystemFont(ofSize: size, weight: .medium) as CTFont
         return pinningCascadeList(system, size: size)
     }
 

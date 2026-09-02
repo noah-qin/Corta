@@ -20,6 +20,7 @@ public enum ChildEnvironment {
     /// - `CORTA_` is reserved for our own internals.
     static let strippedNames: Set<String> = [
         "COLUMNS",
+        "COLORTERM",
         "LINES",
         "LC_TERMINAL",
         "LC_TERMINAL_VERSION",
@@ -51,6 +52,10 @@ public enum ChildEnvironment {
         }
         result["TERM"] = term
         result["TERM_PROGRAM"] = "Corta"
+        // The parser supports 24-bit SGR colours. Advertising that capability
+        // keeps applications such as Claude Code from quantising its orange
+        // brand colour to xterm-256's pink 215/135/135 cube entry.
+        result["COLORTERM"] = "truecolor"
         // A child with no locale runs in the C locale, where zsh's line
         // editor handles input one byte at a time: typing CJK or an emoji
         // produced isolated continuation bytes on screen instead of the

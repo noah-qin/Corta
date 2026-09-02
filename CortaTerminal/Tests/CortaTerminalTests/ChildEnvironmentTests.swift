@@ -11,10 +11,12 @@ struct ChildEnvironmentTests {
             "TERMCAP": "junk",
             "TERM_PROGRAM": "Apple_Terminal",
             "COLUMNS": "999",
+            "COLORTERM": "inherited-and-wrong",
             "LINES": "999",
         ])
         #expect(sanitized["TERM"] == "xterm-256color")
         #expect(sanitized["TERM_PROGRAM"] == "Corta")
+        #expect(sanitized["COLORTERM"] == "truecolor")
         #expect(sanitized["TERMCAP"] == nil)
         #expect(sanitized["COLUMNS"] == nil)
         #expect(sanitized["LINES"] == nil)

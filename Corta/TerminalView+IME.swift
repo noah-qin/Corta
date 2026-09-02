@@ -146,7 +146,8 @@ final class MarkedTextOverlayView: NSView {
     /// The renderer's primary font (SF Mono) at the default size; the shell
     /// re-points this at the current size on every `show` via
     /// `TerminalView.preeditFontProvider`, so ⌘=/⌘- resizes marked text too.
-    var font = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
+    var font = NSFont.monospacedSystemFont(
+        ofSize: ViewController.defaultFontSize, weight: .medium)
 
     /// Set by the terminal view before each `show`; needed to size and
     /// vertically centre the text against the cell it covers.
@@ -154,7 +155,7 @@ final class MarkedTextOverlayView: NSView {
 
     /// Same light grey the renderer resolves `.default` foreground to
     /// (`TerminalColorPalette.defaultForeground`).
-    private let textColor = NSColor(white: 0.898, alpha: 1)
+    private let textColor = NSColor(white: 0.96, alpha: 1)
 
     override var isFlipped: Bool { true }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }

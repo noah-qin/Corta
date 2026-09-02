@@ -13,7 +13,10 @@ import simd
 /// untagged, they were interpreted in the display's own space and rendered
 /// oversaturated on a P3 screen.
 nonisolated enum TerminalColorPalette {
-    static let defaultForeground = SIMD4<Float>(0.898, 0.898, 0.898, 1)
+    /// Slightly brighter than Terminal.app's stock grey. At 12pt the extra
+    /// luminance keeps the System Monospaced stems clean against the dark
+    /// blue surface without turning coloured ANSI output pastel.
+    static let defaultForeground = SIMD4<Float>(0.96, 0.96, 0.96, 1)
     /// A soft black rather than pure black — the tone Terminal.app's dark
     /// profiles have, without the hard contrast of pure #000.
     ///
@@ -21,9 +24,16 @@ nonisolated enum TerminalColorPalette {
     /// over a window full of text, and the terminal has to stay readable
     /// over anything. Lowering this constant is all it takes to bring it
     /// back; the window and layer already permit it.
-    static let backgroundOpacity: Float = 0.72
+    /// Opaque. The terminal canvas is the *content* layer, not a glass
+    /// surface — see the structure note in `ViewController`. Content that is
+    /// translucent over glass pays for it in contrast: at 0.72 every colour
+    /// lost a fifth of its ratio against the background, which reads as the
+    /// whole screen being washed out.
+    static let backgroundOpacity: Float = 1.0
+    /// A dark blue rather than a neutral grey, at the same luminance as
+    /// Terminal.app's own background.
     static let defaultBackground = SIMD4<Float>(
-        40.0 / 255, 42.0 / 255, 47.0 / 255, backgroundOpacity)
+        35.0 / 255, 40.0 / 255, 51.0 / 255, backgroundOpacity)
     static var clearColor: SIMD4<Float> {
         let c = defaultBackground
         return SIMD4<Float>(c.x * c.w, c.y * c.w, c.z * c.w, c.w)

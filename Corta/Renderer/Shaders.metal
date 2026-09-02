@@ -62,6 +62,10 @@ fragment float4 quad_fragment_glyph(VertexOut in [[stage_in]],
                                      sampler atlasSampler [[sampler(0)]]) {
     // The atlas is `r8Unorm` coverage; `.r` is the glyph's alpha.
     float coverage = atlas.sample(atlasSampler, in.uv).r;
+    // Metal composites grayscale coverage without the stem treatment used
+    // by AppKit text. A modest curve restores the edge density; without it
+    // 12pt SF Mono looks pale and fuzzy beside Terminal.app.
+    coverage = pow(coverage, 1.0 / 1.45);
     return float4(in.color.rgb, in.color.a * coverage);
 }
 
