@@ -191,3 +191,39 @@ Run at every milestone, because these are the actual workload:
 4. A long training run producing continuous output for minutes
 5. A Python REPL, paste a multi-line function
 6. `git log --graph --color` through a pager
+
+**2026-09-02 — M2 closeout pass (items 1 and 3).** tmux, htop and
+Neovim were not installed and the machine has no Homebrew
+(`/opt/homebrew` absent; installing Homebrew itself needs sudo, which
+unattended runs must not do), so tmux 3.5a and htop 3.4.1 were built
+from source into a user-writable prefix (`/tmp/corta-tools`). Neovim
+was not installed; nothing in items 1 or 3 needs it, so item 2 is
+unaffected either way.
+
+- **Item 1 (`tmux` split running `htop`, resize) — ran, no
+  artifacts.** A live Corta window was launched with a `SHELL` wrapper
+  that started tmux (private socket), split the window, and ran htop
+  in the lower pane. Resizing the OS window from outside requires
+  Accessibility permission and would prompt, so that half was not
+  attempted unattended — a human still needs to drag the window edge.
+  Instead tmux's own layout changes exercised the same terminal
+  machinery from inside the child: `resize-pane` and `select-layout`
+  force DECSTBM reprogramming and deliver SIGWINCH to htop.
+  `capture-pane` after each step (baseline, grown, shrunk, two forced
+  relayouts, htop tree-view and sort toggles) showed no garbage cells,
+  no misaligned status line and no missing rows; htop's F-key footer
+  and the tmux status line stayed correct throughout. A screenshot of
+  the live window showed the htop footer and tmux status line
+  upright and full size. `stty size` in the child (30 120) agreed with
+  the tmux client size (120x30).
+- **Item 3 (`ssh` to a remote host, `vim`, resize) — cannot run
+  here.** `~/.ssh/config` contains exactly one entry, `github.com`,
+  which is a git forge with no shell access; there is no configured,
+  reachable remote host, and unknown hosts were not probed. The item
+  remains unticked until a real target exists.
+- **esctest re-run — reproduces the M2 number exactly.** esctest2
+  (ThomasDickey/esctest2) with `--expected-terminal xterm
+  --max-vt-level 3`, run as the child of a live Corta window against
+  the M2-closeout build: **50 passed, 334 known bugs, 184 failed of
+  568** — identical totals to the M2 record, and the list of failing
+  tests is byte-identical to the M2 run's. No new failures, no fixes.
