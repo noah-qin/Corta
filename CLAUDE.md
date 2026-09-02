@@ -35,6 +35,11 @@ Do not reopen these without a concrete new reason. Each is explained in
   the AppKit shell only.
 - **Cells are fixed-size; complex graphemes spill to a side table.** Rows
   are variable-length.
+- **Selection lives in the core and is document-anchored.** Selection
+  coordinates are document rows (scrollback counts backwards from the
+  screen boundary), never viewport rows, and the rules that consult the
+  `wrapped` flag live in `CortaTerminal/Selection.swift` — the app stores
+  only the range. See `docs/DESIGN.md` §2.7.
 - **Multi-viewport from day one.** Render into a given rect, never into
   "the window". No singletons in the core.
 - **`$TERM` is `xterm-256color`.** A deliberate lie until conformance is

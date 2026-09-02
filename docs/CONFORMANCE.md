@@ -70,8 +70,8 @@ be **fixed-format and never echo attacker-controlled text** — see
 | ------------------------------------------------ | ---- | -------------------------------------------------- |
 | Keyboard → PTY, including control and function keys | P0 |                                                    |
 | **CJK IME** (`NSTextInputClient`)                | P0   | Harder than it looks — `DESIGN.md` §7.1             |
-| Copy / paste with bracketed paste                | P0   |                                                    |
-| Keyboard and mouse text selection                | P0   | Must respect the soft-wrap flag                     |
+| Copy / paste with bracketed paste                | P0   | Copy joins soft-wrapped lines into one and trims trailing blanks; ⌘C / Edit ▸ Copy |
+| Keyboard and mouse text selection                | P0   | Drag, double-click word, triple-click logical line, ⇧-click extend; document-anchored — `DESIGN.md` §2.7 |
 | Configurable key bindings                        | P1   |                                                    |
 | Click-to-position, drag-to-select                | P1   |                                                    |
 | ⌘-click to open a URL                            | P1   | Scheme allowlist required — `SECURITY.md` §2.4      |
@@ -84,7 +84,7 @@ be **fixed-format and never echo attacker-controlled text** — see
 | GPU glyph atlas + instanced quads                | P0   | One draw call per screen                            |
 | Foreground / background, bold, italic, underline | P0   |                                                    |
 | Cursor: block / bar / underline, blink           | P0   |                                                    |
-| Selection highlight                              | P0   |                                                    |
+| Selection highlight                              | P0   | Document-anchored quads; follows its text as output scrolls |
 | Retina / HiDPI scaling                           | P0   |                                                    |
 | **Font fallback** for CJK and emoji              | P0   | Core Text's strongest suit                          |
 | Atlas eviction (LRU or multi-page)               | P0   | A CJK session exhausts a single page                |
