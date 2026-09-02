@@ -92,6 +92,32 @@ See `PERFORMANCE.md` §2. The single most important performance property:
 if we stop draining the PTY, the child process blocks on `write`, and the
 terminal becomes the reason a training job is slow.
 
+### 2.7 Selection is anchored to the document, not the viewport
+
+Selection coordinates are document coordinates (`CortaTerminal/Selection.swift`):
+row ≥ 0 is a live-screen row, row < 0 addresses the scrollback counting
+backwards from the screen boundary (row −1 is the newest history line).
+A selection therefore survives the user scrolling, and when output pushes
+lines into the scrollback the stored rows shift by the growth — the
+highlight follows its text. The rules that consult the grid live in the
+core, not the shell:
+
+- **Copying a soft-wrapped line yields one line** with no inserted
+  newline, and trailing blanks are trimmed from every other copied line.
+- **Word selection** covers letters, digits and `_ - . /` — a path
+  selects as one word. Triple-click selects the logical line, following
+  `wrapped` in both directions.
+
+One known limit: the anchoring shift is computed from the scrollback's
+count, which stops growing once the ring is full, so a selection made
+while a full ring floods stays put instead of tracking its text. Exact
+anchoring under eviction needs a monotonic line counter on `Scrollback`.
+
+Reflow (M4.2) and search (M4.4) must preserve these invariants: reflow
+rewrites document rows wholesale and must invalidate or re-anchor any
+live selection, and search matches must be reported in the same document
+coordinates so a match can be selected verbatim.
+
 ---
 
 ## 3. Architecture
