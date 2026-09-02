@@ -17,7 +17,7 @@ extension ViewController {
         case .lines(let delta):
             scrollOffset = min(max(0, scrollOffset + delta), historyDepth)
         case .page(let up):
-            let usableHeight = view.bounds.height - Self.insetHeight
+            let usableHeight = view.bounds.height - TerminalLayout.insetHeight
             let rows = Int(usableHeight / terminalRenderer.pointMetrics.cellHeight)
             scrollOffset = min(max(0, scrollOffset + (up ? rows : -rows)), historyDepth)
         case .toTop:
@@ -155,9 +155,9 @@ extension ViewController {
         for point: CGPoint, viewHeight: CGFloat, metrics: CellMetrics, grid: Grid, scrollOffset: Int
     ) -> SelectionPoint {
         let gridTop = max(
-            Self.contentInsets.top,
-            viewHeight - Self.contentInsets.bottom - CGFloat(grid.rows) * metrics.cellHeight)
-        let column = Int(((point.x - Self.contentInsets.left) / metrics.cellWidth).rounded(.down))
+            TerminalLayout.insets.top,
+            viewHeight - TerminalLayout.insets.bottom - CGFloat(grid.rows) * metrics.cellHeight)
+        let column = Int(((point.x - TerminalLayout.insets.left) / metrics.cellWidth).rounded(.down))
         let row = Int(((point.y - gridTop) / metrics.cellHeight).rounded(.down))
         return SelectionPoint(
             row: min(max(0, row), grid.rows - 1) - scrollOffset,

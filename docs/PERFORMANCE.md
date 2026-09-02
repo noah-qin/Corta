@@ -89,6 +89,7 @@ idiomatic Swift.
 | Convert to `String` only at the Core Text boundary        | Shaping is the only place that needs it                     |
 | No `NSString` / `NSArray` / ObjC bridging                 | Bridging cost per element                                   |
 | No allocation per cell or per frame                       | Reuse buffers; size them at resize, not at draw             |
+| Reuse pipelines and the atlas texture when the font changes | Rebuilding a `TerminalRenderer` per keystroke recompiled pipeline states and allocated a new atlas texture, which is what made key-repeat font sizing stutter |
 | Triple-buffer the Metal instance buffer                   | Avoids a CPU/GPU stall waiting on the previous frame        |
 | Rebuild the instance buffer only on damage                | Idle CPU must be ~0%; a static screen rebuilds nothing      |
 

@@ -267,4 +267,31 @@ struct GridTests {
         grid.eraseLine(.toEnd)
         #expect(!grid.line(0).wrapped)
     }
+
+    /// Shrinking used to `removeLast`, which threw away the rows the cursor
+    /// and the newest output were on — and threw them away silently, since
+    /// they never reached the scrollback either. Making a window smaller ate
+    /// the last commands you had run.
+    @Test func shrinkingRowsScrollsIntoScrollbackInsteadOfTruncating() {
+        var grid = Grid(rows: 5, columns: 10, scrollbackLimit: 100)
+        for line in 1...5 {
+            grid.write(UInt32(48 + line))   // "1" ... "5"
+            if line < 5 { grid.lineFeed() }
+        }
+        #expect(grid.cursor.row == 4)
+
+        grid.resize(rows: 3, columns: 10)
+
+        // The newest row survives and the cursor is still on it.
+        #expect(grid.rows == 3)
+        #expect(grid.cursor.row == 2)
+        // `lineFeed` moves down without returning to column 0, so row n
+        // holds its digit at column n.
+        #expect(grid.line(2)[4].scalar == 53)   // "5", from old row 4
+        // The rows that came off the top went to history, not to nothing.
+        #expect(grid.scrollback.count == 2)
+        #expect(grid.scrollback[0][0].scalar == 49)   // "1", old row 0
+        #expect(grid.scrollback[1][1].scalar == 50)   // "2", old row 1
+    }
+
 }

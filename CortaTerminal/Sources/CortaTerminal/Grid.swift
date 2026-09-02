@@ -469,7 +469,24 @@ public struct Grid: Sendable {
         guard newRows != rows || newColumns != columns else { return }
 
         if newRows < rows {
-            lines.removeLast(rows - newRows)
+            // Take the rows off the TOP, into scrollback — not off the
+            // bottom. The bottom is where the cursor and the newest output
+            // are; truncating there destroys the most recent lines outright,
+            // and silently, since they never reach the history either.
+            // Shrinking a window used to eat the last commands you ran.
+            //
+            // Only as many rows as it takes to keep the cursor on screen
+            // move up; anything still surplus is below the cursor and blank,
+            // so it comes off the bottom as before.
+            let excess = rows - newRows
+            let fromTop = min(excess, max(0, cursor.row - (newRows - 1)))
+            for row in 0..<fromTop { scrollback.push(lines[row]) }
+            if fromTop > 0 {
+                lines.removeFirst(fromTop)
+                cursor.row -= fromTop
+            }
+            let surplus = excess - fromTop
+            if surplus > 0 { lines.removeLast(surplus) }
         } else if newRows > rows {
             lines.append(contentsOf: repeatElement(Line(), count: newRows - rows))
         }

@@ -61,8 +61,8 @@ nonisolated final class GlyphAtlas {
 
     let atlasPixelSize: Int
     private(set) var texture: MTLTexture
-    private let font: CTFont
-    private let boldFont: CTFont
+    private var font: CTFont
+    private var boldFont: CTFont
     private var cache: [GlyphKey: GlyphInfo] = [:]
     private var clusterCache: [ClusterKey: GlyphInfo] = [:]
     private var nextOrigin = (x: 0, y: 1)  // row 0 is reserved: see `solidWhiteUV`
@@ -99,6 +99,26 @@ nonisolated final class GlyphAtlas {
         descriptor.storageMode = .managed
         self.texture = device.makeTexture(descriptor: descriptor)!
 
+        var white: UInt8 = 255
+        texture.replace(
+            region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: &white, bytesPerRow: 1)
+    }
+
+    /// Re-points the atlas at a new font, reusing the texture.
+    ///
+    /// Runtime font sizing (cmd-=/cmd--) used to construct a whole new
+    /// renderer per keystroke, which meant a fresh multi-megabyte atlas
+    /// texture *and* fresh Metal pipeline states every time a key repeated.
+    /// The font changes; the storage and the pipelines do not need to.
+    func reset(font newFont: CTFont) {
+        font = newFont
+        boldFont = CTFontCreateCopyWithSymbolicTraits(newFont, 0, nil, .traitBold, .traitBold)
+            ?? newFont
+        cache.removeAll(keepingCapacity: true)
+        clusterCache.removeAll(keepingCapacity: true)
+        nextOrigin = (x: 0, y: 1)
+        rowHeight = 1
+        evictionCount += 1
         var white: UInt8 = 255
         texture.replace(
             region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: &white, bytesPerRow: 1)

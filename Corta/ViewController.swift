@@ -68,22 +68,6 @@ class ViewController: NSViewController {
     /// so it follows a font or size change.
     private let defaultColumns = 120
     private let defaultRows = 30
-    /// Breathing room between the grid and the window edge, in points. The
-    /// grid used to start at x=0, which clipped the left column's glyphs
-    /// against the window frame.
-    ///
-    /// The top is larger because the window uses `.fullSizeContentView`: the
-    /// background runs the full height so there is no seam at the titlebar,
-    /// and the grid starts below where the traffic lights sit.
-    static let titlebarHeight: CGFloat = 28
-    /// Matches the window's own curvature so the glass and the drawable end
-    /// on the same arc.
-    static let windowCornerRadius: CGFloat = 12
-    static let contentInsets = NSEdgeInsets(
-        top: 8 + titlebarHeight, left: 10, bottom: 8, right: 10)
-    static var insetWidth: CGFloat { contentInsets.left + contentInsets.right }
-    static var insetHeight: CGFloat { contentInsets.top + contentInsets.bottom }
-
     let minimumColumns = 20
     let minimumRows = 5
 
@@ -101,8 +85,8 @@ class ViewController: NSViewController {
 
         let metrics = terminalRenderer.pointMetrics
         let contentSize = NSSize(
-            width: CGFloat(defaultColumns) * metrics.cellWidth + Self.insetWidth,
-            height: CGFloat(defaultRows) * metrics.cellHeight + Self.insetHeight)
+            width: CGFloat(defaultColumns) * metrics.cellWidth + TerminalLayout.insetWidth,
+            height: CGFloat(defaultRows) * metrics.cellHeight + TerminalLayout.insetHeight)
         // Size the container to the target content size *before* the first
         // layout. Otherwise the storyboard's 480x270 produces a transient
         // 53x15 session, the shell's early output is laid out against that,
@@ -130,7 +114,7 @@ class ViewController: NSViewController {
         // dimmer desktop.
         let glass = NSGlassEffectView()
         glass.style = .regular
-        glass.cornerRadius = Self.windowCornerRadius
+        glass.cornerRadius = TerminalLayout.windowCornerRadius
         // Tinted toward the terminal's own background so the glass stays a
         // dark surface whatever is behind the window.
         glass.tintColor = NSColor(srgbRed: 40 / 255, green: 42 / 255, blue: 47 / 255, alpha: 1)
@@ -203,8 +187,8 @@ class ViewController: NSViewController {
             let metrics = terminalRenderer.pointMetrics
             let cursor = session.snapshot().cursor
             return CGRect(
-                x: Self.contentInsets.left + CGFloat(cursor.column) * metrics.cellWidth,
-                y: Self.contentInsets.top + CGFloat(cursor.row) * metrics.cellHeight,
+                x: TerminalLayout.insets.left + CGFloat(cursor.column) * metrics.cellWidth,
+                y: TerminalLayout.insets.top + CGFloat(cursor.row) * metrics.cellHeight,
                 width: metrics.cellWidth, height: metrics.cellHeight)
         }
         // SGR mouse reports name an on-screen cell, so they need the same
@@ -253,11 +237,11 @@ class ViewController: NSViewController {
         window.backgroundColor = .clear
         window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
         window.contentMinSize = NSSize(
-            width: CGFloat(minimumColumns) * metrics.cellWidth + Self.insetWidth,
-            height: CGFloat(minimumRows) * metrics.cellHeight + Self.insetHeight)
+            width: CGFloat(minimumColumns) * metrics.cellWidth + TerminalLayout.insetWidth,
+            height: CGFloat(minimumRows) * metrics.cellHeight + TerminalLayout.insetHeight)
         window.setContentSize(NSSize(
-            width: CGFloat(defaultColumns) * metrics.cellWidth + Self.insetWidth,
-            height: CGFloat(defaultRows) * metrics.cellHeight + Self.insetHeight))
+            width: CGFloat(defaultColumns) * metrics.cellWidth + TerminalLayout.insetWidth,
+            height: CGFloat(defaultRows) * metrics.cellHeight + TerminalLayout.insetHeight))
         // Nothing else claims first responder, and without one the view
         // hierarchy — the terminal view, this controller — is not in the
         // responder chain at all: keyDown never fires and menu actions
@@ -334,8 +318,8 @@ class ViewController: NSViewController {
         // window's frame is transient by construction; skip it.
         guard abs(view.bounds.height - window.frame.height) < 1 else { return }
         let usable = CGSize(
-            width: view.bounds.width - Self.insetWidth,
-            height: view.bounds.height - Self.insetHeight)
+            width: view.bounds.width - TerminalLayout.insetWidth,
+            height: view.bounds.height - TerminalLayout.insetHeight)
         let columns = UInt16(max(1, usable.width / terminalRenderer.pointMetrics.cellWidth))
         let rows = UInt16(max(1, usable.height / terminalRenderer.pointMetrics.cellHeight))
         let size = TerminalSize(rows: rows, columns: columns)
@@ -375,11 +359,11 @@ class ViewController: NSViewController {
     static func contentRect(
         in drawableSize: CGSize, scale: CGFloat, gridHeight: CGFloat
     ) -> CGRect {
-        let bottom = drawableSize.height - contentInsets.bottom * scale
+        let bottom = drawableSize.height - TerminalLayout.insets.bottom * scale
         return CGRect(
-            x: contentInsets.left * scale,
-            y: max(contentInsets.top * scale, bottom - gridHeight),
-            width: max(0, drawableSize.width - insetWidth * scale),
+            x: TerminalLayout.insets.left * scale,
+            y: max(TerminalLayout.insets.top * scale, bottom - gridHeight),
+            width: max(0, drawableSize.width - TerminalLayout.insetWidth * scale),
             height: gridHeight)
     }
 

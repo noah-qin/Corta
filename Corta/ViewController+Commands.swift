@@ -32,7 +32,10 @@ extension ViewController {
 
         let font = CTFontCreateWithName("Menlo" as CFString, fontSize, nil)
         let scale = view.window?.backingScaleFactor ?? terminalRenderer.scale
-        terminalRenderer = try! TerminalRenderer(device: device, font: font, scale: scale)
+        // Re-point the existing renderer rather than building a new one: the
+        // pipelines and the atlas texture are reusable, and rebuilding them
+        // per keystroke is what made key repeat stutter.
+        terminalRenderer.setFont(font, scale: scale)
         let metrics = terminalRenderer.pointMetrics
         terminalView.cellSize = CGSize(width: metrics.cellWidth, height: metrics.cellHeight)
 
@@ -41,16 +44,16 @@ extension ViewController {
         guard didSizeWindow, let window = view.window else { return }
         window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
         window.contentMinSize = NSSize(
-            width: CGFloat(minimumColumns) * metrics.cellWidth + Self.insetWidth,
-            height: CGFloat(minimumRows) * metrics.cellHeight + Self.insetHeight)
+            width: CGFloat(minimumColumns) * metrics.cellWidth + TerminalLayout.insetWidth,
+            height: CGFloat(minimumRows) * metrics.cellHeight + TerminalLayout.insetHeight)
         // Keep the grid the child sees (rows x columns) and resize the
         // window around it; `viewDidLayout` then finds the session already
         // matches and sends no resize. `lastRequestedSize` is set in
         // `viewDidLoad`, so it is non-nil whenever `didSizeWindow` holds.
         guard let gridSize = lastRequestedSize else { return }
         window.setContentSize(NSSize(
-            width: CGFloat(gridSize.columns) * metrics.cellWidth + Self.insetWidth,
-            height: CGFloat(gridSize.rows) * metrics.cellHeight + Self.insetHeight))
+            width: CGFloat(gridSize.columns) * metrics.cellWidth + TerminalLayout.insetWidth,
+            height: CGFloat(gridSize.rows) * metrics.cellHeight + TerminalLayout.insetHeight))
         invalidateDisplay()
     }
 }

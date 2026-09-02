@@ -126,6 +126,14 @@ frames on an idle screen (`PERFORMANCE.md` §1, idle CPU ~0%).
 
 ---
 
+### 2.4 Shrinking the screen
+
+Reducing the row count moves rows off the **top**, into scrollback, until
+the cursor fits. Only rows below the cursor — which are blank — come off
+the bottom. Truncating from the bottom instead destroys the newest output
+and does not preserve it in history, so making a window smaller silently
+ate the last commands that ran.
+
 ## 3. The Daily-Driver Checklist
 
 The operational definition of success from `DESIGN.md` §8. If all ten

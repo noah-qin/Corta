@@ -181,15 +181,15 @@ struct SelectionCellMappingTests {
     /// A view exactly as tall as the insets plus the grid: no remainder, so
     /// the grid top is the top inset.
     private static func exactHeight(rows: Int) -> CGFloat {
-        ViewController.contentInsets.top + ViewController.contentInsets.bottom
+        TerminalLayout.insets.top + TerminalLayout.insets.bottom
             + CGFloat(rows) * metrics.cellHeight
     }
 
     @Test func pointInsideTheGridMapsToItsCell() {
         let grid = Grid(rows: 30, columns: 120)
         let point = CGPoint(
-            x: ViewController.contentInsets.left + 2.5 * Self.metrics.cellWidth,
-            y: ViewController.contentInsets.top + 3.5 * Self.metrics.cellHeight)
+            x: TerminalLayout.insets.left + 2.5 * Self.metrics.cellWidth,
+            y: TerminalLayout.insets.top + 3.5 * Self.metrics.cellHeight)
         let position = ViewController.documentPosition(
             for: point, viewHeight: Self.exactHeight(rows: 30), metrics: Self.metrics,
             grid: grid, scrollOffset: 0)
@@ -203,8 +203,8 @@ struct SelectionCellMappingTests {
         // down: a point just inside row 1 of the exact-height layout is row
         // 0 of this one.
         let point = CGPoint(
-            x: ViewController.contentInsets.left + 2.5 * Self.metrics.cellWidth,
-            y: ViewController.contentInsets.top + 1.1 * Self.metrics.cellHeight)
+            x: TerminalLayout.insets.left + 2.5 * Self.metrics.cellWidth,
+            y: TerminalLayout.insets.top + 1.1 * Self.metrics.cellHeight)
         let position = ViewController.documentPosition(
             for: point, viewHeight: Self.exactHeight(rows: 30) + Self.metrics.cellHeight / 2,
             metrics: Self.metrics, grid: grid, scrollOffset: 0)
@@ -214,8 +214,8 @@ struct SelectionCellMappingTests {
     @Test func theScrollOffsetMovesEventsIntoDocumentRows() {
         let grid = Grid(rows: 30, columns: 120)
         let point = CGPoint(
-            x: ViewController.contentInsets.left + 1,
-            y: ViewController.contentInsets.top + 1)
+            x: TerminalLayout.insets.left + 1,
+            y: TerminalLayout.insets.top + 1)
         let position = ViewController.documentPosition(
             for: point, viewHeight: Self.exactHeight(rows: 30), metrics: Self.metrics,
             grid: grid, scrollOffset: 7)

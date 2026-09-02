@@ -48,7 +48,7 @@ nonisolated struct TerminalSelection {
 nonisolated final class TerminalRenderer {
     let quadRenderer: QuadRenderer
     let glyphAtlas: GlyphAtlas
-    var metrics: CellMetrics
+    private(set) var metrics: CellMetrics
 
     /// Alpha for the cursor block and selection highlight, over the cell's
     /// own background.
@@ -88,9 +88,9 @@ nonisolated final class TerminalRenderer {
 
     /// Cell geometry in points — what the window, the grid size and mouse
     /// coordinates are expressed in.
-    let pointMetrics: CellMetrics
+    private(set) var pointMetrics: CellMetrics
     /// The backing scale this renderer's atlas was rasterised for.
-    let scale: CGFloat
+    private(set) var scale: CGFloat
 
     /// - Parameter scale: the display's backing scale factor. Glyphs are
     ///   rasterised at `font size * scale` so they are sharp at device
@@ -108,6 +108,21 @@ nonisolated final class TerminalRenderer {
         self.pointMetrics = CellMetrics(font: font)
         self.metrics = CellMetrics(font: font).scaled(by: scale)
         self.scale = scale
+    }
+
+    /// Adopts a new font size, reusing the pipelines and the atlas texture.
+    ///
+    /// The alternative — building a new `TerminalRenderer` — recompiled the
+    /// render pipeline states and allocated a new atlas texture on every
+    /// keystroke, which is what made cmd-=/cmd-- stutter under key repeat.
+    func setFont(_ font: CTFont, scale newScale: CGFloat) {
+        let atlasFont = CTFontCreateCopyWithAttributes(
+            font, CTFontGetSize(font) * newScale, nil, nil)
+        glyphAtlas.reset(font: atlasFont)
+        pointMetrics = CellMetrics(font: font)
+        metrics = pointMetrics.scaled(by: newScale)
+        scale = newScale
+        invalidate()
     }
 
     /// Marks every row damaged, so the next `updateInstances` rebuilds the
