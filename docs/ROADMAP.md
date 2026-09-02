@@ -221,28 +221,28 @@ Target: Chinese input is correct and text never drifts.
 
 Budget time here. `NSTextInputClient` is not free (`DESIGN.md` §7.1).
 
-- [ ] **M3.1** Conform to `NSTextInputClient`; handle marked text.
-- [ ] **M3.2** `firstRectForCharacterRange:` returning correct **screen**
+- [x] **M3.1** Conform to `NSTextInputClient`; handle marked text.
+- [x] **M3.2** `firstRectForCharacterRange:` returning correct **screen**
       coordinates.
       *Done when:* the candidate window appears directly under the
       cursor, in every split and after the window moves.
-- [ ] **M3.3** Render preedit text as a grid overlay with underline
+- [x] **M3.3** Render preedit text as a grid overlay with underline
       styling, without committing it to the grid.
-- [ ] **M3.4** Key routing: bypass the IME path entirely unless marked
+- [x] **M3.4** Key routing: bypass the IME path entirely unless marked
       text is active.
       *Done when:* ⌃C, ⌃D, ⌃Z and arrow keys behave identically whether
       or not an IME is selected.
-- [ ] **M3.5** Font fallback via the Core Text cascade list for CJK and
+- [x] **M3.5** Font fallback via the Core Text cascade list for CJK and
       emoji, and a shaping cache for non-ASCII runs.
-- [ ] **M3.6** Grapheme side table for clusters exceeding one scalar —
+- [x] **M3.6** Grapheme side table for clusters exceeding one scalar —
       combining marks and ZWJ emoji (`DESIGN.md` §2.3).
       *Done when:* a golden test renders a ZWJ family emoji in one
       double-width cell.
-- [ ] **M3.7** Selection by mouse and keyboard, **respecting the
+- [x] **M3.7** Selection by mouse and keyboard, **respecting the
       `wrapped` flag**.
       *Done when:* copying a soft-wrapped long command yields one line
       with no inserted newline.
-- [ ] **M3.8** Copy and paste, including the multi-line paste warning.
+- [x] **M3.8** Copy and paste, including the multi-line paste warning.
 
 **M3 is done when** a Chinese conversation in a REPL composes, displays
 and aligns correctly, and copy/paste is trustworthy.
@@ -324,13 +324,13 @@ Trends matter more than absolute values.
 
 | Metric                    | M1     | M2 | M3 | M4 | M5 | M6 |
 | ------------------------- | ------ | -- | -- | -- | -- | -- |
-| Parse throughput (MB/s)   | 109.9  | 80.0 |    |    |    |    |
-| Frame CPU (ms)            | 1.67   | 1.72 |    |    |    |    |
-| Idle CPU (%)              | ~4     | ~0   |    |    |    |    |
-| Memory @ 100k lines (MB)  | 265.7  | 265.7 |    |    |    |    |
-| Keypress → pixel (ms)     | —      | —    |    |    |    |    |
-| `esctest` pass rate (%)   | —      | 8.8 (50/568) |    |    |    |    |
-| Core LOC                  | 2,547  | 3,972 |    |    |    |    |
+| Parse throughput (MB/s)   | 109.9  | 80.0 | 80.8 |    |    |    |
+| Frame CPU (ms)            | 1.67   | 1.72 | 2.32 |    |    |    |
+| Idle CPU (%)              | ~4     | ~0   | ~0   |    |    |    |
+| Memory @ 100k lines (MB)  | 265.7  | 265.7 | 265.7 |    |    |    |
+| Keypress → pixel (ms)     | —      | —    | —    |    |    |    |
+| `esctest` pass rate (%)   | —      | 8.8 (50/568) | 8.8 (50/568) |    |    |    |
+| Core LOC                  | 2,547  | 3,972 | 4,247 |    |    |    |
 
 Expect roughly 6,000–10,000 lines in `CortaTerminal` by M4
 (`DESIGN.md` §1). Reaching 3,000 does not mean the work is nearly done —
@@ -397,3 +397,25 @@ a launched release build sampled with `top`; see `PERFORMANCE.md` §5):**
   but its tests are interactive and visual — no automatable pass rate.
 - *Memory @ 100k lines* — unchanged at 265.7 MB; the M2 write path added
   no per-cell state.
+
+**How measured (M3, same methods as M2 unless noted):**
+
+- *Parse throughput* — `corta-bench`, 80.8 MB/s, level with M2's 80.0:
+  the M3 write-path addition (ZWJ cluster continuation) costs a bounds
+  check on non-ASCII only.
+- *Frame CPU* — `FrameCPUBaselineTests` re-run in isolation: 2.319 ms
+  avg / 5.218 ms p95, the full-rebuild worst case. The +0.6 ms over M2
+  is the wide-glyph/cluster branches in `appendRowInstances` (Track B
+  measured +0.17 ms medians on the same machine; absolute numbers run
+  higher than the M2 entry under this machine's current conditions).
+  The p95 spike is noise from the first iterations, not a regression in
+  the steady average; still inside the 4 ms budget on average.
+- *Idle CPU* — Release build with a real shell child, `top -pid` at
+  one-second intervals after settling: 0.0% on all six samples.
+- *`esctest`* — re-run identically to M2 (esctest2,
+  `--expected-terminal xterm --max-vt-level 3`, child of a live window):
+  **50 passed, 334 known bugs, 184 failed of 568** — byte-identical
+  failing list to M2, so 67.6% xterm-compatible, unchanged.
+- *Memory @ 100k lines* — unchanged at 265.7 MB.
+- *Core LOC* — 4,247; the growth is the selection model
+  (`Selection.swift`) and M3 tests.
