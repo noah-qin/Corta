@@ -97,7 +97,13 @@ Runtime font scaling landed at M3 (⌘= bigger, ⌘- smaller, ⌘0 reset).
 The glyph atlas is rasterised for one size and scale, so a change
 rebuilds the renderer and re-fits the window around the unchanged
 grid. Measured on a 2x display (Menlo): 14pt → 9x17pt cell, 1100x554pt
-content (120x30 grid); 15pt → 10x18pt cell, 1220x584pt content. The
+content (120x30 grid); 15pt → 10x18pt cell, 1220x584pt content; the
+13pt step was re-measured live (980x524pt) when fixing the ⌘- shadowing
+below. The stock storyboard's Format menu (font panel, rich-text
+traits) was removed at the same time: its Font ▸ Smaller item claimed
+⌘- first in menu order and routed it to `modifyFont:`, which a terminal
+never implements — the shortcut arrived dead. `MenuShortcutTests` pins
+the invariant: no keystroke is claimed by two menu items. The
 cursor renders the core's DECSCUSR state — block, bar and underline;
 blinking variants render steadily, because a blink timer would force
 frames on an idle screen (`PERFORMANCE.md` §1, idle CPU ~0%).
@@ -132,7 +138,7 @@ hold, Corta has replaced Terminal.app for this repository's own use.
 - [ ] Scrollback holds a long training run and scrolls smoothly
 - [ ] ⌘F searches scrollback
 - [ ] New tab and split pane
-- [ ] ⌘+ / ⌘− resize the font
+- [x] ⌘+ / ⌘− resize the font
 - [ ] Resizing the window resizes the program inside it
 - [ ] ⌘-clicking a `localhost:` URL opens the browser
 
