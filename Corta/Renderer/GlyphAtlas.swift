@@ -24,9 +24,15 @@ import simd
 /// (Rasterising a fallback glyph with the primary font drew the wrong
 /// glyph's outlines: glyph ids are per-font.)
 ///
-/// Atlas eviction (LRU or multiple pages, `DESIGN.md` §7 hard part 4) is not
-/// implemented here yet: a CJK session can still exhaust the single page, in
-/// which case further glyphs simply fail to allocate.
+/// **Eviction** (M3, `DESIGN.md` §7 hard part 4): a CJK session exhausts a
+/// single 2048×2048 page, and shelf packing cannot reclaim individual slots
+/// without fragmenting, so on exhaustion the whole atlas is reset — every
+/// cache cleared, the allocator rewound — and glyphs re-rasterise on demand
+/// (the strategy Alacritty uses for the same reason). Every `GlyphInfo`
+/// handed out before a reset holds stale UVs, so `generation` counts resets
+/// and the renderer rebuilds all rows when it changes mid-frame. A screen
+/// whose live content alone exceeds the atlas cannot be served by any
+/// eviction policy; after one retry those cells draw blank.
 nonisolated final class GlyphAtlas {
     struct GlyphKey: Hashable {
         var scalar: UInt32
@@ -53,6 +59,7 @@ nonisolated final class GlyphAtlas {
 
     static let atlasSize = 2048
 
+    let atlasPixelSize: Int
     private(set) var texture: MTLTexture
     private let font: CTFont
     private let boldFont: CTFont
@@ -62,24 +69,32 @@ nonisolated final class GlyphAtlas {
     private var rowHeight = 1
 
     /// Counters for tests: prove the ASCII path never shapes, and that
-    /// fallback happens when it should.
+    /// fallback and eviction happen when they should.
     private(set) var fastPathHits = 0
     private(set) var shapingHits = 0
     /// How many shaped runs resolved to a font other than the requested one —
     /// Core Text's cascade list at work (M3.5).
     private(set) var fallbackHits = 0
+    /// How many times a full atlas was reset (see the type comment).
+    private(set) var evictionCount = 0
+    /// Bumped on every eviction reset. UVs issued before a bump are stale.
+    private(set) var generation = 0
 
     /// A 1×1 fully-opaque texel at the atlas origin, sampled by cursor and
     /// selection quads so they can share the glyph pipeline instead of a
     /// third one.
     static let solidWhiteUV = SIMD4<Float>(0, 0, 0, 0)
 
-    init(device: MTLDevice, font: CTFont) {
+    /// - Parameter atlasPixelSize: edge length of the square atlas texture.
+    ///   Tests pass a small size to exercise eviction without rasterising
+    ///   thousands of glyphs.
+    init(device: MTLDevice, font: CTFont, atlasPixelSize: Int = GlyphAtlas.atlasSize) {
         self.font = font
         self.boldFont = CTFontCreateCopyWithSymbolicTraits(font, 0, nil, .traitBold, .traitBold) ?? font
+        self.atlasPixelSize = atlasPixelSize
 
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: .r8Unorm, width: Self.atlasSize, height: Self.atlasSize, mipmapped: false)
+            pixelFormat: .r8Unorm, width: atlasPixelSize, height: atlasPixelSize, mipmapped: false)
         descriptor.usage = [.shaderRead]
         descriptor.storageMode = .managed
         self.texture = device.makeTexture(descriptor: descriptor)!
@@ -200,7 +215,13 @@ nonisolated final class GlyphAtlas {
         let bbox = bounds.insetBy(dx: -1, dy: -1)
         let width = max(1, Int(bbox.width.rounded(.up)))
         let height = max(1, Int(bbox.height.rounded(.up)))
-        guard let origin = allocate(width: width, height: height),
+        var allocation = allocate(width: width, height: height)
+        if allocation == nil {
+            // The page is full: reset and retry once (see the type comment).
+            evict()
+            allocation = allocate(width: width, height: height)
+        }
+        guard let origin = allocation,
             let context = CGContext(
                 data: nil, width: width, height: height, bitsPerComponent: 8,
                 bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(),
@@ -234,19 +255,34 @@ nonisolated final class GlyphAtlas {
 
         return GlyphInfo(
             uvRect: SIMD4<Float>(
-                Float(origin.x) / Float(Self.atlasSize), Float(origin.y) / Float(Self.atlasSize),
-                Float(width) / Float(Self.atlasSize), Float(height) / Float(Self.atlasSize)),
+                Float(origin.x) / Float(atlasPixelSize), Float(origin.y) / Float(atlasPixelSize),
+                Float(width) / Float(atlasPixelSize), Float(height) / Float(atlasPixelSize)),
             size: SIMD2<Float>(Float(width), Float(height)),
             bearing: SIMD2<Float>(Float(bbox.minX), Float(bbox.minY))
         )
     }
 
+    /// Full-atlas reset on exhaustion — see the type comment. The texture
+    /// itself is kept: the allocator rewinds to the origin and every lookup
+    /// is a cache miss that re-rasterises into freshly allocated (and thus
+    /// freshly written) regions, so stale texels are never sampled. The
+    /// reserved white texel at (0, 0) sits below the allocator's first row
+    /// and survives.
+    private func evict() {
+        cache.removeAll(keepingCapacity: true)
+        clusterCache.removeAll(keepingCapacity: true)
+        nextOrigin = (x: 0, y: 1)
+        rowHeight = 1
+        evictionCount += 1
+        generation += 1
+    }
+
     private func allocate(width: Int, height: Int) -> (x: Int, y: Int)? {
-        if nextOrigin.x + width > Self.atlasSize {
+        if nextOrigin.x + width > atlasPixelSize {
             nextOrigin = (0, nextOrigin.y + rowHeight)
             rowHeight = 0
         }
-        guard nextOrigin.y + height <= Self.atlasSize else { return nil }
+        guard nextOrigin.y + height <= atlasPixelSize else { return nil }
         let origin = nextOrigin
         nextOrigin.x += width
         rowHeight = max(rowHeight, height)

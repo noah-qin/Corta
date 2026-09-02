@@ -109,6 +109,35 @@ struct GlyphAtlasTests {
         #expect(atlas.shapingHits == hits)
     }
 
+    /// M3 eviction (DESIGN.md §7 hard part 4): when the page fills, the atlas
+    /// resets — caches cleared, allocator rewound, `generation` bumped — and
+    /// previously issued glyphs re-rasterise on their next lookup.
+    @Test func exhaustingTheAtlasEvictsAndReRasterises() throws {
+        guard let device = Self.makeDevice() else {
+            Issue.record("No Metal device available in this environment")
+            return
+        }
+        let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
+        // A 64×64 page holds only a handful of 14 pt CJK glyphs.
+        let atlas = GlyphAtlas(device: device, font: font, atlasPixelSize: 64)
+
+        let first = atlas.glyph(shaping: 0x4E00, bold: false)  // 一
+        #expect(first != nil)
+
+        for i: UInt32 in 0..<40 {
+            _ = atlas.glyph(shaping: 0x4E00 + i, bold: false)
+            if atlas.evictionCount > 0 { break }
+        }
+        #expect(atlas.evictionCount > 0, "40 CJK glyphs must overflow a 64x64 page")
+        #expect(atlas.generation == atlas.evictionCount)
+
+        // A glyph issued before the reset is a cache miss now and
+        // re-rasterises into the rewound allocator.
+        let again = atlas.glyph(shaping: 0x4E00, bold: false)
+        #expect(again != nil)
+        #expect(again?.size != .zero)
+    }
+
     @Test func aGlyphProducesInkInsideItsCellAndNoneOutside() throws {
         guard let device = Self.makeDevice() else {
             Issue.record("No Metal device available in this environment")

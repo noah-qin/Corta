@@ -85,11 +85,13 @@ nonisolated final class TerminalRenderer {
     ///   coordinate space is the drawable — pixels, not points. Rasterising
     ///   at 1x and laying out in point units on a 2x display is what made the
     ///   text render at half size and look soft.
-    init(device: MTLDevice, font: CTFont, scale: CGFloat) throws {
+    /// - Parameter atlasPixelSize: atlas texture edge length; tests pass a
+    ///   small value to exercise atlas eviction.
+    init(device: MTLDevice, font: CTFont, scale: CGFloat, atlasPixelSize: Int = GlyphAtlas.atlasSize) throws {
         let atlasFont = CTFontCreateCopyWithAttributes(
             font, CTFontGetSize(font) * scale, nil, nil)
         self.quadRenderer = try QuadRenderer(device: device)
-        self.glyphAtlas = GlyphAtlas(device: device, font: atlasFont)
+        self.glyphAtlas = GlyphAtlas(device: device, font: atlasFont, atlasPixelSize: atlasPixelSize)
         self.pointMetrics = CellMetrics(font: font)
         self.metrics = CellMetrics(font: font).scaled(by: scale)
         self.scale = scale
@@ -122,10 +124,19 @@ nonisolated final class TerminalRenderer {
             || (offset > 0 && cachedScrollbackCount != grid.scrollback.count)
 
         var changed = fullRebuild
+        // An atlas eviction mid-build invalidates every UV handed out so far
+        // (see `GlyphAtlas`'s type comment), so a generation change forces a
+        // second full build. Only one retry: content that alone exceeds the
+        // atlas evicts again on every attempt, and those cells draw blank.
+        let atlasGeneration = glyphAtlas.generation
         if fullRebuild {
             rebuildAllRows(grid: grid, offset: offset)
         } else {
             changed = rebuildDamagedRows(grid: grid, offset: offset)
+        }
+        if glyphAtlas.generation != atlasGeneration {
+            rebuildAllRows(grid: grid, offset: offset)
+            changed = true
         }
 
         if fullRebuild || !Self.selectionsEqual(cachedSelection, selection)
