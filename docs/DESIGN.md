@@ -123,6 +123,11 @@ terminal becomes the reason a training job is slow.
 Data flows one way: **bytes in → grid → pixels**. Input flows the other
 way: **key/IME → PTY → child**. Nothing else crosses those arrows.
 
+Windows are cheap composition: each window is its own `ViewController`
+and `TerminalSession` (⌘N instantiates the storyboard scene again;
+`AppDelegate` retains the window controllers until their windows close).
+Nothing is shared between windows — that is what §2.4 buys.
+
 The two thread boundaries are the interesting part of this diagram:
 
 - **PTY/parse → render** is a snapshot taken at vsync, not a push. The
