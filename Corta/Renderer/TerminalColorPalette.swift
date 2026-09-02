@@ -5,12 +5,9 @@ import simd
 /// pipeline: the 16 indexed colours, the 6×6×6 colour cube and the 24-step
 /// greyscale ramp that `Color.indexed` describes.
 ///
-/// The 16 are VS Code's Dark+ values, not xterm's — this comment used to
-/// claim xterm and did not match the table below it. They are chosen for
-/// legibility: xterm's blue (`#0000EE`) and Terminal.app's (`#492EE1`) are
-/// both close to unreadable on a dark background, which is why almost every
-/// modern terminal ships something else by default. Colours a program sends
-/// as 24-bit values are unaffected either way.
+/// The 16 are Terminal.app's, not xterm's — this comment used to claim
+/// xterm over a table of VS Code Dark+ values, and neither matched what the
+/// terminal was being compared against.
 ///
 /// The values are sRGB, and the drawable is tagged sRGB in `TerminalView`;
 /// untagged, they were interpreted in the display's own space and rendered
@@ -32,11 +29,17 @@ nonisolated enum TerminalColorPalette {
         return SIMD4<Float>(c.x * c.w, c.y * c.w, c.z * c.w, c.w)
     }
 
+    /// Terminal.app's "Basic" profile. Vivid on purpose: the VS Code Dark+
+    /// set that was here reads noticeably flat beside it, and the reference
+    /// this terminal gets compared against is the one macOS ships.
+    ///
+    /// Colours a program sends as 24-bit values do not come through here at
+    /// all — those are exact, and match Terminal.app channel for channel.
     private static let ansi16: [SIMD4<Float>] = [
-        rgb(0, 0, 0), rgb(205, 49, 49), rgb(13, 188, 121), rgb(229, 229, 16),
-        rgb(36, 114, 200), rgb(188, 63, 188), rgb(17, 168, 205), rgb(229, 229, 229),
-        rgb(102, 102, 102), rgb(241, 76, 76), rgb(35, 209, 139), rgb(245, 245, 67),
-        rgb(59, 142, 234), rgb(214, 112, 214), rgb(41, 184, 219), rgb(255, 255, 255),
+        rgb(0, 0, 0), rgb(194, 54, 33), rgb(37, 188, 36), rgb(173, 173, 39),
+        rgb(73, 46, 225), rgb(211, 56, 211), rgb(51, 187, 200), rgb(203, 204, 205),
+        rgb(129, 131, 131), rgb(252, 57, 31), rgb(49, 231, 34), rgb(234, 236, 35),
+        rgb(88, 51, 255), rgb(249, 53, 248), rgb(20, 240, 240), rgb(233, 235, 235),
     ]
 
     private static func rgb(_ r: UInt8, _ g: UInt8, _ b: UInt8) -> SIMD4<Float> {
