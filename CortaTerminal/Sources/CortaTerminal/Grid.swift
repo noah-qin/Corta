@@ -144,6 +144,14 @@ public struct Grid: Sendable {
         // arrives anyway, it is not printable — and a C0/C1 control has
         // display width 0, which would corrupt the combining-mark path.
         guard let value = Unicode.Scalar(scalar), !Self.isControl(value) else { return }
+        // M3.6: a scalar following a ZWJ-terminated cluster continues that
+        // cluster — an emoji ZWJ sequence (👨‍👩‍👧‍👦) is one grapheme and
+        // stays one (wide) cell, not one wide pair per emoji. ZWJ itself is
+        // zero-width and arrives through `writeZeroWidth` as usual.
+        if scalar != 0x200D, let target = clusterJoinTarget(), clusterEndsWithZWJ(target) {
+            combine(scalar, row: target.row, column: target.column)
+            return
+        }
         switch displayWidth(of: value) {
         case 0:
             writeZeroWidth(scalar)
@@ -221,6 +229,22 @@ public struct Grid: Sendable {
     /// the cluster of the previously written cell and the cursor does not
     /// move — a zero-width scalar never gets a cell of its own.
     private mutating func writeZeroWidth(_ scalar: UInt32) {
+        guard let target = clusterJoinTarget() else {
+            // No previous cell (start of output, hard newline). xterm keeps
+            // the mark visible by storing it as a base character of its own
+            // (charproc.c: "we will add the combining character as a base
+            // character"), rather than dropping it.
+            writeNarrow(scalar)
+            return
+        }
+        combine(scalar, row: target.row, column: target.column)
+    }
+
+    /// The cell a zero-width scalar — or the continuation of a
+    /// ZWJ-terminated cluster (M3.6) — joins: the previously written cell,
+    /// following wraps and wide pairs. `nil` when there is no previous cell
+    /// (start of output, hard newline).
+    private func clusterJoinTarget() -> (row: Int, column: Int)? {
         var row = cursor.row
         var column: Int
         if pendingWrap {
@@ -233,18 +257,23 @@ public struct Grid: Sendable {
             row = cursor.row - 1
             column = columns - 1
         } else {
-            // No previous cell (start of output, hard newline). xterm keeps
-            // the mark visible by storing it as a base character of its own
-            // (charproc.c: "we will add the combining character as a base
-            // character"), rather than dropping it.
-            writeNarrow(scalar)
-            return
+            return nil
         }
         // A mark after a wide pair belongs to the pair's lead cell.
         if column > 0, lines[row][column].attributes.contains(.wideSpacer) {
             column -= 1
         }
-        combine(scalar, row: row, column: column)
+        return (row, column)
+    }
+
+    /// Whether the cell at `target` holds a cluster whose last scalar is
+    /// ZWJ — the join condition for M3.6's ZWJ-continuation in `write`.
+    /// Plain cells (`.none` id) answer false without touching the table, so
+    /// ordinary CJK output pays a bounds check, not a lookup.
+    private func clusterEndsWithZWJ(_ target: (row: Int, column: Int)) -> Bool {
+        let cell = lines[target.row][target.column]
+        guard !cell.grapheme.isNone else { return false }
+        return graphemes.scalars(for: cell.grapheme)?.last == 0x200D
     }
 
     /// Appends `scalar` to the grapheme cluster of the cell at (`row`,

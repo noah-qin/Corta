@@ -1,0 +1,7 @@
+# M3.6 — an emoji ZWJ sequence is ONE grapheme cluster (UAX #29 GB11: no
+# break between ZWJ and an extended-pictographic scalar), so it occupies a
+# single double-width cell: the lead cell carries the whole cluster in the
+# grapheme side table (DESIGN.md §2.3), the spacer stays blank, and the
+# cursor advances 2 columns, not 8. The family emoji below is
+# U+1F468 ZWJ U+1F469 ZWJ U+1F467 ZWJ U+1F466.
+\xF0\x9F\x91\xA8\xE2\x80\x8D\xF0\x9F\x91\xA9\xE2\x80\x8D\xF0\x9F\x91\xA7\xE2\x80\x8D\xF0\x9F\x91\xA6ab

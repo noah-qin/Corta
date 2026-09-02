@@ -1,0 +1,4 @@
+rows: 2 columns: 6
+cursor: row 0 column 4
+   0 |👨 ab  |
+   1 |      |
