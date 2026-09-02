@@ -6,7 +6,9 @@ import Testing
 
 @testable import Corta
 
-struct TerminalRendererTests {
+/// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
+/// by design — see the type's comment.
+@Suite(.serialized) struct TerminalRendererTests {
     private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (
         r: UInt8, g: UInt8, b: UInt8, a: UInt8
     ) {

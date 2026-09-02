@@ -2,8 +2,19 @@ import CortaTerminal
 import simd
 
 /// Maps a `CortaTerminal.Color` to sRGB-encoded RGBA floats for the quad
-/// pipeline. The default xterm 16-colour table, the 6×6×6 colour cube and
-/// the 24-step greyscale ramp that `Color.indexed` describes.
+/// pipeline: the 16 indexed colours, the 6×6×6 colour cube and the 24-step
+/// greyscale ramp that `Color.indexed` describes.
+///
+/// The 16 are VS Code's Dark+ values, not xterm's — this comment used to
+/// claim xterm and did not match the table below it. They are chosen for
+/// legibility: xterm's blue (`#0000EE`) and Terminal.app's (`#492EE1`) are
+/// both close to unreadable on a dark background, which is why almost every
+/// modern terminal ships something else by default. Colours a program sends
+/// as 24-bit values are unaffected either way.
+///
+/// The values are sRGB, and the drawable is tagged sRGB in `TerminalView`;
+/// untagged, they were interpreted in the display's own space and rendered
+/// oversaturated on a P3 screen.
 nonisolated enum TerminalColorPalette {
     static let defaultForeground = SIMD4<Float>(0.898, 0.898, 0.898, 1)
     /// A soft black rather than pure black — the tone Terminal.app's dark

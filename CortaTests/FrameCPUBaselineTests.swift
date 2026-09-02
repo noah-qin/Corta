@@ -15,7 +15,9 @@ import Testing
 /// costs. Not an assertion — `docs/PERFORMANCE.md`'s < 4 ms target is a
 /// design constraint to defend later, not a CI gate this early. The result
 /// is written to a file so it survives outside the ephemeral test log.
-struct FrameCPUBaselineTests {
+/// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
+/// by design — see the type's comment.
+@Suite(.serialized) struct FrameCPUBaselineTests {
     @Test func measureFrameCPUTime() throws {
         guard let device = MTLCreateSystemDefaultDevice() else {
             Issue.record("No Metal device available in this environment")

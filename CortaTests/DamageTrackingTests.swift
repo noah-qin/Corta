@@ -10,7 +10,9 @@ import Testing
 /// buffer is rebuilt only for rows whose line actually changed, and a fully
 /// static screen reports no damage at all — which is what lets the shell skip
 /// the frame and idle at ~0% CPU.
-struct DamageTrackingTests {
+/// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
+/// by design — see the type's comment.
+@Suite(.serialized) struct DamageTrackingTests {
     private static func makeRenderer() -> TerminalRenderer? {
         guard let device = MTLCreateSystemDefaultDevice() else { return nil }
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)

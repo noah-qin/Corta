@@ -9,7 +9,9 @@ import Testing
 /// M3.5/M3.6 — wide glyphs and grapheme clusters in the renderer: a wide
 /// pair's glyph is scaled into and centred on its two-cell box, clusters are
 /// shaped as one run, and no glyph ever inks a cell that is not its own.
-struct WideGlyphRenderTests {
+/// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
+/// by design — see the type's comment.
+@Suite(.serialized) struct WideGlyphRenderTests {
     private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> UInt8 {
         var bytes = [UInt8](repeating: 0, count: 4)
         texture.getBytes(&bytes, bytesPerRow: 4, from: MTLRegionMake2D(x, y, 1, 1), mipmapLevel: 0)

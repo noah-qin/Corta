@@ -43,6 +43,12 @@ import simd
 /// and the renderer rebuilds all rows when it changes mid-frame. A screen
 /// whose live content alone exceeds the atlas cannot be served by any
 /// eviction policy; after one retry those cells draw blank.
+/// **Single-threaded.** The cache, the shelf allocator and the texture are
+/// plain mutable state with no synchronisation, and Core Text's run and line
+/// objects are not safe to share either — rasterising the same atlas from two
+/// threads segfaults inside `CTRunGetImageBounds`. In the app that holds
+/// naturally: the renderer is driven from the display link on the main
+/// thread. Tests that build an atlas therefore have to be serialised.
 nonisolated final class GlyphAtlas {
     struct GlyphKey: Hashable {
         var scalar: UInt32
@@ -166,7 +172,7 @@ nonisolated final class GlyphAtlas {
         guard CTFontGetGlyphsForCharacters(f, &utf16, &glyphs, 1) else { return nil }
         fastPathHits += 1
         guard glyphs[0] != 0 else { return nil }
-        let info = rasterize([(glyphs: glyphs, positions: [CGPoint.zero], font: f, isColor: false, ctRun: nil)])
+        let info = rasterize([(glyphs: glyphs, positions: [CGPoint.zero], font: f, isColor: false, ctRun: nil, ctLine: nil)])
         cache[key] = info
         return info
     }
@@ -205,8 +211,15 @@ nonisolated final class GlyphAtlas {
     /// list, the font the run actually shaped with, whether that font is a
     /// color (bitmap) font, and — for color runs — the `CTRun` itself, since
     /// color bitmaps only rasterise through run-level drawing.
+    ///
+    /// `ctLine` is held alongside `ctRun` and is not otherwise used. A
+    /// `CTRun`'s glyph storage belongs to the line that produced it, and
+    /// retaining the run does not keep that line alive: once `shape` returned
+    /// and the line was released, `CTRunGetImageBounds` read freed memory and
+    /// crashed inside Core Text — intermittently, as dangling reads do.
     private typealias ShapedRun = (
-        glyphs: [CGGlyph], positions: [CGPoint], font: CTFont, isColor: Bool, ctRun: CTRun?
+        glyphs: [CGGlyph], positions: [CGPoint], font: CTFont, isColor: Bool,
+        ctRun: CTRun?, ctLine: CTLine?
     )
 
     /// One shaped string as a flat list of runs.
@@ -250,7 +263,9 @@ nonisolated final class GlyphAtlas {
             CTRunGetPositions(run, CFRange(location: 0, length: count), &positions)
             let kept = zip(glyphs, positions).filter { $0.0 != 0 }
             guard !kept.isEmpty else { continue }
-            runs.append((kept.map(\.0), kept.map(\.1), runFont, isColor, isColor ? run : nil))
+            runs.append(
+                (kept.map(\.0), kept.map(\.1), runFont, isColor,
+                 isColor ? run : nil, isColor ? line : nil))
         }
         return runs
     }

@@ -9,7 +9,9 @@ import Testing
 /// M4.4, renderer side: search matches paint as overlay quads, the current
 /// match reads differently from the rest, and the overlay moves with the
 /// scroll offset exactly like a selection does.
-struct SearchHighlightRenderTests {
+/// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
+/// by design — see the type's comment.
+@Suite(.serialized) struct SearchHighlightRenderTests {
     private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (
         r: UInt8, g: UInt8, b: UInt8, a: UInt8
     ) {

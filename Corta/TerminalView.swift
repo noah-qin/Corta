@@ -112,7 +112,15 @@ final class TerminalView: NSView, CALayerDelegate {
         metalLayer.delegate = self
         metalLayer.device = MTLCreateSystemDefaultDevice()
         metalLayer.pixelFormat = QuadRenderer.pixelFormat
+        // Tag the drawable sRGB. Untagged, its contents are interpreted in
+        // the display's own space — Display P3 on this hardware — so every
+        // sRGB value the palette and the escape sequences specify rendered
+        // oversaturated, and nothing matched what Terminal.app drew from the
+        // same bytes. The pixel format stays `.bgra8Unorm` rather than
+        // `_srgb` so no implicit linearisation happens on write; the values
+        // are already sRGB-encoded (see `QuadRenderer`).
         metalLayer.framebufferOnly = true
+        metalLayer.colorspace = CGColorSpace(name: CGColorSpace.sRGB)
         metalLayer.isOpaque = false
         // A layer-hosting view is not clipped by the window's rounded
         // corners, so the drawable painted square corners past the frame.

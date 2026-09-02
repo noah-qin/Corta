@@ -11,7 +11,9 @@ import Testing
 /// the system monospaced font, the pinned cascade resolves CJK to PingFang
 /// SC and emoji to Apple Color Emoji, and color glyphs rasterise — in color —
 /// into the atlas's RGBA texture and draw through the color pipeline.
-struct ColorEmojiRenderTests {
+/// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
+/// by design — see the type's comment.
+@Suite(.serialized) struct ColorEmojiRenderTests {
     private static func makeDevice() -> MTLDevice? { MTLCreateSystemDefaultDevice() }
 
     private static func synchronize(_ texture: MTLTexture, queue: MTLCommandQueue) {

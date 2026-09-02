@@ -9,7 +9,9 @@ import Testing
 /// D.4: the renderer draws the DECSCUSR cursor style the core tracks
 /// (`Grid.cursorStyle`) — block, bar and underline; blinking variants draw
 /// steady.
-struct CursorStyleRenderTests {
+/// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
+/// by design — see the type's comment.
+@Suite(.serialized) struct CursorStyleRenderTests {
     private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (
         r: UInt8, g: UInt8, b: UInt8, a: UInt8
     ) {
