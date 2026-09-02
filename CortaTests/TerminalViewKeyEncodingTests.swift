@@ -3,9 +3,10 @@ import Testing
 
 @testable import Corta
 
-/// Keyboard events must produce bytes directly — never routed through
-/// `interpretKeyEvents:` (`ROADMAP.md` M1.18) — so this is tested as a pure
-/// function from a synthetic `NSEvent` to a byte array.
+/// The direct translation must keep producing exact bytes, so this is tested
+/// as a pure function from a synthetic `NSEvent` to a byte array. The M3.4
+/// routing decision — which events ever reach this path versus the IME — is
+/// covered in `TerminalViewIMETests`.
 struct TerminalViewKeyEncodingTests {
     private static func keyEvent(
         characters: String, charactersIgnoringModifiers: String? = nil,
