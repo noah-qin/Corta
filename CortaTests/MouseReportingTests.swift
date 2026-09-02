@@ -46,4 +46,22 @@ struct MouseReportingTests {
         #expect(column == 0)
         #expect(row == 0)
     }
+
+    // View-creating tests are @MainActor: Swift Testing runs cases on
+    // arbitrary threads, and AppKit view construction is main-thread only.
+
+    @MainActor @Test func aShellProvidedMappingWinsOverTheRawDivide() {
+        // The shell's mapping is inset-aware and bottom-anchored; the view
+        // defers to it rather than dividing the raw point.
+        let view = TerminalView(frame: NSRect(x: 0, y: 0, width: 1000, height: 600))
+        view.cellSize = CGSize(width: 9, height: 17)
+        view.cellAtPoint = { _ in (column: 7, row: 4) }
+        #expect(view.cellUnder(point: CGPoint(x: 1, y: 1)) == (column: 7, row: 4))
+    }
+
+    @MainActor @Test func withoutAShellMappingTheRawDivideApplies() {
+        let view = TerminalView(frame: NSRect(x: 0, y: 0, width: 1000, height: 600))
+        view.cellSize = CGSize(width: 10, height: 20)
+        #expect(view.cellUnder(point: CGPoint(x: 55, y: 45)) == (column: 5, row: 2))
+    }
 }

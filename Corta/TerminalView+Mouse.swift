@@ -64,7 +64,13 @@ extension TerminalView {
     /// The cell under the event, in grid coordinates. Also used by the
     /// scroll-wheel SGR report in `TerminalView+Scroll.swift`.
     func cellUnder(_ event: NSEvent) -> (column: Int, row: Int) {
-        let point = convert(event.locationInWindow, from: nil)
+        cellUnder(point: convert(event.locationInWindow, from: nil))
+    }
+
+    /// The shell's inset-aware, bottom-anchored mapping when wired (it is,
+    /// in the app); the raw divide remains the fallback for an unwired view.
+    func cellUnder(point: CGPoint) -> (column: Int, row: Int) {
+        if let cellAtPoint { return cellAtPoint(point) }
         return SGRMouse.cell(for: point, cellWidth: cellSize.width, cellHeight: cellSize.height)
     }
 

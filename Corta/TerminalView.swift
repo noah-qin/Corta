@@ -67,6 +67,12 @@ final class TerminalView: NSView, CALayerDelegate {
     /// currently knowable or visible.
     var cursorRectProvider: (() -> CGRect?)?
 
+    /// The point→cell mapping SGR mouse reports use, answered by the shell —
+    /// it owns the content insets, the bottom-anchored grid origin and the
+    /// grid size. A raw divide of the view point by the cell size is off by
+    /// the insets (roughly one column and two rows at the defaults).
+    var cellAtPoint: ((CGPoint) -> (column: Int, row: Int))?
+
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
 

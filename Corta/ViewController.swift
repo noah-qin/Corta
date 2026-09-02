@@ -207,6 +207,20 @@ class ViewController: NSViewController {
                 y: Self.contentInsets.top + CGFloat(cursor.row) * metrics.cellHeight,
                 width: metrics.cellWidth, height: metrics.cellHeight)
         }
+        // SGR mouse reports name an on-screen cell, so they need the same
+        // inset-aware, bottom-anchored mapping as selection hit-testing
+        // (`documentPosition`) — a raw divide of the view point by the cell
+        // size reports a cell off by the insets. scrollOffset is 0 here:
+        // the report is about what is on screen, not the document.
+        view.cellAtPoint = { [weak self] point in
+            guard let self, let terminalRenderer, session != nil, let terminalView
+            else { return (column: 0, row: 0) }
+            let grid = session.snapshot()
+            let position = Self.documentPosition(
+                for: point, viewHeight: terminalView.bounds.height,
+                metrics: terminalRenderer.pointMetrics, grid: grid, scrollOffset: 0)
+            return (position.column, position.row)
+        }
     }
 
     override func viewWillAppear() {
