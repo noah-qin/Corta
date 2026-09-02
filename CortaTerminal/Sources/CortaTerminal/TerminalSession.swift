@@ -38,6 +38,9 @@ public final class TerminalSession: @unchecked Sendable {
 
     private let state: Mutex<State>
     private let stopped = Mutex(false)
+    /// Serial, not concurrent: two resizes must apply in the order they
+    /// were requested, never race to decide which size "wins".
+    private let resizeQueue = DispatchQueue(label: "dev.corta.terminal-session.resize")
 
     /// Called from the reader thread whenever a batch has been applied, so
     /// the shell can schedule a redraw. Never called on the main thread by
@@ -190,12 +193,26 @@ public final class TerminalSession: @unchecked Sendable {
         state.withLock { $0.terminal.workingDirectory }
     }
 
+    /// `TIOCSWINSZ` happens synchronously — the child should see `SIGWINCH`
+    /// promptly — but the grid-side reflow (M4.2) does not: measured at
+    /// ~108 ms for a full 100k-line scrollback (`corta-bench`), which is
+    /// longer than `ResizeDebouncer`'s own 100 ms coalescing window and
+    /// would stall the main thread if run there. It runs on `resizeQueue`
+    /// instead, serially (so out-of-order completions can't apply an older
+    /// size after a newer one) and off the thread that owns layout and
+    /// input, then calls `onOutput` to wake the display link — the same
+    /// signal a parse batch uses — so the reflowed grid still gets drawn
+    /// even if nothing else invalidates the display after a live resize
+    /// ends.
     public func resize(to size: TerminalSize) {
         try? pty.resize(to: size)
-        state.withLock { current in
-            var grid = current.terminal.grid
-            grid.resize(rows: Int(size.rows), columns: Int(size.columns))
-            current.terminal.grid = grid
+        resizeQueue.async { [self] in
+            state.withLock { current in
+                var grid = current.terminal.grid
+                grid.resize(rows: Int(size.rows), columns: Int(size.columns))
+                current.terminal.grid = grid
+            }
+            onOutput?()
         }
     }
 

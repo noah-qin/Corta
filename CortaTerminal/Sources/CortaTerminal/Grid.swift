@@ -51,9 +51,9 @@ public struct Grid: Sendable {
     public static let maxRows = 4096
     public static let maxColumns = 4096
 
-    public private(set) var rows: Int
-    public private(set) var columns: Int
-    public private(set) var lines: ContiguousArray<Line>
+    public internal(set) var rows: Int
+    public internal(set) var columns: Int
+    public internal(set) var lines: ContiguousArray<Line>
 
     public var cursor: Cursor
     public var pen: Pen
@@ -75,7 +75,7 @@ public struct Grid: Sendable {
     /// printable character wraps first, and only then is the row marked
     /// `wrapped`. Without the deferral, a program that fills the last column
     /// and then moves the cursor would scroll the screen by one row.
-    public private(set) var pendingWrap: Bool
+    public internal(set) var pendingWrap: Bool
 
     /// DECSC's slot — cursor, pen and wrap state (VT510 §DECSC).
     private var savedCursor: Cursor?
@@ -458,15 +458,29 @@ public struct Grid: Sendable {
 
     // MARK: - Resizing
 
-    /// Changes the visible dimensions without reflowing content — rows are
-    /// truncated or padded, and columns beyond the new width are simply not
-    /// read (`Line` stores only up to its last written column already).
-    /// Reflow (`DESIGN.md` §2.1, roadmap M4.1) rewraps history to the new
-    /// width; that is deliberately not this method's job.
+    /// Changes the visible dimensions. A column change reflows the document
+    /// (`DESIGN.md` §2.1, roadmap M4.2) — except on the alternate screen,
+    /// which has no scrollback and is resized, never reflowed, because a
+    /// full-screen application redraws itself on `SIGWINCH` and re-wrapping
+    /// what it drew would corrupt its own model of the screen. A row-only
+    /// change keeps the cheaper non-reflowing path: rows move to or from
+    /// scrollback without touching any row's content.
     public mutating func resize(rows newRows: Int, columns newColumns: Int) {
         let newRows = min(max(1, newRows), Self.maxRows)
         let newColumns = min(max(1, newColumns), Self.maxColumns)
         guard newRows != rows || newColumns != columns else { return }
+
+        if newColumns != columns, !isAlternateScreenActive {
+            reflow(toColumns: newColumns, newRows: newRows)
+            rows = newRows
+            marginTop = min(marginTop, rows - 1)
+            marginBottom = min(marginBottom, rows - 1)
+            if marginTop >= marginBottom {
+                marginTop = 0
+                marginBottom = rows - 1
+            }
+            return
+        }
 
         if newRows < rows {
             // Take the rows off the TOP, into scrollback — not off the

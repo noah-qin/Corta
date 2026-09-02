@@ -166,3 +166,27 @@ func diagnoseScrollbackFootprint() {
 }
 
 diagnoseScrollbackFootprint()
+
+// MARK: - Reflow cost on a full scrollback (M4.2)
+
+/// `ResizeDebouncer` (100ms) already means a live drag delivers at most one
+/// resize roughly every 100ms, not one per pixel — so "stays smooth" means
+/// one reflow finishing well inside that window, not inside a frame budget.
+func benchmarkReflowCost() {
+    var terminal = Terminal(rows: 50, columns: 120, scrollbackLimit: 100_000)
+    let line = String(repeating: "the quick brown fox jumps over ", count: 4) + "\r\n"  // wraps at 120
+    let lineBytes = Array(line.utf8)
+    for _ in 0..<100_000 {
+        terminal.feed(lineBytes)
+    }
+
+    let start = DispatchTime.now()
+    var grid = terminal.grid
+    grid.resize(rows: 50, columns: 80)
+    let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e6
+    print(
+        "reflow cost, 100k-line scrollback, 120 -> 80 columns: \(String(format: "%.1f", elapsedMs)) ms "
+            + "(one resize call; ResizeDebouncer coalesces a live drag to ~1 call/100ms)")
+}
+
+benchmarkReflowCost()

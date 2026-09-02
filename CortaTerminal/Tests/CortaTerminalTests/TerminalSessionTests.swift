@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 
 @testable import CortaTerminal
@@ -94,6 +95,29 @@ import Testing
         #expect(
             text.contains("hi"),
             "expected the grid to echo the written bytes; grid held:\n\(text)")
+    }
+
+    /// M4.2: the grid-side reflow runs off the calling thread (measured too
+    /// slow, at 100k lines, to run synchronously without stalling whoever
+    /// called `resize` — see `TerminalSession.resize`'s doc comment) and
+    /// signals completion through `onOutput`, the same hook a parse batch
+    /// uses to wake a display link.
+    @Test func resizeAppliesAsynchronouslyAndSignalsOnOutput() throws {
+        let session = try TerminalSession(executable: "/bin/cat")
+        defer { session.stop() }
+
+        let signaled = Mutex(false)
+        session.onOutput = { signaled.withLock { $0 = true } }
+
+        session.resize(to: TerminalSize(rows: 30, columns: 100))
+
+        let deadline = ContinuousClock.now + .seconds(10)
+        while session.snapshot().columns != 100, ContinuousClock.now < deadline {
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        #expect(session.snapshot().rows == 30)
+        #expect(session.snapshot().columns == 100)
+        #expect(signaled.withLock { $0 })
     }
 
     /// Polls the grid until `condition` accepts its dump, or the hang
