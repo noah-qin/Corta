@@ -6,7 +6,16 @@ import AppKit
 /// `cellSize`) live on the class itself — extensions cannot add storage.
 extension TerminalView {
     override func mouseDown(with event: NSEvent) {
-        guard report(event, phase: .press(.left)) else { super.mouseDown(with: event); return }
+        if report(event, phase: .press(.left)) { return }
+        // Mouse reporting is off, so the left button selects text (M3.7).
+        // The shell owns the selection state; it is reached through the
+        // window rather than a stored closure because extensions cannot add
+        // storage to the class.
+        guard let controller = window?.contentViewController as? ViewController else {
+            super.mouseDown(with: event)
+            return
+        }
+        controller.handleSelectionMouseDown(event, in: self)
     }
 
     override func mouseUp(with event: NSEvent) {

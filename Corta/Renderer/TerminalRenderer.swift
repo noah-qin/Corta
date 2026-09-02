@@ -4,7 +4,10 @@ import CortaTerminal
 import Metal
 import simd
 
-/// A single point in the grid: (row, column), scrollback rows negative.
+/// A single point in the *document*: (row, column), where row ≥ 0 is a
+/// live-screen row and row < 0 addresses the scrollback counting backwards
+/// from the screen boundary (row -1 is the newest history line). Never a
+/// viewport row — scrolling translates, it does not move the selection.
 nonisolated struct GridPosition: Equatable {
     var row: Int
     var column: Int
@@ -14,6 +17,14 @@ nonisolated struct GridPosition: Equatable {
 nonisolated struct TerminalSelection {
     var start: GridPosition
     var end: GridPosition
+    /// The scrollback depth the rows were recorded against. Output since
+    /// then has pushed `grid.scrollback.count - baseScrollbackCount` lines
+    /// into history, shifting every stored row by that much; the renderer
+    /// applies the shift when translating to viewport rows. (Exact while
+    /// the ring is not yet full; once it is, pushes evict without growing
+    /// the count and the shift undercounts — the selection then stays put
+    /// rather than tracking text that flooded past.)
+    var baseScrollbackCount: Int = 0
 }
 
 /// Turns a `Grid` snapshot into instanced quads and draws it into a given
@@ -130,8 +141,11 @@ nonisolated final class TerminalRenderer {
 
         if fullRebuild || !Self.selectionsEqual(cachedSelection, selection)
             || grid.cursor != cachedCursor || cursorVisible != cachedCursorVisible
+            // Output that scrolled lines into history shifts the selection's
+            // viewport rows without the selection itself changing.
+            || (selection != nil && cachedScrollbackCount != grid.scrollback.count)
         {
-            rebuildOverlay(grid: grid, cursorVisible: cursorVisible, selection: selection)
+            rebuildOverlay(grid: grid, cursorVisible: cursorVisible, selection: selection, offset: offset)
             changed = true
         }
 
@@ -233,14 +247,14 @@ nonisolated final class TerminalRenderer {
 
     /// Selection and cursor quads, rebuilt when either changes and spliced
     /// into the tail of `cachedBackground`, after every row's slice.
-    private func rebuildOverlay(grid: Grid, cursorVisible: Bool, selection: TerminalSelection?) {
+    private func rebuildOverlay(grid: Grid, cursorVisible: Bool, selection: TerminalSelection?, offset: Int) {
         let cellWidth = Float(metrics.cellWidth)
         let cellHeight = Float(metrics.cellHeight)
         overlayScratch.removeAll(keepingCapacity: true)
         if let selection {
             overlayScratch.append(
                 contentsOf: selectionQuads(
-                    selection, columns: grid.columns, cellWidth: cellWidth, cellHeight: cellHeight))
+                    selection, grid: grid, offset: offset, cellWidth: cellWidth, cellHeight: cellHeight))
         }
         if cursorVisible {
             let origin = SIMD2<Float>(
@@ -301,7 +315,9 @@ nonisolated final class TerminalRenderer {
     private static func selectionsEqual(_ a: TerminalSelection?, _ b: TerminalSelection?) -> Bool {
         switch (a, b) {
         case (nil, nil): return true
-        case let (a?, b?): return a.start == b.start && a.end == b.end
+        case let (a?, b?):
+            return a.start == b.start && a.end == b.end
+                && a.baseScrollbackCount == b.baseScrollbackCount
         default: return false
         }
     }
@@ -320,14 +336,26 @@ nonisolated final class TerminalRenderer {
         return grid.line(combinedIndex - grid.scrollback.count)
     }
 
+    /// The selection's quads in viewport rows. The selection is stored in
+    /// document rows (negative = scrollback, see `GridPosition`), recorded
+    /// against a scrollback of `baseScrollbackCount` lines; two shifts map
+    /// them onto what is on screen now: `growth` for output that pushed
+    /// lines into history since, and `offset` for the user's own scrolling.
+    /// Rows outside the viewport produce no quads.
     private func selectionQuads(
-        _ selection: TerminalSelection, columns: Int, cellWidth: Float, cellHeight: Float
+        _ selection: TerminalSelection, grid: Grid, offset: Int, cellWidth: Float, cellHeight: Float
     ) -> [QuadInstance] {
         guard selection.start.row <= selection.end.row else { return [] }
+        let growth = max(0, grid.scrollback.count - selection.baseScrollbackCount)
+        let firstRow = selection.start.row - growth + offset
+        let lastRow = selection.end.row - growth + offset
+        guard lastRow >= 0, firstRow < grid.rows else { return [] }
         var quads: [QuadInstance] = []
-        for row in selection.start.row...selection.end.row {
-            let startColumn = row == selection.start.row ? selection.start.column : 0
-            let endColumn = row == selection.end.row ? selection.end.column + 1 : columns
+        for row in max(0, firstRow)...min(grid.rows - 1, lastRow) {
+            let startColumn =
+                row == firstRow ? min(max(0, selection.start.column), grid.columns) : 0
+            let endColumn =
+                row == lastRow ? min(max(0, selection.end.column) + 1, grid.columns) : grid.columns
             guard endColumn > startColumn else { continue }
             quads.append(
                 QuadInstance(
