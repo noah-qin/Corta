@@ -76,6 +76,19 @@ startup-ordering or gesture defects — six such bugs shipped a blank or
 unusable window while those tests stayed green. `docs/CONFORMANCE.md`
 §4.4 has the five-point check.
 
+**First responder is not free.** Nothing makes the terminal view first
+responder by default; `ViewController.viewWillAppear` calls
+`makeFirstResponder`. Without it `keyDown` never fires and menu actions
+targeting First Responder (⌘V, ⌘=, …) silently dead-end — keep that
+call intact.
+
+**Never size the session from a transient layout.** With
+`.fullSizeContentView`, the first layout after window setup runs at the
+content-rect height (frame minus titlebar). Delivering that winsize
+shrinks the grid and strands content (D.1). `resizeSessionToFitView`
+skips layouts where the view does not fill its window's frame — do not
+bypass the gate.
+
 **Testing.** Golden-file grid tests are built during M1, not later:
 feed a byte stream, serialise the grid to text, diff against a checked-in
 expectation. Record `esctest` pass rate and benchmark numbers at each

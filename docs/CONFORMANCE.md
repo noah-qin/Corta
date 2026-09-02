@@ -93,11 +93,21 @@ be **fixed-format and never echo attacker-controlled text** — see
 | Ligatures                                        | P2   | Conflicts with the cell grid — `DESIGN.md` §7.3     |
 | Background transparency, blur, padding           | P2   |                                                    |
 
+Runtime font scaling landed at M3 (⌘= bigger, ⌘- smaller, ⌘0 reset).
+The glyph atlas is rasterised for one size and scale, so a change
+rebuilds the renderer and re-fits the window around the unchanged
+grid. Measured on a 2x display (Menlo): 14pt → 9x17pt cell, 1100x554pt
+content (120x30 grid); 15pt → 10x18pt cell, 1220x584pt content. The
+cursor renders the core's DECSCUSR state — block, bar and underline;
+blinking variants render steadily, because a blink timer would force
+frames on an idle screen (`PERFORMANCE.md` §1, idle CPU ~0%).
+
 ### 2.3 Windows and sessions
 
 | Capability                                              | Tier | Notes                                        |
 | ------------------------------------------------------- | ---- | -------------------------------------------- |
 | Single window, single terminal                          | P0   | M1                                           |
+| Multiple windows (⌘N), each its own session             | P1   | Landed at M3; composition, not new mechanism |
 | PTY lifecycle: spawn, read/write, `TIOCSWINSZ`, `SIGCHLD` | P0 | Resize must be reported or remote `vim` and `htop` desynchronise |
 | Resize debouncing                                       | P1   | A live window drag otherwise hammers the child |
 | Tabs                                                    | P1   |                                              |
@@ -170,7 +180,14 @@ and still shipped a blank or unusable window:
 - the grid laid out in points against a pixel coordinate space, so
   everything rendered at half size on a Retina display,
 - a transient window size at startup that the shell laid its early
-  output out against.
+  output out against,
+- a transient *winsize* delivered at startup: the first layout ran at
+  the content-rect height (window frame minus titlebar, before
+  `.fullSizeContentView` took effect) and shrank the session 30 → 28
+  rows, then grew it back — stranding two blank rows under the prompt
+  while `stty size` and the render rect both reported the correct 30
+  (M2 closeout, D.1; fixed by gating session resizes on the view
+  filling its window's frame).
 
 These are properties of the live view hierarchy, of orientation, and of
 startup ordering — none of which a texture readback can see. Any change

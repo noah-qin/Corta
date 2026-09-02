@@ -20,18 +20,26 @@ import Synchronization
 /// `ViewController+Selection.swift` (Track C) and
 /// `ViewController+Commands.swift` (Track D).
 class ViewController: NSViewController {
-    private var terminalView: TerminalView!
-    // Not `private`: the extension files (`+Input`, `+Selection`) reach
-    // these, and extensions cannot add their own storage.
+    // Not `private`: the extension files (`+Input`, `+Selection`, `+Commands`)
+    // reach these, and extensions cannot add their own storage.
+    var terminalView: TerminalView!
     var terminalRenderer: TerminalRenderer!
     var session: TerminalSession!
     private var commandQueue: MTLCommandQueue!
+    /// Kept so `ViewController+Commands` can rebuild the renderer (with a new
+    /// font size) without going through `MTLCreateSystemDefaultDevice` again.
+    var device: MTLDevice!
+    /// The font's point size; ⌘+/⌘−/⌘0 change it (`ViewController+Commands`).
+    /// The atlas is rasterised for one size, so a change rebuilds the
+    /// renderer — see `setFontSize`.
+    var fontSize: CGFloat = ViewController.defaultFontSize
+    static let defaultFontSize: CGFloat = 14
     var scrollOffset = 0
     /// The current text selection, owned by `ViewController+Selection.swift`
     /// (Track C) and read by the render loop. Stored here because extensions
     /// cannot add storage.
     var selection: TerminalSelection?
-    private var didSizeWindow = false
+    var didSizeWindow = false
     /// Set by layout changes the damage diff cannot see (drawable size,
     /// backing scale) and by local actions that change what is drawn without
     /// touching the grid (scrolling); consumed by `updateDamage`.
@@ -44,7 +52,9 @@ class ViewController: NSViewController {
     /// Coalesces `session.resize` during a live drag (M2.9); the last size
     /// actually requested, so no-op layouts don't re-send the same winsize.
     private var resizeDebouncer: ResizeDebouncer!
-    private var lastRequestedSize: TerminalSize?
+    /// The last grid size sent (or about to be sent) to the child; ⌘+/⌘−
+    /// re-fit the window to keep this grid size at the new cell metrics.
+    var lastRequestedSize: TerminalSize?
 
     /// The drag is over — the child should see the final size now, not after
     /// the debounce window expires. Wired to `TerminalView`'s
@@ -74,16 +84,17 @@ class ViewController: NSViewController {
     static var insetWidth: CGFloat { contentInsets.left + contentInsets.right }
     static var insetHeight: CGFloat { contentInsets.top + contentInsets.bottom }
 
-    private let minimumColumns = 20
-    private let minimumRows = 5
+    let minimumColumns = 20
+    let minimumRows = 5
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
+        let font = CTFontCreateWithName("Menlo" as CFString, fontSize, nil)
         guard let device = MTLCreateSystemDefaultDevice() else {
             fatalError("Metal is required")
         }
+        self.device = device
         let scale = NSScreen.main?.backingScaleFactor ?? 2
         terminalRenderer = try! TerminalRenderer(device: device, font: font, scale: scale)
         commandQueue = device.makeCommandQueue()
@@ -198,8 +209,8 @@ class ViewController: NSViewController {
         }
     }
 
-    override func viewDidAppear() {
-        super.viewDidAppear()
+    override func viewWillAppear() {
+        super.viewWillAppear()
         guard !didSizeWindow, let window = view.window else { return }
         didSizeWindow = true
         let metrics = terminalRenderer.pointMetrics
@@ -212,7 +223,14 @@ class ViewController: NSViewController {
         window.appearance = NSAppearance(named: .darkAqua)
         // Content runs the full height with a transparent titlebar, so the
         // background is one continuous surface instead of a titlebar butted
-        // against a differently-shaded grid.
+        // against a differently-shaded grid. This is `viewWillAppear`, not
+        // `viewDidAppear`, for a reason: the style mask must be final before
+        // the window's first layout. When it was applied in `viewDidAppear`
+        // the first layout ran at the content-rect height (frame minus
+        // titlebar), and `resizeSessionToFitView` — already ungated by then —
+        // delivered a transient 28-row winsize to the child, then 30 once the
+        // full height arrived. The shrink-then-grow strands two blank rows
+        // under the prompt of anything the child printed in between.
         window.styleMask.insert(.fullSizeContentView)
         window.titlebarAppearsTransparent = true
         // The Metal layer clears to a translucent colour; the window has to
@@ -226,6 +244,12 @@ class ViewController: NSViewController {
         window.setContentSize(NSSize(
             width: CGFloat(defaultColumns) * metrics.cellWidth + Self.insetWidth,
             height: CGFloat(defaultRows) * metrics.cellHeight + Self.insetHeight))
+        // Nothing else claims first responder, and without one the view
+        // hierarchy — the terminal view, this controller — is not in the
+        // responder chain at all: keyDown never fires and menu actions
+        // targeting First Responder (⌘V, ⌘=) dispatch from the window down,
+        // past the controller. The terminal view is where keys belong.
+        window.makeFirstResponder(terminalView)
     }
 
     override func viewDidLayout() {
@@ -277,14 +301,24 @@ class ViewController: NSViewController {
     }
 
     private func resizeSessionToFitView() {
-        // Nothing reaches the child until `viewDidAppear` has settled the
-        // window. The storyboard lays out at the content-layout height first
-        // (the frame less the titlebar) and only reaches full height once
-        // `.fullSizeContentView` applies, so an early layout produced a
-        // 28-row session that the shell laid its first output out against,
-        // stranding two blank rows under the prompt once the grid grew to 30.
-        // The session is constructed at the target size already.
-        guard didSizeWindow, session != nil, let terminalRenderer else { return }
+        // Nothing reaches the child until `viewWillAppear` has made the
+        // window's style mask final (`.fullSizeContentView` decides how tall
+        // the content view is) and pinned the content size — before that,
+        // layouts run at transient sizes the child's early output would be
+        // laid out against (D.1: a 28-row transient followed by the real 30
+        // stranded two blank rows under the prompt). The session is
+        // constructed at the target size already, so skipping early layouts
+        // loses nothing.
+        guard didSizeWindow, session != nil, let terminalRenderer, let window = view.window
+        else { return }
+        // The style-mask insertion lands one layout pass late: the first
+        // layout after `setContentSize` still runs at the content-rect height
+        // (frame minus titlebar — observed 522pt against the final 554pt),
+        // and delivering that size shrinks the grid and strands content
+        // exactly as above. With `.fullSizeContentView` effective the content
+        // view spans the whole frame, so a view that does not fill its
+        // window's frame is transient by construction; skip it.
+        guard abs(view.bounds.height - window.frame.height) < 1 else { return }
         let usable = CGSize(
             width: view.bounds.width - Self.insetWidth,
             height: view.bounds.height - Self.insetHeight)

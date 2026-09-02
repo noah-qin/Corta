@@ -31,8 +31,9 @@ nonisolated struct TerminalSelection {
 /// skip the frame entirely (no drawable, no command buffer, ~0% idle CPU).
 ///
 /// Cursor and selection are extra background-pass quads, not a third
-/// pipeline: a block cursor and a selection highlight are colour under the
-/// glyph, exactly like a cell's own background.
+/// pipeline: a cursor (block, bar or underline — `Grid.cursorStyle`,
+/// blinking variants drawn steady) and a selection highlight are colour
+/// under the glyph, exactly like a cell's own background.
 nonisolated final class TerminalRenderer {
     let quadRenderer: QuadRenderer
     let glyphAtlas: GlyphAtlas
@@ -60,6 +61,7 @@ nonisolated final class TerminalRenderer {
     private var cachedOffset = -1
     private var cachedScrollbackCount = -1
     private var cachedCursor: Cursor?
+    private var cachedCursorStyle: CursorStyle?
     private var cachedCursorVisible = false
     private var cachedSelection: TerminalSelection?
     private var needsFullRebuild = true
@@ -140,7 +142,8 @@ nonisolated final class TerminalRenderer {
         }
 
         if fullRebuild || !Self.selectionsEqual(cachedSelection, selection)
-            || grid.cursor != cachedCursor || cursorVisible != cachedCursorVisible
+            || grid.cursor != cachedCursor || grid.cursorStyle != cachedCursorStyle
+            || cursorVisible != cachedCursorVisible
         {
             rebuildOverlay(grid: grid, cursorVisible: cursorVisible, selection: selection)
             changed = true
@@ -150,6 +153,7 @@ nonisolated final class TerminalRenderer {
         cachedOffset = offset
         cachedScrollbackCount = grid.scrollback.count
         cachedCursor = grid.cursor
+        cachedCursorStyle = grid.cursorStyle
         cachedCursorVisible = cursorVisible
         cachedSelection = selection
         needsFullRebuild = false
@@ -258,10 +262,31 @@ nonisolated final class TerminalRenderer {
                     selection, columns: grid.columns, cellWidth: cellWidth, cellHeight: cellHeight))
         }
         if cursorVisible {
-            let origin = SIMD2<Float>(
+            let cellOrigin = SIMD2<Float>(
                 Float(grid.cursor.column) * cellWidth, Float(grid.cursor.row) * cellHeight)
-            overlayScratch.append(
-                QuadInstance(origin: origin, size: .init(cellWidth, cellHeight), color: Self.cursorColor))
+            // DECSCUSR (M2.5/D.4): the core tracks the style, the renderer
+            // draws it. Blinking variants render steady — the damage model
+            // redraws on change, and a blink timer would force a frame every
+            // interval on an otherwise idle screen (`PERFORMANCE.md` §1:
+            // idle CPU ~0%).
+            //
+            // The stroke is an eighth of a cell (2pt at the 2x baseline),
+            // floored at 2 device pixels so it stays visible at 1x.
+            let stroke = max(2, (cellHeight / 8).rounded(.down))
+            switch grid.cursorStyle {
+            case .block, .blinkingBlock:
+                overlayScratch.append(
+                    QuadInstance(origin: cellOrigin, size: .init(cellWidth, cellHeight), color: Self.cursorColor))
+            case .underline, .blinkingUnderline:
+                overlayScratch.append(
+                    QuadInstance(
+                        origin: .init(cellOrigin.x, cellOrigin.y + cellHeight - stroke),
+                        size: .init(cellWidth, stroke), color: Self.cursorColor))
+            case .bar, .blinkingBar:
+                overlayScratch.append(
+                    QuadInstance(
+                        origin: cellOrigin, size: .init(stroke, cellHeight), color: Self.cursorColor))
+            }
         }
         let end = cachedBackground.count
         cachedBackground.replaceSubrange((end - overlayCount)..<end, with: overlayScratch)
