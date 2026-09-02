@@ -44,6 +44,11 @@ class ViewController: NSViewController {
     /// backing scale) and by local actions that change what is drawn without
     /// touching the grid (scrolling); consumed by `updateDamage`.
     private var needsRedraw = true
+    /// True while a synchronized-output batch (`?2026`, M4.3) has withheld a
+    /// frame that would otherwise have been presented; forces the next
+    /// non-synchronized `updateDamage` to present once, even if the diff
+    /// alone finds nothing new since the mode ended.
+    private var wasSynchronizedOutputActive = false
     /// Set from the reader thread's `onOutput` (every parse batch); the
     /// vsync gate checks this one flag and only snapshots and diffs the grid
     /// when it is set, so a truly idle frame costs a boolean check rather
@@ -265,14 +270,26 @@ class ViewController: NSViewController {
     /// output did arrive, the snapshot is diffed against the renderer's
     /// line-granular cache and the frame happens only on damage.
     private func updateDamage() -> Bool {
+        if session.takeBell() {
+            handleBell()
+        }
         let hasOutput = outputPending.withLock { pending -> Bool in
             let was = pending
             pending = false
             return was
         }
         guard needsRedraw || hasOutput else { return false }
-        let forced = needsRedraw
+        if session.isSynchronizedOutputEnabled {
+            // A frame drawn mid-batch would show a torn intermediate state.
+            // Remember that a present is owed and wait for the matching
+            // DECRST, which arrives as its own output batch and forces one
+            // frame then (`?2026`, M4.3).
+            wasSynchronizedOutputActive = true
+            return false
+        }
+        let forced = needsRedraw || wasSynchronizedOutputActive
         needsRedraw = false
+        wasSynchronizedOutputActive = false
         let grid = session.snapshot()
         // The rebuilt rows land in the renderer's cache; `render` diffs once
         // more when it draws and picks up anything that arrived since.
@@ -280,6 +297,19 @@ class ViewController: NSViewController {
             grid: grid, scrollOffset: scrollOffset,
             cursorVisible: scrollOffset == 0, selection: selection)
         return forced || damaged
+    }
+
+    /// M4.8, app side — dispatches on `BellMode.current`. The core decided
+    /// nothing beyond "a bell happened" (`Terminal.takeBell()`).
+    private func handleBell() {
+        switch BellMode.current {
+        case .audible:
+            NSSound.beep()
+        case .visual:
+            terminalView.flashBell()
+        case .muted:
+            break
+        }
     }
 
     /// Called from the reader thread after each parse batch: record that the

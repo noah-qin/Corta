@@ -69,5 +69,80 @@ func benchmarkScrollbackMemory() {
     )
 }
 
+// MARK: - Keypress -> grid latency (M4, PERFORMANCE.md §1)
+
+/// The software round-trip a keypress causes before there is anything new
+/// for the renderer to draw: write to the PTY, the byte comes back, the
+/// reader thread parses it and applies it to the grid. Three things this is
+/// NOT, stated plainly because it would be easy to overstate this number:
+///
+/// 1. It is not a full keypress-to-photon measurement. That also needs one
+///    vsync period (already bounded by `FrameCPUBaselineTests`, < 4 ms CPU
+///    against an 8.3 ms 120 Hz frame) plus real display/compositor latency,
+///    which needs a tool like Typometer against actual hardware and cannot
+///    come from a headless benchmark.
+/// 2. `/bin/cat` is the child so the number isolates PTY + parse + grid
+///    write from a particular shell's own processing cost — but the pty
+///    replica's default termios has `ICANON`/`ECHO` set, so what comes back
+///    is very likely the kernel tty driver's own echo, not `cat` actually
+///    reading and rewriting the byte in userspace. Measured this way it is
+///    a floor on the round trip, not a ceiling: an interactive shell (zsh's
+///    `zle`) turns raw mode and its own echo on instead, which costs a
+///    userspace scheduling hop this number does not include.
+/// 3. It says nothing about shell-side processing (prompt redraw, syntax
+///    highlighting) some shells do per keystroke.
+func benchmarkKeypressLatency() {
+    let session: TerminalSession
+    do {
+        session = try TerminalSession(executable: "/bin/cat", size: TerminalSize(rows: 24, columns: 80))
+    } catch {
+        print("keypress -> grid latency: SKIPPED (could not spawn /bin/cat: \(error))")
+        return
+    }
+    defer { session.stop() }
+
+    let iterations = 200
+    var samplesNanoseconds: [UInt64] = []
+    samplesNanoseconds.reserveCapacity(iterations)
+
+    let semaphore = DispatchSemaphore(value: 0)
+    session.onOutput = { semaphore.signal() }
+
+    // Warm up: the first write pays for thread startup and PTY buffering
+    // effects a steady-state loop shouldn't be charged for.
+    session.write([UInt8(ascii: "a")])
+    _ = semaphore.wait(timeout: .now() + 1)
+
+    for i in 0..<iterations {
+        // Cycle through a few scalars so the grid write is not a no-op
+        // fast path repeating the exact same cell every time.
+        let byte = UInt8(ascii: "a") + UInt8(i % 26)
+        let start = DispatchTime.now()
+        session.write([byte])
+        guard semaphore.wait(timeout: .now() + 1) == .success else { continue }
+        let elapsed = DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds
+        samplesNanoseconds.append(elapsed)
+    }
+
+    guard !samplesNanoseconds.isEmpty else {
+        print("keypress -> grid latency: SKIPPED (no samples completed)")
+        return
+    }
+    let sorted = samplesNanoseconds.sorted()
+    let avgMs = Double(sorted.reduce(0, +)) / Double(sorted.count) / 1e6
+    let p95Ms = Double(sorted[Int(Double(sorted.count) * 0.95).clamped(to: 0...(sorted.count - 1))]) / 1e6
+    print(
+        "keypress -> grid latency: \(String(format: "%.3f", avgMs)) ms avg / "
+            + "\(String(format: "%.3f", p95Ms)) ms p95 over \(sorted.count) samples "
+            + "(write -> PTY echo -> parse -> grid write; excludes vsync + display)")
+}
+
+extension Int {
+    fileprivate func clamped(to range: ClosedRange<Int>) -> Int {
+        Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
+    }
+}
+
 benchmarkParseThroughput()
 benchmarkScrollbackMemory()
+benchmarkKeypressLatency()

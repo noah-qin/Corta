@@ -136,6 +136,27 @@ final class TerminalView: NSView, CALayerDelegate {
         displayLink?.isPaused = false
     }
 
+    /// The default visual bell (M4.8): a brief flash of the terminal
+    /// surface. A transient screen effect, not a persistent panel, so it
+    /// draws directly on the Metal layer rather than adding a glass surface.
+    func flashBell() {
+        let flash = CALayer()
+        flash.frame = bounds
+        flash.backgroundColor = NSColor.white.withAlphaComponent(0.35).cgColor
+        flash.cornerRadius = metalLayer.cornerRadius
+        flash.maskedCorners = metalLayer.maskedCorners
+        layer?.addSublayer(flash)
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 1.0
+        fade.toValue = 0.0
+        fade.duration = 0.18
+        fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { flash.removeFromSuperlayer() }
+        flash.add(fade, forKey: "flash")
+        CATransaction.commit()
+    }
+
     private func updateDrawableSize() {
         let scale = window?.backingScaleFactor ?? 1
         metalLayer.contentsScale = scale
