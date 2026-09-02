@@ -20,18 +20,26 @@ import Synchronization
 /// `ViewController+Selection.swift` (Track C) and
 /// `ViewController+Commands.swift` (Track D).
 class ViewController: NSViewController {
-    private var terminalView: TerminalView!
-    // Not `private`: the extension files (`+Input`, `+Selection`) reach
-    // these, and extensions cannot add their own storage.
+    // Not `private`: the extension files (`+Input`, `+Selection`, `+Commands`)
+    // reach these, and extensions cannot add their own storage.
+    var terminalView: TerminalView!
     var terminalRenderer: TerminalRenderer!
     var session: TerminalSession!
     private var commandQueue: MTLCommandQueue!
+    /// Kept so `ViewController+Commands` can rebuild the renderer (with a new
+    /// font size) without going through `MTLCreateSystemDefaultDevice` again.
+    var device: MTLDevice!
+    /// The font's point size; ⌘+/⌘−/⌘0 change it (`ViewController+Commands`).
+    /// The atlas is rasterised for one size, so a change rebuilds the
+    /// renderer — see `setFontSize`.
+    var fontSize: CGFloat = ViewController.defaultFontSize
+    static let defaultFontSize: CGFloat = 14
     var scrollOffset = 0
     /// The current text selection, owned by `ViewController+Selection.swift`
     /// (Track C) and read by the render loop. Stored here because extensions
     /// cannot add storage.
     var selection: TerminalSelection?
-    private var didSizeWindow = false
+    var didSizeWindow = false
     /// Set by layout changes the damage diff cannot see (drawable size,
     /// backing scale) and by local actions that change what is drawn without
     /// touching the grid (scrolling); consumed by `updateDamage`.
@@ -44,7 +52,9 @@ class ViewController: NSViewController {
     /// Coalesces `session.resize` during a live drag (M2.9); the last size
     /// actually requested, so no-op layouts don't re-send the same winsize.
     private var resizeDebouncer: ResizeDebouncer!
-    private var lastRequestedSize: TerminalSize?
+    /// The last grid size sent (or about to be sent) to the child; ⌘+/⌘−
+    /// re-fit the window to keep this grid size at the new cell metrics.
+    var lastRequestedSize: TerminalSize?
 
     /// The drag is over — the child should see the final size now, not after
     /// the debounce window expires. Wired to `TerminalView`'s
@@ -74,16 +84,17 @@ class ViewController: NSViewController {
     static var insetWidth: CGFloat { contentInsets.left + contentInsets.right }
     static var insetHeight: CGFloat { contentInsets.top + contentInsets.bottom }
 
-    private let minimumColumns = 20
-    private let minimumRows = 5
+    let minimumColumns = 20
+    let minimumRows = 5
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
+        let font = CTFontCreateWithName("Menlo" as CFString, fontSize, nil)
         guard let device = MTLCreateSystemDefaultDevice() else {
             fatalError("Metal is required")
         }
+        self.device = device
         let scale = NSScreen.main?.backingScaleFactor ?? 2
         terminalRenderer = try! TerminalRenderer(device: device, font: font, scale: scale)
         commandQueue = device.makeCommandQueue()

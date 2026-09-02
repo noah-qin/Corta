@@ -603,6 +603,22 @@
                                 <modifierMask key="keyEquivalentModifierMask"/>
                                 <menu key="submenu" title="View" id="HyV-fh-RgO">
                                     <items>
+                                        <menuItem title="Bigger" keyEquivalent="=" id="dVw-Bg-001">
+                                            <connections>
+                                                <action selector="increaseFontSize:" target="Ady-hI-5gd" id="dVw-Bg-002"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Smaller" keyEquivalent="-" id="dVw-Sm-001">
+                                            <connections>
+                                                <action selector="decreaseFontSize:" target="Ady-hI-5gd" id="dVw-Sm-002"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Actual Size" keyEquivalent="0" id="dVw-As-001">
+                                            <connections>
+                                                <action selector="resetFontSize:" target="Ady-hI-5gd" id="dVw-As-002"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="dVw-Se-001"/>
                                         <menuItem title="Show Toolbar" keyEquivalent="t" id="snW-S8-Cw5">
                                             <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
                                             <connections>
