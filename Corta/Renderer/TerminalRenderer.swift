@@ -202,7 +202,9 @@ nonisolated final class TerminalRenderer {
             let line = Self.visibleLine(grid: grid, row: row, offset: offset)
             let backgroundStart = cachedBackground.count
             let glyphStart = cachedGlyphs.count
-            appendRowInstances(line: line, row: row, background: &cachedBackground, glyphs: &cachedGlyphs)
+            appendRowInstances(
+                line: line, row: row, graphemes: grid.graphemes,
+                background: &cachedBackground, glyphs: &cachedGlyphs)
             backgroundCounts.append(cachedBackground.count - backgroundStart)
             glyphCounts.append(cachedGlyphs.count - glyphStart)
             cachedLines.append(line)
@@ -224,7 +226,9 @@ nonisolated final class TerminalRenderer {
             if line != cachedLines[row] {
                 rowBackground.removeAll(keepingCapacity: true)
                 rowGlyphs.removeAll(keepingCapacity: true)
-                appendRowInstances(line: line, row: row, background: &rowBackground, glyphs: &rowGlyphs)
+                appendRowInstances(
+                    line: line, row: row, graphemes: grid.graphemes,
+                    background: &rowBackground, glyphs: &rowGlyphs)
                 cachedBackground.replaceSubrange(
                     backgroundStart..<(backgroundStart + backgroundCounts[row]), with: rowBackground)
                 cachedGlyphs.replaceSubrange(
@@ -267,8 +271,18 @@ nonisolated final class TerminalRenderer {
     /// Every instance one viewport row contributes — the per-cell loop that
     /// used to run for the whole screen every frame, now run only for rows
     /// whose line actually changed.
+    ///
+    /// A wide pair's lead cell draws its glyph across the full two-cell box
+    /// (M3.5), *scaled down to fit* when the fallback font's bitmap is larger
+    /// — the CJK font Core Text falls back to has its own metrics and is
+    /// never exactly two primary-font advances wide, and trusting it is what
+    /// made CJK spill into the next cell or draw at the wrong width. A cell
+    /// whose grapheme cluster spills to the side table (`DESIGN.md` §2.3,
+    /// M3.6) is shaped as one run and drawn into the same box — one cell, or
+    /// two for a wide cluster such as a ZWJ emoji.
     private func appendRowInstances(
-        line: Line, row: Int, background: inout [QuadInstance], glyphs: inout [QuadInstance]
+        line: Line, row: Int, graphemes: GraphemeTable,
+        background: inout [QuadInstance], glyphs: inout [QuadInstance]
     ) {
         let cellWidth = Float(metrics.cellWidth)
         let cellHeight = Float(metrics.cellHeight)
@@ -287,25 +301,53 @@ nonisolated final class TerminalRenderer {
 
             // A wide pair's spacer holds a space scalar and draws nothing;
             // the flag check keeps that true even if the scalar ever
-            // changes. Double-width *glyph* drawing is beyond M2.1 — the
-            // lead's glyph is drawn into a single cell for now.
+            // changes.
             guard !cell.attributes.contains(.invisible),
-                !cell.attributes.contains(.wideSpacer), cell.scalar != 0x20,
-                let scalar = Unicode.Scalar(cell.scalar)
+                !cell.attributes.contains(.wideSpacer)
             else { continue }
             let bold = cell.attributes.contains(.bold)
-            let info =
-                scalar.isASCII
-                ? glyphAtlas.glyph(forASCII: cell.scalar, bold: bold)
-                : glyphAtlas.glyph(shaping: cell.scalar, bold: bold)
-            guard let info, info.size != .zero else { continue }
+            let info: GlyphAtlas.GlyphInfo
+            if !cell.grapheme.isNone,
+                let scalars = graphemes.scalars(for: cell.grapheme)
+            {
+                // A cluster cell is drawn even when its base scalar is a
+                // space (a combining mark can attach to one).
+                guard let shaped = glyphAtlas.glyph(forCluster: scalars, bold: bold)
+                else { continue }
+                info = shaped
+            } else {
+                guard cell.scalar != 0x20, let scalar = Unicode.Scalar(cell.scalar)
+                else { continue }
+                guard
+                    let lookedUp =
+                        scalar.isASCII
+                        ? glyphAtlas.glyph(forASCII: cell.scalar, bold: bold)
+                        : glyphAtlas.glyph(shaping: cell.scalar, bold: bold)
+                else { continue }
+                info = lookedUp
+            }
+            guard info.size != .zero else { continue }
 
-            let glyphOrigin = SIMD2<Float>(
+            var glyphOrigin = SIMD2<Float>(
                 origin.x + info.bearing.x,
                 origin.y + baseline - info.bearing.y - info.size.y
             )
+            var glyphSize = info.size
+            if cell.attributes.contains(.wide) {
+                let boxWidth = cellWidth * 2
+                // Scale the glyph down into the two-cell box (never up), then
+                // centre it horizontally; the baseline fixes the vertical
+                // axis, so scaled bearings keep the glyph sitting on the
+                // line. The quad can then never paint outside its pair.
+                let fit = min(1, boxWidth / info.size.x, cellHeight / info.size.y)
+                glyphSize = info.size * fit
+                glyphOrigin = SIMD2<Float>(
+                    origin.x + (boxWidth - glyphSize.x) / 2,
+                    origin.y + baseline - (info.bearing.y + info.size.y) * fit
+                )
+            }
             glyphs.append(
-                QuadInstance(origin: glyphOrigin, size: info.size, color: fg, uvRect: info.uvRect))
+                QuadInstance(origin: glyphOrigin, size: glyphSize, color: fg, uvRect: info.uvRect))
         }
     }
 
