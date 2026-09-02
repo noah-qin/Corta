@@ -212,9 +212,33 @@ Ordered by how badly they are usually underestimated.
    `firstRectForCharacterRange:` must return correct *screen* coordinates
    or the candidate window lands in the wrong place; preedit text must be
    drawn into the grid as an overlay without being committed to it; and
-   `interpretKeyEvents:` swallows control keys the terminal needs. The
-   standard structure is to bypass the IME path entirely unless marked
-   text is active.
+   `interpretKeyEvents:` swallows control keys the terminal needs.
+
+   As implemented (M3.1–M3.4, `TerminalView+IME.swift`,
+   `TerminalView+Keyboard.swift`):
+
+   - The conformance must be **declared** on the view — `NSView` does not
+     conform by default, and its `inputContext` is nil until it does.
+   - Routing: an event carrying ⌘ or ⌃ bypasses the IME entirely; every
+     other event is offered to `inputContext.handleEvent(_:)` first and
+     falls through to direct byte translation only when unconsumed. The
+     input context consumes more than text keys — Return, Delete, Escape
+     and the arrows come back through `doCommand(by:)`, and forwarding
+     those there is load-bearing: without it they are silently eaten.
+   - Committed text arrives via `insertText(_:replacementRange:)` and is
+     written to the PTY there. Marked text is app-layer only — never the
+     grid, never the PTY — drawn by `MarkedTextOverlayView` over the cells
+     at the cursor with the IME's underline styling intact. The overlay
+     must be layer-backed (`wantsLayer`); the terminal view is
+     layer-hosting, and a subview without a backing layer never composites
+     over the Metal layer — the preedit is silently invisible.
+   - `firstRect` converts the cursor cell to screen coordinates on demand,
+     so it stays correct after the window moves.
+   - Verification caveat: synthetic key events — `NSEvent.keyEvent(with:)`
+     in tests, or `CGEvent`s with `keyboardSetUnicodeString` — carry baked
+     characters, which an IME treats as already-translated text;
+     composition never opens for them. Live IME verification needs
+     character-less HID-level events; see `CONFORMANCE.md` §4.4.
 
 2. **`fork` in a Cocoa process.** Between `fork` and `exec` only
    async-signal-safe functions are legal, and the Swift runtime is not —

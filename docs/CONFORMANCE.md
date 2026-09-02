@@ -69,7 +69,7 @@ be **fixed-format and never echo attacker-controlled text** — see
 | Capability                                       | Tier | Notes                                              |
 | ------------------------------------------------ | ---- | -------------------------------------------------- |
 | Keyboard → PTY, including control and function keys | P0 |                                                    |
-| **CJK IME** (`NSTextInputClient`)                | P0   | Harder than it looks — `DESIGN.md` §7.1             |
+| **CJK IME** (`NSTextInputClient`)                | P0   | Harder than it looks — `DESIGN.md` §7.1. Composition, candidate window and commit verified in the launched app (§4.4) |
 | Copy / paste with bracketed paste                | P0   |                                                    |
 | Keyboard and mouse text selection                | P0   | Must respect the soft-wrap flag                     |
 | Configurable key bindings                        | P1   |                                                    |
@@ -180,6 +180,29 @@ under `Corta/` is therefore verified by launching the app and checking:
 2. `stty size` in the child agrees with it,
 3. a screenshot shows text upright, full size, and filling the window,
 4. output longer than the screen scrolls and uses every row.
+
+### 4.4.1 IME verification (M3.1–M3.4)
+
+IME behaviour additionally requires driving a *real* input method in the
+launched app; no offscreen or in-suite test can do it (`DESIGN.md` §7.1 —
+synthetic events with baked characters bypass composition). Procedure used
+at M3:
+
+1. Launch the app with a wrapper `$SHELL` that records `stty size` and
+   ends with `exec cat > capture-file` (a *backgrounded* reader is stopped
+   by `SIGTTIN`; the capture must own the terminal).
+2. Select an enabled Chinese input source for the session via TIS
+   (`TISSelectInputSource`, e.g. `com.apple.inputmethod.SCIM.ITABC`) and
+   restore the previous source afterwards.
+3. Inject key events at HID level (`CGEvent.post(tap: .cghidEventTap)`)
+   with **key codes only** — setting a unicode string on the event makes
+   the IME treat it as plain text. Requires the injecting process to be
+   accessibility-trusted; without that grant this is a manual test.
+4. Verify: typing pinyin opens a composition (marked text overlay at the
+   cursor, underlined; nothing reaches the child), the candidate window
+   appears under the cursor cell, selecting a candidate writes it to the
+   child as UTF-8, and ⌃C / ⌃D / ⌃Z and the arrows behave identically
+   with and without the IME selected.
 
 ### 4.5 Manual scenario pass
 
