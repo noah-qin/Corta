@@ -146,3 +146,23 @@ extension Int {
 benchmarkParseThroughput()
 benchmarkScrollbackMemory()
 benchmarkKeypressLatency()
+
+// MARK: - Where the 100k-line memory actually goes (M4 Step 4 footprint)
+
+func diagnoseScrollbackFootprint() {
+    var probe = ContiguousArray<Cell>()
+    for _ in 0..<120 { probe.append(.blank) }
+    let stride = MemoryLayout<Cell>.stride
+    let usedBytes = 120 * stride
+    let allocatedBytes = probe.capacity * stride
+    print(
+        "diagnostic: a 120-cell row grown one append at a time has capacity "
+            + "\(probe.capacity) (stride \(stride)B) => \(allocatedBytes)B allocated vs "
+            + "\(usedBytes)B used (\(allocatedBytes - usedBytes)B slack/row); "
+            + "x100k rows => \((allocatedBytes - usedBytes) * 100_000 / 1_048_576)MB slack, "
+            + "\(usedBytes * 100_000 / 1_048_576)MB actual cell data, "
+            + "\(allocatedBytes * 100_000 / 1_048_576)MB allocated cell storage")
+    print("diagnostic: sizeof(Line) = \(MemoryLayout<Line>.stride)B, x100k => \(MemoryLayout<Line>.stride * 100_000 / 1_048_576)MB for the outer array alone")
+}
+
+diagnoseScrollbackFootprint()

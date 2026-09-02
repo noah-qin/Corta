@@ -25,6 +25,16 @@ public struct Line: Equatable, Sendable {
         self.wrapped = wrapped
     }
 
+    /// Rebuilds a line's cells from a slice of someone else's storage —
+    /// `Scrollback` uses this to hand back a value-type `Line` view into a
+    /// shared batch arena without exposing that arena publicly. Copies:
+    /// this is the read-side cost that pays for the batch arena needing no
+    /// growth headroom on the write side.
+    init(wrapped: Bool, cells: ArraySlice<Cell>) {
+        self.cells = ContiguousArray(cells)
+        self.wrapped = wrapped
+    }
+
     /// The number of stored cells, which is one past the last written column.
     public var count: Int { cells.count }
 

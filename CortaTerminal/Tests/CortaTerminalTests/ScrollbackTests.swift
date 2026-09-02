@@ -45,10 +45,10 @@ struct ScrollbackTests {
 
         #expect(scrollback.count == 1_000)
         #expect(scrollback.isFull)
-        // The ring never reallocated past its cap: eviction overwrites one
-        // slot rather than shifting or growing the storage.
-        #expect(scrollback.storage.count == 1_000)
-        #expect(scrollback.storage.capacity < 2_000)
+        // The batch FIFO stays bounded by the cap, not by how many lines
+        // were ever pushed: 10,000 pushes into a 1,000-line, batch-size-256
+        // scrollback should never carry more than a handful of live batches.
+        #expect(scrollback.batchCount <= 6)
 
         // And the ceiling on stored cells is the cap times the row width,
         // not the number of lines ever written.
