@@ -190,3 +190,26 @@ func benchmarkReflowCost() {
 }
 
 benchmarkReflowCost()
+
+// MARK: - Search cost over a full scrollback (M4.4)
+
+func benchmarkSearchCost() {
+    var terminal = Terminal(rows: 50, columns: 120, scrollbackLimit: 100_000)
+    let line = "the quick brown fox jumps over the lazy dog\r\n"
+    let lineBytes = Array(line.utf8)
+    for _ in 0..<100_000 {
+        terminal.feed(lineBytes)
+    }
+
+    let before = currentResidentBytes()
+    let start = DispatchTime.now()
+    let matches = Search.find("fox", in: terminal.grid)
+    let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e6
+    let after = currentResidentBytes()
+    print(
+        "search cost, 100k-line scrollback, one query: \(String(format: "%.1f", elapsedMs)) ms, "
+            + "\(matches.count) matches, resident delta \(String(format: "%.1f", megabytes(after - before))) MB "
+            + "(should not be anywhere near a full-scrollback copy)")
+}
+
+benchmarkSearchCost()
