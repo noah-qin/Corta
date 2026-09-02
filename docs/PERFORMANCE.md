@@ -108,8 +108,9 @@ itself.
   Fixed 200-cell rows over 100k lines is ~320 MB (`DESIGN.md` §2.3).
 - **Scrollback is a ring buffer** with a configured line cap; eviction is
   O(1) and never a reallocation of the whole history.
-- **The glyph atlas is bounded** with LRU eviction or paging. A CJK
-  session exceeds a single 2048×2048 page.
+- **The glyph atlas is bounded**: a full 2048×2048 page is reset on
+  exhaustion and re-rasterised on demand (`DESIGN.md` §7, hard part 4). A
+  CJK session exceeds a single page.
 - **Every unbounded input has a cap** — OSC/DCS string length, CSI
   parameter count and magnitude. See `SECURITY.md` §3; these are
   simultaneously a memory-safety and a denial-of-service concern.

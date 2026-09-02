@@ -242,8 +242,14 @@ Ordered by how badly they are usually underestimated.
    simplification that the cursor row disables ligatures.
 
 4. **Glyph atlas eviction.** A 2048×2048 atlas holds roughly 2,000 glyphs
-   at typical sizes. A CJK session exceeds that easily. LRU eviction or
-   multiple atlas pages is required, not optional.
+   at typical sizes. A CJK session exceeds that easily. Resolved at M3 with
+   the strategy Alacritty uses: shelf packing cannot reclaim individual
+   slots without fragmenting, so a full page is *reset* — caches cleared,
+   allocator rewound — and glyphs re-rasterise on demand. A `generation`
+   counter on `GlyphAtlas` lets the renderer detect a mid-build reset and
+   rebuild once, since every UV issued before the reset is stale. A screen
+   whose live content alone exceeds one page cannot be served by any
+   eviction policy; those cells draw blank.
 
 5. **Text rendering weight.** macOS has had no subpixel antialiasing
    since Mojave. Naively alpha-blending grayscale-AA glyphs makes light
