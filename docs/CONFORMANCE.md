@@ -24,6 +24,7 @@ measured. Priorities:
 | UTF-8 byte stream decoding                              | P0   | The foundation                                          |
 | SGR: ANSI / 256 / 24-bit true colour, bold, underline, reverse | P0 |                                                  |
 | Cursor movement, absolute positioning, save/restore     | P0   |                                                         |
+| CHA / HPA / HPR / VPA / VPR — absolute and relative position | P0 | A TUI that lays a line out in segments jumps between columns rather than writing spaces; without these the whole screen collapses |
 | Erase display / line, insert / delete lines and columns | P0   |                                                         |
 | **Alternate screen** (`?1049`)                          | P0   | `vim`/`less`/`htop` depend on it entirely               |
 | **Scroll region** (`DECSTBM`)                           | P0   | tmux and vim status lines depend on it                  |

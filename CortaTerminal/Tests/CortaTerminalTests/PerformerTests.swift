@@ -237,4 +237,31 @@ struct SGRTests {
         #expect(terminal.grid[0, 0].foreground == .indexed(2))
         #expect(terminal.grid[1, 0].foreground == .indexed(2))
     }
+
+    /// CHA and friends were missing, and a TUI that lays a line out in
+    /// segments — Ink, and so Claude Code — jumps between columns with
+    /// `CSI n G` rather than writing runs of spaces. Ignored, every jump did
+    /// nothing and each segment landed against the one before it: a whole
+    /// screen rendered with its spacing collapsed, "Quick safety check"
+    /// arriving as "Quicksafetycheck".
+    @Test func absoluteAndRelativePositioningMoveTheCursor() {
+        func columns(of input: String) -> String {
+            var terminal = Terminal(rows: 3, columns: 20)
+            terminal.feed(Array(input.utf8))
+            return String(terminal.grid.dump().split(separator: "\n")[2])
+        }
+        // CHA and HPA: absolute column, one-based on the wire.
+        #expect(columns(of: "A\u{1B}[5GB\u{1B}[10GC").contains("A   B    C"))
+        #expect(columns(of: "A\u{1B}[5`B\u{1B}[10`C").contains("A   B    C"))
+        // HPR: relative, the same motion as CUF.
+        #expect(columns(of: "A\u{1B}[4aB").contains("A    B"))
+
+        // VPA and VPR move rows, leaving the column alone.
+        var terminal = Terminal(rows: 4, columns: 10)
+        terminal.feed(Array("A\u{1B}[3dB".utf8))
+        #expect(terminal.grid.cursor.row == 2)
+        terminal.feed(Array("\u{1B}[1e".utf8))
+        #expect(terminal.grid.cursor.row == 3)
+    }
+
 }
