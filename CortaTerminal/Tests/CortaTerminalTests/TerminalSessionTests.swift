@@ -3,27 +3,28 @@ import Testing
 
 @testable import CortaTerminal
 
-// `.serialized`: every test here forks a real child process, and `fork()`
+// `.serialized`: every test here spawns a real child process, and spawning
 // in a heavily multithreaded process carries a real, if small, per-call
-// risk (see `Spawn.swift`'s `forkLockStorage` comment) that scales with how
-// many threads are doing how much concurrently. Running this suite's own
+// risk (see `Spawn.swift`'s header comment) that scales with how many
+// threads are doing how much concurrently. Running this suite's own
 // spawns one at a time removes this suite's contribution to that risk
 // during a parallel test run; it does not eliminate the underlying hazard.
+//
+// These tests spawn real children and share a machine with other spawns,
+// so they wait on conditions, never on the clock: no fixed `Thread.sleep`
+// before an assertion. Every wait polls the grid for the expected content;
+// the only deadlines are 30-second ceilings that stop a wedged child from
+// hanging the run — generous enough that reaching one means something is
+// genuinely wrong, not that the machine was busy (CI is loaded too).
 @Suite(.serialized) struct TerminalSessionTests {
     @Test func readsChildOutputIntoTheGrid() throws {
         let session = try TerminalSession(executable: "/bin/echo", arguments: ["hello"])
         defer { session.stop() }
 
-        // A generous budget, not a tight one: under a parallel test run
-        // sharing the machine with other spawns (including this file's own
-        // 100 MB `cat`), scheduling this child promptly is not guaranteed.
-        var text = ""
-        for _ in 0..<1_000 {
-            text = session.snapshot().dump()
-            if text.contains("hello") { break }
-            Thread.sleep(forTimeInterval: 0.01)
-        }
-        #expect(text.contains("hello"))
+        let text = waitForGrid(session) { $0.contains("hello") }
+        #expect(
+            text.contains("hello"),
+            "expected the grid to contain the child's output; grid held:\n\(text)")
     }
 
     @Test func floodDoesNotHangTheReaderLoop() throws {
@@ -32,9 +33,10 @@ import Testing
         let session = try TerminalSession(executable: "/usr/bin/yes")
         defer { session.stop() }
 
-        Thread.sleep(forTimeInterval: 0.2)
-        let text = session.snapshot().dump()
-        #expect(text.contains("y"))
+        let text = waitForGrid(session) { $0.contains("y") }
+        #expect(
+            text.contains("y"),
+            "expected flood output in the grid; grid held:\n\(text)")
     }
 
     @Test func catOfALargeFileDoesNotStallTheChild() throws {
@@ -69,11 +71,17 @@ import Testing
         let session = try TerminalSession(executable: "/usr/bin/yes")
         defer { session.stop() }
 
-        Thread.sleep(forTimeInterval: 0.1)
+        // Establish the precondition by condition, not by the clock: the
+        // flood is visible in the grid before ETX is sent, so this test
+        // exercises "^C reaches a *running* flood" on machines of any speed.
+        let flooded = waitForGrid(session) { $0.contains("y") }
+        #expect(
+            flooded.contains("y"),
+            "precondition: the child should be flooding before ^C is sent; grid held:\n\(flooded)")
         session.write([0x03])
 
-        let exit = session.pty.waitForExit(timeout: .seconds(5))
-        #expect(exit != nil, "^C should terminate a flooding child within 5s")
+        let exit = session.pty.waitForExit(timeout: .seconds(30))
+        #expect(exit != nil, "^C should terminate a flooding child well within 30s")
     }
 
     @Test func writeDeliversBytesToTheChild() throws {
@@ -82,12 +90,25 @@ import Testing
 
         session.write(Array("hi\n".utf8))
 
-        var text = ""
-        for _ in 0..<1_000 {
-            text = session.snapshot().dump()
-            if text.contains("hi") { break }
+        let text = waitForGrid(session) { $0.contains("hi") }
+        #expect(
+            text.contains("hi"),
+            "expected the grid to echo the written bytes; grid held:\n\(text)")
+    }
+
+    /// Polls the grid until `condition` accepts its dump, or the hang
+    /// ceiling expires — see the suite header. Returns the last dump either
+    /// way, so a failing expectation can show what the grid actually held.
+    private func waitForGrid(
+        _ session: TerminalSession, timeout: Duration = .seconds(30),
+        until condition: (String) -> Bool
+    ) -> String {
+        let deadline = ContinuousClock.now + timeout
+        var dump = session.snapshot().dump()
+        while !condition(dump), ContinuousClock.now < deadline {
             Thread.sleep(forTimeInterval: 0.01)
+            dump = session.snapshot().dump()
         }
-        #expect(text.contains("hi"))
+        return dump
     }
 }
