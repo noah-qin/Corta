@@ -13,6 +13,9 @@ import AppKit
 /// called; it would swallow control keys the shell needs verbatim.)
 extension TerminalView {
     override func keyDown(with event: NSEvent) {
+        if onSearchKey?(event) == true {
+            return
+        }
         if let gesture = Self.scrollGesture(for: event) {
             onScroll?(gesture)
             return

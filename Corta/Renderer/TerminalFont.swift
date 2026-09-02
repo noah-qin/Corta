@@ -1,0 +1,53 @@
+import AppKit
+import CoreText
+
+/// The terminal's font stack.
+///
+/// **Primary**: the system monospaced font (SF Mono), asked for through
+/// AppKit so the exact face tracks the OS. **Fallback**: a *pinned* cascade
+/// list — PingFang SC for CJK, Apple Color Emoji for emoji — set as
+/// `kCTFontCascadeListAttribute` on the font's descriptor, so a scalar the
+/// primary lacks resolves deterministically instead of walking whatever
+/// cascade the system happens to pick for the current locale.
+///
+/// One caveat shapes the API: deriving a font through
+/// `CTFontCreateCopyWithSymbolicTraits` (the atlas's bold variant) *drops*
+/// the cascade-list attribute, while `CTFontCreateCopyWithAttributes` (the
+/// renderer's backing-scale resize) keeps it — verified behaviour, not
+/// documented. So every derivation that matters re-pins the list rather
+/// than trusting inheritance.
+nonisolated enum TerminalFont {
+    /// The descriptors the cascade resolves through, in order. Point size is
+    /// irrelevant on a descriptor; a cascade font instantiates at the
+    /// primary's size when a run falls back to it. `CTFontDescriptor` is not
+    /// `Sendable`, but this list is immutable after initialisation and the
+    /// descriptors are only ever read — hence `nonisolated(unsafe)`.
+    private nonisolated(unsafe) static let cascadeList: [CTFontDescriptor] = [
+        CTFontDescriptorCreateWithNameAndSize("PingFangSC-Regular" as CFString, 0),
+        CTFontDescriptorCreateWithNameAndSize("AppleColorEmoji" as CFString, 0),
+    ]
+
+    /// The primary font at `size` points, cascade list already pinned.
+    static func primary(ofSize size: CGFloat) -> CTFont {
+        let system = NSFont.monospacedSystemFont(ofSize: size, weight: .regular) as CTFont
+        return pinningCascadeList(system, size: size)
+    }
+
+    /// The bold variant of `font` — what the atlas rasterises bold cells
+    /// with. The trait copy drops the cascade list (see the type comment),
+    /// so it is re-pinned here; without this a bold CJK scalar would resolve
+    /// through the system cascade instead of PingFang SC.
+    static func bold(of font: CTFont) -> CTFont {
+        let derived = CTFontCreateCopyWithSymbolicTraits(font, 0, nil, .traitBold, .traitBold) ?? font
+        return pinningCascadeList(derived, size: CTFontGetSize(font))
+    }
+
+    /// Returns `font` with the pinned cascade list (re)applied. Idempotent;
+    /// safe on fonts that already carry the list.
+    static func pinningCascadeList(_ font: CTFont, size: CGFloat) -> CTFont {
+        let attributes = [kCTFontCascadeListAttribute: cascadeList] as CFDictionary
+        let descriptor = CTFontDescriptorCreateCopyWithAttributes(
+            CTFontCopyFontDescriptor(font), attributes)
+        return CTFontCreateWithFontDescriptor(descriptor, size, nil)
+    }
+}

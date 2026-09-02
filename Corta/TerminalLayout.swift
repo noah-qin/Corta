@@ -16,8 +16,11 @@ nonisolated enum TerminalLayout {
     static let windowCornerRadius: CGFloat = 12
     /// Breathing room between the grid and the window edge. Without it the
     /// left column's glyphs were clipped against the frame.
-    static let insets = NSEdgeInsets(
-        top: 8 + titlebarHeight, left: 10, bottom: 8, right: 10)
+    /// Padding only. The window's chrome — titlebar, and the tab bar when
+    /// the window is tabbed — is measured at runtime from
+    /// `contentLayoutRect` and added on top; a fixed 28pt here put the first
+    /// row underneath the tab bar as soon as a second tab appeared.
+    static let insets = NSEdgeInsets(top: 8, left: 10, bottom: 8, right: 10)
     static var insetWidth: CGFloat { insets.left + insets.right }
     static var insetHeight: CGFloat { insets.top + insets.bottom }
 }

@@ -6,6 +6,12 @@ import AppKit
 /// `cellSize`) live on the class itself — extensions cannot add storage.
 extension TerminalView {
     override func mouseDown(with event: NSEvent) {
+        // ⌘-click opens a link (M4.6) before anything else sees the click —
+        // it is neither an SGR report nor the start of a selection.
+        if event.modifierFlags.contains(.command),
+            let controller = window?.contentViewController as? ViewController,
+            controller.handleLinkClick(event, in: self)
+        { return }
         if report(event, phase: .press(.left)) { return }
         // Mouse reporting is off, so the left button selects text (M3.7).
         // The shell owns the selection state; it is reached through the
@@ -80,5 +86,30 @@ extension TerminalView {
         modifiers.meta = event.modifierFlags.contains(.option)
         modifiers.control = event.modifierFlags.contains(.control)
         return modifiers
+    }
+
+    // MARK: - ⌘-hover link feedback (M4.6)
+
+    override func mouseMoved(with event: NSEvent) {
+        guard let controller = window?.contentViewController as? ViewController else {
+            super.mouseMoved(with: event)
+            return
+        }
+        controller.handleLinkHover(event, in: self)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        NSCursor.arrow.set()
+        toolTip = nil
+    }
+
+    /// ⌘ pressed or released while the pointer rests still: `locationInWindow`
+    /// is valid on flags-changed events, so hover feedback refreshes in place.
+    override func flagsChanged(with event: NSEvent) {
+        guard let controller = window?.contentViewController as? ViewController else {
+            super.flagsChanged(with: event)
+            return
+        }
+        controller.handleLinkHover(event, in: self)
     }
 }

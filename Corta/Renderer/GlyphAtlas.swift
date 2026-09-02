@@ -4,7 +4,8 @@ import Metal
 import simd
 
 /// Rasterises glyphs into an `r8Unorm` texture atlas and caches them by
-/// scalar, cluster and weight.
+/// scalar, cluster and weight. Color glyphs (Apple Color Emoji bitmaps)
+/// rasterise into a second, `bgra8Unorm` atlas instead — see below.
 ///
 /// **ASCII fast path.** `glyph(forASCII:bold:)` looks the glyph up directly
 /// with `CTFontGetGlyphsForCharacters` — no `CTLine`, no shaping. Calling
@@ -22,7 +23,16 @@ import simd
 /// with a font that lacks a scalar resolves the run to a fallback font, and
 /// the *run's* font — not the requested one — is what rasterises the glyph.
 /// (Rasterising a fallback glyph with the primary font drew the wrong
-/// glyph's outlines: glyph ids are per-font.)
+/// glyph's outlines: glyph ids are per-font.) The cascade is pinned by
+/// `TerminalFont` (PingFang SC, then Apple Color Emoji) rather than left to
+/// the system.
+///
+/// **Color glyphs.** `CTFontDrawGlyphs` rasterises outlines only — an emoji
+/// shaped through to Apple Color Emoji comes out blank, so color runs
+/// (detected by the font's `traitColorGlyphs`) are drawn with `CTRunDraw`
+/// into an RGBA context and uploaded to `colorTexture` (`bgra8Unorm`,
+/// premultiplied). The renderer draws those quads in a separate pass whose
+/// fragment returns the texture sample directly instead of tinting coverage.
 ///
 /// **Eviction** (M3, `DESIGN.md` §7 hard part 4): a CJK session exhausts a
 /// single 2048×2048 page, and shelf packing cannot reclaim individual slots
@@ -55,18 +65,29 @@ nonisolated final class GlyphAtlas {
         var size: SIMD2<Float>
         /// Offset from the pen origin to the bitmap's top-left, pixels.
         var bearing: SIMD2<Float>
+        /// True when the bitmap lives in `colorTexture` (premultiplied bgra)
+        /// rather than `texture` — color emoji. The renderer routes these to
+        /// the color pipeline, which ignores the instance tint.
+        var isColor: Bool = false
     }
 
     static let atlasSize = 2048
 
     let atlasPixelSize: Int
     private(set) var texture: MTLTexture
+    /// The RGBA atlas color glyphs rasterise into (see the type comment).
+    /// Premultiplied bgra, matching what `CTRunDraw` produces and what the
+    /// color pipeline's blend state expects.
+    private(set) var colorTexture: MTLTexture
     private var font: CTFont
     private var boldFont: CTFont
     private var cache: [GlyphKey: GlyphInfo] = [:]
     private var clusterCache: [ClusterKey: GlyphInfo] = [:]
     private var nextOrigin = (x: 0, y: 1)  // row 0 is reserved: see `solidWhiteUV`
     private var rowHeight = 1
+    /// The color atlas packs its own shelves (no reserved row on this one).
+    private var nextColorOrigin = (x: 0, y: 0)
+    private var colorRowHeight = 0
 
     /// Counters for tests: prove the ASCII path never shapes, and that
     /// fallback and eviction happen when they should.
@@ -89,8 +110,12 @@ nonisolated final class GlyphAtlas {
     ///   Tests pass a small size to exercise eviction without rasterising
     ///   thousands of glyphs.
     init(device: MTLDevice, font: CTFont, atlasPixelSize: Int = GlyphAtlas.atlasSize) {
-        self.font = font
-        self.boldFont = CTFontCreateCopyWithSymbolicTraits(font, 0, nil, .traitBold, .traitBold) ?? font
+        // Pinning here — not only at the font's creation site — makes the
+        // atlas the single choke point: the cascade list then holds whatever
+        // font a caller hands in, and `TerminalFont.bold` re-pins after the
+        // trait copy that would otherwise drop it (see `TerminalFont`).
+        self.font = TerminalFont.pinningCascadeList(font, size: CTFontGetSize(font))
+        self.boldFont = TerminalFont.bold(of: self.font)
         self.atlasPixelSize = atlasPixelSize
 
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
@@ -98,6 +123,12 @@ nonisolated final class GlyphAtlas {
         descriptor.usage = [.shaderRead]
         descriptor.storageMode = .managed
         self.texture = device.makeTexture(descriptor: descriptor)!
+
+        let colorDescriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm, width: atlasPixelSize, height: atlasPixelSize, mipmapped: false)
+        colorDescriptor.usage = [.shaderRead]
+        colorDescriptor.storageMode = .managed
+        self.colorTexture = device.makeTexture(descriptor: colorDescriptor)!
 
         var white: UInt8 = 255
         texture.replace(
@@ -111,13 +142,14 @@ nonisolated final class GlyphAtlas {
     /// texture *and* fresh Metal pipeline states every time a key repeated.
     /// The font changes; the storage and the pipelines do not need to.
     func reset(font newFont: CTFont) {
-        font = newFont
-        boldFont = CTFontCreateCopyWithSymbolicTraits(newFont, 0, nil, .traitBold, .traitBold)
-            ?? newFont
+        font = TerminalFont.pinningCascadeList(newFont, size: CTFontGetSize(newFont))
+        boldFont = TerminalFont.bold(of: font)
         cache.removeAll(keepingCapacity: true)
         clusterCache.removeAll(keepingCapacity: true)
         nextOrigin = (x: 0, y: 1)
         rowHeight = 1
+        nextColorOrigin = (x: 0, y: 0)
+        colorRowHeight = 0
         evictionCount += 1
         var white: UInt8 = 255
         texture.replace(
@@ -134,7 +166,7 @@ nonisolated final class GlyphAtlas {
         guard CTFontGetGlyphsForCharacters(f, &utf16, &glyphs, 1) else { return nil }
         fastPathHits += 1
         guard glyphs[0] != 0 else { return nil }
-        let info = rasterize([(glyphs: glyphs, positions: [CGPoint.zero], font: f)])
+        let info = rasterize([(glyphs: glyphs, positions: [CGPoint.zero], font: f, isColor: false, ctRun: nil)])
         cache[key] = info
         return info
     }
@@ -169,7 +201,15 @@ nonisolated final class GlyphAtlas {
         return info
     }
 
-    /// One shaped string as a flat list of (glyphs, positions, font) runs.
+    /// One shaped run: the glyphs and positions resolved through the cascade
+    /// list, the font the run actually shaped with, whether that font is a
+    /// color (bitmap) font, and — for color runs — the `CTRun` itself, since
+    /// color bitmaps only rasterise through run-level drawing.
+    private typealias ShapedRun = (
+        glyphs: [CGGlyph], positions: [CGPoint], font: CTFont, isColor: Bool, ctRun: CTRun?
+    )
+
+    /// One shaped string as a flat list of runs.
     /// The font is the run's own: when the requested font lacks the scalars,
     /// Core Text resolves the run through its cascade list and the run carries
     /// the fallback font (M3.5) — rasterising with anything else draws glyphs
@@ -179,13 +219,13 @@ nonisolated final class GlyphAtlas {
     /// box, and zero-width format characters (ZWJ) can surface as glyph 0 in
     /// a run. A string that shapes to nothing yields no runs and rasterises
     /// as an empty, cached glyph.
-    private func shape(_ string: String, bold: Bool) -> [(glyphs: [CGGlyph], positions: [CGPoint], font: CTFont)] {
+    private func shape(_ string: String, bold: Bool) -> [ShapedRun] {
         let requested = bold ? boldFont : font
         let attributed = CFAttributedStringCreate(
             nil, string as CFString, [kCTFontAttributeName: requested] as CFDictionary)!
         let line = CTLineCreateWithAttributedString(attributed)
         guard let glyphRuns = CTLineGetGlyphRuns(line) as? [CTRun] else { return [] }
-        var runs: [(glyphs: [CGGlyph], positions: [CGPoint], font: CTFont)] = []
+        var runs: [ShapedRun] = []
         for run in glyphRuns {
             let count = CTRunGetGlyphCount(run)
             guard count > 0 else { continue }
@@ -199,13 +239,18 @@ nonisolated final class GlyphAtlas {
                 runFont = requested
             }
             if !CFEqual(runFont, requested) { fallbackHits += 1 }
+            // Color fonts (Apple Color Emoji) must rasterise through
+            // `CTRunDraw` — `CTFontDrawGlyphs` draws outlines only, which
+            // for a bitmap font is nothing at all.
+            let isColor = CTFontGetSymbolicTraits(runFont).contains(.traitColorGlyphs)
+                || (CTFontCopyPostScriptName(runFont) as String).hasPrefix("AppleColorEmoji")
             var glyphs = [CGGlyph](repeating: 0, count: count)
             var positions = [CGPoint](repeating: .zero, count: count)
             CTRunGetGlyphs(run, CFRange(location: 0, length: count), &glyphs)
             CTRunGetPositions(run, CFRange(location: 0, length: count), &positions)
             let kept = zip(glyphs, positions).filter { $0.0 != 0 }
             guard !kept.isEmpty else { continue }
-            runs.append((kept.map(\.0), kept.map(\.1), runFont))
+            runs.append((kept.map(\.0), kept.map(\.1), runFont, isColor, isColor ? run : nil))
         }
         return runs
     }
@@ -213,9 +258,10 @@ nonisolated final class GlyphAtlas {
     /// Rasterises one shaped glyph run list into the atlas. An empty list —
     /// or one whose glyphs have no ink (a space) — yields a cached empty
     /// `GlyphInfo`, so a blank cell is never shaped twice.
-    private func rasterize(
-        _ runs: [(glyphs: [CGGlyph], positions: [CGPoint], font: CTFont)]
-    ) -> GlyphInfo {
+    private func rasterize(_ runs: [ShapedRun]) -> GlyphInfo {
+        if runs.contains(where: \.isColor) {
+            return rasterizeColor(runs)
+        }
         // The union of every run's bounding boxes, positions applied: a
         // cluster's glyphs do not share an origin.
         var bounds = CGRect.null
@@ -282,17 +328,105 @@ nonisolated final class GlyphAtlas {
         )
     }
 
-    /// Full-atlas reset on exhaustion — see the type comment. The texture
-    /// itself is kept: the allocator rewinds to the origin and every lookup
-    /// is a cache miss that re-rasterises into freshly allocated (and thus
-    /// freshly written) regions, so stale texels are never sampled. The
-    /// reserved white texel at (0, 0) sits below the allocator's first row
-    /// and survives.
+    /// The color half of `rasterize` (see the type comment): at least one
+    /// run shaped to a color font, so the bitmap goes into `colorTexture`
+    /// (premultiplied bgra) instead of the coverage atlas.
+    ///
+    /// Color runs draw with `CTRunDraw` — the only Core Text entry point
+    /// that renders bitmap glyphs; `CTFontDrawGlyphs` is outlines only. The
+    /// bounds come from `CTRunGetImageBounds`, which unlike
+    /// `CTFontGetBoundingRectsForGlyphs` knows the bitmap's real extent.
+    /// `CTRunDraw` places the run relative to the context's text position,
+    /// so that is set to `-bbox.origin` rather than shifting positions by
+    /// hand. A grayscale run sharing the cluster (rare, but a mixed cluster
+    /// is possible) still draws by outline with a white fill.
+    ///
+    /// Premultiplication: the context's `premultipliedFirst` bitmap info is
+    /// what Core Graphics supports drawing into, and the color pipeline's
+    /// blend state (`sourceRGB = .one`) is premultiplied-over, so the texels
+    /// upload verbatim — no un-premultiply pass, no precision loss.
+    private func rasterizeColor(_ runs: [ShapedRun]) -> GlyphInfo {
+        let empty = GlyphInfo(uvRect: .zero, size: .zero, bearing: .zero, isColor: true)
+        var bounds = CGRect.null
+        for run in runs {
+            if let ctRun = run.ctRun {
+                // location 0 / length 0 means the whole run.
+                bounds = bounds.union(CTRunGetImageBounds(ctRun, nil, CFRange(location: 0, length: 0)))
+            } else {
+                var glyphs = run.glyphs
+                var rects = [CGRect](repeating: .zero, count: glyphs.count)
+                CTFontGetBoundingRectsForGlyphs(run.font, .horizontal, &glyphs, &rects, glyphs.count)
+                for (rect, position) in zip(rects, run.positions) {
+                    bounds = bounds.union(rect.offsetBy(dx: position.x, dy: position.y))
+                }
+            }
+        }
+        guard !bounds.isNull, !bounds.isEmpty else { return empty }
+        let bbox = bounds.insetBy(dx: -1, dy: -1)
+        let width = max(1, Int(bbox.width.rounded(.up)))
+        let height = max(1, Int(bbox.height.rounded(.up)))
+        var allocation = allocateColor(width: width, height: height)
+        if allocation == nil {
+            // The page is full: reset and retry once (see the type comment).
+            evict()
+            allocation = allocateColor(width: width, height: height)
+        }
+        guard let origin = allocation,
+            let context = CGContext(
+                data: nil, width: width, height: height, bitsPerComponent: 8,
+                bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
+                    | CGBitmapInfo.byteOrder32Little.rawValue)
+        else { return empty }
+        context.setAllowsAntialiasing(true)
+        context.setShouldAntialias(true)
+        context.setShouldSmoothFonts(false)  // no subpixel AA since Mojave
+        context.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
+        // No CTM flip, for the same reason as the grayscale path: top-down
+        // buffer against y-up drawing coordinates cancels out.
+        for run in runs {
+            if let ctRun = run.ctRun {
+                context.textPosition = CGPoint(x: -bbox.minX, y: -bbox.minY)
+                CTRunDraw(ctRun, context, CFRange(location: 0, length: 0))
+            } else {
+                var glyphs = run.glyphs
+                var positions = run.positions.map {
+                    CGPoint(x: $0.x - bbox.minX, y: $0.y - bbox.minY)
+                }
+                CTFontDrawGlyphs(run.font, &glyphs, &positions, glyphs.count, context)
+            }
+        }
+
+        guard let data = context.data else { return empty }
+        colorTexture.replace(
+            region: MTLRegionMake2D(origin.x, origin.y, width, height),
+            mipmapLevel: 0, withBytes: data, bytesPerRow: width * 4)
+
+        return GlyphInfo(
+            uvRect: SIMD4<Float>(
+                Float(origin.x) / Float(atlasPixelSize), Float(origin.y) / Float(atlasPixelSize),
+                Float(width) / Float(atlasPixelSize), Float(height) / Float(atlasPixelSize)),
+            size: SIMD2<Float>(Float(width), Float(height)),
+            bearing: SIMD2<Float>(Float(bbox.minX), Float(bbox.minY)),
+            isColor: true
+        )
+    }
+
+    /// Full-atlas reset on exhaustion — see the type comment. The textures
+    /// themselves are kept: the allocators rewind to their origins and every
+    /// lookup is a cache miss that re-rasterises into freshly allocated (and
+    /// thus freshly written) regions, so stale texels are never sampled. The
+    /// reserved white texel at (0, 0) sits below the grayscale allocator's
+    /// first row and survives. Both allocators rewind together: an eviction
+    /// clears both caches, so a kept color shelf would only ever be
+    /// re-allocated over.
     private func evict() {
         cache.removeAll(keepingCapacity: true)
         clusterCache.removeAll(keepingCapacity: true)
         nextOrigin = (x: 0, y: 1)
         rowHeight = 1
+        nextColorOrigin = (x: 0, y: 0)
+        colorRowHeight = 0
         evictionCount += 1
         generation += 1
     }
@@ -306,6 +440,20 @@ nonisolated final class GlyphAtlas {
         let origin = nextOrigin
         nextOrigin.x += width
         rowHeight = max(rowHeight, height)
+        return origin
+    }
+
+    /// The color atlas's shelf packer — the same scheme as `allocate`, over
+    /// its own state, starting at row 0 (no reserved texel on this page).
+    private func allocateColor(width: Int, height: Int) -> (x: Int, y: Int)? {
+        if nextColorOrigin.x + width > atlasPixelSize {
+            nextColorOrigin = (0, nextColorOrigin.y + colorRowHeight)
+            colorRowHeight = 0
+        }
+        guard nextColorOrigin.y + height <= atlasPixelSize else { return nil }
+        let origin = nextColorOrigin
+        nextColorOrigin.x += width
+        colorRowHeight = max(colorRowHeight, height)
         return origin
     }
 }

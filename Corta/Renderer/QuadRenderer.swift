@@ -12,9 +12,11 @@ enum QuadRendererError: Error {
 ///
 /// Every entry point takes a `CGRect` and a `MTLRenderPassDescriptor`; this
 /// type never assumes "the window" (`DESIGN.md` §2.4). Two draw calls cover
-/// a full frame — one instanced pass for every cell's background, one for
+/// a typical frame — one instanced pass for every cell's background, one for
 /// every glyph — which is what "one draw call per screen" in the roadmap is
 /// protecting against: a call per cell or per row, not a call per pipeline.
+/// A frame with color emoji adds a third (the color-atlas pass), skipped
+/// entirely when no cell produced a color glyph.
 ///
 /// **Colour space.** Cell colours and the glyph atlas both hold sRGB-encoded
 /// values, and blending (glyph alpha over a cell's background) happens
@@ -27,6 +29,11 @@ nonisolated final class QuadRenderer {
     let device: MTLDevice
     private let solidPipeline: MTLRenderPipelineState
     private let glyphPipeline: MTLRenderPipelineState
+    /// The color-atlas variant of the glyph pipeline: its fragment returns
+    /// the texture sample (premultiplied bgra) directly instead of tinting
+    /// coverage, so it blends premultiplied-over rather than re-multiplying
+    /// the source rgb by alpha.
+    private let colorGlyphPipeline: MTLRenderPipelineState
     private let sampler: MTLSamplerState
 
     /// A small ring of GPU-visible instance buffers per pipeline kind
@@ -61,6 +68,7 @@ nonisolated final class QuadRenderer {
 
     private let solidBufferRing = InstanceBufferRing()
     private let glyphBufferRing = InstanceBufferRing()
+    private let colorGlyphBufferRing = InstanceBufferRing()
 
     /// The pixel format every render target passed to this renderer must
     /// use — the pipelines are built against it up front.
@@ -73,12 +81,13 @@ nonisolated final class QuadRenderer {
         }
         guard let vertexFunction = library.makeFunction(name: "quad_vertex"),
             let solidFragment = library.makeFunction(name: "quad_fragment_solid"),
-            let glyphFragment = library.makeFunction(name: "quad_fragment_glyph")
+            let glyphFragment = library.makeFunction(name: "quad_fragment_glyph"),
+            let colorGlyphFragment = library.makeFunction(name: "quad_fragment_color")
         else {
             throw QuadRendererError.functionUnavailable
         }
 
-        func makePipeline(fragment: MTLFunction) throws -> MTLRenderPipelineState {
+        func makePipeline(fragment: MTLFunction, premultipliedSource: Bool = false) throws -> MTLRenderPipelineState {
             let descriptor = MTLRenderPipelineDescriptor()
             descriptor.vertexFunction = vertexFunction
             descriptor.fragmentFunction = fragment
@@ -87,7 +96,10 @@ nonisolated final class QuadRenderer {
             attachment.isBlendingEnabled = true
             attachment.rgbBlendOperation = .add
             attachment.alphaBlendOperation = .add
-            attachment.sourceRGBBlendFactor = .sourceAlpha
+            // `.one` for a premultiplied source (the color atlas): the
+            // sample's rgb is already alpha-scaled, so multiplying by
+            // sourceAlpha again would double-darken every translucent texel.
+            attachment.sourceRGBBlendFactor = premultipliedSource ? .one : .sourceAlpha
             // `.one`, not `.sourceAlpha`: the drawable is composited by Core
             // Animation as premultiplied alpha, so the alpha channel must
             // accumulate as src.a + dst.a*(1-src.a). Squaring it here made
@@ -100,6 +112,7 @@ nonisolated final class QuadRenderer {
 
         self.solidPipeline = try makePipeline(fragment: solidFragment)
         self.glyphPipeline = try makePipeline(fragment: glyphFragment)
+        self.colorGlyphPipeline = try makePipeline(fragment: colorGlyphFragment, premultipliedSource: true)
 
         let samplerDescriptor = MTLSamplerDescriptor()
         samplerDescriptor.minFilter = .linear
@@ -137,6 +150,24 @@ nonisolated final class QuadRenderer {
         draw(
             instances, ring: glyphBufferRing, pipeline: glyphPipeline, atlas: atlas, rect: rect,
             drawableSize: drawableSize, renderPassDescriptor: renderPassDescriptor,
+            commandBuffer: commandBuffer)
+    }
+
+    /// Draws `instances` sampled from the *color* atlas into `rect`. Same
+    /// quad math as `drawGlyphQuads`; the difference is entirely in the
+    /// fragment (sample verbatim, no tint) and the blend (premultiplied
+    /// source) — see `colorGlyphPipeline`.
+    func drawColorQuads(
+        _ instances: [QuadInstance],
+        atlas: MTLTexture,
+        rect: CGRect,
+        drawableSize: CGSize,
+        renderPassDescriptor: MTLRenderPassDescriptor,
+        commandBuffer: MTLCommandBuffer
+    ) {
+        draw(
+            instances, ring: colorGlyphBufferRing, pipeline: colorGlyphPipeline, atlas: atlas,
+            rect: rect, drawableSize: drawableSize, renderPassDescriptor: renderPassDescriptor,
             commandBuffer: commandBuffer)
     }
 

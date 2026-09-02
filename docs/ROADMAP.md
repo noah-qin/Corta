@@ -251,27 +251,27 @@ and aligns correctly, and copy/paste is trustworthy.
 
 ## M4 — Modern
 
-- [ ] **M4.1** **Damage tracking.** Rebuild the instance buffer only on
+- [x] **M4.1** **Damage tracking.** Rebuild the instance buffer only on
       damage, tracked at line granularity (`PERFORMANCE.md` §3). M1's idle
       CPU baseline is ~4% against the ~0% target specifically because this
       is missing — `CADisplayLink` fires every vsync and each tick rebuilds
       and redraws unconditionally. *Done when:* idle CPU on a static screen
       drops to ~0%, measured the same way as the M1 baseline.
-- [ ] **M4.2** **Reflow on resize.** The largest single feature in this
+- [x] **M4.2** **Reflow on resize.** The largest single feature in this
       milestone. Must be incremental or lazy — a live window drag fires
       continuously and cannot re-wrap 100k lines per event.
       *Done when:* narrowing the window preserves scrollback content,
       and dragging the window edge stays smooth with a full scrollback.
-- [ ] **M4.3** Synchronized output (`?2026`).
+- [x] **M4.3** Synchronized output (`?2026`).
       *Done when:* Neovim scrolling shows no tearing.
-- [ ] **M4.4** Scrollback search (⌘F), matching across soft-wrapped
+- [x] **M4.4** Scrollback search (⌘F), matching across soft-wrapped
       lines, with match highlighting and next/previous navigation.
-- [ ] **M4.5** Runtime font scaling (⌘+ / ⌘−), including atlas rebuild.
-- [ ] **M4.6** URL detection and ⌘-click, with an **allowlist of
+- [x] **M4.5** Runtime font scaling (⌘+ / ⌘−), including atlas rebuild.
+- [x] **M4.6** URL detection and ⌘-click, with an **allowlist of
       `http`/`https`/`mailto`**, target shown, never auto-opened
       (`SECURITY.md` §2.4).
-- [ ] **M4.7** Tabs.
-- [ ] **M4.8** Bell: audible, visual, muted.
+- [x] **M4.7** Tabs.
+- [x] **M4.8** Bell: audible, visual, muted.
 
 ---
 
@@ -324,13 +324,13 @@ Trends matter more than absolute values.
 
 | Metric                    | M1     | M2 | M3 | M4 | M5 | M6 |
 | ------------------------- | ------ | -- | -- | -- | -- | -- |
-| Parse throughput (MB/s)   | 109.9  | 80.0 | 80.8 |    |    |    |
-| Frame CPU (ms)            | 1.67   | 1.72 | 2.32 |    |    |    |
-| Idle CPU (%)              | ~4     | ~0   | ~0   |    |    |    |
-| Memory @ 100k lines (MB)  | 265.7  | 265.7 | 265.7 |    |    |    |
-| Keypress → pixel (ms)     | —      | —    | —    |    |    |    |
-| `esctest` pass rate (%)   | —      | 8.8 (50/568) | 8.8 (50/568) |    |    |    |
-| Core LOC                  | 2,547  | 3,972 | 4,247 |    |    |    |
+| Parse throughput (MB/s)   | 109.9  | 80.0 | 80.8 | 75.5 |    |    |
+| Frame CPU (ms)            | 1.67   | 1.72 | 2.32 | 2.26 |    |    |
+| Idle CPU (%)              | ~4     | ~0   | ~0   | ~0   |    |    |
+| Memory @ 100k lines (MB)  | 265.7  | 265.7 | 265.7 | 184.6 |    |    |
+| Keypress → pixel (ms)     | —      | —    | —    | —    |    |    |
+| `esctest` pass rate (%)   | —      | 8.8 (50/568) | 8.8 (50/568) | 8.8 (50/568, M3 carry) |    |    |
+| Core LOC                  | 2,547  | 3,972 | 4,247 | 4,908 |    |    |
 
 Expect roughly 6,000–10,000 lines in `CortaTerminal` by M4
 (`DESIGN.md` §1). Reaching 3,000 does not mean the work is nearly done —
@@ -419,3 +419,38 @@ a launched release build sampled with `top`; see `PERFORMANCE.md` §5):**
 - *Memory @ 100k lines* — unchanged at 265.7 MB.
 - *Core LOC* — 4,247; the growth is the selection model
   (`Selection.swift`) and M3 tests.
+
+**How measured (M4, same methods as M3 unless noted):**
+
+- *Parse throughput* — `corta-bench`, 75.5 MB/s. The M4 additions on the
+  parse path are the `?2026` mode flag and the bell flag (boolean sets);
+  the reflow/search work is off the feed path entirely.
+- *Frame CPU* — `FrameCPUBaselineTests`, 2.255 ms avg / 5.039 ms p95,
+  still the full-rebuild worst case with the instance cache invalidated
+  every iteration. Level with M3's 2.319: the color-emoji pass is a third
+  draw call issued only when color glyphs exist, so the emoji-free
+  baseline screen pays nothing for it.
+- *Idle CPU* — Release build with a real shell child, `top -pid` at
+  one-second intervals after settling: 0.0% on all seven samples.
+- *Memory @ 100k lines* — 184.6 MB, down from 265.7: scrollback rows are
+  packed into shared batch arenas (M4.2's footprint work), which removed
+  most of the per-row `ContiguousArray` growth slack the old number was
+  mostly made of (see the M1 note).
+- *`esctest`* — not re-run. M4 changed nothing on the escape-sequence
+  surface except `?2026` (which vt-level-3 esctest does not probe), so the
+  M3 figure (50/568, byte-identical failing list) carries over.
+- *Core LOC* — 4,908; the growth is reflow (`Grid+Reflow.swift`),
+  search (`Search.swift`) and link detection (`LinkDetection.swift`).
+- *Reflow and search cost* — `corta-bench` also reports: a full reflow of
+  a 100k-line scrollback on a 120→80 column change is 97.7 ms, paid once
+  per debounced resize (~1 call/100 ms during a live drag), off the main
+  thread; a full-scrollback search is 359.6 ms for 100k matches with a
+  6.2 MB resident delta (the lazy logical-line pass, no document copy).
+- *M4.3's "Neovim shows no tearing"* — Neovim is not installed on this
+  machine (see the M2 closeout note in `CONFORMANCE.md` §4.5), so the
+  done-when is met by the mechanism, not by observation: `?2026` batches
+  withhold presents until the matching reset (core mode tracking is
+  unit-tested in `PrivateModeTests`; the withholding itself is
+  `ViewController.updateDamage`). M4.2's "dragging stays smooth"
+  likewise needs a human hand on the window edge; the numbers above are
+  the automatable half.

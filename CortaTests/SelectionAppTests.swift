@@ -178,21 +178,25 @@ struct SelectionCellMappingTests {
     private static let metrics = CellMetrics(
         font: CTFontCreateWithName("Menlo" as CFString, 14, nil))
 
+    /// The grid's top edge in a window with a titlebar and no tab bar — the
+    /// same value `ViewController.topInset` computes at runtime, now that
+    /// the chrome is measured rather than baked into the inset constant.
+    static let topInset = TerminalLayout.titlebarHeight + TerminalLayout.insets.top
+
     /// A view exactly as tall as the insets plus the grid: no remainder, so
     /// the grid top is the top inset.
     private static func exactHeight(rows: Int) -> CGFloat {
-        TerminalLayout.insets.top + TerminalLayout.insets.bottom
-            + CGFloat(rows) * metrics.cellHeight
+        topInset + TerminalLayout.insets.bottom + CGFloat(rows) * metrics.cellHeight
     }
 
     @Test func pointInsideTheGridMapsToItsCell() {
         let grid = Grid(rows: 30, columns: 120)
         let point = CGPoint(
             x: TerminalLayout.insets.left + 2.5 * Self.metrics.cellWidth,
-            y: TerminalLayout.insets.top + 3.5 * Self.metrics.cellHeight)
+            y: Self.topInset + 3.5 * Self.metrics.cellHeight)
         let position = ViewController.documentPosition(
             for: point, viewHeight: Self.exactHeight(rows: 30), metrics: Self.metrics,
-            grid: grid, scrollOffset: 0)
+            grid: grid, scrollOffset: 0, topInset: Self.topInset)
         #expect(position.row == 3)
         #expect(position.column == 2)
     }
@@ -204,10 +208,10 @@ struct SelectionCellMappingTests {
         // 0 of this one.
         let point = CGPoint(
             x: TerminalLayout.insets.left + 2.5 * Self.metrics.cellWidth,
-            y: TerminalLayout.insets.top + 1.1 * Self.metrics.cellHeight)
+            y: Self.topInset + 1.1 * Self.metrics.cellHeight)
         let position = ViewController.documentPosition(
             for: point, viewHeight: Self.exactHeight(rows: 30) + Self.metrics.cellHeight / 2,
-            metrics: Self.metrics, grid: grid, scrollOffset: 0)
+            metrics: Self.metrics, grid: grid, scrollOffset: 0, topInset: Self.topInset)
         #expect(position.row == 0)
     }
 
@@ -215,10 +219,10 @@ struct SelectionCellMappingTests {
         let grid = Grid(rows: 30, columns: 120)
         let point = CGPoint(
             x: TerminalLayout.insets.left + 1,
-            y: TerminalLayout.insets.top + 1)
+            y: Self.topInset + 1)
         let position = ViewController.documentPosition(
             for: point, viewHeight: Self.exactHeight(rows: 30), metrics: Self.metrics,
-            grid: grid, scrollOffset: 7)
+            grid: grid, scrollOffset: 7, topInset: Self.topInset)
         #expect(position.row == -7, "viewport row 0 is document row -scrollOffset")
         #expect(position.column == 0)
     }
@@ -227,12 +231,12 @@ struct SelectionCellMappingTests {
         let grid = Grid(rows: 30, columns: 120)
         let far = ViewController.documentPosition(
             for: CGPoint(x: 9_999, y: 9_999), viewHeight: Self.exactHeight(rows: 30),
-            metrics: Self.metrics, grid: grid, scrollOffset: 0)
+            metrics: Self.metrics, grid: grid, scrollOffset: 0, topInset: Self.topInset)
         #expect(far.row == 29)
         #expect(far.column == 119)
         let above = ViewController.documentPosition(
             for: CGPoint(x: -50, y: -50), viewHeight: Self.exactHeight(rows: 30),
-            metrics: Self.metrics, grid: grid, scrollOffset: 0)
+            metrics: Self.metrics, grid: grid, scrollOffset: 0, topInset: Self.topInset)
         #expect(above.row == 0)
         #expect(above.column == 0)
     }

@@ -61,6 +61,25 @@ class ViewController: NSViewController {
     /// re-fit the window to keep this grid size at the new cell metrics.
     var lastRequestedSize: TerminalSize?
 
+    // Search (M4.4), owned by `ViewController+Search.swift`. Storage lives
+    // here because extensions cannot add their own.
+
+    /// The Liquid Glass search bar; `nil` when closed.
+    var searchBar: NSGlassEffectView?
+    var searchField: NSTextField?
+    /// Every current match, oldest first — recomputed on each query or grid
+    /// change, not incrementally maintained.
+    var searchMatches: [SelectionRange] = []
+    var currentSearchMatchIndex: Int?
+    /// The scroll position from before the search bar opened, restored on
+    /// Esc.
+    var scrollOffsetBeforeSearch: Int?
+    /// Local key monitor for Esc while the bar is open: the field editor
+    /// turns Esc into `cancelOperation:`, which NSSearchField can swallow
+    /// without ever calling the delegate — a monitor sees the key before
+    /// any of that. Removed when the bar closes.
+    var searchKeyMonitor: Any?
+
     /// The drag is over — the child should see the final size now, not after
     /// the debounce window expires. Wired to `TerminalView`'s
     /// `viewDidEndLiveResize` (live-resize notifications live on the view).
@@ -73,13 +92,27 @@ class ViewController: NSViewController {
     /// so it follows a font or size change.
     private let defaultColumns = 120
     private let defaultRows = 30
+    /// Titlebar plus, when the window is tabbed, the tab bar. AppKit
+    /// reports the pair as the difference between the frame and the content
+    /// layout rect, which is the only value that follows a tab bar
+    /// appearing. Before the window exists, the titlebar alone is the best
+    /// estimate.
+    var windowChrome: CGFloat {
+        guard let window = view.window else { return TerminalLayout.titlebarHeight }
+        return max(0, window.frame.height - window.contentLayoutRect.height)
+    }
+    /// Distance from the top of the drawable to the first row.
+    var topInset: CGFloat { windowChrome + TerminalLayout.insets.top }
+    /// Total vertical space the grid does not get.
+    var verticalInsets: CGFloat { topInset + TerminalLayout.insets.bottom }
+
     let minimumColumns = 20
     let minimumRows = 5
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        let font = CTFontCreateWithName("Menlo" as CFString, fontSize, nil)
+        let font = TerminalFont.primary(ofSize: fontSize)
         guard let device = MTLCreateSystemDefaultDevice() else {
             fatalError("Metal is required")
         }
@@ -91,7 +124,7 @@ class ViewController: NSViewController {
         let metrics = terminalRenderer.pointMetrics
         let contentSize = NSSize(
             width: CGFloat(defaultColumns) * metrics.cellWidth + TerminalLayout.insetWidth,
-            height: CGFloat(defaultRows) * metrics.cellHeight + TerminalLayout.insetHeight)
+            height: CGFloat(defaultRows) * metrics.cellHeight + verticalInsets)
         // Size the container to the target content size *before* the first
         // layout. Otherwise the storyboard's 480x270 produces a transient
         // 53x15 session, the shell's early output is laid out against that,
@@ -177,7 +210,19 @@ class ViewController: NSViewController {
         view.onPaste = { [weak self] in
             self?.pasteFromClipboard()
         }
+        view.onSearchKey = { [weak self] (event: NSEvent) -> Bool in
+            self?.handleSearchKey(event) ?? false
+        }
         view.cellSize = CGSize(width: terminalRenderer.pointMetrics.cellWidth, height: terminalRenderer.pointMetrics.cellHeight)
+        // The preedit overlay draws with the renderer's own font stack at
+        // the current size, so ⌘=/⌘- resizes marked text too.
+        view.preeditFontProvider = { [weak self] in
+            guard let self else {
+                return NSFont.monospacedSystemFont(
+                    ofSize: ViewController.defaultFontSize, weight: .regular)
+            }
+            return TerminalFont.primary(ofSize: fontSize) as NSFont
+        }
         view.isMouseReportingEnabled = { [weak self] in
             self?.mouseReportingEnabled() ?? false
         }
@@ -193,7 +238,7 @@ class ViewController: NSViewController {
             let cursor = session.snapshot().cursor
             return CGRect(
                 x: TerminalLayout.insets.left + CGFloat(cursor.column) * metrics.cellWidth,
-                y: TerminalLayout.insets.top + CGFloat(cursor.row) * metrics.cellHeight,
+                y: topInset + CGFloat(cursor.row) * metrics.cellHeight,
                 width: metrics.cellWidth, height: metrics.cellHeight)
         }
         // SGR mouse reports name an on-screen cell, so they need the same
@@ -207,7 +252,8 @@ class ViewController: NSViewController {
             let grid = session.snapshot()
             let position = Self.documentPosition(
                 for: point, viewHeight: terminalView.bounds.height,
-                metrics: terminalRenderer.pointMetrics, grid: grid, scrollOffset: 0)
+                metrics: terminalRenderer.pointMetrics, grid: grid, scrollOffset: 0,
+                topInset: self.topInset)
             return (position.column, position.row)
         }
     }
@@ -220,6 +266,10 @@ class ViewController: NSViewController {
         // Dragging snaps to whole cells, so a resize never leaves a partial
         // row or column.
         window.title = "Corta"
+        // Tabs (M4.7) are native window tabbing: `.automatic` here, and File >
+        // New Tab joins the key window's tab group. The tab label follows
+        // `window.title`, which the OSC 0/2 title update keeps current.
+        window.tabbingMode = .automatic
         // A terminal is a dark surface whatever the system appearance is.
         // Following the system turned the glass light and washed the grey
         // background out with it.
@@ -243,10 +293,10 @@ class ViewController: NSViewController {
         window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
         window.contentMinSize = NSSize(
             width: CGFloat(minimumColumns) * metrics.cellWidth + TerminalLayout.insetWidth,
-            height: CGFloat(minimumRows) * metrics.cellHeight + TerminalLayout.insetHeight)
+            height: CGFloat(minimumRows) * metrics.cellHeight + verticalInsets)
         window.setContentSize(NSSize(
             width: CGFloat(defaultColumns) * metrics.cellWidth + TerminalLayout.insetWidth,
-            height: CGFloat(defaultRows) * metrics.cellHeight + TerminalLayout.insetHeight))
+            height: CGFloat(defaultRows) * metrics.cellHeight + verticalInsets))
         // Nothing else claims first responder, and without one the view
         // hierarchy — the terminal view, this controller — is not in the
         // responder chain at all: keyDown never fires and menu actions
@@ -279,6 +329,20 @@ class ViewController: NSViewController {
             return was
         }
         guard needsRedraw || hasOutput else { return false }
+        // The OSC 0/2 title (M2.8) arrives as output; applying it here keeps
+        // the window — and with native tabbing (M4.7), the tab label —
+        // current without a timer.
+        if hasOutput, let title = session.windowTitle, let window = view.window,
+            window.title != title
+        {
+            window.title = title
+        }
+        // While the search bar is open, output shifts what matches: re-run
+        // the query against the new snapshot before this frame diffs it
+        // (M4.4). Recomputed, not patched — `updateSearchResults` explains.
+        if hasOutput, searchBar != nil {
+            updateSearchResults(scrollsToMatch: false)
+        }
         if session.isSynchronizedOutputEnabled {
             // A frame drawn mid-batch would show a torn intermediate state.
             // Remember that a present is owed and wait for the matching
@@ -295,7 +359,9 @@ class ViewController: NSViewController {
         // more when it draws and picks up anything that arrived since.
         let damaged = terminalRenderer.updateInstances(
             grid: grid, scrollOffset: scrollOffset,
-            cursorVisible: scrollOffset == 0, selection: selection)
+            cursorVisible: scrollOffset == 0, selection: selection,
+            searchMatches: searchMatches.map { TerminalSelection($0, grid: grid) },
+            currentSearchMatchIndex: currentSearchMatchIndex)
         return forced || damaged
     }
 
@@ -349,7 +415,7 @@ class ViewController: NSViewController {
         guard abs(view.bounds.height - window.frame.height) < 1 else { return }
         let usable = CGSize(
             width: view.bounds.width - TerminalLayout.insetWidth,
-            height: view.bounds.height - TerminalLayout.insetHeight)
+            height: view.bounds.height - verticalInsets)
         let columns = UInt16(max(1, usable.width / terminalRenderer.pointMetrics.cellWidth))
         let rows = UInt16(max(1, usable.height / terminalRenderer.pointMetrics.cellHeight))
         let size = TerminalSize(rows: rows, columns: columns)
@@ -371,9 +437,12 @@ class ViewController: NSViewController {
             grid: grid, scrollOffset: scrollOffset,
             rect: Self.contentRect(
                 in: drawableSize, scale: terminalRenderer.scale,
-                gridHeight: CGFloat(grid.rows) * terminalRenderer.metrics.cellHeight),
+                gridHeight: CGFloat(grid.rows) * terminalRenderer.metrics.cellHeight,
+                topInset: topInset),
             drawableSize: drawableSize,
             cursorVisible: scrollOffset == 0, selection: selection,
+            searchMatches: searchMatches.map { TerminalSelection($0, grid: grid) },
+            currentSearchMatchIndex: currentSearchMatchIndex,
             renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
         commandBuffer.present(drawable)
         commandBuffer.commit()
@@ -387,12 +456,12 @@ class ViewController: NSViewController {
     /// the prompt — the one place a terminal's spacing gets noticed. At the
     /// top it lands in the titlebar band instead.
     static func contentRect(
-        in drawableSize: CGSize, scale: CGFloat, gridHeight: CGFloat
+        in drawableSize: CGSize, scale: CGFloat, gridHeight: CGFloat, topInset: CGFloat
     ) -> CGRect {
         let bottom = drawableSize.height - TerminalLayout.insets.bottom * scale
         return CGRect(
             x: TerminalLayout.insets.left * scale,
-            y: max(TerminalLayout.insets.top * scale, bottom - gridHeight),
+            y: max(topInset * scale, bottom - gridHeight),
             width: max(0, drawableSize.width - TerminalLayout.insetWidth * scale),
             height: gridHeight)
     }

@@ -64,3 +64,14 @@ fragment float4 quad_fragment_glyph(VertexOut in [[stage_in]],
     float coverage = atlas.sample(atlasSampler, in.uv).r;
     return float4(in.color.rgb, in.color.a * coverage);
 }
+
+// The color-atlas variant: texels are premultiplied bgra (Apple Color Emoji
+// bitmaps), so the sample is the fragment colour verbatim and the instance
+// colour — a tint for coverage glyphs — does not apply. The pipeline's
+// blend state is premultiplied-over (`sourceRGB = one`), matching the
+// texels.
+fragment float4 quad_fragment_color(VertexOut in [[stage_in]],
+                                     texture2d<float> atlas [[texture(0)]],
+                                     sampler atlasSampler [[sampler(0)]]) {
+    return atlas.sample(atlasSampler, in.uv);
+}

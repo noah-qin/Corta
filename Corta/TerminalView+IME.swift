@@ -58,6 +58,10 @@ extension TerminalView: NSTextInputClient {
         }
         let overlay = markedTextOverlay
         overlay.cellSize = cellSize
+        // Re-read on every show: the shell's provider answers with the
+        // renderer's font at the *current* size, so ⌘=/⌘- mid-composition
+        // is picked up on the next preedit update.
+        if let font = preeditFontProvider?() { overlay.font = font }
         overlay.show(attributed, at: cursorRectProvider?() ?? .zero)
     }
 
@@ -139,10 +143,10 @@ final class MarkedTextOverlayView: NSView {
     /// underline/clause attributes intact; nil while hidden.
     private(set) var markedText: NSAttributedString?
 
-    /// Matches the shell's hardcoded Menlo 14 (`ViewController.viewDidLoad`).
-    /// When the font stack becomes configurable (M4's ⌘+/⌘−), wire the
-    /// current font in here — until then this is a seam, not a setting.
-    var font = NSFont(name: "Menlo", size: 14) ?? NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
+    /// The renderer's primary font (SF Mono) at the default size; the shell
+    /// re-points this at the current size on every `show` via
+    /// `TerminalView.preeditFontProvider`, so ⌘=/⌘- resizes marked text too.
+    var font = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
 
     /// Set by the terminal view before each `show`; needed to size and
     /// vertically centre the text against the cell it covers.

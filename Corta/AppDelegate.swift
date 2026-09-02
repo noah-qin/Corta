@@ -21,12 +21,42 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// the per-session architecture (`DESIGN.md` §2.4) makes a new window
     /// composition, not new mechanism.
     @objc func newDocument(_ sender: Any?) {
-        guard let controller = NSStoryboard(name: "Main", bundle: nil)
-            .instantiateInitialController() as? NSWindowController
-        else { return }
-        track(controller)
+        guard let controller = instantiateWindowController() else { return }
+        // Offset from the window it was opened from. Placed at the same
+        // origin the new window is invisible behind the old one, and ⌘N
+        // looks like it did nothing.
+        if let previous = NSApp.keyWindow, let window = controller.window {
+            window.setFrameTopLeftPoint(
+                NSPoint(x: previous.frame.minX + 24, y: previous.frame.maxY - 24))
+        }
         controller.showWindow(sender)
         controller.window?.makeKeyAndOrderFront(sender)
+    }
+
+    /// File > New Tab (⌘T, M4.7): native window tabbing. The new session is
+    /// a full window of its own, added to the key window's tab group — so a
+    /// tab can always be dragged out into a standalone window again, and
+    /// ⌘N keeps meaning "new window".
+    @objc func newTab(_ sender: Any?) {
+        guard let controller = instantiateWindowController(),
+            let window = controller.window
+        else { return }
+        window.tabbingMode = .automatic
+        if let keyWindow = NSApp.keyWindow, keyWindow !== window {
+            keyWindow.addTabbedWindow(window, ordered: .above)
+        }
+        controller.showWindow(sender)
+        window.makeKeyAndOrderFront(sender)
+    }
+
+    /// One storyboard window controller, tracked so it lives as long as its
+    /// window does.
+    private func instantiateWindowController() -> NSWindowController? {
+        guard let controller = NSStoryboard(name: "Main", bundle: nil)
+            .instantiateInitialController() as? NSWindowController
+        else { return nil }
+        track(controller)
+        return controller
     }
 
     /// Retains `controller` until its window closes, so the array does not

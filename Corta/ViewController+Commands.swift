@@ -23,14 +23,14 @@ extension ViewController {
     }
 
     func setFontSize(_ newSize: CGFloat) {
-        // A clamp, not a policy: below ~8pt Menlo's metrics round to a
-        // degenerate cell, above 64pt a cell is wider than the minimum
+        // A clamp, not a policy: below ~8pt the primary font's metrics round
+        // to a degenerate cell, above 64pt a cell is wider than the minimum
         // window can meaningfully show.
         let clamped = min(64, max(8, newSize))
         guard clamped != fontSize else { return }
         fontSize = clamped
 
-        let font = CTFontCreateWithName("Menlo" as CFString, fontSize, nil)
+        let font = TerminalFont.primary(ofSize: fontSize)
         let scale = view.window?.backingScaleFactor ?? terminalRenderer.scale
         // Re-point the existing renderer rather than building a new one: the
         // pipelines and the atlas texture are reusable, and rebuilding them
@@ -45,7 +45,7 @@ extension ViewController {
         window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
         window.contentMinSize = NSSize(
             width: CGFloat(minimumColumns) * metrics.cellWidth + TerminalLayout.insetWidth,
-            height: CGFloat(minimumRows) * metrics.cellHeight + TerminalLayout.insetHeight)
+            height: CGFloat(minimumRows) * metrics.cellHeight + verticalInsets)
         // Keep the grid the child sees (rows x columns) and resize the
         // window around it; `viewDidLayout` then finds the session already
         // matches and sends no resize. `lastRequestedSize` is set in
@@ -53,7 +53,7 @@ extension ViewController {
         guard let gridSize = lastRequestedSize else { return }
         window.setContentSize(NSSize(
             width: CGFloat(gridSize.columns) * metrics.cellWidth + TerminalLayout.insetWidth,
-            height: CGFloat(gridSize.rows) * metrics.cellHeight + TerminalLayout.insetHeight))
+            height: CGFloat(gridSize.rows) * metrics.cellHeight + verticalInsets))
         invalidateDisplay()
     }
 }

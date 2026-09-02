@@ -188,10 +188,11 @@ struct WideGlyphRenderTests {
     }
 
     /// M3.6 done-when, renderer half: a ZWJ family emoji drawn as the wide
-    /// cluster the grid will reference once the core collapses ZWJ sequences
-    /// (see the track-B report's seam) inks its two-cell box and nothing
-    /// beyond it. The atlas shapes the cluster; the quad math is the same
-    /// scale-and-centre `appendRowInstances` applies to a wide cell.
+    /// cluster the grid references inks its two-cell box and nothing beyond
+    /// it. This builds the quad by hand — it exercises the atlas's cluster
+    /// shaping plus the scale-and-centre quad math, not the
+    /// `appendRowInstances` colour routing; the full feed→grid→draw path is
+    /// covered by `ColorEmojiRenderTests.zwjClusterRendersInColorThroughTheRenderer`.
     @Test func zwjFamilyEmojiRendersInOneDoubleWidthCell() throws {
         guard let device = MTLCreateSystemDefaultDevice() else {
             Issue.record("No Metal device available in this environment")
@@ -234,8 +235,12 @@ struct WideGlyphRenderTests {
         pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1)
         pass.colorAttachments[0].storeAction = .store
         let commandBuffer = queue.makeCommandBuffer()!
-        renderer.quadRenderer.drawGlyphQuads(
-            [instance], atlas: renderer.glyphAtlas.texture,
+        // A color emoji bitmaps into the RGBA atlas and draws through the
+        // color pipeline (see `GlyphAtlas`'s type comment) — the coverage
+        // pipeline would find nothing at these UVs in the grayscale atlas.
+        #expect(info.isColor)
+        renderer.quadRenderer.drawColorQuads(
+            [instance], atlas: renderer.glyphAtlas.colorTexture,
             rect: CGRect(x: 0, y: 0, width: width, height: height),
             drawableSize: CGSize(width: width, height: height),
             renderPassDescriptor: pass, commandBuffer: commandBuffer)

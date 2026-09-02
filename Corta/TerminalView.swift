@@ -13,6 +13,9 @@ import QuartzCore
 final class TerminalView: NSView, CALayerDelegate {
     private let metalLayer = CAMetalLayer()
     private var displayLink: CADisplayLink?
+    /// Mouse-moved tracking for ⌘-hover link feedback (M4.6); `.inVisibleRect`
+    /// keeps it glued to the visible area across resizes.
+    private var mouseTrackingArea: NSTrackingArea?
 
     /// Called once per frame, on the main thread, with the drawable's render
     /// pass descriptor and pixel size. `nil` drawable (window occluded,
@@ -40,6 +43,13 @@ final class TerminalView: NSView, CALayerDelegate {
     /// (`SECURITY.md` §2.3).
     var onPaste: (() -> Void)?
 
+    /// M4.4 search shortcuts and Escape-while-searching, offered before
+    /// anything else in `keyDown`: Esc must dismiss the search bar rather
+    /// than send a raw ESC byte to the child while it's open, and ⌘F/⌘G/
+    /// ⇧⌘G must not fall through to `deliverBytes`. Returns whether the
+    /// event was handled; `false` (or `nil`) continues the normal routing.
+    var onSearchKey: ((NSEvent) -> Bool)?
+
     /// Called when a live window resize ends, so the shell can deliver the
     /// final size to the child without waiting out the debounce (M2.9).
     var onLiveResizeEnded: (() -> Void)?
@@ -66,6 +76,11 @@ final class TerminalView: NSView, CALayerDelegate {
     /// and the preedit overlay from it; nil means the cursor is not
     /// currently knowable or visible.
     var cursorRectProvider: (() -> CGRect?)?
+
+    /// The font the preedit overlay draws marked text with, answered by the
+    /// shell so it tracks the renderer's font stack and current size
+    /// (⌘=/⌘-). Nil leaves the overlay on its default.
+    var preeditFontProvider: (() -> NSFont)?
 
     /// The point→cell mapping SGR mouse reports use, answered by the shell —
     /// it owns the content insets, the bottom-anchored grid origin and the
@@ -128,6 +143,17 @@ final class TerminalView: NSView, CALayerDelegate {
     override func viewDidEndLiveResize() {
         super.viewDidEndLiveResize()
         onLiveResizeEnded?()
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let mouseTrackingArea { removeTrackingArea(mouseTrackingArea) }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+            owner: self)
+        addTrackingArea(area)
+        mouseTrackingArea = area
     }
 
     /// Wakes the parked display link; the next vsync asks

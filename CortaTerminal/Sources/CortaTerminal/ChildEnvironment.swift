@@ -1,3 +1,4 @@
+import Foundation
 import Darwin
 
 /// Builds the environment handed to a child process.
@@ -50,7 +51,31 @@ public enum ChildEnvironment {
         }
         result["TERM"] = term
         result["TERM_PROGRAM"] = "Corta"
+        // A child with no locale runs in the C locale, where zsh's line
+        // editor handles input one byte at a time: typing CJK or an emoji
+        // produced isolated continuation bytes on screen instead of the
+        // character. Terminal.app and iTerm2 both derive this from system
+        // preferences, which is why they looked fine and this did not.
+        //
+        // Only filled in when the inherited environment says nothing — a
+        // user who has set `LANG` or `LC_ALL` themselves keeps their choice.
+        if result["LANG"] == nil, result["LC_ALL"] == nil, result["LC_CTYPE"] == nil {
+            result["LANG"] = utf8Locale
+        }
         return result
+    }
+
+    /// The user's language and region as a UTF-8 locale name, e.g.
+    /// `zh_CN.UTF-8`. Falls back to `en_US.UTF-8`, which every macOS install
+    /// has, rather than to nothing.
+    static var utf8Locale: String {
+        let identifier = Locale.current.identifier
+            .split(separator: "@").first.map(String.init) ?? ""
+        let normalised = identifier.replacingOccurrences(of: "-", with: "_")
+        // A bare language ("en") is not a locale name; only a
+        // language_REGION pair names a file in /usr/share/locale.
+        guard normalised.contains("_") else { return "en_US.UTF-8" }
+        return "\(normalised).UTF-8"
     }
 
     /// This process's environment, read from `environ`.

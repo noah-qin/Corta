@@ -17,7 +17,7 @@ extension ViewController {
         case .lines(let delta):
             scrollOffset = min(max(0, scrollOffset + delta), historyDepth)
         case .page(let up):
-            let usableHeight = view.bounds.height - TerminalLayout.insetHeight
+            let usableHeight = view.bounds.height - verticalInsets
             let rows = Int(usableHeight / terminalRenderer.pointMetrics.cellHeight)
             scrollOffset = min(max(0, scrollOffset + (up ? rows : -rows)), historyDepth)
         case .toTop:
@@ -143,7 +143,8 @@ extension ViewController {
         Self.documentPosition(
             for: terminalView.convert(event.locationInWindow, from: nil),
             viewHeight: terminalView.bounds.height,
-            metrics: terminalRenderer.pointMetrics, grid: grid, scrollOffset: scrollOffset)
+            metrics: terminalRenderer.pointMetrics, grid: grid, scrollOffset: scrollOffset,
+            topInset: topInset)
     }
 
     /// The pure half of the mapping, kept static and nonisolated so tests
@@ -152,10 +153,11 @@ extension ViewController {
     /// view's edges and anchored to the bottom — the rounding remainder of
     /// `viewHeight` over whole cells lands at the top.
     nonisolated static func documentPosition(
-        for point: CGPoint, viewHeight: CGFloat, metrics: CellMetrics, grid: Grid, scrollOffset: Int
+        for point: CGPoint, viewHeight: CGFloat, metrics: CellMetrics, grid: Grid,
+        scrollOffset: Int, topInset: CGFloat
     ) -> SelectionPoint {
         let gridTop = max(
-            TerminalLayout.insets.top,
+            topInset,
             viewHeight - TerminalLayout.insets.bottom - CGFloat(grid.rows) * metrics.cellHeight)
         let column = Int(((point.x - TerminalLayout.insets.left) / metrics.cellWidth).rounded(.down))
         let row = Int(((point.y - gridTop) / metrics.cellHeight).rounded(.down))

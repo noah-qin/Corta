@@ -14,7 +14,7 @@ nonisolated struct GridPosition: Equatable {
 }
 
 /// An inclusive text selection, `start` to `end` in document order.
-nonisolated struct TerminalSelection {
+nonisolated struct TerminalSelection: Equatable {
     var start: GridPosition
     var end: GridPosition
     /// The scrollback depth the rows were recorded against. Output since
@@ -28,7 +28,8 @@ nonisolated struct TerminalSelection {
 }
 
 /// Turns a `Grid` snapshot into instanced quads and draws it into a given
-/// rectangle — two draw calls (background, glyphs).
+/// rectangle — two draw calls (background, glyphs), plus a third for color
+/// emoji when a frame contains any (see `cachedColorGlyphs`).
 ///
 /// **Damage tracking** (`PERFORMANCE.md` §3, roadmap M4.1): the core exposes
 /// no version or damage signal (`TerminalSession.snapshot()` is a plain COW
@@ -54,6 +55,9 @@ nonisolated final class TerminalRenderer {
     /// own background.
     private static let cursorColor = SIMD4<Float>(0.6, 0.6, 0.6, 0.6)
     private static let selectionColor = SIMD4<Float>(0.25, 0.45, 0.85, 0.4)
+    /// M4.4: every search match highlights; the current one differently.
+    private static let searchMatchColor = SIMD4<Float>(0.85, 0.75, 0.2, 0.35)
+    private static let currentSearchMatchColor = SIMD4<Float>(0.95, 0.55, 0.15, 0.6)
 
     // MARK: - Damage-tracked instance cache
 
@@ -63,8 +67,13 @@ nonisolated final class TerminalRenderer {
     /// a row's slice starts at the sum of the counts before it.
     private var backgroundCounts: [Int] = []
     private var glyphCounts: [Int] = []
+    private var colorGlyphCounts: [Int] = []
     private var cachedBackground: [QuadInstance] = []
     private var cachedGlyphs: [QuadInstance] = []
+    /// Color-emoji quads, sampled from the atlas's RGBA texture and drawn in
+    /// their own pass after the tinted glyphs — the coverage pipeline would
+    /// reduce an emoji bitmap to a monochrome silhouette.
+    private var cachedColorGlyphs: [QuadInstance] = []
     /// Selection and cursor quads live at the tail of `cachedBackground`.
     private var overlayCount = 0
     /// What the cache was built against; a mismatch forces a full rebuild.
@@ -75,12 +84,18 @@ nonisolated final class TerminalRenderer {
     private var cachedCursorStyle: CursorStyle?
     private var cachedCursorVisible = false
     private var cachedSelection: TerminalSelection?
+    /// M4.4 search highlights, in document rows exactly like `TerminalSelection`
+    /// — recomputed fresh from the current grid whenever the query or the
+    /// grid changes, so unlike a selection there is no growth to track.
+    private var cachedSearchMatches: [TerminalSelection] = []
+    private var cachedCurrentSearchMatchIndex: Int?
     private var needsFullRebuild = true
 
     /// Scratch for one row's rebuild, reused across rows and frames so a
     /// damaged row allocates nothing (`PERFORMANCE.md` §3).
     private var rowBackground: [QuadInstance] = []
     private var rowGlyphs: [QuadInstance] = []
+    private var rowColorGlyphs: [QuadInstance] = []
     private var overlayScratch: [QuadInstance] = []
 
     /// Test hook: how many viewport rows the last `updateInstances` rebuilt.
@@ -139,7 +154,8 @@ nonisolated final class TerminalRenderer {
     /// match and the caller can skip the frame entirely.
     @discardableResult
     func updateInstances(
-        grid: Grid, scrollOffset: Int, cursorVisible: Bool, selection: TerminalSelection?
+        grid: Grid, scrollOffset: Int, cursorVisible: Bool, selection: TerminalSelection?,
+        searchMatches: [TerminalSelection] = [], currentSearchMatchIndex: Int? = nil
     ) -> Bool {
         let offset = min(max(0, scrollOffset), grid.scrollback.count)
         let fullRebuild =
@@ -173,8 +189,12 @@ nonisolated final class TerminalRenderer {
             // Output that scrolled lines into history shifts the selection's
             // viewport rows without the selection itself changing.
             || (selection != nil && cachedScrollbackCount != grid.scrollback.count)
+            || cachedSearchMatches != searchMatches
+            || cachedCurrentSearchMatchIndex != currentSearchMatchIndex
         {
-            rebuildOverlay(grid: grid, cursorVisible: cursorVisible, selection: selection, offset: offset)
+            rebuildOverlay(
+                grid: grid, cursorVisible: cursorVisible, selection: selection, offset: offset,
+                searchMatches: searchMatches, currentSearchMatchIndex: currentSearchMatchIndex)
             changed = true
         }
 
@@ -185,6 +205,8 @@ nonisolated final class TerminalRenderer {
         cachedCursorStyle = grid.cursorStyle
         cachedCursorVisible = cursorVisible
         cachedSelection = selection
+        cachedSearchMatches = searchMatches
+        cachedCurrentSearchMatchIndex = currentSearchMatchIndex
         needsFullRebuild = false
         return changed
     }
@@ -201,12 +223,15 @@ nonisolated final class TerminalRenderer {
         drawableSize: CGSize,
         cursorVisible: Bool,
         selection: TerminalSelection?,
+        searchMatches: [TerminalSelection] = [],
+        currentSearchMatchIndex: Int? = nil,
         renderPassDescriptor: MTLRenderPassDescriptor,
         commandBuffer: MTLCommandBuffer
     ) {
         updateInstances(
             grid: grid, scrollOffset: scrollOffset, cursorVisible: cursorVisible,
-            selection: selection)
+            selection: selection, searchMatches: searchMatches,
+            currentSearchMatchIndex: currentSearchMatchIndex)
 
         quadRenderer.drawSolidQuads(
             cachedBackground, rect: rect, drawableSize: drawableSize,
@@ -220,14 +245,24 @@ nonisolated final class TerminalRenderer {
         quadRenderer.drawGlyphQuads(
             cachedGlyphs, atlas: glyphAtlas.texture, rect: rect, drawableSize: drawableSize,
             renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
+        // Skipped outright when no cell produced a color glyph — an
+        // emoji-free frame pays nothing for the third pipeline.
+        if !cachedColorGlyphs.isEmpty {
+            quadRenderer.drawColorQuads(
+                cachedColorGlyphs, atlas: glyphAtlas.colorTexture, rect: rect,
+                drawableSize: drawableSize, renderPassDescriptor: renderPassDescriptor,
+                commandBuffer: commandBuffer)
+        }
     }
 
     /// Full rebuild: every row's instances, straight into the cached arrays.
     private func rebuildAllRows(grid: Grid, offset: Int) {
         cachedBackground.removeAll(keepingCapacity: true)
         cachedGlyphs.removeAll(keepingCapacity: true)
+        cachedColorGlyphs.removeAll(keepingCapacity: true)
         backgroundCounts.removeAll(keepingCapacity: true)
         glyphCounts.removeAll(keepingCapacity: true)
+        colorGlyphCounts.removeAll(keepingCapacity: true)
         cachedLines.removeAll(keepingCapacity: true)
         cachedBackground.reserveCapacity(grid.rows * grid.columns / 4 + 2)
         cachedGlyphs.reserveCapacity(grid.rows * grid.columns / 2)
@@ -235,11 +270,14 @@ nonisolated final class TerminalRenderer {
             let line = Self.visibleLine(grid: grid, row: row, offset: offset)
             let backgroundStart = cachedBackground.count
             let glyphStart = cachedGlyphs.count
+            let colorGlyphStart = cachedColorGlyphs.count
             appendRowInstances(
                 line: line, row: row, graphemes: grid.graphemes,
-                background: &cachedBackground, glyphs: &cachedGlyphs)
+                background: &cachedBackground, glyphs: &cachedGlyphs,
+                colorGlyphs: &cachedColorGlyphs)
             backgroundCounts.append(cachedBackground.count - backgroundStart)
             glyphCounts.append(cachedGlyphs.count - glyphStart)
+            colorGlyphCounts.append(cachedColorGlyphs.count - colorGlyphStart)
             cachedLines.append(line)
         }
         overlayCount = 0
@@ -254,41 +292,62 @@ nonisolated final class TerminalRenderer {
         var rebuilt = 0
         var backgroundStart = 0
         var glyphStart = 0
+        var colorGlyphStart = 0
         for row in 0..<grid.rows {
             let line = Self.visibleLine(grid: grid, row: row, offset: offset)
             if line != cachedLines[row] {
                 rowBackground.removeAll(keepingCapacity: true)
                 rowGlyphs.removeAll(keepingCapacity: true)
+                rowColorGlyphs.removeAll(keepingCapacity: true)
                 appendRowInstances(
                     line: line, row: row, graphemes: grid.graphemes,
-                    background: &rowBackground, glyphs: &rowGlyphs)
+                    background: &rowBackground, glyphs: &rowGlyphs,
+                    colorGlyphs: &rowColorGlyphs)
                 cachedBackground.replaceSubrange(
                     backgroundStart..<(backgroundStart + backgroundCounts[row]), with: rowBackground)
                 cachedGlyphs.replaceSubrange(
                     glyphStart..<(glyphStart + glyphCounts[row]), with: rowGlyphs)
+                cachedColorGlyphs.replaceSubrange(
+                    colorGlyphStart..<(colorGlyphStart + colorGlyphCounts[row]), with: rowColorGlyphs)
                 backgroundCounts[row] = rowBackground.count
                 glyphCounts[row] = rowGlyphs.count
+                colorGlyphCounts[row] = rowColorGlyphs.count
                 cachedLines[row] = line
                 changed = true
                 rebuilt += 1
             }
             backgroundStart += backgroundCounts[row]
             glyphStart += glyphCounts[row]
+            colorGlyphStart += colorGlyphCounts[row]
         }
         lastRebuiltRowCount = rebuilt
         return changed
     }
 
-    /// Selection and cursor quads, rebuilt when either changes and spliced
-    /// into the tail of `cachedBackground`, after every row's slice.
-    private func rebuildOverlay(grid: Grid, cursorVisible: Bool, selection: TerminalSelection?, offset: Int) {
+    /// Selection, search-match and cursor quads, rebuilt when any changes
+    /// and spliced into the tail of `cachedBackground`, after every row's
+    /// slice.
+    private func rebuildOverlay(
+        grid: Grid, cursorVisible: Bool, selection: TerminalSelection?, offset: Int,
+        searchMatches: [TerminalSelection] = [], currentSearchMatchIndex: Int? = nil
+    ) {
         let cellWidth = Float(metrics.cellWidth)
         let cellHeight = Float(metrics.cellHeight)
         overlayScratch.removeAll(keepingCapacity: true)
         if let selection {
             overlayScratch.append(
                 contentsOf: selectionQuads(
-                    selection, grid: grid, offset: offset, cellWidth: cellWidth, cellHeight: cellHeight))
+                    selection, grid: grid, offset: offset, cellWidth: cellWidth, cellHeight: cellHeight,
+                    color: Self.selectionColor))
+        }
+        // All matches highlight; the current one highlights differently
+        // (M4.4). Drawn after the selection and before the cursor, so the
+        // cursor still reads as the topmost quad if they overlap.
+        for (index, match) in searchMatches.enumerated() {
+            overlayScratch.append(
+                contentsOf: selectionQuads(
+                    match, grid: grid, offset: offset, cellWidth: cellWidth, cellHeight: cellHeight,
+                    color: index == currentSearchMatchIndex ? Self.currentSearchMatchColor : Self.searchMatchColor))
         }
         if cursorVisible {
             let cellOrigin = SIMD2<Float>(
@@ -336,7 +395,8 @@ nonisolated final class TerminalRenderer {
     /// two for a wide cluster such as a ZWJ emoji.
     private func appendRowInstances(
         line: Line, row: Int, graphemes: GraphemeTable,
-        background: inout [QuadInstance], glyphs: inout [QuadInstance]
+        background: inout [QuadInstance], glyphs: inout [QuadInstance],
+        colorGlyphs: inout [QuadInstance]
     ) {
         let cellWidth = Float(metrics.cellWidth)
         let cellHeight = Float(metrics.cellHeight)
@@ -400,8 +460,17 @@ nonisolated final class TerminalRenderer {
                     origin.y + baseline - (info.bearing.y + info.size.y) * fit
                 )
             }
-            glyphs.append(
-                QuadInstance(origin: glyphOrigin, size: glyphSize, color: fg, uvRect: info.uvRect))
+            // Color glyphs (Apple Color Emoji bitmaps in the RGBA atlas)
+            // draw in the color pass, which ignores the tint — routing one
+            // through the coverage pipeline would render a monochrome
+            // silhouette. The wide-glyph scale-and-centre above applies to
+            // both paths, so an emoji sits centred on its two-cell box.
+            let instance = QuadInstance(origin: glyphOrigin, size: glyphSize, color: fg, uvRect: info.uvRect)
+            if info.isColor {
+                colorGlyphs.append(instance)
+            } else {
+                glyphs.append(instance)
+            }
         }
     }
 
@@ -436,7 +505,8 @@ nonisolated final class TerminalRenderer {
     /// lines into history since, and `offset` for the user's own scrolling.
     /// Rows outside the viewport produce no quads.
     private func selectionQuads(
-        _ selection: TerminalSelection, grid: Grid, offset: Int, cellWidth: Float, cellHeight: Float
+        _ selection: TerminalSelection, grid: Grid, offset: Int, cellWidth: Float, cellHeight: Float,
+        color: SIMD4<Float>
     ) -> [QuadInstance] {
         guard selection.start.row <= selection.end.row else { return [] }
         let growth = max(0, grid.scrollback.count - selection.baseScrollbackCount)
@@ -454,7 +524,7 @@ nonisolated final class TerminalRenderer {
                 QuadInstance(
                     origin: .init(Float(startColumn) * cellWidth, Float(row) * cellHeight),
                     size: .init(Float(endColumn - startColumn) * cellWidth, cellHeight),
-                    color: Self.selectionColor))
+                    color: color))
         }
         return quads
     }
