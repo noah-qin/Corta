@@ -198,8 +198,8 @@ class ViewController: NSViewController {
         }
     }
 
-    override func viewDidAppear() {
-        super.viewDidAppear()
+    override func viewWillAppear() {
+        super.viewWillAppear()
         guard !didSizeWindow, let window = view.window else { return }
         didSizeWindow = true
         let metrics = terminalRenderer.pointMetrics
@@ -212,7 +212,14 @@ class ViewController: NSViewController {
         window.appearance = NSAppearance(named: .darkAqua)
         // Content runs the full height with a transparent titlebar, so the
         // background is one continuous surface instead of a titlebar butted
-        // against a differently-shaded grid.
+        // against a differently-shaded grid. This is `viewWillAppear`, not
+        // `viewDidAppear`, for a reason: the style mask must be final before
+        // the window's first layout. When it was applied in `viewDidAppear`
+        // the first layout ran at the content-rect height (frame minus
+        // titlebar), and `resizeSessionToFitView` — already ungated by then —
+        // delivered a transient 28-row winsize to the child, then 30 once the
+        // full height arrived. The shrink-then-grow strands two blank rows
+        // under the prompt of anything the child printed in between.
         window.styleMask.insert(.fullSizeContentView)
         window.titlebarAppearsTransparent = true
         // The Metal layer clears to a translucent colour; the window has to
@@ -277,14 +284,24 @@ class ViewController: NSViewController {
     }
 
     private func resizeSessionToFitView() {
-        // Nothing reaches the child until `viewDidAppear` has settled the
-        // window. The storyboard lays out at the content-layout height first
-        // (the frame less the titlebar) and only reaches full height once
-        // `.fullSizeContentView` applies, so an early layout produced a
-        // 28-row session that the shell laid its first output out against,
-        // stranding two blank rows under the prompt once the grid grew to 30.
-        // The session is constructed at the target size already.
-        guard didSizeWindow, session != nil, let terminalRenderer else { return }
+        // Nothing reaches the child until `viewWillAppear` has made the
+        // window's style mask final (`.fullSizeContentView` decides how tall
+        // the content view is) and pinned the content size — before that,
+        // layouts run at transient sizes the child's early output would be
+        // laid out against (D.1: a 28-row transient followed by the real 30
+        // stranded two blank rows under the prompt). The session is
+        // constructed at the target size already, so skipping early layouts
+        // loses nothing.
+        guard didSizeWindow, session != nil, let terminalRenderer, let window = view.window
+        else { return }
+        // The style-mask insertion lands one layout pass late: the first
+        // layout after `setContentSize` still runs at the content-rect height
+        // (frame minus titlebar — observed 522pt against the final 554pt),
+        // and delivering that size shrinks the grid and strands content
+        // exactly as above. With `.fullSizeContentView` effective the content
+        // view spans the whole frame, so a view that does not fill its
+        // window's frame is transient by construction; skip it.
+        guard abs(view.bounds.height - window.frame.height) < 1 else { return }
         let usable = CGSize(
             width: view.bounds.width - Self.insetWidth,
             height: view.bounds.height - Self.insetHeight)
