@@ -2,10 +2,15 @@ import AppKit
 
 /// Keyboard input: one key event to the bytes a real terminal would send.
 ///
-/// Bytes are written straight to the PTY — **not** routed through
-/// `interpretKeyEvents:`. That path exists for text input and IME
-/// composition (Track A, M3); using it for every key would swallow control
-/// keys the shell needs verbatim (`ROADMAP.md` M1.18).
+/// Routing (M3.4): an event carrying ⌘ or ⌃ bypasses the IME entirely —
+/// control sequences are the terminal's own and must never reach an input
+/// method. Every other event is offered to the input context first
+/// (`inputContext.handleEvent(_:)`); only an event the IME does not consume
+/// falls through to the direct `bytes(for:)` translation. Text an IME
+/// commits does not come back through `keyDown` at all — it arrives via
+/// `insertText(_:replacementRange:)` in `TerminalView+IME.swift`, which is
+/// where it is written to the PTY. (`interpretKeyEvents:` is still never
+/// called; it would swallow control keys the shell needs verbatim.)
 extension TerminalView {
     override func keyDown(with event: NSEvent) {
         if let gesture = Self.scrollGesture(for: event) {
@@ -16,11 +21,27 @@ extension TerminalView {
             onPaste?()
             return
         }
+        // M3.4: offer the event to the IME first. A consumed event ends
+        // here — the IME answers through `insertText`/`setMarkedText`.
+        if Self.routesEventThroughIME(event), inputContext?.handleEvent(event) == true {
+            return
+        }
+        deliverBytes(for: event)
+    }
+
+    /// The direct translation, run for events the IME never saw or declined.
+    func deliverBytes(for event: NSEvent) {
         guard let bytes = Self.bytes(for: event) else {
             super.keyDown(with: event)
             return
         }
         onKeyBytes?(bytes)
+    }
+
+    /// M3.4: ⌘/⌃ events bypass the IME entirely. Kept a pure function of the
+    /// event so the bypass decision is testable without a window server.
+    static func routesEventThroughIME(_ event: NSEvent) -> Bool {
+        event.modifierFlags.isDisjoint(with: [.command, .control])
     }
 
     /// ⌘V — checked before `bytes(for:)`, which would otherwise deliver a
