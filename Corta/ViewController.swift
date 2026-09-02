@@ -14,12 +14,19 @@ import Synchronization
 /// Owns one `TerminalSession` and the `TerminalRenderer`/`TerminalView` that
 /// draw it — the unit a split (M5) will multiply, not a global (`DESIGN.md`
 /// §2.4).
+///
+/// This file owns lifecycle, the session and the render loop. Behaviour
+/// lives in extensions by concern: `ViewController+Input.swift` (Track A),
+/// `ViewController+Selection.swift` (Track C) and
+/// `ViewController+Commands.swift` (Track D).
 class ViewController: NSViewController {
     private var terminalView: TerminalView!
-    private var terminalRenderer: TerminalRenderer!
-    private var session: TerminalSession!
+    // Not `private`: the extension files (`+Input`, `+Selection`) reach
+    // these, and extensions cannot add their own storage.
+    var terminalRenderer: TerminalRenderer!
+    var session: TerminalSession!
     private var commandQueue: MTLCommandQueue!
-    private var scrollOffset = 0
+    var scrollOffset = 0
     private var didSizeWindow = false
     /// Set by layout changes the damage diff cannot see (drawable size,
     /// backing scale) and by local actions that change what is drawn without
@@ -248,7 +255,7 @@ class ViewController: NSViewController {
 
     /// Marks the display dirty and wakes the display link — for local changes
     /// (layout, scrolling) that produce no PTY output.
-    private func invalidateDisplay() {
+    func invalidateDisplay() {
         needsRedraw = true
         terminalView.setNeedsRedraw()
     }
@@ -273,56 +280,6 @@ class ViewController: NSViewController {
         // During a live drag, coalesce; otherwise (initial layout,
         // programmatic resize) deliver immediately.
         resizeDebouncer.resize(to: size, coalesce: view.window?.inLiveResize ?? false)
-    }
-
-    // MARK: - Paste (M2.6, app side)
-
-    private func pasteFromClipboard() {
-        guard let text = NSPasteboard.general.string(forType: .string) else { return }
-        let sanitized = Paste.sanitized(text)
-        guard !sanitized.isEmpty else { return }
-        if Paste.needsWarning(text: sanitized, bracketedPasteEnabled: bracketedPasteEnabled()) {
-            let alert = NSAlert()
-            alert.messageText = "Paste text containing newlines?"
-            alert.informativeText =
-                "The application in the terminal has not enabled bracketed paste mode, so each line will execute as if you typed it."
-            alert.addButton(withTitle: "Paste")
-            alert.addButton(withTitle: "Cancel")
-            guard alert.runModal() == .alertFirstButtonReturn else { return }
-        }
-        session.write(Paste.bytes(for: sanitized, bracketedPasteEnabled: bracketedPasteEnabled()))
-    }
-
-    /// The core's ?2004 bracketed-paste flag (M2.6). When on, pastes are
-    /// wrapped in `ESC[200~`…`ESC[201~` and the newline warning is skipped.
-    private func bracketedPasteEnabled() -> Bool {
-        session.isBracketedPasteEnabled
-    }
-
-    /// The core's ?1006 SGR mouse-reporting flag (M2.7). While off, clicks
-    /// and the wheel keep their normal terminal behaviour.
-    private func mouseReportingEnabled() -> Bool {
-        session.isSgrMouseEncodingEnabled
-    }
-
-    private func scroll(_ gesture: ScrollGesture) {
-
-        let historyDepth = session.snapshot().scrollback.count
-        switch gesture {
-        case .lines(let delta):
-            scrollOffset = min(max(0, scrollOffset + delta), historyDepth)
-        case .page(let up):
-            let usableHeight = view.bounds.height - Self.insetHeight
-            let rows = Int(usableHeight / terminalRenderer.pointMetrics.cellHeight)
-            scrollOffset = min(max(0, scrollOffset + (up ? rows : -rows)), historyDepth)
-        case .toTop:
-            scrollOffset = historyDepth
-        case .toBottom:
-            scrollOffset = 0
-        }
-        // Scrolling moves the viewport without any grid output, so the
-        // output flag alone would never trigger the redraw.
-        invalidateDisplay()
     }
 
     /// Runs at vsync, on the main thread — reads the latest grid without
