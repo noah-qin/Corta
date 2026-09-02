@@ -233,6 +233,12 @@ class ViewController: NSViewController {
         window.setContentSize(NSSize(
             width: CGFloat(defaultColumns) * metrics.cellWidth + Self.insetWidth,
             height: CGFloat(defaultRows) * metrics.cellHeight + Self.insetHeight))
+        // Nothing else claims first responder, and without one the view
+        // hierarchy — the terminal view, this controller — is not in the
+        // responder chain at all: keyDown never fires and menu actions
+        // targeting First Responder (⌘V, ⌘=) dispatch from the window down,
+        // past the controller. The terminal view is where keys belong.
+        window.makeFirstResponder(terminalView)
     }
 
     override func viewDidLayout() {
