@@ -60,6 +60,13 @@ final class TerminalView: NSView, CALayerDelegate {
     /// point into a cell.
     var cellSize: CGSize = .zero
 
+    /// The cursor cell's rect in this view's coordinates, answered by the
+    /// shell (it owns the session, the insets and the metrics). Track A's
+    /// IME layer (`TerminalView+IME.swift`) positions the candidate window
+    /// and the preedit overlay from it; nil means the cursor is not
+    /// currently knowable or visible.
+    var cursorRectProvider: (() -> CGRect?)?
+
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
 

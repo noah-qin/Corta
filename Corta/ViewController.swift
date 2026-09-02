@@ -27,6 +27,10 @@ class ViewController: NSViewController {
     var session: TerminalSession!
     private var commandQueue: MTLCommandQueue!
     var scrollOffset = 0
+    /// The current text selection, owned by `ViewController+Selection.swift`
+    /// (Track C) and read by the render loop. Stored here because extensions
+    /// cannot add storage.
+    var selection: TerminalSelection?
     private var didSizeWindow = false
     /// Set by layout changes the damage diff cannot see (drawable size,
     /// backing scale) and by local actions that change what is drawn without
@@ -180,6 +184,18 @@ class ViewController: NSViewController {
         view.onMouseBytes = { [weak self] bytes in
             self?.session.write(bytes)
         }
+        // Track A's IME layer positions the candidate window and the preedit
+        // overlay from this: the cursor cell's rect in view coordinates,
+        // derived here where the insets and metrics live.
+        view.cursorRectProvider = { [weak self] in
+            guard let self, let terminalRenderer, session != nil else { return nil }
+            let metrics = terminalRenderer.pointMetrics
+            let cursor = session.snapshot().cursor
+            return CGRect(
+                x: Self.contentInsets.left + CGFloat(cursor.column) * metrics.cellWidth,
+                y: Self.contentInsets.top + CGFloat(cursor.row) * metrics.cellHeight,
+                width: metrics.cellWidth, height: metrics.cellHeight)
+        }
     }
 
     override func viewDidAppear() {
@@ -240,7 +256,7 @@ class ViewController: NSViewController {
         // more when it draws and picks up anything that arrived since.
         let damaged = terminalRenderer.updateInstances(
             grid: grid, scrollOffset: scrollOffset,
-            cursorVisible: scrollOffset == 0, selection: nil)
+            cursorVisible: scrollOffset == 0, selection: selection)
         return forced || damaged
     }
 
@@ -295,7 +311,7 @@ class ViewController: NSViewController {
                 in: drawableSize, scale: terminalRenderer.scale,
                 gridHeight: CGFloat(grid.rows) * terminalRenderer.metrics.cellHeight),
             drawableSize: drawableSize,
-            cursorVisible: scrollOffset == 0, selection: nil,
+            cursorVisible: scrollOffset == 0, selection: selection,
             renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
         commandBuffer.present(drawable)
         commandBuffer.commit()
