@@ -69,6 +69,16 @@ attacker-supplied text back to the child's stdin. Some capabilities are
 deliberately absent (title query, OSC 52 read) — do not add them as
 "missing features". See `docs/SECURITY.md` §6 for the eight-rule summary.
 
+**Never change the machine to test.** A verification fixture reached the
+app by way of `launchctl setenv SHELL /tmp/corta-font-demo.zsh`, which
+sets the variable for *every GUI application the user launches after it*,
+not just this one — so Corta started under a bare `zsh -f` with no PATH
+and a demo banner, for days, and `claude: command not found` looked like
+a Corta bug. Pass a test shell in the environment of the launch you
+control (`SHELL=/path ... Corta.app/Contents/MacOS/Corta`), never through
+`launchctl setenv`, `defaults write`, the user's shell rc files, or
+anything else that outlives the test. Clean up what you create.
+
 **App-layer changes are verified by launching the app.** Offscreen render
 tests assert pixel coverage and cannot see view-hierarchy, orientation or
 startup-ordering defects — four such bugs shipped a blank window while

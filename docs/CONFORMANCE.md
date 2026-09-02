@@ -235,7 +235,23 @@ at M3:
    child as UTF-8, and ⌃C / ⌃D / ⌃Z and the arrows behave identically
    with and without the IME selected.
 
-### 4.5 Manual scenario pass
+### 4.5 Test fixtures must not outlive the test
+
+A fixture shell was wired in with `launchctl setenv SHELL`, which applies
+to every GUI application the user launches afterwards. Corta then started
+under `zsh -f` — no rc files, so no PATH — and a demo banner printed on
+every launch. Both looked like defects in the terminal.
+
+Pass fixtures in the environment of a launch you control:
+
+```sh
+SHELL=/path/to/fixture.zsh Corta.app/Contents/MacOS/Corta
+```
+
+Never `launchctl setenv`, never the user's rc files, never `defaults
+write`. Delete the fixture when finished.
+
+### 4.6 Manual scenario pass
 
 Run at every milestone, because these are the actual workload:
 
