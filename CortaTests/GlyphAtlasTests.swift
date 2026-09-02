@@ -46,6 +46,69 @@ struct GlyphAtlasTests {
         #expect(atlas.shapingHits == 1)  // second lookup is a cache hit
     }
 
+    /// M3.5 — Core Text's cascade list: Menlo has no CJK ideograph, so the
+    /// shaped run must resolve to a fallback font and rasterise with *that*
+    /// font (glyph ids are per-font; drawing with the requested font drew the
+    /// wrong outlines).
+    @Test func cjkShapesThroughTheFontCascadeList() throws {
+        guard let device = Self.makeDevice() else {
+            Issue.record("No Metal device available in this environment")
+            return
+        }
+        let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
+        let atlas = GlyphAtlas(device: device, font: font)
+
+        let info = atlas.glyph(shaping: 0x4E2D, bold: false)  // 中
+        #expect(info != nil)
+        #expect(info?.size != .zero)
+        #expect(atlas.fallbackHits > 0, "expected the CJK run to resolve to a fallback font")
+    }
+
+    /// M3.6 — a ZWJ family emoji is one cluster: it shapes into a single
+    /// glyph run in the emoji font, so its bitmap is one emoji wide, not one
+    /// per family member.
+    @Test func zwjFamilyEmojiShapesAsOneGlyphRun() throws {
+        guard let device = Self.makeDevice() else {
+            Issue.record("No Metal device available in this environment")
+            return
+        }
+        let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
+        let atlas = GlyphAtlas(device: device, font: font)
+
+        // 👨‍👩‍👧‍👦 = 👨 ZWJ 👩 ZWJ 👧 ZWJ 👦
+        let family: [UInt32] = [0x1F468, 0x200D, 0x1F469, 0x200D, 0x1F467, 0x200D, 0x1F466]
+        guard let familyInfo = atlas.glyph(forCluster: family, bold: false),
+            let singleInfo = atlas.glyph(shaping: 0x1F468, bold: false),
+            familyInfo.size != .zero, singleInfo.size != .zero
+        else {
+            Issue.record("emoji cluster failed to shape in this environment")
+            return
+        }
+        #expect(familyInfo.size.x < singleInfo.size.x * 2, "a ZWJ family is one glyph, not four")
+
+        let hits = atlas.shapingHits
+        _ = atlas.glyph(forCluster: family, bold: false)
+        #expect(atlas.shapingHits == hits, "the cluster shaping cache must hit on a repeat lookup")
+    }
+
+    /// A combining-mark cluster (`GraphemeTable`'s other tenant) shapes
+    /// through the same path.
+    @Test func combiningClusterShapesAndIsCached() throws {
+        guard let device = Self.makeDevice() else {
+            Issue.record("No Metal device available in this environment")
+            return
+        }
+        let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
+        let atlas = GlyphAtlas(device: device, font: font)
+
+        let info = atlas.glyph(forCluster: [0x65, 0x301], bold: false)  // e + combining acute
+        #expect(info != nil)
+        #expect(info?.size != .zero)
+        let hits = atlas.shapingHits
+        _ = atlas.glyph(forCluster: [0x65, 0x301], bold: false)
+        #expect(atlas.shapingHits == hits)
+    }
+
     @Test func aGlyphProducesInkInsideItsCellAndNoneOutside() throws {
         guard let device = Self.makeDevice() else {
             Issue.record("No Metal device available in this environment")
