@@ -27,7 +27,7 @@ measured. Priorities:
 | Erase display / line, insert / delete lines and columns | P0   |                                                         |
 | **Alternate screen** (`?1049`)                          | P0   | `vim`/`less`/`htop` depend on it entirely               |
 | **Scroll region** (`DECSTBM`)                           | P0   | tmux and vim status lines depend on it                  |
-| **Character width**: CJK wide, emoji, combining, zero-width | P0 | Wrong widths mean misaligned CJK text                 |
+| **Character width**: CJK wide, emoji, combining, zero-width | P0 | Wrong widths mean misaligned CJK text; wide pairs draw scaled into their two-cell box (M3.5) |
 | Scrollback                                              | P0   | Ring buffer, variable-length rows                       |
 | Soft-wrap flag per line                                 | P0   | Required by reflow, selection and search — see `DESIGN.md` §2.1 |
 | Reflow on resize                                        | P1   | Must be incremental; live window drag fires continuously |
@@ -86,8 +86,8 @@ be **fixed-format and never echo attacker-controlled text** — see
 | Cursor: block / bar / underline, blink           | P0   |                                                    |
 | Selection highlight                              | P0   |                                                    |
 | Retina / HiDPI scaling                           | P0   |                                                    |
-| **Font fallback** for CJK and emoji              | P0   | Core Text's strongest suit                          |
-| Atlas eviction (LRU or multi-page)               | P0   | A CJK session exhausts a single page                |
+| **Font fallback** for CJK and emoji              | P0   | Core Text cascade list; the shaped run's font rasterises the glyph (M3.5) |
+| Atlas eviction (LRU or multi-page)               | P0   | Full-page reset on exhaustion + `generation` rebuild (M3, `DESIGN.md` §7.4) |
 | Gamma-corrected glyph blending                   | P1   | Otherwise light-on-dark text looks too thin         |
 | Runtime font scaling (⌘+ / ⌘−)                   | P1   |                                                    |
 | Ligatures                                        | P2   | Conflicts with the cell grid — `DESIGN.md` §7.3     |
