@@ -77,10 +77,10 @@ extension ViewController {
         let glass = NSImageView(
             image: NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: nil)!)
         glass.symbolConfiguration = symbols
-        glass.contentTintColor = .secondaryLabelColor
+        glass.contentTintColor = SystemAccessibility.secondaryLabelColor
 
         let field = NSSearchField()
-        field.placeholderString = "Find"
+        field.placeholderString = L10n.text("search.placeholder")
         field.sendsWholeSearchString = false
         field.sendsSearchStringImmediately = true
         field.delegate = self
@@ -102,7 +102,7 @@ extension ViewController {
         let countLabel = NSTextField(labelWithString: "")
         countLabel.font = .monospacedDigitSystemFont(
             ofSize: NSFont.smallSystemFontSize, weight: .regular)
-        countLabel.textColor = .tertiaryLabelColor
+        countLabel.textColor = SystemAccessibility.tertiaryLabelColor
         countLabel.alignment = .right
         countLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
         countLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -121,7 +121,7 @@ extension ViewController {
                 target: self, action: action)
             button.isBordered = false
             button.symbolConfiguration = symbols
-            button.contentTintColor = .secondaryLabelColor
+            button.contentTintColor = SystemAccessibility.secondaryLabelColor
             button.translatesAutoresizingMaskIntoConstraints = false
             // Square, so the two chevrons and the close mark sit on an even
             // rhythm instead of each hugging its own glyph's width.
@@ -158,6 +158,14 @@ extension ViewController {
         let container = NSGlassEffectContainerView()
         let bar = NSGlassEffectView()
         bar.style = .regular
+        // Reduce Transparency is not "less translucent", it is "background
+        // content must not show through" — so the glass gets an opaque tint
+        // rather than a lowered alpha. The bar keeps its shape and its
+        // position; what changes is that the terminal text behind it stops
+        // competing with the query the user is typing.
+        if SystemAccessibility.reduceTransparency {
+            bar.tintColor = .windowBackgroundColor
+        }
         let content = NSView()
         content.addSubview(stack)
         NSLayoutConstraint.activate([
@@ -197,12 +205,24 @@ extension ViewController {
         view.layoutSubtreeIfNeeded()
         bar.cornerRadius = bar.bounds.height / 2
 
+        // Under Increase Contrast — or once the material is opaque and has no
+        // edge of its own left to read — the pill needs a drawn outline, or it
+        // has no boundary against the terminal behind it.
+        if SystemAccessibility.increaseContrast || SystemAccessibility.reduceTransparency {
+            let border = SystemAccessibility.panelBorder
+            wrapper.wantsLayer = true
+            wrapper.layer?.cornerRadius = bar.cornerRadius
+            wrapper.layer?.borderColor = border.color.cgColor
+            wrapper.layer?.borderWidth = border.width
+        }
+
         // Ease in. Appearing instantly at full size over a screen of text
         // reads as a glitch; the glass wants to look like it rose out of the
-        // content.
+        // content — unless the user has asked for no motion, in which case the
+        // duration collapses to zero and it simply is there.
         container.alphaValue = 0
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.18
+            context.duration = SystemAccessibility.duration(0.18)
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             container.animator().alphaValue = 1
         }

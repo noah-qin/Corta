@@ -21,7 +21,27 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
 
     private let searchField = NSTextField()
     private let tableView = NSTableView()
-    private var matches: [TerminalCommand] = []
+    /// A group heading or a command. Headings are non-selectable and skipped
+    /// by the arrow keys, so the list reads as sections without the selection
+    /// ever landing on one.
+    private enum Row {
+        case header(String)
+        case command(TerminalCommand)
+    }
+
+    private var rows: [Row] = []
+    /// Shown in place of the list when a query matches nothing. A blank panel
+    /// left the user unable to tell "no such command" from "the palette has
+    /// stopped responding".
+    private let emptyLabel = NSTextField(labelWithString: "")
+    /// The commands run from the palette, most recent first, deduplicated.
+    ///
+    /// In memory and for this launch only — deliberately not a config-file
+    /// key. The config file is the user's settings, and a most-recently-used
+    /// list is neither a setting nor something anyone would hand-edit; a key
+    /// for it would be a key `docs/CONFIGURATION.md` has to document and
+    /// nobody would ever set.
+    private var recentCommands: [TerminalCommand] = []
     private var keyMonitor: Any?
     /// The window the palette was opened over. Commands act on the key
     /// window, and the palette itself becomes key while it is up.
@@ -83,7 +103,7 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
     // MARK: - Layout
 
     private func buildContentView() -> NSView {
-        searchField.placeholderString = "Command"
+        searchField.placeholderString = L10n.text("commandPalette.placeholder")
         searchField.font = .systemFont(ofSize: 16)
         searchField.isBordered = false
         searchField.drawsBackground = false
@@ -94,7 +114,10 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
         column.resizingMask = .autoresizingMask
         tableView.addTableColumn(column)
         tableView.headerView = nil
-        tableView.rowHeight = 26
+        // 26 pt put a 13 pt title and an 11 pt shortcut inside 26 points with
+        // nothing left over; a long command and its shortcut had no air on
+        // either side of them.
+        tableView.rowHeight = Self.commandRowHeight
         tableView.style = .plain
         tableView.backgroundColor = .clear
         tableView.dataSource = self
@@ -107,7 +130,28 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
         scrollView.hasVerticalScroller = true
         scrollView.drawsBackground = false
 
-        let stack = NSStackView(views: [searchField, NSBox.separator(), scrollView])
+        emptyLabel.stringValue = L10n.text("commandPalette.empty")
+        emptyLabel.font = .systemFont(ofSize: 13)
+        emptyLabel.textColor = SystemAccessibility.secondaryLabelColor
+        emptyLabel.alignment = .center
+        emptyLabel.isHidden = true
+        emptyLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        let list = NSView()
+        for subview in [scrollView, emptyLabel] {
+            subview.translatesAutoresizingMaskIntoConstraints = false
+            list.addSubview(subview)
+        }
+        NSLayoutConstraint.activate([
+            scrollView.leadingAnchor.constraint(equalTo: list.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: list.trailingAnchor),
+            scrollView.topAnchor.constraint(equalTo: list.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: list.bottomAnchor),
+            emptyLabel.centerXAnchor.constraint(equalTo: list.centerXAnchor),
+            emptyLabel.topAnchor.constraint(equalTo: list.topAnchor, constant: 28),
+        ])
+
+        let stack = NSStackView(views: [searchField, NSBox.separator(), list])
         stack.orientation = .vertical
         stack.spacing = 8
         stack.edgeInsets = NSEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
@@ -115,8 +159,22 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
         stack.setHuggingPriority(.defaultLow, for: .vertical)
 
         let content = NSVisualEffectView()
-        content.material = .popover
-        content.blendingMode = .behindWindow
+        // Reduce Transparency means background content must not show through,
+        // so the material is swapped for an opaque window background rather
+        // than merely dimmed — and the panel then needs a drawn border,
+        // because the material edge that separated it from the desktop is
+        // gone with it.
+        if SystemAccessibility.reduceTransparency {
+            content.material = .windowBackground
+            content.blendingMode = .withinWindow
+            content.wantsLayer = true
+            let border = SystemAccessibility.panelBorder
+            content.layer?.borderColor = border.color.cgColor
+            content.layer?.borderWidth = border.width
+        } else {
+            content.material = .popover
+            content.blendingMode = .behindWindow
+        }
         content.state = .active
         content.addSubview(stack)
         NSLayoutConstraint.activate([
@@ -135,24 +193,64 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
     /// characters, or one starting at a word boundary, beats a scattered one.
     private func reloadMatches() {
         let query = searchField.stringValue.lowercased()
-        let commands = TerminalCommand.allCases
-        if query.isEmpty {
-            matches = commands
-        } else {
-            matches =
-                commands
-                .compactMap { command -> (TerminalCommand, Int)? in
-                    guard let score = Self.score(command.title.lowercased(), query: query)
-                    else { return nil }
-                    return (command, score)
-                }
-                .sorted { $0.1 > $1.1 }
-                .map(\.0)
-        }
+        rows = query.isEmpty ? browsingRows() : searchRows(matching: query)
         tableView.reloadData()
-        if !matches.isEmpty {
-            tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+        emptyLabel.isHidden = !rows.isEmpty
+        if let first = rows.firstIndex(where: { if case .command = $0 { true } else { false } }) {
+            tableView.selectRowIndexes(IndexSet(integer: first), byExtendingSelection: false)
         }
+    }
+
+    /// With no query: what was used recently, then every command under its
+    /// group heading. Recents first because the single most likely next
+    /// command is one of the last few — and it is the only ordering that gets
+    /// shorter with use rather than longer.
+    private func browsingRows() -> [Row] {
+        var rows: [Row] = []
+        let recents = recentCommands.prefix(Self.recentLimit)
+        if !recents.isEmpty {
+            rows.append(.header(L10n.text("commandPalette.category.recent")))
+            rows.append(contentsOf: recents.map { Row.command($0) })
+        }
+        for category in CommandCategory.allCases {
+            let commands = TerminalCommand.allCases
+                .filter { $0.category == category }
+                .sorted { $0.paletteRank < $1.paletteRank }
+            guard !commands.isEmpty else { continue }
+            rows.append(.header(category.title))
+            rows.append(contentsOf: commands.map { Row.command($0) })
+        }
+        return rows
+    }
+
+    /// With a query: one flat ranked list, no headings. A search result is
+    /// already ordered by how well it matched, and grouping would fight that
+    /// ordering for the sake of a structure the user has stopped browsing.
+    private func searchRows(matching query: String) -> [Row] {
+        TerminalCommand.allCases
+            .compactMap { command -> (TerminalCommand, Int)? in
+                guard let score = Self.score(command.title.lowercased(), query: query)
+                else { return nil }
+                // A recently used command wins a tie against one that has
+                // never been run, which is the same argument as the recents
+                // section, applied inside the ranking.
+                let recency =
+                    recentCommands.firstIndex(of: command)
+                    .map { Self.recentLimit - $0 } ?? 0
+                return (command, score + recency)
+            }
+            .sorted { $0.1 > $1.1 }
+            .map { Row.command($0.0) }
+    }
+
+    private static let recentLimit = 5
+    static let commandRowHeight: CGFloat = 32
+    static let headerRowHeight: CGFloat = 26
+
+    private func command(at row: Int) -> TerminalCommand? {
+        guard row >= 0, row < rows.count, case .command(let command) = rows[row]
+        else { return nil }
+        return command
     }
 
     /// Pure, and deliberately not `@MainActor`: the ranking is the part worth
@@ -183,9 +281,9 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
     // MARK: - Running
 
     @objc private func runSelected() {
-        let row = tableView.selectedRow
-        guard row >= 0, row < matches.count else { return }
-        let command = matches[row]
+        guard let command = command(at: tableView.selectedRow) else { return }
+        recentCommands.removeAll { $0 == command }
+        recentCommands.insert(command, at: 0)
         close()
         // After the palette is gone and the terminal window is key again, so
         // the responder chain is the one the command expects.
@@ -223,11 +321,27 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
         keyMonitor = nil
     }
 
+    /// Steps to the next *command* row, stepping over headings rather than
+    /// selecting them — a heading is a label, and an arrow key that lands on
+    /// one leaves Return with nothing to run.
     private func moveSelection(by delta: Int) {
-        guard !matches.isEmpty else { return }
-        let row = min(max(0, tableView.selectedRow + delta), matches.count - 1)
+        guard !rows.isEmpty else { return }
+        var row = tableView.selectedRow
+        var remaining = abs(delta)
+        let step = delta > 0 ? 1 : -1
+        while remaining > 0 {
+            var next = row + step
+            while next >= 0, next < rows.count, command(at: next) == nil { next += step }
+            guard next >= 0, next < rows.count else { break }
+            row = next
+            remaining -= 1
+        }
+        guard command(at: row) != nil else { return }
         tableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
-        tableView.scrollRowToVisible(row)
+        // The heading above a section scrolls into view with its first
+        // command, so a jump to a new group shows which group it is.
+        let anchor = row > 0 && command(at: row - 1) == nil ? row - 1 : row
+        tableView.scrollRowToVisible(anchor)
     }
 }
 
@@ -238,24 +352,56 @@ extension CommandPaletteController: NSTextFieldDelegate {
 }
 
 extension CommandPaletteController: NSTableViewDataSource, NSTableViewDelegate {
-    func numberOfRows(in tableView: NSTableView) -> Int { matches.count }
+    func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
+
+    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+        command(at: row) == nil ? Self.headerRowHeight : Self.commandRowHeight
+    }
+
+    func tableView(_ tableView: NSTableView, isGroupRow row: Int) -> Bool {
+        command(at: row) == nil
+    }
+
+    func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
+        command(at: row) != nil
+    }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int)
         -> NSView?
     {
-        guard row < matches.count else { return nil }
-        let command = matches[row]
-        let title = NSTextField(labelWithString: command.title)
-        let shortcut = NSTextField(
-            labelWithString: ConfigurationStore.shared.configuration.keybindings[command]?
-                .displayText ?? "")
-        shortcut.textColor = .secondaryLabelColor
-        shortcut.alignment = .right
-        shortcut.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
-        let stack = NSStackView(views: [title, NSView(), shortcut])
-        stack.orientation = .horizontal
-        stack.distribution = .fill
-        return stack
+        guard row >= 0, row < rows.count else { return nil }
+        switch rows[row] {
+        case .header(let title):
+            let label = NSTextField(labelWithString: title.uppercased())
+            label.font = .systemFont(ofSize: 10, weight: .semibold)
+            label.textColor = SystemAccessibility.secondaryLabelColor
+            label.setAccessibilityRole(.staticText)
+            return label
+        case .command(let command):
+            let title = NSTextField(labelWithString: command.title)
+            title.font = .systemFont(ofSize: 13)
+            let shortcut = NSTextField(
+                labelWithString: ConfigurationStore.shared.configuration.keybindings[command]?
+                    .displayText ?? "")
+            shortcut.textColor = SystemAccessibility.secondaryLabelColor
+            shortcut.alignment = .right
+            // The system font, not a monospaced one: these are the same
+            // ⌘⇧D / ← / ⇞ glyphs the menu bar draws, and the menu bar draws
+            // them in the system face.
+            shortcut.font = .systemFont(ofSize: 12)
+            shortcut.setContentHuggingPriority(.required, for: .horizontal)
+            let stack = NSStackView(views: [title, NSView(), shortcut])
+            stack.orientation = .horizontal
+            stack.distribution = .fill
+            stack.edgeInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 2)
+            // One element with one name, so VoiceOver announces "Split Pane
+            // Right, Command Shift D" instead of two adjacent labels.
+            stack.setAccessibilityRole(.staticText)
+            stack.setAccessibilityLabel(
+                shortcut.stringValue.isEmpty
+                    ? command.title : "\(command.title), \(shortcut.stringValue)")
+            return stack
+        }
     }
 }
 
