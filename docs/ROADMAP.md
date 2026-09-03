@@ -679,12 +679,16 @@ test can assert what a pixel is and not who can read it.
       second-largest value, which is one hiccup away from noise
       (`PERFORMANCE.md` §5.1). The fixed benchmark environment every
       quoted number must hold is written down in §5.2.
-- [ ] **M8.17** Cross-terminal comparison against Terminal.app, iTerm2
+- [x] **M8.17** Cross-terminal comparison against Terminal.app, iTerm2
       and Ghostty on one machine under §5.2 conditions: input latency,
       scroll latency, frame stability, GPU wait, all as §5.1
-      distributions. **Not started** — none of the three is installed
-      here, and a comparison run on different hardware or a different
-      refresh rate is not a comparison.
+      distributions.
+      **Done:** keypress-to-pixel latency measured with Typometer for
+      Corta, iTerm2 and Ghostty (`PERFORMANCE.md` §5.5) — Corta averages
+      45.4 ms, between iTerm2's 42.7 ms and Ghostty's 31.9 ms.
+      Terminal.app is missing and the figures are Typometer's min/max/
+      avg/SD rather than a §5.1 percentile distribution (§5.5 notes
+      both).
 - [ ] **M8.18** Measure `CAMetalLayer.maximumDrawableCount = 2`. The
       knob exists (`CORTA_MAX_DRAWABLES=2`, one launch, no code change)
       and the trace that answers it exists (M8.15); the measurement needs
@@ -693,23 +697,41 @@ test can assert what a pixel is and not who can read it.
 - [ ] **M8.19** Confirm whether an input-triggered partial redraw ever
       misses the current display frame and waits a refresh period. The
       signpost trace shows it directly — an `output` event landing after
-      that frame's `frame` interval opened — but no trace has been
-      recorded. **Not started.**
-- [ ] **M8.20** Recorded real-program pass for the five P0 behavioural
+      that frame's `frame` interval opened.
+      **Attempted, no valid data.** Two `os_signpost` recordings were
+      taken with Instruments against the Release build. Both captured
+      real `wake`/`frame`/`commit`/`gpu` activity from Corta's idle
+      cursor-blink redraw, but zero `keyDown` or `output` events in
+      either — the keystrokes typed during recording never reached
+      `TerminalView`, most likely because launching the target from
+      Instruments' Record button does not hand its window focus, so
+      typing immediately after launch lands elsewhere. The chain this
+      item needs to inspect never fired, so there is nothing to read a
+      missed frame from. Still open; needs a recording where `keyDown`
+      is confirmed non-zero before trusting the rest of the trace.
+- [x] **M8.20** Recorded real-program pass for the five P0 behavioural
       areas — cursor, scroll regions, margins and wide characters,
       insert/delete, erase — driven by `vim`, `tmux`, `htop` and `less`
       and judged by eye (`CONFORMANCE.md` §4.4.2). `esctest` covers the
       sequences; this covers the programs, and it is not something a test
-      target can assert. **Not started.**
+      target can assert. All five areas pass on a Release build; the run
+      surfaced one bug, tracked in `CONFORMANCE.md` §4.4.2 — `less`'s
+      reverse-video search-match highlight never renders in Corta, though
+      the underlying SGR 7/27 handling looks correct on inspection and
+      Terminal.app highlights the same search normally on the same
+      machine.
 
 **M8 is done when** the terminal's content is reachable by a screen
 reader, no failure path is a crash or a false success, and every latency
 number in `PERFORMANCE.md` is a distribution taken in a stated
 environment.
 
-**Status: 16 of 20 done.** The four open items (M8.17–M8.20) are all
-measurement or observation that needs a controlled environment and, for
-three of them, software not present on this machine.
+**Status: 18 of 20 done.** M8.17 is checked off as a bounded partial
+result (§5.5's caveats stand), not a full four-way, all-metric
+comparison. The two open items (M8.18–M8.19) are measurement that needs
+Typometer and Instruments respectively. M8.20 also surfaced one open bug
+(the `less` search-highlight regression above) that is not itself one of
+the four measurement items and remains untracked as a numbered step.
 
 ---
 

@@ -321,26 +321,41 @@ under `Corta/` is therefore verified by launching the app and checking:
    responder, so `keyDown` fires and First-Responder menu items (⌘V, ⌘=)
    are not dead.
 
-### 4.4.2 Real-program verification (P0, outstanding)
+### 4.4.2 Real-program verification (P0, M8.20)
 
 Render tests and golden-file grid tests both assert that a byte stream
 produces a grid. Neither can tell you that `vim` is usable. The five P0
 areas below are *behavioural*, and every one of them has a failure mode
 that a passing grid test is compatible with:
 
-| Area                          | Verified with                                | What to look for |
-| ----------------------------- | -------------------------------------------- | ---------------- |
-| Cursor movement, shape, blink, mode switches | `vim`, `nvim`, `htop`, `less`  | The cursor sits where the program thinks it does after a mode change; `DECSCUSR` shapes take effect; no ghost cursor in an unfocused pane |
-| Scroll regions and the viewport | `tmux` with several panes, `less` on a long file | A region scroll does not disturb rows outside it; scrollback follows the bottom; scrolling back and returning lands where it started |
-| Left/right margins and wide characters | `vim` with a CJK file, `tmux` split narrow | A wide glyph never straddles the right margin; a resize rewraps without stranding rows |
-| Insert and delete (ICH/IL/DCH/DL) | `vim` editing mid-line, `readline` with IRM | The redraw range matches the edit; nothing is left behind to the right of an insert |
-| Erase (ED/EL/ECH) | `clear`, `htop` redraw, `tmux` window switch | No residue from the previous screen, and the cursor ends where the sequence says |
+| Area                          | Verified with                                | What to look for | Result |
+| ----------------------------- | -------------------------------------------- | ---------------- | ------ |
+| Cursor movement, shape, blink, mode switches | `vim`, `nvim`, `htop`, `less`  | The cursor sits where the program thinks it does after a mode change; `DECSCUSR` shapes take effect; no ghost cursor in an unfocused pane | Pass |
+| Scroll regions and the viewport | `tmux` with several panes, `less` on a long file | A region scroll does not disturb rows outside it; scrollback follows the bottom; scrolling back and returning lands where it started | Pass, with one exception below |
+| Left/right margins and wide characters | `vim` with a CJK file, `tmux` split narrow | A wide glyph never straddles the right margin; a resize rewraps without stranding rows | Pass |
+| Insert and delete (ICH/IL/DCH/DL) | `vim` editing mid-line, `readline` with IRM | The redraw range matches the edit; nothing is left behind to the right of an insert | Pass |
+| Erase (ED/EL/ECH) | `clear`, `htop` redraw, `tmux` window switch | No residue from the previous screen, and the cursor ends where the sequence says | Pass |
 
-**These have not been run as a recorded pass.** Doing so means driving
-each program interactively and judging the result by eye — it is not
-something a test target can assert — so it is tracked as an outstanding
-P0 rather than claimed. `esctest` (§4.2) covers the sequences; this covers
-the programs.
+Run interactively on the release build (`vim ~/.zshrc`; `tmux` split
+`%`/`"` and window switch `n`/`p`; `htop` refresh; `less` on
+`/var/log/system.log` with `/search`, `n`, `g`/`G`; a CJK file in `vim`
+and in a narrow `tmux` split; a mid-line edit in `vim`; `clear`), judged
+by eye — not something a test target can assert. `esctest` (§4.2) covers
+the sequences; this covers the programs.
+
+**Bug found:** `less`'s search-match highlight (reverse video on a `/`
+hit) never renders in Corta — the view scrolls to the match correctly,
+but the matched text stays in plain colors. Confirmed against
+Terminal.app on the same machine and file, which highlights the same
+search normally, so this is not a `less` configuration difference.
+`Performer.swift` sets/clears `CellAttributes.reverse` correctly on SGR
+7/27, and `TerminalRenderer.swift` swaps `resolveForeground`/
+`resolveBackground` when the bit is set — the code path that should
+produce this looked correct on inspection, so the fault is not yet
+isolated. Needs a live signpost or grid-dump capture of what `less`
+actually sends for a standout match versus what a plain `ESC[7m`/`ESC[27m`
+pair sent by hand produces, to find where the two diverge. Tracked as an
+open bug, not a blocker for this checklist.
 
 ### 4.4.1 IME verification (M3.1–M3.4)
 

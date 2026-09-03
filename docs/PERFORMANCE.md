@@ -219,7 +219,23 @@ a trace.
 input-triggered partial redraw occasionally misses the current display
 frame and waits a whole refresh period. In a trace this is visible
 directly — an `output` event landing after that frame's `frame` interval
-has begun, with the next `frame` an interval later. Not yet measured.
+has begun, with the next `frame` an interval later.
+
+**Attempted, no valid data.** Two Instruments recordings against the
+Release build both showed zero `keyDown` and `output` events — only
+`wake`/`frame`/`commit`/`gpu` from idle cursor-blink activity — because
+the typing done immediately after launching Corta from Instruments'
+Record button never reached `TerminalView` (launching a target this way
+does not appear to hand it window focus). The question above is still
+open; it needs a recording where `keyDown` is confirmed non-zero before
+its `output`/`frame` ordering means anything.
+
+One incidental result from those two recordings, unrelated to the
+missed-frame question but relevant to §5.4: Instruments' own
+`CAMetalLayer.Stalls` track recorded real stalls from idle cursor-blink
+redraws alone — 146 stalls averaging 30.6 ms in the first recording, 305
+stalls averaging 30.5 ms in the second. Drawable stalling is happening on
+this machine at rest, not only under load.
 
 ### 5.4 `maximumDrawableCount`
 
@@ -239,12 +255,17 @@ saving, it appears as the `frame` interval growing at its front.
 
 ### 5.5 Cross-terminal comparison
 
-**Not yet measured.** Corta's numbers have never been taken alongside
-Terminal.app, iTerm2 and Ghostty on the same machine, in the same
-conditions, with the same test programs — input latency, scroll latency,
-frame stability and GPU wait. Until they have been, "fast" is a claim
-about Corta against its own previous self.
+Typometer 1.0.1, 200 characters / 150 ms delay / 50 ms period / 1000 ms
+length, synchronous mode, same machine, same font (system monospaced,
+12 pt), power connected, target app frontmost with nothing else running:
 
-The comparison must hold §5.2 fixed across all four terminals, use the
-same font family and size in each (the atlas cost is per face), and
-report §5.1 distributions rather than averages for every one of them.
+| Terminal | Min, ms | Max, ms | Avg, ms | SD, ms |
+| -------- | ------- | ------- | ------- | ------ |
+| Corta    | 32.8    | 64.1    | 45.4    | 8.1    |
+| iTerm2   | 28.1    | 63.0    | 42.7    | 7.7    |
+| Ghostty  | 17.8    | 45.2    | 31.9    | 5.9    |
+
+Corta is slower on average than iTerm2 and noticeably slower than
+Ghostty on this machine. (Terminal.app is missing — Typometer would not
+measure it; figures above are Typometer's min/max/avg/SD, not the §5.1
+percentile distribution.)
