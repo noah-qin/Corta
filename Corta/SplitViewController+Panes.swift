@@ -101,14 +101,13 @@ extension SplitViewController {
         let names = running.compactMap { $0.session?.foregroundProcessName }
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "Close \(scope) while something is running?"
+        alert.messageText = L10n.format("close.running.title", scope)
         alert.informativeText =
             names.isEmpty
-            ? "A process is still running and will be terminated."
-            : "\(ListFormatter.localizedString(byJoining: Array(Set(names)).sorted())) "
-                + "\(names.count == 1 ? "is" : "are") still running and will be terminated."
-        alert.addButton(withTitle: "Close Anyway")
-        alert.addButton(withTitle: "Cancel")
+            ? L10n.text("close.running.single")
+            : L10n.format("close.running.multiple", ListFormatter.localizedString(byJoining: Array(Set(names)).sorted()))
+        alert.addButton(withTitle: L10n.text("close.running.closeAnyway"))
+        alert.addButton(withTitle: L10n.text("common.cancel"))
         // The buttons are destructive-first, so make Cancel the escape route
         // rather than relying on button order alone.
         alert.buttons.first?.hasDestructiveAction = true

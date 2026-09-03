@@ -26,7 +26,7 @@ final class AboutWindowController: NSWindowController {
             contentRect: NSRect(x: 0, y: 0, width: 420, height: 300),
             styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered, defer: false)
-        window.title = "About Corta"
+        window.title = L10n.text("about.title")
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.isMovableByWindowBackground = true
@@ -67,7 +67,7 @@ final class AboutWindowController: NSWindowController {
         let name = NSTextField(labelWithString: bundleString("CFBundleName") ?? "Corta")
         name.font = .systemFont(ofSize: 22, weight: .semibold)
 
-        let tagline = NSTextField(labelWithString: "A native macOS terminal emulator.")
+        let tagline = NSTextField(labelWithString: L10n.text("about.tagline"))
         tagline.font = .systemFont(ofSize: 12)
         tagline.textColor = .secondaryLabelColor
 
@@ -77,12 +77,12 @@ final class AboutWindowController: NSWindowController {
         version.isSelectable = true
         // The one line a bug report needs, so it can be copied out of here
         // rather than transcribed from a screenshot.
-        version.toolTip = "Select to copy — this is the line a bug report needs."
+        version.toolTip = L10n.text("about.version.tooltip")
 
         let links = NSStackView(views: [
-            linkButton("Website", "https://github.com/noah-qin/Corta"),
-            linkButton("Release Notes", "https://github.com/noah-qin/Corta/releases"),
-            linkButton("License", "https://github.com/noah-qin/Corta/blob/main/LICENSE"),
+            linkButton(L10n.text("about.website"), "https://github.com/noah-qin/Corta"),
+            linkButton(L10n.text("about.releaseNotes"), "https://github.com/noah-qin/Corta/releases"),
+            linkButton(L10n.text("about.license"), "https://github.com/noah-qin/Corta/blob/main/LICENSE"),
         ])
         links.orientation = .horizontal
         links.spacing = 4
@@ -119,8 +119,8 @@ final class AboutWindowController: NSWindowController {
     private static var versionLine: String {
         let short = bundleString("CFBundleShortVersionString") ?? "—"
         let build = bundleString("CFBundleVersion") ?? "—"
-        var line = "Version \(short) (\(build))"
-        if short != CortaVersion.string { line += " · reports \(CortaVersion.string)" }
+        var line = L10n.format("about.version", short, build)
+        if short != CortaVersion.string { line += " · " + L10n.format("about.reportsVersion", CortaVersion.string) }
         return line
     }
 
