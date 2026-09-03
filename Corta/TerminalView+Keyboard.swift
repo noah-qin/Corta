@@ -36,7 +36,8 @@ extension TerminalView {
     override func keyUp(with event: NSEvent) {
         let enhancements = keyboardEnhancements?() ?? []
         guard enhancements.contains(.reportEventTypes),
-            let bytes = Self.bytes(for: event, enhancements: enhancements)
+            let bytes = Self.bytes(
+                for: event, enhancements: enhancements, newLineMode: isNewLineMode?() ?? false)
         else {
             super.keyUp(with: event)
             return
@@ -46,11 +47,18 @@ extension TerminalView {
 
     /// The direct translation, run for events the IME never saw or declined.
     func deliverBytes(for event: NSEvent) {
-        guard let bytes = Self.bytes(for: event, enhancements: keyboardEnhancements?() ?? []) else {
+        guard
+            let bytes = Self.bytes(
+                for: event, enhancements: keyboardEnhancements?() ?? [],
+                newLineMode: isNewLineMode?() ?? false)
+        else {
             super.keyDown(with: event)
             return
         }
-        onKeyBytes?(bytes)
+        // The first link in the keypress-to-pixel chain
+        // (`InputLatencySignposts`): everything from here to the GPU
+        // completion handler is attributable in one trace.
+        InputLatencySignposts.measure(.keyDown) { onKeyBytes?(bytes) }
     }
 
     /// M3.4: ⌘/⌃ events bypass the IME entirely. Kept a pure function of the
@@ -81,7 +89,10 @@ extension TerminalView {
     /// - Parameter enhancements: the kitty keyboard protocol flags the child
     ///   has asked for (M6.9). With `disambiguate` set, the keys the legacy
     ///   encoding collides are sent as `CSI code ; modifiers u` instead.
-    static func bytes(for event: NSEvent, enhancements: KeyboardEnhancementFlags = [])
+    static func bytes(
+        for event: NSEvent, enhancements: KeyboardEnhancementFlags = [],
+        newLineMode: Bool = false
+    )
         -> [UInt8]?
     {
         let flags = event.modifierFlags
@@ -129,8 +140,12 @@ extension TerminalView {
 
         guard let characters = event.characters, !characters.isEmpty else { return nil }
         // Return sends CR, not LF — the pty's line discipline turns that
-        // into whatever the child's terminal driver expects.
-        if characters == "\r" || characters == "\n" { return [0x0D] }
+        // into whatever the child's terminal driver expects. Under LNM
+        // (`CSI 20 h`) it sends CR LF instead, which is the half of that mode
+        // the keyboard owns (ECMA-48 §8.3.106).
+        if characters == "\r" || characters == "\n" {
+            return newLineMode ? [0x0D, 0x0A] : [0x0D]
+        }
         return Array(characters.utf8)
     }
 
