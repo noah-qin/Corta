@@ -319,6 +319,7 @@ final class SplitViewController: NSViewController {
     func closePane(_ pane: ViewController) {
         // The bar's key monitor outlives the pane if it is left open.
         pane.closeSearchBar()
+        pane.taskNotifier.cancel()
         pane.session.stop()
         let survivingSubtree = tree.close(leaf: pane.view)
         pane.removeFromParent()

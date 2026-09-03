@@ -25,6 +25,8 @@ extension Performer {
             state.windowTitle = String(decoding: payload, as: UTF8.self)
         case 7:
             setWorkingDirectory(payload)
+        case 8:
+            setHyperlink(payload)
         case 10, 11, 12:
             // The dynamic colours (M6.6). A payload of exactly `?` is the
             // query form; anything else is a colour specification to set.
@@ -38,6 +40,31 @@ extension Performer {
         default:
             break
         }
+    }
+
+    /// OSC 8 — `OSC 8 ; params ; URI ST` (M6.8).
+    ///
+    /// The parameters (`id=…`, and anything a future spec adds) are parsed
+    /// and discarded: `id` exists so a terminal can treat two runs of cells
+    /// as one link for hover highlighting, which Corta does by target
+    /// instead — identical URLs intern to one id, which gives the same
+    /// answer without trusting a stream-supplied identifier.
+    ///
+    /// An empty URI ends the current link, which is how a program stops
+    /// linking. So does a URI the table cannot take (over-long, or the table
+    /// is full): failing closed means the following text is unlinked rather
+    /// than silently joined to whatever link came before.
+    private mutating func setHyperlink(_ payload: ArraySlice<UInt8>) {
+        guard let separator = payload.firstIndex(of: 0x3B) else {  // ';'
+            grid.pen.hyperlink = .none
+            return
+        }
+        let uri = String(decoding: payload[payload.index(after: separator)...], as: UTF8.self)
+        guard !uri.isEmpty, let id = grid.hyperlinks.intern(uri) else {
+            grid.pen.hyperlink = .none
+            return
+        }
+        grid.pen.hyperlink = id
     }
 
     /// OSC 7 — the payload is a `file://host/path` URL. Only `file` is

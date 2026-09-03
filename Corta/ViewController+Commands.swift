@@ -50,6 +50,39 @@ extension ViewController {
         setFontSizeForAllPanes(Self.defaultFontSize)
     }
 
+    /// M6.14 — the trackpad magnification gesture, driving the same scale
+    /// path as ⌘+/⌘−.
+    ///
+    /// A pinch is continuous and the font size is not: the atlas is
+    /// rasterised per size, so a fractional size is a rebuild for a step the
+    /// keyboard could not produce anyway. The gesture's magnification is
+    /// accumulated instead and spent one whole point at a time, which keeps
+    /// a live pinch on exactly the steps ⌘+/⌘− lands on.
+    func magnify(by magnification: CGFloat) {
+        pinchAccumulator += magnification
+        // ~0.15 of a pinch per point: small enough that a deliberate pinch
+        // resizes, large enough that resting two fingers does not.
+        let step: CGFloat = 0.15
+        while abs(pinchAccumulator) >= step {
+            let direction: CGFloat = pinchAccumulator > 0 ? 1 : -1
+            pinchAccumulator -= direction * step
+            let target = fontSize + direction
+            // At the clamp the accumulator would otherwise keep filling and
+            // fire a burst of rebuilds the moment the pinch reverses.
+            guard target >= 8, target <= 64 else {
+                pinchAccumulator = 0
+                return
+            }
+            setFontSizeForAllPanes(target)
+        }
+    }
+
+    /// Called when the gesture ends, so the next pinch starts from zero
+    /// rather than from a leftover fraction of the last one.
+    func endMagnification() {
+        pinchAccumulator = 0
+    }
+
     private func setFontSizeForAllPanes(_ newSize: CGFloat) {
         if let splitController {
             splitController.setFontSizeForAllPanes(newSize)

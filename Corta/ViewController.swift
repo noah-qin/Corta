@@ -41,6 +41,11 @@ class ViewController: NSViewController {
     /// the same rebuild, but a size change has its own path (`setFontSize`)
     /// that short-circuits when the size is unchanged.
     var fontFamily: String = Configuration.systemFontFamily
+    /// Unspent trackpad magnification (M6.14). Storage lives here because
+    /// the gesture handling is in `ViewController+Commands`, an extension.
+    var pinchAccumulator: CGFloat = 0
+    /// M6.3 — the long-task heuristic for this pane.
+    let taskNotifier = TaskNotifier()
     /// Matches the stock 120x30 Terminal profile on this Mac. Keeping the
     /// terminal's default here (rather than compensating with narrower cell
     /// geometry) preserves the font's real advance and makes TUIs such as
@@ -312,13 +317,24 @@ class ViewController: NSViewController {
             self?.updateDamage() ?? false
         }
         view.onKeyBytes = { [weak self] bytes in
-            self?.session.write(bytes)
+            guard let self else { return }
+            // A Return is the one moment a terminal without shell
+            // integration knows the user asked for something (M6.3).
+            if bytes.contains(0x0D) { taskNotifier.noteCommandSubmitted(in: view.window) }
+            session.write(bytes)
         }
         view.onScroll = { [weak self] gesture in
             self?.scroll(gesture)
         }
         view.onLiveResizeEnded = { [weak self] in
             self?.endLiveResize()
+        }
+        installNativeIntegrations(on: view)
+        view.onMagnify = { [weak self] magnification in
+            self?.magnify(by: magnification)
+        }
+        view.onMagnifyEnded = { [weak self] in
+            self?.endMagnification()
         }
         view.onBackingScaleChange = { [weak self] scale in
             self?.rebuildAtlas(forBackingScale: scale)
@@ -462,6 +478,7 @@ class ViewController: NSViewController {
         outputPending.withLock { $0 = true }
         Task { @MainActor [weak self] in
             self?.terminalView.setNeedsRedraw()
+            self?.taskNotifier.noteOutput()
         }
     }
 

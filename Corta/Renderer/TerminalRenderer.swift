@@ -415,6 +415,34 @@ nonisolated final class TerminalRenderer {
                     QuadInstance(origin: origin, size: .init(cellWidth, cellHeight), color: bg))
             }
 
+            // Underline and strikethrough are rules, not glyphs: one quad
+            // each, in the cell's foreground. An OSC 8 hyperlink (M6.8)
+            // draws the same underline whether or not the program also set
+            // SGR 4 — that rule is what makes it read as a link, and
+            // `ls --hyperlink` sets no rendition at all.
+            let isInvisible = cell.attributes.contains(.invisible)
+            if !isInvisible, cell.attributes.contains(.underline) || !cell.hyperlink.isNone {
+                // One device pixel, sitting just below the baseline. A
+                // wide pair's spacer draws it too, so the rule runs the
+                // full width of a double-width character rather than
+                // stopping halfway.
+                let thickness = max(1, Float(scale).rounded(.down))
+                background.append(
+                    QuadInstance(
+                        origin: .init(origin.x, origin.y + baseline + thickness),
+                        size: .init(cellWidth, thickness), color: fg))
+            }
+            if !isInvisible, cell.attributes.contains(.strikethrough) {
+                let thickness = max(1, Float(scale).rounded(.down))
+                background.append(
+                    QuadInstance(
+                        // Roughly mid x-height. The exact strike position
+                        // is a font metric Core Text will give, but it is
+                        // per-font and this is a rule across a fixed cell.
+                        origin: .init(origin.x, origin.y + baseline * 0.7),
+                        size: .init(cellWidth, thickness), color: fg))
+            }
+
             // A wide pair's spacer holds a space scalar and draws nothing;
             // the flag check keeps that true even if the scalar ever
             // changes.

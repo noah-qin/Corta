@@ -67,6 +67,12 @@ public struct Grid: Sendable {
     /// ZWJ sequences arrive with M3.6.
     public var graphemes: GraphemeTable
 
+    /// OSC 8 hyperlink targets, keyed by the id a cell carries (M6.8).
+    /// Shared with the alternate screen and never cleared while a link may
+    /// still be on screen or in the scrollback — an id in a cell that no
+    /// longer resolves would render as a link that goes nowhere.
+    public var hyperlinks: HyperlinkTable
+
     /// Rows that have scrolled off the top.
     public var scrollback: Scrollback
 
@@ -102,6 +108,7 @@ public struct Grid: Sendable {
         self.pen = Pen()
         self.cursorStyle = .blinkingBlock
         self.graphemes = GraphemeTable()
+        self.hyperlinks = HyperlinkTable()
         self.scrollback = Scrollback(limit: scrollbackLimit)
         self.pendingWrap = false
         self.savedCursor = nil

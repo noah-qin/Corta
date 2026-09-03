@@ -4,20 +4,28 @@ public struct Pen: Equatable, Sendable {
     public var foreground: Color
     public var background: Color
     public var attributes: CellAttributes
+    /// The OSC 8 hyperlink newly written cells belong to (M6.8), or `.none`.
+    ///
+    /// Deliberately *not* reset by SGR 0. A hyperlink is not a rendition —
+    /// `OSC 8 ; ; ST` is what ends one, and a program that colours the link
+    /// text and then resets the colour has not stopped linking.
+    public var hyperlink: HyperlinkID
 
     public init(
         foreground: Color = .default,
         background: Color = .default,
-        attributes: CellAttributes = []
+        attributes: CellAttributes = [],
+        hyperlink: HyperlinkID = .none
     ) {
         self.foreground = foreground
         self.background = background
         self.attributes = attributes
+        self.hyperlink = hyperlink
     }
 
-    /// SGR 0.
+    /// SGR 0. Keeps the hyperlink: see the note on that property.
     public mutating func reset() {
-        self = Pen()
+        self = Pen(hyperlink: hyperlink)
     }
 
     /// A cell carrying `scalar` in the current rendition.
@@ -27,7 +35,8 @@ public struct Pen: Equatable, Sendable {
             scalar: scalar,
             foreground: foreground,
             background: background,
-            attributes: attributes
+            attributes: attributes,
+            hyperlink: hyperlink
         )
     }
 

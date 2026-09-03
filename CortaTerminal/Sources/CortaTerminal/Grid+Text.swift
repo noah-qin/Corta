@@ -53,7 +53,7 @@ extension Grid {
 
     /// The document row's line, in the numbering `Selection.swift` and
     /// `Grid.dump` use. Out-of-range rows read as an empty line.
-    func documentLine(_ row: Int) -> Line {
+    public func documentLine(_ row: Int) -> Line {
         if row < 0 {
             let index = scrollback.count + row
             guard index >= 0, index < scrollback.count else { return Line() }

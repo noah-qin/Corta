@@ -9,10 +9,12 @@ import Foundation
 /// `file://` or custom-scheme string is plain text as far as the shell is
 /// concerned, so no click path can ever carry it to `NSWorkspace`.
 ///
-/// "Show the real target" (§2.4) is about display text and destination
-/// differing, which only OSC 8 hyperlinks can do; Corta does not implement
-/// OSC 8, so the text on screen *is* the target, and the shell additionally
-/// shows it in a tooltip on ⌘-hover before any click can open it.
+/// OSC 8 hyperlinks (M6.8) are checked first, because they are the case
+/// where the display text and the destination can differ — the whole reason
+/// "show the real target" (§2.4) is a rule. The tooltip on ⌘-hover names the
+/// destination, not the text under the pointer, and the scheme allowlist is
+/// applied to it at the hand-off; for a detected URL the two are the same
+/// string, so the same path covers both.
 public enum LinkDetection {
     /// One detected URL: its text and its span in document coordinates.
     public struct Link: Equatable, Sendable {
@@ -30,11 +32,33 @@ public enum LinkDetection {
     /// URLs like `(https://example.com)` are how URLs appear in prose.
     private static let trailingTrim: Set<Character> = [".", ",", ";", ":", "!", "?", "'", "\""]
 
-    /// The link under `point`, if the cell sits inside one.
+    /// The link under `point`, if the cell sits inside one. An explicit
+    /// OSC 8 hyperlink wins over pattern detection: the program said what
+    /// the target is, and guessing from the text it chose to display would
+    /// be guessing against the answer.
     public static func link(at point: SelectionPoint, in grid: Grid) -> Link? {
+        if let explicit = hyperlink(at: point, in: grid) { return explicit }
         let line = grid.logicalLine(containing: point.row)
         guard !line.text.isEmpty else { return nil }
         return links(in: line).first { $0.range.start <= point && point <= $0.range.end }
+    }
+
+    /// The OSC 8 hyperlink the cell at `point` carries, with its range
+    /// widened to the whole contiguous run of cells sharing that id on the
+    /// row — which is what the hover highlight and the tooltip want.
+    public static func hyperlink(at point: SelectionPoint, in grid: Grid) -> Link? {
+        let line = grid.documentLine(point.row)
+        let id = line[point.column].hyperlink
+        guard !id.isNone, let url = grid.hyperlinks.url(for: id) else { return nil }
+        var first = point.column
+        while first > 0, line[first - 1].hyperlink == id { first -= 1 }
+        var last = point.column
+        while last + 1 < line.count, line[last + 1].hyperlink == id { last += 1 }
+        return Link(
+            url: url,
+            range: SelectionRange(
+                start: SelectionPoint(row: point.row, column: first),
+                end: SelectionPoint(row: point.row, column: last)))
     }
 
     /// Every link in a logical line — exposed for tests and for a shell

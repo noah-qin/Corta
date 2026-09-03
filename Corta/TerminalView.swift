@@ -59,6 +59,25 @@ final class TerminalView: NSView, CALayerDelegate {
     /// split controller can track which pane owns input (M5.2).
     var onFocus: (() -> Void)?
 
+    /// M6.15 — file paths dropped on the pane, already resolved to
+    /// filesystem paths. The controller quotes and sends them.
+    var onDropPaths: (([String]) -> Void)?
+    /// The word under a force touch and where to anchor the dictionary
+    /// popover, in this view's coordinates.
+    var onLookUp: ((CGPoint) -> (String, CGPoint)?)?
+    /// The current selection as text, for the Services menu, or nil when
+    /// nothing is selected.
+    var onServicesSelection: (() -> String?)?
+    /// Text a service returned, to be sent to the child like a paste.
+    var onServicesInsert: ((String) -> Void)?
+
+    /// M6.14 — the trackpad magnification gesture. The controller spends it
+    /// in whole font-size steps; the view only forwards it, like every other
+    /// input here.
+    var onMagnify: ((CGFloat) -> Void)?
+    /// The magnification gesture ended, so the unspent remainder is dropped.
+    var onMagnifyEnded: (() -> Void)?
+
     /// The window's backing scale factor changed — the view moved to a
     /// display with a different pixel density. The renderer's glyph atlas is
     /// rasterised per scale and has to be rebuilt.
@@ -159,6 +178,7 @@ final class TerminalView: NSView, CALayerDelegate {
         metalLayer.cornerRadius = 10
         metalLayer.maskedCorners = []
         metalLayer.masksToBounds = true
+        registerForFileDrags()
     }
 
     override func viewDidMoveToWindow() {
@@ -185,6 +205,15 @@ final class TerminalView: NSView, CALayerDelegate {
     /// The glyph atlas is rasterised for one scale (`TerminalRenderer.init`),
     /// so without this the glyphs keep the old density and the text goes
     /// soft on the new display.
+    /// AppKit delivers a pinch as a stream of `magnify:` events carrying
+    /// the *delta* since the last one, then a phase-ended event. Both halves
+    /// matter: without the end, the next pinch inherits this one's unspent
+    /// remainder and jumps.
+    override func magnify(with event: NSEvent) {
+        onMagnify?(event.magnification)
+        if event.phase == .ended || event.phase == .cancelled { onMagnifyEnded?() }
+    }
+
     override func viewDidChangeBackingProperties() {
         super.viewDidChangeBackingProperties()
         updateDrawableSize()
