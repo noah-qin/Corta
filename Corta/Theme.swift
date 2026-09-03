@@ -125,10 +125,109 @@ extension Theme {
                 rgb(60, 95, 175), rgb(150, 75, 160), rgb(50, 140, 150), rgb(10, 10, 10),
             ]))
 
-    /// Every theme the settings page offers, in the order it lists them.
-    nonisolated static let builtIn: [Theme] = [.corta, .solarized, .mono]
+    /// The theme Corta *offers*: one, listed in the settings page and the
+    /// View menu.
+    ///
+    /// Shipping three meant shipping two that had never been looked at in
+    /// anger — a theme is nineteen colours in two variants, and "it parses"
+    /// is not the same as "it reads well at 12pt on a laptop panel for eight
+    /// hours". One theme that is right is a better first release than three
+    /// of which two are guesses.
+    ///
+    /// This is a presentation decision, not a deletion: `solarized` and
+    /// `mono` stay defined and stay resolvable by name below, so a config
+    /// file that already says `theme = solarized` keeps working and
+    /// `theme.<name>.inherit = solarized` still has something to inherit
+    /// from (M7.6). Promoting one back into the offered list is one entry
+    /// here.
+    nonisolated static let builtIn: [Theme] = [.corta]
+
+    /// Every theme this binary can resolve by name, offered or not. Wider
+    /// than `builtIn` on purpose — see the note there.
+    nonisolated static let known: [Theme] = [.corta, .solarized, .mono]
 
     nonisolated static func named(_ name: String) -> Theme? {
-        builtIn.first { $0.name == name }
+        known.first { $0.name == name }
+    }
+
+    /// A built-in *or* user-defined theme (M7.6). Custom themes win on a
+    /// name collision: a user who names their theme `corta` has said what
+    /// they want, and silently ignoring it would be the more surprising rule.
+    nonisolated static func named(_ name: String, in configuration: Configuration) -> Theme? {
+        configuration.customThemes.first { $0.name == name } ?? named(name)
+    }
+
+    /// Every theme available under `configuration`, in list order: the
+    /// offered built-ins first, then the user's own.
+    ///
+    /// The theme the file currently selects is always in the list, even when
+    /// it is one of the unoffered built-ins. Otherwise a config that says
+    /// `theme = solarized` would leave the settings popup with nothing
+    /// selected, and the next click on any control in the page would write
+    /// the first item back over the user's choice.
+    nonisolated static func all(in configuration: Configuration) -> [Theme] {
+        let custom = configuration.customThemes
+        let customNames = Set(custom.map(\.name))
+        var themes = builtIn.filter { !customNames.contains($0.name) } + custom
+        if !themes.contains(where: { $0.name == configuration.theme }),
+            let active = named(configuration.theme)
+        {
+            themes.append(active)
+        }
+        return themes
+    }
+}
+
+// MARK: - User-defined themes (M7.6)
+
+extension Theme {
+    /// A theme built from config-file keys, with anything unspecified taken
+    /// from `base`.
+    ///
+    /// Inheriting rather than requiring all nineteen colours is what makes
+    /// the feature usable: overriding a background and a cursor is the common
+    /// case, and demanding a full ANSI table for it would mean nobody does
+    /// it. It also means a half-written theme still renders — a config file
+    /// is hand-edited, and a partially-typed one must not black out the
+    /// terminal.
+    nonisolated static func custom(
+        name: String, displayName: String, base: Theme, dark: Variant, light: Variant
+    ) -> Theme {
+        Theme(name: name, displayName: displayName, dark: dark, light: light)
+    }
+
+    /// `#rgb` or `#rrggbb`, the two notations a person actually types. Also
+    /// accepts them without the `#`, because half the palettes on the web are
+    /// written that way.
+    nonisolated static func color(_ text: String) -> SIMD4<Float>? {
+        var digits = Substring(text.trimmingCharacters(in: .whitespaces))
+        if digits.hasPrefix("#") { digits = digits.dropFirst() }
+        let characters = Array(digits)
+        func value(_ slice: [Character]) -> Float? {
+            guard let byte = UInt8(String(slice), radix: 16) else { return nil }
+            return Float(byte) / 255
+        }
+        switch characters.count {
+        case 3:
+            guard let r = value([characters[0], characters[0]]),
+                let g = value([characters[1], characters[1]]),
+                let b = value([characters[2], characters[2]])
+            else { return nil }
+            return SIMD4<Float>(r, g, b, 1)
+        case 6:
+            guard let r = value(Array(characters[0..<2])),
+                let g = value(Array(characters[2..<4])),
+                let b = value(Array(characters[4..<6]))
+            else { return nil }
+            return SIMD4<Float>(r, g, b, 1)
+        default:
+            return nil
+        }
+    }
+
+    /// The `#rrggbb` a colour serialises back as.
+    nonisolated static func hex(_ color: SIMD4<Float>) -> String {
+        func byte(_ value: Float) -> Int { Int((min(1, max(0, value)) * 255).rounded()) }
+        return String(format: "#%02x%02x%02x", byte(color.x), byte(color.y), byte(color.z))
     }
 }

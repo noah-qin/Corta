@@ -12,11 +12,11 @@ extension ViewController {
         guard !sanitized.isEmpty else { return }
         if Paste.needsWarning(text: sanitized, bracketedPasteEnabled: bracketedPasteEnabled()) {
             let alert = NSAlert()
-            alert.messageText = "Paste text containing newlines?"
+            alert.messageText = L10n.text("paste.newlines.title")
             alert.informativeText =
-                "The application in the terminal has not enabled bracketed paste mode, so each line will execute as if you typed it."
-            alert.addButton(withTitle: "Paste")
-            alert.addButton(withTitle: "Cancel")
+                L10n.text("paste.newlines.message")
+            alert.addButton(withTitle: L10n.text("common.paste"))
+            alert.addButton(withTitle: L10n.text("common.cancel"))
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
         session.write(Paste.bytes(for: sanitized, bracketedPasteEnabled: bracketedPasteEnabled()))

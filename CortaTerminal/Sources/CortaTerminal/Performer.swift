@@ -25,12 +25,20 @@ public struct Performer: ParserPerformer, Sendable {
         grid.write(scalar)
     }
 
+    public mutating func printASCII(_ bytes: ArraySlice<UInt8>) {
+        grid.writeASCII(bytes)
+    }
+
     public mutating func execute(_ control: UInt8) {
         switch control {
         case 0x08: grid.backspace()
         case 0x09: grid.tab()
-        // LF, VT and FF all move down one row without changing the column.
-        case 0x0A, 0x0B, 0x0C: grid.lineFeed()
+        // LF, VT and FF all move down one row without changing the column —
+        // unless LNM is set, which makes each of them a new *line* rather
+        // than a new row (ECMA-48 §8.3.106).
+        case 0x0A, 0x0B, 0x0C:
+            grid.lineFeed()
+            if state.newLineModeEnabled { grid.carriageReturn() }
         case 0x0D: grid.carriageReturn()
         case 0x07: state.bellRequested = true  // BEL (M4.8, core side).
         default: break  // The rest have no effect on the grid.
@@ -70,6 +78,8 @@ public struct Performer: ParserPerformer, Sendable {
                 popKeyboardProtocol(sequence.parameters)
             case (0x3D, 0x75):
                 setKeyboardProtocol(sequence.parameters)
+            case (0x3F, 0x6E):  // DECXCPR — CSI ? Ps n
+                reportExtendedCursorPosition(sequence.parameters)
             case (0x3F, 0x68):  // DECSET — CSI ? Pm h
                 applyPrivateModes(sequence.parameters, enabled: true)
                 _ = performAlternateScreenMode(final: sequence.final, parameters: sequence.parameters)
@@ -106,14 +116,31 @@ public struct Performer: ParserPerformer, Sendable {
         }
 
         let parameters = sequence.parameters
+        // SGR dominates coloured shell/log output. It cannot be a cursor,
+        // erase or editing command, so do not make every colour change walk
+        // those three dispatch tables first.
+        if sequence.final == 0x6D {
+            applyGraphicRendition(parameters)
+            return
+        }
+        // SM / RM — `CSI Pm h` / `CSI Pm l`, the ANSI modes. Distinct from
+        // DECSET/DECRST above, which carry the `?` marker; `CSI 4 h` (insert
+        // mode) and `CSI ? 4 h` (smooth scroll) are different sequences that
+        // used to both land in the same place — nowhere.
+        if sequence.final == 0x68 {
+            applyAnsiModes(parameters, enabled: true)
+            return
+        }
+        if sequence.final == 0x6C {
+            applyAnsiModes(parameters, enabled: false)
+            return
+        }
         if performCursorControl(final: sequence.final, parameters: parameters) { return }
         if performErase(final: sequence.final, parameters: parameters) { return }
         if performEditing(final: sequence.final, parameters: parameters) { return }
         switch sequence.final {
         case 0x63:  // DA1
             reportPrimaryDeviceAttributes()
-        case 0x6D:  // SGR
-            applyGraphicRendition(parameters)
         case 0x6E:  // DSR
             reportDeviceStatus(parameters)
         case 0x74:  // CSI Ps t — window manipulation; only the size report

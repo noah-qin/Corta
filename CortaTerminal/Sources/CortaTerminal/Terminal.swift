@@ -31,6 +31,12 @@ public struct Terminal: Sendable {
         parser.parse(bytes, performer: &performer)
     }
 
+    /// PTY reads are contiguous. Preserve that fact so `Parser` can batch
+    /// printable ASCII instead of erasing it behind `some Sequence`.
+    public mutating func feed(_ bytes: [UInt8]) {
+        parser.parse(bytes, performer: &performer)
+    }
+
     /// Whether query responses are queued for the child.
     public var hasPendingOutput: Bool { !performer.state.outputBuffer.isEmpty }
 
@@ -48,6 +54,10 @@ public struct Terminal: Sendable {
     /// `?1004` — whether the child has asked to be told about focus changes
     /// (M6.7). The app sends `CSI I` / `CSI O` while this is true.
     public var isFocusReportingEnabled: Bool { performer.state.focusReportingEnabled }
+
+    /// LNM (`CSI 20 h`). While set the Return key sends CR LF rather than
+    /// CR — the app encodes keys, so it has to be able to ask.
+    public var isNewLineModeEnabled: Bool { performer.state.newLineModeEnabled }
 
     /// The colours OSC 10/11/12 report (M6.6). The app seeds these from its
     /// palette so a query answers with what is actually drawn; the child can
@@ -78,6 +88,34 @@ public struct Terminal: Sendable {
 
     /// The working directory reported by OSC 7 (M2.8).
     public var workingDirectory: String? { performer.state.workingDirectory }
+
+    /// Whether the shell says a command is running (OSC 133, M7.2). `false`
+    /// when the shell emits no shell-integration sequences at all, which is
+    /// why the app still keeps its keystroke heuristic as a fallback.
+    public var isCommandRunning: Bool { performer.state.isCommandRunning }
+
+    /// Whether this session has ever emitted an OSC 133 mark — i.e. whether
+    /// its shell has integration configured. The app uses this to choose
+    /// between the exact command boundaries and its own heuristic.
+    public var hasShellIntegration: Bool { performer.state.promptRow != nil }
+
+    /// Consumes the exit status of a command that just finished (OSC 133 D).
+    /// Drained, like `takeBell`: a notification fires once per command, and a
+    /// value left in place would fire on every frame after it.
+    public mutating func takeFinishedCommand() -> Int? {
+        let status = performer.state.finishedCommandExitStatus
+        performer.state.finishedCommandExitStatus = nil
+        return status
+    }
+
+    /// Consumes text the child asked to put on the system clipboard via OSC
+    /// 52 (M7.11). The app decides whether to honour it; the core never
+    /// touches a pasteboard, and the *read* direction does not exist.
+    public mutating func takeClipboardCopy() -> String? {
+        let text = performer.state.pendingClipboardCopy
+        performer.state.pendingClipboardCopy = nil
+        return text
+    }
 
     /// Drains the queued query responses. `TerminalSession` calls this after
     /// every `feed` and writes the bytes to the PTY; tests read them

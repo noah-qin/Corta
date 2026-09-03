@@ -35,9 +35,15 @@ extension TerminalView {
     }
 
     private func droppedPaths(from sender: any NSDraggingInfo) -> [String] {
+        Self.droppedPaths(from: sender.draggingPasteboard)
+    }
+
+    /// Kept separate from `NSDraggingInfo` so the pasteboard boundary can
+    /// be exercised without synthesising a Finder drag in a unit test.
+    static func droppedPaths(from pasteboard: NSPasteboard) -> [String] {
         let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
         let urls =
-            sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: options)
+            pasteboard.readObjects(forClasses: [NSURL.self], options: options)
             as? [URL] ?? []
         return urls.map(\.path)
     }

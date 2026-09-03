@@ -26,6 +26,9 @@ final class CortaUITests: XCTestCase {
     func testExample() throws {
         // UI tests must launch the application that they test.
         let app = XCUIApplication()
+        // Session restore (M7.4) would otherwise carry the previous
+        // test's windows into this one; the suite asserts window counts.
+        app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
         app.launch()
 
         // Use XCTAssert and related functions to verify your tests produce the correct results.
@@ -37,7 +40,9 @@ final class CortaUITests: XCTestCase {
     func testLaunchPerformance() throws {
         // This measures how long it takes to launch your application.
         measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
+            let app = XCUIApplication()
+            app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
+            app.launch()
         }
     }
 }

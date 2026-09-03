@@ -243,9 +243,12 @@ Worth doing eventually, deliberately not in the M1–M6 path:
 
 - **Kitty graphics protocol** — inline images. Genuinely useful for
   viewing plots from ML work without leaving the terminal.
-- **Shell integration / OSC 133** — jump to previous prompt, command
-  duration, exit-code marks. High value per line of code; consider
-  pulling forward if M4 finishes early.
+- ~~**Shell integration / OSC 133**~~ — shipped as M7.2: prompt and
+  exit-status marks on the line, command-to-command jumping, and an exact
+  long-task notification. It cost four sequences and a per-line mark, as
+  the M6.4 reassessment below predicted. Corta still ships no shell
+  snippets, so the marks appear only for a shell the user has configured
+  to emit them — the distribution half of the problem is open.
 
 The kitty keyboard protocol was on this list; it shipped as M6.9.
 

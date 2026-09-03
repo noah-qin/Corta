@@ -8,16 +8,18 @@ import Testing
 /// as a pure function from a synthetic `NSEvent` to a byte array. The M3.4
 /// routing decision — which events ever reach this path versus the IME — is
 /// covered in `TerminalViewIMETests`.
+@MainActor
 struct TerminalViewKeyEncodingTests {
     private static func keyEvent(
         characters: String, charactersIgnoringModifiers: String? = nil,
-        modifiers: NSEvent.ModifierFlags = [], keyCode: UInt16 = 0
+        modifiers: NSEvent.ModifierFlags = [], keyCode: UInt16 = 0,
+        type: NSEvent.EventType = .keyDown, isRepeat: Bool = false
     ) -> NSEvent {
         NSEvent.keyEvent(
-            with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0,
+            with: type, location: .zero, modifierFlags: modifiers, timestamp: 0,
             windowNumber: 0, context: nil, characters: characters,
             charactersIgnoringModifiers: charactersIgnoringModifiers ?? characters,
-            isARepeat: false, keyCode: keyCode)!
+            isARepeat: isRepeat, keyCode: keyCode)!
     }
 
     @Test func plainLetterSendsItsUTF8Bytes() throws {
@@ -137,5 +139,37 @@ struct TerminalViewKeyEncodingTests {
                     characters: "\u{9}", charactersIgnoringModifiers: "i",
                     modifiers: [.control, .shift]),
                 enhancements: .disambiguate) == Array("\u{1B}[105;6u".utf8))
+    }
+
+    @Test func eventReportingDistinguishesPressRepeatAndRelease() throws {
+        func controlI(type: NSEvent.EventType = .keyDown, repeat isRepeat: Bool = false) -> NSEvent {
+            Self.keyEvent(
+                characters: "\u{9}", charactersIgnoringModifiers: "i", modifiers: .control,
+                type: type, isRepeat: isRepeat)
+        }
+        let enhancements: KeyboardEnhancementFlags = [.disambiguate, .reportEventTypes]
+        #expect(
+            TerminalView.bytes(for: controlI(), enhancements: enhancements)
+                == Array("\u{1B}[105;5:1u".utf8))
+        #expect(
+            TerminalView.bytes(for: controlI(repeat: true), enhancements: enhancements)
+                == Array("\u{1B}[105;5:2u".utf8))
+        #expect(
+            TerminalView.bytes(for: controlI(type: .keyUp), enhancements: enhancements)
+                == Array("\u{1B}[105;5:3u".utf8))
+    }
+
+    @Test func eventReportingEncodesFunctionalKeyRelease() throws {
+        let release = Self.keyEvent(
+            characters: "\u{F700}", modifiers: [.numericPad, .function], keyCode: 126,
+            type: .keyUp)
+        #expect(
+            TerminalView.bytes(for: release, enhancements: .reportEventTypes)
+                == Array("\u{1B}[1;1:3A".utf8))
+    }
+
+    @Test func eventReportingDoesNotInventPlainTextReleases() throws {
+        let release = Self.keyEvent(characters: "a", type: .keyUp)
+        #expect(TerminalView.bytes(for: release, enhancements: .reportEventTypes) == nil)
     }
 }

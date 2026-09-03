@@ -21,7 +21,18 @@ final class ConfigurationStore {
     /// picks up the current values by reading, not by being told.
     static let didChange = Notification.Name("dev.noahqin.Corta.configurationDidChange")
 
+    /// Posted when a write to the config file fails, and again when a later
+    /// write succeeds — so a page showing the failure can clear it. The
+    /// settings page is the only observer; nothing else can do anything
+    /// useful about a read-only home directory.
+    static let writeStatusDidChange = Notification.Name(
+        "dev.noahqin.Corta.configurationWriteStatusDidChange")
+
     private(set) var configuration = Configuration()
+    /// Why the last write failed, `nil` when the last write succeeded. The
+    /// settings page renders this instead of implying a save that did not
+    /// happen.
+    private(set) var lastWriteError: Error?
     /// Keys from a config written by a different version — carried through a
     /// write so an older Corta does not silently delete a newer one's
     /// settings.
@@ -64,13 +75,27 @@ final class ConfigurationStore {
 
     /// Applies a change by writing the file and reading the result back. The
     /// settings page calls this; nothing sets `configuration` directly.
-    func update(_ mutate: (inout Configuration) -> Void) {
+    ///
+    /// Returns whether the change was persisted. A failed write is rolled
+    /// back rather than kept in memory: the file is the source of truth, so a
+    /// value the file does not hold is a value the next reload discards — and
+    /// keeping it would make every surface report a setting that will not
+    /// survive a relaunch, which is exactly the drift the single-store rule
+    /// exists to prevent. No `didChange` is posted for a change that did not
+    /// happen; `writeStatusDidChange` is, so the settings page can say why.
+    @discardableResult
+    func update(_ mutate: (inout Configuration) -> Void) -> Bool {
         var updated = configuration
         mutate(&updated)
-        guard updated != configuration else { return }
+        guard updated != configuration else { return true }
+        let previous = configuration
         configuration = updated
-        write()
+        guard write() else {
+            configuration = previous
+            return false
+        }
         NotificationCenter.default.post(name: Self.didChange, object: nil)
+        return true
     }
 
     /// Creates the file with the current values — what the settings page's
@@ -91,12 +116,23 @@ final class ConfigurationStore {
             try configuration.serialized(preserving: unknownKeys)
                 .write(to: url, atomically: true, encoding: .utf8)
         } catch {
+            noteWriteResult(error)
             return false
         }
+        noteWriteResult(nil)
         // An atomic write replaces the inode, so the descriptor the file
         // watcher holds now points at a file nothing will ever write again.
         startWatching()
         return true
+    }
+
+    /// Records the outcome and posts only on a transition, so a page bound to
+    /// the notification is not rebuilt on every successful keystroke.
+    private func noteWriteResult(_ error: Error?) {
+        let wasFailing = lastWriteError != nil
+        lastWriteError = error
+        guard wasFailing != (error != nil) else { return }
+        NotificationCenter.default.post(name: Self.writeStatusDidChange, object: nil)
     }
 
     // MARK: - Watching

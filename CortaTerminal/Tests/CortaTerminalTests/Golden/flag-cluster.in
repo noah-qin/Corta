@@ -1,0 +1,10 @@
+# A flag is a pair of regional indicators and ONE grapheme cluster (UAX #29
+# GB12/GB13: no break between indicators when an odd number precedes the
+# break), so it occupies a single double-width cell — the lead cell holds
+# both scalars in the grapheme side table (DESIGN.md §2.3), the spacer stays
+# blank, and the cursor advances 2 columns, not 4.
+#
+# The first flag below is U+1F1EF U+1F1F5. The lone indicator that follows
+# the second flag has no pair, so it keeps a cell of its own: three
+# indicators in a row are a flag and a leftover, never a flag and a half.
+\xF0\x9F\x87\xAF\xF0\x9F\x87\xB5\xF0\x9F\x87\xA9\xF0\x9F\x87\xAA\xF0\x9F\x87\xA6ab

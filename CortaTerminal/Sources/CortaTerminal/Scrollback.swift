@@ -47,6 +47,9 @@ public struct Scrollback: Sendable {
         var start: Int32
         var length: Int32
         var wrapped: Bool
+        /// The shell-integration mark (M7.2). Free: the span already had a
+        /// padding byte after `wrapped`.
+        var mark: LineMark = .none
     }
 
     /// One shared arena and the spans within it that are its rows, in
@@ -97,7 +100,22 @@ public struct Scrollback: Sendable {
         let span = batch.rows[rowIndex]
         let start = Int(span.start)
         let end = start + Int(span.length)
-        return Line(wrapped: span.wrapped, cells: batch.arena[start..<end])
+        return Line(wrapped: span.wrapped, mark: span.mark, cells: batch.arena[start..<end])
+    }
+
+    /// Re-marks a row already in history (M7.2). A command's exit status
+    /// arrives long after its prompt row was written, and for anything that
+    /// took more than a screenful of output that row is in history by then —
+    /// so the mark has to be reachable here, or a slow command could never be
+    /// marked as failed. Out-of-range indices are ignored: the row may have
+    /// been evicted while the command ran, which is not an error.
+    public mutating func setMark(_ mark: LineMark, at index: Int) {
+        guard index >= 0, index < count else { return }
+        let global = index + headSkip
+        let batchIndex = global / batchSize
+        let rowIndex = global % batchSize
+        guard batchIndex < batches.count, rowIndex < batches[batchIndex].rows.count else { return }
+        batches[batchIndex].rows[rowIndex].mark = mark
     }
 
     /// The history, oldest first. Allocates; for dumps and diagnostics, not
@@ -118,7 +136,8 @@ public struct Scrollback: Sendable {
         let start = Int32(batches[tailIndex].arena.count)
         batches[tailIndex].arena.append(contentsOf: line.cells)
         batches[tailIndex].rows.append(
-            RowSpan(start: start, length: Int32(line.count), wrapped: line.wrapped))
+            RowSpan(
+                start: start, length: Int32(line.count), wrapped: line.wrapped, mark: line.mark))
 
         totalPushed += 1
         if count < limit {

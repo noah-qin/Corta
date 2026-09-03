@@ -47,10 +47,13 @@ extension ViewController {
     }
 
     @objc func appearanceChanged() {
-        // The theme decides the drawable's clear colour as well as the
-        // cells', and the clear colour is read at the start of the frame —
-        // so a plain damage invalidation is enough, but it has to be forced:
-        // no grid content changed, so the diff alone would find nothing.
+        // Every cell's colours are resolved into the instance buffer when its
+        // row is built, so a theme change invalidates the whole buffer — the
+        // clear colour alone is read fresh each frame. Forcing a frame
+        // without also forcing a rebuild redrew the new background behind the
+        // old theme's glyph colours, which on a dark-to-light-to-dark round
+        // trip left dark text on a dark ground: the terminal looked empty.
+        terminalRenderer.invalidate()
         terminalView.layer?.backgroundColor = nil
         invalidateDisplay()
         terminalView.drawNow()

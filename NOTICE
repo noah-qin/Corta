@@ -1,0 +1,30 @@
+Corta
+Copyright 2026 Noah Qin
+
+This product includes software developed by the Corta project
+(https://github.com/noah-qin/Corta).
+
+Licensed under the Apache License, Version 2.0. See the LICENSE file
+for the full terms.
+
+--------------------------------------------------------------------
+Trademarks and artwork
+--------------------------------------------------------------------
+
+The Apache License grants no trademark rights (Section 6). The
+following are excluded from the license granted over the source code
+and remain the property of the copyright holder:
+
+  - The name "Corta" and any associated word or design marks.
+  - The pangolin mascot and every derivative of it, including
+    `docs/brand/corta-pangolin-mascot.png` and
+    `docs/brand/corta-pangolin-loop.gif`.
+  - The application icon bundle `AppIcon.icon/` and its assets.
+
+Forks and derivative works may use the source code freely under the
+Apache License, but must not use the Corta name, the pangolin mascot
+or the application icon in a way that suggests they are the Corta
+project or are endorsed by it. Rename and re-brand your distribution.
+
+Quoting or reproducing the artwork to write or talk about Corta is
+fine; shipping it as your own product's identity is not.

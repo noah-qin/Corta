@@ -183,6 +183,12 @@ public final class TerminalSession: @unchecked Sendable {
         state.withLock { $0.terminal.isFocusReportingEnabled }
     }
 
+    /// Whether LNM is set (`CSI 20 h`). The Return key sends CR LF while it
+    /// is, rather than a bare CR.
+    public var isNewLineModeEnabled: Bool {
+        state.withLock { $0.terminal.isNewLineModeEnabled }
+    }
+
     /// The colours OSC 10/11/12 report and set (M6.6). The app seeds these
     /// from its palette at startup so a query answers with what is drawn.
     public var dynamicColors: DynamicColors {
@@ -209,6 +215,53 @@ public final class TerminalSession: @unchecked Sendable {
     /// The working directory reported via OSC 7 (M2.8).
     public var workingDirectory: String? {
         state.withLock { $0.terminal.workingDirectory }
+    }
+
+    /// Whether a command other than the shell itself is running here — what
+    /// a close confirmation asks before it throws away a half-finished job
+    /// (M7.5). Derived from the pty's foreground process group; see
+    /// `PTY.hasForegroundJob`.
+    public var hasForegroundJob: Bool { pty.hasForegroundJob }
+
+    /// The name of that command, when it can be read.
+    public var foregroundProcessName: String? { pty.foregroundProcessName }
+
+    /// What owns the terminal right now, shell included — for a title bar
+    /// rather than for a confirmation dialog. See `PTY.activeProcessName`.
+    public var activeProcessName: String? { pty.activeProcessName }
+
+    /// Where this session is, by whichever route answers.
+    ///
+    /// OSC 7 first: a shell that reports its directory is reporting the one
+    /// it believes it is in, which is the right answer when a program has
+    /// changed directory internally. Otherwise the kernel's answer for the
+    /// foreground process group, because a stock macOS zsh sends no OSC 7 to
+    /// anything but Terminal.app (`PTY.currentWorkingDirectory`).
+    public var currentDirectory: String? {
+        state.withLock { $0.terminal.workingDirectory } ?? pty.currentWorkingDirectory
+    }
+
+    /// Whether the shell reports a command running via OSC 133 (M7.2).
+    public var isCommandRunning: Bool {
+        state.withLock { $0.terminal.isCommandRunning }
+    }
+
+    /// Whether this session's shell emits OSC 133 at all. The app falls back
+    /// to its keystroke heuristic when it does not.
+    public var hasShellIntegration: Bool {
+        state.withLock { $0.terminal.hasShellIntegration }
+    }
+
+    /// Consumes the exit status of a command that just finished (OSC 133 D).
+    public func takeFinishedCommand() -> Int? {
+        state.withLock { $0.terminal.takeFinishedCommand() }
+    }
+
+    /// Consumes text the child asked to place on the system clipboard via
+    /// OSC 52 (M7.11). Whether it actually reaches the pasteboard is the
+    /// app's decision.
+    public func takeClipboardCopy() -> String? {
+        state.withLock { $0.terminal.takeClipboardCopy() }
     }
 
     /// `TIOCSWINSZ` happens synchronously — the child should see `SIGWINCH`

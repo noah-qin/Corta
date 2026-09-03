@@ -7,7 +7,7 @@ extension ViewController {
     /// The core's ?1006 SGR mouse-reporting flag (M2.7). While off, clicks
     /// and the wheel keep their normal terminal behaviour.
     func mouseReportingEnabled() -> Bool {
-        session.isSgrMouseEncodingEnabled
+        session?.isSgrMouseEncodingEnabled ?? false
     }
 
     func scroll(_ gesture: ScrollGesture) {
@@ -48,6 +48,12 @@ extension ViewController {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
+        // Confirmation *after* the write, and only when there was something
+        // to write: an empty selection returns above, and a toast for a copy
+        // that did not happen is worse than no toast. This is what makes
+        // copy-on-select safe to have on by default (M7.10) — the clipboard
+        // no longer changes silently.
+        terminalView?.showToast(L10n.text("toast.copied"))
     }
 
     /// ⌘A: the whole document — scrollback plus screen.
@@ -90,6 +96,7 @@ extension ViewController {
         } else if unit == .character {
             // A plain click clears; a drag re-creates the selection below.
             selection = nil
+            terminalView.noteAccessibilitySelectionChanged()
             invalidateDisplay()
         } else {
             applySelection(anchor: anchor, head: anchor, unit: unit, grid: grid)
@@ -105,6 +112,17 @@ extension ViewController {
                 // click that never moved, which stays cleared.
                 if head != anchor || unit != .character || extending {
                     applySelection(anchor: anchor, head: head, unit: unit, grid: grid)
+                    // M7.10: a finished selection goes to the pasteboard when
+                    // the user asked for that. On mouse-*up* only — copying
+                    // on every intermediate drag position would rewrite the
+                    // clipboard dozens of times per gesture.
+                    if ConfigurationStore.shared.configuration.copyOnSelect { copy(nil) }
+                } else {
+                    // A click that never moved, with no modifier: in
+                    // `link-activation = click` this is how a link opens
+                    // (M7.9). Deferred to mouse-up precisely so that
+                    // dragging across a URL still selects it.
+                    openLinkOnPlainClick(next, in: terminalView)
                 }
                 break
             }
@@ -119,6 +137,9 @@ extension ViewController {
     ) {
         let range = Selection.range(from: anchor, to: head, unit: unit, in: grid)
         selection = TerminalSelection(range, grid: grid)
+        // A local change no output batch will report, so the accessibility
+        // notification has to be posted from here.
+        terminalView?.noteAccessibilitySelectionChanged()
         invalidateDisplay()
     }
 

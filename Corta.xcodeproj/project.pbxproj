@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		4F2E2B293047183A0037705B /* corta-exec in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000730465E2000E8DD20 /* corta-exec */; };
+		4F9658043049C77E005C56CD /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 4F9658033049C77E005C56CD /* Sparkle */; };
 		A1C0A001030465E2000E8DD20 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = A1C0A000030465E2000E8DD20 /* AppIcon.icon */; };
 		C07A000130465E2000E8DD20 /* CortaTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000530465E2000E8DD20 /* CortaTerminal */; };
 		C07A000230465E2000E8DD20 /* CortaTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000630465E2000E8DD20 /* CortaTerminal */; };
@@ -75,6 +76,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4F9658043049C77E005C56CD /* Sparkle in Frameworks */,
 				4F2E2B293047183A0037705B /* corta-exec in Frameworks */,
 				C07A000130465E2000E8DD20 /* CortaTerminal in Frameworks */,
 			);
@@ -142,6 +144,7 @@
 			packageProductDependencies = (
 				C07A000530465E2000E8DD20 /* CortaTerminal */,
 				C07A000730465E2000E8DD20 /* corta-exec */,
+				4F9658033049C77E005C56CD /* Sparkle */,
 			);
 			productName = Corta;
 			productReference = 4F17769F30465E1F00E8DD20 /* Corta.app */;
@@ -223,11 +226,20 @@
 			knownRegions = (
 				en,
 				Base,
+				"zh-Hans",
+				"zh-Hant",
+				ja,
+				ko,
+				de,
+				fr,
+				es,
+				"pt-BR",
 			);
 			mainGroup = 4F17769630465E1F00E8DD20;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				C07A000430465E2000E8DD20 /* XCLocalSwiftPackageReference "CortaTerminal" */,
+				4F9658023049C77E005C56CD /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4F1776A030465E1F00E8DD20 /* Products */;
@@ -338,6 +350,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 646VSJ9K5F;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -358,11 +371,12 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -402,6 +416,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 646VSJ9K5F;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -416,10 +431,11 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
@@ -433,18 +449,22 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 646VSJ9K5F;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Noah Qin. Apache License 2.0.";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				INFOPLIST_KEY_SUFeedURL = "https://raw.githubusercontent.com/noah-qin/Corta/main/appcast.xml";
+				INFOPLIST_KEY_SUPublicEDKey = "qA5ohnw34Yjg0pfWN0AJ4KCxYfia3jNLdvgudVzPgog=";
+				INFOPLIST_KEY_SUScheduledCheckInterval = 86400;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.noahqin.Corta;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -462,21 +482,33 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
+				// A plain `xcodebuild build` picks a Development certificate under
+				// Automatic signing regardless of a Developer ID identity's
+				// presence unless told otherwise, and a Development-signed build
+				// cannot be notarized (M6.16, SECURITY.md §4.1). Manual style is
+				// required to name an identity explicitly — Automatic conflicts
+				// with it — matching the signed path .github/workflows/release.yml
+				// already uses.
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 646VSJ9K5F;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Noah Qin. Apache License 2.0.";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				INFOPLIST_KEY_SUFeedURL = "https://raw.githubusercontent.com/noah-qin/Corta/main/appcast.xml";
+				INFOPLIST_KEY_SUPublicEDKey = "qA5ohnw34Yjg0pfWN0AJ4KCxYfia3jNLdvgudVzPgog=";
+				INFOPLIST_KEY_SUScheduledCheckInterval = 86400;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.noahqin.Corta;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -496,10 +528,11 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 646VSJ9K5F;
 				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.noahqin.CortaTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -517,10 +550,11 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 646VSJ9K5F;
 				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.noahqin.CortaTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -538,9 +572,10 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 646VSJ9K5F;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.noahqin.CortaUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -557,9 +592,10 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 646VSJ9K5F;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.noahqin.CortaUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -619,7 +655,23 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		4F9658023049C77E005C56CD /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.9.6;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
+		4F9658033049C77E005C56CD /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4F9658023049C77E005C56CD /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
 		C07A000530465E2000E8DD20 /* CortaTerminal */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C07A000430465E2000E8DD20 /* XCLocalSwiftPackageReference "CortaTerminal" */;

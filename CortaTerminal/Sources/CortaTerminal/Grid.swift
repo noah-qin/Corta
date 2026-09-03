@@ -53,10 +53,11 @@ public struct Grid: Sendable {
 
     public internal(set) var rows: Int
     public internal(set) var columns: Int
-    public internal(set) var lines: ContiguousArray<Line>
+    internal var lines: ScreenLines
 
     public var cursor: Cursor
     public var pen: Pen
+    private var tabStops: ContiguousArray<Bool>
 
     /// DECSCUSR state (xterm ctlseqs). Global to the terminal rather than
     /// per screen: it survives an alternate-screen round trip.
@@ -81,6 +82,17 @@ public struct Grid: Sendable {
     /// printable character wraps first, and only then is the row marked
     /// `wrapped`. Without the deferral, a program that fills the last column
     /// and then moves the cursor would scroll the screen by one row.
+    /// IRM — ECMA-48 §8.3.64, `CSI 4 h` / `CSI 4 l`. While set, a printed
+    /// character *inserts* at the cursor and pushes the rest of the row
+    /// right, rather than overwriting the cell under it; characters pushed
+    /// past the last column are lost.
+    ///
+    /// Implemented rather than reported: DECRQM used to answer 0 ("not
+    /// recognised") for IRM, and a program that sets a mode the terminal
+    /// silently ignores draws its next screen against a layout that never
+    /// happened. `readline`'s and `ed`'s insert paths both use it.
+    public var insertMode: Bool = false
+
     public internal(set) var pendingWrap: Bool
 
     /// DECSC's slot — cursor, pen and wrap state (VT510 §DECSC).
@@ -103,9 +115,10 @@ public struct Grid: Sendable {
     public init(rows: Int = 24, columns: Int = 80, scrollbackLimit: Int = Scrollback.defaultLimit) {
         self.rows = min(max(1, rows), Self.maxRows)
         self.columns = min(max(1, columns), Self.maxColumns)
-        self.lines = ContiguousArray(repeating: Line(), count: self.rows)
+        self.lines = ScreenLines(repeating: Line(), count: self.rows)
         self.cursor = Cursor()
         self.pen = Pen()
+        self.tabStops = Self.defaultTabStops(columns: self.columns)
         self.cursorStyle = .blinkingBlock
         self.graphemes = GraphemeTable()
         self.hyperlinks = HyperlinkTable()
@@ -159,6 +172,17 @@ public struct Grid: Sendable {
             combine(scalar, row: target.row, column: target.column)
             return
         }
+        // A flag is a *pair* of regional indicators and one grapheme (UAX #29
+        // GB12/GB13), so the second indicator joins the first's cell instead
+        // of claiming a wide pair of its own. Without this a two-letter flag
+        // occupies four columns and every border drawn after it on the line
+        // lands two columns late.
+        if Self.isRegionalIndicator(scalar), let target = clusterJoinTarget(),
+            endsWithLoneRegionalIndicator(target)
+        {
+            combine(scalar, row: target.row, column: target.column)
+            return
+        }
         switch displayWidth(of: value) {
         case 0:
             writeZeroWidth(scalar)
@@ -168,6 +192,40 @@ public struct Grid: Sendable {
             // A one-column screen cannot hold a pair; the wide scalar falls
             // back to a single cramped cell rather than vanishing.
             writeNarrow(scalar)
+        }
+    }
+
+    /// Writes a ground-state printable ASCII run in row-sized chunks. The
+    /// parser has already established that every byte is printable and width
+    /// one, so repeating scalar validation and state dispatch is pure cost.
+    public mutating func writeASCII(_ bytes: ArraySlice<UInt8>) {
+        var index = bytes.startIndex
+        while index < bytes.endIndex {
+            if pendingWrap {
+                lines[cursor.row].wrapped = true
+                cursor.column = 0
+                lineFeedWithoutClearingWrap()
+            }
+            let available = columns - cursor.column
+            let count = min(available, bytes.distance(from: index, to: bytes.endIndex))
+            let end = bytes.index(index, offsetBy: count)
+            // Insert mode shifts the row right by the whole chunk once,
+            // rather than per character — the result is identical and the
+            // fast path above is untouched when the mode is off, which is
+            // always except while a line editor has it on.
+            if insertMode {
+                lines[cursor.row].insertCells(
+                    count, at: cursor.column, template: pen.eraseCell, width: columns)
+            }
+            lines[cursor.row].overwriteASCII(bytes[index..<end], at: cursor.column, pen: pen)
+            if cursor.column + count >= columns {
+                cursor.column = columns - 1
+                pendingWrap = true
+            } else {
+                cursor.column += count
+                pendingWrap = false
+            }
+            index = end
         }
     }
 
@@ -183,6 +241,10 @@ public struct Grid: Sendable {
             lines[cursor.row].wrapped = true
             cursor.column = 0
             lineFeedWithoutClearingWrap()
+        }
+        if insertMode {
+            lines[cursor.row].insertCells(
+                1, at: cursor.column, template: pen.eraseCell, width: columns)
         }
         blankWidePairHalves(row: cursor.row, column: cursor.column)
         lines[cursor.row][cursor.column] = pen.cell(scalar)
@@ -211,6 +273,13 @@ public struct Grid: Sendable {
             lines[cursor.row].wrapped = true
             cursor.column = 0
             lineFeedWithoutClearingWrap()
+        }
+        if insertMode {
+            // A wide scalar is two columns, so insert mode makes room for
+            // both — inserting one and writing two would overwrite whatever
+            // the shift had just moved into the second column.
+            lines[cursor.row].insertCells(
+                2, at: cursor.column, template: pen.eraseCell, width: columns)
         }
         blankWidePairHalves(row: cursor.row, column: cursor.column)
         // The spacer may land on the lead of a later pair; blank it too.
@@ -283,6 +352,28 @@ public struct Grid: Sendable {
         return graphemes.scalars(for: cell.grapheme)?.last == 0x200D
     }
 
+    private static func isRegionalIndicator(_ scalar: UInt32) -> Bool {
+        (0x1F1E6...0x1F1FF).contains(scalar)
+    }
+
+    /// Whether the cell at `target` ends in an *unpaired* regional indicator,
+    /// which is the join condition for the second half of a flag. GB12/GB13
+    /// break between indicators only after an even number of them, so the
+    /// trailing run decides: one indicator is still waiting for its pair, two
+    /// are a finished flag and a third starts a new cell.
+    private func endsWithLoneRegionalIndicator(_ target: (row: Int, column: Int)) -> Bool {
+        let cell = lines[target.row][target.column]
+        guard !cell.grapheme.isNone, let cluster = graphemes.scalars(for: cell.grapheme) else {
+            return Self.isRegionalIndicator(cell.scalar)
+        }
+        var trailing = 0
+        for scalar in cluster.reversed() {
+            guard Self.isRegionalIndicator(scalar) else { break }
+            trailing += 1
+        }
+        return trailing % 2 == 1
+    }
+
     /// Appends `scalar` to the grapheme cluster of the cell at (`row`,
     /// `column`), interning the extended cluster in the side table
     /// (`DESIGN.md` §2.3).
@@ -345,11 +436,13 @@ public struct Grid: Sendable {
     }
 
     public mutating func moveCursorUp(_ count: Int = 1) {
-        moveCursor(row: cursor.row - max(0, count), column: cursor.column)
+        let floor = (marginTop...marginBottom).contains(cursor.row) ? marginTop : 0
+        moveCursor(row: max(floor, cursor.row - max(0, count)), column: cursor.column)
     }
 
     public mutating func moveCursorDown(_ count: Int = 1) {
-        moveCursor(row: cursor.row + max(0, count), column: cursor.column)
+        let ceiling = (marginTop...marginBottom).contains(cursor.row) ? marginBottom : rows - 1
+        moveCursor(row: min(ceiling, cursor.row + max(0, count)), column: cursor.column)
     }
 
     public mutating func moveCursorLeft(_ count: Int = 1) {
@@ -358,6 +451,14 @@ public struct Grid: Sendable {
 
     public mutating func moveCursorRight(_ count: Int = 1) {
         moveCursor(row: cursor.row, column: cursor.column + max(0, count))
+    }
+
+    public mutating func moveToNextLine(_ count: Int = 1) {
+        moveCursor(row: cursor.row + max(1, count), column: 0)
+    }
+
+    public mutating func moveToPreviousLine(_ count: Int = 1) {
+        moveCursor(row: cursor.row - max(1, count), column: 0)
     }
 
     /// CR — column 0, same row.
@@ -380,17 +481,87 @@ public struct Grid: Sendable {
     /// HT — the next tab stop. Stops are every eight columns; DECST8C and a
     /// programmable stop table arrive with M2.
     public mutating func tab() {
-        let next = (cursor.column / Self.tabInterval + 1) * Self.tabInterval
-        cursor.column = min(next, columns - 1)
+        tabForward(1)
+    }
+
+    public mutating func tabForward(_ count: Int) {
+        for _ in 0..<max(1, count) {
+            var next = cursor.column + 1
+            while next < columns - 1, !tabStops[next] { next += 1 }
+            cursor.column = min(next, columns - 1)
+        }
+        pendingWrap = false
+    }
+
+    public mutating func tabBackward(_ count: Int) {
+        for _ in 0..<max(1, count) {
+            var previous = cursor.column - 1
+            while previous > 0, !tabStops[previous] { previous -= 1 }
+            cursor.column = max(previous, 0)
+        }
         pendingWrap = false
     }
 
     public static let tabInterval = 8
 
+    public mutating func resetToInitialState() {
+        self = Grid(rows: rows, columns: columns, scrollbackLimit: scrollback.limit)
+    }
+
+    /// DECSTR (soft reset) resets modes without erasing the display or
+    /// moving the active cursor.
+    public mutating func softReset() {
+        marginTop = 0
+        marginBottom = rows - 1
+        pen.reset()
+        pendingWrap = false
+        savedCursor = Cursor()
+        savedPen = Pen()
+        savedPendingWrap = false
+        cursorStyle = .blinkingBlock
+    }
+
+    public mutating func setTabStop() {
+        tabStops[cursor.column] = true
+    }
+
+    public mutating func clearTabStop(atCursorOnly: Bool) {
+        if atCursorOnly {
+            tabStops[cursor.column] = false
+        } else {
+            for index in tabStops.indices { tabStops[index] = false }
+        }
+    }
+
+    private static func defaultTabStops(columns: Int) -> ContiguousArray<Bool> {
+        ContiguousArray((0..<columns).map { $0 > 0 && $0 % tabInterval == 0 })
+    }
+
+    private mutating func resizeTabStops(to newColumns: Int) {
+        if newColumns < tabStops.count {
+            tabStops.removeLast(tabStops.count - newColumns)
+        } else if newColumns > tabStops.count {
+            let oldCount = tabStops.count
+            tabStops.append(contentsOf: repeatElement(false, count: newColumns - oldCount))
+            for column in oldCount..<newColumns where column > 0 && column % Self.tabInterval == 0 {
+                tabStops[column] = true
+            }
+        }
+    }
+
     /// LF, VT, FF — down one row, scrolling at the bottom. The column does
     /// not change; that is CR's job.
     public mutating func lineFeed() {
         lineFeedWithoutClearingWrap()
+        pendingWrap = false
+    }
+
+    public mutating func reverseIndex() {
+        if cursor.row == marginTop {
+            scrollDown(1)
+        } else if cursor.row > 0 {
+            cursor.row -= 1
+        }
         pendingWrap = false
     }
 
@@ -478,6 +649,7 @@ public struct Grid: Sendable {
         guard newRows != rows || newColumns != columns else { return }
 
         if newColumns != columns, !isAlternateScreenActive {
+            resizeTabStops(to: newColumns)
             reflow(toColumns: newColumns, newRows: newRows)
             rows = newRows
             marginTop = min(marginTop, rows - 1)
@@ -512,6 +684,7 @@ public struct Grid: Sendable {
             lines.append(contentsOf: repeatElement(Line(), count: newRows - rows))
         }
         rows = newRows
+        resizeTabStops(to: newColumns)
         columns = newColumns
         cursor.row = min(cursor.row, rows - 1)
         cursor.column = min(cursor.column, columns - 1)
@@ -556,10 +729,12 @@ public struct Grid: Sendable {
         let count = min(max(0, count), marginBottom - marginTop + 1)
         guard count > 0 else { return }
         let saveToHistory = marginTop == 0 && marginBottom == rows - 1
+        if saveToHistory {
+            for row in 0..<count { scrollback.push(lines[row]) }
+            lines.rotateUp(count)
+            return
+        }
         for row in marginTop..<(marginBottom - count + 1) {
-            if saveToHistory, row < marginTop + count {
-                scrollback.push(lines[row])
-            }
             lines[row] = lines[row + count]
         }
         for row in (marginBottom - count + 1)...marginBottom {
@@ -702,7 +877,7 @@ public struct Grid: Sendable {
             return
         }
         suspendedMain = SuspendedScreen(self)
-        lines = ContiguousArray(repeating: Line(), count: rows)
+        lines = ScreenLines(repeating: Line(), count: rows)
         scrollback = Scrollback(limit: 0)
         graphemes = GraphemeTable()
         marginTop = 0

@@ -17,6 +17,27 @@ final class TerminalView: NSView, CALayerDelegate {
     /// Mouse-moved tracking for ⌘-hover link feedback (M4.6); `.inVisibleRect`
     /// keeps it glued to the visible area across resizes.
     private var mouseTrackingArea: NSTrackingArea?
+    /// The transient confirmation in the pane's bottom-right corner
+    /// (`showToast`), and the work item that takes it away again. Stored so a
+    /// second toast replaces the first instead of stacking on top of it —
+    /// copy-on-select fires once per drag, and a user selecting three things
+    /// in a row must not end up with three overlapping labels.
+    private var toastLayer: CALayer?
+    private var toastDismissal: DispatchWorkItem?
+
+    // Accessibility (`TerminalView+Accessibility.swift`). Storage lives here
+    // because extensions cannot add their own.
+
+    /// The pane's answer to "what does this terminal say" — text, cursor and
+    /// selection, flattened. Installed by `ViewController`, like every other
+    /// closure hook here, so the view needs no knowledge of `Grid`.
+    var accessibilitySnapshotProvider: (() -> TerminalAccessibilitySnapshot?)?
+    /// One cell's rect in this view's coordinates, so VoiceOver's cursor can
+    /// be drawn around the characters it is reading.
+    var accessibilityCellFrameProvider: ((_ row: Int, _ column: Int) -> CGRect)?
+    var cachedAccessibilitySnapshot: TerminalAccessibilitySnapshot?
+    var cachedAccessibilitySnapshotTime: CFTimeInterval = 0
+    var lastAccessibilityPost: CFTimeInterval = 0
 
     /// Called once per frame, on the main thread, with the drawable's render
     /// pass descriptor and pixel size. `nil` drawable (window occluded,
@@ -59,6 +80,11 @@ final class TerminalView: NSView, CALayerDelegate {
     /// ⌘⌥ focus-move shortcuts, a split, a close all arrive here — so the
     /// split controller can track which pane owns input (M5.2).
     var onFocus: (() -> Void)?
+
+    /// LNM (`CSI 20 h`) — while set, Return sends CR LF. Read per key event
+    /// for the same reason as the kitty flags below: a program can change it
+    /// at any point and the next keystroke has to honour the new value.
+    var isNewLineMode: (() -> Bool)?
 
     /// M6.9 — the kitty keyboard protocol flags the child has asked for.
     /// Read per key event rather than cached: a program can change them at
@@ -170,6 +196,33 @@ final class TerminalView: NSView, CALayerDelegate {
         // `_srgb` so no implicit linearisation happens on write; the values
         // are already sRGB-encoded (see `QuadRenderer`).
         metalLayer.framebufferOnly = true
+        // Double buffering, opt-in for measurement.
+        //
+        // `maximumDrawableCount = 2` is often cited as removing a frame of
+        // latency: with three drawables in flight a present can sit behind
+        // two others, and with two it cannot. It can equally *add* latency,
+        // because `nextDrawable()` then blocks the main thread more often
+        // waiting for one to be recycled — and which of the two happens
+        // depends on how long a frame takes on the machine in question, so
+        // it is a question to measure rather than a value to pick.
+        //
+        // Corta ships the default (3) because that is what has been measured
+        // (M6.12: 45.5 ms). This variable exists so the comparison can be run
+        // as two launches of the same binary rather than as a code change —
+        // an A/B where the only difference is the flag. Pair it with an
+        // `os_signpost` trace (`InputLatencySignposts`): if double buffering
+        // is costing rather than saving, it shows up as the `frame` interval
+        // growing at its front, where `nextDrawable` waits.
+        //
+        // An environment variable and not a config key: this is a measurement
+        // harness, not a setting anybody should be tuning, and a key nobody
+        // should set is a row `docs/CONFIGURATION.md` should not have to
+        // carry (`CLAUDE.md`). Same reasoning as `CORTA_RESTORE_WINDOWS`.
+        if let raw = ProcessInfo.processInfo.environment["CORTA_MAX_DRAWABLES"],
+            let count = Int(raw), (2...3).contains(count)
+        {
+            metalLayer.maximumDrawableCount = count
+        }
         metalLayer.colorspace = CGColorSpace(name: CGColorSpace.sRGB)
         metalLayer.isOpaque = false
         // A layer-hosting view is not clipped by the window's rounded
@@ -204,6 +257,7 @@ final class TerminalView: NSView, CALayerDelegate {
         super.layout()
         updateDrawableSize()
         updateExteriorCornerMask()
+        positionToast()
     }
 
     /// Moving between displays of different backing scales — Retina to an
@@ -283,6 +337,15 @@ final class TerminalView: NSView, CALayerDelegate {
     /// surface. A transient screen effect, not a persistent panel, so it
     /// draws directly on the Metal layer rather than adding a glass surface.
     func flashBell() {
+        // Reduce Motion, on a *flash*, cannot mean "no animation": a bell
+        // whose whole expression is a 0.18 s fade would silently stop
+        // signalling anything at zero duration. It means "no movement" — so
+        // the flash stays and is simply held steady for the same span before
+        // being removed, which is what the setting actually asks for.
+        if SystemAccessibility.reduceMotion {
+            flashBellWithoutMotion()
+            return
+        }
         let flash = CALayer()
         flash.frame = bounds
         flash.backgroundColor = NSColor.white.withAlphaComponent(0.35).cgColor
@@ -300,6 +363,181 @@ final class TerminalView: NSView, CALayerDelegate {
         CATransaction.commit()
     }
 
+    /// The bell as a held wash rather than a fade — same layer, same colour,
+    /// same duration, no animated property.
+    private func flashBellWithoutMotion() {
+        let flash = CALayer()
+        flash.frame = bounds
+        flash.backgroundColor = NSColor.white.withAlphaComponent(0.35).cgColor
+        flash.cornerRadius = metalLayer.cornerRadius
+        flash.maskedCorners = metalLayer.maskedCorners
+        layer?.addSublayer(flash)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            flash.removeFromSuperlayer()
+        }
+    }
+
+    // MARK: - Transient confirmation
+
+    /// A short-lived label in the pane's bottom-right corner — "Copied", and
+    /// anything else that is worth confirming but not worth a dialog.
+    ///
+    /// This exists because copy-on-select is now on by default. Copying
+    /// silently was the whole argument against that default: the clipboard
+    /// changes under the user with nothing to show for it. A confirmation
+    /// they can ignore is the smallest thing that answers it.
+    ///
+    /// A `CALayer`, not a subview: this view is layer-*hosting* (see
+    /// `commonInit`), so its layer tree is the only place to put a decoration
+    /// — the same reason `flashBell` is drawn this way. Nothing here touches
+    /// the Metal drawable, so a toast never costs the render loop a frame.
+    /// `kind` decides the symbol and the fill. The symbol is the point: a
+    /// toast that distinguished "copied" from "the shell could not start" by
+    /// blue against amber would distinguish them for nobody who cannot
+    /// separate those two hues, and the words alone are easy to miss in the
+    /// corner of a screen full of text. Icon *and* word *and* colour, in that
+    /// order of importance.
+    enum ToastKind {
+        case confirmation
+        case warning
+
+        var symbolName: String {
+            switch self {
+            case .confirmation: "checkmark.circle.fill"
+            case .warning: "exclamationmark.triangle.fill"
+            }
+        }
+
+        var fill: NSColor {
+            switch self {
+            // Blue, and deliberately not one of the theme's colours: the
+            // toast has to be legible over whatever the terminal is showing
+            // under it, and a colour taken from the palette would be the one
+            // element that vanishes exactly when the theme is low-contrast or
+            // when a program has painted that colour across the screen.
+            // `systemBlue` rather than `controlAccentColor` for the same
+            // reason — the accent colour is the user's and can be grey.
+            case .confirmation: NSColor.systemBlue.withAlphaComponent(0.92)
+            case .warning: NSColor.systemOrange.withAlphaComponent(0.94)
+            }
+        }
+    }
+
+    func showToast(_ text: String, kind: ToastKind = .confirmation) {
+        toastDismissal?.cancel()
+        toastLayer?.removeFromSuperlayer()
+
+        let scale = window?.backingScaleFactor ?? 2
+        let font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        let label = CATextLayer()
+        label.string = NSAttributedString(
+            string: text,
+            attributes: [.font: font, .foregroundColor: NSColor.white])
+        label.contentsScale = scale
+        label.alignmentMode = .left
+
+        let symbolSide = (font.pointSize + 3).rounded(.up)
+        let symbolGap: CGFloat = 5
+        let textSize = (text as NSString).size(withAttributes: [.font: font])
+        let size = CGSize(
+            width: (textSize.width).rounded(.up) + symbolSide + symbolGap
+                + 2 * Self.toastPadding.width,
+            height: max(symbolSide, textSize.height.rounded(.up))
+                + 2 * Self.toastPadding.height)
+
+        let capsule = CALayer()
+        capsule.bounds = CGRect(origin: .zero, size: size)
+        capsule.anchorPoint = .zero
+        capsule.cornerRadius = size.height / 2
+        capsule.contentsScale = scale
+        capsule.backgroundColor = kind.fill.cgColor
+        capsule.borderColor = NSColor.white.withAlphaComponent(
+            SystemAccessibility.increaseContrast ? 0.85 : 0.22
+        ).cgColor
+        capsule.borderWidth = 1
+        // A little lift, so the capsule reads as sitting above the text
+        // rather than as a coloured run inside it.
+        capsule.shadowColor = NSColor.black.cgColor
+        capsule.shadowOpacity = 0.28
+        capsule.shadowRadius = 6
+        capsule.shadowOffset = CGSize(width: 0, height: 1)
+        if let symbol = NSImage(
+            systemSymbolName: kind.symbolName, accessibilityDescription: nil)?
+            .withSymbolConfiguration(
+                .init(pointSize: font.pointSize + 1, weight: .semibold)
+                    .applying(.init(paletteColors: [.white])))
+        {
+            let icon = CALayer()
+            icon.frame = CGRect(
+                x: Self.toastPadding.width,
+                y: ((size.height - symbolSide) / 2).rounded(),
+                width: symbolSide, height: symbolSide)
+            icon.contentsScale = scale
+            icon.contents = symbol.layerContents(forContentsScale: scale)
+            icon.contentsGravity = .resizeAspect
+            capsule.addSublayer(icon)
+        }
+        label.frame = CGRect(
+            x: Self.toastPadding.width + symbolSide + symbolGap,
+            y: (size.height - textSize.height).rounded() / 2,
+            width: textSize.width.rounded(.up) + 1, height: textSize.height.rounded(.up))
+        capsule.addSublayer(label)
+
+        layer?.addSublayer(capsule)
+        toastLayer = capsule
+        positionToast()
+
+        let appear = CABasicAnimation(keyPath: "opacity")
+        appear.fromValue = 0.0
+        appear.toValue = 1.0
+        appear.duration = SystemAccessibility.duration(0.12)
+        capsule.add(appear, forKey: "appear")
+
+        // Held on the main queue rather than a `Timer`: the view may go away
+        // with the pane, and a cancelled work item leaves nothing behind.
+        let dismissal = DispatchWorkItem { [weak self] in self?.dismissToast() }
+        toastDismissal = dismissal
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.toastDuration, execute: dismissal)
+    }
+
+    private func dismissToast() {
+        guard let capsule = toastLayer else { return }
+        toastLayer = nil
+        toastDismissal = nil
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 1.0
+        fade.toValue = 0.0
+        fade.duration = SystemAccessibility.duration(0.25)
+        fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { capsule.removeFromSuperlayer() }
+        capsule.opacity = 0
+        capsule.add(fade, forKey: "fade")
+        CATransaction.commit()
+    }
+
+    /// Bottom-right, inside the same inset the text grid uses so it lines up
+    /// with the content rather than with the pane edge. The hosted layer's
+    /// geometry runs top-down with the flipped view (see `commonInit`), so
+    /// "bottom" is `maxY`. Re-run from `layout()`: a pane resized while a
+    /// toast is up must not leave it stranded mid-air.
+    private func positionToast() {
+        guard let capsule = toastLayer else { return }
+        let size = capsule.bounds.size
+        CATransaction.begin()
+        // No implicit animation: this is a correction, not a move.
+        CATransaction.setDisableActions(true)
+        capsule.position = CGPoint(
+            x: bounds.maxX - size.width - TerminalLayout.insets.right,
+            y: bounds.maxY - size.height - TerminalLayout.insets.bottom)
+        CATransaction.commit()
+    }
+
+    /// Long enough to read four words without looking for it, short enough
+    /// that it is gone before it becomes something to dismiss.
+    private static let toastDuration: TimeInterval = 1.1
+    private static let toastPadding = CGSize(width: 10, height: 5)
+
     private func updateDrawableSize() {
         let scale = window?.backingScaleFactor ?? 1
         metalLayer.contentsScale = scale
@@ -307,6 +545,8 @@ final class TerminalView: NSView, CALayerDelegate {
     }
 
     @objc private func frameTick() {
+        let frameInterval = InputLatencySignposts.begin(.frame)
+        defer { InputLatencySignposts.end(.frame, frameInterval) }
         if let shouldRenderFrame, !shouldRenderFrame() {
             // Nothing to draw: park the link. The shell un-parks it via
             // `setNeedsRedraw()` when output arrives or the viewport changes.

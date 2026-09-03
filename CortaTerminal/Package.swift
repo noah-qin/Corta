@@ -9,7 +9,7 @@ import PackageDescription
 // isolation here is the entire reason this package exists.
 let package = Package(
     name: "CortaTerminal",
-    platforms: [.macOS("26.5")],
+    platforms: [.macOS("26.0")],
     products: [
         .library(name: "CortaTerminal", targets: ["CortaTerminal"]),
         .executable(name: "corta-dump", targets: ["corta-dump"]),

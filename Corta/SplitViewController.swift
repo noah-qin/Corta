@@ -18,7 +18,10 @@ final class SplitViewController: NSViewController {
     /// `noteFocus` from `TerminalView.becomeFirstResponder`, so every route
     /// to focus — click, ⌘⌥ arrows, a split, a close — funnels through one
     /// place.
-    private(set) var focusedPane: ViewController?
+    /// Settable from `SplitViewController+Restore`, which walks a saved
+    /// layout by focusing each pane in turn and splitting it — the same path
+    /// ⌘D takes, rather than a second tree builder.
+    var focusedPane: ViewController?
     /// Window setup ran (`viewWillAppear`). Panes created by a split later
     /// take `didSizeWindow` from this.
     private var didSetUpWindow = false
@@ -45,9 +48,16 @@ final class SplitViewController: NSViewController {
     var panes: [ViewController] { children.compactMap { $0 as? ViewController } }
     var hasMultiplePanes: Bool { tree?.leafCount ?? 1 > 1 }
 
+    /// The layout this window is being restored into (M7.4), set by
+    /// `AppDelegate` before the view loads. The root pane needs its working
+    /// directory at spawn time, which is why this has to be here rather than
+    /// applied afterwards.
+    var pendingRestore: WindowState?
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        let pane = makePane(workingDirectory: nil, initialGridSize: nil)
+        let pane = makePane(
+            workingDirectory: pendingRestore?.layout.firstDirectory, initialGridSize: nil)
         focusedPane = pane
         tree = SplitTree(root: pane.view)
         installRoot()
@@ -58,7 +68,13 @@ final class SplitViewController: NSViewController {
         guard !didSetUpWindow, let window = view.window, let pane = focusedPane else { return }
         didSetUpWindow = true
         pane.didSizeWindow = true
-        let metrics = pane.terminalRenderer.pointMetrics
+        // A pane that failed to build (`PaneFailureView`) has no atlas to
+        // measure, so the window falls back to the storyboard's size rather
+        // than to a trap.
+        guard let metrics = pane.terminalRenderer?.pointMetrics else {
+            didSetUpWindow = false
+            return
+        }
         window.title = "Corta"
         // Tabs (M4.7) are native window tabbing: `.automatic` here, and File >
         // New Tab joins the key window's tab group. The tab label follows
@@ -100,8 +116,8 @@ final class SplitViewController: NSViewController {
         // On this OS, once `.fullSizeContentView` is in the mask,
         // `setContentSize` sizes the *frame* (the content view spans the
         // frame) — and it still miscalculates the chrome by a full titlebar
-        // height on the first call. The size is therefore corrected once at
-        // the first settled layout (`correctInitialWindowSize`); the
+        // height on the first call. The size is therefore corrected once in
+        // `viewDidAppear`, after AppKit's final adjustment; the
         // session is born at the target grid size and nothing is delivered
         // before then (`sizeSettled` gate), so no transient winsize reaches
         // the child (D.1).
@@ -131,7 +147,34 @@ final class SplitViewController: NSViewController {
         // once, so without this every new window and every new tab flashes
         // the desktop for a frame or two.
         view.layoutSubtreeIfNeeded()
-        pane.terminalView.drawNow()
+        pane.terminalView?.drawNow()
+
+        // The splits, last: they need the window's final frame to halve, and
+        // the frame is only final once the sizing above has run.
+        if let restore = pendingRestore {
+            pendingRestore = nil
+            // The saved frame is authoritative; the default-grid correction
+            // must not overwrite it after the window appears.
+            didCorrectWindowSize = true
+            // Clamped to a display that exists now — see `Frame.onScreen`.
+            if window.tabbedWindows == nil {
+                window.setFrame(restore.frame.onScreen(), display: false)
+            }
+            view.layoutSubtreeIfNeeded()
+            self.restore(layout: restore.layout)
+        }
+    }
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        // AppKit applies `.fullSizeContentView`'s final frame adjustment after
+        // the last pre-display layout. Correcting in `viewWillLayout` saw the
+        // still-correct frame, marked the work done, and then AppKit removed
+        // one titlebar height — turning a configured 120×30 into 120×27.
+        // At this point that adjustment is complete, while the session is
+        // still protected by the `sizeSettled` gate.
+        correctInitialWindowSize()
+        view.layoutSubtreeIfNeeded()
     }
 
     override func viewWillLayout() {
@@ -144,7 +187,6 @@ final class SplitViewController: NSViewController {
             abs(view.bounds.height - window.frame.height) < 1
         {
             layoutSettled = true
-            correctInitialWindowSize()
         }
     }
 
@@ -192,13 +234,19 @@ final class SplitViewController: NSViewController {
     private func correctInitialWindowSize() {
         guard !didCorrectWindowSize, let window = view.window, let pane = focusedPane
         else { return }
-        didCorrectWindowSize = true
         // A tab takes the group's frame; nothing to correct.
-        guard window.tabbedWindows == nil else { return }
+        guard window.tabbedWindows == nil else {
+            didCorrectWindowSize = true
+            return
+        }
         let target = pane.initialWindowContentSize
         guard abs(window.frame.height - target.height) > 1
             || abs(window.frame.width - target.width) > 1
-        else { return }
+        else {
+            didCorrectWindowSize = true
+            return
+        }
+        didCorrectWindowSize = true
         var frame = window.frame
         frame.origin.y += frame.height - target.height
         frame.size = target
@@ -249,7 +297,7 @@ final class SplitViewController: NSViewController {
     @objc func splitRight(_ sender: Any?) { splitFocusedPane(orientation: .columns) }
     @objc func splitDown(_ sender: Any?) { splitFocusedPane(orientation: .rows) }
 
-    func splitFocusedPane(orientation: SplitOrientation) {
+    func splitFocusedPane(orientation: SplitOrientation, workingDirectory: String? = nil) {
         guard let focusedPane else { return }
         // Captured before the split: the node takes the leaf's old frame,
         // and the two halves are pre-set on the subviews so the very first
@@ -258,7 +306,7 @@ final class SplitViewController: NSViewController {
         // the "split flashes, then settles" jank.
         let oldFrame = focusedPane.view.frame
         let pane = makePane(
-            workingDirectory: focusedPane.session.workingDirectory,
+            workingDirectory: workingDirectory ?? focusedPane.session?.workingDirectory,
             initialGridSize: halvedGridSize(of: focusedPane, orientation: orientation))
         let node = tree.split(
             leaf: focusedPane.view, orientation: orientation, newLeaf: pane.view)
@@ -310,9 +358,16 @@ final class SplitViewController: NSViewController {
     /// meaning (a tabbed window closes the tab, not the group).
     @objc func performClose(_ sender: Any?) {
         guard hasMultiplePanes, let focusedPane else {
+            // The window's own close runs through `windowShouldClose`, which
+            // is where the whole-window confirmation lives — asking here too
+            // would ask twice.
             view.window?.performClose(sender)
             return
         }
+        guard confirmClose(
+            of: focusedPane.session?.hasForegroundJob == true ? [focusedPane] : [],
+            scope: "this pane")
+        else { return }
         closePane(focusedPane)
     }
 
@@ -320,7 +375,7 @@ final class SplitViewController: NSViewController {
         // The bar's key monitor outlives the pane if it is left open.
         pane.closeSearchBar()
         pane.taskNotifier.cancel()
-        pane.session.stop()
+        pane.session?.stop()
         let survivingSubtree = tree.close(leaf: pane.view)
         pane.removeFromParent()
         installRoot()
@@ -369,12 +424,17 @@ final class SplitViewController: NSViewController {
         applyWindowTitle()
     }
 
-    /// The window's title is the focused pane's OSC 0/2 title (M2.8); a
-    /// title arriving in an unfocused pane waits for focus.
+    /// The window's title is the focused pane's (M2.8, M5.2) — what is
+    /// running, where, and the grid size (`ViewController.applyWindowTitle`).
+    /// A title arriving in an unfocused pane waits for focus.
     func applyWindowTitle() {
         guard let window = view.window else { return }
-        let title = focusedPane?.session.windowTitle
-        window.title = title?.isEmpty == false ? title! : "Corta"
+        guard let focusedPane else {
+            window.title = "Corta"
+            window.representedURL = nil
+            return
+        }
+        focusedPane.applyWindowTitle()
     }
 
     @objc func moveFocusLeft(_ sender: Any?) { moveFocus(.left) }

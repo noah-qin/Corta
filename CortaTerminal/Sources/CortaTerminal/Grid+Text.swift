@@ -80,6 +80,33 @@ extension Grid {
         return joinedLogicalLine(firstRow: top, lastRow: bottom)
     }
 
+    /// One document row's text, trailing blanks trimmed. The only text
+    /// accessor that does *not* re-join wrapped rows: an assistive technology
+    /// addresses the terminal by screen line, because that is what a person
+    /// reading a terminal out loud is looking at — a soft wrap is a fact about
+    /// the screen, not about the sentence.
+    public func rowText(_ row: Int) -> String {
+        joinedLogicalLine(firstRow: row, lastRow: row).text
+    }
+
+    /// `rowText`, plus the grid column each character came from.
+    ///
+    /// The two do not line up on their own: a wide character occupies two
+    /// columns and contributes one character, a combining sequence occupies
+    /// one column and can contribute several, and trailing blanks are trimmed
+    /// away entirely. Anything translating between a cell coordinate and a
+    /// character offset — a selection an accessibility client asks for as a
+    /// character range — needs the mapping rather than an assumption.
+    public func rowTextWithColumns(_ row: Int) -> (text: String, columns: [Int]) {
+        let line = joinedLogicalLine(firstRow: row, lastRow: row)
+        var columns: [Int] = []
+        columns.reserveCapacity(line.text.count)
+        for offset in 0..<line.text.count {
+            columns.append(line.position(at: offset)?.column ?? offset)
+        }
+        return (line.text, columns)
+    }
+
     /// Joins `firstRow...lastRow` (already known to be one wrap chain) into
     /// a `LogicalLine`, trimming trailing blanks and recording the
     /// per-character (row, column) mapping.

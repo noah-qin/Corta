@@ -1,0 +1,202 @@
+name: Release
+
+# Cutting a release: follow the checklist at the bottom of CHANGELOG.md,
+# then push a tag. This builds from the tag and opens a DRAFT release for
+# review — nothing is ever published automatically.
+#
+# Signing and notarisation (M6.16) run only when all six repository
+# secrets below exist. Until they do, the workflow still produces an
+# ad-hoc signed build, and the release notes say so plainly rather than
+# handing users a download that Gatekeeper will silently refuse.
+#
+#   MACOS_CERTIFICATE          Developer ID Application .p12, base64
+#   MACOS_CERTIFICATE_PASSWORD Password for that .p12
+#   MACOS_SIGNING_IDENTITY     e.g. "Developer ID Application: Name (TEAMID)"
+#   MACOS_NOTARY_KEY           App Store Connect API private key (.p8), base64
+#   MACOS_NOTARY_KEY_ID        Key ID for that .p8
+#   MACOS_NOTARY_ISSUER_ID     Issuer ID from App Store Connect
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build (e.g. v0.1.0)
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and draft a release
+    runs-on: macos-26
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Select the newest installed Xcode
+        run: |
+          latest=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          sudo xcode-select -s "$latest"
+          xcodebuild -version
+
+      - name: Work out the version
+        id: version
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether signing secrets are available
+        id: signing
+        env:
+          CERT: ${{ secrets.MACOS_CERTIFICATE }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+          NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+        run: |
+          if [ -n "$CERT" ] && [ -n "$CERT_PASSWORD" ] && \
+             [ -n "$SIGNING_IDENTITY" ] && [ -n "$NOTARY_KEY" ] && \
+             [ -n "$NOTARY_KEY_ID" ] && [ -n "$NOTARY_ISSUER_ID" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No signing secrets. Producing an ad-hoc signed, un-notarised build."
+          fi
+
+      - name: Run the tests before shipping anything
+        run: |
+          swift test --package-path CortaTerminal
+          xcodebuild test \
+            -project Corta.xcodeproj \
+            -scheme Corta \
+            -destination 'platform=macOS' \
+            -skip-testing:CortaUITests \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGNING_REQUIRED=NO \
+            DEVELOPMENT_TEAM="" \
+            -quiet
+
+      - name: Import the signing certificate
+        if: steps.signing.outputs.available == 'true'
+        env:
+          CERT: ${{ secrets.MACOS_CERTIFICATE }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          keychain=build.keychain
+          password=$(uuidgen)
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security list-keychains -d user -s "$keychain" login.keychain-db
+          echo "$CERT" | base64 --decode > /tmp/certificate.p12
+          security import /tmp/certificate.p12 -k "$keychain" \
+            -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$password" "$keychain"
+          rm -f /tmp/certificate.p12
+
+      - name: Build (signed)
+        if: steps.signing.outputs.available == 'true'
+        run: |
+          xcodebuild build \
+            -project Corta.xcodeproj \
+            -scheme Corta \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="${{ secrets.MACOS_SIGNING_IDENTITY }}" \
+            CODE_SIGN_STYLE=Manual \
+            ENABLE_HARDENED_RUNTIME=YES \
+            OTHER_CODE_SIGN_FLAGS="--timestamp --options=runtime" \
+            -quiet
+
+      - name: Build (ad-hoc)
+        if: steps.signing.outputs.available != 'true'
+        run: |
+          xcodebuild build \
+            -project Corta.xcodeproj \
+            -scheme Corta \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGNING_REQUIRED=NO \
+            DEVELOPMENT_TEAM="" \
+            -quiet
+
+      - name: Package
+        id: package
+        run: |
+          app=build/Build/Products/Release/Corta.app
+          test -d "$app" || { echo "no app at $app"; exit 1; }
+          zip="Corta-${{ steps.version.outputs.version }}.zip"
+          ditto -c -k --keepParent --sequesterRsrc "$app" "$zip"
+          shasum -a 256 "$zip" > "$zip.sha256"
+          echo "zip=$zip" >> "$GITHUB_OUTPUT"
+
+      - name: Notarise and staple
+        if: steps.signing.outputs.available == 'true'
+        env:
+          NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+          NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+        run: |
+          echo "$NOTARY_KEY" | base64 --decode > /tmp/notary.p8
+          xcrun notarytool submit "${{ steps.package.outputs.zip }}" \
+            --key /tmp/notary.p8 \
+            --key-id "$NOTARY_KEY_ID" \
+            --issuer "$NOTARY_ISSUER_ID" \
+            --wait
+          xcrun stapler staple build/Build/Products/Release/Corta.app
+          xcrun stapler validate build/Build/Products/Release/Corta.app
+          codesign --verify --deep --strict --verbose=2 \
+            build/Build/Products/Release/Corta.app
+          rm -f /tmp/notary.p8 "${{ steps.package.outputs.zip }}"
+          ditto -c -k --keepParent --sequesterRsrc \
+            build/Build/Products/Release/Corta.app \
+            "${{ steps.package.outputs.zip }}"
+          shasum -a 256 "${{ steps.package.outputs.zip }}" \
+            > "${{ steps.package.outputs.zip }}.sha256"
+
+      - name: Write the release notes
+        run: |
+          sha=$(shasum -a 256 "${{ steps.package.outputs.zip }}" | cut -d' ' -f1)
+          {
+            echo "## Corta ${{ steps.version.outputs.tag }}"
+            echo
+            echo "See [CHANGELOG.md](https://github.com/noah-qin/Corta/blob/${{ steps.version.outputs.tag }}/CHANGELOG.md) for what changed."
+            echo
+            echo "Requires macOS 26.5 or later."
+            echo
+            if [ "${{ steps.signing.outputs.available }}" != "true" ]; then
+              echo "> [!WARNING]"
+              echo "> **This build is not signed or notarised.** macOS will refuse to"
+              echo "> open it until you clear the quarantine attribute yourself:"
+              echo "> \`xattr -dr com.apple.quarantine /Applications/Corta.app\`."
+              echo "> Only do that if you trust this build. Building from source is"
+              echo "> the alternative, and is documented in the README."
+              echo
+            fi
+            echo "\`\`\`"
+            echo "SHA-256  $sha"
+            echo "\`\`\`"
+          } > release-notes.md
+
+      - name: Open a draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --draft \
+            --title "Corta ${{ steps.version.outputs.tag }}" \
+            --notes-file release-notes.md \
+            "${{ steps.package.outputs.zip }}" \
+            "${{ steps.package.outputs.zip }}.sha256"

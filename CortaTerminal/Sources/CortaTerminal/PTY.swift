@@ -229,6 +229,88 @@ public final class PTY: @unchecked Sendable {
     /// How the child ended, or `nil` while it is still running.
     public var exitStatus: ChildExit? { state.withLock { $0.exit } }
 
+    /// The process group that currently owns the terminal, or `nil` when the
+    /// descriptor has no controlling terminal any more (the child exited).
+    ///
+    /// This is how a terminal answers "is anything running in here?" without
+    /// shell integration: the shell puts a job it starts into its own process
+    /// group and hands that group the terminal, so a foreground group that is
+    /// not the shell itself *is* a running command.
+    public var foregroundProcessGroup: pid_t? {
+        let group = tcgetpgrp(fileDescriptor)
+        return group > 0 ? group : nil
+    }
+
+    /// Whether a command other than the shell owns the terminal right now —
+    /// what a "something is still running" close confirmation has to know.
+    public var hasForegroundJob: Bool {
+        guard let group = foregroundProcessGroup else { return false }
+        return group != processIdentifier
+    }
+
+    /// The executable name of the foreground job, for a confirmation dialog
+    /// that can say *what* is running. `nil` when nothing but the shell is,
+    /// or when the name cannot be read — a dialog without a name is still a
+    /// useful dialog.
+    public var foregroundProcessName: String? {
+        guard let group = foregroundProcessGroup, group != processIdentifier else { return nil }
+        return Self.processName(ofGroup: group)
+    }
+
+    /// The name of whatever owns the terminal right now — the shell while it
+    /// sits at a prompt, the command while one runs.
+    ///
+    /// Deliberately not the same question as `foregroundProcessName`, which
+    /// is `nil` for the shell: a close confirmation must not say "zsh is
+    /// still running", and a title bar very much wants to say "zsh".
+    public var activeProcessName: String? {
+        guard let group = foregroundProcessGroup else { return nil }
+        return Self.processName(ofGroup: group)
+    }
+
+    /// `proc_name` writes into a fixed buffer and returns the name's length,
+    /// excluding the terminator; `String(cString:)` is deprecated for a
+    /// `[CChar]` buffer, and unlike this, scans for that terminator itself
+    /// rather than trusting the length the syscall already gave.
+    private static func processName(ofGroup group: pid_t) -> String? {
+        var buffer = [CChar](repeating: 0, count: 256)
+        let length = proc_name(group, &buffer, UInt32(buffer.count))
+        guard length > 0 else { return nil }
+        let bytes = buffer.prefix(Int(length)).map { UInt8(bitPattern: $0) }
+        let name = String(decoding: bytes, as: UTF8.self)
+        return name.isEmpty ? nil : name
+    }
+
+    /// The working directory of whatever owns the terminal, read from the
+    /// kernel.
+    ///
+    /// Asked of the OS rather than of the child, because the child does not
+    /// answer. The conventional route is OSC 7, and on macOS the system
+    /// `/etc/zshrc` only emits it when `TERM_PROGRAM` is `Apple_Terminal` —
+    /// so every terminal that is not Terminal.app gets nothing from a stock
+    /// shell. `proc_pidinfo` needs no cooperation and cannot be spoofed by
+    /// output, which also makes it the safer of the two: OSC 7 is a string
+    /// the child chooses (`SECURITY.md` §2).
+    ///
+    /// `nil` when the process is gone or the path cannot be read. Not cached
+    /// here — it is a syscall, and the caller decides how often it is worth
+    /// making (`ViewController.applyWindowTitle` refreshes on an interval,
+    /// not per output batch).
+    public var currentWorkingDirectory: String? {
+        guard let group = foregroundProcessGroup else { return nil }
+        var info = proc_vnodepathinfo()
+        let size = Int32(MemoryLayout<proc_vnodepathinfo>.size)
+        guard proc_pidinfo(group, PROC_PIDVNODEPATHINFO, 0, &info, size) == size else {
+            return nil
+        }
+        let path = withUnsafeBytes(of: &info.pvi_cdir.vip_path) { raw -> String? in
+            guard let base = raw.baseAddress else { return nil }
+            return String(cString: base.assumingMemoryBound(to: CChar.self))
+        }
+        guard let path, !path.isEmpty else { return nil }
+        return path
+    }
+
     /// Sends a signal to the child's process *group*.
     ///
     /// The group, not the process: the child is a shell, and its own children

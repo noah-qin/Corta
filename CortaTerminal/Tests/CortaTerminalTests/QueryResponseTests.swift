@@ -55,14 +55,21 @@ struct QueryResponseTests {
         #expect(terminal.takeOutput().isEmpty)
     }
 
-    /// DSR 5 (status), a bare `CSI n`, DECXCPR (`CSI ? 6 n`) and the title
-    /// query all stay silent — the title query deliberately so
-    /// (`SECURITY.md` §2.2).
+    /// DSR 5 (operating status) and DECXCPR (`CSI ? 6 n`) are now answered:
+    /// both went unanswered, and a status query is the one sequence where
+    /// silence is read as "the terminal is dead" — the programs that wait for
+    /// it without a timeout wait forever.
+    @Test("status and extended cursor-position queries are answered")
+    func statusQueriesAreAnswered() throws {
+        #expect(try output("\\e[5n") == Array("\u{1B}[0n".utf8))
+        #expect(try output("\\e[?6n") == Array("\u{1B}[?1;1;1R".utf8))
+    }
+
+    /// A bare `CSI n` names no report, and the title query is withheld on
+    /// purpose (`SECURITY.md` §2.2).
     @Test("other queries get no answer")
     func unimplementedQueriesAreSilent() throws {
-        #expect(try output("\\e[5n").isEmpty)
         #expect(try output("\\e[n").isEmpty)
-        #expect(try output("\\e[?6n").isEmpty)
         #expect(try output("\\e[21t").isEmpty)
     }
 

@@ -12,6 +12,9 @@ final class SplitPaneUITests: XCTestCase {
     @MainActor
     func testSplitThenClosePaneThenCloseWindow() throws {
         let app = XCUIApplication()
+        // Session restore (M7.4) would otherwise carry the previous
+        // test's windows into this one; the suite asserts window counts.
+        app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
         app.launch()
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 5))
@@ -39,6 +42,9 @@ final class SplitPaneUITests: XCTestCase {
     @MainActor
     func testSplitScreenshot() throws {
         let app = XCUIApplication()
+        // Session restore (M7.4) would otherwise carry the previous
+        // test's windows into this one; the suite asserts window counts.
+        app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
         app.launch()
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 5))

@@ -13,6 +13,13 @@ public protocol ParserPerformer {
     /// A printable character.
     mutating func print(_ scalar: UInt32)
 
+    /// A contiguous run of printable ASCII bytes in the ground state.
+    /// Keeping this as a separate callback lets the overwhelmingly common
+    /// terminal-output case avoid one parser state-machine dispatch and one
+    /// protocol call per byte. The default preserves compatibility for small
+    /// performers used by parser tests.
+    mutating func printASCII(_ bytes: ArraySlice<UInt8>)
+
     /// A C0 control that acts immediately — `\r`, `\n`, `\t`, `\b`, BEL.
     mutating func execute(_ control: UInt8)
 
@@ -29,6 +36,10 @@ public protocol ParserPerformer {
 }
 
 extension ParserPerformer {
+    public mutating func printASCII(_ bytes: ArraySlice<UInt8>) {
+        for byte in bytes { print(UInt32(byte)) }
+    }
+
     public mutating func escapeDispatch(intermediates: Intermediates, final: UInt8) {}
     public mutating func csiDispatch(_ sequence: CSISequence) {}
     public mutating func oscDispatch(_ bytes: ArraySlice<UInt8>) {}

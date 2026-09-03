@@ -59,10 +59,43 @@ capabilities.
 | **Dynamic colour** (OSC 10/11/12 query form) | Themes and TUI capability probes  | Probe times out                      |
 | **Kitty keyboard** (`ESC [ ? u`) | Editors that bind `Ctrl+I` and `Tab` apart    | Both keys arrive as `0x09`           |
 
-All four shipped in M6 (M6.5, M6.6, M6.9). DECRQM answers 0 —
-"not recognised" — for the modes Corta does not track, which is the
-honest reply and the one that unblocks the probe; the failure mode this
-table is about is *silence*, not a negative answer.
+All four shipped in M6 (M6.5, M6.6, M6.9), plus **DSR operating status**
+(`ESC [ 5 n` → `ESC [ 0 n`) and **DECXCPR** (`ESC [ ? 6 n`), both of which
+went unanswered until M8. A status query is the one sequence where silence
+is read as "the terminal is dead", and the programs that wait for it
+without a timeout wait forever.
+
+DECRQM answers 0 — "not recognised" — for the modes Corta does not track,
+which is the honest reply and the one that unblocks the probe; the failure
+mode this table is about is *silence*, not a negative answer.
+
+**A mode reported as supported has to behave.** DECRQM's four-state answer
+is a contract: a program that is told a mode is set lays its next screen
+out against that behaviour, so answering 1 or 2 for a bit nothing acts on
+is worse than answering 0. The four modifiable ANSI modes therefore split:
+
+| Mode      | Answer | Why                                                     |
+| --------- | ------ | ------------------------------------------------------- |
+| IRM (4)   | 1 / 2  | Implemented (`Grid.insertMode`) — a print inserts and shifts the row right |
+| LNM (20)  | 1 / 2  | Implemented (`PerformerState.newLineModeEnabled`) — LF/VT/FF also return the carriage, and Return sends CR LF |
+| KAM (2)   | 4      | Deliberately not implemented: a terminal that stops accepting input on a byte from the child is one a runaway program can wedge, with no way for the user to tell it from a hang |
+| SRM (12)  | 4      | Deliberately not implemented: Corta never echoes keystrokes itself, so there is no local echo to switch off |
+
+4 is "permanently reset", which is a stronger answer than 0 — a program
+learns not to ask again.
+
+**Colour-space specifications (P2).** OSC 10/11/12 accept `#RGB` through
+`#RRRRGGGGBBBB` and `rgb:R/G/B`. `rgbi:`, `CIELab:`, `CIEuvY:`, `CIExyY:`,
+`CIEXYZ:` and `TekHVC:` are **refused**: the sequence is parsed, no colour
+is changed, and nothing is written back. Each of those is a colour-space
+conversion needing a white point and a gamma curve — the answer depends on
+the display profile, so an implementation is either colour-managed
+properly or it is a wrong number dressed as a right one. Refusing is also
+the safe direction: a program that sets a colour and sees no change keeps
+legible text, whereas a mis-converted `CIELab` black-on-black is a
+terminal you cannot read. The corresponding esctest cases are recorded as
+expected failures for this reason (`ROADMAP.md`), and
+`Performer+Query.parseColorSpecification` carries the policy in full.
 
 **DECSCL gates DECRQM.** A program that announced VT200 with
 `ESC [ 62 ; 0 " p` has asked to be talked to as an older terminal, and
@@ -95,7 +128,9 @@ be **fixed-format and never echo attacker-controlled text** — see
 | Capability                                       | Tier | Notes                                              |
 | ------------------------------------------------ | ---- | -------------------------------------------------- |
 | GPU glyph atlas + instanced quads                | P0   | One draw call per screen                            |
-| Foreground / background, bold, italic, underline | P0   |                                                    |
+| Foreground / background, bold, italic, underline | P0   | Real faces where the family has them; synthetic oblique and stroked weight where it does not |
+| Missing glyph is visible, not blank              | P0   | Hollow box for a scalar no font in the cascade covers |
+| Every glyph clipped to its cell box              | P0   | Overwide ink is scaled to fit rather than painted into the next column |
 | Cursor: block / bar / underline, blink           | P0   |                                                    |
 | Selection highlight                              | P0   | Document-anchored quads; follows its text as output scrolls |
 | Retina / HiDPI scaling                           | P0   |                                                    |
@@ -208,14 +243,14 @@ chmod +x /tmp/corta-esctest.sh
 SHELL=/tmp/corta-esctest.sh Corta.app/Contents/MacOS/Corta
 ```
 
-**M6 result: 81 passed, 335 known bugs, 152 failed of 568.** Against the
-M2 record (50 / 334 / 184) that is 32 failures fixed and none
-introduced — the failing-test list is a strict subset. 16 of the 32 came
-from the CHA/HPA/HPR/VPA/VPR commit made between milestones; the other
-16 are M6's DECRQM, DECSCL and dynamic-colour work.
+**M6 result: 106 passed, 335 known bugs, 127 failed of 568.** Against the
+M2 record (50 / 334 / 184) that is 57 failures fixed and none
+introduced — the failing-test list is a strict subset. The closeout pass
+added programmable tabs, CNL/CPL/CHT/CBT, IND/NEL/RI, RIS and DECSTR,
+including the soft-reset isolation esctest itself relies on.
 
 xterm-compatibility — passes plus "known bugs", the number comparable
-across terminals — is **73.2%**, up from the 67.6% carried since M2.
+across terminals — is **77.6%**, up from the 67.6% carried since M2.
 
 ### 4.3 Fuzzing
 
@@ -244,7 +279,8 @@ CortaTerminal/.build/release/corta-fuzz --fuzz 500000 --seed 1 \
 It has no coverage feedback, so it explores far less per iteration than
 libFuzzer would. What it does have is a fixed seed, so a failure is
 reproducible from the command line that found it. **Recorded at M6:**
-2.5M mutated inputs across seeds 1–5, clean.
+2.5M mutated inputs across seeds 1–5, clean. A separate 100,000-input
+run under AddressSanitizer (seed `3735928559`) was also clean.
 
 The corpus itself replays inside the test suite (`FuzzCorpusTests`), so a
 crash found by a long run is fixed by adding its input to
@@ -280,7 +316,46 @@ under `Corta/` is therefore verified by launching the app and checking:
 1. the window's content size matches columns x rows x point metrics,
 2. `stty size` in the child agrees with it,
 3. a screenshot shows text upright, full size, and filling the window,
-4. output longer than the screen scrolls and uses every row.
+4. output longer than the screen scrolls and uses every row,
+5. gestures and menu actions reach the pane — the terminal view is first
+   responder, so `keyDown` fires and First-Responder menu items (⌘V, ⌘=)
+   are not dead.
+
+### 4.4.2 Real-program verification (P0, M8.20)
+
+Render tests and golden-file grid tests both assert that a byte stream
+produces a grid. Neither can tell you that `vim` is usable. The five P0
+areas below are *behavioural*, and every one of them has a failure mode
+that a passing grid test is compatible with:
+
+| Area                          | Verified with                                | What to look for | Result |
+| ----------------------------- | -------------------------------------------- | ---------------- | ------ |
+| Cursor movement, shape, blink, mode switches | `vim`, `nvim`, `htop`, `less`  | The cursor sits where the program thinks it does after a mode change; `DECSCUSR` shapes take effect; no ghost cursor in an unfocused pane | Pass |
+| Scroll regions and the viewport | `tmux` with several panes, `less` on a long file | A region scroll does not disturb rows outside it; scrollback follows the bottom; scrolling back and returning lands where it started | Pass, with one exception below |
+| Left/right margins and wide characters | `vim` with a CJK file, `tmux` split narrow | A wide glyph never straddles the right margin; a resize rewraps without stranding rows | Pass |
+| Insert and delete (ICH/IL/DCH/DL) | `vim` editing mid-line, `readline` with IRM | The redraw range matches the edit; nothing is left behind to the right of an insert | Pass |
+| Erase (ED/EL/ECH) | `clear`, `htop` redraw, `tmux` window switch | No residue from the previous screen, and the cursor ends where the sequence says | Pass |
+
+Run interactively on the release build (`vim ~/.zshrc`; `tmux` split
+`%`/`"` and window switch `n`/`p`; `htop` refresh; `less` on
+`/var/log/system.log` with `/search`, `n`, `g`/`G`; a CJK file in `vim`
+and in a narrow `tmux` split; a mid-line edit in `vim`; `clear`), judged
+by eye — not something a test target can assert. `esctest` (§4.2) covers
+the sequences; this covers the programs.
+
+**Bug found:** `less`'s search-match highlight (reverse video on a `/`
+hit) never renders in Corta — the view scrolls to the match correctly,
+but the matched text stays in plain colors. Confirmed against
+Terminal.app on the same machine and file, which highlights the same
+search normally, so this is not a `less` configuration difference.
+`Performer.swift` sets/clears `CellAttributes.reverse` correctly on SGR
+7/27, and `TerminalRenderer.swift` swaps `resolveForeground`/
+`resolveBackground` when the bit is set — the code path that should
+produce this looked correct on inspection, so the fault is not yet
+isolated. Needs a live signpost or grid-dump capture of what `less`
+actually sends for a standout match versus what a plain `ESC[7m`/`ESC[27m`
+pair sent by hand produces, to find where the two diverge. Tracked as an
+open bug, not a blocker for this checklist.
 
 ### 4.4.1 IME verification (M3.1–M3.4)
 
@@ -333,9 +408,7 @@ Run at every milestone, because these are the actual workload:
 6. `git log --graph --color` through a pager
 
 **2026-09-02 — M2 closeout pass (items 1 and 3).** tmux, htop and
-Neovim were not installed and the machine has no Homebrew
-(`/opt/homebrew` absent; installing Homebrew itself needs sudo, which
-unattended runs must not do), so tmux 3.5a and htop 3.4.1 were built
+Neovim were not installed, so tmux 3.5a and htop 3.4.1 were built
 from source into a user-writable prefix (`/tmp/corta-tools`). Neovim
 was not installed; nothing in items 1 or 3 needs it, so item 2 is
 unaffected either way.
@@ -383,11 +456,11 @@ window in this milestone, and what was not:
   entry points are the documented ones, but **a human still has to
   pinch, force-touch and drag a file** before those three lines of the
   milestone are honestly closed.
-- **Not verified live: focus reporting end to end.** `?1004` is tested
-  in the core and the app's transition rule is a pure function of pane
-  focus and window key state, but "Neovim `autoread` fires when you
-  come back to the window" needs Neovim installed and a person
-  switching windows.
+- **Verified live: focus reporting end to end.** Portable Neovim 0.12.5
+  ran as the child of a Release Corta session with `FocusLost` and
+  `FocusGained` autocmds recording to a side-channel file. A detached
+  TextEdit → Corta focus cycle recorded `lost`, then `gained`; a raw PTY
+  probe independently captured the expected `CSI O` and `CSI I` bytes.
 
 - **esctest re-run — reproduces the M2 number exactly.** esctest2
   (ThomasDickey/esctest2) with `--expected-terminal xterm

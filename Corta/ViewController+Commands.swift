@@ -59,22 +59,41 @@ extension ViewController {
     /// accumulated instead and spent one whole point at a time, which keeps
     /// a live pinch on exactly the steps ⌘+/⌘− lands on.
     func magnify(by magnification: CGFloat) {
-        pinchAccumulator += magnification
+        let sizes = Self.fontSizes(
+            forMagnification: magnification,
+            accumulator: &pinchAccumulator,
+            startingAt: fontSize)
+        for size in sizes { setFontSizeForAllPanes(size) }
+    }
+
+    /// Pure step accumulator behind the AppKit gesture entry point. Keeping
+    /// the continuous-to-discrete conversion here makes its threshold,
+    /// direction, multi-step behaviour and clamps deterministic in tests.
+    nonisolated static func fontSizes(
+        forMagnification magnification: CGFloat,
+        accumulator: inout CGFloat,
+        startingAt fontSize: CGFloat
+    ) -> [CGFloat] {
+        accumulator += magnification
         // ~0.15 of a pinch per point: small enough that a deliberate pinch
         // resizes, large enough that resting two fingers does not.
         let step: CGFloat = 0.15
-        while abs(pinchAccumulator) >= step {
-            let direction: CGFloat = pinchAccumulator > 0 ? 1 : -1
-            pinchAccumulator -= direction * step
-            let target = fontSize + direction
+        var current = fontSize
+        var sizes: [CGFloat] = []
+        while abs(accumulator) >= step {
+            let direction: CGFloat = accumulator > 0 ? 1 : -1
+            accumulator -= direction * step
+            let target = current + direction
             // At the clamp the accumulator would otherwise keep filling and
             // fire a burst of rebuilds the moment the pinch reverses.
             guard target >= 8, target <= 64 else {
-                pinchAccumulator = 0
-                return
+                accumulator = 0
+                return sizes
             }
-            setFontSizeForAllPanes(target)
+            sizes.append(target)
+            current = target
         }
+        return sizes
     }
 
     /// Called when the gesture ends, so the next pinch starts from zero
@@ -89,6 +108,28 @@ extension ViewController {
         } else {
             setFontSize(newSize)
         }
+        persistFontSize(newSize)
+    }
+
+    /// Writes the new size to the config file, which is the only store there
+    /// is (`CLAUDE.md`: two stores drift, and the file has to win).
+    ///
+    /// Without this, ⌘+ / ⌘− / pinch changed a size that lived nowhere:
+    /// the file still said 12, and the *next* config change of any kind —
+    /// picking a theme, opening the settings page, saving the file in an
+    /// editor — ran `configurationChanged`, which re-applies `font-size` and
+    /// silently threw the zoom away. It also meant a zoom did not survive a
+    /// relaunch, and a new window opened at the old size while the one beside
+    /// it was zoomed.
+    ///
+    /// `ConfigurationStore.update` is a no-op when the value is unchanged, so
+    /// the write happens once per whole-point step and a pinch that ends
+    /// where it started writes nothing at all. `setFontSize` is likewise
+    /// guarded, so the change notification this posts costs every pane a
+    /// comparison and nothing more.
+    private func persistFontSize(_ newSize: CGFloat) {
+        let clamped = Double(min(64, max(8, newSize)))
+        ConfigurationStore.shared.update { $0.fontSize = clamped }
     }
 
     /// A font change rebuilds the renderer: the glyph atlas is rasterised

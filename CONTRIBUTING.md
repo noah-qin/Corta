@@ -119,3 +119,28 @@ Before writing a commit, work through this checklist:
   line.
 - Describe the motivation and how you verified the change.
 - Make sure `CortaTests` and `CortaUITests` pass before requesting review.
+- A template is filled in for you when you open the PR. The three
+  conditional sections are not decoration: app-layer changes are verified
+  by launching the app, render-loop changes report a re-measured frame-CPU
+  baseline, and parser changes replay the fuzz corpus.
+- `main` is protected. Changes land by squash merge, and the branch is
+  deleted afterwards.
+
+## Reporting Problems
+
+- **Bugs and feature requests** — open an issue. The forms ask for the
+  byte sequence that reproduces the problem; that is the part that makes a
+  VT bug fixable.
+- **Questions and ideas** — Discussions, not issues.
+- **Security vulnerabilities** — never in public. `SECURITY.md` has the
+  private reporting channel.
+- **Conduct** — `CODE_OF_CONDUCT.md`.
+
+## Licence of Contributions
+
+Corta is licensed under the Apache License 2.0. Under Section 5 of that
+licence, anything you deliberately submit for inclusion is licensed the
+same way. There is no separate CLA to sign.
+
+The Corta name, the pangolin mascot and the application icon are not
+covered by the source licence — see `NOTICE`.
