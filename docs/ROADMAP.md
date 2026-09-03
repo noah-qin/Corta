@@ -568,6 +568,151 @@ changes at 1.879 ms avg / 2.659 ms p95, below M6's figure.
 
 ---
 
+## M8 — Usability, Accessibility and Honesty
+
+M7 closed the places Corta guessed. M8 closes the places it was
+*unreachable*, *silent* or *not telling the truth* — three categories
+that share a shape: each was invisible to every passing test, because a
+test can assert what a pixel is and not who can read it.
+
+### Reachable
+
+- [x] **M8.1** VoiceOver and every other assistive technology. A
+      `CAMetalLayer` is pixels, so AppKit had no text to derive an
+      accessibility tree from and the app's entire content was one
+      unlabelled rectangle. `TerminalView` now implements the text-area
+      protocol — value, selection, insertion point, per-line ranges,
+      on-screen frames for a character range — fed by a flattened
+      snapshot the pane supplies (`TerminalAccessibilitySnapshot`), with
+      `valueChanged` posted on output, rate-limited and gated on
+      VoiceOver actually running so the render path pays nothing.
+      *Done when:* the pane reports role `AXTextArea`, its value is the
+      visible grid text, and its help line carries the grid size and the
+      cursor's row and column.
+- [x] **M8.2** Settings-page label-control relationships
+      (`accessibilityTitleUIElement` / `servesAsTitleForUIElements` per
+      row), so a control is never announced as unnamed and its label is
+      never read as loose text elsewhere in the pane.
+- [x] **M8.3** The three system display preferences, in one place
+      (`SystemAccessibility`): Reduce Motion (the settings window's
+      resize, the search bar's fade, the toast, the visual bell — which
+      holds steady rather than vanishing, because a bell whose whole
+      expression is a fade would stop signalling at zero duration),
+      Reduce Transparency (the search bar and the command palette take an
+      opaque fill and a drawn border, not a lowered alpha), and Increase
+      Contrast (secondary label colours promoted, panel borders drawn).
+      Observed, not read once at launch.
+- [x] **M8.4** State stops being carried by colour alone. The toast takes
+      a symbol and a kind, the settings page reports saves and failures
+      through `SettingsStatusView` (symbol, then sentence, then tint —
+      in that order of load-bearing), and `PaneFailureView` uses the
+      label colour rather than red.
+- [x] **M8.5** Discoverability: Help > Keyboard Shortcuts (⌘/), listing
+      every `TerminalCommand` under its group with the key that runs it,
+      unbound commands included. It reads the same table the menus and
+      the palette do, so a rebinding in the config file shows rebound.
+- [x] **M8.6** Split focus stops reading as "disabled". A 22%-black wash
+      over every pane but one cost a fifth of the contrast on text the
+      user was still reading, in a feature whose purpose is watching two
+      things at once. The signal is now positive and on the active pane —
+      an accent ring — with the dim reduced to 8%.
+
+### Honest
+
+- [x] **M8.7** No `fatalError`, no `try!` on the pane's startup path.
+      Metal absence, an atlas that will not build, a `$SHELL` pointing at
+      an uninstalled shell and a restored working directory on an
+      unmounted volume were four crashes; the recoverable ones now
+      degrade (system face at the default size; a shell/directory
+      fallback chain that drops the failing ingredient first and says so
+      in a toast) and the rest present `PaneFailureView` with Try Again.
+      `isOperable` guards every geometry and render entry point.
+- [x] **M8.8** A failed config write no longer reports success.
+      `ConfigurationStore.update` rolls the in-memory value back and
+      posts no `didChange` — the file is the source of truth, so a value
+      the file does not hold is a value the next reload discards. The
+      settings page shows the reason with a Retry, and "Show Config File"
+      reveals nothing it did not manage to write.
+- [x] **M8.9** Notification permission is read, not assumed. The switch
+      said "on" over a denied permission; the page now says macOS is not
+      delivering and offers the System Settings pane, which is the only
+      route back — there is no API to re-prompt.
+- [x] **M8.10** The window title stops spending a third of itself, and a
+      third of every tab label, on a grid size that is interesting for
+      the two seconds of a drag. `120×27` appears while resizing and for
+      a moment after, then goes.
+- [x] **M8.11** The Edit menu loses the `NSTextView` template it could
+      never honour: spelling, substitutions, transformations, speech,
+      Paste and Match Style, and Find and Replace — the last of which was
+      a menu item promising an operation `performFindPanelAction` had
+      already decided to drop. AutoFill and Start Dictation are pruned as
+      the menu opens, because AppKit re-injects them. Emoji & Symbols
+      stays: `TerminalView` is an `NSTextInputClient`, so it works.
+- [x] **M8.12** Window restore lands on a display that exists
+      (`WindowState.Frame.onScreen` intersects the saved frame with a
+      screen's `visibleFrame`), and the first restored window is a fresh
+      window rather than the storyboard's — whose root pane had already
+      spawned a shell in the home directory, which is the one thing a
+      restore cannot repair after the fact.
+- [x] **M8.13** SM/RM — the ANSI modes — get a dispatch case at all.
+      IRM (4) and LNM (20) are implemented and DECRQM reports their live
+      state; KAM (2) and SRM (12) report permanently reset, with the
+      reasoning in `Performer+Modes.swift`. DSR operating status
+      (`CSI 5 n`) and DECXCPR (`CSI ? 6 n`) are answered — both were
+      silent, and a status query is where silence reads as a dead
+      terminal. The refused colour spaces (`rgbi:`, `CIELab:` and kin)
+      are now a documented policy rather than an omission
+      (`CONFORMANCE.md` §1.2).
+- [x] **M8.14** The macOS deployment target moves to 26.0
+      (`project.pbxproj` ×4, `CortaTerminal/Package.swift`, `README.md`,
+      `CLAUDE.md`).
+
+### Measurable
+
+- [x] **M8.15** `os_signpost` across the whole input chain — keyDown →
+      PTY write → grid revision → MainActor wake → display-link callback
+      → commit → GPU completion (`InputLatencySignposts`,
+      `PERFORMANCE.md` §5.3). Behind `OSSignposter.isEnabled`, so a run
+      with no trace pays one atomic load per stage.
+- [x] **M8.16** `corta-bench` reports p50/p95/p99/max instead of an
+      average, over 2,000 samples rather than 200 — the p99 of 200 is the
+      second-largest value, which is one hiccup away from noise
+      (`PERFORMANCE.md` §5.1). The fixed benchmark environment every
+      quoted number must hold is written down in §5.2.
+- [ ] **M8.17** Cross-terminal comparison against Terminal.app, iTerm2
+      and Ghostty on one machine under §5.2 conditions: input latency,
+      scroll latency, frame stability, GPU wait, all as §5.1
+      distributions. **Not started** — none of the three is installed
+      here, and a comparison run on different hardware or a different
+      refresh rate is not a comparison.
+- [ ] **M8.18** Measure `CAMetalLayer.maximumDrawableCount = 2`. The
+      knob exists (`CORTA_MAX_DRAWABLES=2`, one launch, no code change)
+      and the trace that answers it exists (M8.15); the measurement needs
+      Typometer and a controlled A/B, which has not been run.
+      **Not started.**
+- [ ] **M8.19** Confirm whether an input-triggered partial redraw ever
+      misses the current display frame and waits a refresh period. The
+      signpost trace shows it directly — an `output` event landing after
+      that frame's `frame` interval opened — but no trace has been
+      recorded. **Not started.**
+- [ ] **M8.20** Recorded real-program pass for the five P0 behavioural
+      areas — cursor, scroll regions, margins and wide characters,
+      insert/delete, erase — driven by `vim`, `tmux`, `htop` and `less`
+      and judged by eye (`CONFORMANCE.md` §4.4.2). `esctest` covers the
+      sequences; this covers the programs, and it is not something a test
+      target can assert. **Not started.**
+
+**M8 is done when** the terminal's content is reachable by a screen
+reader, no failure path is a crash or a false success, and every latency
+number in `PERFORMANCE.md` is a distribution taken in a stated
+environment.
+
+**Status: 16 of 20 done.** The four open items (M8.17–M8.20) are all
+measurement or observation that needs a controlled environment and, for
+three of them, software not present on this machine.
+
+---
+
 ## Cut List
 
 If time runs short, drop in this order. None of these blocks daily use.

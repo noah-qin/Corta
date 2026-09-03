@@ -59,10 +59,43 @@ capabilities.
 | **Dynamic colour** (OSC 10/11/12 query form) | Themes and TUI capability probes  | Probe times out                      |
 | **Kitty keyboard** (`ESC [ ? u`) | Editors that bind `Ctrl+I` and `Tab` apart    | Both keys arrive as `0x09`           |
 
-All four shipped in M6 (M6.5, M6.6, M6.9). DECRQM answers 0 —
-"not recognised" — for the modes Corta does not track, which is the
-honest reply and the one that unblocks the probe; the failure mode this
-table is about is *silence*, not a negative answer.
+All four shipped in M6 (M6.5, M6.6, M6.9), plus **DSR operating status**
+(`ESC [ 5 n` → `ESC [ 0 n`) and **DECXCPR** (`ESC [ ? 6 n`), both of which
+went unanswered until M8. A status query is the one sequence where silence
+is read as "the terminal is dead", and the programs that wait for it
+without a timeout wait forever.
+
+DECRQM answers 0 — "not recognised" — for the modes Corta does not track,
+which is the honest reply and the one that unblocks the probe; the failure
+mode this table is about is *silence*, not a negative answer.
+
+**A mode reported as supported has to behave.** DECRQM's four-state answer
+is a contract: a program that is told a mode is set lays its next screen
+out against that behaviour, so answering 1 or 2 for a bit nothing acts on
+is worse than answering 0. The four modifiable ANSI modes therefore split:
+
+| Mode      | Answer | Why                                                     |
+| --------- | ------ | ------------------------------------------------------- |
+| IRM (4)   | 1 / 2  | Implemented (`Grid.insertMode`) — a print inserts and shifts the row right |
+| LNM (20)  | 1 / 2  | Implemented (`PerformerState.newLineModeEnabled`) — LF/VT/FF also return the carriage, and Return sends CR LF |
+| KAM (2)   | 4      | Deliberately not implemented: a terminal that stops accepting input on a byte from the child is one a runaway program can wedge, with no way for the user to tell it from a hang |
+| SRM (12)  | 4      | Deliberately not implemented: Corta never echoes keystrokes itself, so there is no local echo to switch off |
+
+4 is "permanently reset", which is a stronger answer than 0 — a program
+learns not to ask again.
+
+**Colour-space specifications (P2).** OSC 10/11/12 accept `#RGB` through
+`#RRRRGGGGBBBB` and `rgb:R/G/B`. `rgbi:`, `CIELab:`, `CIEuvY:`, `CIExyY:`,
+`CIEXYZ:` and `TekHVC:` are **refused**: the sequence is parsed, no colour
+is changed, and nothing is written back. Each of those is a colour-space
+conversion needing a white point and a gamma curve — the answer depends on
+the display profile, so an implementation is either colour-managed
+properly or it is a wrong number dressed as a right one. Refusing is also
+the safe direction: a program that sets a colour and sees no change keeps
+legible text, whereas a mis-converted `CIELab` black-on-black is a
+terminal you cannot read. The corresponding esctest cases are recorded as
+expected failures for this reason (`ROADMAP.md`), and
+`Performer+Query.parseColorSpecification` carries the policy in full.
 
 **DECSCL gates DECRQM.** A program that announced VT200 with
 `ESC [ 62 ; 0 " p` has asked to be talked to as an older terminal, and
@@ -283,7 +316,31 @@ under `Corta/` is therefore verified by launching the app and checking:
 1. the window's content size matches columns x rows x point metrics,
 2. `stty size` in the child agrees with it,
 3. a screenshot shows text upright, full size, and filling the window,
-4. output longer than the screen scrolls and uses every row.
+4. output longer than the screen scrolls and uses every row,
+5. gestures and menu actions reach the pane — the terminal view is first
+   responder, so `keyDown` fires and First-Responder menu items (⌘V, ⌘=)
+   are not dead.
+
+### 4.4.2 Real-program verification (P0, outstanding)
+
+Render tests and golden-file grid tests both assert that a byte stream
+produces a grid. Neither can tell you that `vim` is usable. The five P0
+areas below are *behavioural*, and every one of them has a failure mode
+that a passing grid test is compatible with:
+
+| Area                          | Verified with                                | What to look for |
+| ----------------------------- | -------------------------------------------- | ---------------- |
+| Cursor movement, shape, blink, mode switches | `vim`, `nvim`, `htop`, `less`  | The cursor sits where the program thinks it does after a mode change; `DECSCUSR` shapes take effect; no ghost cursor in an unfocused pane |
+| Scroll regions and the viewport | `tmux` with several panes, `less` on a long file | A region scroll does not disturb rows outside it; scrollback follows the bottom; scrolling back and returning lands where it started |
+| Left/right margins and wide characters | `vim` with a CJK file, `tmux` split narrow | A wide glyph never straddles the right margin; a resize rewraps without stranding rows |
+| Insert and delete (ICH/IL/DCH/DL) | `vim` editing mid-line, `readline` with IRM | The redraw range matches the edit; nothing is left behind to the right of an insert |
+| Erase (ED/EL/ECH) | `clear`, `htop` redraw, `tmux` window switch | No residue from the previous screen, and the cursor ends where the sequence says |
+
+**These have not been run as a recorded pass.** Doing so means driving
+each program interactively and judging the result by eye — it is not
+something a test target can assert — so it is tracked as an outstanding
+P0 rather than claimed. `esctest` (§4.2) covers the sequences; this covers
+the programs.
 
 ### 4.4.1 IME verification (M3.1–M3.4)
 

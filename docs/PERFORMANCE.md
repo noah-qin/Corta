@@ -145,3 +145,106 @@ the observed latency after the grid mutation.
 
 **Establish the baseline at M1.** Without a baseline, "performance is the
 first priority" is a slogan rather than a constraint.
+
+### 5.1 Report distributions, never averages
+
+Every latency number in this document must carry **p50, p95, p99 and the
+maximum**. `corta-bench` reports all four (`LatencyDistribution`); the
+M6 Typometer figure above predates the rule and is reported as its
+average, which is exactly the shape of the problem.
+
+An average is the one statistic a latency measurement should not be
+reduced to. Keypress latency is not normally distributed — a tight body
+with a tail of vsync misses and scheduling hiccups — and it is the tail
+that is felt: 45 ms average with a 90 ms p99 is a terminal that visibly
+stutters once a second while averaging "fine". A change that trades 2 ms
+off the mean for 20 ms on the p99 is a regression that an average
+reports as an improvement.
+
+The sample count has to support the percentile it claims. The p99 of 200
+samples is the second-largest value in the set, which is one scheduling
+hiccup away from being noise; `corta-bench` takes 2,000.
+
+### 5.2 The fixed benchmark environment
+
+Numbers recorded in this document or in `ROADMAP.md` are only comparable
+against numbers taken the same way. Any run that is quoted must state:
+
+| Variable          | Fixed at                                              |
+| ----------------- | ----------------------------------------------------- |
+| Machine           | The recorded machine and chip (M6: MacBook Air, Apple silicon) |
+| Build             | Release (`-c release` / the Release scheme), never Debug |
+| Display           | Built-in panel, and its refresh rate — a 120 Hz panel halves the vsync quantum a 60 Hz one imposes, which moves every latency number in this table |
+| Scale factor      | The display's native backing scale (the atlas is rasterised per scale) |
+| Font              | System monospaced at 12 pt, the default |
+| Window            | 120×30, one pane, not full screen, no tab bar |
+| Power             | Mains, not battery — the efficiency cores and a lowered display refresh rate are both on the table otherwise |
+| Other load        | No other application in the foreground; the app activated and its window frontmost |
+| Test program      | Named explicitly (`cat`, `yes`, `nvim` in `tmux`, `vtebench` case) |
+
+Two runs that differ in any row of that table are two different
+measurements. In particular a Debug build is not a slow Release build:
+the parse path's bounds checks and non-inlined generics change its shape,
+not only its speed.
+
+### 5.3 Attributing latency: `os_signpost`
+
+An end-to-end number says whether the last change helped. It cannot say
+*where* the time goes, and each stage has a different fix — so the whole
+chain emits `os_signpost` intervals (`Corta/InputLatencySignposts.swift`),
+subsystem `dev.noahqin.Corta`, category `input-latency`:
+
+| Signpost  | Covers                                              |
+| --------- | --------------------------------------------------- |
+| `keyDown` | key event → bytes written to the PTY                |
+| `output`  | a parse batch has been applied to the grid (a point, not an interval — it is emitted on the reader thread) |
+| `wake`    | the MainActor hop that un-parks the display link    |
+| `frame`   | the vsync callback: damage diff, instance build, `nextDrawable` |
+| `commit`  | encode and submit                                   |
+| `gpu`     | submission → the command buffer's completion handler |
+
+```sh
+xcrun xctrace record --template 'os_signpost' --launch -- \
+    /path/to/Corta.app/Contents/MacOS/Corta
+```
+
+Everything is behind `OSSignposter.isEnabled`, which is false unless a
+trace is recording, so the render path pays one atomic load per stage.
+That is what makes it safe in a Release build — and the point is that the
+2.40 ms → 4.19 ms frame-CPU regression this document warns about was
+invisible to every passing test and would have been one interval wide in
+a trace.
+
+**Open question this instrumentation exists to answer:** whether an
+input-triggered partial redraw occasionally misses the current display
+frame and waits a whole refresh period. In a trace this is visible
+directly — an `output` event landing after that frame's `frame` interval
+has begun, with the next `frame` an interval later. Not yet measured.
+
+### 5.4 `maximumDrawableCount`
+
+`CAMetalLayer.maximumDrawableCount = 2` is often cited as removing a
+frame of latency; it can equally add one, because `nextDrawable()` then
+blocks the main thread more often waiting for a drawable to be recycled.
+Which one happens depends on how long a frame takes on the machine in
+question, so it is a measurement, not a choice.
+
+Corta ships the default (3), which is what the M6 figure was measured
+against. `CORTA_MAX_DRAWABLES=2` sets it for one launch, so the
+comparison is two launches of the same binary rather than a code change.
+Pair it with a signpost trace: if double buffering is costing rather than
+saving, it appears as the `frame` interval growing at its front.
+
+**Not yet measured.**
+
+### 5.5 Cross-terminal comparison
+
+**Not yet measured.** Corta's numbers have never been taken alongside
+Terminal.app, iTerm2 and Ghostty on the same machine, in the same
+conditions, with the same test programs — input latency, scroll latency,
+frame stability and GPU wait. Until they have been, "fast" is a claim
+about Corta against its own previous self.
+
+The comparison must hold §5.2 fixed across all four terminals, use the
+same font family and size in each (the atlas cost is per face), and
+report §5.1 distributions rather than averages for every one of them.
