@@ -74,7 +74,11 @@ extension ViewController {
     /// change does, and refits the session afterwards.
     func rebuildAtlas(forBackingScale scale: CGFloat) {
         guard scale > 0, scale != terminalRenderer.scale else { return }
-        terminalRenderer.setFont(TerminalFont.primary(ofSize: fontSize), scale: scale)
+        terminalRenderer.setFont(
+            TerminalFont.primary(
+                ofSize: fontSize,
+                family: fontFamily),
+            scale: scale)
         let metrics = terminalRenderer.pointMetrics
         terminalView.cellSize = CGSize(width: metrics.cellWidth, height: metrics.cellHeight)
         view.window?.contentResizeIncrements = NSSize(
@@ -91,7 +95,8 @@ extension ViewController {
         guard clamped != fontSize else { return }
         fontSize = clamped
 
-        let font = TerminalFont.primary(ofSize: fontSize)
+        let font = TerminalFont.primary(
+            ofSize: fontSize, family: fontFamily)
         let scale = view.window?.backingScaleFactor ?? terminalRenderer.scale
         // Re-point the existing renderer rather than building a new one: the
         // pipelines and the atlas texture are reusable, and rebuilding them

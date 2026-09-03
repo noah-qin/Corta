@@ -109,7 +109,7 @@ struct SelectionRendererTests {
         let selection = TerminalSelection(
             start: GridPosition(row: -count, column: 4),
             end: GridPosition(row: -count, column: 8),
-            baseScrollbackCount: count)
+            baseScrollbackTotal: count)
 
         // Scrolled all the way up, that line is viewport row 0.
         let scrolled = Self.draw(fixture, grid: grid, scrollOffset: count, selection: selection)
@@ -143,7 +143,7 @@ struct SelectionRendererTests {
         let selection = TerminalSelection(
             start: GridPosition(row: 1, column: 4),
             end: GridPosition(row: 1, column: 8),
-            baseScrollbackCount: 0)
+            baseScrollbackTotal: 0)
         #expect(grid1.scrollback.count == 0)
 
         // Frame 1 populates the renderer's caches, overlay included.

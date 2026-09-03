@@ -9,7 +9,7 @@ import Cocoa
 import CortaTerminal
 
 @main
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     /// Strong references to every open terminal window's controller —
     /// nothing else retains a window controller, and a deallocated
@@ -92,6 +92,96 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         windowControllers.removeAll { $0.window === window }
         NotificationCenter.default.removeObserver(
             self, name: NSWindow.willCloseNotification, object: window)
+    }
+
+    // MARK: - Settings (M6.1)
+
+    /// ⌘, from the app menu, and the Settings menu's own item.
+    @objc func showSettings(_ sender: Any?) {
+        SettingsWindowController.shared.show(sender)
+    }
+
+    /// The settings menu sits in the menu bar beside Shell and Edit, and is
+    /// built here rather than in the storyboard because two of its three
+    /// sections are lists of values that live in code — the built-in themes
+    /// and the appearance choices. A storyboard copy of either would be a
+    /// second place to update.
+    private func installSettingsMenu() {
+        guard let mainMenu = NSApp.mainMenu,
+            let shellIndex = mainMenu.items.firstIndex(where: { $0.title == "Shell" })
+        else { return }
+
+        let menu = NSMenu(title: "Settings")
+        menu.addItem(
+            withTitle: "Settings…", action: #selector(showSettings(_:)), keyEquivalent: "")
+        menu.addItem(.separator())
+
+        let themeItem = NSMenuItem(title: "Theme", action: nil, keyEquivalent: "")
+        let themeMenu = NSMenu(title: "Theme")
+        for (index, theme) in Theme.builtIn.enumerated() {
+            let item = NSMenuItem(
+                title: theme.displayName, action: #selector(selectTheme(_:)), keyEquivalent: "")
+            item.tag = index
+            item.target = self
+            themeMenu.addItem(item)
+        }
+        themeItem.submenu = themeMenu
+        menu.addItem(themeItem)
+
+        let appearanceItem = NSMenuItem(title: "Appearance", action: nil, keyEquivalent: "")
+        let appearanceMenu = NSMenu(title: "Appearance")
+        for (index, appearance) in Configuration.Appearance.allCases.enumerated() {
+            let title = appearance == .auto ? "Follow System" : appearance.rawValue.capitalized
+            let item = NSMenuItem(
+                title: title, action: #selector(selectAppearance(_:)), keyEquivalent: "")
+            item.tag = index
+            item.target = self
+            appearanceMenu.addItem(item)
+        }
+        appearanceItem.submenu = appearanceMenu
+        menu.addItem(appearanceItem)
+
+        let item = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
+        item.submenu = menu
+        mainMenu.insertItem(item, at: shellIndex + 1)
+    }
+
+    @objc private func selectTheme(_ sender: NSMenuItem) {
+        let theme = Theme.builtIn[sender.tag]
+        ConfigurationStore.shared.update { $0.theme = theme.name }
+    }
+
+    @objc private func selectAppearance(_ sender: NSMenuItem) {
+        let appearance = Configuration.Appearance.allCases[sender.tag]
+        ConfigurationStore.shared.update { $0.appearance = appearance }
+    }
+
+    /// Ticks the live theme and appearance. `NSMenuValidation` runs just
+    /// before a menu opens, which is the only moment the state has to be
+    /// right — and it stays right when the config file changes underneath.
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        let configuration = ConfigurationStore.shared.configuration
+        switch menuItem.action {
+        case #selector(selectTheme(_:)):
+            menuItem.state = Theme.builtIn[menuItem.tag].name == configuration.theme ? .on : .off
+        case #selector(selectAppearance(_:)):
+            menuItem.state =
+                Configuration.Appearance.allCases[menuItem.tag] == configuration.appearance
+                ? .on : .off
+        default:
+            break
+        }
+        return true
+    }
+
+    /// Before the storyboard's first window exists — the first pane reads
+    /// the configuration as it loads and draws with the theme's live
+    /// variant, so both have to be resolved by then or the window opens in
+    /// the default colours and visibly re-themes a frame later.
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        _ = ConfigurationStore.shared
+        AppearanceController.shared.start()
+        installSettingsMenu()
     }
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {

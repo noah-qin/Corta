@@ -35,6 +35,12 @@ class ViewController: NSViewController {
     /// The atlas is rasterised for one size, so a change rebuilds the
     /// renderer — see `setFontSize`.
     var fontSize: CGFloat = ViewController.defaultFontSize
+    /// The font family in use, from the settings page (M6.1). The sentinel
+    /// `Configuration.systemFontFamily` means System Monospaced. Kept so a
+    /// config change can tell a family swap from a size change — they need
+    /// the same rebuild, but a size change has its own path (`setFontSize`)
+    /// that short-circuits when the size is unchanged.
+    var fontFamily: String = Configuration.systemFontFamily
     /// Matches the stock 120x30 Terminal profile on this Mac. Keeping the
     /// terminal's default here (rather than compensating with narrower cell
     /// geometry) preserves the font's real advance and makes TUIs such as
@@ -195,7 +201,14 @@ class ViewController: NSViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        let font = TerminalFont.primary(ofSize: fontSize)
+        // The settings page's font and size (M6.1). Read here rather than
+        // pushed in later: a pane created at any time — a split, a new tab —
+        // gets the current values by asking, and nothing has to remember to
+        // tell it.
+        let configuration = ConfigurationStore.shared.configuration
+        fontSize = min(64, max(8, configuration.fontSize))
+        fontFamily = configuration.fontFamily
+        let font = TerminalFont.primary(ofSize: fontSize, family: fontFamily)
         guard let device = MTLCreateSystemDefaultDevice() else {
             fatalError("Metal is required")
         }
@@ -276,13 +289,18 @@ class ViewController: NSViewController {
             // terminal should start where a login shell would — and a split
             // pane starts where the pane it was split from is (M5.5).
             size: initialSize,
-            workingDirectory: inheritedWorkingDirectory ?? NSHomeDirectory())
+            workingDirectory: inheritedWorkingDirectory ?? NSHomeDirectory(),
+            // Per session: a running child's history cannot be re-limited
+            // without discarding lines, so a change applies to sessions
+            // opened after it.
+            scrollbackLimit: configuration.scrollbackLines)
         lastRequestedSize = initialSize
         resizeDebouncer = ResizeDebouncer { [weak self] size in
             self?.session.resize(to: size)
         }
         // Fires on the reader thread after every parse batch.
         observeWindowFocus()
+        observeConfiguration()
         session.onOutput = { [weak self] in
             self?.noteOutput()
         }
@@ -319,7 +337,7 @@ class ViewController: NSViewController {
                 return NSFont.monospacedSystemFont(
                     ofSize: ViewController.defaultFontSize, weight: .medium)
             }
-            return TerminalFont.primary(ofSize: fontSize) as NSFont
+            return TerminalFont.primary(ofSize: fontSize, family: fontFamily) as NSFont
         }
         view.isMouseReportingEnabled = { [weak self] in
             self?.mouseReportingEnabled() ?? false

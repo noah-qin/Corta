@@ -31,9 +31,27 @@ nonisolated enum TerminalFont {
     /// `.medium` matches Terminal.app's on-screen stem density at 12pt;
     /// `.regular` rasterises roughly a quarter lighter through the grayscale
     /// Metal atlas and reads soft even when its quads are pixel-aligned.
-    static func primary(ofSize size: CGFloat) -> CTFont {
+    ///
+    /// - Parameter family: a font family from the settings page (M6.1), or
+    ///   `nil` for System Monospaced. A family that is not installed, or
+    ///   whose faces are not fixed-pitch, falls back to the system font
+    ///   rather than laying a proportional face out on a grid.
+    static func primary(ofSize size: CGFloat, family: String? = nil) -> CTFont {
+        if let family, family != Configuration.systemFontFamily,
+            let font = NSFont(name: family, size: size) ?? namedFamily(family, size: size),
+            font.isFixedPitch
+        {
+            return pinningCascadeList(font as CTFont, size: size)
+        }
         let system = NSFont.monospacedSystemFont(ofSize: size, weight: .medium) as CTFont
         return pinningCascadeList(system, size: size)
+    }
+
+    /// `NSFont(name:)` wants a *face* name ("Menlo-Regular"); the settings
+    /// page lists *family* names ("Menlo"). This resolves the latter.
+    private static func namedFamily(_ family: String, size: CGFloat) -> NSFont? {
+        let descriptor = NSFontDescriptor(fontAttributes: [.family: family])
+        return NSFont(descriptor: descriptor, size: size)
     }
 
     /// The bold variant of `font` — what the atlas rasterises bold cells
