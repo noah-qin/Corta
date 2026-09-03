@@ -89,9 +89,37 @@ nonisolated struct Shortcut: Equatable, Sendable {
         if modifiers.contains(.option) { glyphs += "⌥" }
         if modifiers.contains(.shift) { glyphs += "⇧" }
         if modifiers.contains(.command) { glyphs += "⌘" }
-        let name = Self.namedKeys.first { $0.key == key }?.name ?? key
-        return glyphs + name.uppercased()
+        return glyphs + Self.keyGlyph(for: key)
     }
+
+    /// The key as macOS spells it in a menu: `←`, `⇞`, `⏎`, `⎋`.
+    ///
+    /// The config-file name uppercased gave `⌥⌘LEFT` and `⌃⌘RIGHT` — legible,
+    /// and not what any Mac shows anywhere. Every one of these keys has a
+    /// glyph the system uses in its own menus, and a palette that spells them
+    /// out is a palette whose shortcuts do not match the menu bar's next to
+    /// it. A single letter still uppercases, because that is also what AppKit
+    /// draws (`menuKeyEquivalent`).
+    static func keyGlyph(for key: String) -> String {
+        if let glyph = keyGlyphs.first(where: { $0.key == key })?.glyph { return glyph }
+        return (namedKeys.first { $0.key == key }?.name ?? key).uppercased()
+    }
+
+    private static let keyGlyphs: [(key: String, glyph: String)] = [
+        (String(UnicodeScalar(NSUpArrowFunctionKey)!), "↑"),
+        (String(UnicodeScalar(NSDownArrowFunctionKey)!), "↓"),
+        (String(UnicodeScalar(NSLeftArrowFunctionKey)!), "←"),
+        (String(UnicodeScalar(NSRightArrowFunctionKey)!), "→"),
+        (String(UnicodeScalar(NSHomeFunctionKey)!), "↖"),
+        (String(UnicodeScalar(NSEndFunctionKey)!), "↘"),
+        (String(UnicodeScalar(NSPageUpFunctionKey)!), "⇞"),
+        (String(UnicodeScalar(NSPageDownFunctionKey)!), "⇟"),
+        ("\r", "⏎"),
+        ("\t", "⇥"),
+        (" ", "␣"),
+        ("\u{1B}", "⎋"),
+        ("\u{8}", "⌫"),
+    ]
 
     /// AppKit's convention: an uppercase key equivalent *is* the shift
     /// modifier, and a menu item that sets both shows "⇧⇧". Normalises to the
@@ -152,35 +180,35 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     /// What the menus and the palette call it.
     var title: String {
         switch self {
-        case .newWindow: return "New Window"
-        case .newTab: return "New Tab"
-        case .close: return "Close"
-        case .splitRight: return "Split Pane Right"
-        case .splitDown: return "Split Pane Down"
-        case .focusLeft: return "Move Focus Left"
-        case .focusRight: return "Move Focus Right"
-        case .focusUp: return "Move Focus Up"
-        case .focusDown: return "Move Focus Down"
-        case .growPaneHorizontally: return "Grow Pane Horizontally"
-        case .shrinkPaneHorizontally: return "Shrink Pane Horizontally"
-        case .growPaneVertically: return "Grow Pane Vertically"
-        case .shrinkPaneVertically: return "Shrink Pane Vertically"
-        case .equalizePanes: return "Equalize Panes"
-        case .increaseFontSize: return "Bigger"
-        case .decreaseFontSize: return "Smaller"
-        case .resetFontSize: return "Actual Size"
-        case .find: return "Find…"
-        case .copy: return "Copy"
-        case .paste: return "Paste"
-        case .selectAll: return "Select All"
-        case .scrollPageUp: return "Scroll Page Up"
-        case .scrollPageDown: return "Scroll Page Down"
-        case .scrollToTop: return "Scroll to Top"
-        case .scrollToBottom: return "Scroll to Bottom"
-        case .previousCommand: return "Previous Command"
-        case .nextCommand: return "Next Command"
-        case .settings: return "Settings…"
-        case .commandPalette: return "Command Palette…"
+        case .newWindow: return L10n.text("command.newWindow")
+        case .newTab: return L10n.text("command.newTab")
+        case .close: return L10n.text("command.close")
+        case .splitRight: return L10n.text("command.splitRight")
+        case .splitDown: return L10n.text("command.splitDown")
+        case .focusLeft: return L10n.text("command.focusLeft")
+        case .focusRight: return L10n.text("command.focusRight")
+        case .focusUp: return L10n.text("command.focusUp")
+        case .focusDown: return L10n.text("command.focusDown")
+        case .growPaneHorizontally: return L10n.text("command.growPaneHorizontally")
+        case .shrinkPaneHorizontally: return L10n.text("command.shrinkPaneHorizontally")
+        case .growPaneVertically: return L10n.text("command.growPaneVertically")
+        case .shrinkPaneVertically: return L10n.text("command.shrinkPaneVertically")
+        case .equalizePanes: return L10n.text("command.equalizePanes")
+        case .increaseFontSize: return L10n.text("command.increaseFontSize")
+        case .decreaseFontSize: return L10n.text("command.decreaseFontSize")
+        case .resetFontSize: return L10n.text("command.resetFontSize")
+        case .find: return L10n.text("command.find")
+        case .copy: return L10n.text("common.copy")
+        case .paste: return L10n.text("common.paste")
+        case .selectAll: return L10n.text("common.selectAll")
+        case .scrollPageUp: return L10n.text("command.scrollPageUp")
+        case .scrollPageDown: return L10n.text("command.scrollPageDown")
+        case .scrollToTop: return L10n.text("command.scrollToTop")
+        case .scrollToBottom: return L10n.text("command.scrollToBottom")
+        case .previousCommand: return L10n.text("command.previousCommand")
+        case .nextCommand: return L10n.text("command.nextCommand")
+        case .settings: return L10n.text("command.settings")
+        case .commandPalette: return L10n.text("command.commandPalette")
         }
     }
 
@@ -267,6 +295,66 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         }
     }
 
+    /// Which group the command palette lists it under.
+    ///
+    /// Thirty commands in one flat list is thirty things to read before
+    /// finding the one you want; grouped, it is five short lists whose
+    /// headings say which one to read. The grouping is the one the menu bar
+    /// already uses, so the palette teaches where a command lives rather than
+    /// replacing that knowledge.
+    var category: CommandCategory {
+        switch self {
+        case .newWindow, .newTab, .close: return .window
+        case .splitRight, .splitDown, .focusLeft, .focusRight, .focusUp, .focusDown,
+            .growPaneHorizontally, .shrinkPaneHorizontally, .growPaneVertically,
+            .shrinkPaneVertically, .equalizePanes:
+            return .panes
+        case .increaseFontSize, .decreaseFontSize, .resetFontSize, .scrollPageUp,
+            .scrollPageDown, .scrollToTop, .scrollToBottom, .previousCommand, .nextCommand:
+            return .view
+        case .find, .copy, .paste, .selectAll: return .edit
+        case .settings, .commandPalette: return .app
+        }
+    }
+
+    /// Where the command sits inside its group before any search or recency
+    /// reordering: lower comes first. Ordered by how often a command is
+    /// reached for, not alphabetically — an alphabetical list puts "Actual
+    /// Size" above "Split Pane Right", which is not the order anybody wants.
+    var paletteRank: Int {
+        switch self {
+        case .newTab: return 0
+        case .newWindow: return 1
+        case .close: return 2
+        case .splitRight: return 0
+        case .splitDown: return 1
+        case .focusLeft: return 2
+        case .focusRight: return 3
+        case .focusUp: return 4
+        case .focusDown: return 5
+        case .equalizePanes: return 6
+        case .growPaneHorizontally: return 7
+        case .shrinkPaneHorizontally: return 8
+        case .growPaneVertically: return 9
+        case .shrinkPaneVertically: return 10
+        case .increaseFontSize: return 0
+        case .decreaseFontSize: return 1
+        case .resetFontSize: return 2
+        case .scrollPageUp: return 3
+        case .scrollPageDown: return 4
+        case .scrollToTop: return 5
+        case .scrollToBottom: return 6
+        case .previousCommand: return 7
+        case .nextCommand: return 8
+        case .copy: return 0
+        case .paste: return 1
+        case .selectAll: return 2
+        case .find: return 3
+        case .settings: return 0
+        case .commandPalette: return 1
+        }
+    }
+
     /// The config-file key this command's binding is written under.
     var configurationKey: String { "bind.\(rawValue)" }
 
@@ -309,4 +397,15 @@ nonisolated struct Keybindings: Equatable, Sendable {
             overrides[command].map { (command, $0) }
         }
     }
+}
+
+/// The command palette's groups, in the order it lists them.
+nonisolated enum CommandCategory: String, CaseIterable, Sendable {
+    case window
+    case panes
+    case view
+    case edit
+    case app
+
+    var title: String { L10n.text("commandPalette.category.\(rawValue)") }
 }
