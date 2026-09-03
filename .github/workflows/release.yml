@@ -134,19 +134,52 @@ jobs:
             -s -k "$password" "$keychain"
           rm -f /tmp/certificate.p12
 
+      # `xcodebuild build` is a development action: it left the
+      # com.apple.security.get-task-allow entitlement on Corta and
+      # corta-exec, and re-signed Sparkle.framework's own nested helpers
+      # (Autoupdate, Updater.app, the two XPC services) without a secure
+      # timestamp — both are things notarization rejects outright, and a
+      # plain `build` does not go through the same "prepare for
+      # distribution" pipeline `archive` + `-exportArchive` does, which
+      # is what actually fixes them rather than working around either
+      # symptom by hand.
       - name: Build (signed)
         if: steps.signing.outputs.available == 'true'
         run: |
-          xcodebuild build \
+          xcodebuild archive \
             -project Corta.xcodeproj \
             -scheme Corta \
             -configuration Release \
-            -derivedDataPath build \
+            -archivePath build/Corta.xcarchive \
             CODE_SIGN_IDENTITY="${{ secrets.MACOS_SIGNING_IDENTITY }}" \
             CODE_SIGN_STYLE=Manual \
             ENABLE_HARDENED_RUNTIME=YES \
             OTHER_CODE_SIGN_FLAGS="--timestamp --options=runtime" \
             -quiet
+
+          cat > /tmp/ExportOptions.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>developer-id</string>
+            <key>teamID</key>
+            <string>646VSJ9K5F</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>signingCertificate</key>
+            <string>${{ secrets.MACOS_SIGNING_IDENTITY }}</string>
+          </dict>
+          </plist>
+          PLIST
+
+          xcodebuild -exportArchive \
+            -archivePath build/Corta.xcarchive \
+            -exportPath build/Build/Products/Release \
+            -exportOptionsPlist /tmp/ExportOptions.plist \
+            -quiet
+          rm -f /tmp/ExportOptions.plist
 
       - name: Build (ad-hoc)
         if: steps.signing.outputs.available != 'true'
