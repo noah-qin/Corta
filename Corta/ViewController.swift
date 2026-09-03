@@ -1008,8 +1008,16 @@ class ViewController: NSViewController {
 
     /// One line a person can act on. `PTYError` writes its description for
     /// exactly this purpose; anything else falls back to Foundation's.
+    ///
+    /// Cast to the concrete `PTYError` type, not the `CustomStringConvertible`
+    /// protocol: recent Swift gives every `Error` a synthesized
+    /// `CustomStringConvertible` conformance, so `error as? CustomStringConvertible`
+    /// always succeeds and the `localizedDescription` fallback below it never
+    /// runs — a non-`PTYError` (an `NSError` from a system API, say) would
+    /// print its raw synthesized description instead of the friendly
+    /// Foundation-provided one.
     private static func describe(_ error: Error) -> String {
-        (error as? CustomStringConvertible)?.description ?? error.localizedDescription
+        (error as? PTYError)?.description ?? error.localizedDescription
     }
 
     /// Replaces the pane's content with an explanation and the two actions
