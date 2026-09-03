@@ -26,7 +26,9 @@ Report it privately through GitHub:
 2. Choose **Report a vulnerability** to open a private security advisory.
 
 That channel is visible only to the maintainer until an advisory is
-published.
+published. If the Security tab does not offer the option, email
+<noah@noahqin.dev> instead and say in the subject line that it is a
+security report.
 
 ### What to include
 
