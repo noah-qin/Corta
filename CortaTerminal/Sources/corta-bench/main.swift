@@ -23,6 +23,48 @@ func currentResidentBytes() -> UInt64 {
 
 func megabytes(_ bytes: UInt64) -> Double { Double(bytes) / 1_048_576 }
 
+/// The distribution of a latency sample set, not its average.
+///
+/// An average is the one statistic a latency measurement should not be
+/// reported as. Keypress latency is not normally distributed — it is a tight
+/// body with a tail of vsync misses and scheduling hiccups — and the tail is
+/// the part a person feels: 45 ms average with a 90 ms p99 is a terminal that
+/// stutters once a second while averaging "fine". So every latency number
+/// here reports p50, p95, p99 and the maximum, and the average only as a
+/// cross-check against the p50.
+struct LatencyDistribution {
+    let count: Int
+    let meanMs: Double
+    let p50Ms: Double
+    let p95Ms: Double
+    let p99Ms: Double
+    let maxMs: Double
+
+    /// - Parameter samplesNanoseconds: need not be sorted.
+    init?(samplesNanoseconds: [UInt64]) {
+        guard !samplesNanoseconds.isEmpty else { return nil }
+        let sorted = samplesNanoseconds.sorted()
+        func percentile(_ fraction: Double) -> Double {
+            // Nearest-rank, the definition that needs no interpolation and
+            // cannot report a value no sample actually had.
+            let rank = Int((fraction * Double(sorted.count)).rounded(.up)) - 1
+            return Double(sorted[min(max(0, rank), sorted.count - 1)]) / 1e6
+        }
+        count = sorted.count
+        meanMs = Double(sorted.reduce(0, +)) / Double(sorted.count) / 1e6
+        p50Ms = percentile(0.50)
+        p95Ms = percentile(0.95)
+        p99Ms = percentile(0.99)
+        maxMs = Double(sorted[sorted.count - 1]) / 1e6
+    }
+
+    var description: String {
+        "p50 \(String(format: "%.3f", p50Ms)) ms / p95 \(String(format: "%.3f", p95Ms)) ms / "
+            + "p99 \(String(format: "%.3f", p99Ms)) ms / max \(String(format: "%.3f", maxMs)) ms "
+            + "(mean \(String(format: "%.3f", meanMs)) ms, \(count) samples)"
+    }
+}
+
 func throughput(_ byteCount: Int, elapsedSeconds: Double) -> Double {
     megabytes(UInt64(byteCount)) / elapsedSeconds
 }
@@ -131,7 +173,11 @@ func benchmarkKeypressLatency() {
     }
     defer { session.stop() }
 
-    let iterations = 200
+    // 200 samples cannot support a p99 — the 99th percentile of 200 is the
+    // second-largest value, which is one scheduling hiccup away from being
+    // noise. 2000 keeps the whole run under a couple of seconds and makes
+    // the p99 a number rather than an anecdote.
+    let iterations = 2_000
     var samplesNanoseconds: [UInt64] = []
     samplesNanoseconds.reserveCapacity(iterations)
 
@@ -158,19 +204,13 @@ func benchmarkKeypressLatency() {
         print("keypress -> grid latency: SKIPPED (no samples completed)")
         return
     }
-    let sorted = samplesNanoseconds.sorted()
-    let avgMs = Double(sorted.reduce(0, +)) / Double(sorted.count) / 1e6
-    let p95Ms = Double(sorted[Int(Double(sorted.count) * 0.95).clamped(to: 0...(sorted.count - 1))]) / 1e6
-    print(
-        "keypress -> grid latency: \(String(format: "%.3f", avgMs)) ms avg / "
-            + "\(String(format: "%.3f", p95Ms)) ms p95 over \(sorted.count) samples "
-            + "(write -> PTY echo -> parse -> grid write; excludes vsync + display)")
-}
-
-extension Int {
-    fileprivate func clamped(to range: ClosedRange<Int>) -> Int {
-        Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
+    guard let distribution = LatencyDistribution(samplesNanoseconds: samplesNanoseconds) else {
+        print("keypress -> grid latency: SKIPPED (no samples completed)")
+        return
     }
+    print(
+        "keypress -> grid latency: \(distribution.description) "
+            + "(write -> PTY echo -> parse -> grid write; excludes vsync + display)")
 }
 
 benchmarkParseThroughput()
