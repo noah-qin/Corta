@@ -48,6 +48,64 @@ final class TaskNotifier {
     private weak var window: NSWindow?
     private static var didRequestAuthorization = false
 
+    /// Whether macOS will actually deliver anything.
+    ///
+    /// The switch on the settings page said "on" whether or not permission
+    /// had been granted, so a user who tapped Don't Allow — once, months ago,
+    /// possibly by reflex — had a setting that was on, a feature that never
+    /// fired, and nothing anywhere telling them which. The state is read from
+    /// `UNUserNotificationCenter`, not stored, because System Settings can
+    /// change it while Corta is running and a cached copy would be the second
+    /// store the project's own rule forbids.
+    enum Permission: Equatable {
+        /// Not asked yet — the setting is on and the prompt appears at the
+        /// first long task. Nothing to report.
+        case notDetermined
+        case granted
+        /// Refused, or switched off in System Settings afterwards. The
+        /// setting is on and does nothing.
+        case denied
+    }
+
+    /// Posted when the permission state is read and turns out to be denied,
+    /// so the settings page can say so without polling.
+    static let permissionDidChange = Notification.Name(
+        "dev.noahqin.Corta.notificationPermissionDidChange")
+
+    /// The last state read. `nil` until something asks.
+    private(set) static var permission: Permission?
+
+    /// Reads the current authorization state and posts
+    /// `permissionDidChange`. Cheap, asynchronous, and safe to call whenever
+    /// a surface needs the answer — the settings page calls it as it opens.
+    static func refreshPermission() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            let state: Permission =
+                switch settings.authorizationStatus {
+                case .notDetermined: .notDetermined
+                case .denied: .denied
+                default: .granted
+                }
+            Task { @MainActor in
+                guard permission != state else { return }
+                permission = state
+                NotificationCenter.default.post(name: permissionDidChange, object: nil)
+            }
+        }
+    }
+
+    /// Opens System Settings at the pane where the decision can be reversed.
+    /// There is no API to re-prompt after a denial — the only route back is
+    /// the one the user has to walk, so the app has to point at it rather
+    /// than ask again and appear to do nothing.
+    static func openSystemNotificationSettings() {
+        guard
+            let url = URL(
+                string: "x-apple.systempreferences:com.apple.preference.notifications")
+        else { return }
+        NSWorkspace.shared.open(url)
+    }
+
     init() {}
 
     /// The shell said a command started or stopped (OSC 133 C / D). Once
@@ -140,9 +198,9 @@ final class TaskNotifier {
         // text: the grid is full of things that should not reach Notification
         // Center, and a small integer is not one of them (`SECURITY.md` §5).
         let outcome =
-            lastExitStatus.map { $0 == 0 ? "Finished" : "Failed (status \($0))" } ?? "Finished"
+            lastExitStatus.map { $0 == 0 ? L10n.text("notification.finished") : L10n.format("notification.failed", $0) } ?? L10n.text("notification.finished")
         lastExitStatus = nil
-        content.body = "\(outcome) after \(Self.duration(elapsed))."
+        content.body = L10n.format("notification.body", outcome, Self.duration(elapsed))
         content.sound = nil
         UNUserNotificationCenter.current().add(
             UNNotificationRequest(
@@ -153,14 +211,14 @@ final class TaskNotifier {
     /// on something that already ran for half a minute.
     static func duration(_ seconds: TimeInterval) -> String {
         let total = Int(seconds.rounded())
-        if total < 60 { return "\(total)s" }
+        if total < 60 { return L10n.format("duration.seconds", total) }
         let minutes = total / 60
         let remainder = total % 60
         if minutes < 60 {
-            return remainder == 0 ? "\(minutes)m" : "\(minutes)m \(remainder)s"
+            return remainder == 0 ? L10n.format("duration.minutes", minutes) : L10n.format("duration.minutesSeconds", minutes, remainder)
         }
         let hours = minutes / 60
-        return "\(hours)h \(minutes % 60)m"
+        return L10n.format("duration.hoursMinutes", hours, minutes % 60)
     }
 
     /// Asked for at the first task rather than at launch: a terminal that
@@ -169,6 +227,17 @@ final class TaskNotifier {
     private func requestAuthorizationOnce() {
         guard !Self.didRequestAuthorization else { return }
         Self.didRequestAuthorization = true
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert]) { _, _ in }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert]) {
+            granted, _ in
+            // Both results used to be discarded, which is how the setting
+            // ended up able to say "on" about a feature the system had
+            // switched off.
+            Task { @MainActor in
+                let state: Permission = granted ? .granted : .denied
+                guard Self.permission != state else { return }
+                Self.permission = state
+                NotificationCenter.default.post(name: Self.permissionDidChange, object: nil)
+            }
+        }
     }
 }
