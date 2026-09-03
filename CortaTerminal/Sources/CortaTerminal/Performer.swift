@@ -60,6 +60,16 @@ public struct Performer: ParserPerformer, Sendable {
                 reportSecondaryDeviceAttributes()
             case (0x3E, 0x71):  // XTVERSION — CSI > Ps q (M6.5)
                 reportVersion(sequence.parameters)
+            // The kitty keyboard protocol (M6.9). Four private markers on
+            // one final byte: `?` queries, `>` pushes, `<` pops, `=` sets.
+            case (0x3F, 0x75):
+                reportKeyboardProtocol()
+            case (0x3E, 0x75):
+                pushKeyboardProtocol(sequence.parameters)
+            case (0x3C, 0x75):
+                popKeyboardProtocol(sequence.parameters)
+            case (0x3D, 0x75):
+                setKeyboardProtocol(sequence.parameters)
             case (0x3F, 0x68):  // DECSET — CSI ? Pm h
                 applyPrivateModes(sequence.parameters, enabled: true)
                 _ = performAlternateScreenMode(final: sequence.final, parameters: sequence.parameters)

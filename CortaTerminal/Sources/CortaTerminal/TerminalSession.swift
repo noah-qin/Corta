@@ -190,6 +190,11 @@ public final class TerminalSession: @unchecked Sendable {
         set { state.withLock { $0.terminal.dynamicColors = newValue } }
     }
 
+    /// The kitty keyboard protocol flags in force (`CSI > flags u`, M6.9).
+    public var keyboardEnhancements: KeyboardEnhancementFlags {
+        state.withLock { $0.terminal.keyboardEnhancements }
+    }
+
     /// Consumes a pending BEL (M4.8): true at most once per bell.
     public func takeBell() -> Bool {
         state.withLock { $0.terminal.takeBell() }

@@ -329,6 +329,9 @@ class ViewController: NSViewController {
         view.onLiveResizeEnded = { [weak self] in
             self?.endLiveResize()
         }
+        view.keyboardEnhancements = { [weak self] in
+            self?.session?.keyboardEnhancements ?? []
+        }
         installNativeIntegrations(on: view)
         view.onMagnify = { [weak self] magnification in
             self?.magnify(by: magnification)

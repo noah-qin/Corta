@@ -1,4 +1,5 @@
 import AppKit
+import CortaTerminal
 import Metal
 import QuartzCore
 
@@ -58,6 +59,11 @@ final class TerminalView: NSView, CALayerDelegate {
     /// ⌘⌥ focus-move shortcuts, a split, a close all arrive here — so the
     /// split controller can track which pane owns input (M5.2).
     var onFocus: (() -> Void)?
+
+    /// M6.9 — the kitty keyboard protocol flags the child has asked for.
+    /// Read per key event rather than cached: a program can change them at
+    /// any point, and the next keystroke has to honour the new value.
+    var keyboardEnhancements: (() -> KeyboardEnhancementFlags)?
 
     /// M6.15 — file paths dropped on the pane, already resolved to
     /// filesystem paths. The controller quotes and sends them.

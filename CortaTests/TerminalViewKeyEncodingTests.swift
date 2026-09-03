@@ -1,4 +1,5 @@
 import AppKit
+import CortaTerminal
 import Testing
 
 @testable import Corta
@@ -80,5 +81,61 @@ struct TerminalViewKeyEncodingTests {
             windowNumber: 0, context: nil, characters: "\u{F700}",
             charactersIgnoringModifiers: "\u{F700}", isARepeat: false, keyCode: 126)!
         #expect(TerminalView.scrollGesture(for: event) == nil)
+    }
+
+    // MARK: - Kitty keyboard protocol (M6.9)
+
+    /// The done-when for M6.9: a Neovim mapping that binds `Ctrl+I` and
+    /// `Tab` differently cannot work while both are `0x09`.
+    @Test func disambiguateSeparatesControlIFromTab() throws {
+        func controlI() -> NSEvent {
+            Self.keyEvent(
+                characters: "\u{9}", charactersIgnoringModifiers: "i", modifiers: .control)
+        }
+        // Legacy: the two are the same byte, which is the problem.
+        #expect(TerminalView.bytes(for: controlI()) == [0x09])
+        #expect(TerminalView.bytes(for: Self.keyEvent(characters: "\t")) == [0x09])
+
+        // With the flag, Ctrl+I is `CSI 105 ; 5 u` and Tab is untouched.
+        #expect(
+            TerminalView.bytes(for: controlI(), enhancements: .disambiguate)
+                == Array("\u{1B}[105;5u".utf8))
+        #expect(
+            TerminalView.bytes(for: Self.keyEvent(characters: "\t"), enhancements: .disambiguate)
+                == [0x09])
+    }
+
+    @Test func disambiguateSeparatesTheOtherThreeCollisions() throws {
+        for (character, code) in [("m", 109), ("h", 104), ("[", 91)] {
+            let event = Self.keyEvent(
+                characters: "x", charactersIgnoringModifiers: character, modifiers: .control)
+            #expect(
+                TerminalView.bytes(for: event, enhancements: .disambiguate)
+                    == Array("\u{1B}[\(code);5u".utf8))
+        }
+    }
+
+    /// `disambiguate` asks a terminal to stop colliding keys, not to
+    /// re-encode the keyboard. `Ctrl+A` has no unmodified twin, so `0x01`
+    /// already says exactly one thing.
+    @Test func disambiguateLeavesUnambiguousControlKeysAlone() throws {
+        #expect(
+            TerminalView.bytes(
+                for: Self.keyEvent(
+                    characters: "\u{1}", charactersIgnoringModifiers: "a", modifiers: .control),
+                enhancements: .disambiguate) == [0x01])
+        #expect(
+            TerminalView.bytes(for: Self.keyEvent(characters: "a"), enhancements: .disambiguate)
+                == Array("a".utf8))
+    }
+
+    @Test func disambiguateReportsTheModifierBitmask() throws {
+        // 1 (base) + 1 (shift) + 4 (control).
+        #expect(
+            TerminalView.bytes(
+                for: Self.keyEvent(
+                    characters: "\u{9}", charactersIgnoringModifiers: "i",
+                    modifiers: [.control, .shift]),
+                enhancements: .disambiguate) == Array("\u{1B}[105;6u".utf8))
     }
 }

@@ -149,4 +149,35 @@ extension Performer {
         guard maximum > 0 else { return 0 }
         return UInt8((value * 255 + maximum / 2) / maximum)
     }
+
+    // MARK: - Kitty keyboard protocol (M6.9)
+
+    /// `CSI ? u` — report the flags in force, as `CSI ? flags u`.
+    ///
+    /// Reporting only the flags Corta honours is the point: a program that
+    /// asks for event reporting and is told it got it would encode key
+    /// releases nobody sends.
+    mutating func reportKeyboardProtocol() {
+        let flags = state.keyboardProtocol.current.rawValue
+        state.outputBuffer.append(contentsOf: Array("\u{1B}[?\(flags)u".utf8))
+    }
+
+    /// `CSI > flags u` — push a new level onto the mode stack.
+    mutating func pushKeyboardProtocol(_ parameters: Parameters) {
+        state.keyboardProtocol.push(
+            KeyboardEnhancementFlags(rawValue: UInt8(min(255, parameters.value(0, default: 0)))))
+    }
+
+    /// `CSI < number u` — pop `number` levels, default one.
+    mutating func popKeyboardProtocol(_ parameters: Parameters) {
+        state.keyboardProtocol.pop(parameters.value(0, default: 1))
+    }
+
+    /// `CSI = flags ; mode u` — set, add or remove flags at the current
+    /// level.
+    mutating func setKeyboardProtocol(_ parameters: Parameters) {
+        state.keyboardProtocol.set(
+            KeyboardEnhancementFlags(rawValue: UInt8(min(255, parameters.value(0, default: 0)))),
+            mode: parameters.value(1, default: 1))
+    }
 }

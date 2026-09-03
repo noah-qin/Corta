@@ -57,6 +57,12 @@ public struct Terminal: Sendable {
         set { performer.state.dynamicColors = newValue }
     }
 
+    /// The kitty keyboard protocol flags in force (M6.9). The app encodes
+    /// key presses according to these.
+    public var keyboardEnhancements: KeyboardEnhancementFlags {
+        performer.state.keyboardProtocol.current
+    }
+
     /// Consumes a pending BEL (M4.8): true at most once per bell, false
     /// otherwise. The app decides what a bell does; the core only reports
     /// that one happened.

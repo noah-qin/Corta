@@ -1,4 +1,5 @@
 import AppKit
+import CortaTerminal
 
 /// Keyboard input: one key event to the bytes a real terminal would send.
 ///
@@ -34,7 +35,7 @@ extension TerminalView {
 
     /// The direct translation, run for events the IME never saw or declined.
     func deliverBytes(for event: NSEvent) {
-        guard let bytes = Self.bytes(for: event) else {
+        guard let bytes = Self.bytes(for: event, enhancements: keyboardEnhancements?() ?? []) else {
             super.keyDown(with: event)
             return
         }
@@ -65,8 +66,20 @@ extension TerminalView {
     /// send. Control combinations map to C0 codes; arrows and a handful of
     /// editing keys map to the xterm CSI sequences `$TERM=xterm-256color`
     /// promises (`DESIGN.md` §2.5).
-    static func bytes(for event: NSEvent) -> [UInt8]? {
+    ///
+    /// - Parameter enhancements: the kitty keyboard protocol flags the child
+    ///   has asked for (M6.9). With `disambiguate` set, the keys the legacy
+    ///   encoding collides are sent as `CSI code ; modifiers u` instead.
+    static func bytes(for event: NSEvent, enhancements: KeyboardEnhancementFlags = [])
+        -> [UInt8]?
+    {
         let flags = event.modifierFlags
+
+        if enhancements.contains(.disambiguate),
+            let disambiguated = disambiguatedBytes(for: event)
+        {
+            return disambiguated
+        }
 
         switch event.specialKey {
         case .some(.upArrow): return escape("A")
@@ -94,6 +107,43 @@ extension TerminalView {
         // into whatever the child's terminal driver expects.
         if characters == "\r" || characters == "\n" { return [0x0D] }
         return Array(characters.utf8)
+    }
+
+    /// The kitty encoding, applied only to the keys the legacy one cannot
+    /// tell apart (M6.9). Everything else keeps its legacy bytes: the
+    /// `disambiguate` flag asks a terminal to stop colliding keys, not to
+    /// re-encode the whole keyboard — that is what `reportAllKeysAsEscapeCodes`
+    /// is for, and Corta does not claim it.
+    ///
+    /// The collisions, and why each matters:
+    /// - `Ctrl+I` is `0x09`, which is also `Tab`.
+    /// - `Ctrl+M` is `0x0D`, which is also `Return`.
+    /// - `Ctrl+[` is `0x1B`, which is also `Esc` and the start of every
+    ///   escape sequence.
+    /// - `Ctrl+H` is `0x08`, which is also `Backspace` on many keyboards.
+    private static func disambiguatedBytes(for event: NSEvent) -> [UInt8]? {
+        let flags = event.modifierFlags
+        guard flags.contains(.control), !flags.contains(.command),
+            let characters = event.charactersIgnoringModifiers?.lowercased(),
+            let scalar = characters.unicodeScalars.first
+        else { return nil }
+        // The four ambiguous ones only. `Ctrl+A` has no unmodified twin, so
+        // `0x01` says exactly one thing and re-encoding it would break every
+        // program that has read it for forty years.
+        let ambiguous: Set<UInt32> = [
+            UInt32(UnicodeScalar("i").value),
+            UInt32(UnicodeScalar("m").value),
+            UInt32(UnicodeScalar("h").value),
+            UInt32(UnicodeScalar("[").value),
+        ]
+        guard ambiguous.contains(scalar.value) else { return nil }
+        // `CSI unicode-key-code ; modifiers u`, modifiers as the protocol's
+        // 1-based bitmask: shift 1, alt 2, ctrl 4, super 8.
+        var modifiers = 1
+        if flags.contains(.shift) { modifiers += 1 }
+        if flags.contains(.option) { modifiers += 2 }
+        modifiers += 4  // control, which the guard above required
+        return Array("\u{1B}[\(scalar.value);\(modifiers)u".utf8)
     }
 
     private static func escape(_ final: String) -> [UInt8] {
