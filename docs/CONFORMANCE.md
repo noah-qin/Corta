@@ -54,9 +54,20 @@ capabilities.
 | **DA1** (`ESC [ c`)             | vim / Neovim at startup                        | Startup stalls until timeout         |
 | **DA2** (`ESC [ > c`)           | Capability detection                           | Feature misdetection                 |
 | **DSR-CPR** (`ESC [ 6 n`)       | zsh, starship and similar prompts              | Prompt corrupts or hangs             |
-| DECRQM (mode query)             | tmux, Neovim capability probes                 | Conservative fallback behaviour      | (M6.5)
-| XTVERSION (`ESC [ > 0 q`)       | Modern TUIs                                    | Feature misdetection                 | (M6.5)
-| Dynamic colour reports (OSC 10/11/12 queries) | Themes and TUI capability probes | esctest's query class times out — the bulk of the 184 M2 failures | (M6.6)
+| **DECRQM** (`ESC [ Ps $ p`)     | tmux, Neovim capability probes                 | Conservative fallback behaviour      |
+| **XTVERSION** (`ESC [ > 0 q`)   | Modern TUIs                                    | Feature misdetection                 |
+| **Dynamic colour** (OSC 10/11/12 query form) | Themes and TUI capability probes  | Probe times out                      |
+| **Kitty keyboard** (`ESC [ ? u`) | Editors that bind `Ctrl+I` and `Tab` apart    | Both keys arrive as `0x09`           |
+
+All four shipped in M6 (M6.5, M6.6, M6.9). DECRQM answers 0 —
+"not recognised" — for the modes Corta does not track, which is the
+honest reply and the one that unblocks the probe; the failure mode this
+table is about is *silence*, not a negative answer.
+
+**DECSCL gates DECRQM.** A program that announced VT200 with
+`ESC [ 62 ; 0 " p` has asked to be talked to as an older terminal, and
+DECRQM arrived at VT300. Answering anyway is the terminal ignoring what
+it was told.
 
 Every response is written to the child's stdin. Responses must therefore
 be **fixed-format and never echo attacker-controlled text** — see
@@ -147,7 +158,8 @@ hold, Corta has replaced Terminal.app for this repository's own use.
 - [ ] Copy and paste work; pasting multi-line code does not auto-execute
 - [ ] Scrollback holds a long training run and scrolls smoothly
 - [ ] ⌘F searches scrollback
-- [ ] New tab and split pane
+- [x] New tab and split pane (M4.7, M5; and a new tab no longer shrinks
+      the window — `SearchAndTabUITests`)
 - [x] ⌘+ / ⌘− resize the font
 - [ ] Resizing the window resizes the program inside it
 - [ ] ⌘-clicking a `localhost:` URL opens the browser
@@ -177,11 +189,67 @@ breaking `vim`. Written once, useful for the life of the project.
 Record the pass rate at each milestone. "Conformance improved" is only
 meaningful against a previous number.
 
+**How the esctest run is done.** esctest2 (ThomasDickey/esctest2), run
+as the child of a live Corta window — it drives the terminal through its
+own tty, so it has to be the shell:
+
+```sh
+# A wrapper passed only in the environment of the launch you control.
+# Never via `launchctl setenv` (§4.5).
+cat > /tmp/corta-esctest.sh <<'EOF'
+#!/bin/bash
+export TERM=xterm-256color
+cd /path/to/esctest2/esctest
+python3 esctest.py --expected-terminal xterm --max-vt-level 3 \
+  --logfile /tmp/esctest-run.log
+exec /bin/zsh -l
+EOF
+chmod +x /tmp/corta-esctest.sh
+SHELL=/tmp/corta-esctest.sh Corta.app/Contents/MacOS/Corta
+```
+
+**M6 result: 81 passed, 335 known bugs, 152 failed of 568.** Against the
+M2 record (50 / 334 / 184) that is 32 failures fixed and none
+introduced — the failing-test list is a strict subset. 16 of the 32 came
+from the CHA/HPA/HPR/VPA/VPR commit made between milestones; the other
+16 are M6's DECRQM, DECSCL and dynamic-colour work.
+
+xterm-compatibility — passes plus "known bugs", the number comparable
+across terminals — is **73.2%**, up from the 67.6% carried since M2.
+
 ### 4.3 Fuzzing
 
 The parser consumes untrusted bytes and must never crash, hang, or
-allocate without bound. Fuzz it (SwiftPM supports libFuzzer via
-`-sanitize=fuzzer`) with the resource caps in `SECURITY.md` §3 asserted.
+allocate without bound. The harness is the `corta-fuzz` target in the
+`CortaTerminal` package (M6.11); it asserts the `SECURITY.md` §3 caps on
+every input rather than waiting for a sanitizer to notice — grid
+dimensions, the scrollback ring, cursor bounds, row width, the interned
+grapheme and hyperlink tables, and the size of the response one input can
+queue.
+
+**libFuzzer is not available on macOS with the current toolchain.**
+Xcode 26 ships no `libclang_rt.fuzzer_osx.a`, and
+`swiftc -sanitize=fuzzer` is rejected outright for
+`arm64-apple-macosx` — verified, not assumed. The
+`LLVMFuzzerTestOneInput` entry point is present and correct for a
+toolchain that has one; what runs today is a deterministic mutation
+driver over a checked-in corpus:
+
+```sh
+swift build --package-path CortaTerminal -c release --product corta-fuzz
+CortaTerminal/.build/release/corta-fuzz --fuzz 500000 --seed 1 \
+  CortaTerminal/Tests/Fuzz/corpus
+```
+
+It has no coverage feedback, so it explores far less per iteration than
+libFuzzer would. What it does have is a fixed seed, so a failure is
+reproducible from the command line that found it. **Recorded at M6:**
+2.5M mutated inputs across seeds 1–5, clean.
+
+The corpus itself replays inside the test suite (`FuzzCorpusTests`), so a
+crash found by a long run is fixed by adding its input to
+`CortaTerminal/Tests/Fuzz/corpus` — from then on it is a regression
+test.
 
 ### 4.4 App-layer verification requires a launched app
 
@@ -293,6 +361,34 @@ unaffected either way.
   which is a git forge with no shell access; there is no configured,
   reachable remote host, and unknown hosts were not probed. The item
   remains unticked until a real target exists.
+**2026-09-03 — M6 closeout pass.** What was verified against a live
+window in this milestone, and what was not:
+
+- **Verified live, by driving the running app.** ⌘T four times leaves
+  the window frame unchanged (it used to lose a chrome height per tab
+  until it hit the 49pt minimum); the settings page opens from the app
+  menu with its eight controls; the Settings menu lists every theme;
+  switching theme re-colours the open window's surface with no restart;
+  the app menu's Settings… item carries ⌘,. The first four are
+  regression tests now (`SearchAndTabUITests`, `SettingsUITests`); the
+  shortcut is checked by screenshotting the open menu, because
+  XCUITest's `typeKey` does not deliver a punctuation key equivalent
+  and a test that cannot press the key cannot tell a broken shortcut
+  from a broken harness.
+- **Not verified live: the gesture and hardware items.** Pinch-to-zoom
+  (M6.14), Force Touch → Look Up and a file drag onto a pane (M6.15)
+  need a trackpad gesture or a drag from Finder. Neither XCUITest nor
+  any unattended path produces them; the logic under each is unit
+  tested (shell quoting, the pinch's step accumulator) and the AppKit
+  entry points are the documented ones, but **a human still has to
+  pinch, force-touch and drag a file** before those three lines of the
+  milestone are honestly closed.
+- **Not verified live: focus reporting end to end.** `?1004` is tested
+  in the core and the app's transition rule is a pure function of pane
+  focus and window key state, but "Neovim `autoread` fires when you
+  come back to the window" needs Neovim installed and a person
+  switching windows.
+
 - **esctest re-run — reproduces the M2 number exactly.** esctest2
   (ThomasDickey/esctest2) with `--expected-terminal xterm
   --max-vt-level 3`, run as the child of a live Corta window against

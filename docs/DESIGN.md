@@ -63,9 +63,18 @@ and benchmarkable without launching an app.
 
 ### 2.3 Cells are fixed-size; complex graphemes spill to a side table
 
-A cell stores a `UInt32` scalar plus attributes. Grapheme clusters that
+A cell stores a `UInt32` word plus attributes and two 16-bit table keys,
+16 bytes in total, asserted by `CellLayoutTests`. Grapheme clusters that
 do not fit in one scalar (combining marks, emoji ZWJ sequences such as
 `👨‍👩‍👧‍👦`) store a tag pointing into an interned side table.
+
+**That `UInt32` is now fully spent.** Unicode's codespace ends at
+U+10FFFF, so a scalar needs 21 bits; the other 11 hold the OSC 8
+hyperlink id (M6.8), keyed into a second interned side table. The
+alternative was an 18-byte cell, and `PERFORMANCE.md` §4 measures what
+that costs across a 100k-line scrollback. Anything else wanting per-cell
+identity — an image placement, for one — needs a side table keyed by
+document position instead of a new field.
 
 Rows are **variable length** — stored up to the last non-blank cell. A
 fixed 200-cell row over 100k scrollback lines is ~320 MB, which is not
@@ -108,11 +117,13 @@ core, not the shell:
   selects as one word. Triple-click selects the logical line, following
   `wrapped` in both directions.
 
-One known limit: the anchoring shift is computed from the scrollback's
-count, which stops growing once the ring is full, so a selection made
-while a full ring floods stays put instead of tracking its text. Exact
-anchoring under eviction needs a monotonic line counter on `Scrollback`;
-that fix is scheduled as M6.10.
+The anchoring shift is computed from `Scrollback.totalPushed`, a
+monotonic count of every line ever pushed (M6.10). `scrollback.count`
+cannot do that job: it saturates at the ring's limit, so once the ring is
+full every push evicts a row while the count reports no growth, and a
+selection anchored on it drifted onto whatever text arrived underneath
+it. The counter keeps rising, so the shift is right whether the ring is
+filling or flooding.
 
 Reflow (M4.2) and search (M4.4) must preserve these invariants: reflow
 rewrites document rows wholesale and must invalidate or re-anchor any
@@ -236,8 +247,41 @@ Worth doing eventually, deliberately not in the M1–M6 path:
   duration, exit-code marks. High value per line of code; consider
   pulling forward if M4 finishes early.
 
-The kitty keyboard protocol was on this list; it is now scheduled as
-M6.9.
+The kitty keyboard protocol was on this list; it shipped as M6.9.
+
+#### M6.4 — the reassessment
+
+Both items were re-examined at the end of M6, as that step required.
+Neither moves into M6; both keep their place, and the ordering between
+them changed.
+
+**OSC 133 moves to the front, and now has a caller.** M6.3 shipped a
+long-task notification built on a heuristic — Return starts a task, an
+idle output stream ends it — because a terminal without shell
+integration cannot see command boundaries. That heuristic is the
+feature's whole weakness: it is off by default precisely because a
+command that pauses for two seconds mid-run gets an early notification.
+OSC 133 replaces the guess with a fact, and the same marks pay for jump
+to previous prompt, per-command duration and exit-code marks. It is the
+next thing to build, and it is small: four sequences and a per-line
+mark, no new rendering.
+
+The cost that stopped it being pulled into M6 is not the terminal side.
+It is that the marks only exist if the user's shell emits them, which
+means shipping and installing shell snippets for zsh, bash and fish —
+distribution work, and M6.16 shows distribution is not yet solved.
+
+**The kitty graphics protocol stays deferred, and its cost went up.**
+The M6 estimate of it has moved in the wrong direction. Cells are
+16 bytes and now full: the OSC 8 hyperlink id (M6.8) took the last of
+the scalar's spare bits, so an image placement cannot be a per-cell
+field without growing the cell — and `PERFORMANCE.md` §4 measures what a
+byte per cell costs across a 100k-line scrollback. It would need a
+placement side table keyed by document position, kept correct across
+reflow (M4.2) and scrollback eviction, plus a second texture path in a
+renderer that currently has exactly two pipelines. That is a milestone,
+not a step, and nothing in the daily-driver checklist
+(`CONFORMANCE.md` §2) is blocked on it.
 
 ---
 

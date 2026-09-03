@@ -84,6 +84,27 @@ hostile input:
 - **Never auto-open** anything. Opening is always an explicit user
   action.
 
+**As implemented (M4.6, M6.8).** The detector's pattern can only match
+the three allowlisted schemes, so a `file://` string in terminal output
+is plain text; the scheme is then re-checked at the hand-off to
+`NSWorkspace`, because that is the line between terminal output and
+another application launching. An explicit OSC 8 hyperlink wins over
+pattern detection — the program said what the target is — and the ⌘-hover
+tooltip names *that* target, not the text under the pointer, which is the
+only thing that makes the "show the real target" rule mean anything.
+
+### 2.4.1 Text sent to the shell
+
+Dropping a file on a pane types its path at the prompt (M6.15). A
+filename is attacker-influenceable and can contain `;`, backticks or
+`$(…)`, so the path is POSIX single-quoted before it is sent: an
+unquoted drop of a maliciously named file would be a command waiting for
+a Return. The same path handles text returned by a Services item.
+
+This does not contradict §2.1. That rule forbids writing *stream-supplied*
+text back to the child — output the terminal received. A dropped path is
+a user action naming a file the user chose, which is what typing is.
+
 ### 2.5 Bidirectional and invisible characters
 
 Corta does not implement RTL/bidi (`DESIGN.md` §6), which removes the
@@ -195,6 +216,22 @@ macOS state restoration is a specific case:
 `applicationSupportsSecureRestorableState` returns `true`, but restored
 state must contain **window geometry only**. Terminal contents are never
 written to the restoration store.
+
+Terminal windows now set `isRestorable = false` outright. Nothing about a
+terminal window is restorable — its content is a live child process, not
+a document — so there is no geometry worth saving either, and the one
+thing restoration actually did was re-apply a stale frame *after* the
+deliberate sizing. Off is both the correct behaviour and one fewer store
+that could ever hold something it should not.
+
+**Notifications carry no terminal content.** The long-task notification
+(M6.3) reports a duration and the window title, never the command or any
+output: Notification Center is a second store, outside the app, with its
+own retention — and the grid is full of things that must not go there.
+
+**The config file holds settings only** (M6.1). It is a plain text file
+at `~/.config/corta/config` with no credential-shaped field, and nothing
+from the terminal stream is ever written into it.
 
 If session persistence is ever added, it is opt-in, documented as storing
 plaintext, and off by default.

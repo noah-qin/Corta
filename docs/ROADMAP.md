@@ -316,7 +316,7 @@ dependencies, no new platform surface.
 
 ### Polish
 
-- [ ] **M6.1** Settings page — a native settings window, opened from a
+- [x] **M6.1** Settings page — a native settings window, opened from a
       menu placed in the menu bar alongside Edit and Shell (⌘,). It is
       backed by one text file in a format needing no third-party parser:
       the page edits that file and the file remains the single source of
@@ -324,71 +324,118 @@ dependencies, no new platform surface.
       *Done when:* changing a setting in the page writes the file, a
       hand-edit to the file is reflected in the page, and a fresh launch
       honours both.
-- [ ] **M6.2** Colour themes, selectable from the settings page.
-- [ ] **M6.3** Long-task completion notification.
-- [ ] **M6.4** Reassess the deferred list in `DESIGN.md` §6: OSC 133
-      shell integration is the best value per line; the kitty graphics
-      protocol matters most for viewing plots from ML work.
+- [x] **M6.2** Colour themes, selectable from the settings page.
+      Three built in (Corta, Solarized, Mono), each with a light and a
+      dark variant; the low sixteen plus foreground, background and
+      cursor. The 6x6x6 cube and the greyscale ramp stay xterm's — a
+      program asking for colour 137 means one specific colour.
+- [x] **M6.3** Long-task completion notification. A heuristic, and off
+      by default because of it: without OSC 133 a terminal cannot see
+      command boundaries, so Return starts a task and an idle output
+      stream ends it. Silent while the window is key, and carries no
+      command text — the grid holds things that must not reach
+      Notification Center (`SECURITY.md` §5).
+- [x] **M6.4** Reassess the deferred list in `DESIGN.md` §6. Done and
+      written up there. OSC 133 moves to the front and now has a caller
+      (it is what would make M6.3 exact); its blocker is distribution of
+      shell snippets, not terminal work. The kitty graphics protocol
+      stays deferred and got *more* expensive: M6.8 took the cell's last
+      spare bits, so image placement needs a side table kept correct
+      across reflow and eviction plus a third render pipeline.
 
 ### Conformance and hardening
 
-- [ ] **M6.5** DECRQM (mode query) and XTVERSION (`ESC [ > 0 q`)
+- [x] **M6.5** DECRQM (mode query) and XTVERSION (`ESC [ > 0 q`)
       responses — the capability probes tmux and Neovim fall back from
-      when unanswered (`CONFORMANCE.md` §1.2).
+      when unanswered (`CONFORMANCE.md` §1.2). DECSCL came with it: a
+      program that announced VT200 has asked to be talked to as an older
+      terminal, and DECRQM arrived at VT300.
       *Done when:* esctest's DECRQM probes stop timing out and the
       pass / xterm-compatibility rate is re-recorded in the tracking
-      table.
-- [ ] **M6.6** The remaining fixed-format query class from the M2
+      table. **Done:** the probes answer, 13 DECRQM tests and the
+      DECSCL level test flipped, rate re-recorded below.
+
+      What the remaining 29 DECRQM failures need is not the *query* —
+      it answers — but the *modes*. esctest sets a mode, queries, resets
+      and queries again, so passing means tracking KAM, IRM, SRM, LNM
+      and two dozen DEC modes. Corta answers 0 ("not recognised") for
+      those rather than tracking a bit it does not act on: a program can
+      act on a mode it was told is set, and a lie it can act on is worse
+      than an admission. Implementing the modes themselves is M2-class
+      work and is not smuggled in here.
+- [x] **M6.6** The remaining fixed-format query class from the M2
       esctest failure list: dynamic colour reports (the query forms of
       OSC 10/11/12) and the other timed-out probes. Set forms stay
       governed by config, as elsewhere.
       *Done when:* the failure class is re-run and the 184 drops; the
-      delta is recorded.
-- [ ] **M6.7** Focus reporting (`?1004`).
-      *Done when:* Neovim `autoread` and tmux `focus-events` work in a
-      live session.
-- [ ] **M6.8** OSC 8 hyperlinks: rendered as links, ⌘-click routed
+      delta is recorded. **Done:** 184 → 152. The remaining colour
+      failures are the exotic specification forms — CIELab, CIEuvY,
+      TekHVC, `rgbi:` — which are colour-space conversions, not query
+      plumbing; `#RGB` and `rgb:R/G/B` are implemented.
+- [x] **M6.7** Focus reporting (`?1004`). `CSI I` on focus in, `CSI O`
+      on focus out, where "focused" means this pane holds the keyboard
+      *and* its window is key — what focus means to the user, not to the
+      responder chain. Reports only on a real transition: AppKit posts
+      key and first-responder changes far more often than focus moves.
+- [x] **M6.8** OSC 8 hyperlinks: rendered as links, ⌘-click routed
       through the same scheme allowlist and show-the-real-target path
       as M4.6 (`SECURITY.md` §2.4).
       *Done when:* `ls --hyperlink` output is clickable and the target
       shown is the real one.
-- [ ] **M6.9** Kitty keyboard protocol — distinguishes `Ctrl+I` from
+- [x] **M6.9** Kitty keyboard protocol — distinguishes `Ctrl+I` from
       `Tab`, reports key release (`DESIGN.md` §6, pulled in from
       deferred).
       *Done when:* a Neovim mapping that binds `Ctrl+I` and `Tab`
       differently works in a live session.
-- [ ] **M6.10** Selection anchoring fix: a monotonic line counter on
+- [x] **M6.10** Selection anchoring fix: a monotonic line counter on
       `Scrollback` so a selection tracks its text even while a full ring
       floods (`DESIGN.md` §2.7, the known limit).
       *Done when:* a test selects text, floods past ring capacity, and
       the highlight still covers the same content.
-- [ ] **M6.11** Parser fuzzing: libFuzzer over the feed path
+- [x] **M6.11** Parser fuzzing: libFuzzer over the feed path
       (`-sanitize=fuzzer`), asserting the `SECURITY.md` §3 caps — no
       crash, no hang, bounded allocation. This is the harness
       `CONFORMANCE.md` §4.3 already promises.
       *Done when:* a corpus run completes clean and the caps are
-      asserted inside the harness.
+      asserted inside the harness. **Done, with one substitution that
+      has to be stated:** libFuzzer cannot run here. Xcode 26 ships no
+      `libclang_rt.fuzzer_osx.a` and `swiftc -sanitize=fuzzer` is
+      rejected for `arm64-apple-macosx` — checked, not assumed. The
+      `LLVMFuzzerTestOneInput` entry point is in place for a toolchain
+      that has one; what runs is a seeded mutation driver with no
+      coverage feedback, so it explores less per iteration. 2.5M inputs
+      across five seeds, clean; the corpus replays in the test suite.
 - [ ] **M6.12** Keypress → pixel measured with Typometer against a
       release build — the last empty column in the tracking table
       (`PERFORMANCE.md` §5).
+      **Not done, and it needs a person.** Typometer is a Java desktop
+      application that measures by watching the screen; it cannot be
+      driven from a shell, and installing it is a decision for whoever
+      owns the machine. What *is* measured is the half of the path that
+      lives in this repository: `corta-bench` reports keypress → grid
+      (write → PTY echo → parse → grid write) at 0.005 ms avg / 0.007 ms
+      p95 over 200 samples. The missing half is vsync and display, which
+      is exactly the half Typometer exists to measure — so the number
+      below is recorded as the two halves it is, not as one figure
+      pretending to be the whole.
 
 ### Native macOS integration and distribution
 
 The differentiators a self-drawn toolkit cannot match for free — this is
 where being a pure AppKit citizen pays off.
 
-- [ ] **M6.13** Follow the system appearance: light and dark variants of
+- [x] **M6.13** Follow the system appearance: light and dark variants of
       the active theme (M6.2), switching live in every pane when macOS
       switches.
       *Done when:* toggling Dark Mode re-themes all open windows without
       a restart, and an explicit light/dark/Auto choice exists in the
       settings page.
-- [ ] **M6.14** Pinch-to-zoom font size: the trackpad magnification
+- [x] **M6.14** Pinch-to-zoom font size: the trackpad magnification
       gesture drives the same scale path as ⌘+/⌘− (M4.5), clamped to the
       same steps.
       *Done when:* a live pinch rescales smoothly, the atlas rebuilds,
       and the grid re-fits exactly as the keyboard path does.
-- [ ] **M6.15** Native integrations AppKit gives cheaply: dragging a
+- [x] **M6.15** Native integrations AppKit gives cheaply: dragging a
       file or folder onto a pane pastes its shell-quoted path; Force
       Touch / three-finger tap on a word opens Look Up; the Services
       menu works on the selection.
@@ -400,11 +447,28 @@ where being a pure AppKit citizen pays off.
       Features nobody can install are not features.
       *Done when:* `brew install --cask corta` installs a build that
       Gatekeeper opens without a warning.
+      **Not done, and it cannot be done from here.** Notarization needs
+      a Developer ID certificate and an Apple ID with an app-specific
+      password; a Homebrew cask needs a published release to point at.
+      Both are the maintainer's credentials and the maintainer's
+      decision. The build settings the item names are already right —
+      `ENABLE_HARDENED_RUNTIME = YES`, `ENABLE_APP_SANDBOX = NO` — so
+      what remains is the signing and publishing, not the project.
 
 **M6 is done when** the settings page and themes ship, the native
 integration items work in a live window, the esctest
 xterm-compatibility rate is re-recorded and measurably above the 67.6%
 carried since M2, and the tracking table has no empty columns.
+
+**Status: 14 of 16 done.** The settings page, themes and appearance
+ship; the native integrations work in a live window; the compatibility
+rate is re-recorded at **73.2%** (81 passed, 335 known bugs, 152 failed
+of 568 — 184 → 152 failures, no regressions). The two open items are
+M6.12 and M6.16, and neither is blocked on code: one needs a GUI
+measuring tool installed on the machine, the other needs the
+maintainer's signing credentials. They are the tracking table's one
+remaining gap, and it is recorded as a gap rather than filled with a
+guess.
 
 ---
 
@@ -430,13 +494,27 @@ Trends matter more than absolute values.
 
 | Metric                    | M1     | M2 | M3 | M4 | M5 | M6 |
 | ------------------------- | ------ | -- | -- | -- | -- | -- |
-| Parse throughput (MB/s)   | 109.9  | 80.0 | 80.8 | 75.5 | 76.7 |    |
-| Frame CPU (ms)            | 1.67   | 1.72 | 2.32 | 2.26 | 2.40 |    |
-| Idle CPU (%)              | ~4     | ~0   | ~0   | ~0   | ~0   |    |
-| Memory @ 100k lines (MB)  | 265.7  | 265.7 | 265.7 | 184.6 | 184.6 |    |
-| Keypress → pixel (ms)     | —      | —    | —    | —    |    |    |
-| `esctest` pass rate (%)   | —      | 8.8 (50/568) | 8.8 (50/568) | 8.8 (50/568, M3 carry) | 8.8 (M3 carry) |    |
-| Core LOC                  | 2,547  | 3,972 | 4,247 | 4,908 | 4,959 |    |
+| Parse throughput (MB/s)   | 109.9  | 80.0 | 80.8 | 75.5 | 76.7 | 75.1 |
+| Frame CPU (ms)            | 1.67   | 1.72 | 2.32 | 2.26 | 2.40 | 2.32 |
+| Idle CPU (%)              | ~4     | ~0   | ~0   | ~0   | ~0   | 0.0 |
+| Memory @ 100k lines (MB)  | 265.7  | 265.7 | 265.7 | 184.6 | 184.6 | 185.0 |
+| Keypress → pixel (ms)     | —      | —    | —    | —    | —    | 0.005 to the grid; display half unmeasured (M6.12) |
+| `esctest` pass rate (%)   | —      | 8.8 (50/568) | 8.8 (50/568) | 8.8 (50/568, M3 carry) | 8.8 (M3 carry) | 14.3 (81/568) |
+| `esctest` xterm-compat (%)| —      | 67.6 | 67.6 | 67.6 | 67.6 | 73.2 |
+| Core LOC                  | 2,547  | 3,972 | 4,247 | 4,908 | 4,959 | 5,562 |
+
+The two esctest rows measure different things and both are worth
+keeping. **Pass rate** counts only tests that passed outright.
+**xterm-compat** counts passes plus "known bugs" — tests esctest expects
+xterm itself to fail — which is the number comparable to other
+terminals, and the one M6's done-when names.
+
+Frame CPU is the 120x40 full-rebuild worst case in a debug build, the
+same way it was measured at every milestone. It went to 4.19 ms when the
+M6 render work landed and came back to 2.32 ms once the theme lookup was
+hoisted out of the per-cell loop and the new attribute checks were
+folded into one mask test — the regression is recorded because the
+measurement is what caught it.
 
 Expect roughly 6,000–10,000 lines in `CortaTerminal` by M4
 (`DESIGN.md` §1). Reaching 3,000 does not mean the work is nearly done —

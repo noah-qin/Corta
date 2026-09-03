@@ -62,6 +62,11 @@ Example: `fix(ui): keep the window title in sync after a document rename`
 4. **One logical change per commit.** Do not mix a refactor with a
    feature, or a dependency bump with a bug fix.
 5. No emoji, no ticket ID in the subject line, no `WIP` on `main`.
+6. **No tool or session identifiers in a commit message.** No
+   `Claude-Session:`, no assistant URLs, no "generated with" footer. This
+   repository is public: a session link is a private URL that never stops
+   being one, and a commit message is the one place it can never be
+   deleted from. It also says nothing a reader of the history needs.
 
 ### Examples
 
@@ -100,6 +105,7 @@ Before writing a commit, work through this checklist:
 - [ ] The commit contains one logical change; split it otherwise.
 - [ ] Do not add advertising footers, emoji, or co-author trailers unless
       the maintainer asked for them.
+- [ ] No tool or session identifiers anywhere in the message (rule 6).
 - [ ] Never rewrite published history without explicit instruction.
 
 ## Branches

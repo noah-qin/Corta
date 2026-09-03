@@ -3,8 +3,11 @@
 A native macOS terminal emulator in pure Swift. Metal rendering, Core
 Text shaping, AppKit shell, a hand-written VT parser.
 
-**Status: pre-M1.** The repository currently contains only the Xcode
-scaffold. Nothing in `docs/` is implemented yet.
+**Status: M6, 14 of 16 steps done.** M1–M5 are complete. The two open
+M6 steps are M6.12 (Typometer, needs the tool installed) and M6.16
+(notarization and a Homebrew cask, needs the maintainer's signing
+credentials); neither is blocked on code. `docs/ROADMAP.md` is the
+tracking record.
 
 ## Documentation
 
@@ -48,6 +51,17 @@ Do not reopen these without a concrete new reason. Each is explained in
   features.** See `docs/DESIGN.md` §6. Settings are one native page in
   the menu bar next to Edit/Shell, backed by a single text config file
   (M6.1) — the page edits the file, which remains the source of truth.
+- **The config file at `~/.config/corta/config` is the only settings
+  store.** `ConfigurationStore` reads it, writes it and watches it; the
+  settings page is a front over that and holds no state of its own. Do
+  not add a `UserDefaults` key for something the config file could
+  carry — two stores drift, and the file has to win because a user can
+  edit it.
+- **A cell is 16 bytes and now full.** `Cell.scalar` is 21 bits and the
+  OSC 8 hyperlink id (M6.8) is the other 11. Anything else that wants
+  per-cell identity needs a side table keyed by position, not a new
+  field: `CellLayoutTests` asserts the size, and `PERFORMANCE.md` §4
+  measures what a byte per cell costs over a 100k-line scrollback.
 
 ## Working Rules
 
@@ -119,13 +133,35 @@ layout (`correctInitialWindowSize`); do not "fix" the size earlier in
 **Testing.** Golden-file grid tests are built during M1, not later:
 feed a byte stream, serialise the grid to text, diff against a checked-in
 expectation. Record `esctest` pass rate and benchmark numbers at each
-milestone.
+milestone — `CONFORMANCE.md` §4.2 has the exact esctest invocation, and
+§4.3 the fuzz harness (`corta-fuzz`; libFuzzer does not link on macOS
+with the current Xcode, so a seeded mutation driver runs instead).
+
+**Measure the frame-CPU baseline after touching the render loop.**
+The M6 render work took it from 2.40 ms to 4.19 ms — a per-cell read of
+a global that retained an array, plus three unelided `OptionSet.contains`
+calls — and back to 2.32 ms once both were folded away. The regression
+was invisible in every test that passed; only the number caught it.
+
+**Never put a tool or session identifier in a commit message.** No
+`Claude-Session:`, no assistant URLs, no "generated with" footer. The
+repository is public and a commit message is the one place a private URL
+can never be deleted from. `CONTRIBUTING.md` rule 6.
 
 ## Build and Test
 
 ```sh
 xcodebuild -project Corta.xcodeproj -scheme Corta build
 xcodebuild -project Corta.xcodeproj -scheme Corta test
+```
+
+Fuzzing and the core benchmark are SwiftPM products:
+
+```sh
+swift build --package-path CortaTerminal -c release --product corta-fuzz
+CortaTerminal/.build/release/corta-fuzz --fuzz 500000 --seed 1 \
+  CortaTerminal/Tests/Fuzz/corpus
+CortaTerminal/.build/release/corta-bench
 ```
 
 Layout:
