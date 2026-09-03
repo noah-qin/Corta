@@ -3,7 +3,8 @@ import Sparkle
 
 /// Wraps Sparkle's standard updater as the single point of contact for
 /// update checks — the automatic background check on the interval
-/// `INFOPLIST_KEY_SUScheduledCheckInterval` sets, and the manual one from
+/// `SUScheduledCheckInterval` sets (`Sparkle-Info.plist`, merged into the
+/// generated Info.plist via `INFOPLIST_FILE`), and the manual one from
 /// "Check for Updates…", which `AppDelegate+Menus` installs directly under
 /// About, where every other Sparkle-using Mac app puts it.
 ///

@@ -51,6 +51,7 @@
 		4F1776AF30465E2000E8DD20 /* CortaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CortaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4F1776B930465E2000E8DD20 /* CortaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CortaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1C0A000030465E2000E8DD20 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		E9A0D9C512919DCC5A6DF615 /* Sparkle-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Sparkle-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -104,6 +105,7 @@
 			isa = PBXGroup;
 			children = (
 				A1C0A000030465E2000E8DD20 /* AppIcon.icon */,
+				E9A0D9C512919DCC5A6DF615 /* Sparkle-Info.plist */,
 				4F1776A130465E1F00E8DD20 /* Corta */,
 				4F1776B230465E2000E8DD20 /* CortaTests */,
 				4F1776BC30465E2000E8DD20 /* CortaUITests */,
@@ -454,12 +456,10 @@
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Sparkle-Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Noah Qin. Apache License 2.0.";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
-				INFOPLIST_KEY_SUFeedURL = "https://raw.githubusercontent.com/noah-qin/Corta/main/appcast.xml";
-				INFOPLIST_KEY_SUPublicEDKey = "qA5ohnw34Yjg0pfWN0AJ4KCxYfia3jNLdvgudVzPgog=";
-				INFOPLIST_KEY_SUScheduledCheckInterval = 86400;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -482,13 +482,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				// A plain `xcodebuild build` picks a Development certificate under
-				// Automatic signing regardless of a Developer ID identity's
-				// presence unless told otherwise, and a Development-signed build
-				// cannot be notarized (M6.16, SECURITY.md §4.1). Manual style is
-				// required to name an identity explicitly — Automatic conflicts
-				// with it — matching the signed path .github/workflows/release.yml
-				// already uses.
 				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -498,12 +491,10 @@
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Sparkle-Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Noah Qin. Apache License 2.0.";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
-				INFOPLIST_KEY_SUFeedURL = "https://raw.githubusercontent.com/noah-qin/Corta/main/appcast.xml";
-				INFOPLIST_KEY_SUPublicEDKey = "qA5ohnw34Yjg0pfWN0AJ4KCxYfia3jNLdvgudVzPgog=";
-				INFOPLIST_KEY_SUScheduledCheckInterval = 86400;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

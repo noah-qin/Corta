@@ -87,9 +87,10 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// process running.
     var confirmClose: Bool = true
     /// Whether Sparkle checks for updates in the background, on the
-    /// interval `INFOPLIST_KEY_SUScheduledCheckInterval` sets. Check for
-    /// Updates… (`AppDelegate+Menus`, `UpdateController`) always works,
-    /// on or off — this only gates the unattended check nobody asked for.
+    /// interval `SUScheduledCheckInterval` sets (`Sparkle-Info.plist`).
+    /// Check for Updates… (`AppDelegate+Menus`, `UpdateController`) always
+    /// works, on or off — this only gates the unattended check nobody
+    /// asked for.
     var updateAutoCheck: Bool = true
 
     /// Themes defined in the config file itself (M7.6), in file order.
