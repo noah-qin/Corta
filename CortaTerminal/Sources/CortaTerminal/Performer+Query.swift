@@ -34,6 +34,11 @@ extension Performer {
     /// does not implement is the honest reply and is what stops the probe
     /// blocking — silence is the only answer that hurts.
     mutating func reportMode(_ parameters: Parameters, isPrivate: Bool) {
+        // DECRQM is a VT300-and-later sequence. A program that announced a
+        // lower conformance level with DECSCL has asked to be talked to as
+        // an older terminal, and answering anyway is the terminal ignoring
+        // what it was told.
+        guard state.conformanceLevel >= 63 else { return }
         let mode = parameters.value(0, default: 0)
         let marker = isPrivate ? "?" : ""
         let setting = isPrivate ? privateModeSetting(mode) : ansiModeSetting(mode)
@@ -60,12 +65,23 @@ extension Performer {
         }
     }
 
-    /// The DECRQM answer for an ANSI mode. Corta implements none of them as
-    /// toggles; IRM (4, insert/replace) is permanently reset because the
-    /// grid always replaces.
+    /// The DECRQM answer for an ANSI mode.
+    ///
+    /// The ECMA-48 modes below are *permanently reset* (4), not unknown:
+    /// they describe hardware a terminal emulator has no analogue of —
+    /// guarded areas, form feeds to a printer, transfer termination — and
+    /// Corta will never implement them. 4 says exactly that, and is what
+    /// xterm answers. It is a stronger and more useful answer than 0: a
+    /// program learns not to ask again.
+    ///
+    /// The genuinely modifiable ANSI modes — KAM (2), IRM (4), SRM (12),
+    /// LNM (20) — answer 0 until the modes themselves exist. Reporting a
+    /// bit Corta tracks but does not act on would be a lie a program can
+    /// act on, which is worse than admitting the mode is unimplemented.
     private func ansiModeSetting(_ mode: Int) -> Int {
         switch mode {
-        case 4: return 4
+        // GATM, SRTM, VEM, HEM, PUM, FEAM, FETM, MATM, TTM, SATM, TSM, EBM.
+        case 1, 5, 7, 10, 11, 13, 14, 15, 16, 17, 18, 19: return 4
         default: return 0
         }
     }
@@ -179,5 +195,17 @@ extension Performer {
         state.keyboardProtocol.set(
             KeyboardEnhancementFlags(rawValue: UInt8(min(255, parameters.value(0, default: 0)))),
             mode: parameters.value(1, default: 1))
+    }
+
+    /// DECSCL — `CSI Ps ; Ps " p`. Sets the conformance level the terminal
+    /// answers at; see `PerformerState.conformanceLevel`.
+    ///
+    /// The second parameter (7-bit versus 8-bit controls) is ignored: Corta
+    /// emits 7-bit control sequences unconditionally, which is legal at
+    /// every level and is what every modern terminal does.
+    mutating func setConformanceLevel(_ parameters: Parameters) {
+        let level = parameters.value(0, default: 65)
+        guard (61...65).contains(level) else { return }
+        state.conformanceLevel = level
     }
 }

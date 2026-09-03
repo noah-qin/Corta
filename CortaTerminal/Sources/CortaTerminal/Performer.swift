@@ -90,6 +90,13 @@ public struct Performer: ParserPerformer, Sendable {
                 reportMode(sequence.parameters, isPrivate: false)
                 return
             }
+            // DECSCL — `CSI Ps ; Ps " p`, the announced conformance level.
+            if sequence.intermediates.count == 1, sequence.intermediates[0] == 0x22,
+                sequence.final == 0x70
+            {
+                setConformanceLevel(sequence.parameters)
+                return
+            }
             _ = performIntermediate(
                 final: sequence.final,
                 intermediates: sequence.intermediates,

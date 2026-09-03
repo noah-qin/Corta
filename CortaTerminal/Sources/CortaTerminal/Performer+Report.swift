@@ -40,6 +40,12 @@ public struct PerformerState: Sendable {
     /// tmux's `focus-events` are waiting for.
     public internal(set) var focusReportingEnabled = false
 
+    /// DECSCL — the announced conformance level (`CSI Ps ; Ps " p`), 61 for
+    /// VT100 through 65 for VT500. Corta behaves as a VT500-class terminal
+    /// and starts there; what the level actually gates is which sequences
+    /// are allowed to answer, DECRQM being the one that matters (M6.5).
+    public internal(set) var conformanceLevel = 65
+
     /// The kitty keyboard protocol's mode stack (M6.9). The app reads
     /// `current` to decide how to encode a key press.
     public internal(set) var keyboardProtocol = KeyboardProtocolStack()

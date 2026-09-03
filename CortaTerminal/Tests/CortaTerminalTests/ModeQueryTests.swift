@@ -50,8 +50,28 @@ struct ModeQueryTests {
 
     @Test("the ANSI form has no ? in either the request or the reply")
     func decrqmAnsiForm() {
-        #expect(response(to: "\u{1B}[4$p") == "\u{1B}[4;4$y")
+        #expect(response(to: "\u{1B}[1$p") == "\u{1B}[1;4$y")
         #expect(response(to: "\u{1B}[20$p") == "\u{1B}[20;0$y")
+    }
+
+    /// The ECMA-48 modes describing hardware an emulator has no analogue of
+    /// answer 4 — permanently reset — which is a stronger answer than 0: a
+    /// program learns not to ask again.
+    @Test("modes Corta will never implement answer permanently reset")
+    func decrqmPermanentlyResetAnsiModes() {
+        for mode in [1, 5, 7, 10, 11, 13, 14, 15, 16, 17, 18, 19] {
+            #expect(response(to: "\u{1B}[\(mode)$p") == "\u{1B}[\(mode);4$y")
+        }
+    }
+
+    /// A program that announced VT200 with DECSCL has asked to be talked to
+    /// as an older terminal; DECRQM arrived at VT300.
+    @Test("DECRQM goes unanswered below the conformance level that defines it")
+    func decrqmRespectsTheConformanceLevel() {
+        #expect(response(to: "\u{1B}[62;0\"p\u{1B}[?2004$p").isEmpty)
+        #expect(response(to: "\u{1B}[63;0\"p\u{1B}[?2004$p") == "\u{1B}[?2004;2$y")
+        // Back up to the default level and it answers again.
+        #expect(response(to: "\u{1B}[62;0\"p\u{1B}[65;0\"p\u{1B}[?2004$p") == "\u{1B}[?2004;2$y")
     }
 
     @Test("DECRQM does not change the mode it asks about")
