@@ -17,7 +17,7 @@ extension Performer {
     /// The name is a compile-time constant, so the answer cannot carry
     /// stream-supplied bytes. xterm's own answer is `XTerm(<patch>)`; the
     /// convention every consumer parses is `Name(version)`.
-    private static let versionReport = Array("\u{1B}P>|Corta(1)\u{1B}\\".utf8)
+    private static let versionReport = Array("\u{1B}P>|Corta(0.1.0)\u{1B}\\".utf8)
 
     mutating func reportVersion(_ parameters: Parameters) {
         // `CSI > 0 q` and `CSI > q` are the same request; any other Ps is a

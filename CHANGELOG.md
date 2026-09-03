@@ -10,8 +10,12 @@ what to edit.
 
 ## [Unreleased]
 
-Nothing has been released yet. Everything below is on `main` and is
-reachable by building from source — see the README.
+Nothing yet.
+
+## [0.1.0] - 2026-09-03
+
+The first release. Everything below is what `main` had accumulated
+through M1–M7.
 
 ### Added
 
@@ -61,8 +65,28 @@ reachable by building from source — see the README.
 - Configuration in one text file at `~/.config/corta/config`, watched for
   external edits. The settings page is a front over that file and holds no
   state of its own.
-- A long-running-task notification, off by default while it rests on a
-  heuristic rather than on shell integration.
+- A long-running-task notification, off by default.
+- Shell integration (OSC 133): prompt and exit-status marks in the left
+  edge of each prompt row, ⌘↑/⌘↓ to jump command to command, and an exact
+  long-task notification when the shell reports boundaries. The
+  keystroke-and-idle heuristic remains for shells with no integration
+  configured.
+- Session restore — windows, split layout, divider proportions and each
+  pane's working directory — and a Dock click that reopens a window when
+  none is open.
+- A confirmation before closing a pane, window or the app while a shell
+  still has a foreground job.
+- A command palette (⇧⌘P) over every command Corta has.
+- Rebindable keyboard shortcuts, `bind.<command> = cmd+shift+d` in the
+  config file; an empty value unbinds.
+- Themes defined in the config file, inheriting from a built-in so a
+  two-line theme is a legal theme.
+- Keyboard pane resizing by whole cells, and Equalize Panes.
+- Copy on select, and `link-activation = click` — hovering a link
+  underlines it and shows the target, and a click that never moved opens
+  it. ⌘-click remains the default.
+- OSC 52 clipboard *write*, off by default (`SECURITY.md` §2.6). The read
+  form is not implemented and will not be.
 
 **Project**
 - Golden-file grid tests, a fuzz harness (`corta-fuzz`) with a checked-in
@@ -72,6 +96,31 @@ reachable by building from source — see the README.
 
 ### Fixed
 
+- The Bell setting did something. The settings page wrote `bell` to the
+  config file while the bell itself read a `UserDefaults` key, so changing
+  it had no effect at all. There is now one store, as there was always
+  supposed to be.
+- Only font families that actually render on a grid are offered. The list
+  was filtered by `isFixedPitch` on a family's *first* face, which let
+  through families whose bold face is wider (bold text painted into the
+  next column), families that are monospaced for letters but not digits
+  (ragged TUI borders), and bitmap and colour faces (blurred or blank).
+  Every ASCII advance is now measured across all four faces Corta draws
+  with.
+- Italics render. `SGR 3` was parsed and the attribute set, and the
+  renderer had no italic path at all, so italic text drew upright.
+- A family with no real bold or italic face gets a synthesised one rather
+  than silently dropping the rendition.
+- A glyph wider than its cell is scaled to fit instead of painting into
+  the neighbouring column, and a scalar no font in the cascade covers
+  draws a hollow box instead of nothing — output that looked lost.
+- One "Settings…" entry in the menu bar instead of two; the theme and
+  appearance lists moved to View. The settings page is grouped into
+  labelled sections with explanations, and its window resizes and
+  scrolls rather than truncating long font names at a fixed 460 points.
+- The File and View menus no longer carry inert document and toolbar
+  items. They did nothing in a terminal, and Page Setup's ⇧⌘P and Show
+  Toolbar's ⌘T silently shadowed real commands.
 - A flag emoji is one grapheme cluster again. A pair of regional indicators
   (`🇯🇵` = U+1F1EF U+1F1F5) was stored as two independent wide cells and
   occupied four columns instead of two, so every character after it on the
@@ -85,11 +134,17 @@ reachable by building from source — see the README.
 
 ### Known gaps
 
-- Parser throughput is **75.1 MB/s** against a target of 100 MB/s.
-- `esctest` xterm conformance is **73.2%** — 152 of 568 tests failing.
-- Keypress-to-pixel latency is measured only as far as the grid
-  (0.005 ms); the display half is unmeasured pending Typometer.
-- There is no signed or notarised build, and no Homebrew cask.
+- Core feed throughput is **130.0 MiB/s** (five-run mean), above the
+  100 MB/s target; parser-only and parser+grid are measured separately.
+- `esctest` xterm conformance is **77.6%** — 127 of 568 tests failing.
+- Typometer measures keypress-to-pixel latency at **45.5 ms average**
+  (24.8 ms minimum, 56.4 ms maximum, 6.8 ms standard deviation), above the
+  one-frame-plus-input target; the in-process path to the grid is 0.005 ms.
+- There is no signed or notarised direct-download build yet.
+- Frame CPU is **1.879 ms average** / 2.659 ms p95 for a full 120x40
+  rebuild, inside the 4 ms budget.
+- OSC 133 marks only appear if the user's shell emits them; Corta ships no
+  shell snippets yet.
 
 ---
 
@@ -106,4 +161,5 @@ For the maintainer, when the first tag is cut:
    The release workflow builds from the tag and opens a **draft** release
    for review — it is never published automatically.
 
-[Unreleased]: https://github.com/noah-qin/Corta/commits/main
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/noah-qin/Corta/releases/tag/v0.1.0
