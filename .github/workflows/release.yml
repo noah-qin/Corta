@@ -79,11 +79,41 @@ jobs:
             -scheme Corta \
             -destination 'platform=macOS' \
             -skip-testing:CortaUITests \
+            -resultBundlePath test-results.xcresult \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGNING_REQUIRED=NO \
             DEVELOPMENT_TEAM="" \
             -quiet
+
+      # -quiet above hides the individual #expect failure message (which
+      # menu items collided, here) — only the test name survives to the
+      # log. Print it from the result bundle so a failure is diagnosable
+      # without re-running locally, which has not reproduced this at all
+      # (docs/readme-build-step and v0.1.0 both failed
+      # MenuShortcutTests.noKeystrokeIsClaimedByTwoMenuItems on this
+      # runner; a dozen local attempts across two machines have not).
+      - name: Print test failure details
+        if: failure()
+        run: |
+          xcrun xcresulttool get test-results tests \
+            --path test-results.xcresult --compact | \
+            python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          # 'Failure Message' is a *child node type* here, not a field on
+          # the failing test — confirmed against this schema locally
+          # before relying on it in CI (\`xcresulttool ... --schema\`).
+          def walk(node, under=None):
+              node_type = node.get('nodeType')
+              if node_type == 'Failure Message':
+                  print(f'{under}: {node.get(\"name\")}')
+              label = node.get('name') if node_type == 'Test Case' else under
+              for child in node.get('children', []) or []:
+                  walk(child, label)
+          for suite in data.get('testNodes', []) or []:
+              walk(suite)
+          "
 
       - name: Import the signing certificate
         if: steps.signing.outputs.available == 'true'
