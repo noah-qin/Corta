@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question, idea or general discussion
+    url: https://github.com/noah-qin/Corta/discussions
+    about: Anything that is not a reproducible bug or a concrete feature request belongs in Discussions.
+  - name: Security vulnerability
+    url: https://github.com/noah-qin/Corta/security/advisories/new
+    about: Report privately. Never open a public issue for a security problem.
+  - name: Things Corta deliberately does not do
+    url: https://github.com/noah-qin/Corta/blob/main/docs/DESIGN.md
+    about: Multiplexing, cross-platform, tmux control mode, AI features and RTL text were each considered and rejected. Read §6 before requesting one.

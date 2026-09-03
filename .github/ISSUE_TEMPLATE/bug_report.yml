@@ -1,0 +1,67 @@
+name: Bug report
+description: Something renders wrong, crashes, hangs or behaves differently from another terminal.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. The single most useful thing you can give us is
+        **the byte sequence that reproduces it** — a `printf` line beats a
+        paragraph of description and a screenshot.
+
+        If this is a security problem, stop here and
+        [report it privately](https://github.com/noah-qin/Corta/security/advisories/new).
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: >
+        Ideally a single command. If it involves an escape sequence, give it as
+        a `printf` line or a hex dump — `xxd` output of the offending bytes is
+        perfect.
+      placeholder: |
+        printf '\033[?1049h\033[2J'
+        # then: ...
+      render: shell
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Corta version or commit
+      description: "`git rev-parse --short HEAD` of the build you tested."
+    validations:
+      required: true
+
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version and hardware
+      placeholder: macOS 26.5, M2 Pro
+    validations:
+      required: true
+
+  - type: input
+    id: other-terminals
+    attributes:
+      label: Does another terminal do it right?
+      description: >
+        Compare against Terminal.app, iTerm2, Ghostty or xterm. Knowing which
+        terminals agree with you narrows a VT bug down enormously.
+      placeholder: "Correct in iTerm2 and xterm; wrong in Corta"
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Screenshots, a screen recording, your `~/.config/corta/config`, the shell and program you were running.

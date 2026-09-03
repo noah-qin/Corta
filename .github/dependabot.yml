@@ -1,0 +1,10 @@
+# Corta has no third-party code dependencies by design, so the only thing
+# to keep current is the actions used by CI.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci"

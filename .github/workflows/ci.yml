@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    name: Terminal core (SwiftPM)
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select the newest installed Xcode
+        run: |
+          latest=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "Using $latest"
+          sudo xcode-select -s "$latest"
+          xcodebuild -version
+          swift --version
+
+      - name: Build
+        run: swift build --package-path CortaTerminal -c release
+
+      - name: Test
+        run: swift test --package-path CortaTerminal
+
+      - name: Replay the fuzz corpus
+        run: |
+          CortaTerminal/.build/release/corta-fuzz \
+            CortaTerminal/Tests/Fuzz/corpus/*
+
+      - name: Short mutation fuzz run
+        run: |
+          CortaTerminal/.build/release/corta-fuzz --fuzz 200000 --seed 1 \
+            CortaTerminal/Tests/Fuzz/corpus
+
+  app:
+    name: App and tests (Xcode)
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select the newest installed Xcode
+        run: |
+          latest=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "Using $latest"
+          sudo xcode-select -s "$latest"
+          xcodebuild -version
+
+      # The runner has no signing identity and no access to the maintainer's
+      # team, so build ad-hoc signed. The unit tests host inside the app, so
+      # signing cannot be switched off entirely — only made local.
+      - name: Build and test
+        run: |
+          xcodebuild test \
+            -project Corta.xcodeproj \
+            -scheme Corta \
+            -destination 'platform=macOS' \
+            -skip-testing:CortaUITests \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGNING_REQUIRED=NO \
+            DEVELOPMENT_TEAM="" \
+            -quiet
+
+  # UI tests need a real window server session and are not run on every PR.
+  # `docs/CONFORMANCE.md` §4.4 is explicit that the app-layer check is a
+  # human launching the app — CI does not replace it.
