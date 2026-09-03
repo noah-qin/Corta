@@ -46,9 +46,9 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
 
         var title: String {
             switch self {
-            case .appearance: return "Appearance"
-            case .terminal: return "Terminal"
-            case .general: return "General"
+            case .appearance: return L10n.text("settings.tab.appearance")
+            case .terminal: return L10n.text("settings.tab.terminal")
+            case .general: return L10n.text("settings.tab.general")
             }
         }
 
@@ -67,19 +67,30 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         }
     }
 
-    /// The page's geometry, in one place: a right-aligned label column, a
-    /// gap, and a value column every control and every explanation starts at.
-    private static let labelColumnWidth: CGFloat = 132
+    /// The page's geometry: a right-aligned label column, a gap, and a value
+    /// column every control and every explanation starts at.
     private static let columnGap: CGFloat = 10
     private static let valueColumnWidth: CGFloat = 218
     /// The margin from the window's edge to a row.
     private static let pageMargin: CGFloat = 22
     /// Vertical space between rows.
     private static let rowSpacing: CGFloat = 14
+    /// How far a dependent row is indented under the setting it belongs to.
+    private static let dependentIndent: CGFloat = 18
+
+    /// Measured at launch, not fixed at 132.
+    ///
+    /// A constant fitted the English labels at the default system font size,
+    /// and nothing else: "Benachrichtigungen bei langen Aufgaben" is half
+    /// again as wide, and every label on the page grows with Larger Text in
+    /// System Settings. Measuring the actual labels in the actual language at
+    /// the actual size is the only version of this that cannot clip — and it
+    /// costs one pass over fifteen strings, once.
+    private let labelColumnWidth: CGFloat
     /// Derived, so a change to a column cannot leave the window too narrow
-    /// for its own rows.
-    private static let contentWidth: CGFloat =
-        2 * pageMargin + labelColumnWidth + columnGap + valueColumnWidth
+    /// for its own rows. The *minimum* width now: the window is resizable and
+    /// the value column takes anything past this.
+    private let contentWidth: CGFloat
 
     private let themePopUp = NSPopUpButton()
     private let appearancePopUp = NSPopUpButton()
@@ -97,8 +108,23 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
     private let confirmCloseSwitch = NSSwitch()
     private let notifySwitch = NSSwitch()
     private let thresholdField = NSTextField()
-    private let thresholdLabel = NSTextField(labelWithString: "Longer than")
+    private let thresholdLabel = NSTextField(labelWithString: L10n.text("settings.label.longerThan"))
     private let pathLabel = NSTextField(labelWithString: "")
+    /// The row under the notify switch, disabled and dimmed with it — held so
+    /// the dependency can be expressed by the whole row rather than by the
+    /// field alone.
+    private var thresholdRow: NSView?
+    private var notificationPermissionRow: NSView?
+    /// Save feedback (icon, word and colour, in that order of importance —
+    /// `SettingsStatusView`). Every control on this page writes immediately,
+    /// which left the user with no way to tell a saved change from a silently
+    /// clamped one from a write that failed outright.
+    private let statusView = SettingsStatusView()
+    /// Shown under the notification switch when macOS has been told not to
+    /// deliver anything — an "on" switch over a denied permission is a
+    /// setting that lies. Icon and words, with a button to the one place the
+    /// decision can be reversed.
+    private let notificationPermissionNotice = SettingsStatusView()
 
     /// The panes, built on first visit and kept. A control on a tab that is
     /// not showing is still populated from the store, so switching tabs never
@@ -120,31 +146,78 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
     /// store — otherwise setting a control's value looks like a user edit
     /// and writes the file back at itself.
     private var isPopulating = false
+    /// Every explanation line on the page, so Increase Contrast can promote
+    /// them all at once.
+    private var helpNotes: [NSTextField] = []
 
     private init() {
+        let labelColumn = Self.measuredLabelColumnWidth()
+        labelColumnWidth = labelColumn
+        contentWidth = 2 * Self.pageMargin + labelColumn + Self.columnGap + Self.valueColumnWidth
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: Self.contentWidth, height: 200),
-            // Not resizable: every pane is laid out for one width and sized
-            // to its own content, so there is nothing for a drag to do.
-            styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            contentRect: NSRect(x: 0, y: 0, width: contentWidth, height: 200),
+            // Resizable, with the fitted size as the minimum. The panes were
+            // laid out for exactly one width, which made the window unable to
+            // give a long localized label or a Larger Text label any more
+            // room than the English default happened to need; the value
+            // column now takes whatever a drag adds.
+            styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         super.init(window: window)
         window.contentView = buildContentView()
         installToolbar()
         NotificationCenter.default.addObserver(
             self, selector: #selector(populate), name: ConfigurationStore.didChange, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(configurationWriteStatusChanged),
+            name: ConfigurationStore.writeStatusDidChange, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(applyNotificationPermission),
+            name: TaskNotifier.permissionDidChange, object: nil)
+        accessibilityObserver = SystemAccessibility.observe { [weak self] in
+            self?.applySystemAccessibilityPreferences()
+        }
         populate()
         show(tab: currentTab, animated: false)
         window.center()
     }
 
+    /// The widest label the page will draw, in the running language and at
+    /// the user's system font size, clamped so neither a terse language nor a
+    /// runaway translation decides the whole window's proportions.
+    private static func measuredLabelColumnWidth() -> CGFloat {
+        let keys = [
+            "settings.label.theme", "settings.label.lightOrDark", "settings.label.font",
+            "settings.label.size", "settings.label.scrollback", "settings.label.bell",
+            "settings.label.copyOnSelect", "settings.label.openLinksWith",
+            "settings.label.allowClipboardCopy", "settings.label.newWindow",
+            "settings.label.restoreWindows", "settings.label.confirmClose",
+            "settings.label.notifyOnLongTasks", "settings.label.longerThan",
+        ]
+        let field = NSTextField(labelWithString: "")
+        var widest: CGFloat = 0
+        for key in keys {
+            field.stringValue = L10n.text(key)
+            // Two lines are allowed in a row, so a label may wrap rather than
+            // widen the column past what a settings window should be.
+            widest = max(widest, field.fittingSize.width)
+        }
+        return min(240, max(120, widest.rounded(.up)))
+    }
+
+    /// Retains the display-preferences observer for the window's lifetime.
+    private var accessibilityObserver: Any?
+
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     @objc func show(_ sender: Any?) {
         // The file may not exist until something writes it; writing on first
-        // open is what makes the format discoverable and gives "Reveal"
-        // something to reveal.
-        ConfigurationStore.shared.write()
+        // open is what makes the format discoverable and gives "Show in
+        // Finder" something to show.
+        if !ConfigurationStore.shared.write() { showWriteFailure() }
+        // System Settings can have flipped it since this window was last
+        // open, so it is read on every open rather than cached.
+        TaskNotifier.refreshPermission()
         populate()
         showWindow(sender)
         window?.makeKeyAndOrderFront(sender)
@@ -207,7 +280,7 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         currentTab = tab
         // Suppressed by `.preference` toolbar style, but it is what Mission
         // Control and the Window menu show.
-        window.title = "Corta Settings"
+        window.title = L10n.text("settings.title")
         window.toolbar?.selectedItemIdentifier = tab.identifier
 
         let pane = self.pane(for: tab)
@@ -216,7 +289,7 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         paneContainer.addSubview(pane)
         paneConstraints = [
             pane.leadingAnchor.constraint(equalTo: paneContainer.leadingAnchor),
-            pane.trailingAnchor.constraint(lessThanOrEqualTo: paneContainer.trailingAnchor),
+            pane.trailingAnchor.constraint(equalTo: paneContainer.trailingAnchor),
             pane.topAnchor.constraint(equalTo: paneContainer.topAnchor),
             pane.bottomAnchor.constraint(equalTo: paneContainer.bottomAnchor),
         ]
@@ -227,14 +300,21 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
     private func resizeToFitPane(animated: Bool) {
         guard let window, let content = window.contentView else { return }
         content.layoutSubtreeIfNeeded()
+        // The user's own width is kept — the height is the only dimension a
+        // tab switch has an opinion about.
+        let width = max(contentWidth, content.frame.width)
         let frame = window.frameRect(
             forContentRect: NSRect(
-                x: 0, y: 0, width: Self.contentWidth, height: content.fittingSize.height))
+                x: 0, y: 0, width: width, height: content.fittingSize.height))
+        window.contentMinSize = NSSize(width: contentWidth, height: content.fittingSize.height)
         var target = window.frame
         // Top-left pinned: only the bottom edge moves.
         target.origin.y += target.height - frame.height
         target.size = frame.size
-        window.setFrame(target, display: true, animate: animated)
+        // A resize the user did not ask for is exactly the motion Reduce
+        // Motion is about: the window still lands in the same place, it just
+        // gets there in one step.
+        window.setFrame(target, display: true, animate: animated && !SystemAccessibility.reduceMotion)
     }
 
     // MARK: - Layout
@@ -249,16 +329,27 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         separator.translatesAutoresizingMaskIntoConstraints = false
 
         let content = NSView()
-        for subview in [paneContainer, separator, footer] { content.addSubview(subview) }
+        for subview in [paneContainer, statusView, separator, footer] {
+            content.addSubview(subview)
+        }
+        statusView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
+            statusView.topAnchor.constraint(
+                equalTo: paneContainer.bottomAnchor, constant: 10),
+            statusView.leadingAnchor.constraint(
+                equalTo: content.leadingAnchor, constant: Self.pageMargin),
+            statusView.trailingAnchor.constraint(
+                lessThanOrEqualTo: content.trailingAnchor, constant: -Self.pageMargin),
+
             paneContainer.topAnchor.constraint(equalTo: content.topAnchor, constant: 18),
             paneContainer.leadingAnchor.constraint(
                 equalTo: content.leadingAnchor, constant: Self.pageMargin),
             paneContainer.trailingAnchor.constraint(
                 equalTo: content.trailingAnchor, constant: -Self.pageMargin),
+            content.widthAnchor.constraint(greaterThanOrEqualToConstant: contentWidth),
 
             separator.topAnchor.constraint(
-                equalTo: paneContainer.bottomAnchor, constant: Self.pageMargin),
+                equalTo: statusView.bottomAnchor, constant: 10),
             separator.leadingAnchor.constraint(equalTo: content.leadingAnchor),
             separator.trailingAnchor.constraint(equalTo: content.trailingAnchor),
 
@@ -276,13 +367,19 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
     /// there. Small, grey and last, because it answers a question only some
     /// users ask — but it is what makes the config file discoverable at all.
     private func buildFooter() -> NSView {
-        pathLabel.font = .systemFont(ofSize: 10)
-        pathLabel.textColor = .tertiaryLabelColor
+        // 10 pt in `tertiaryLabelColor` was a path nobody could read — which
+        // for the one line that tells you where every setting on this page
+        // actually lives is the wrong end of the trade. The type is now the
+        // small system size and the colour follows Increase Contrast.
+        pathLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         pathLabel.lineBreakMode = .byTruncatingMiddle
-        pathLabel.toolTip = "Every setting on this page is stored in this file."
+        pathLabel.toolTip = L10n.text("settings.footer.tooltip")
         pathLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        pathLabel.setAccessibilityLabel(L10n.text("settings.footer.pathLabel"))
 
-        let reveal = NSButton(title: "Reveal", target: self, action: #selector(revealConfigFile))
+        // "Reveal" named the AppKit call, not the outcome; the button says
+        // what it does and to what.
+        let reveal = NSButton(title: L10n.text("settings.footer.reveal"), target: self, action: #selector(revealConfigFile))
         reveal.bezelStyle = .accessoryBarAction
         reveal.controlSize = .small
         reveal.setContentHuggingPriority(.required, for: .horizontal)
@@ -302,39 +399,46 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         let rows: [NSView]
         switch tab {
         case .appearance:
-            let themeRow = row("Theme", themePopUp)
+            let themeRow = row(L10n.text("settings.label.theme"), themePopUp)
             self.themeRow = themeRow
             rows = [
                 themeRow,
-                row("Light or dark", appearancePopUp),
-                row("Font", fontFamilyLabel),
-                row("Size", makeFontSizeRow()),
+                row(L10n.text("settings.label.lightOrDark"), appearancePopUp),
+                // The font row states a fact and offers no control, which
+                // read as a broken picker. The explanation is the fix: it
+                // says why there is nothing to click, and where the one
+                // remaining lever is.
+                row(
+                    L10n.text("settings.label.font"), fontFamilyLabel,
+                    help: L10n.text("settings.help.font")),
+                row(L10n.text("settings.label.size"), makeFontSizeRow()),
             ]
         case .terminal:
             rows = [
                 row(
-                    "Scrollback", scrollbackField,
-                    help: "Lines kept per session; applies to new sessions."),
-                row("Bell", bellPopUp),
-                row("Copy on select", copyOnSelectSwitch),
-                row("Open links with", linkActivationPopUp),
+                    L10n.text("settings.label.scrollback"), scrollbackField,
+                    help: L10n.text("settings.help.scrollback")),
+                row(L10n.text("settings.label.bell"), bellPopUp),
+                row(L10n.text("settings.label.copyOnSelect"), copyOnSelectSwitch),
+                row(L10n.text("settings.label.openLinksWith"), linkActivationPopUp),
                 row(
-                    "Allow OSC 52 copy", clipboardWriteSwitch,
-                    help: "Lets a program put text on the clipboard. Reading is never allowed."),
+                    L10n.text("settings.label.allowClipboardCopy"), clipboardWriteSwitch,
+                    help: L10n.text("settings.help.allowClipboardCopy")),
             ]
         case .general:
             rows = [
                 row(
-                    "New window", makeWindowSizeRow(),
-                    help: "Columns × rows. The window's pixel size follows the font."),
-                row("Restore windows", restoreWindowsSwitch),
+                    L10n.text("settings.label.newWindow"), makeWindowSizeRow(),
+                    help: L10n.text("settings.help.newWindow")),
+                row(L10n.text("settings.label.restoreWindows"), restoreWindowsSwitch),
                 row(
-                    "Confirm close", confirmCloseSwitch,
-                    help: "Ask when a pane still has something running."),
+                    L10n.text("settings.label.confirmClose"), confirmCloseSwitch,
+                    help: L10n.text("settings.help.confirmClose")),
                 row(
-                    "Notify on long tasks", notifySwitch,
-                    help: "Only while the window is in the background."),
-                row(thresholdLabel, makeThresholdRow()),
+                    L10n.text("settings.label.notifyOnLongTasks"), notifySwitch,
+                    help: L10n.text("settings.help.notifyOnLongTasks")),
+                permissionRow(),
+                makeThresholdFormRow(),
             ]
         }
         let pane = stack(rows)
@@ -352,21 +456,46 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         stack.alignment = .leading
         stack.spacing = Self.rowSpacing
         stack.translatesAutoresizingMaskIntoConstraints = false
+        // Each row spans the stack, so widening the window widens the value
+        // column instead of leaving a strip of empty page on the right.
+        for row in rows {
+            row.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        }
         return stack
     }
 
     // MARK: - Rows
 
-    private func row(_ title: String, _ control: NSView, help: String? = nil) -> NSView {
-        row(label(title), control, help: help)
+    private func row(
+        _ title: String, _ control: NSView, help: String? = nil, indented: Bool = false
+    ) -> NSView {
+        row(label(title), control, help: help, indented: indented)
     }
 
     /// One form row: a right-aligned label, the control in the shared value
     /// column, and an optional line of grey explanation under it.
-    private func row(_ title: NSTextField, _ control: NSView, help: String? = nil) -> NSView {
+    private func row(
+        _ title: NSTextField, _ control: NSView, help: String? = nil, indented: Bool = false
+    ) -> NSView {
         title.alignment = .right
         title.lineBreakMode = .byWordWrapping
         title.maximumNumberOfLines = 2
+
+        // The label-control relationship, which is what makes VoiceOver read
+        // "Scrollback, text field, 10000" instead of "text field, 10000" and
+        // then a stray "Scrollback" somewhere else in the pane. A separate
+        // `NSTextField` next to a control is only a label to a person looking
+        // at it; the two have to be told about each other.
+        title.setAccessibilityRole(.staticText)
+        title.cell?.setAccessibilityServesAsTitleForUIElements([control])
+        control.setAccessibilityTitleUIElement(title)
+        // Belt and braces: a control whose title element is not honoured (a
+        // composite row's stack view, say) still has a name of its own rather
+        // than being announced as an unnamed control.
+        if control.accessibilityLabel() == nil {
+            control.setAccessibilityLabel(title.stringValue)
+        }
+        if let help { control.setAccessibilityHelp(help) }
 
         let container = NSView()
         container.translatesAutoresizingMaskIntoConstraints = false
@@ -375,12 +504,17 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
             container.addSubview(view)
         }
 
+        // A dependent row is indented under the setting it belongs to, so
+        // "Longer than 10 seconds" reads as part of the notification switch
+        // above it rather than as a fourth independent setting.
+        let indent = indented ? Self.dependentIndent : 0
         var constraints: [NSLayoutConstraint] = [
             container.widthAnchor.constraint(
-                equalToConstant: Self.labelColumnWidth + Self.columnGap + Self.valueColumnWidth),
+                greaterThanOrEqualToConstant:
+                    labelColumnWidth + Self.columnGap + Self.valueColumnWidth),
 
-            title.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            title.widthAnchor.constraint(equalToConstant: Self.labelColumnWidth),
+            title.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: indent),
+            title.widthAnchor.constraint(equalToConstant: labelColumnWidth - indent),
             // Against the control's centre — the only alignment that reads
             // right across a pop-up, a switch and a text field at once.
             title.centerYAnchor.constraint(equalTo: control.centerYAnchor),
@@ -388,8 +522,9 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
 
             control.leadingAnchor.constraint(
                 equalTo: container.leadingAnchor,
-                constant: Self.labelColumnWidth + Self.columnGap),
+                constant: labelColumnWidth + Self.columnGap),
             control.topAnchor.constraint(equalTo: container.topAnchor),
+            control.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor),
         ]
 
         if let help {
@@ -406,9 +541,15 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
             constraints += [
                 note.leadingAnchor.constraint(equalTo: control.leadingAnchor),
                 note.topAnchor.constraint(equalTo: control.bottomAnchor, constant: 3),
-                note.widthAnchor.constraint(equalToConstant: Self.valueColumnWidth),
+                // At least the value column, and the rest of the row when the
+                // window is wider than its minimum — a wrapping explanation
+                // is the first thing that should get the extra space.
+                note.widthAnchor.constraint(
+                    greaterThanOrEqualToConstant: Self.valueColumnWidth),
+                note.trailingAnchor.constraint(equalTo: container.trailingAnchor),
                 note.bottomAnchor.constraint(equalTo: container.bottomAnchor),
             ]
+            helpNotes.append(note)
         } else {
             constraints.append(control.bottomAnchor.constraint(equalTo: container.bottomAnchor))
         }
@@ -417,8 +558,11 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         // on the page at a different width; a text field has no intrinsic
         // width worth having. Both are pinned to the value column instead.
         if control is NSPopUpButton {
-            constraints.append(
-                control.widthAnchor.constraint(equalToConstant: Self.valueColumnWidth))
+            constraints += [
+                control.widthAnchor.constraint(
+                    greaterThanOrEqualToConstant: Self.valueColumnWidth),
+                control.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            ]
         }
         if control === scrollbackField {
             constraints.append(control.widthAnchor.constraint(equalToConstant: 92))
@@ -457,9 +601,41 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         return stack
     }
 
+    /// The notification threshold, indented under the switch it depends on
+    /// and held so `populate` can disable the whole row rather than just the
+    /// field — an editable-looking row under an off switch is what made
+    /// "Longer than" read as a setting of its own.
+    /// The permission notice, in the value column under the switch. Its own
+    /// row rather than the switch's `help:` line, because it appears and
+    /// disappears with a system setting while the help text is constant.
+    private func permissionRow() -> NSView {
+        let container = NSView()
+        container.translatesAutoresizingMaskIntoConstraints = false
+        notificationPermissionNotice.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(notificationPermissionNotice)
+        NSLayoutConstraint.activate([
+            notificationPermissionNotice.leadingAnchor.constraint(
+                equalTo: container.leadingAnchor,
+                constant: labelColumnWidth + Self.columnGap),
+            notificationPermissionNotice.trailingAnchor.constraint(
+                equalTo: container.trailingAnchor),
+            notificationPermissionNotice.topAnchor.constraint(equalTo: container.topAnchor),
+            notificationPermissionNotice.bottomAnchor.constraint(
+                equalTo: container.bottomAnchor),
+        ])
+        notificationPermissionRow = container
+        return container
+    }
+
+    private func makeThresholdFormRow() -> NSView {
+        let created = row(thresholdLabel, makeThresholdRow(), indented: true)
+        thresholdRow = created
+        return created
+    }
+
     private func makeThresholdRow() -> NSView {
         thresholdField.widthAnchor.constraint(equalToConstant: 54).isActive = true
-        let suffix = NSTextField(labelWithString: "seconds")
+        let suffix = NSTextField(labelWithString: L10n.text("settings.label.seconds"))
         suffix.textColor = .secondaryLabelColor
         let stack = NSStackView(views: [thresholdField, suffix])
         stack.spacing = 6
@@ -474,7 +650,7 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         themePopUp.action = #selector(commit)
 
         for appearance in Configuration.Appearance.allCases {
-            let title = appearance == .auto ? "Follow System" : appearance.rawValue.capitalized
+            let title = appearance == .auto ? L10n.text("settings.appearance.followSystem") : L10n.text("settings.appearance.\(appearance.rawValue)")
             appearancePopUp.addItem(withTitle: title)
         }
         appearancePopUp.target = self
@@ -490,9 +666,7 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         // `font-family` in the config file still works and is still verified;
         // what is gone is Corta *recommending* a hundred faces it knows
         // nothing about.
-        fontFamilyLabel.toolTip =
-            "Corta uses the system monospaced font. Set `font-family` in the config file to use "
-            + "another; families whose glyphs do not all advance by one cell are rejected."
+        fontFamilyLabel.toolTip = L10n.text("settings.font.tooltip")
 
         fontSizeField.alignment = .right
         fontSizeField.target = self
@@ -516,8 +690,8 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         bellPopUp.target = self
         bellPopUp.action = #selector(commit)
 
-        linkActivationPopUp.addItem(withTitle: "Command-click")
-        linkActivationPopUp.addItem(withTitle: "Click")
+        linkActivationPopUp.addItem(withTitle: L10n.text("settings.linkActivation.commandClick"))
+        linkActivationPopUp.addItem(withTitle: L10n.text("settings.linkActivation.click"))
         linkActivationPopUp.target = self
         linkActivationPopUp.action = #selector(commit)
 
@@ -568,7 +742,7 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         // question a reader of this page has.
         fontFamilyLabel.stringValue =
             configuration.fontFamily == Configuration.systemFontFamily
-            ? "System Monospaced" : configuration.fontFamily
+            ? L10n.text("settings.font.systemMonospaced") : configuration.fontFamily
         fontSizeField.stringValue = String(Int(configuration.fontSize))
         fontSizeStepper.doubleValue = configuration.fontSize
         scrollbackField.stringValue = String(configuration.scrollbackLines)
@@ -587,7 +761,47 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         thresholdField.isEnabled = configuration.notifyOnLongTask
         thresholdLabel.textColor =
             configuration.notifyOnLongTask ? .labelColor : .disabledControlTextColor
+        // The whole row, not only the field: the "seconds" suffix and the
+        // row's own accessibility state have to say "off" too, or a screen
+        // reader reports an editable setting that changes nothing.
+        thresholdRow?.subviews.forEach { subview in
+            if let field = subview as? NSTextField, field !== thresholdLabel {
+                field.textColor =
+                    configuration.notifyOnLongTask ? .labelColor : .disabledControlTextColor
+            }
+            (subview as? NSStackView)?.views.forEach { view in
+                (view as? NSTextField)?.textColor =
+                    configuration.notifyOnLongTask ? .labelColor : .disabledControlTextColor
+            }
+        }
         pathLabel.stringValue = ConfigurationStore.fileURL.path
+        applyNotificationPermission()
+        applySystemAccessibilityPreferences()
+    }
+
+    /// The notice under the notification switch: shown only when the setting
+    /// is on *and* the system has been told not to deliver — the one
+    /// combination in which the switch's position is not the truth.
+    @objc private func applyNotificationPermission() {
+        let isOn = ConfigurationStore.shared.configuration.notifyOnLongTask
+        let denied = TaskNotifier.permission == .denied
+        let show = isOn && denied
+        notificationPermissionNotice.show(
+            show ? .failed(L10n.text("settings.status.notificationsDenied")) : .none,
+            retry: show ? { TaskNotifier.openSystemNotificationSettings() } : nil,
+            actionTitle: show ? L10n.text("settings.status.openSystemSettings") : nil)
+        if let notificationPermissionRow, notificationPermissionRow.isHidden == show {
+            notificationPermissionRow.isHidden = !show
+            if currentTab == .general { resizeToFitPane(animated: false) }
+        }
+    }
+
+    /// Colours that have to follow Increase Contrast. Applied on every
+    /// populate and whenever the system preference changes, so a switch
+    /// flipped while this window is open is picked up without a relaunch.
+    @objc private func applySystemAccessibilityPreferences() {
+        pathLabel.textColor = SystemAccessibility.tertiaryLabelColor
+        for note in helpNotes { note.textColor = SystemAccessibility.secondaryLabelColor }
     }
 
     @objc private func stepFontSize() {
@@ -603,22 +817,43 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         let themeIndex = max(0, themePopUp.indexOfSelectedItem)
         let appearanceIndex = max(0, appearancePopUp.indexOfSelectedItem)
         let bellIndex = max(0, bellPopUp.indexOfSelectedItem)
-        ConfigurationStore.shared.update { configuration in
+        // Collected rather than applied silently. A field clamped from 200 to
+        // 64 used to simply show 64 on the next populate, which looks exactly
+        // like the app ignoring what was typed; the page now says which value
+        // was adjusted and to what.
+        var clamps: [String] = []
+        func clamp<T: Comparable & CustomStringConvertible>(
+            _ value: T, _ low: T, _ high: T, label: String
+        ) -> T {
+            let result = min(high, max(low, value))
+            if result != value {
+                clamps.append(
+                    L10n.format(
+                        "settings.status.clamped", label, Self.plain(low), Self.plain(high),
+                        Self.plain(result)))
+            }
+            return result
+        }
+        let saved = ConfigurationStore.shared.update { configuration in
             if themeIndex < listedThemes.count {
                 configuration.theme = listedThemes[themeIndex].name
             }
             configuration.appearance = Configuration.Appearance.allCases[appearanceIndex]
             if let size = Double(fontSizeField.stringValue) {
-                configuration.fontSize = min(64, max(8, size))
+                configuration.fontSize = clamp(
+                    size, 8, 64, label: L10n.text("settings.label.size"))
             }
             if let lines = Int(scrollbackField.stringValue) {
-                configuration.scrollbackLines = min(1_000_000, max(0, lines))
+                configuration.scrollbackLines = clamp(
+                    lines, 0, 1_000_000, label: L10n.text("settings.label.scrollback"))
             }
             if let columns = Int(columnsField.stringValue) {
-                configuration.columns = min(500, max(20, columns))
+                configuration.columns = clamp(
+                    columns, 20, 500, label: L10n.text("settings.label.columns"))
             }
             if let rows = Int(rowsField.stringValue) {
-                configuration.rows = min(300, max(5, rows))
+                configuration.rows = clamp(
+                    rows, 5, 300, label: L10n.text("settings.label.rows"))
             }
             if bellIndex < Self.bellModes.count { configuration.bell = Self.bellModes[bellIndex] }
             configuration.copyOnSelect = copyOnSelectSwitch.state == .on
@@ -629,16 +864,72 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
             configuration.confirmClose = confirmCloseSwitch.state == .on
             configuration.notifyOnLongTask = notifySwitch.state == .on
             if let seconds = Double(thresholdField.stringValue) {
-                configuration.notificationThreshold = max(1, seconds)
+                configuration.notificationThreshold = clamp(
+                    seconds, 1, 86_400, label: L10n.text("settings.label.longerThan"))
             }
         }
         // A clamped or rejected value has to appear in the field, or the
         // page shows something the file does not say.
         populate()
+        if !saved {
+            showWriteFailure()
+        } else if let first = clamps.first {
+            statusView.show(.adjusted(first))
+        } else {
+            statusView.show(.saved)
+        }
     }
 
+    /// A bound as a person would write it. The fields hold whole numbers, but
+    /// the font size and the notification threshold are `Double` — so the
+    /// unformatted description said "Size must be between 8.0 and 64.0",
+    /// which reads as a precision the setting does not have.
+    private static func plain(_ value: CustomStringConvertible) -> String {
+        let text = value.description
+        return text.hasSuffix(".0") ? String(text.dropLast(2)) : text
+    }
+
+    /// The write failed — a read-only home directory, a full disk, a
+    /// `~/.config/corta` someone has made a symlink to nowhere. The page has
+    /// already rolled the value back (`ConfigurationStore.update`), so the
+    /// controls show what the file still says; this is what tells the user why
+    /// their change did not take, and offers the one action that can help.
+    private func showWriteFailure() {
+        let reason =
+            (ConfigurationStore.shared.lastWriteError?.localizedDescription)
+            ?? L10n.text("settings.status.writeFailedUnknown")
+        statusView.show(
+            .failed(L10n.format("settings.status.writeFailed", reason)),
+            retry: { [weak self] in self?.retryWrite() })
+    }
+
+    private func retryWrite() {
+        if ConfigurationStore.shared.write() {
+            statusView.show(.saved)
+        } else {
+            showWriteFailure()
+        }
+    }
+
+    /// The store's write status changed from somewhere other than this page —
+    /// an external edit that could not be re-serialised, or a retry that
+    /// succeeded. Reflect it rather than leaving a stale failure on screen.
+    @objc private func configurationWriteStatusChanged() {
+        if ConfigurationStore.shared.lastWriteError != nil {
+            showWriteFailure()
+        } else {
+            statusView.show(.none)
+        }
+    }
+
+    /// Writes first and only reveals what it managed to write. Revealing a
+    /// path whose write just failed points Finder at a file that does not say
+    /// what the page says — or at no file at all on a first launch.
     @objc private func revealConfigFile() {
-        ConfigurationStore.shared.write()
+        guard ConfigurationStore.shared.write() else {
+            showWriteFailure()
+            return
+        }
         NSWorkspace.shared.activateFileViewerSelecting([ConfigurationStore.fileURL])
     }
 }
