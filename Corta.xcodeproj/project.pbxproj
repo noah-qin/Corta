@@ -51,6 +51,7 @@
 		4F1776AF30465E2000E8DD20 /* CortaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CortaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4F1776B930465E2000E8DD20 /* CortaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CortaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1C0A000030465E2000E8DD20 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		E9A0D9C512919DCC5A6DF615 /* Sparkle-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Sparkle-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -104,6 +105,7 @@
 			isa = PBXGroup;
 			children = (
 				A1C0A000030465E2000E8DD20 /* AppIcon.icon */,
+				E9A0D9C512919DCC5A6DF615 /* Sparkle-Info.plist */,
 				4F1776A130465E1F00E8DD20 /* Corta */,
 				4F1776B230465E2000E8DD20 /* CortaTests */,
 				4F1776BC30465E2000E8DD20 /* CortaUITests */,
