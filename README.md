@@ -170,8 +170,9 @@ and an exact long-task notification.
 
 ## Building
 
-Corta needs **macOS 26.0 or later** and **Xcode 26** (Swift 6). There is no
-dependency step, because there are no dependencies.
+Corta needs **macOS 26.0 or later** and **Xcode 26** (Swift 6). The one
+dependency step is Xcode resolving Sparkle over the network on first
+build; the terminal core builds and tests with none at all.
 
 ```sh
 git clone https://github.com/noah-qin/Corta.git
