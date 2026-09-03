@@ -61,6 +61,10 @@ class ViewController: NSViewController {
     /// cursor alone was too subtle. Above the terminal canvas, below the
     /// search bar's glass; it never intercepts input (`PassthroughView`).
     var focusDimView: NSView?
+    /// The focus state last reported to the child (`?1004`, M6.7). `nil`
+    /// until the first report, so the first one always goes out. Storage
+    /// lives here because `ViewController+Focus` is an extension.
+    var lastReportedFocus: Bool?
     /// Set by `SplitViewController` once the window's style mask and content
     /// size are final — the gate that keeps transient startup layouts from
     /// reaching the child (see `resizeSessionToFitView`).
@@ -278,6 +282,7 @@ class ViewController: NSViewController {
             self?.session.resize(to: size)
         }
         // Fires on the reader thread after every parse batch.
+        observeWindowFocus()
         session.onOutput = { [weak self] in
             self?.noteOutput()
         }
@@ -545,6 +550,7 @@ class ViewController: NSViewController {
     /// pane.
     func applyFocusAppearance() {
         focusDimView?.isHidden = isFocusedPane
+        reportFocusIfNeeded()
     }
 }
 

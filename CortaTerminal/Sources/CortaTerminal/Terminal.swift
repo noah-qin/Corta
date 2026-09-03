@@ -45,6 +45,18 @@ public struct Terminal: Sendable {
     /// the shell must present no frame; when it goes false, present once.
     public var isSynchronizedOutputEnabled: Bool { performer.state.synchronizedOutputEnabled }
 
+    /// `?1004` — whether the child has asked to be told about focus changes
+    /// (M6.7). The app sends `CSI I` / `CSI O` while this is true.
+    public var isFocusReportingEnabled: Bool { performer.state.focusReportingEnabled }
+
+    /// The colours OSC 10/11/12 report (M6.6). The app seeds these from its
+    /// palette so a query answers with what is actually drawn; the child can
+    /// then change them, and the app reads them back to render.
+    public var dynamicColors: DynamicColors {
+        get { performer.state.dynamicColors }
+        set { performer.state.dynamicColors = newValue }
+    }
+
     /// Consumes a pending BEL (M4.8): true at most once per bell, false
     /// otherwise. The app decides what a bell does; the core only reports
     /// that one happened.

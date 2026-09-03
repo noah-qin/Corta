@@ -25,6 +25,16 @@ extension Performer {
             state.windowTitle = String(decoding: payload, as: UTF8.self)
         case 7:
             setWorkingDirectory(payload)
+        case 10, 11, 12:
+            // The dynamic colours (M6.6). A payload of exactly `?` is the
+            // query form; anything else is a colour specification to set.
+            // Unlike the title, these are numeric state, so reporting them
+            // echoes nothing the stream supplied (`SECURITY.md` §2.2).
+            if payload.count == 1, payload.first == 0x3F {
+                reportDynamicColor(code)
+            } else {
+                setDynamicColor(code, specification: payload)
+            }
         default:
             break
         }

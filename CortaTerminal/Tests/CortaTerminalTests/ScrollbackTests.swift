@@ -93,6 +93,15 @@ struct ScrollbackTests {
         scrollback.push(line("after"))
         #expect(text(scrollback[0]) == "after")
     }
+    /// M6.10 — `count` saturates at the limit, so it cannot say how far the
+    /// document has moved once the ring is full. `totalPushed` can.
+    @Test("totalPushed keeps counting after the ring is full")
+    func totalPushedIsMonotonic() {
+        var scrollback = Scrollback(limit: 4)
+        for index in 0..<10 { scrollback.push(line("line\(index)")) }
+        #expect(scrollback.count == 4)
+        #expect(scrollback.totalPushed == 10)
+    }
 }
 
 /// M1.14 — the grid's side of it.

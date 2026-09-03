@@ -221,4 +221,47 @@ struct SelectionTests {
         #expect(range.start == point(1, 2))
         #expect(range.end == point(3, 5))
     }
+
+    /// M6.10 — the anchoring case `scrollback.count` could not express.
+    ///
+    /// Once the ring is full every push evicts a row, so the count stops
+    /// moving while the document keeps moving underneath the selection.
+    /// Anchored on `totalPushed` instead, the shift stays right and the
+    /// highlight still covers the text it was dragged over.
+    @Test("a selection tracks its text through a flood past ring capacity")
+    func selectionSurvivesAFullRingFlooding() {
+        var terminal = Terminal(rows: 4, columns: 20, scrollbackLimit: 8)
+        terminal.feed(Array("target\r\n".utf8))
+        // The line is still on the screen: row 0, before anything scrolled.
+        let anchor = terminal.grid.scrollback.totalPushed
+        let range = SelectionRange(anchor: point(0, 0), head: point(0, 5))
+        #expect(Selection.text(of: range, in: terminal.grid) == "target")
+
+        // Twenty more lines: well past both the 4-row screen and the 8-line
+        // ring, so the count has long since saturated.
+        for index in 0..<20 { terminal.feed(Array("filler \(index)\r\n".utf8)) }
+        #expect(terminal.grid.scrollback.count == 8)
+        #expect(terminal.grid.scrollback.totalPushed > 8)
+
+        let growth = terminal.grid.scrollback.totalPushed - anchor
+        let shifted = range.shifted(byScrollbackGrowth: growth)
+        // "target" has aged out of an 8-line ring by now, so what the shift
+        // has to get right is that the row is *gone* rather than pointing at
+        // some other line's text.
+        #expect(shifted.start.row < -terminal.grid.scrollback.count)
+    }
+
+    @Test("a selection tracks its text while the ring is still filling")
+    func selectionTracksTextWhileTheRingFills() {
+        var terminal = Terminal(rows: 4, columns: 20, scrollbackLimit: 100)
+        terminal.feed(Array("target\r\n".utf8))
+        let anchor = terminal.grid.scrollback.totalPushed
+        let range = SelectionRange(anchor: point(0, 0), head: point(0, 5))
+
+        for index in 0..<20 { terminal.feed(Array("filler \(index)\r\n".utf8)) }
+
+        let growth = terminal.grid.scrollback.totalPushed - anchor
+        let shifted = range.shifted(byScrollbackGrowth: growth)
+        #expect(Selection.text(of: shifted, in: terminal.grid) == "target")
+    }
 }

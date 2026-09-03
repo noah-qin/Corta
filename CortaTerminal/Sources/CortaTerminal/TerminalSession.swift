@@ -177,6 +177,19 @@ public final class TerminalSession: @unchecked Sendable {
         state.withLock { $0.terminal.isSynchronizedOutputEnabled }
     }
 
+    /// Whether the child has asked to be told about focus changes (`?1004`,
+    /// M6.7).
+    public var isFocusReportingEnabled: Bool {
+        state.withLock { $0.terminal.isFocusReportingEnabled }
+    }
+
+    /// The colours OSC 10/11/12 report and set (M6.6). The app seeds these
+    /// from its palette at startup so a query answers with what is drawn.
+    public var dynamicColors: DynamicColors {
+        get { state.withLock { $0.terminal.dynamicColors } }
+        set { state.withLock { $0.terminal.dynamicColors = newValue } }
+    }
+
     /// Consumes a pending BEL (M4.8): true at most once per bell.
     public func takeBell() -> Bool {
         state.withLock { $0.terminal.takeBell() }

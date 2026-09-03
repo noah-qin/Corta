@@ -35,7 +35,44 @@ public struct PerformerState: Sendable {
     /// path. A hint for new tabs and splits (M5.5), nothing more.
     public internal(set) var workingDirectory: String?
 
+    /// `?1004` — focus reporting (M6.7). While set, the app sends `CSI I` on
+    /// focus and `CSI O` on blur, which is what Neovim's `autoread` and
+    /// tmux's `focus-events` are waiting for.
+    public internal(set) var focusReportingEnabled = false
+
+    /// The colours OSC 10/11/12 report (M6.6). Seeded by the app from its
+    /// palette so a query answers with what is actually on screen, and
+    /// updated by the set forms.
+    public internal(set) var dynamicColors = DynamicColors()
+
     public init() {}
+}
+
+/// The three colours the OSC 10/11/12 pair of set and query forms names:
+/// default foreground, default background and the cursor (M6.6).
+///
+/// 8 bits per channel. The report form is xterm's 16-bit `rgb:` notation,
+/// which is produced by doubling each byte — a fixed transformation of
+/// numeric state, never stream-supplied text (`SECURITY.md` §2.2).
+public struct DynamicColors: Sendable, Equatable {
+    public var foreground: (red: UInt8, green: UInt8, blue: UInt8)
+    public var background: (red: UInt8, green: UInt8, blue: UInt8)
+    public var cursor: (red: UInt8, green: UInt8, blue: UInt8)
+
+    public init(
+        foreground: (red: UInt8, green: UInt8, blue: UInt8) = (245, 245, 245),
+        background: (red: UInt8, green: UInt8, blue: UInt8) = (35, 40, 51),
+        cursor: (red: UInt8, green: UInt8, blue: UInt8) = (245, 245, 245)
+    ) {
+        self.foreground = foreground
+        self.background = background
+        self.cursor = cursor
+    }
+
+    public static func == (lhs: DynamicColors, rhs: DynamicColors) -> Bool {
+        lhs.foreground == rhs.foreground && lhs.background == rhs.background
+            && lhs.cursor == rhs.cursor
+    }
 }
 
 /// Query responses — M2.2 (`CONFORMANCE.md` §1.2). A program that asks and

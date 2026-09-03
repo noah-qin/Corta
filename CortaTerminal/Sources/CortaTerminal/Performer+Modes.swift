@@ -12,6 +12,8 @@ extension Performer {
                 state.sgrMouseEncodingEnabled = enabled
             case 2026:  // synchronized output (M4.3)
                 state.synchronizedOutputEnabled = enabled
+            case 1004:  // focus reporting (M6.7)
+                state.focusReportingEnabled = enabled
             default:
                 break
             }

@@ -46,10 +46,20 @@ public struct Performer: ParserPerformer, Sendable {
         // other marker or intermediate form is ignored cleanly, which is the
         // correct and safe default (`SECURITY.md` §3).
         if sequence.privateMarker != 0 {
+            // DECRQM's private form carries a `$` intermediate: `CSI ? Ps $ p`
+            // is a question about a mode, not a mode change (M6.5).
+            if sequence.intermediates.count == 1, sequence.intermediates[0] == 0x24,
+                sequence.final == 0x70, sequence.privateMarker == 0x3F
+            {
+                reportMode(sequence.parameters, isPrivate: true)
+                return
+            }
             guard sequence.intermediates.count == 0 else { return }
             switch (sequence.privateMarker, sequence.final) {
             case (0x3E, 0x63):  // DA2 — CSI > c
                 reportSecondaryDeviceAttributes()
+            case (0x3E, 0x71):  // XTVERSION — CSI > Ps q (M6.5)
+                reportVersion(sequence.parameters)
             case (0x3F, 0x68):  // DECSET — CSI ? Pm h
                 applyPrivateModes(sequence.parameters, enabled: true)
                 _ = performAlternateScreenMode(final: sequence.final, parameters: sequence.parameters)
@@ -63,6 +73,13 @@ public struct Performer: ParserPerformer, Sendable {
         }
         // DECSCUSR (`CSI Ps SP q`) and its kin carry an intermediate byte.
         if sequence.intermediates.count > 0 {
+            // DECRQM, ANSI form — `CSI Ps $ p` (M6.5).
+            if sequence.intermediates.count == 1, sequence.intermediates[0] == 0x24,
+                sequence.final == 0x70
+            {
+                reportMode(sequence.parameters, isPrivate: false)
+                return
+            }
             _ = performIntermediate(
                 final: sequence.final,
                 intermediates: sequence.intermediates,

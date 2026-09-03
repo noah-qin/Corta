@@ -67,6 +67,17 @@ public struct Scrollback: Sendable {
 
     public private(set) var count = 0
 
+    /// Every line ever pushed, never decremented — the anchor a selection
+    /// tracks its text by (M6.10).
+    ///
+    /// `count` cannot do that job: it stops at `limit`, so once the ring is
+    /// full it reports no growth while rows are still being evicted one per
+    /// push. A selection anchored against it stayed on its document rows
+    /// while the text under those rows scrolled away, and the highlight
+    /// drifted onto whatever arrived next. This counter keeps rising, so the
+    /// shift is right whether the ring is filling or flooding.
+    public private(set) var totalPushed = 0
+
     public init(limit: Int = defaultLimit) {
         self.limit = max(0, limit)
         self.batchSize = self.limit == 0 ? 1 : max(1, min(256, self.limit))
@@ -109,6 +120,7 @@ public struct Scrollback: Sendable {
         batches[tailIndex].rows.append(
             RowSpan(start: start, length: Int32(line.count), wrapped: line.wrapped))
 
+        totalPushed += 1
         if count < limit {
             count += 1
         } else {

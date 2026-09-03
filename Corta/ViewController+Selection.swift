@@ -57,7 +57,7 @@ extension ViewController {
         selection = TerminalSelection(
             start: GridPosition(row: -grid.scrollback.count, column: 0),
             end: GridPosition(row: grid.rows - 1, column: grid.columns - 1),
-            baseScrollbackCount: grid.scrollback.count)
+            baseScrollbackTotal: grid.scrollback.totalPushed)
         invalidateDisplay()
     }
 
@@ -123,16 +123,20 @@ extension ViewController {
     }
 
     /// The selection as a core range against the current grid: rows recorded
-    /// against `baseScrollbackCount` shift by the scrollback's growth since
-    /// (never negative — a cleared history leaves the rows stale, it does
-    /// not move them onto other text).
+    /// against `baseScrollbackTotal` shift by the number of lines pushed
+    /// since (never negative — a cleared history leaves the rows stale, it
+    /// does not move them onto other text).
+    ///
+    /// `totalPushed`, not `scrollback.count`: the count saturates at the
+    /// ring's limit, and a selection anchored on it drifted off its text as
+    /// soon as a full scrollback started evicting (M6.10).
     func selectionRange(for selection: TerminalSelection, in grid: Grid) -> SelectionRange {
-        let growth = max(0, grid.scrollback.count - selection.baseScrollbackCount)
-        return SelectionRange(
-            start: SelectionPoint(
-                row: selection.start.row - growth, column: selection.start.column),
-            end: SelectionPoint(
-                row: selection.end.row - growth, column: selection.end.column))
+        let range = SelectionRange(
+            start: SelectionPoint(row: selection.start.row, column: selection.start.column),
+            end: SelectionPoint(row: selection.end.row, column: selection.end.column))
+        return range.shifted(
+            byScrollbackGrowth: max(
+                0, grid.scrollback.totalPushed - selection.baseScrollbackTotal))
     }
 
     /// The document position under an event: view point → grid cell, then
@@ -176,6 +180,6 @@ extension TerminalSelection {
         self.init(
             start: GridPosition(row: range.start.row, column: range.start.column),
             end: GridPosition(row: range.end.row, column: range.end.column),
-            baseScrollbackCount: grid.scrollback.count)
+            baseScrollbackTotal: grid.scrollback.totalPushed)
     }
 }
