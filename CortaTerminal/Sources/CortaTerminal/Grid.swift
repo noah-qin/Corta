@@ -82,6 +82,17 @@ public struct Grid: Sendable {
     /// printable character wraps first, and only then is the row marked
     /// `wrapped`. Without the deferral, a program that fills the last column
     /// and then moves the cursor would scroll the screen by one row.
+    /// IRM — ECMA-48 §8.3.64, `CSI 4 h` / `CSI 4 l`. While set, a printed
+    /// character *inserts* at the cursor and pushes the rest of the row
+    /// right, rather than overwriting the cell under it; characters pushed
+    /// past the last column are lost.
+    ///
+    /// Implemented rather than reported: DECRQM used to answer 0 ("not
+    /// recognised") for IRM, and a program that sets a mode the terminal
+    /// silently ignores draws its next screen against a layout that never
+    /// happened. `readline`'s and `ed`'s insert paths both use it.
+    public var insertMode: Bool = false
+
     public internal(set) var pendingWrap: Bool
 
     /// DECSC's slot — cursor, pen and wrap state (VT510 §DECSC).
@@ -198,6 +209,14 @@ public struct Grid: Sendable {
             let available = columns - cursor.column
             let count = min(available, bytes.distance(from: index, to: bytes.endIndex))
             let end = bytes.index(index, offsetBy: count)
+            // Insert mode shifts the row right by the whole chunk once,
+            // rather than per character — the result is identical and the
+            // fast path above is untouched when the mode is off, which is
+            // always except while a line editor has it on.
+            if insertMode {
+                lines[cursor.row].insertCells(
+                    count, at: cursor.column, template: pen.eraseCell, width: columns)
+            }
             lines[cursor.row].overwriteASCII(bytes[index..<end], at: cursor.column, pen: pen)
             if cursor.column + count >= columns {
                 cursor.column = columns - 1
@@ -222,6 +241,10 @@ public struct Grid: Sendable {
             lines[cursor.row].wrapped = true
             cursor.column = 0
             lineFeedWithoutClearingWrap()
+        }
+        if insertMode {
+            lines[cursor.row].insertCells(
+                1, at: cursor.column, template: pen.eraseCell, width: columns)
         }
         blankWidePairHalves(row: cursor.row, column: cursor.column)
         lines[cursor.row][cursor.column] = pen.cell(scalar)
@@ -250,6 +273,13 @@ public struct Grid: Sendable {
             lines[cursor.row].wrapped = true
             cursor.column = 0
             lineFeedWithoutClearingWrap()
+        }
+        if insertMode {
+            // A wide scalar is two columns, so insert mode makes room for
+            // both — inserting one and writing two would overwrite whatever
+            // the shift had just moved into the second column.
+            lines[cursor.row].insertCells(
+                2, at: cursor.column, template: pen.eraseCell, width: columns)
         }
         blankWidePairHalves(row: cursor.row, column: cursor.column)
         // The spacer may land on the lead of a later pair; blank it too.

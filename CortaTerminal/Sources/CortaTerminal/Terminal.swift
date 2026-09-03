@@ -55,6 +55,10 @@ public struct Terminal: Sendable {
     /// (M6.7). The app sends `CSI I` / `CSI O` while this is true.
     public var isFocusReportingEnabled: Bool { performer.state.focusReportingEnabled }
 
+    /// LNM (`CSI 20 h`). While set the Return key sends CR LF rather than
+    /// CR — the app encodes keys, so it has to be able to ask.
+    public var isNewLineModeEnabled: Bool { performer.state.newLineModeEnabled }
+
     /// The colours OSC 10/11/12 report (M6.6). The app seeds these from its
     /// palette so a query answers with what is actually drawn; the child can
     /// then change them, and the app reads them back to render.

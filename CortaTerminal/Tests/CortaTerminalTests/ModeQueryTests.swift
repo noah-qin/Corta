@@ -51,7 +51,27 @@ struct ModeQueryTests {
     @Test("the ANSI form has no ? in either the request or the reply")
     func decrqmAnsiForm() {
         #expect(response(to: "\u{1B}[1$p") == "\u{1B}[1;4$y")
-        #expect(response(to: "\u{1B}[20$p") == "\u{1B}[20;0$y")
+        // LNM is implemented, so it answers its live state — 2, reset.
+        #expect(response(to: "\u{1B}[20$p") == "\u{1B}[20;2$y")
+    }
+
+    /// IRM and LNM are the two ANSI modes Corta implements, so DECRQM
+    /// reports what they are actually doing rather than "not recognised".
+    @Test("the implemented ANSI modes report their live state")
+    func decrqmImplementedAnsiModes() {
+        #expect(response(to: "\u{1B}[4$p") == "\u{1B}[4;2$y")
+        #expect(response(to: "\u{1B}[4h\u{1B}[4$p") == "\u{1B}[4;1$y")
+        #expect(response(to: "\u{1B}[4h\u{1B}[4l\u{1B}[4$p") == "\u{1B}[4;2$y")
+        #expect(response(to: "\u{1B}[20h\u{1B}[20$p") == "\u{1B}[20;1$y")
+    }
+
+    /// KAM locks the keyboard and SRM turns on local echo; Corta implements
+    /// neither on purpose (`Performer+Modes.swift`), and 4 says "reset, and
+    /// it stays reset" rather than leaving a program to guess.
+    @Test("KAM and SRM report permanently reset rather than unknown")
+    func decrqmUnimplementedModifiableAnsiModes() {
+        #expect(response(to: "\u{1B}[2$p") == "\u{1B}[2;4$y")
+        #expect(response(to: "\u{1B}[12$p") == "\u{1B}[12;4$y")
     }
 
     /// The ECMA-48 modes describing hardware an emulator has no analogue of

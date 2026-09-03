@@ -77,12 +77,25 @@ extension Performer {
     /// xterm answers. It is a stronger and more useful answer than 0: a
     /// program learns not to ask again.
     ///
-    /// The genuinely modifiable ANSI modes — KAM (2), IRM (4), SRM (12),
-    /// LNM (20) — answer 0 until the modes themselves exist. Reporting a
-    /// bit Corta tracks but does not act on would be a lie a program can
-    /// act on, which is worse than admitting the mode is unimplemented.
+    /// Of the four ANSI modes a real program touches, two are implemented
+    /// and report their live state, and two never will be and report 4:
+    ///
+    /// - IRM (4) and LNM (20) are implemented (`applyAnsiModes`), so 1 or 2
+    ///   here is a fact about behaviour the terminal actually has.
+    /// - KAM (2) locks the keyboard and SRM (12) turns on local echo. Corta
+    ///   implements neither, on purpose — see `applyAnsiModes` for why — and
+    ///   4 is the honest answer: not "unknown", but "reset, and it will stay
+    ///   reset". A program learns not to ask again, which 0 does not tell it.
+    ///
+    /// Nothing here reports a bit Corta tracks but does not act on. That
+    /// would be a lie a program can lay out a screen against, which is worse
+    /// than admitting a mode is unimplemented.
     private func ansiModeSetting(_ mode: Int) -> Int {
         switch mode {
+        case 4: return grid.insertMode ? 1 : 2
+        case 20: return state.newLineModeEnabled ? 1 : 2
+        // KAM and SRM: permanently reset, deliberately.
+        case 2, 12: return 4
         // GATM, SRTM, VEM, HEM, PUM, FEAM, FETM, MATM, TTM, SATM, TSM, EBM.
         case 1, 5, 7, 10, 11, 13, 14, 15, 16, 17, 18, 19: return 4
         default: return 0
@@ -128,6 +141,33 @@ extension Performer {
         }
     }
 
+    /// The X11 colour specifications Corta accepts, and the ones it
+    /// deliberately refuses.
+    ///
+    /// **Accepted.** `#RGB` through `#RRRRGGGGBBBB`, and `rgb:R/G/B` with one
+    /// to four hex digits per channel. Between them these are what every
+    /// program that sets a colour actually sends.
+    ///
+    /// **Refused, on purpose.** X11 also defines `rgbi:` (floating-point
+    /// intensities) and four device-independent spaces — `CIELab:`,
+    /// `CIEuvY:`, `CIExyY:`, `CIEXYZ:` and `TekHVC:`. Corta returns nil for
+    /// all of them and leaves the colour unchanged, which the caller treats
+    /// as "the sequence did nothing" (`setDynamicColor`).
+    ///
+    /// That is a decision, not an omission. Each of those is a colour-space
+    /// conversion, not a parse: `CIELab` needs a white point and a gamma
+    /// curve, and the answer depends on the display's profile — so an
+    /// implementation is either colour-managed properly or it is a wrong
+    /// number dressed as a right one. The esctest cases covering them are
+    /// recorded as expected failures for exactly this reason
+    /// (`docs/ROADMAP.md`, `docs/CONFORMANCE.md` §3). Refusing is also the
+    /// safe direction: a program that sets a background it cannot verify and
+    /// gets no change is a program whose text stays legible, whereas a
+    /// mis-converted `CIELab` black-on-black is a terminal you cannot read.
+    ///
+    /// `rgbi:` is refused with the same reasoning and less regret — it is a
+    /// second syntax for something `rgb:` already expresses exactly, and no
+    /// program has been observed to send it.
     static func parseColorSpecification(_ bytes: ArraySlice<UInt8>)
         -> (red: UInt8, green: UInt8, blue: UInt8)?
     {
@@ -147,6 +187,9 @@ extension Performer {
             }
             return (channels[0], channels[1], channels[2])
         }
+        // `rgb:` and nothing else. `rgbi:` shares the prefix, so the colon
+        // has to be matched exactly or an intensity triple would be read as
+        // hex and produce a colour nobody asked for.
         guard text.hasPrefix("rgb:") else { return nil }
         let parts = text.dropFirst(4).split(separator: "/", omittingEmptySubsequences: false)
         guard parts.count == 3 else { return nil }

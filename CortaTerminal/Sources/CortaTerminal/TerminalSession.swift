@@ -183,6 +183,12 @@ public final class TerminalSession: @unchecked Sendable {
         state.withLock { $0.terminal.isFocusReportingEnabled }
     }
 
+    /// Whether LNM is set (`CSI 20 h`). The Return key sends CR LF while it
+    /// is, rather than a bare CR.
+    public var isNewLineModeEnabled: Bool {
+        state.withLock { $0.terminal.isNewLineModeEnabled }
+    }
+
     /// The colours OSC 10/11/12 report and set (M6.6). The app seeds these
     /// from its palette at startup so a query answers with what is drawn.
     public var dynamicColors: DynamicColors {

@@ -46,6 +46,17 @@ public struct PerformerState: Sendable {
     /// are allowed to answer, DECRQM being the one that matters (M6.5).
     public internal(set) var conformanceLevel = 65
 
+    /// LNM — ECMA-48 §8.3.106, `CSI 20 h` / `CSI 20 l`. While set, LF, VT and
+    /// FF each perform a carriage return as well as an index, and the Return
+    /// key sends CR LF rather than CR.
+    ///
+    /// Implemented rather than reported: this is the mode a program sets when
+    /// it wants to print bare `\n` and have the next line start at column
+    /// zero. Answering "not recognised" and then not doing it produced the
+    /// classic staircase — each line starting where the last one ended — for
+    /// anything that trusted the answer.
+    public internal(set) var newLineModeEnabled = false
+
     /// The kitty keyboard protocol's mode stack (M6.9). The app reads
     /// `current` to decide how to encode a key press.
     public internal(set) var keyboardProtocol = KeyboardProtocolStack()
@@ -141,9 +152,39 @@ extension Performer {
     /// DSR — `CSI Ps n`. Only the cursor-position report (Ps = 6) is
     /// implemented: CPR is `CSI Pl ; Pc R` with 1-based row and column.
     mutating func reportDeviceStatus(_ parameters: Parameters) {
+        switch parameters.value(0, default: 0) {
+        case 5:
+            // DSR "operating status" — ECMA-48 §8.3.35, `CSI 5 n`, answered
+            // `CSI 0 n`: ready, no malfunctions.
+            //
+            // This went unanswered, which is the one outcome a status query
+            // must never get: it is the sequence a program sends precisely
+            // *because* it wants to find out whether the terminal is alive,
+            // so silence is read as "it is not" — and the ones that wait
+            // without a timeout wait forever, with the terminal looking like
+            // the thing that hung.
+            state.outputBuffer.append(contentsOf: Array("\u{1B}[0n".utf8))
+        case 6:
+            state.outputBuffer.append(
+                contentsOf: Array("\u{1B}[\(grid.cursor.row + 1);\(grid.cursor.column + 1)R".utf8)
+            )
+        default:
+            break
+        }
+    }
+
+    /// DECXCPR — `CSI ? 6 n`, the private cursor-position report, answered
+    /// `CSI ? row ; column ; page R`.
+    ///
+    /// The same query as DSR 6 with a page number added, and it was
+    /// unanswered for the same reason DSR 5 was: the private marker routed
+    /// to a switch with no `n` case at all. Page is always 1 — Corta has one
+    /// page and no DECPAM to switch it.
+    mutating func reportExtendedCursorPosition(_ parameters: Parameters) {
         guard parameters.value(0, default: 0) == 6 else { return }
         state.outputBuffer.append(
-            contentsOf: Array("\u{1B}[\(grid.cursor.row + 1);\(grid.cursor.column + 1)R".utf8)
+            contentsOf: Array(
+                "\u{1B}[?\(grid.cursor.row + 1);\(grid.cursor.column + 1);1R".utf8)
         )
     }
 
