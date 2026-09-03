@@ -16,6 +16,8 @@ first-class CJK input, and a terminal core with zero third-party dependencies.
 ![Swift](https://img.shields.io/badge/Swift-6-f05138?style=flat-square)
 ![Core dependencies](https://img.shields.io/badge/core%20dependencies-0-00c2c7?style=flat-square)
 [![Release](https://img.shields.io/github/v/release/noah-qin/Corta?style=flat-square&label=release)](https://github.com/noah-qin/Corta/releases/latest)
+[![Contributors](https://img.shields.io/github/contributors/noah-qin/Corta?style=flat-square)](https://github.com/noah-qin/Corta/graphs/contributors)
+[![Sponsors](https://img.shields.io/github/sponsors/noah-qin?style=flat-square)](https://github.com/sponsors/noah-qin)
 
 <br>
 
@@ -231,6 +233,17 @@ newcomers out, and both were learned the expensive way:
 > 0.9 ms regression once passed the entire suite. Only the number caught it.
 
 Contributions are accepted under Apache 2.0 §5. There is no separate CLA.
+
+### Contributors
+
+<a href="https://github.com/noah-qin/Corta/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=noah-qin/Corta" alt="Corta contributors" />
+</a>
+
+## Support
+
+If Corta is useful to you, [sponsoring](https://github.com/sponsors/noah-qin)
+helps keep it maintained.
 
 ## Security
 
