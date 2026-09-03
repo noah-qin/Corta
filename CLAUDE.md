@@ -3,7 +3,7 @@
 A native macOS terminal emulator in pure Swift. Metal rendering, Core
 Text shaping, AppKit shell, a hand-written VT parser.
 
-**Status: 0.1.0. M7 done, M6 has one open step.** M1–M5 are complete.
+**Status: 0.1.0. M7 and M8 done, M6 has one open step.** M1–M5 are complete.
 M6.12 was measured with Typometer at 45.5 ms average keypress-to-pixel
 latency; the sole open step is M6.16 (signed, notarized direct-download
 packaging, pending signing credentials). M7 closed the places the
@@ -193,7 +193,7 @@ Layout:
 - `Corta.xcodeproj/` — build settings live in `project.pbxproj`
 - `docs/` — design documentation
 
-Deployment target is macOS 26.5, Swift 6, app sandbox disabled
+Deployment target is macOS 26.0, Swift 6, app sandbox disabled
 (intentionally — `docs/SECURITY.md` §4.1).
 
 ## Commit Messages

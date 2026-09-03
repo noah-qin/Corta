@@ -12,7 +12,7 @@ first-class CJK input, and not one third-party dependency.
 <br>
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-2f81f7?style=flat-square)](LICENSE)
-![Platform](https://img.shields.io/badge/macOS-26.5%2B-4d4d4d?style=flat-square)
+![Platform](https://img.shields.io/badge/macOS-26.0%2B-4d4d4d?style=flat-square)
 ![Swift](https://img.shields.io/badge/Swift-6-f05138?style=flat-square)
 ![Dependencies](https://img.shields.io/badge/dependencies-0-00c2c7?style=flat-square)
 [![Release](https://img.shields.io/github/v/release/noah-qin/Corta?style=flat-square&label=release)](https://github.com/noah-qin/Corta/releases/latest)
@@ -168,7 +168,7 @@ and an exact long-task notification.
 
 ## Building
 
-Corta needs **macOS 26.5 or later** and **Xcode 26** (Swift 6). There is no
+Corta needs **macOS 26.0 or later** and **Xcode 26** (Swift 6). There is no
 dependency step, because there are no dependencies.
 
 ```sh
