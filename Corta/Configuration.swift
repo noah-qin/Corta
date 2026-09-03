@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 /// M6.1 — everything the settings page can change, and the text format the
@@ -10,9 +11,15 @@ import Foundation
 ///
 /// The format is `key = value`, one per line, `#` to end of line for
 /// comments — chosen because it needs no third-party parser and stays
-/// readable when hand-edited. An unknown key is preserved on write rather
+/// readable when hand-edited. A `#` that opens a *value* is not a comment:
+/// that is how a colour is written. An unknown key is preserved on write rather
 /// than dropped: a config written by a newer Corta must survive a round trip
 /// through an older one.
+///
+/// Two families of key are structured rather than scalar, and both use a
+/// dotted prefix so the flat format does not need nesting: `theme.<name>.…`
+/// defines a colour theme (M7.6), and `bind.<command>` rebinds a keyboard
+/// shortcut (M7.7).
 nonisolated struct Configuration: Equatable, Sendable {
     /// Which of a theme's two variants is live (M6.13).
     enum Appearance: String, CaseIterable, Sendable {
@@ -20,6 +27,16 @@ nonisolated struct Configuration: Equatable, Sendable {
         case auto
         case light
         case dark
+    }
+
+    /// What it takes to open a link (M7.9).
+    enum LinkActivation: String, CaseIterable, Sendable {
+        /// ⌘-click, the original behaviour: the modifier is the confirmation.
+        case command
+        /// A plain click on a link opens it, and hovering one underlines it
+        /// so the target is visible before the click. Selection still wins
+        /// the moment the mouse moves, so dragging across a URL selects it.
+        case click
     }
 
     var fontFamily: String = Configuration.systemFontFamily
@@ -35,6 +52,34 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// notification. Below this a notification is noise — the user was
     /// watching.
     var notificationThreshold: Double = 30
+    /// M7.10 — a finished selection goes straight to the pasteboard, the way
+    /// X11 and every terminal that grew up beside it behave. Off by default:
+    /// it silently replaces the clipboard, which surprises anyone who did not
+    /// ask for it.
+    var copyOnSelect: Bool = false
+    /// M7.9 — see `LinkActivation`.
+    var linkActivation: LinkActivation = .command
+    /// M7.11 — whether OSC 52 may write the system pasteboard.
+    ///
+    /// Off by default, as `SECURITY.md` §2.6 requires: any output at all
+    /// could put `rm -rf ~` or an attacker's wallet address on the clipboard
+    /// for the user to paste later, and that is not a risk to take on
+    /// somebody's behalf. Turning it on is one switch in Settings, which is
+    /// what the feature is for — inside `tmux` or over `ssh` there is no
+    /// other route to the local clipboard. The *read* half stays unavailable
+    /// under every setting (`SECURITY.md` §6).
+    var allowClipboardWrite: Bool = false
+    /// M7.4 — reopen the windows, splits and working directories from the
+    /// last run.
+    var restoreWindows: Bool = true
+    /// M7.5 — ask before closing a pane whose shell still has a child
+    /// process running.
+    var confirmClose: Bool = true
+
+    /// Themes defined in the config file itself (M7.6), in file order.
+    var customThemes: [Theme] = []
+    /// Keyboard shortcuts, defaults plus the file's overrides (M7.7).
+    var keybindings = Keybindings()
 
     /// The sentinel meaning "whatever `NSFont.monospacedSystemFont` gives",
     /// which is the default and tracks the OS rather than pinning a face.
@@ -53,16 +98,47 @@ nonisolated struct Configuration: Equatable, Sendable {
     static func parse(_ text: String) -> (configuration: Configuration, unknown: [(String, String)]) {
         var configuration = Configuration()
         var unknown: [(String, String)] = []
+        // Theme keys arrive one colour at a time and in any order, so they
+        // accumulate into drafts and are resolved once the whole file is
+        // read — a theme that inherits from another has to be able to name
+        // one defined further down.
+        var themeDrafts: [String: ThemeDraft] = [:]
+        var themeOrder: [String] = []
         for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            let line = rawLine.prefix { $0 != "#" }.trimmingCharacters(in: .whitespaces)
-            guard !line.isEmpty, let separator = line.firstIndex(of: "=") else { continue }
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            // A `#` opens a comment — except as the first character of a
+            // *value*, where it is a colour (`background = #101018`). Splitting
+            // the key from the value before stripping comments is what makes
+            // both readings possible; stripping first ate every theme colour
+            // in the file and left the key with an empty value.
+            guard !line.isEmpty, !line.hasPrefix("#"), let separator = line.firstIndex(of: "=")
+            else { continue }
             let key = line[..<separator].trimmingCharacters(in: .whitespaces)
-            let value = line[line.index(after: separator)...].trimmingCharacters(in: .whitespaces)
+            var value = line[line.index(after: separator)...]
+                .trimmingCharacters(in: .whitespaces)
+            if let comment = value.dropFirst().firstIndex(of: "#") {
+                value = String(value[..<comment]).trimmingCharacters(in: .whitespaces)
+            }
             guard !key.isEmpty else { continue }
-            if !configuration.apply(key: key, value: value) {
+            if key.hasPrefix("theme.") {
+                if applyThemeKey(key, value: value, drafts: &themeDrafts, order: &themeOrder) {
+                    continue
+                }
+                unknown.append((key, value))
+            } else if key.hasPrefix("bind.") {
+                if let command = TerminalCommand(rawValue: String(key.dropFirst("bind.".count))) {
+                    // An empty value unbinds; a malformed one is left alone
+                    // rather than silently reverting to the default.
+                    configuration.keybindings[command] =
+                        value.isEmpty ? nil : (Shortcut.parse(value) ?? command.defaultShortcut)
+                    continue
+                }
+                unknown.append((key, value))
+            } else if !configuration.apply(key: key, value: value) {
                 unknown.append((key, value))
             }
         }
+        configuration.customThemes = themeOrder.compactMap { themeDrafts[$0]?.resolved() }
         return (configuration, unknown)
     }
 
@@ -78,7 +154,9 @@ nonisolated struct Configuration: Equatable, Sendable {
             // round to a degenerate cell.
             if let size = Double(value) { fontSize = min(64, max(8, size)) }
         case "theme":
-            theme = Theme.named(value) != nil ? value : Theme.corta.name
+            // Not validated here: a custom theme may be defined further down
+            // the same file, and the name is resolved when it is used.
+            theme = value.isEmpty ? Theme.corta.name : value
         case "appearance":
             appearance = Appearance(rawValue: value) ?? .auto
         case "scrollback-lines":
@@ -91,6 +169,16 @@ nonisolated struct Configuration: Equatable, Sendable {
             notifyOnLongTask = Self.parseBool(value) ?? false
         case "notification-threshold":
             if let seconds = Double(value) { notificationThreshold = max(1, seconds) }
+        case "copy-on-select":
+            copyOnSelect = Self.parseBool(value) ?? false
+        case "link-activation":
+            linkActivation = LinkActivation(rawValue: value) ?? .command
+        case "allow-clipboard-write":
+            allowClipboardWrite = Self.parseBool(value) ?? false
+        case "restore-windows":
+            restoreWindows = Self.parseBool(value) ?? true
+        case "confirm-close":
+            confirmClose = Self.parseBool(value) ?? true
         default:
             return false
         }
@@ -103,6 +191,121 @@ nonisolated struct Configuration: Equatable, Sendable {
         case "false", "no", "off", "0": return false
         default: return nil
         }
+    }
+
+    // MARK: - Custom themes (M7.6)
+
+    /// A theme under construction: `theme.<name>.<variant>.<field>` keys
+    /// arrive one at a time, and anything left unset inherits.
+    private struct ThemeDraft {
+        var name: String
+        var displayName: String?
+        /// The built-in this theme starts from, so a two-line theme is a
+        /// legal theme. `theme.<name>.inherit = solarized`.
+        var inherit: String?
+        var dark = VariantDraft()
+        var light = VariantDraft()
+
+        struct VariantDraft {
+            var foreground: SIMD4<Float>?
+            var background: SIMD4<Float>?
+            var cursor: SIMD4<Float>?
+            /// Sparse: a theme may override one ANSI slot and leave fifteen.
+            var ansi: [Int: SIMD4<Float>] = [:]
+        }
+
+        func resolved() -> Theme {
+            let base = inherit.flatMap(Theme.named(_:)) ?? .corta
+            return Theme(
+                name: name,
+                displayName: displayName ?? name,
+                dark: Self.resolve(dark, base: base.dark),
+                light: Self.resolve(light, base: base.light))
+        }
+
+        private static func resolve(_ draft: VariantDraft, base: Theme.Variant) -> Theme.Variant {
+            var ansi = base.ansi
+            for (index, color) in draft.ansi where index >= 0 && index < ansi.count {
+                ansi[index] = color
+            }
+            return Theme.Variant(
+                foreground: draft.foreground ?? base.foreground,
+                background: draft.background ?? base.background,
+                cursor: draft.cursor ?? base.cursor,
+                ansi: ansi)
+        }
+    }
+
+    /// `theme.<name>.<field>` and `theme.<name>.<dark|light>.<field>`.
+    /// Returns false for a shape this does not recognise, so it lands in
+    /// `unknown` and survives the round trip.
+    private static func applyThemeKey(
+        _ key: String, value: String, drafts: inout [String: ThemeDraft], order: inout [String]
+    ) -> Bool {
+        let parts = key.split(separator: ".").map(String.init)
+        guard parts.count >= 3 else { return false }
+        let name = parts[1]
+        guard !name.isEmpty else { return false }
+        if drafts[name] == nil {
+            drafts[name] = ThemeDraft(name: name)
+            order.append(name)
+        }
+
+        // `theme.<name>.name` and `theme.<name>.inherit` are theme-level.
+        if parts.count == 3 {
+            switch parts[2] {
+            case "name":
+                drafts[name]?.displayName = value
+                return true
+            case "inherit":
+                drafts[name]?.inherit = value
+                return true
+            default:
+                return false
+            }
+        }
+        guard parts.count == 4, let isDark = variantIsDark(parts[2]), var draft = drafts[name]
+        else { return false }
+        let applied =
+            isDark
+            ? applyVariantField(parts[3], value: value, into: &draft.dark)
+            : applyVariantField(parts[3], value: value, into: &draft.light)
+        drafts[name] = draft
+        return applied
+    }
+
+    private static func variantIsDark(_ text: String) -> Bool? {
+        switch text {
+        case "dark": return true
+        case "light": return false
+        default: return nil
+        }
+    }
+
+    private static func applyVariantField(
+        _ field: String, value: String, into draft: inout ThemeDraft.VariantDraft
+    ) -> Bool {
+        if field == "ansi" {
+            // The whole table on one line, comma-separated. Shorter lists are
+            // taken as a prefix, so `ansi = #000, #f00` overrides two slots.
+            let colors = value.split(separator: ",").compactMap { Theme.color(String($0)) }
+            guard !colors.isEmpty else { return false }
+            for (index, color) in colors.enumerated() { draft.ansi[index] = color }
+            return true
+        }
+        if field.hasPrefix("ansi"), let index = Int(field.dropFirst("ansi".count)) {
+            guard let color = Theme.color(value) else { return false }
+            draft.ansi[index] = color
+            return true
+        }
+        guard let color = Theme.color(value) else { return false }
+        switch field {
+        case "foreground": draft.foreground = color
+        case "background": draft.background = color
+        case "cursor": draft.cursor = color
+        default: return false
+        }
+        return true
     }
 
     // MARK: - Writing
@@ -118,21 +321,60 @@ nonisolated struct Configuration: Equatable, Sendable {
             "# This file is the single source of truth. The settings page edits it,",
             "# and an edit made here is picked up while Corta is running.",
             "",
-            "font-family = \(fontFamily)",
-            "font-size = \(Self.number(fontSize))",
+            "# Appearance",
             "theme = \(theme)",
             "appearance = \(appearance.rawValue)",
+            "font-family = \(fontFamily)",
+            "font-size = \(Self.number(fontSize))",
+            "",
+            "# Terminal",
             "scrollback-lines = \(scrollbackLines)",
             "bell = \(bell.rawValue)",
+            "copy-on-select = \(copyOnSelect)",
+            "link-activation = \(linkActivation.rawValue)",
+            "allow-clipboard-write = \(allowClipboardWrite)",
+            "restore-windows = \(restoreWindows)",
+            "confirm-close = \(confirmClose)",
+            "",
+            "# Notifications",
             "notify-on-long-task = \(notifyOnLongTask)",
             "notification-threshold = \(Self.number(notificationThreshold))",
         ]
+        if !customThemes.isEmpty {
+            lines.append("")
+            lines.append("# Themes defined here. Anything left out is inherited from")
+            lines.append("# `theme.<name>.inherit`, or from the built-in `corta` theme.")
+            for theme in customThemes { lines.append(contentsOf: Self.themeLines(theme)) }
+        }
+        let overrides = keybindings.overriddenCommands
+        if !overrides.isEmpty {
+            lines.append("")
+            lines.append("# Keyboard shortcuts. An empty value removes the binding.")
+            for (command, shortcut) in overrides {
+                lines.append("\(command.configurationKey) = \(shortcut?.text ?? "")")
+            }
+        }
         if !unknown.isEmpty {
             lines.append("")
             lines.append("# Written by a different version of Corta and kept verbatim.")
             for (key, value) in unknown { lines.append("\(key) = \(value)") }
         }
         return lines.joined(separator: "\n") + "\n"
+    }
+
+    /// One theme's block. Written in full rather than as a diff against what
+    /// it inherits: a theme read back has already been resolved, and
+    /// reconstructing the original sparse form would be guesswork.
+    private static func themeLines(_ theme: Theme) -> [String] {
+        var lines = ["", "theme.\(theme.name).name = \(theme.displayName)"]
+        for (label, variant) in [("dark", theme.dark), ("light", theme.light)] {
+            let prefix = "theme.\(theme.name).\(label)"
+            lines.append("\(prefix).foreground = \(Theme.hex(variant.foreground))")
+            lines.append("\(prefix).background = \(Theme.hex(variant.background))")
+            lines.append("\(prefix).cursor = \(Theme.hex(variant.cursor))")
+            lines.append("\(prefix).ansi = \(variant.ansi.map(Theme.hex).joined(separator: ", "))")
+        }
+        return lines
     }
 
     /// Trims a trailing `.0` so a whole number reads as one.

@@ -21,11 +21,10 @@ struct KeyboardProtocolTests {
         #expect(response(to: "\u{1B}[>1u\u{1B}[?u") == "\u{1B}[?1u")
     }
 
-    /// The report has to be the truth, not the request: a program told it
-    /// got event reporting would encode key releases nobody sends.
+    /// The report has to be the truth, not the request.
     @Test("flags Corta does not honour are not reported as honoured")
     func unsupportedFlagsAreNotClaimed() {
-        #expect(response(to: "\u{1B}[>31u\u{1B}[?u") == "\u{1B}[?1u")
+        #expect(response(to: "\u{1B}[>31u\u{1B}[?u") == "\u{1B}[?3u")
     }
 
     @Test("pop restores what the pusher found")

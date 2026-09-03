@@ -27,7 +27,7 @@ extension Grid {
         oldRows.append(contentsOf: lines)
         guard !oldRows.isEmpty else {
             columns = newColumns
-            lines = ContiguousArray(repeating: Line(), count: newRows)
+            lines = ScreenLines(repeating: Line(), count: newRows)
             return
         }
 
@@ -58,7 +58,7 @@ extension Grid {
         }
 
         scrollback = newScrollback
-        lines = newScreen
+        lines = ScreenLines(newScreen)
         columns = newColumns
 
         let cursorScreenRow = rewrapped.cursorRow - historyCount

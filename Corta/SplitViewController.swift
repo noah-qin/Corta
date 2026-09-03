@@ -18,7 +18,10 @@ final class SplitViewController: NSViewController {
     /// `noteFocus` from `TerminalView.becomeFirstResponder`, so every route
     /// to focus — click, ⌘⌥ arrows, a split, a close — funnels through one
     /// place.
-    private(set) var focusedPane: ViewController?
+    /// Settable from `SplitViewController+Restore`, which walks a saved
+    /// layout by focusing each pane in turn and splitting it — the same path
+    /// ⌘D takes, rather than a second tree builder.
+    var focusedPane: ViewController?
     /// Window setup ran (`viewWillAppear`). Panes created by a split later
     /// take `didSizeWindow` from this.
     private var didSetUpWindow = false
@@ -45,9 +48,16 @@ final class SplitViewController: NSViewController {
     var panes: [ViewController] { children.compactMap { $0 as? ViewController } }
     var hasMultiplePanes: Bool { tree?.leafCount ?? 1 > 1 }
 
+    /// The layout this window is being restored into (M7.4), set by
+    /// `AppDelegate` before the view loads. The root pane needs its working
+    /// directory at spawn time, which is why this has to be here rather than
+    /// applied afterwards.
+    var pendingRestore: WindowState?
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        let pane = makePane(workingDirectory: nil, initialGridSize: nil)
+        let pane = makePane(
+            workingDirectory: pendingRestore?.layout.firstDirectory, initialGridSize: nil)
         focusedPane = pane
         tree = SplitTree(root: pane.view)
         installRoot()
@@ -132,6 +142,15 @@ final class SplitViewController: NSViewController {
         // the desktop for a frame or two.
         view.layoutSubtreeIfNeeded()
         pane.terminalView.drawNow()
+
+        // The splits, last: they need the window's final frame to halve, and
+        // the frame is only final once the sizing above has run.
+        if let restore = pendingRestore {
+            pendingRestore = nil
+            if window.tabbedWindows == nil { window.setFrame(restore.frame.rect, display: false) }
+            view.layoutSubtreeIfNeeded()
+            self.restore(layout: restore.layout)
+        }
     }
 
     override func viewWillLayout() {
@@ -249,7 +268,7 @@ final class SplitViewController: NSViewController {
     @objc func splitRight(_ sender: Any?) { splitFocusedPane(orientation: .columns) }
     @objc func splitDown(_ sender: Any?) { splitFocusedPane(orientation: .rows) }
 
-    func splitFocusedPane(orientation: SplitOrientation) {
+    func splitFocusedPane(orientation: SplitOrientation, workingDirectory: String? = nil) {
         guard let focusedPane else { return }
         // Captured before the split: the node takes the leaf's old frame,
         // and the two halves are pre-set on the subviews so the very first
@@ -258,7 +277,7 @@ final class SplitViewController: NSViewController {
         // the "split flashes, then settles" jank.
         let oldFrame = focusedPane.view.frame
         let pane = makePane(
-            workingDirectory: focusedPane.session.workingDirectory,
+            workingDirectory: workingDirectory ?? focusedPane.session.workingDirectory,
             initialGridSize: halvedGridSize(of: focusedPane, orientation: orientation))
         let node = tree.split(
             leaf: focusedPane.view, orientation: orientation, newLeaf: pane.view)
@@ -310,9 +329,16 @@ final class SplitViewController: NSViewController {
     /// meaning (a tabbed window closes the tab, not the group).
     @objc func performClose(_ sender: Any?) {
         guard hasMultiplePanes, let focusedPane else {
+            // The window's own close runs through `windowShouldClose`, which
+            // is where the whole-window confirmation lives — asking here too
+            // would ask twice.
             view.window?.performClose(sender)
             return
         }
+        guard confirmClose(
+            of: focusedPane.session?.hasForegroundJob == true ? [focusedPane] : [],
+            scope: "this pane")
+        else { return }
         closePane(focusedPane)
     }
 

@@ -105,6 +105,17 @@ extension ViewController {
                 // click that never moved, which stays cleared.
                 if head != anchor || unit != .character || extending {
                     applySelection(anchor: anchor, head: head, unit: unit, grid: grid)
+                    // M7.10: a finished selection goes to the pasteboard when
+                    // the user asked for that. On mouse-*up* only — copying
+                    // on every intermediate drag position would rewrite the
+                    // clipboard dozens of times per gesture.
+                    if ConfigurationStore.shared.configuration.copyOnSelect { copy(nil) }
+                } else {
+                    // A click that never moved, with no modifier: in
+                    // `link-activation = click` this is how a link opens
+                    // (M7.9). Deferred to mouse-up precisely so that
+                    // dragging across a URL still selects it.
+                    openLinkOnPlainClick(next, in: terminalView)
                 }
                 break
             }

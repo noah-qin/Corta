@@ -23,6 +23,10 @@ func currentResidentBytes() -> UInt64 {
 
 func megabytes(_ bytes: UInt64) -> Double { Double(bytes) / 1_048_576 }
 
+func throughput(_ byteCount: Int, elapsedSeconds: Double) -> Double {
+    megabytes(UInt64(byteCount)) / elapsedSeconds
+}
+
 // MARK: - Parse throughput
 
 // A representative corpus: plain text, SGR colour changes, cursor moves —
@@ -41,14 +45,40 @@ func makeCorpus(targetBytes: Int) -> [UInt8] {
 
 func benchmarkParseThroughput() {
     let corpus = makeCorpus(targetBytes: 64 * 1_048_576)
+
+    struct CountingPerformer: ParserPerformer {
+        var printableBytes = 0
+        mutating func print(_ scalar: UInt32) { printableBytes &+= 1 }
+        mutating func printASCII(_ bytes: ArraySlice<UInt8>) { printableBytes &+= bytes.count }
+        mutating func execute(_ control: UInt8) {}
+    }
+
+    var parser = Parser()
+    var counter = CountingPerformer()
+    var start = DispatchTime.now()
+    parser.parse(corpus, performer: &counter)
+    var elapsedSeconds = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e9
+    print(
+        "parser-only throughput: \(String(format: "%.1f", throughput(corpus.count, elapsedSeconds: elapsedSeconds))) MiB/s "
+            + "(\(counter.printableBytes) printable bytes observed)"
+    )
+
+    var gridOnly = Terminal(rows: 50, columns: 200, scrollbackLimit: 0)
+    start = DispatchTime.now()
+    gridOnly.feed(corpus)
+    elapsedSeconds = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e9
+    print(
+        "parser + grid throughput: \(String(format: "%.1f", throughput(corpus.count, elapsedSeconds: elapsedSeconds))) MiB/s "
+            + "(scrollback disabled)"
+    )
+
     var terminal = Terminal(rows: 50, columns: 200, scrollbackLimit: 10_000)
-
-    let start = DispatchTime.now()
+    start = DispatchTime.now()
     terminal.feed(corpus)
-    let elapsedSeconds = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e9
+    elapsedSeconds = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e9
 
-    let mbps = megabytes(UInt64(corpus.count)) / elapsedSeconds
-    print("parse throughput: \(String(format: "%.1f", mbps)) MB/s (\(corpus.count) bytes in \(String(format: "%.3f", elapsedSeconds))s)")
+    let mibps = throughput(corpus.count, elapsedSeconds: elapsedSeconds)
+    print("core feed throughput: \(String(format: "%.1f", mibps)) MiB/s (\(corpus.count) bytes in \(String(format: "%.3f", elapsedSeconds))s)")
 }
 
 // MARK: - Scrollback memory at 100k lines

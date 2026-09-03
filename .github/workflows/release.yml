@@ -4,7 +4,7 @@ name: Release
 # then push a tag. This builds from the tag and opens a DRAFT release for
 # review — nothing is ever published automatically.
 #
-# Signing and notarisation (M6.16) run only when the four repository
+# Signing and notarisation (M6.16) run only when all six repository
 # secrets below exist. Until they do, the workflow still produces an
 # ad-hoc signed build, and the release notes say so plainly rather than
 # handing users a download that Gatekeeper will silently refuse.
@@ -56,8 +56,15 @@ jobs:
         id: signing
         env:
           CERT: ${{ secrets.MACOS_CERTIFICATE }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+          NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
         run: |
-          if [ -n "$CERT" ]; then
+          if [ -n "$CERT" ] && [ -n "$CERT_PASSWORD" ] && \
+             [ -n "$SIGNING_IDENTITY" ] && [ -n "$NOTARY_KEY" ] && \
+             [ -n "$NOTARY_KEY_ID" ] && [ -n "$NOTARY_ISSUER_ID" ]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
@@ -134,7 +141,6 @@ jobs:
           ditto -c -k --keepParent --sequesterRsrc "$app" "$zip"
           shasum -a 256 "$zip" > "$zip.sha256"
           echo "zip=$zip" >> "$GITHUB_OUTPUT"
-          echo "sha=$(shasum -a 256 "$zip" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
       - name: Notarise and staple
         if: steps.signing.outputs.available == 'true'
@@ -150,6 +156,9 @@ jobs:
             --issuer "$NOTARY_ISSUER_ID" \
             --wait
           xcrun stapler staple build/Build/Products/Release/Corta.app
+          xcrun stapler validate build/Build/Products/Release/Corta.app
+          codesign --verify --deep --strict --verbose=2 \
+            build/Build/Products/Release/Corta.app
           rm -f /tmp/notary.p8 "${{ steps.package.outputs.zip }}"
           ditto -c -k --keepParent --sequesterRsrc \
             build/Build/Products/Release/Corta.app \
@@ -159,6 +168,7 @@ jobs:
 
       - name: Write the release notes
         run: |
+          sha=$(shasum -a 256 "${{ steps.package.outputs.zip }}" | cut -d' ' -f1)
           {
             echo "## Corta ${{ steps.version.outputs.tag }}"
             echo
@@ -176,7 +186,7 @@ jobs:
               echo
             fi
             echo "\`\`\`"
-            echo "SHA-256  ${{ steps.package.outputs.sha }}"
+            echo "SHA-256  $sha"
             echo "\`\`\`"
           } > release-notes.md
 

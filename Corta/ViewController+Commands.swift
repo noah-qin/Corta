@@ -59,22 +59,41 @@ extension ViewController {
     /// accumulated instead and spent one whole point at a time, which keeps
     /// a live pinch on exactly the steps ⌘+/⌘− lands on.
     func magnify(by magnification: CGFloat) {
-        pinchAccumulator += magnification
+        let sizes = Self.fontSizes(
+            forMagnification: magnification,
+            accumulator: &pinchAccumulator,
+            startingAt: fontSize)
+        for size in sizes { setFontSizeForAllPanes(size) }
+    }
+
+    /// Pure step accumulator behind the AppKit gesture entry point. Keeping
+    /// the continuous-to-discrete conversion here makes its threshold,
+    /// direction, multi-step behaviour and clamps deterministic in tests.
+    nonisolated static func fontSizes(
+        forMagnification magnification: CGFloat,
+        accumulator: inout CGFloat,
+        startingAt fontSize: CGFloat
+    ) -> [CGFloat] {
+        accumulator += magnification
         // ~0.15 of a pinch per point: small enough that a deliberate pinch
         // resizes, large enough that resting two fingers does not.
         let step: CGFloat = 0.15
-        while abs(pinchAccumulator) >= step {
-            let direction: CGFloat = pinchAccumulator > 0 ? 1 : -1
-            pinchAccumulator -= direction * step
-            let target = fontSize + direction
+        var current = fontSize
+        var sizes: [CGFloat] = []
+        while abs(accumulator) >= step {
+            let direction: CGFloat = accumulator > 0 ? 1 : -1
+            accumulator -= direction * step
+            let target = current + direction
             // At the clamp the accumulator would otherwise keep filling and
             // fire a burst of rebuilds the moment the pinch reverses.
             guard target >= 8, target <= 64 else {
-                pinchAccumulator = 0
-                return
+                accumulator = 0
+                return sizes
             }
-            setFontSizeForAllPanes(target)
+            sizes.append(target)
+            current = target
         }
+        return sizes
     }
 
     /// Called when the gesture ends, so the next pinch starts from zero

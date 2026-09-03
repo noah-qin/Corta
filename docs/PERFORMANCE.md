@@ -136,5 +136,12 @@ Latency (keypress → pixel) is measured separately with a tool such as
 Typometer; it is invisible to throughput benchmarks and is the number
 users actually perceive.
 
+**M6 measurement:** Typometer 1.0.1 against a Release build, 200
+characters, 150 ms delay, 50 ms period, 1,000 ms length, synchronous mode:
+45.5 ms average, 24.8 ms minimum, 56.4 ms maximum, 6.8 ms standard
+deviation. The in-process write → PTY echo → parse → grid portion measured
+separately at 0.005 ms average / 0.007 ms p95, placing essentially all of
+the observed latency after the grid mutation.
+
 **Establish the baseline at M1.** Without a baseline, "performance is the
 first priority" is a slogan rather than a constraint.

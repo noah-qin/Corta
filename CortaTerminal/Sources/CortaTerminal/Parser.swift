@@ -58,6 +58,29 @@ public struct Parser: Sendable {
         for byte in bytes { advance(byte, performer: &performer) }
     }
 
+    /// Contiguous input gets an ASCII-run fast path. PTY reads and the
+    /// benchmark both arrive as `[UInt8]`, so this is the production path;
+    /// the generic overload above remains for streaming/test sequences.
+    public mutating func parse<P: ParserPerformer>(
+        _ bytes: [UInt8],
+        performer: inout P
+    ) {
+        var index = bytes.startIndex
+        while index < bytes.endIndex {
+            if case .ground = state, bytes[index] >= 0x20, bytes[index] < 0x7F {
+                var end = index + 1
+                while end < bytes.endIndex, bytes[end] >= 0x20, bytes[end] < 0x7F {
+                    end += 1
+                }
+                performer.printASCII(bytes[index..<end])
+                index = end
+            } else {
+                advance(bytes[index], performer: &performer)
+                index += 1
+            }
+        }
+    }
+
     public mutating func advance<P: ParserPerformer>(_ byte: UInt8, performer: inout P) {
         // "Anywhere" transitions, which outrank the current state. CAN and
         // SUB abort whatever is in progress; ESC restarts it. Without these a

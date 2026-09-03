@@ -63,6 +63,10 @@ class ViewController: NSViewController {
     /// arrow on every mouse-moved fights the split view's resize cursor
     /// near a divider and makes the pointer flicker there (M5).
     var hoveringLink = false
+    /// The link range under the pointer (M7.9), underlined by the renderer
+    /// so the target is visible before a click can open it. Storage lives
+    /// here because `ViewController+Links` is an extension.
+    var hoveredLink: TerminalSelection?
     /// The current text selection, owned by `ViewController+Selection.swift`
     /// (Track C) and read by the render loop. Stored here because extensions
     /// cannot add storage.
@@ -440,6 +444,18 @@ class ViewController: NSViewController {
         if hasOutput, searchBar != nil {
             updateSearchResults(scrollsToMatch: false)
         }
+        if hasOutput {
+            // Two things the child asked for, drained on the same batch
+            // boundary every other "the child told us something" hand-off
+            // uses: a clipboard write (OSC 52, M7.11) and the command
+            // boundaries a shell with integration reports (OSC 133, M7.2).
+            drainClipboardRequests()
+            let finished = session.takeFinishedCommand()
+            if session.hasShellIntegration {
+                taskNotifier.noteCommandRunning(
+                    session.isCommandRunning, exitStatus: finished, in: view.window)
+            }
+        }
         if session.isSynchronizedOutputEnabled {
             // A frame drawn mid-batch would show a torn intermediate state.
             // Remember that a present is owed and wait for the matching
@@ -458,14 +474,14 @@ class ViewController: NSViewController {
             grid: grid, scrollOffset: scrollOffset,
             cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
             searchMatches: searchMatches.map { TerminalSelection($0, grid: grid) },
-            currentSearchMatchIndex: currentSearchMatchIndex)
+            currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink)
         return forced || damaged
     }
 
-    /// M4.8, app side — dispatches on `BellMode.current`. The core decided
-    /// nothing beyond "a bell happened" (`Terminal.takeBell()`).
+    /// M4.8, app side — dispatches on the configured bell mode. The core
+    /// decided nothing beyond "a bell happened" (`Terminal.takeBell()`).
     private func handleBell() {
-        switch BellMode.current {
+        switch ConfigurationStore.shared.configuration.bell {
         case .audible:
             NSSound.beep()
         case .visual:
@@ -548,7 +564,7 @@ class ViewController: NSViewController {
             drawableSize: drawableSize,
             cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
             searchMatches: searchMatches.map { TerminalSelection($0, grid: grid) },
-            currentSearchMatchIndex: currentSearchMatchIndex,
+            currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink,
             renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
         commandBuffer.present(drawable)
         commandBuffer.commit()

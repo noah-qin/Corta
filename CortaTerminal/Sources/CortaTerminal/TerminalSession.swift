@@ -211,6 +211,38 @@ public final class TerminalSession: @unchecked Sendable {
         state.withLock { $0.terminal.workingDirectory }
     }
 
+    /// Whether a command other than the shell itself is running here — what
+    /// a close confirmation asks before it throws away a half-finished job
+    /// (M7.5). Derived from the pty's foreground process group; see
+    /// `PTY.hasForegroundJob`.
+    public var hasForegroundJob: Bool { pty.hasForegroundJob }
+
+    /// The name of that command, when it can be read.
+    public var foregroundProcessName: String? { pty.foregroundProcessName }
+
+    /// Whether the shell reports a command running via OSC 133 (M7.2).
+    public var isCommandRunning: Bool {
+        state.withLock { $0.terminal.isCommandRunning }
+    }
+
+    /// Whether this session's shell emits OSC 133 at all. The app falls back
+    /// to its keystroke heuristic when it does not.
+    public var hasShellIntegration: Bool {
+        state.withLock { $0.terminal.hasShellIntegration }
+    }
+
+    /// Consumes the exit status of a command that just finished (OSC 133 D).
+    public func takeFinishedCommand() -> Int? {
+        state.withLock { $0.terminal.takeFinishedCommand() }
+    }
+
+    /// Consumes text the child asked to place on the system clipboard via
+    /// OSC 52 (M7.11). Whether it actually reaches the pasteboard is the
+    /// app's decision.
+    public func takeClipboardCopy() -> String? {
+        state.withLock { $0.terminal.takeClipboardCopy() }
+    }
+
     /// `TIOCSWINSZ` happens synchronously — the child should see `SIGWINCH`
     /// promptly — but the grid-side reflow (M4.2) does not: measured at
     /// ~108 ms for a full 100k-line scrollback (`corta-bench`), which is

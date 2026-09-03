@@ -60,6 +60,8 @@ nonisolated final class TerminalRenderer {
     /// M4.4: every search match highlights; the current one differently.
     private static let searchMatchColor = SIMD4<Float>(0.85, 0.75, 0.2, 0.35)
     private static let currentSearchMatchColor = SIMD4<Float>(0.95, 0.55, 0.15, 0.6)
+    /// M7.9 — the underline under a hovered link.
+    private static let linkUnderlineColor = SIMD4<Float>(0.45, 0.7, 1.0, 0.95)
 
     // MARK: - Damage-tracked instance cache
 
@@ -91,6 +93,9 @@ nonisolated final class TerminalRenderer {
     /// grid changes, so unlike a selection there is no growth to track.
     private var cachedSearchMatches: [TerminalSelection] = []
     private var cachedCurrentSearchMatchIndex: Int?
+    /// The link the pointer is over (M7.9), underlined so the target is
+    /// visible before a click can open it.
+    private var cachedHoveredLink: TerminalSelection?
     private var needsFullRebuild = true
 
     /// Scratch for one row's rebuild, reused across rows and frames so a
@@ -164,7 +169,8 @@ nonisolated final class TerminalRenderer {
     @discardableResult
     func updateInstances(
         grid: Grid, scrollOffset: Int, cursorVisible: Bool, selection: TerminalSelection?,
-        searchMatches: [TerminalSelection] = [], currentSearchMatchIndex: Int? = nil
+        searchMatches: [TerminalSelection] = [], currentSearchMatchIndex: Int? = nil,
+        hoveredLink: TerminalSelection? = nil
     ) -> Bool {
         let offset = min(max(0, scrollOffset), grid.scrollback.count)
         let fullRebuild =
@@ -200,10 +206,12 @@ nonisolated final class TerminalRenderer {
             || (selection != nil && cachedScrollbackCount != grid.scrollback.count)
             || cachedSearchMatches != searchMatches
             || cachedCurrentSearchMatchIndex != currentSearchMatchIndex
+            || !Self.selectionsEqual(cachedHoveredLink, hoveredLink)
         {
             rebuildOverlay(
                 grid: grid, cursorVisible: cursorVisible, selection: selection, offset: offset,
-                searchMatches: searchMatches, currentSearchMatchIndex: currentSearchMatchIndex)
+                searchMatches: searchMatches, currentSearchMatchIndex: currentSearchMatchIndex,
+                hoveredLink: hoveredLink)
             changed = true
         }
 
@@ -216,6 +224,7 @@ nonisolated final class TerminalRenderer {
         cachedSelection = selection
         cachedSearchMatches = searchMatches
         cachedCurrentSearchMatchIndex = currentSearchMatchIndex
+        cachedHoveredLink = hoveredLink
         needsFullRebuild = false
         return changed
     }
@@ -234,13 +243,14 @@ nonisolated final class TerminalRenderer {
         selection: TerminalSelection?,
         searchMatches: [TerminalSelection] = [],
         currentSearchMatchIndex: Int? = nil,
+        hoveredLink: TerminalSelection? = nil,
         renderPassDescriptor: MTLRenderPassDescriptor,
         commandBuffer: MTLCommandBuffer
     ) {
         updateInstances(
             grid: grid, scrollOffset: scrollOffset, cursorVisible: cursorVisible,
             selection: selection, searchMatches: searchMatches,
-            currentSearchMatchIndex: currentSearchMatchIndex)
+            currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink)
 
         quadRenderer.drawSolidQuads(
             cachedBackground, rect: rect, drawableSize: drawableSize,
@@ -338,7 +348,8 @@ nonisolated final class TerminalRenderer {
     /// slice.
     private func rebuildOverlay(
         grid: Grid, cursorVisible: Bool, selection: TerminalSelection?, offset: Int,
-        searchMatches: [TerminalSelection] = [], currentSearchMatchIndex: Int? = nil
+        searchMatches: [TerminalSelection] = [], currentSearchMatchIndex: Int? = nil,
+        hoveredLink: TerminalSelection? = nil
     ) {
         let cellWidth = Float(metrics.cellWidth)
         let cellHeight = Float(metrics.cellHeight)
@@ -357,6 +368,21 @@ nonisolated final class TerminalRenderer {
                 contentsOf: selectionQuads(
                     match, grid: grid, offset: offset, cellWidth: cellWidth, cellHeight: cellHeight,
                     color: index == currentSearchMatchIndex ? Self.currentSearchMatchColor : Self.searchMatchColor))
+        }
+        // The hovered link's underline (M7.9). A rule rather than a fill:
+        // a link under the pointer has to read as a link, and filling it
+        // would compete with the selection highlight it can overlap.
+        if let hoveredLink {
+            for quad in selectionQuads(
+                hoveredLink, grid: grid, offset: offset, cellWidth: cellWidth,
+                cellHeight: cellHeight, color: Self.linkUnderlineColor)
+            {
+                let thickness = max(1, Float(scale).rounded(.down))
+                overlayScratch.append(
+                    QuadInstance(
+                        origin: .init(quad.origin.x, quad.origin.y + cellHeight - thickness * 2),
+                        size: .init(quad.size.x, thickness), color: quad.color))
+            }
         }
         if cursorVisible {
             let cellOrigin = SIMD2<Float>(
@@ -414,6 +440,21 @@ nonisolated final class TerminalRenderer {
         // a global and retains the theme's ANSI array every time it is
         // touched, and this loop runs tens of thousands of times a frame.
         let palette = TerminalColorPalette.activeVariant
+        // Shell-integration mark (M7.2): a two-pixel rule down the left edge
+        // of a prompt row, coloured by how that command ended. It is the only
+        // way to see at a glance which of the last twenty commands failed,
+        // and it costs one comparison per row rather than per cell. Drawn
+        // inside the first cell rather than in the window inset, because the
+        // inset is outside the rect this renderer is given and quads there
+        // would fall outside the pane.
+        if line.mark != .none {
+            let width = max(2, Float(scale) * 2)
+            background.append(
+                QuadInstance(
+                    origin: .init(0, Float(row) * cellHeight),
+                    size: .init(width, cellHeight),
+                    color: Self.markColor(line.mark)))
+        }
         for column in 0..<line.count {
             let cell = line[column]
             let reversed = cell.attributes.contains(.reverse)
@@ -488,14 +529,21 @@ nonisolated final class TerminalRenderer {
                 continue
             }
 
-            let bold = cell.attributes.contains(.bold)
+            // Bold and italic together, straight off the already-loaded
+            // rawValue: two bit tests and no `OptionSet.contains` call, which
+            // this loop cannot afford (`PERFORMANCE.md` §3).
+            let style = GlyphAtlas.Style(
+                rawValue: UInt8(
+                    (attributes & CellAttributes.bold.rawValue != 0 ? 1 : 0)
+                        | (attributes & CellAttributes.italic.rawValue != 0 ? 2 : 0)))
+            let isWide = attributes & CellAttributes.wide.rawValue != 0
             let info: GlyphAtlas.GlyphInfo
             if !cell.grapheme.isNone,
                 let scalars = graphemes.scalars(for: cell.grapheme)
             {
                 // A cluster cell is drawn even when its base scalar is a
                 // space (a combining mark can attach to one).
-                guard let shaped = glyphAtlas.glyph(forCluster: scalars, bold: bold)
+                guard let shaped = glyphAtlas.glyph(forCluster: scalars, style: style)
                 else { continue }
                 info = shaped
             } else {
@@ -504,10 +552,21 @@ nonisolated final class TerminalRenderer {
                 guard
                     let lookedUp =
                         scalar.isASCII
-                        ? glyphAtlas.glyph(forASCII: cell.scalar, bold: bold)
-                        : glyphAtlas.glyph(shaping: cell.scalar, bold: bold)
+                        ? glyphAtlas.glyph(forASCII: cell.scalar, style: style)
+                        : glyphAtlas.glyph(shaping: cell.scalar, style: style)
                 else { continue }
                 info = lookedUp
+            }
+            // No font in the cascade covers this scalar. Drawing nothing
+            // would make the terminal look like it dropped the output, so
+            // the cell gets the conventional hollow box instead — the same
+            // information a `.notdef` glyph carries, without trusting a font
+            // to supply one.
+            if info.isMissing {
+                appendMissingGlyphBox(
+                    at: origin, cellWidth: cellWidth * (isWide ? 2 : 1), cellHeight: cellHeight,
+                    color: fg, into: &background)
+                continue
             }
             guard info.size != .zero else { continue }
 
@@ -516,26 +575,38 @@ nonisolated final class TerminalRenderer {
                 origin.y + baseline - info.bearing.y - info.size.y
             )
             var glyphSize = info.size
-            if cell.attributes.contains(.wide) {
-                let boxWidth = cellWidth * 2
-                // Scale the glyph down into the two-cell box (never up), then
-                // centre it horizontally; the baseline fixes the vertical
-                // axis, so scaled bearings keep the glyph sitting on the
-                // line. The quad can then never paint outside its pair.
+            let boxWidth = isWide ? cellWidth * 2 : cellWidth
+            // Does the glyph's own ink — the bitmap less the atlas's one-texel
+            // border on each side — fit the box it is allowed to paint?
+            //
+            // For a wide pair this has always been the rule: the CJK font
+            // Core Text falls back to has its own metrics and is never
+            // exactly two primary advances wide. It is now the rule for every
+            // cell, because a font whose bold face advances a shade wider
+            // than its regular one — or one that is monospaced for letters
+            // and not for symbols — spills its ink into the neighbouring
+            // column, and nothing downstream clips a glyph quad to its cell.
+            // The tolerance is one device pixel: rounding and the padding
+            // must not drag ordinary text off the fast path below.
+            let ink = info.size.x - 2 * GlyphAtlas.bitmapPadding
+            if isWide || ink > boxWidth + 1 {
+                // Scale down into the box (never up), then centre
+                // horizontally; the baseline fixes the vertical axis, so
+                // scaled bearings keep the glyph sitting on the line. The
+                // quad can then never paint outside its own cells.
                 let fit = min(1, boxWidth / info.size.x, cellHeight / info.size.y)
                 glyphSize = info.size * fit
                 glyphOrigin = SIMD2<Float>(
                     origin.x + (boxWidth - glyphSize.x) / 2,
                     origin.y + baseline - (info.bearing.y + info.size.y) * fit
                 )
-            }
-            // The atlas already contains Core Text's antialiasing. Sampling
-            // that bitmap from a fractional destination origin filters it a
-            // second time and makes 12pt ASCII look soft. Ordinary coverage
-            // glyphs are 1:1 with the drawable, so align their quads to the
-            // device-pixel grid. Wide/fallback and color glyphs may be
-            // intentionally scaled and keep linear sampling.
-            if !info.isColor && !cell.attributes.contains(.wide) {
+            } else if !info.isColor {
+                // The atlas already contains Core Text's antialiasing.
+                // Sampling that bitmap from a fractional destination origin
+                // filters it a second time and makes 12pt ASCII look soft.
+                // Ordinary coverage glyphs are 1:1 with the drawable, so
+                // align their quads to the device-pixel grid. Scaled and
+                // color glyphs keep linear sampling.
                 glyphOrigin.x = glyphOrigin.x.rounded()
                 glyphOrigin.y = glyphOrigin.y.rounded()
             }
@@ -550,6 +621,44 @@ nonisolated final class TerminalRenderer {
             } else {
                 glyphs.append(instance)
             }
+        }
+    }
+
+    /// The hollow box drawn in place of a scalar no font can render. Four
+    /// rules, one device pixel thick, inset far enough from the cell edges
+    /// that a run of them reads as separate boxes rather than a grid.
+    private func appendMissingGlyphBox(
+        at origin: SIMD2<Float>, cellWidth: Float, cellHeight: Float, color: SIMD4<Float>,
+        into background: inout [QuadInstance]
+    ) {
+        let thickness = max(1, Float(scale).rounded(.down))
+        let inset = max(thickness, (cellWidth * 0.12).rounded())
+        let top = origin.y + max(thickness, (cellHeight * 0.15).rounded())
+        let width = max(thickness * 2, cellWidth - inset * 2)
+        let height = max(thickness * 2, cellHeight - (top - origin.y) * 2)
+        let left = origin.x + inset
+        background.append(
+            QuadInstance(origin: .init(left, top), size: .init(width, thickness), color: color))
+        background.append(
+            QuadInstance(
+                origin: .init(left, top + height - thickness), size: .init(width, thickness),
+                color: color))
+        background.append(
+            QuadInstance(origin: .init(left, top), size: .init(thickness, height), color: color))
+        background.append(
+            QuadInstance(
+                origin: .init(left + width - thickness, top), size: .init(thickness, height),
+                color: color))
+    }
+
+    /// Green for a command that succeeded, red for one that failed, and a
+    /// neutral grey for a prompt whose command has not reported yet — which
+    /// includes the one currently running.
+    private static func markColor(_ mark: LineMark) -> SIMD4<Float> {
+        switch mark {
+        case .promptSucceeded: return SIMD4<Float>(0.25, 0.75, 0.35, 0.85)
+        case .promptFailed: return SIMD4<Float>(0.9, 0.3, 0.25, 0.9)
+        default: return SIMD4<Float>(0.55, 0.55, 0.6, 0.55)
         }
     }
 

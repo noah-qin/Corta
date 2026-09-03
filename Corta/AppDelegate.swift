@@ -101,57 +101,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         SettingsWindowController.shared.show(sender)
     }
 
-    /// The settings menu sits in the menu bar beside Shell and Edit, and is
-    /// built here rather than in the storyboard because two of its three
-    /// sections are lists of values that live in code — the built-in themes
-    /// and the appearance choices. A storyboard copy of either would be a
-    /// second place to update.
-    private func installSettingsMenu() {
-        guard let mainMenu = NSApp.mainMenu,
-            let shellIndex = mainMenu.items.firstIndex(where: { $0.title == "Shell" })
-        else { return }
-
-        let menu = NSMenu(title: "Settings")
-        menu.addItem(
-            withTitle: "Settings…", action: #selector(showSettings(_:)), keyEquivalent: "")
-        menu.addItem(.separator())
-
-        let themeItem = NSMenuItem(title: "Theme", action: nil, keyEquivalent: "")
-        let themeMenu = NSMenu(title: "Theme")
-        for (index, theme) in Theme.builtIn.enumerated() {
-            let item = NSMenuItem(
-                title: theme.displayName, action: #selector(selectTheme(_:)), keyEquivalent: "")
-            item.tag = index
-            item.target = self
-            themeMenu.addItem(item)
-        }
-        themeItem.submenu = themeMenu
-        menu.addItem(themeItem)
-
-        let appearanceItem = NSMenuItem(title: "Appearance", action: nil, keyEquivalent: "")
-        let appearanceMenu = NSMenu(title: "Appearance")
-        for (index, appearance) in Configuration.Appearance.allCases.enumerated() {
-            let title = appearance == .auto ? "Follow System" : appearance.rawValue.capitalized
-            let item = NSMenuItem(
-                title: title, action: #selector(selectAppearance(_:)), keyEquivalent: "")
-            item.tag = index
-            item.target = self
-            appearanceMenu.addItem(item)
-        }
-        appearanceItem.submenu = appearanceMenu
-        menu.addItem(appearanceItem)
-
-        let item = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
-        item.submenu = menu
-        mainMenu.insertItem(item, at: shellIndex + 1)
+    /// M7.12 — the command palette (⇧⌘P by default).
+    @objc func showCommandPalette(_ sender: Any?) {
+        CommandPaletteController.shared.show(sender)
     }
 
-    @objc private func selectTheme(_ sender: NSMenuItem) {
-        let theme = Theme.builtIn[sender.tag]
-        ConfigurationStore.shared.update { $0.theme = theme.name }
+    @objc func selectTheme(_ sender: NSMenuItem) {
+        let themes = Theme.all(in: ConfigurationStore.shared.configuration)
+        guard sender.tag < themes.count else { return }
+        ConfigurationStore.shared.update { $0.theme = themes[sender.tag].name }
     }
 
-    @objc private func selectAppearance(_ sender: NSMenuItem) {
+    @objc func selectAppearance(_ sender: NSMenuItem) {
         let appearance = Configuration.Appearance.allCases[sender.tag]
         ConfigurationStore.shared.update { $0.appearance = appearance }
     }
@@ -163,7 +124,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let configuration = ConfigurationStore.shared.configuration
         switch menuItem.action {
         case #selector(selectTheme(_:)):
-            menuItem.state = Theme.builtIn[menuItem.tag].name == configuration.theme ? .on : .off
+            let themes = Theme.all(in: configuration)
+            menuItem.state =
+                menuItem.tag < themes.count && themes[menuItem.tag].name == configuration.theme
+                ? .on : .off
         case #selector(selectAppearance(_:)):
             menuItem.state =
                 Configuration.Appearance.allCases[menuItem.tag] == configuration.appearance
@@ -181,7 +145,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     func applicationWillFinishLaunching(_ notification: Notification) {
         _ = ConfigurationStore.shared
         AppearanceController.shared.start()
-        installSettingsMenu()
+        installMenus()
     }
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
@@ -192,15 +156,110 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                 track(controller)
             }
         }
+        restoreWindowsIfConfigured()
+    }
+
+    // MARK: - Reopening (M7.3)
+
+    /// Clicking the Dock icon with no window open.
+    ///
+    /// Corta keeps running with its last window closed — a terminal that
+    /// quits when you close a window loses whatever else it was hosting — but
+    /// without this it kept running with *no way back*: the Dock click did
+    /// nothing at all, and ⌘N was the only route to a window. That is the
+    /// worst of both designs. AppKit asks this exact question; the answer is
+    /// simply "open one".
+    func applicationShouldHandleReopen(
+        _ sender: NSApplication, hasVisibleWindows: Bool
+    ) -> Bool {
+        guard !hasVisibleWindows else { return true }
+        newDocument(sender)
+        return false
+    }
+
+    // MARK: - Restoring the arrangement (M7.4)
+
+    /// The setting, plus an environment escape hatch for the UI tests.
+    ///
+    /// A UI test launches, does something, and is killed; the next test then
+    /// launches into whatever the previous one left behind, which for a
+    /// feature whose whole job is "reopen last time's windows" means every
+    /// window-count assertion in the suite depends on test order. The escape
+    /// hatch is one variable the tests set, not a behaviour change: a real
+    /// launch never has it.
+    static var isRestoreEnabled: Bool {
+        guard ProcessInfo.processInfo.environment["CORTA_RESTORE_WINDOWS"] != "0" else {
+            return false
+        }
+        return ConfigurationStore.shared.configuration.restoreWindows
+    }
+
+    /// Reopens the windows and splits from the last run. The storyboard has
+    /// already opened one window by this point, so the first saved state is
+    /// applied to *that* window and the rest get windows of their own —
+    /// otherwise a restore would always leave one empty extra window behind.
+    private func restoreWindowsIfConfigured() {
+        guard Self.isRestoreEnabled else { return }
+        let states = SessionRestore.load()
+        guard !states.isEmpty else { return }
+        // Consumed on launch: a crash mid-restore must not replay the same
+        // state forever, and the file is rewritten at the next quit anyway.
+        SessionRestore.clear()
+
+        for (index, state) in states.enumerated() {
+            if index == 0, let existing = windowControllers.first,
+                let split = existing.contentViewController as? SplitViewController
+            {
+                // The window is already on screen and its root pane spawned in
+                // the home directory; only the frame and the splits can be
+                // applied now.
+                existing.window?.setFrame(state.frame.rect, display: true)
+                split.restore(layout: state.layout)
+                continue
+            }
+            guard let controller = instantiateWindowController(),
+                let split = controller.contentViewController as? SplitViewController
+            else { continue }
+            // Before the view loads: the root pane needs its working
+            // directory at spawn time.
+            split.pendingRestore = state
+            controller.showWindow(nil)
+            controller.window?.makeKeyAndOrderFront(nil)
+        }
+    }
+
+    private func saveWindowStates() {
+        guard Self.isRestoreEnabled else {
+            SessionRestore.clear()
+            return
+        }
+        SessionRestore.save(
+            windowControllers.compactMap { ($0 as? TerminalWindowController)?.restorableState })
+    }
+
+    /// ⌘Q with something still running. `windowShouldClose` covers closing a
+    /// window; quitting bypasses it entirely, and losing a build to a
+    /// mistyped ⌘Q is exactly the case the confirmation exists for (M7.5).
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let running = windowControllers.compactMap {
+            ($0.contentViewController as? SplitViewController)
+        }.flatMap(\.panesWithRunningJobs)
+        guard let split = windowControllers.first?.contentViewController as? SplitViewController,
+            !running.isEmpty
+        else { return .terminateNow }
+        return split.confirmClose(of: running, scope: "Corta") ? .terminateNow : .terminateCancel
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
-        // Insert code here to tear down your application
+        saveWindowStates()
     }
 
+    /// False: a terminal window has nothing to restore through AppKit's own
+    /// mechanism — its content is a live child process, not a document — and
+    /// `SplitViewController` already turns `isRestorable` off per window for
+    /// that reason. Corta saves and reopens the *arrangement* itself
+    /// (`SessionRestore`), which is the part that is actually meaningful.
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
-        return true
+        return false
     }
-
-
 }

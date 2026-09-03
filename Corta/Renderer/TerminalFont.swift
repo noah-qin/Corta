@@ -33,13 +33,15 @@ nonisolated enum TerminalFont {
     /// Metal atlas and reads soft even when its quads are pixel-aligned.
     ///
     /// - Parameter family: a font family from the settings page (M6.1), or
-    ///   `nil` for System Monospaced. A family that is not installed, or
-    ///   whose faces are not fixed-pitch, falls back to the system font
-    ///   rather than laying a proportional face out on a grid.
+    ///   `nil` for System Monospaced. A family that is not installed, or that
+    ///   `MonospacedFontCatalog` will not vouch for, falls back to the system
+    ///   font rather than laying an uneven face out on a grid — the same
+    ///   check the settings page filters its list with, applied again here
+    ///   because the config file is hand-editable and can name anything.
     static func primary(ofSize size: CGFloat, family: String? = nil) -> CTFont {
         if let family, family != Configuration.systemFontFamily,
-            let font = NSFont(name: family, size: size) ?? namedFamily(family, size: size),
-            font.isFixedPitch
+            MonospacedFontCatalog.isUsable(family: family),
+            let font = NSFont(name: family, size: size) ?? namedFamily(family, size: size)
         {
             return pinningCascadeList(font as CTFont, size: size)
         }
@@ -54,13 +56,56 @@ nonisolated enum TerminalFont {
         return NSFont(descriptor: descriptor, size: size)
     }
 
-    /// The bold variant of `font` — what the atlas rasterises bold cells
-    /// with. The trait copy drops the cascade list (see the type comment),
-    /// so it is re-pinned here; without this a bold CJK scalar would resolve
-    /// through the system cascade instead of PingFang SC.
+    /// One styled variant of `font` — what the atlas rasterises bold, italic
+    /// and bold-italic cells with, alongside whether the bold half had to be
+    /// faked.
+    ///
+    /// Neither style is allowed to silently disappear. A family with no bold
+    /// face used to fall back to the regular one, so `SGR 1` content simply
+    /// stopped being bold; a family with no italic face had nothing to fall
+    /// back *to*, because italics were never rendered at all. Both are now
+    /// synthesised when the real face is missing:
+    ///
+    /// - **Italic** by an oblique shear on the font matrix, which is what a
+    ///   text system does for a missing italic and what keeps the advance
+    ///   unchanged (a sheared glyph is the same width at the baseline).
+    /// - **Bold** by stroking the outline as well as filling it, which the
+    ///   atlas does at rasterisation time — hence the flag, since a font
+    ///   cannot carry that instruction.
+    ///
+    /// The trait copy drops the cascade list (see the type comment), so it is
+    /// re-pinned here; without this a bold CJK scalar would resolve through
+    /// the system cascade instead of PingFang SC.
+    static func variant(of font: CTFont, bold: Bool, italic: Bool)
+        -> (font: CTFont, syntheticBold: Bool)
+    {
+        let size = CTFontGetSize(font)
+        guard bold || italic else { return (pinningCascadeList(font, size: size), false) }
+
+        var desired: CTFontSymbolicTraits = []
+        if bold { desired.insert(.traitBold) }
+        if italic { desired.insert(.traitItalic) }
+        let derived =
+            CTFontCreateCopyWithSymbolicTraits(font, 0, nil, desired, desired) ?? font
+        let actual = CTFontGetSymbolicTraits(derived)
+
+        var styled = derived
+        // The family has no italic face: shear the regular one. `c` is the
+        // usual ~12° oblique (tan 12° ≈ 0.21).
+        if italic, !actual.contains(.traitItalic) {
+            var matrix = CGAffineTransform(a: 1, b: 0, c: 0.21, d: 1, tx: 0, ty: 0)
+            styled = CTFontCreateCopyWithAttributes(derived, 0, &matrix, nil)
+        }
+        return (
+            pinningCascadeList(styled, size: size),
+            bold && !actual.contains(.traitBold)
+        )
+    }
+
+    /// The bold variant of `font`, kept as the name the atlas and its tests
+    /// have always used for the common case.
     static func bold(of font: CTFont) -> CTFont {
-        let derived = CTFontCreateCopyWithSymbolicTraits(font, 0, nil, .traitBold, .traitBold) ?? font
-        return pinningCascadeList(derived, size: CTFontGetSize(font))
+        variant(of: font, bold: true, italic: false).font
     }
 
     /// Returns `font` with the pinned cascade list (re)applied. Idempotent;

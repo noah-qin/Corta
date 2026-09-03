@@ -229,6 +229,38 @@ public final class PTY: @unchecked Sendable {
     /// How the child ended, or `nil` while it is still running.
     public var exitStatus: ChildExit? { state.withLock { $0.exit } }
 
+    /// The process group that currently owns the terminal, or `nil` when the
+    /// descriptor has no controlling terminal any more (the child exited).
+    ///
+    /// This is how a terminal answers "is anything running in here?" without
+    /// shell integration: the shell puts a job it starts into its own process
+    /// group and hands that group the terminal, so a foreground group that is
+    /// not the shell itself *is* a running command.
+    public var foregroundProcessGroup: pid_t? {
+        let group = tcgetpgrp(fileDescriptor)
+        return group > 0 ? group : nil
+    }
+
+    /// Whether a command other than the shell owns the terminal right now —
+    /// what a "something is still running" close confirmation has to know.
+    public var hasForegroundJob: Bool {
+        guard let group = foregroundProcessGroup else { return false }
+        return group != processIdentifier
+    }
+
+    /// The executable name of the foreground job, for a confirmation dialog
+    /// that can say *what* is running. `nil` when nothing but the shell is,
+    /// or when the name cannot be read — a dialog without a name is still a
+    /// useful dialog.
+    public var foregroundProcessName: String? {
+        guard let group = foregroundProcessGroup, group != processIdentifier else { return nil }
+        var buffer = [CChar](repeating: 0, count: 256)
+        let length = proc_name(group, &buffer, UInt32(buffer.count))
+        guard length > 0 else { return nil }
+        let name = String(cString: buffer)
+        return name.isEmpty ? nil : name
+    }
+
     /// Sends a signal to the child's process *group*.
     ///
     /// The group, not the process: the child is a shell, and its own children

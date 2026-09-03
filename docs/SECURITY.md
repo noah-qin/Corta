@@ -95,7 +95,7 @@ only thing that makes the "show the real target" rule mean anything.
 
 ### 2.4.1 Text sent to the shell
 
-Dropping a file on a pane types its path at the prompt (M6.15). A
+Dropping a file on a pane types its path at the prompt (M7.6). A
 filename is attacker-influenceable and can contain `;`, backticks or
 `$(…)`, so the path is POSIX single-quoted before it is sent: an
 unquoted drop of a maliciously named file would be a command waiting for
@@ -120,14 +120,18 @@ glyph. Invisible-by-default is what makes the attack work.
 Useful — it is how copying from Neovim on a remote host reaches the local
 clipboard — and genuinely dangerous.
 
-- **Write** (remote sets the local clipboard): off by default. Any output
-  could place `rm -rf ~` or an attacker's wallet address into the
-  clipboard for the user to paste later. Enable via config, and consider
-  a notification when it fires.
+- **Write** (remote sets the local clipboard): implemented in M7.11, off
+  by default, behind `allow-clipboard-write`. Any output could place
+  `rm -rf ~` or an attacker's wallet address into the clipboard for the
+  user to paste later, so the default stands and the switch is in
+  Settings. The core only records the decoded text
+  (`PerformerState.pendingClipboardCopy`); the *policy* check lives in the
+  app, which is the layer that has a user to ask.
 - **Read** (remote queries the local clipboard): **never implemented.**
   It exfiltrates whatever the user last copied — passwords, tokens — to
   any host that can print bytes. There is no configuration for this; it
-  is simply absent.
+  is simply absent. `OSC 52 ; c ; ?` is parsed only far enough to be
+  discarded, and answers nothing.
 
 ---
 

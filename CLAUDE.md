@@ -3,11 +3,12 @@
 A native macOS terminal emulator in pure Swift. Metal rendering, Core
 Text shaping, AppKit shell, a hand-written VT parser.
 
-**Status: M6, 14 of 16 steps done.** M1–M5 are complete. The two open
-M6 steps are M6.12 (Typometer, needs the tool installed) and M6.16
-(notarization and a Homebrew cask, needs the maintainer's signing
-credentials); neither is blocked on code. `docs/ROADMAP.md` is the
-tracking record.
+**Status: 0.1.0. M7 done, M6 has one open step.** M1–M5 are complete.
+M6.12 was measured with Typometer at 45.5 ms average keypress-to-pixel
+latency; the sole open step is M6.16 (signed, notarized direct-download
+packaging, pending signing credentials). M7 closed the places the
+terminal was still guessing — font behaviour, command boundaries (OSC
+133), and window lifecycle. `docs/ROADMAP.md` is the tracking record.
 
 ## Documentation
 
@@ -56,7 +57,15 @@ Do not reopen these without a concrete new reason. Each is explained in
   settings page is a front over that and holds no state of its own. Do
   not add a `UserDefaults` key for something the config file could
   carry — two stores drift, and the file has to win because a user can
-  edit it.
+  edit it. This is not hypothetical: `BellMode` kept reading a
+  `UserDefaults` key after the settings page started writing `bell` to
+  the file, so the Bell setting silently did nothing until M7.13.
+- **A font family is verified, never trusted.** `isFixedPitch` on one
+  face does not mean the family's bold, italic and bold-italic faces
+  advance the same; `MonospacedFontCatalog` measures every ASCII
+  printable across all four, and the renderer scales an overwide glyph
+  into its cell as a structural backstop. Do not reintroduce a
+  first-face check, and do not let a glyph paint outside its cell.
 - **A cell is 16 bytes and now full.** `Cell.scalar` is 21 bits and the
   OSC 8 hyperlink id (M6.8) is the other 11. Anything else that wants
   per-cell identity needs a side table keyed by position, not a new

@@ -20,6 +20,10 @@ extension Performer {
             grid.moveCursorRight(parameters.value(0, default: 1))
         case 0x44:  // CUB
             grid.moveCursorLeft(parameters.value(0, default: 1))
+        case 0x45:  // CNL
+            grid.moveToNextLine(parameters.value(0, default: 1))
+        case 0x46:  // CPL
+            grid.moveToPreviousLine(parameters.value(0, default: 1))
         case 0x48, 0x66:  // CUP, HVP — one-based on the wire, zero-based here
             grid.moveCursor(
                 row: parameters.value(0, default: 1) - 1,
@@ -39,6 +43,10 @@ extension Performer {
             )
         case 0x65:  // VPR — relative row, same effect as CUD
             grid.moveCursorDown(parameters.value(0, default: 1))
+        case 0x49:  // CHT — forward horizontal tabulation
+            grid.tabForward(parameters.value(0, default: 1))
+        case 0x5A:  // CBT — backward horizontal tabulation
+            grid.tabBackward(parameters.value(0, default: 1))
         default:
             return false
         }

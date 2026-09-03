@@ -60,9 +60,21 @@ struct ConfigurationTests {
         #expect(negative.scrollbackLines == 0)
     }
 
-    @Test("a theme that does not exist falls back to the default")
-    func unknownThemeFallsBack() {
+    /// The name is kept verbatim and resolved when it is *used*, not when it
+    /// is parsed: a custom theme (M7.6) may be defined further down the same
+    /// file, so a parse-time existence check would reject every theme the
+    /// file itself declares. `AppearanceController` falls back to the default
+    /// for a name nothing defines.
+    @Test("a theme name is kept as written and resolved on use")
+    func unknownThemeFallsBackWhenResolved() {
         let (parsed, _) = Configuration.parse("theme = does-not-exist")
+        #expect(parsed.theme == "does-not-exist")
+        #expect(Theme.named(parsed.theme, in: parsed) == nil)
+    }
+
+    @Test("an empty theme name falls back to the default")
+    func emptyThemeFallsBack() {
+        let (parsed, _) = Configuration.parse("theme = ")
         #expect(parsed.theme == Theme.corta.name)
     }
 

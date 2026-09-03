@@ -33,6 +33,17 @@ extension TerminalView {
         deliverBytes(for: event)
     }
 
+    override func keyUp(with event: NSEvent) {
+        let enhancements = keyboardEnhancements?() ?? []
+        guard enhancements.contains(.reportEventTypes),
+            let bytes = Self.bytes(for: event, enhancements: enhancements)
+        else {
+            super.keyUp(with: event)
+            return
+        }
+        onKeyBytes?(bytes)
+    }
+
     /// The direct translation, run for events the IME never saw or declined.
     func deliverBytes(for event: NSEvent) {
         guard let bytes = Self.bytes(for: event, enhancements: keyboardEnhancements?() ?? []) else {
@@ -74,12 +85,26 @@ extension TerminalView {
         -> [UInt8]?
     {
         let flags = event.modifierFlags
+        let eventType = event.type == .keyUp ? 3 : (event.isARepeat ? 2 : 1)
+
+        if enhancements.contains(.reportEventTypes),
+            let functional = eventTypedFunctionalBytes(for: event, eventType: eventType)
+        {
+            return functional
+        }
 
         if enhancements.contains(.disambiguate),
-            let disambiguated = disambiguatedBytes(for: event)
+            let disambiguated = disambiguatedBytes(
+                for: event,
+                eventType: enhancements.contains(.reportEventTypes) ? eventType : nil)
         {
             return disambiguated
         }
+
+        // Text-producing keys remain legacy UTF-8 under reportEventTypes.
+        // The protocol consequently has no release representation for them
+        // unless reportAllKeysAsEscapeCodes is also enabled (not supported).
+        if event.type == .keyUp { return nil }
 
         switch event.specialKey {
         case .some(.upArrow): return escape("A")
@@ -121,7 +146,7 @@ extension TerminalView {
     /// - `Ctrl+[` is `0x1B`, which is also `Esc` and the start of every
     ///   escape sequence.
     /// - `Ctrl+H` is `0x08`, which is also `Backspace` on many keyboards.
-    private static func disambiguatedBytes(for event: NSEvent) -> [UInt8]? {
+    private static func disambiguatedBytes(for event: NSEvent, eventType: Int?) -> [UInt8]? {
         let flags = event.modifierFlags
         guard flags.contains(.control), !flags.contains(.command),
             let characters = event.charactersIgnoringModifiers?.lowercased(),
@@ -139,11 +164,37 @@ extension TerminalView {
         guard ambiguous.contains(scalar.value) else { return nil }
         // `CSI unicode-key-code ; modifiers u`, modifiers as the protocol's
         // 1-based bitmask: shift 1, alt 2, ctrl 4, super 8.
+        let modifiers = kittyModifiers(flags)
+        let suffix = eventType.map { ":\($0)" } ?? ""
+        return Array("\u{1B}[\(scalar.value);\(modifiers)\(suffix)u".utf8)
+    }
+
+    /// Event-reporting form for keys that already use an escape sequence.
+    /// Enter, Tab and Backspace deliberately stay legacy unless the child
+    /// also requests reportAllKeysAsEscapeCodes, per the kitty protocol.
+    private static func eventTypedFunctionalBytes(for event: NSEvent, eventType: Int) -> [UInt8]? {
+        let modifiers = kittyModifiers(event.modifierFlags)
+        let parameter = "\(modifiers):\(eventType)"
+        switch event.specialKey {
+        case .some(.upArrow): return Array("\u{1B}[1;\(parameter)A".utf8)
+        case .some(.downArrow): return Array("\u{1B}[1;\(parameter)B".utf8)
+        case .some(.rightArrow): return Array("\u{1B}[1;\(parameter)C".utf8)
+        case .some(.leftArrow): return Array("\u{1B}[1;\(parameter)D".utf8)
+        case .some(.home): return Array("\u{1B}[1;\(parameter)H".utf8)
+        case .some(.end): return Array("\u{1B}[1;\(parameter)F".utf8)
+        case .some(.deleteForward): return Array("\u{1B}[3;\(parameter)~".utf8)
+        default: return nil
+        }
+    }
+
+    private static func kittyModifiers(_ flags: NSEvent.ModifierFlags) -> Int {
         var modifiers = 1
         if flags.contains(.shift) { modifiers += 1 }
         if flags.contains(.option) { modifiers += 2 }
-        modifiers += 4  // control, which the guard above required
-        return Array("\u{1B}[\(scalar.value);\(modifiers)u".utf8)
+        if flags.contains(.control) { modifiers += 4 }
+        if flags.contains(.command) { modifiers += 8 }
+        if flags.contains(.capsLock) { modifiers += 64 }
+        return modifiers
     }
 
     private static func escape(_ final: String) -> [UInt8] {

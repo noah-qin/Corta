@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/brand/corta-pangolin-loop.gif" width="200" alt="The Corta pangolin mascot, curled into a C, breathing while the cyan cursor at the tip of its tail blinks">
+<img src="docs/brand/corta-pangolin-mascot.png" width="200" alt="The Corta pangolin mascot, curled into a C with a cyan cursor at the tip of its tail">
 
 # Corta
 
@@ -15,7 +15,7 @@ first-class CJK input, and not one third-party dependency.
 ![Platform](https://img.shields.io/badge/macOS-26.5%2B-4d4d4d?style=flat-square)
 ![Swift](https://img.shields.io/badge/Swift-6-f05138?style=flat-square)
 ![Dependencies](https://img.shields.io/badge/dependencies-0-00c2c7?style=flat-square)
-![Status](https://img.shields.io/badge/status-M6%20·%2014%2F16-8957e5?style=flat-square)
+[![Release](https://img.shields.io/github/v/release/noah-qin/Corta?style=flat-square&label=release)](https://github.com/noah-qin/Corta/releases/latest)
 
 <br>
 
@@ -37,7 +37,9 @@ first-class CJK input, and not one third-party dependency.
 
 ### One platform
 
-Metal for rendering, Core Text for shaping, AppKit for input. Used directly, with no portability layer in between. Corta will never run on Linux, and that is the point.
+Metal for rendering, Core Text for shaping, AppKit for input. Used directly,
+with no portability layer in between. Corta is made for macOS, so it can feel
+at home there.
 
 </td>
 <td width="33%" valign="top">
@@ -63,23 +65,25 @@ things Corta deliberately does **not** do.
 
 ## Status
 
-**Milestone 6, 14 of 16 steps complete.** M1 through M5 are done. Corta
-renders `vim`, `tmux` and `htop` correctly, and is used daily by its author.
+**Version 0.1.0. Milestone 7 closed; M6 has one open step.** M1 through
+M5 are done, M7 closed the places where Corta was still guessing — fonts,
+command boundaries, and a window nobody could reopen. Corta renders `vim`,
+`tmux` and `htop` correctly, and is used daily by its author.
 
-There is no tagged release yet. The two open steps are latency measurement
-with Typometer and notarised distribution; neither is blocked on code.
+Notarised direct distribution (M6.16) is the sole open step.
 [`docs/ROADMAP.md`](docs/ROADMAP.md) is the tracking record.
 
-Measured at the M6 close — the method is in
+Measured after M7 — the method is in
 [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md):
 
 | Metric | Target | Measured | |
 | :--- | :--- | :--- | :--- |
-| Frame CPU | < 4 ms | **2.32 ms** | ✅ |
+| Frame CPU | < 4 ms | **1.88 ms** | ✅ |
 | Idle CPU | ~0% | **0.0%** | ✅ |
 | Memory, 100k × 120 lines | ~200 MB | **185.0 MB** | ✅ |
-| Parser throughput | > 100 MB/s | **75.1 MB/s** | ⚠️ below target |
-| `esctest` xterm conformance | — | **73.2%** — 152 of 568 failing | |
+| Core feed throughput | > 100 MB/s | **130.0 MiB/s** (5-run mean) | ✓ |
+| Keypress → pixel | < 1 frame + input | **45.5 ms avg** | ⚠️ above target |
+| `esctest` xterm conformance | — | **77.6%** — 127 of 568 failing | |
 
 The number that misses its target is printed here rather than omitted.
 Numbers that have not been measured are left blank rather than estimated.
@@ -111,11 +115,33 @@ Numbers that have not been measured are left blank rather than estimated.
   document-anchored selection that follows its text as output scrolls.
 - OSC 8 hyperlinks, bracketed paste, the kitty keyboard protocol, focus
   reporting, pinch-to-zoom, file drops, colour themes.
+- Windows, splits and per-pane working directories are restored at launch,
+  and closing something that still has a job running asks first.
+- A command palette (⇧⌘P) over every command, which is also the list the
+  menus and the keybindings are generated from.
+
+**The shell**
+- OSC 133 shell integration: a status mark beside each prompt showing
+  which commands failed, ⌘↑/⌘↓ to jump between them, and a long-task
+  notification that fires on the real boundary rather than a guess.
+- OSC 52 clipboard *write* — how `tmux` and a remote `ssh` reach this
+  Mac's clipboard. Off by default; the read direction does not exist.
 
 **The configuration**
 - One text file at `~/.config/corta/config`. The native settings page is a
   front over that file, which stays the single source of truth — hand-edit
   it and the page follows.
+- Colour themes and keyboard shortcuts are defined there too:
+
+  ```
+  theme = midnight
+  theme.midnight.inherit = solarized
+  theme.midnight.dark.background = #101018
+
+  bind.split-right = ctrl+s
+  bind.command-palette = cmd+shift+p
+  bind.close =              # an empty value unbinds
+  ```
 
 <details>
 <summary><strong>What Corta deliberately does not do</strong></summary>
@@ -130,8 +156,10 @@ Each was considered and rejected for a stated reason in
 [`docs/DESIGN.md`](docs/DESIGN.md) §6. Please read it before opening a
 feature request for one of them.
 
-Deferred rather than rejected: OSC 133 shell integration, which is next, and
-the kitty graphics protocol, whose cost went *up* when the cell filled.
+Deferred rather than rejected: the kitty graphics protocol, whose cost went
+*up* when the cell filled. OSC 133 shell integration was on this list and
+shipped in M7 — prompt and exit-status marks, command-to-command jumping,
+and an exact long-task notification.
 
 </details>
 

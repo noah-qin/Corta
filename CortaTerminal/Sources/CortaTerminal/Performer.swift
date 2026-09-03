@@ -25,6 +25,10 @@ public struct Performer: ParserPerformer, Sendable {
         grid.write(scalar)
     }
 
+    public mutating func printASCII(_ bytes: ArraySlice<UInt8>) {
+        grid.writeASCII(bytes)
+    }
+
     public mutating func execute(_ control: UInt8) {
         switch control {
         case 0x08: grid.backspace()
@@ -106,14 +110,19 @@ public struct Performer: ParserPerformer, Sendable {
         }
 
         let parameters = sequence.parameters
+        // SGR dominates coloured shell/log output. It cannot be a cursor,
+        // erase or editing command, so do not make every colour change walk
+        // those three dispatch tables first.
+        if sequence.final == 0x6D {
+            applyGraphicRendition(parameters)
+            return
+        }
         if performCursorControl(final: sequence.final, parameters: parameters) { return }
         if performErase(final: sequence.final, parameters: parameters) { return }
         if performEditing(final: sequence.final, parameters: parameters) { return }
         switch sequence.final {
         case 0x63:  // DA1
             reportPrimaryDeviceAttributes()
-        case 0x6D:  // SGR
-            applyGraphicRendition(parameters)
         case 0x6E:  // DSR
             reportDeviceStatus(parameters)
         case 0x74:  // CSI Ps t — window manipulation; only the size report

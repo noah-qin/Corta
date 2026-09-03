@@ -3,12 +3,15 @@ import UserNotifications
 
 /// M6.3 — a notification when a long-running command finishes.
 ///
-/// The honest version of this needs shell integration: OSC 133 marks where a
-/// command starts and ends, and without it a terminal cannot actually see
-/// command boundaries — it sees keystrokes going out and bytes coming back.
-/// (`DESIGN.md` §6 has OSC 133 as the best value per line on the deferred
-/// list, and M6.4 is where that gets reassessed.) So this is a heuristic,
-/// and it is built to fail quiet rather than fail noisy:
+/// The honest version of this needs shell integration, and now has it: OSC
+/// 133 marks where a command starts and ends (M7.2), so when the user's
+/// shell emits those marks this notifier uses the real boundaries — a
+/// command that prints nothing for a minute is still running, and the
+/// notification fires when it actually finishes, with its exit status.
+///
+/// The heuristic below remains for shells with no integration configured,
+/// which is most shells on a fresh machine. It is built to fail quiet rather
+/// than fail noisy:
 ///
 /// - A task *starts* when the user presses Return. That is the one moment a
 ///   terminal knows the user asked for something.
@@ -31,6 +34,15 @@ final class TaskNotifier {
 
     private var startedAt: Date?
     private var idleTimer: Timer?
+    /// True once this pane's shell has emitted an OSC 133 boundary. From
+    /// then on the keystroke-and-idle heuristic is switched off entirely:
+    /// running both would double-count, and the exact one is strictly better.
+    private var usesShellIntegration = false
+    /// The last `isCommandRunning` seen, so a start is detected as an edge
+    /// rather than re-triggered on every output batch.
+    private var wasCommandRunning = false
+    /// The exit status of the command that just finished, for the body text.
+    private var lastExitStatus: Int?
     /// The window to check for key status when the task ends, and the pane's
     /// title for the notification body.
     private weak var window: NSWindow?
@@ -38,8 +50,31 @@ final class TaskNotifier {
 
     init() {}
 
-    /// The user pressed Return: whatever happens next is a task.
+    /// The shell said a command started or stopped (OSC 133 C / D). Once
+    /// this is called even once, the heuristic below stops running.
+    func noteCommandRunning(_ running: Bool, exitStatus: Int?, in window: NSWindow?) {
+        usesShellIntegration = true
+        idleTimer?.invalidate()
+        idleTimer = nil
+        guard ConfigurationStore.shared.configuration.notifyOnLongTask else {
+            wasCommandRunning = running
+            return
+        }
+        self.window = window
+        if running, !wasCommandRunning {
+            startedAt = Date()
+            requestAuthorizationOnce()
+        } else if !running, wasCommandRunning {
+            lastExitStatus = exitStatus
+            finishExactly()
+        }
+        wasCommandRunning = running
+    }
+
+    /// The user pressed Return: whatever happens next is a task. Ignored once
+    /// the shell has proved it reports boundaries itself.
     func noteCommandSubmitted(in window: NSWindow?) {
+        guard !usesShellIntegration else { return }
         guard ConfigurationStore.shared.configuration.notifyOnLongTask else { return }
         self.window = window
         startedAt = Date()
@@ -50,7 +85,7 @@ final class TaskNotifier {
     /// Output arrived, so the task is not finished. Called from the render
     /// loop's output hook, which already runs per parse batch.
     func noteOutput() {
-        guard startedAt != nil else { return }
+        guard !usesShellIntegration, startedAt != nil else { return }
         restartIdleTimer()
     }
 
@@ -85,10 +120,29 @@ final class TaskNotifier {
         post(elapsed: elapsed, title: window?.title ?? "Corta")
     }
 
+    /// The shell-integration path: no grace period to subtract, because the
+    /// end of the command is a fact rather than an inference.
+    private func finishExactly() {
+        guard let startedAt else { return }
+        self.startedAt = nil
+        let configuration = ConfigurationStore.shared.configuration
+        guard configuration.notifyOnLongTask else { return }
+        let elapsed = Date().timeIntervalSince(startedAt)
+        guard elapsed >= configuration.notificationThreshold else { return }
+        guard window?.isKeyWindow != true else { return }
+        post(elapsed: elapsed, title: window?.title ?? "Corta")
+    }
+
     private func post(elapsed: TimeInterval, title: String) {
         let content = UNMutableNotificationContent()
         content.title = title
-        content.body = "Finished after \(Self.duration(elapsed))."
+        // The exit status, when the shell reported one. Still no command
+        // text: the grid is full of things that should not reach Notification
+        // Center, and a small integer is not one of them (`SECURITY.md` §5).
+        let outcome =
+            lastExitStatus.map { $0 == 0 ? "Finished" : "Failed (status \($0))" } ?? "Finished"
+        lastExitStatus = nil
+        content.body = "\(outcome) after \(Self.duration(elapsed))."
         content.sound = nil
         UNUserNotificationCenter.current().add(
             UNNotificationRequest(

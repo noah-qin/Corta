@@ -95,7 +95,9 @@ be **fixed-format and never echo attacker-controlled text** — see
 | Capability                                       | Tier | Notes                                              |
 | ------------------------------------------------ | ---- | -------------------------------------------------- |
 | GPU glyph atlas + instanced quads                | P0   | One draw call per screen                            |
-| Foreground / background, bold, italic, underline | P0   |                                                    |
+| Foreground / background, bold, italic, underline | P0   | Real faces where the family has them; synthetic oblique and stroked weight where it does not |
+| Missing glyph is visible, not blank              | P0   | Hollow box for a scalar no font in the cascade covers |
+| Every glyph clipped to its cell box              | P0   | Overwide ink is scaled to fit rather than painted into the next column |
 | Cursor: block / bar / underline, blink           | P0   |                                                    |
 | Selection highlight                              | P0   | Document-anchored quads; follows its text as output scrolls |
 | Retina / HiDPI scaling                           | P0   |                                                    |
@@ -208,14 +210,14 @@ chmod +x /tmp/corta-esctest.sh
 SHELL=/tmp/corta-esctest.sh Corta.app/Contents/MacOS/Corta
 ```
 
-**M6 result: 81 passed, 335 known bugs, 152 failed of 568.** Against the
-M2 record (50 / 334 / 184) that is 32 failures fixed and none
-introduced — the failing-test list is a strict subset. 16 of the 32 came
-from the CHA/HPA/HPR/VPA/VPR commit made between milestones; the other
-16 are M6's DECRQM, DECSCL and dynamic-colour work.
+**M6 result: 106 passed, 335 known bugs, 127 failed of 568.** Against the
+M2 record (50 / 334 / 184) that is 57 failures fixed and none
+introduced — the failing-test list is a strict subset. The closeout pass
+added programmable tabs, CNL/CPL/CHT/CBT, IND/NEL/RI, RIS and DECSTR,
+including the soft-reset isolation esctest itself relies on.
 
 xterm-compatibility — passes plus "known bugs", the number comparable
-across terminals — is **73.2%**, up from the 67.6% carried since M2.
+across terminals — is **77.6%**, up from the 67.6% carried since M2.
 
 ### 4.3 Fuzzing
 
@@ -244,7 +246,8 @@ CortaTerminal/.build/release/corta-fuzz --fuzz 500000 --seed 1 \
 It has no coverage feedback, so it explores far less per iteration than
 libFuzzer would. What it does have is a fixed seed, so a failure is
 reproducible from the command line that found it. **Recorded at M6:**
-2.5M mutated inputs across seeds 1–5, clean.
+2.5M mutated inputs across seeds 1–5, clean. A separate 100,000-input
+run under AddressSanitizer (seed `3735928559`) was also clean.
 
 The corpus itself replays inside the test suite (`FuzzCorpusTests`), so a
 crash found by a long run is fixed by adding its input to
@@ -333,9 +336,7 @@ Run at every milestone, because these are the actual workload:
 6. `git log --graph --color` through a pager
 
 **2026-09-02 — M2 closeout pass (items 1 and 3).** tmux, htop and
-Neovim were not installed and the machine has no Homebrew
-(`/opt/homebrew` absent; installing Homebrew itself needs sudo, which
-unattended runs must not do), so tmux 3.5a and htop 3.4.1 were built
+Neovim were not installed, so tmux 3.5a and htop 3.4.1 were built
 from source into a user-writable prefix (`/tmp/corta-tools`). Neovim
 was not installed; nothing in items 1 or 3 needs it, so item 2 is
 unaffected either way.
@@ -383,11 +384,11 @@ window in this milestone, and what was not:
   entry points are the documented ones, but **a human still has to
   pinch, force-touch and drag a file** before those three lines of the
   milestone are honestly closed.
-- **Not verified live: focus reporting end to end.** `?1004` is tested
-  in the core and the app's transition rule is a pure function of pane
-  focus and window key state, but "Neovim `autoread` fires when you
-  come back to the window" needs Neovim installed and a person
-  switching windows.
+- **Verified live: focus reporting end to end.** Portable Neovim 0.12.5
+  ran as the child of a Release Corta session with `FocusLost` and
+  `FocusGained` autocmds recording to a side-channel file. A detached
+  TextEdit → Corta focus cycle recorded `lost`, then `gained`; a raw PTY
+  probe independently captured the expected `CSI O` and `CSI I` bytes.
 
 - **esctest re-run — reproduces the M2 number exactly.** esctest2
   (ThomasDickey/esctest2) with `--expected-terminal xterm

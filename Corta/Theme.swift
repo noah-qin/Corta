@@ -125,10 +125,79 @@ extension Theme {
                 rgb(60, 95, 175), rgb(150, 75, 160), rgb(50, 140, 150), rgb(10, 10, 10),
             ]))
 
-    /// Every theme the settings page offers, in the order it lists them.
+    /// Every theme Corta ships, in the order the settings page lists them.
     nonisolated static let builtIn: [Theme] = [.corta, .solarized, .mono]
 
     nonisolated static func named(_ name: String) -> Theme? {
         builtIn.first { $0.name == name }
+    }
+
+    /// A built-in *or* user-defined theme (M7.6). Custom themes win on a
+    /// name collision: a user who names their theme `corta` has said what
+    /// they want, and silently ignoring it would be the more surprising rule.
+    nonisolated static func named(_ name: String, in configuration: Configuration) -> Theme? {
+        configuration.customThemes.first { $0.name == name } ?? named(name)
+    }
+
+    /// Every theme available under `configuration`, in list order: the
+    /// built-ins first, then the user's own.
+    nonisolated static func all(in configuration: Configuration) -> [Theme] {
+        let custom = configuration.customThemes
+        let customNames = Set(custom.map(\.name))
+        return builtIn.filter { !customNames.contains($0.name) } + custom
+    }
+}
+
+// MARK: - User-defined themes (M7.6)
+
+extension Theme {
+    /// A theme built from config-file keys, with anything unspecified taken
+    /// from `base`.
+    ///
+    /// Inheriting rather than requiring all nineteen colours is what makes
+    /// the feature usable: overriding a background and a cursor is the common
+    /// case, and demanding a full ANSI table for it would mean nobody does
+    /// it. It also means a half-written theme still renders — a config file
+    /// is hand-edited, and a partially-typed one must not black out the
+    /// terminal.
+    nonisolated static func custom(
+        name: String, displayName: String, base: Theme, dark: Variant, light: Variant
+    ) -> Theme {
+        Theme(name: name, displayName: displayName, dark: dark, light: light)
+    }
+
+    /// `#rgb` or `#rrggbb`, the two notations a person actually types. Also
+    /// accepts them without the `#`, because half the palettes on the web are
+    /// written that way.
+    nonisolated static func color(_ text: String) -> SIMD4<Float>? {
+        var digits = Substring(text.trimmingCharacters(in: .whitespaces))
+        if digits.hasPrefix("#") { digits = digits.dropFirst() }
+        let characters = Array(digits)
+        func value(_ slice: [Character]) -> Float? {
+            guard let byte = UInt8(String(slice), radix: 16) else { return nil }
+            return Float(byte) / 255
+        }
+        switch characters.count {
+        case 3:
+            guard let r = value([characters[0], characters[0]]),
+                let g = value([characters[1], characters[1]]),
+                let b = value([characters[2], characters[2]])
+            else { return nil }
+            return SIMD4<Float>(r, g, b, 1)
+        case 6:
+            guard let r = value(Array(characters[0..<2])),
+                let g = value(Array(characters[2..<4])),
+                let b = value(Array(characters[4..<6]))
+            else { return nil }
+            return SIMD4<Float>(r, g, b, 1)
+        default:
+            return nil
+        }
+    }
+
+    /// The `#rrggbb` a colour serialises back as.
+    nonisolated static func hex(_ color: SIMD4<Float>) -> String {
+        func byte(_ value: Float) -> Int { Int((min(1, max(0, value)) * 255).rounded()) }
+        return String(format: "#%02x%02x%02x", byte(color.x), byte(color.y), byte(color.z))
     }
 }

@@ -5,6 +5,100 @@ import Testing
 /// M1.4 — the grid API, driven directly. No parser, no escape sequences.
 @Suite("Grid")
 struct GridTests {
+    @Test("an ASCII run matches scalar writes across wraps")
+    func asciiRunMatchesScalarWrites() {
+        let bytes = Array("abcdefghij".utf8)
+        var batched = Grid(rows: 3, columns: 4)
+        var scalar = Grid(rows: 3, columns: 4)
+
+        batched.writeASCII(bytes[...])
+        for byte in bytes { scalar.write(UInt32(byte)) }
+
+        #expect(batched.dump() == scalar.dump())
+        #expect(batched.cursor == scalar.cursor)
+        #expect(batched.pendingWrap == scalar.pendingWrap)
+        #expect(batched.scrollback.lines == scalar.scrollback.lines)
+    }
+
+    @Test("the ASCII run fast path does not print DEL")
+    func asciiRunDoesNotPrintDEL() {
+        var terminal = Terminal(rows: 2, columns: 8)
+        terminal.feed([0x61, 0x7F, 0x62])
+        #expect(terminal.grid[0, 0].scalar == 0x61)
+        #expect(terminal.grid[0, 1].scalar == 0x62)
+        #expect(terminal.grid.cursor.column == 2)
+    }
+
+    @Test("an ASCII run repairs wide pairs at both boundaries")
+    func asciiRunRepairsWideBoundaries() {
+        var grid = Grid(rows: 1, columns: 8)
+        grid.moveCursor(row: 0, column: 1)
+        grid.write(0x754C)
+        grid.moveCursor(row: 0, column: 4)
+        grid.write(0x754C)
+
+        grid.moveCursor(row: 0, column: 2)
+        grid.writeASCII(Array("xyz".utf8)[...])
+
+        #expect(grid[0, 1].isBlank)
+        #expect(grid[0, 2].scalar == UInt32(UnicodeScalar("x").value))
+        #expect(grid[0, 3].scalar == UInt32(UnicodeScalar("y").value))
+        #expect(grid[0, 4].scalar == UInt32(UnicodeScalar("z").value))
+        #expect(grid[0, 5].isBlank)
+    }
+
+    @Test("programmable tab stops support forward backward and clearing")
+    func programmableTabStops() {
+        var grid = Grid(rows: 2, columns: 32)
+        grid.tabForward(2)
+        #expect(grid.cursor.column == 16)
+        grid.tabBackward(1)
+        #expect(grid.cursor.column == 8)
+        grid.clearTabStop(atCursorOnly: true)
+        grid.moveCursor(row: 0, column: 0)
+        grid.tab()
+        #expect(grid.cursor.column == 16)
+        grid.clearTabStop(atCursorOnly: false)
+        grid.moveCursor(row: 0, column: 20)
+        grid.setTabStop()
+        grid.moveCursor(row: 0, column: 0)
+        grid.tab()
+        #expect(grid.cursor.column == 20)
+    }
+
+    @Test("IND NEL and RI dispatch through their seven-bit escape forms")
+    func indexEscapeForms() {
+        var terminal = Terminal(rows: 6, columns: 10)
+        terminal.feed(Array("\u{1B}[3;5H\u{1B}M".utf8))
+        #expect(terminal.grid.cursor == Cursor(row: 1, column: 4))
+        terminal.feed(Array("\u{1B}D".utf8))
+        #expect(terminal.grid.cursor == Cursor(row: 2, column: 4))
+        terminal.feed(Array("\u{1B}E".utf8))
+        #expect(terminal.grid.cursor == Cursor(row: 3, column: 0))
+    }
+
+    @Test("RIS restores initial screen cursor margins and modes")
+    func risResetsTerminalState() {
+        var terminal = Terminal(rows: 6, columns: 10)
+        terminal.feed(Array("text\u{1B}[?1004h\u{1B}[2;4r\u{1B}[5;5H\u{1B}c".utf8))
+        #expect(terminal.grid.cursor == Cursor())
+        #expect(terminal.grid.marginTop == 0)
+        #expect(terminal.grid.marginBottom == 5)
+        #expect(terminal.grid.line(0).isEmpty)
+        #expect(!terminal.isFocusReportingEnabled)
+    }
+
+    @Test("vertical cursor movement clamps to active margins")
+    func verticalMovementClampsToMargins() {
+        var grid = Grid(rows: 8, columns: 10)
+        grid.setScrollRegion(top: 2, bottom: 5)
+        grid.moveCursor(row: 3, column: 4)
+        grid.moveCursorUp(99)
+        #expect(grid.cursor == Cursor(row: 2, column: 4))
+        grid.moveCursorDown(99)
+        #expect(grid.cursor == Cursor(row: 5, column: 4))
+    }
+
     /// Writes `text` as ASCII. The parser does not exist yet at this step.
     private func write(_ text: String, to grid: inout Grid) {
         for scalar in text.unicodeScalars { grid.write(scalar.value) }
@@ -292,6 +386,21 @@ struct GridTests {
         #expect(grid.scrollback.count == 2)
         #expect(grid.scrollback[0][0].scalar == 49)   // "1", old row 0
         #expect(grid.scrollback[1][1].scalar == 50)   // "2", old row 1
+    }
+
+    @Test("DECSTR resets margins and saved cursor without moving or erasing")
+    func softReset() {
+        var terminal = Terminal(rows: 6, columns: 8)
+        terminal.feed(Array("kept".utf8))
+        terminal.feed(Array("\u{1B}[2;4r\u{1B}[5;6H\u{1B}7\u{1B}[!p".utf8))
+
+        #expect(terminal.grid.cursor == Cursor(row: 4, column: 5))
+        #expect(terminal.grid.marginTop == 0)
+        #expect(terminal.grid.marginBottom == 5)
+        #expect(terminal.grid[0, 0].scalar == 0x6B)
+
+        terminal.feed(Array("\u{1B}8".utf8))
+        #expect(terminal.grid.cursor == Cursor())
     }
 
 }

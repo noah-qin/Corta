@@ -40,8 +40,12 @@ final class AppearanceController: NSObject {
         apply()
     }
 
+    /// The live theme: a built-in, or one the config file defines (M7.6).
+    /// An unknown name falls back to the default rather than failing — the
+    /// file is hand-edited, and a typo must not black out the terminal.
     var theme: Theme {
-        Theme.named(ConfigurationStore.shared.configuration.theme) ?? .corta
+        let configuration = ConfigurationStore.shared.configuration
+        return Theme.named(configuration.theme, in: configuration) ?? .corta
     }
 
     /// Whether the dark variant is live. `auto` asks AppKit, which is also

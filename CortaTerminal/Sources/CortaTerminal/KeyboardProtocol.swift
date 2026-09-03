@@ -6,7 +6,7 @@
 /// Neovim mapping that binds `Ctrl+I` and `Tab` differently cannot work
 /// until the terminal stops sending the same byte for both.
 ///
-/// Only `disambiguate` is implemented. The remaining flags are declared
+/// `disambiguate` and `reportEventTypes` are implemented. The remaining flags are declared
 /// because the protocol's `CSI ? u` query has to report the whole word, and
 /// a program that sets one Corta does not honour must be able to see that it
 /// did not take — reporting flags Corta ignores would be worse than
@@ -30,7 +30,7 @@ public struct KeyboardEnhancementFlags: OptionSet, Sendable, Equatable {
 
     /// What Corta actually acts on. A `CSI = flags ; 1 u` asking for more
     /// than this stores only this, so the query reports the truth.
-    public static let supported: KeyboardEnhancementFlags = [.disambiguate]
+    public static let supported: KeyboardEnhancementFlags = [.disambiguate, .reportEventTypes]
 }
 
 /// The protocol's mode *stack*.

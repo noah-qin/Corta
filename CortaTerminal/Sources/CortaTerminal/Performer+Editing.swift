@@ -29,6 +29,10 @@ extension Performer {
             if parameters.count <= 1 {
                 grid.scrollDown(parameters.value(0, default: 1))
             }
+        case 0x67:  // TBC — clear current (0/default) or all (3) tab stops
+            let mode = parameters.value(0, default: 0)
+            if mode == 0 { grid.clearTabStop(atCursorOnly: true) }
+            if mode == 3 { grid.clearTabStop(atCursorOnly: false) }
         default:
             return false
         }
@@ -42,8 +46,25 @@ extension Performer {
         switch final {
         case 0x37: grid.saveCursor()     // DECSC — VT510 §DECSC
         case 0x38: grid.restoreCursor()  // DECRC — VT510 §DECRC
+        case 0x44: grid.lineFeed()       // IND
+        case 0x45:                       // NEL
+            grid.carriageReturn()
+            grid.lineFeed()
+        case 0x48: grid.setTabStop()     // HTS
+        case 0x4D: grid.reverseIndex()   // RI
+        case 0x63: resetToInitialState() // RIS
         default: break
         }
+    }
+
+    private mutating func resetToInitialState() {
+        // Dynamic colours originate in the active app theme, not in terminal
+        // mode state; RIS resets modes, screens, title, tab stops and cursor
+        // while keeping those resource values truthful for later queries.
+        let colors = state.dynamicColors
+        grid.resetToInitialState()
+        state = PerformerState()
+        state.dynamicColors = colors
     }
 
     /// CSI sequences carrying an intermediate byte. Only DECSCUSR is
@@ -53,6 +74,12 @@ extension Performer {
         intermediates: Intermediates,
         parameters: Parameters
     ) -> Bool {
+        // DECSTR — CSI ! p. This is a soft reset: content and the current
+        // cursor survive, while margins, rendition and saved cursor reset.
+        if intermediates.count == 1, intermediates[0] == 0x21, final == 0x70 {
+            grid.softReset()
+            return true
+        }
         // DECSCUSR — xterm ctlseqs: `CSI Ps SP q` sets the cursor style.
         // The grid stores it; drawing it is the renderer's concern.
         guard intermediates.count == 1, intermediates[0] == 0x20, final == 0x71 else { return false }

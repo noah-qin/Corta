@@ -11,6 +11,32 @@
 /// the next row records that here. Reflow, selection across a soft wrap, and
 /// search across a wrap boundary all depend on it, and adding it later means
 /// rewriting the grid (`DESIGN.md` §2.1).
+/// What a row means to the shell, when the shell says (OSC 133, M7.2).
+///
+/// Without shell integration a terminal cannot see command boundaries at all
+/// — it sees keystrokes going out and bytes coming back. A shell that emits
+/// OSC 133 marks them, and that one fact is what makes "jump to the previous
+/// command" and an honest long-task notification possible.
+///
+/// The mark rides on the `Line` for the same reason `wrapped` does: rows move
+/// — they scroll into history, they reflow — and anything keyed by position
+/// instead drifts off its text. It costs nothing: `Line`'s layout already had
+/// the padding byte, and so did `Scrollback`'s row span.
+public enum LineMark: UInt8, Sendable {
+    case none = 0
+    /// A prompt starts on this row (`OSC 133 ; A`), and the command it
+    /// introduced has not reported an exit status yet.
+    case prompt = 1
+    /// A prompt whose command finished with status 0 (`OSC 133 ; D ; 0`).
+    case promptSucceeded = 2
+    /// A prompt whose command finished with a non-zero status.
+    case promptFailed = 3
+
+    /// Whether this row starts a command — what command-to-command jumping
+    /// looks for, regardless of how the command ended.
+    public var isPrompt: Bool { self != .none }
+}
+
 public struct Line: Equatable, Sendable {
     /// Cells up to the last written column. Never contains trailing blanks
     /// after `trimTrailingBlanks()`; may during editing.
@@ -19,6 +45,10 @@ public struct Line: Equatable, Sendable {
     /// True when this row continues onto the next one because text reached
     /// the right margin — not because the program printed a newline.
     public var wrapped: Bool
+
+    /// The shell-integration mark on this row (M7.2). `.none` for the
+    /// overwhelming majority of rows.
+    public var mark: LineMark = .none
 
     public init(wrapped: Bool = false) {
         self.cells = []
@@ -30,9 +60,10 @@ public struct Line: Equatable, Sendable {
     /// shared batch arena without exposing that arena publicly. Copies:
     /// this is the read-side cost that pays for the batch arena needing no
     /// growth headroom on the write side.
-    init(wrapped: Bool, cells: ArraySlice<Cell>) {
+    init(wrapped: Bool, mark: LineMark = .none, cells: ArraySlice<Cell>) {
         self.cells = ContiguousArray(cells)
         self.wrapped = wrapped
+        self.mark = mark
     }
 
     /// The number of stored cells, which is one past the last written column.
@@ -53,6 +84,29 @@ public struct Line: Equatable, Sendable {
             guard column >= 0 else { return }
             grow(to: column + 1)
             cells[column] = newValue
+        }
+    }
+
+    /// Overwrites one in-row run of printable ASCII. Wide pairs cannot span
+    /// rows, so only the two run boundaries can leave a half outside the
+    /// overwritten range; everything inside is replaced. This avoids the
+    /// per-cell read/check/grow sequence used by scalar writes.
+    mutating func overwriteASCII(_ bytes: ArraySlice<UInt8>, at column: Int, pen: Pen) {
+        guard !bytes.isEmpty, column >= 0 else { return }
+        let end = column + bytes.count
+        if column < cells.count, cells[column].attributes.contains(.wideSpacer), column > 0 {
+            cells[column - 1] = pen.eraseCell
+        }
+        if end - 1 < cells.count, cells[end - 1].attributes.contains(.wide), end < cells.count {
+            cells[end] = pen.eraseCell
+        }
+        grow(to: end)
+        var destination = column
+        var cell = pen.cell(0x20)
+        for byte in bytes {
+            cell.scalar = UInt32(byte)
+            cells[destination] = cell
+            destination += 1
         }
     }
 

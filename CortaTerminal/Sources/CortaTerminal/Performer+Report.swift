@@ -55,6 +55,31 @@ public struct PerformerState: Sendable {
     /// updated by the set forms.
     public internal(set) var dynamicColors = DynamicColors()
 
+    /// OSC 133 shell integration (M7.2). The absolute row of the most
+    /// recent prompt, so the exit status can be written back onto it however
+    /// far the output has scrolled since.
+    public internal(set) var promptRow: Int?
+
+    /// Whether a command is running right now, between `OSC 133 ; C` and
+    /// `OSC 133 ; D`. The honest answer to the question `TaskNotifier` used
+    /// to guess at.
+    public internal(set) var isCommandRunning = false
+
+    /// The exit status of the command that just finished, until something
+    /// reads it. `Terminal.takeFinishedCommand()` drains this — a
+    /// notification must fire once per command, not once per frame.
+    public internal(set) var finishedCommandExitStatus: Int?
+
+    /// The last exit status seen, kept after `finishedCommandExitStatus` is
+    /// drained.
+    public internal(set) var commandExitStatus: Int?
+
+    /// OSC 52 (M7.11). Text the child asked to put on the system clipboard,
+    /// drained by the app. Never the other direction: the read form of OSC 52
+    /// hands clipboard contents to the child, which is a data-exfiltration
+    /// primitive, and it stays unimplemented (`SECURITY.md` §6).
+    public internal(set) var pendingClipboardCopy: String?
+
     public init() {}
 }
 

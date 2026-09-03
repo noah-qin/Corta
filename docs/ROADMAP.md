@@ -355,7 +355,7 @@ dependencies, no new platform surface.
       table. **Done:** the probes answer, 13 DECRQM tests and the
       DECSCL level test flipped, rate re-recorded below.
 
-      What the remaining 29 DECRQM failures need is not the *query* —
+      What the remaining 17 DECRQM failures need is not the *query* —
       it answers — but the *modes*. esctest sets a mode, queries, resets
       and queries again, so passing means tracking KAM, IRM, SRM, LNM
       and two dozen DEC modes. Corta answers 0 ("not recognised") for
@@ -405,19 +405,23 @@ dependencies, no new platform surface.
       that has one; what runs is a seeded mutation driver with no
       coverage feedback, so it explores less per iteration. 2.5M inputs
       across five seeds, clean; the corpus replays in the test suite.
-- [ ] **M6.12** Keypress → pixel measured with Typometer against a
+- [x] **M6.12** Keypress → pixel measured with Typometer against a
       release build — the last empty column in the tracking table
       (`PERFORMANCE.md` §5).
-      **Not done, and it needs a person.** Typometer is a Java desktop
-      application that measures by watching the screen; it cannot be
-      driven from a shell, and installing it is a decision for whoever
-      owns the machine. What *is* measured is the half of the path that
-      lives in this repository: `corta-bench` reports keypress → grid
+      **Done:** Typometer measured the complete path over 200 samples at
+      **45.5 ms average**, 24.8 ms minimum, 56.4 ms maximum and 6.8 ms
+      standard deviation. This is above the one-frame-plus-input target and
+      is recorded as such.
+      Typometer 1.0.1 was downloaded from its official release, its
+      SHA-256 verified, and it launches under Java 25 with the narrowly
+      scoped `--add-opens=java.desktop/java.awt=ALL-UNNAMED` compatibility
+      flag. The run used 200 characters, a 150 ms delay, 50 ms period,
+      1,000 ms length, synchronous mode and no intermediate pauses.
+      `corta-bench` separately reports keypress → grid
       (write → PTY echo → parse → grid write) at 0.005 ms avg / 0.007 ms
-      p95 over 200 samples. The missing half is vsync and display, which
-      is exactly the half Typometer exists to measure — so the number
-      below is recorded as the two halves it is, not as one figure
-      pretending to be the whole.
+      p95 over 200 samples. The gap between that and 45.5 ms is therefore
+      after the grid update: frame scheduling, Metal/GPU execution,
+      composition, scanout and pixel response.
 
 ### Native macOS integration and distribution
 
@@ -442,16 +446,18 @@ where being a pure AppKit citizen pays off.
       *Done when:* each works in a live window — the drag lands as a
       quoted path at the prompt, Look Up shows the dictionary popover,
       and a Services item receives the selected text.
-- [ ] **M6.16** Distribution: a notarized release build and a Homebrew
-      cask (`SECURITY.md` §4.1 — hardened runtime on, sandbox off).
+- [ ] **M6.16** Direct distribution: a signed and notarized release archive
+      (`SECURITY.md` §4.1 — hardened runtime on, sandbox off), published as
+      a direct download rather than through an app marketplace.
       Features nobody can install are not features.
-      *Done when:* `brew install --cask corta` installs a build that
-      Gatekeeper opens without a warning.
-      **Not done, and it cannot be done from here.** Notarization needs
-      a Developer ID certificate and an Apple ID with an app-specific
-      password; a Homebrew cask needs a published release to point at.
-      Both are the maintainer's credentials and the maintainer's
-      decision. The build settings the item names are already right —
+      *Done when:* the downloadable archive contains a stapled app that
+      Gatekeeper opens without a warning after copying it to Applications.
+      **Not done.** The Apple team has Developer ID certificates, but this
+      Mac does not yet have a valid Developer ID Application identity
+      (certificate paired with its private key), and the workflow still
+      needs App Store Connect notarization credentials. Those are the
+      maintainer's sensitive credentials and release decision. The
+      build settings the item names are already right —
       `ENABLE_HARDENED_RUNTIME = YES`, `ENABLE_APP_SANDBOX = NO` — so
       what remains is the signing and publishing, not the project.
 
@@ -460,15 +466,102 @@ integration items work in a live window, the esctest
 xterm-compatibility rate is re-recorded and measurably above the 67.6%
 carried since M2, and the tracking table has no empty columns.
 
-**Status: 14 of 16 done.** The settings page, themes and appearance
+**Status: 15 of 16 done.** The settings page, themes and appearance
 ship; the native integrations work in a live window; the compatibility
-rate is re-recorded at **73.2%** (81 passed, 335 known bugs, 152 failed
-of 568 — 184 → 152 failures, no regressions). The two open items are
-M6.12 and M6.16, and neither is blocked on code: one needs a GUI
-measuring tool installed on the machine, the other needs the
-maintainer's signing credentials. They are the tracking table's one
-remaining gap, and it is recorded as a gap rather than filled with a
-guess.
+rate is re-recorded at **77.6%** (106 passed, 335 known bugs, 127 failed
+of 568 — 184 → 127 failures, no regressions). M6.12 is measured at
+45.5 ms average keypress-to-pixel latency. The sole open item is M6.16,
+pending the maintainer's signing credentials; it is the release gate rather
+than a code gap.
+
+---
+
+## M7 — Everything That Was Still Guessing
+
+M6 left the terminal correct and fast. What it did not close is a set of
+places where Corta *guessed*: it guessed a font would behave because one
+face claimed to be fixed-pitch, it guessed where a command started
+because the user pressed Return, and it guessed that a window nobody
+could see was a window nobody wanted. Each guess had a visible cost, and
+each is replaced here with something the system can actually be asked.
+
+The milestone also pays off two long-standing pieces of debt: the bell
+setting that wrote one store and read another, and a settings page that
+had grown to a dozen ungrouped controls in a window that could not be
+resized.
+
+### Correctness
+
+- [x] **M7.1** Font handling stops trusting `isFixedPitch`.
+      `MonospacedFontCatalog` measures every ASCII printable advance
+      across the regular, bold, italic and bold-italic faces a family
+      would really be drawn with, and rejects bitmap and colour faces
+      outright — the settings page lists only what survives, and
+      `TerminalFont.primary` re-checks, because the config file is
+      hand-edited. Three rendering fallbacks close the rest of the gap:
+      italics are rendered at all (they were parsed and dropped), a
+      family with no real bold or italic face gets a synthetic one rather
+      than silently losing the rendition, an overwide glyph is scaled
+      into its cell instead of painting the next column, and a scalar no
+      font covers draws a hollow box instead of nothing.
+      *Done when:* a family whose bold face is wider than its regular one
+      cannot be selected, `SGR 3` renders slanted, and a missing glyph is
+      visible.
+- [x] **M7.2** OSC 133 shell integration. Prompt, command and exit-status
+      marks ride on the `Line` — the same reason `wrapped` does, because
+      rows move — addressed by absolute row so a status arriving after a
+      screenful of output still lands on the prompt that produced it.
+      Three features stop being heuristics: jumping command to command,
+      a status mark showing which commands failed, and M6.3's
+      notification, which now fires on the real boundary and carries the
+      exit status.
+
+### The window
+
+- [x] **M7.3** `applicationShouldHandleReopen`: clicking the Dock icon
+      with no window open opens one. Corta stays running with its last
+      window closed, which without this left no route back but ⌘N.
+- [x] **M7.4** Session restore: windows, split layout, divider
+      proportions and per-pane working directories, reopened at launch.
+      Not the scrollback — a pane is a live child process, and restored
+      history would be a screenshot with a prompt that answers to
+      nothing.
+- [x] **M7.5** Close confirmation when a pane's shell still has a
+      foreground job, on ⌘W, the red button and ⌘Q. The pty's foreground
+      process group is the test, so a bare prompt never prompts.
+
+### Configuration
+
+- [x] **M7.6** Themes defined in the config file, inheriting from a
+      built-in so a two-line theme is a legal theme.
+- [x] **M7.7** Rebindable keyboard shortcuts. `TerminalCommand` is one
+      table the menus, the config file and the palette all read; the
+      shortcuts are applied to menu items after the menu exists, so
+      nothing intercepts keys behind AppKit's back and the menus keep
+      showing what actually works.
+- [x] **M7.8** Pane resizing from the keyboard, by whole cells, plus
+      Equalize Panes.
+- [x] **M7.9** `link-activation = click`: hovering a link underlines it
+      and shows its target, and a click that never moved opens it.
+      ⌘-click remains the default and always works.
+- [x] **M7.10** Copy on select.
+- [x] **M7.11** OSC 52 clipboard *write*, off by default per
+      `SECURITY.md` §2.6. The read form remains unimplemented.
+- [x] **M7.12** Command palette (⇧⌘P), rendering the same
+      `TerminalCommand` table and dispatching through the responder
+      chain exactly as a menu item does.
+- [x] **M7.13** Settings page: grouped sections with explanations, a
+      resizable and scrolling window, one "Settings…" entry in the menu
+      bar rather than two, and the Bell setting actually applied — it
+      wrote the config file while the bell read a `UserDefaults` key, so
+      changing it did nothing at all.
+
+**M7 is done when** no setting in the page is inert, a badly-behaved
+font cannot be chosen, and the three features that needed command
+boundaries have them.
+
+**Status: 13 of 13 done.** Frame CPU re-measured after the render-loop
+changes at 1.879 ms avg / 2.659 ms p95, below M6's figure.
 
 ---
 
@@ -494,14 +587,14 @@ Trends matter more than absolute values.
 
 | Metric                    | M1     | M2 | M3 | M4 | M5 | M6 |
 | ------------------------- | ------ | -- | -- | -- | -- | -- |
-| Parse throughput (MB/s)   | 109.9  | 80.0 | 80.8 | 75.5 | 76.7 | 75.1 |
+| Core feed throughput (MiB/s) | 109.9 | 80.0 | 80.8 | 75.5 | 76.7 | 130.0 (5-run mean) |
 | Frame CPU (ms)            | 1.67   | 1.72 | 2.32 | 2.26 | 2.40 | 2.32 |
 | Idle CPU (%)              | ~4     | ~0   | ~0   | ~0   | ~0   | 0.0 |
 | Memory @ 100k lines (MB)  | 265.7  | 265.7 | 265.7 | 184.6 | 184.6 | 185.0 |
-| Keypress → pixel (ms)     | —      | —    | —    | —    | —    | 0.005 to the grid; display half unmeasured (M6.12) |
-| `esctest` pass rate (%)   | —      | 8.8 (50/568) | 8.8 (50/568) | 8.8 (50/568, M3 carry) | 8.8 (M3 carry) | 14.3 (81/568) |
-| `esctest` xterm-compat (%)| —      | 67.6 | 67.6 | 67.6 | 67.6 | 73.2 |
-| Core LOC                  | 2,547  | 3,972 | 4,247 | 4,908 | 4,959 | 5,562 |
+| Keypress → pixel (ms)     | —      | —    | —    | —    | —    | 45.5 avg / 24.8 min / 56.4 max / 6.8 SD |
+| `esctest` pass rate (%)   | —      | 8.8 (50/568) | 8.8 (50/568) | 8.8 (50/568, M3 carry) | 8.8 (M3 carry) | 18.7 (106/568) |
+| `esctest` xterm-compat (%)| —      | 67.6 | 67.6 | 67.6 | 67.6 | 77.6 |
+| Core LOC                  | 2,547  | 3,972 | 4,247 | 4,908 | 4,959 | 5,884 |
 
 The two esctest rows measure different things and both are worth
 keeping. **Pass rate** counts only tests that passed outright.
@@ -523,10 +616,13 @@ that is where the long tail starts.
 **How measured (M1, `corta-bench` release build + an offscreen GPU test +
 a launched release build sampled with `top`; see `PERFORMANCE.md` §5):**
 
-- *Parse throughput* — `swift run -c release corta-bench`: 64 MB of a
+- *Core feed throughput* — `swift run -c release corta-bench`: 64 MiB of a
   representative corpus (SGR colour changes + plain text lines, not a
   worst or best case) fed to one `Terminal.feed` call, timed with
-  `DispatchTime`. Comfortably clears the 100 MB/s target.
+  `DispatchTime`. The M6 closeout also records parser-only and
+  parser+grid separately so parser cost is no longer conflated with screen
+  writes and scrollback. Five consecutive core-feed runs measured
+  127.5–131.3 MiB/s (130.0 mean), clearing the 100 MB/s target.
 - *Frame CPU* — `CortaTests/FrameCPUBaselineTests`: a full 120×40 screen
   (SGR-varied text, no blank cells to shortcut instance-buffer
   construction), 60 iterations of encode + commit + `waitUntilCompleted`,
@@ -549,8 +645,9 @@ a launched release build sampled with `top`; see `PERFORMANCE.md` §5):**
   `ContiguousArray` growth overhead plus `Line`/`Scrollback` bookkeeping,
   not a leak; worth another pass once M2 content (real shell sessions,
   not a synthetic 120-char corpus) gives a more representative shape.
-- *Keypress → pixel* — genuinely needs an external tool (Typometer) against
-  the running app, as `PERFORMANCE.md` §5 already says; not measured here.
+- *Keypress → pixel* — Typometer 1.0.1 against the Release app, 200
+  characters at a 150 ms delay in synchronous mode: 45.5 ms average,
+  24.8–56.4 ms range, 6.8 ms standard deviation.
 - *Core LOC* — `find CortaTerminal/Sources/CortaTerminal -name '*.swift' | xargs wc -l` — the core library only, not `corta-dump`/`corta-bench`.
 
 **How measured (M2, same methods as M1 unless noted):**
