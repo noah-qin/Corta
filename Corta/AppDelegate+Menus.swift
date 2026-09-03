@@ -264,6 +264,8 @@ extension AppDelegate {
             title: L10n.text("menu.checkForUpdates"),
             action: #selector(UpdateController.checkForUpdates(_:)), keyEquivalent: "")
         item.target = UpdateController.shared
+        item.image = NSImage(
+            systemSymbolName: "arrow.triangle.2.circlepath", accessibilityDescription: nil)
         appMenu.insertItem(item, at: aboutIndex + 1)
     }
 
