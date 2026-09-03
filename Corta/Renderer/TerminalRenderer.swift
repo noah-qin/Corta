@@ -469,8 +469,19 @@ nonisolated final class TerminalRenderer {
             // (`PERFORMANCE.md` §3).
             let attributes = cell.attributes.rawValue
             let reversed = attributes & CellAttributes.reverse.rawValue != 0
-            var fg = palette.resolveForeground(reversed ? cell.background : cell.foreground)
-            let bg = palette.resolveBackground(reversed ? cell.foreground : cell.background)
+            // Resolve each colour in its own role first, `.default` and all,
+            // then swap the two resolved values for reverse video. Passing
+            // the swapped *raw* colours into `resolveForeground`/
+            // `resolveBackground` instead (as this used to) is wrong for the
+            // common case: `.default` foreground and `.default` background
+            // both re-resolve to the same defaults regardless of which
+            // resolver they go through, so a plain reversed cell — a
+            // `less` search hit is one — came out identical to an
+            // unreversed one, with no visible highlight at all.
+            let resolvedFg = palette.resolveForeground(cell.foreground)
+            let resolvedBg = palette.resolveBackground(cell.background)
+            var fg = reversed ? resolvedBg : resolvedFg
+            let bg = reversed ? resolvedFg : resolvedBg
             // SGR 2 (dim). Parsed since M1 and drawn nowhere until now, so
             // `git log --oneline`'s hashes, `ls -l`'s metadata and every
             // spinner's hint line came out at full strength and the
