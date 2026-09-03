@@ -45,7 +45,9 @@ Do not reopen these without a concrete new reason. Each is explained in
 - **`$TERM` is `xterm-256color`.** A deliberate lie until conformance is
   proven.
 - **No multiplexer, no cross-platform, no tmux control mode, no AI
-  features, no settings GUI.** See `docs/DESIGN.md` §6.
+  features.** See `docs/DESIGN.md` §6. Settings are one native page in
+  the menu bar next to Edit/Shell, backed by a single text config file
+  (M6.1) — the page edits the file, which remains the source of truth.
 
 ## Working Rules
 
@@ -92,7 +94,7 @@ unusable window while those tests stayed green. `docs/CONFORMANCE.md`
 §4.4 has the five-point check.
 
 **First responder is not free.** Nothing makes the terminal view first
-responder by default; `ViewController.viewWillAppear` calls
+responder by default; `SplitViewController.viewWillAppear` calls
 `makeFirstResponder`. Without it `keyDown` never fires and menu actions
 targeting First Responder (⌘V, ⌘=, …) silently dead-end — keep that
 call intact.
@@ -101,8 +103,18 @@ call intact.
 `.fullSizeContentView`, the first layout after window setup runs at the
 content-rect height (frame minus titlebar). Delivering that winsize
 shrinks the grid and strands content (D.1). `resizeSessionToFitView`
-skips layouts where the view does not fill its window's frame — do not
+waits for `SplitViewController.sizeSettled` — the content view filling
+its window's frame *and* the one-time frame correction having run —
+because a pane in a split tree legitimately never fills it — do not
 bypass the gate.
+
+**`setContentSize` sizes the frame once `.fullSizeContentView` is in the
+mask.** On macOS 26, inserting that style flag changes what
+`setContentSize` means mid-flight: the value lands as the *frame* size,
+and the first call mismeasures the chrome by a full titlebar height.
+`SplitViewController` corrects the frame once at the first settled
+layout (`correctInitialWindowSize`); do not "fix" the size earlier in
+`viewWillAppear`, where the measurement is stale.
 
 **Testing.** Golden-file grid tests are built during M1, not later:
 feed a byte stream, serialise the grid to text, diff against a checked-in

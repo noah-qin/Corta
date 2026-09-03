@@ -201,18 +201,32 @@ struct SelectionCellMappingTests {
         #expect(position.column == 2)
     }
 
-    @Test func theGridIsBottomAnchoredWhenTheViewHasARemainder() {
+    @Test func theGridIsTopAnchoredWhenItFits() {
         let grid = Grid(rows: 30, columns: 120)
-        // Half a cell of extra height lands at the top, pushing the grid
-        // down: a point just inside row 1 of the exact-height layout is row
-        // 0 of this one.
+        // Half a cell of extra height lands at the *bottom* (the remainder
+        // must not become a gap under the titlebar): a point 1.1 cells
+        // below the top inset is row 1.
         let point = CGPoint(
             x: TerminalLayout.insets.left + 2.5 * Self.metrics.cellWidth,
             y: Self.topInset + 1.1 * Self.metrics.cellHeight)
         let position = ViewController.documentPosition(
             for: point, viewHeight: Self.exactHeight(rows: 30) + Self.metrics.cellHeight / 2,
             metrics: Self.metrics, grid: grid, scrollOffset: 0, topInset: Self.topInset)
-        #expect(position.row == 0)
+        #expect(position.row == 1)
+    }
+
+    @Test func theGridIsBottomAnchoredWhileItOverflows() {
+        let grid = Grid(rows: 30, columns: 120)
+        // Mid-resize transient: the view is two cells shorter than the grid
+        // needs. The grid stays bottom-anchored — the top clips — so a
+        // point 1.1 cells below the top inset is row 3, not row 1.
+        let point = CGPoint(
+            x: TerminalLayout.insets.left + 2.5 * Self.metrics.cellWidth,
+            y: Self.topInset + 1.1 * Self.metrics.cellHeight)
+        let position = ViewController.documentPosition(
+            for: point, viewHeight: Self.exactHeight(rows: 30) - 2 * Self.metrics.cellHeight,
+            metrics: Self.metrics, grid: grid, scrollOffset: 0, topInset: Self.topInset)
+        #expect(position.row == 3)
     }
 
     @Test func theScrollOffsetMovesEventsIntoDocumentRows() {

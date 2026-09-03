@@ -17,9 +17,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var windowControllers: [NSWindowController] = []
 
     /// File > New (⌘N), wired in the storyboard to First Responder. Each
-    /// window is its own `ViewController` with its own `TerminalSession` —
-    /// the per-session architecture (`DESIGN.md` §2.4) makes a new window
-    /// composition, not new mechanism.
+    /// window is its own `SplitViewController` composing one or more
+    /// panes — each pane a `ViewController` with its own
+    /// `TerminalSession` — so a new window is composition, not new
+    /// mechanism (`DESIGN.md` §2.4).
     @objc func newDocument(_ sender: Any?) {
         guard let controller = instantiateWindowController() else { return }
         // Offset from the window it was opened from. Placed at the same
@@ -43,10 +44,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         else { return }
         window.tabbingMode = .automatic
         if let keyWindow = NSApp.keyWindow, keyWindow !== window {
+            // Join at the group's size: being born at the default size and
+            // then resized by the tab group reads as a flash.
+            window.setFrame(keyWindow.frame, display: false)
             keyWindow.addTabbedWindow(window, ordered: .above)
         }
         controller.showWindow(sender)
         window.makeKeyAndOrderFront(sender)
+    }
+
+    /// The tab bar's "+" button sends this through the responder chain;
+    /// with no implementor in the chain AppKit does not show the button at
+    /// all, so this is also what makes the button appear.
+    @objc func newWindowForTab(_ sender: Any?) {
+        newTab(sender)
     }
 
     /// One storyboard window controller, tracked so it lives as long as its

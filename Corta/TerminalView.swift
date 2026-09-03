@@ -54,6 +54,26 @@ final class TerminalView: NSView, CALayerDelegate {
     /// final size to the child without waiting out the debounce (M2.9).
     var onLiveResizeEnded: (() -> Void)?
 
+    /// Called when the view becomes first responder — click-to-focus, the
+    /// ⌘⌥ focus-move shortcuts, a split, a close all arrive here — so the
+    /// split controller can track which pane owns input (M5.2).
+    var onFocus: (() -> Void)?
+
+    /// The pane's controller, found by walking the responder chain (the view
+    /// → its controller → the split controller). With splits the pane is no
+    /// longer the window's content view controller, so `contentViewController`
+    /// cannot find it anymore.
+    var paneController: ViewController? {
+        sequence(first: self as NSResponder, next: { $0.nextResponder })
+            .first { $0 is ViewController } as? ViewController
+    }
+
+    override func becomeFirstResponder() -> Bool {
+        let accepted = super.becomeFirstResponder()
+        if accepted { onFocus?() }
+        return accepted
+    }
+
     // Stored state for the extension files — extensions cannot add storage.
     // The methods using these live in `TerminalView+Mouse.swift` and
     // `TerminalView+Scroll.swift`.
@@ -123,10 +143,16 @@ final class TerminalView: NSView, CALayerDelegate {
         metalLayer.colorspace = CGColorSpace(name: CGColorSpace.sRGB)
         metalLayer.isOpaque = false
         // A layer-hosting view is not clipped by the window's rounded
-        // corners, so the drawable painted square corners past the frame.
-        // Round the two bottom corners to match; the titlebar covers the top.
+        // corners, so the drawable paints square corners past the frame.
+        // Because the view is flipped, the hosted layer's MinY corners are
+        // its *top* corners — the mask rounds the window's two top corners
+        // and the window itself rounds the bottom. In a split, though, only
+        // a pane that actually touches a top corner may round it: the same
+        // mask on an interior pane cuts a visible notch out of the divider
+        // junction. `layout()` recomputes the mask from the pane's position
+        // in the window (M5).
         metalLayer.cornerRadius = 10
-        metalLayer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        metalLayer.maskedCorners = []
         metalLayer.masksToBounds = true
     }
 
@@ -146,6 +172,28 @@ final class TerminalView: NSView, CALayerDelegate {
     override func layout() {
         super.layout()
         updateDrawableSize()
+        updateExteriorCornerMask()
+    }
+
+    /// Rounds only the window's top corners this pane actually touches (see
+    /// `commonInit`); interior panes get no mask, so divider junctions stay
+    /// square.
+    private func updateExteriorCornerMask() {
+        guard let window else {
+            metalLayer.maskedCorners = []
+            return
+        }
+        // Window base coordinates are y-up; with `.fullSizeContentView` the
+        // content spans the whole frame, so the window's top is its height.
+        let frame = convert(bounds, to: nil)
+        let touchesTop = abs(frame.maxY - window.frame.height) < 1
+        var mask: CACornerMask = []
+        // The hosted layer is flipped: MinY is the top.
+        if touchesTop && abs(frame.minX) < 1 { mask.insert(.layerMinXMinYCorner) }
+        if touchesTop && abs(frame.maxX - window.frame.width) < 1 {
+            mask.insert(.layerMaxXMinYCorner)
+        }
+        metalLayer.maskedCorners = mask
     }
 
     override func viewDidEndLiveResize() {
@@ -168,6 +216,16 @@ final class TerminalView: NSView, CALayerDelegate {
     /// `shouldRenderFrame`. Main thread only, like everything on a view.
     func setNeedsRedraw() {
         displayLink?.isPaused = false
+    }
+
+    /// Renders and presents one frame immediately, if one is due. Used to
+    /// paint before the window is ordered on screen: the window's
+    /// background is transparent until the Metal layer has presented, so
+    /// without this every new window and every new tab flashes whatever is
+    /// behind it for a frame or two.
+    func drawNow() {
+        updateDrawableSize()
+        frameTick()
     }
 
     /// The default visual bell (M4.8): a brief flash of the terminal

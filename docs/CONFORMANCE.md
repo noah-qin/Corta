@@ -38,8 +38,8 @@ measured. Priorities:
 | **OSC 7** — report working directory                    | P1   | Prerequisite for new tabs and splits inheriting the cwd |
 | Bracketed paste (`?2004`)                               | P0   | A safety feature, not a convenience — see `SECURITY.md` §2.3 |
 | Mouse reporting (SGR, `?1006`)                          | P1   | Mouse inside tmux and vim                               |
-| Focus reporting (`?1004`)                               | P2   | Neovim autoread, tmux focus events                      |
-| OSC 8 — hyperlinks                                      | P2   | Display text and target differ by design; see `SECURITY.md` §2.4 |
+| Focus reporting (`?1004`)                               | P2   | Neovim autoread, tmux focus events; scheduled, M6.7                |
+| OSC 8 — hyperlinks                                      | P2   | Display text and target differ by design; see `SECURITY.md` §2.4. Scheduled, M6.8 |
 | DCS and rare CSI sequences                              | P2   | The long tail                                           |
 
 ### 1.2 Query / response sequences
@@ -54,8 +54,9 @@ capabilities.
 | **DA1** (`ESC [ c`)             | vim / Neovim at startup                        | Startup stalls until timeout         |
 | **DA2** (`ESC [ > c`)           | Capability detection                           | Feature misdetection                 |
 | **DSR-CPR** (`ESC [ 6 n`)       | zsh, starship and similar prompts              | Prompt corrupts or hangs             |
-| DECRQM (mode query)             | tmux, Neovim capability probes                 | Conservative fallback behaviour      |
-| XTVERSION (`ESC [ > 0 q`)       | Modern TUIs                                    | Feature misdetection                 |
+| DECRQM (mode query)             | tmux, Neovim capability probes                 | Conservative fallback behaviour      | (M6.5)
+| XTVERSION (`ESC [ > 0 q`)       | Modern TUIs                                    | Feature misdetection                 | (M6.5)
+| Dynamic colour reports (OSC 10/11/12 queries) | Themes and TUI capability probes | esctest's query class times out — the bulk of the 184 M2 failures | (M6.6)
 
 Every response is written to the child's stdin. Responses must therefore
 be **fixed-format and never echo attacker-controlled text** — see
@@ -76,7 +77,7 @@ be **fixed-format and never echo attacker-controlled text** — see
 | Configurable key bindings                        | P1   |                                                    |
 | Click-to-position, drag-to-select                | P1   |                                                    |
 | ⌘-click to open a URL                            | P1   | Scheme allowlist required — `SECURITY.md` §2.4      |
-| Kitty keyboard protocol                          | P2   | Deferred, not declined                              |
+| Kitty keyboard protocol                          | P2   | Scheduled, M6.9                                        |
 
 ### 2.2 Rendering
 
@@ -122,7 +123,7 @@ frames on an idle screen (`PERFORMANCE.md` §1, idle CPU ~0%).
 | Search scrollback (⌘F)                                  | P1   | Must match across soft-wrapped lines          |
 | Scrolling (wheel, ⌘↑↓, page)                            | P0   |                                              |
 | Bell (audible / visual / mute)                          | P1   |                                              |
-| Config file                                             | P1   | One text file. Prefer a format with no third-party parser |
+| Settings page                                           | P1   | Native page in the menu bar next to Edit/Shell, backed by one text file needing no third-party parser — M6.1 |
 | Multiplexing                                            | —    | Not doing; use tmux                           |
 
 ---

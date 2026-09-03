@@ -27,16 +27,34 @@ extension ViewController {
     /// ⌘-hover feedback: a pointing hand over a link, and a tooltip naming
     /// the real target before any click can open it (`SECURITY.md` §2.4).
     /// Called on mouse-moved and on ⌘ press/release.
+    ///
+    /// The cursor changes on transitions only. Setting it unconditionally
+    /// on every mouse-moved fights `NSSplitView`'s resize cursor at a
+    /// pane's divider edge — the two take turns within a single hover and
+    /// the pointer visibly flickers (M5).
     func handleLinkHover(_ event: NSEvent, in terminalView: TerminalView) {
         if event.modifierFlags.contains(.command),
             let link = linkUnder(event, in: terminalView)
         {
-            NSCursor.pointingHand.set()
+            if !hoveringLink {
+                NSCursor.pointingHand.set()
+                hoveringLink = true
+            }
             if terminalView.toolTip != link.url { terminalView.toolTip = link.url }
         } else {
-            NSCursor.arrow.set()
-            if terminalView.toolTip != nil { terminalView.toolTip = nil }
+            resetLinkHover(terminalView)
         }
+    }
+
+    /// Back to the arrow and no tooltip — but only if the hand is actually
+    /// up, so an unlinked mouse-moved or mouse-exited costs nothing and
+    /// never touches the cursor (see `handleLinkHover`).
+    func resetLinkHover(_ terminalView: TerminalView) {
+        if hoveringLink {
+            NSCursor.arrow.set()
+            hoveringLink = false
+        }
+        if terminalView.toolTip != nil { terminalView.toolTip = nil }
     }
 
     /// The link under the event, resolved through the same inset-aware,

@@ -12,7 +12,9 @@ import Metal
 import Synchronization
 
 /// Owns one `TerminalSession` and the `TerminalRenderer`/`TerminalView` that
-/// draw it — the unit a split (M5) will multiply, not a global (`DESIGN.md`
+/// draw it — the pane. A window composes panes through
+/// `SplitViewController` and its `SplitTree` (M5); nothing here knows about
+/// sibling panes beyond the `splitController` back-reference (`DESIGN.md`
 /// §2.4).
 ///
 /// This file owns lifecycle, the session and the render loop. Behaviour
@@ -38,11 +40,30 @@ class ViewController: NSViewController {
     /// geometry) preserves the font's real advance and makes TUIs such as
     /// Claude Code occupy the same physical proportions in both apps.
     static let defaultFontSize: CGFloat = 12
+    /// Set before the view loads when the pane is created by a split (M5):
+    /// the focused pane's OSC 7 directory (M5.5), and the grid size the new
+    /// pane will actually hold, so the shell's first output is laid out
+    /// against the right width rather than the default and then reflowed.
+    var inheritedWorkingDirectory: String?
+    var initialGridSize: TerminalSize?
     var scrollOffset = 0
+    /// True while the pointing-hand cursor is up for a ⌘-hovered link
+    /// (M4.6). Cursor changes happen on transitions only — setting the
+    /// arrow on every mouse-moved fights the split view's resize cursor
+    /// near a divider and makes the pointer flicker there (M5).
+    var hoveringLink = false
     /// The current text selection, owned by `ViewController+Selection.swift`
     /// (Track C) and read by the render loop. Stored here because extensions
     /// cannot add storage.
     var selection: TerminalSelection?
+    /// The unfocused-pane dim (M5.2): a translucent wash over the pane, so
+    /// which pane owns the keyboard is visible at a glance — the hidden
+    /// cursor alone was too subtle. Above the terminal canvas, below the
+    /// search bar's glass; it never intercepts input (`PassthroughView`).
+    var focusDimView: NSView?
+    /// Set by `SplitViewController` once the window's style mask and content
+    /// size are final — the gate that keeps transient startup layouts from
+    /// reaching the child (see `resizeSessionToFitView`).
     var didSizeWindow = false
     /// Set by layout changes the damage diff cannot see (drawable size,
     /// backing scale) and by local actions that change what is drawn without
@@ -106,13 +127,66 @@ class ViewController: NSViewController {
         guard let window = view.window else { return TerminalLayout.titlebarHeight }
         return max(0, window.frame.height - window.contentLayoutRect.height)
     }
-    /// Distance from the top of the drawable to the first row.
-    var topInset: CGFloat { windowChrome + TerminalLayout.insets.top }
+    /// Distance from the top of the drawable to the first row. Per pane:
+    /// only a pane touching the window's top edge sits under the chrome
+    /// (titlebar, traffic lights), so each pane pays the chrome share that
+    /// actually overlaps it and just its own inset otherwise (M5 — a
+    /// bottom-row pane has no titlebar above it).
+    var topInset: CGFloat {
+        guard let window = view.window else {
+            return TerminalLayout.titlebarHeight + TerminalLayout.insets.top
+        }
+        let distanceFromTop = window.frame.height - view.convert(view.bounds, to: nil).maxY
+        return TerminalLayout.insets.top + max(0, windowChrome - distanceFromTop)
+    }
     /// Total vertical space the grid does not get.
     var verticalInsets: CGFloat { topInset + TerminalLayout.insets.bottom }
 
+    /// The window-level split controller owning this pane (M5). Panes are
+    /// always its children in the app; nil only for a detached controller.
+    var splitController: SplitViewController? { parent as? SplitViewController }
+    /// Keyboard input, the window title and the cursor belong to the
+    /// focused pane alone (M5.2); the unfocused panes draw without a
+    /// cursor, which doubles as the focus indicator.
+    var isFocusedPane: Bool { splitController?.focusedPane === self }
+
     let minimumColumns = 20
     let minimumRows = 5
+
+    /// The smallest pixel area the pane tolerates, at the current cell
+    /// metrics — the leaf value of the split tree's minimum-size walk
+    /// (M5.4).
+    var minimumContentSize: CGSize {
+        let metrics = terminalRenderer.pointMetrics
+        return CGSize(
+            width: CGFloat(minimumColumns) * metrics.cellWidth + TerminalLayout.insetWidth,
+            height: CGFloat(minimumRows) * metrics.cellHeight + TerminalLayout.insetHeight)
+    }
+
+    /// The grid size that fits a pixel area, using the current cell metrics
+    /// and this pane's insets — how a split predicts the new pane's winsize
+    /// before layout settles it exactly.
+    func gridSize(fitting size: CGSize) -> TerminalSize {
+        let metrics = terminalRenderer.pointMetrics
+        return TerminalSize(
+            rows: UInt16(max(1, (size.height - verticalInsets) / metrics.cellHeight)),
+            columns: UInt16(max(1, (size.width - TerminalLayout.insetWidth) / metrics.cellWidth)))
+    }
+
+    /// The window size that fits the initial grid exactly. With
+    /// `.fullSizeContentView` the pane area spans the whole frame — and
+    /// `setContentSize` sizes the frame on this OS — so this is the *frame*
+    /// size: grid cells plus this pane's insets and the measured chrome.
+    /// The first pane's pre-layout frame and the window's initial sizing
+    /// both derive from it, so the session is born at its final size.
+    var initialWindowContentSize: NSSize {
+        let metrics = terminalRenderer.pointMetrics
+        let grid = initialGridSize
+            ?? TerminalSize(rows: UInt16(defaultRows), columns: UInt16(defaultColumns))
+        return NSSize(
+            width: CGFloat(grid.columns) * metrics.cellWidth + TerminalLayout.insetWidth,
+            height: CGFloat(grid.rows) * metrics.cellHeight + verticalInsets)
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -126,10 +200,7 @@ class ViewController: NSViewController {
         terminalRenderer = try! TerminalRenderer(device: device, font: font, scale: scale)
         commandQueue = device.makeCommandQueue()
 
-        let metrics = terminalRenderer.pointMetrics
-        let contentSize = NSSize(
-            width: CGFloat(defaultColumns) * metrics.cellWidth + TerminalLayout.insetWidth,
-            height: CGFloat(defaultRows) * metrics.cellHeight + verticalInsets)
+        let contentSize = initialWindowContentSize
         // Size the container to the target content size *before* the first
         // layout. Otherwise the storyboard's 480x270 produces a transient
         // 53x15 session, the shell's early output is laid out against that,
@@ -175,14 +246,33 @@ class ViewController: NSViewController {
         ])
         terminalView = view
 
+        let dim = PassthroughView()
+        // Layer-backed: a subview without a backing layer never composites
+        // over the Metal layer and the dim would be silently invisible.
+        dim.wantsLayer = true
+        dim.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.22).cgColor
+        dim.isHidden = true
+        dim.translatesAutoresizingMaskIntoConstraints = false
+        self.view.addSubview(dim)
+        NSLayoutConstraint.activate([
+            dim.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
+            dim.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
+            dim.topAnchor.constraint(equalTo: self.view.topAnchor),
+            dim.bottomAnchor.constraint(equalTo: self.view.bottomAnchor),
+        ])
+        focusDimView = dim
+
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        let initialSize = TerminalSize(rows: UInt16(defaultRows), columns: UInt16(defaultColumns))
+        let initialSize = initialGridSize
+            ?? TerminalSize(rows: UInt16(defaultRows), columns: UInt16(defaultColumns))
         session = try! TerminalSession(
             executable: shell, arguments: ["-l"],
             // Launched from Finder the app inherits "/" as its working
             // directory, so the shell opened in the filesystem root. A
-            // terminal should start where a login shell would.
-            size: initialSize, workingDirectory: NSHomeDirectory())
+            // terminal should start where a login shell would — and a split
+            // pane starts where the pane it was split from is (M5.5).
+            size: initialSize,
+            workingDirectory: inheritedWorkingDirectory ?? NSHomeDirectory())
         lastRequestedSize = initialSize
         resizeDebouncer = ResizeDebouncer { [weak self] size in
             self?.session.resize(to: size)
@@ -229,6 +319,13 @@ class ViewController: NSViewController {
         view.onMouseBytes = { [weak self] bytes in
             self?.session.write(bytes)
         }
+        // Click-to-focus, ⌘⌥ arrows, split and close all converge on
+        // `makeFirstResponder`; this is how the split controller learns
+        // which pane owns input (M5.2).
+        view.onFocus = { [weak self] in
+            guard let self else { return }
+            self.splitController?.noteFocus(self)
+        }
         // Track A's IME layer positions the candidate window and the preedit
         // overlay from this: the cursor cell's rect in view coordinates,
         // derived here where the insets and metrics live.
@@ -258,53 +355,6 @@ class ViewController: NSViewController {
         }
     }
 
-    override func viewWillAppear() {
-        super.viewWillAppear()
-        guard !didSizeWindow, let window = view.window else { return }
-        didSizeWindow = true
-        let metrics = terminalRenderer.pointMetrics
-        // Dragging snaps to whole cells, so a resize never leaves a partial
-        // row or column.
-        window.title = "Corta"
-        // Tabs (M4.7) are native window tabbing: `.automatic` here, and File >
-        // New Tab joins the key window's tab group. The tab label follows
-        // `window.title`, which the OSC 0/2 title update keeps current.
-        window.tabbingMode = .automatic
-        // A terminal is a dark surface whatever the system appearance is.
-        // Following the system turned the glass light and washed the grey
-        // background out with it.
-        window.appearance = NSAppearance(named: .darkAqua)
-        // Content runs the full height with a transparent titlebar, so the
-        // background is one continuous surface instead of a titlebar butted
-        // against a differently-shaded grid. This is `viewWillAppear`, not
-        // `viewDidAppear`, for a reason: the style mask must be final before
-        // the window's first layout. When it was applied in `viewDidAppear`
-        // the first layout ran at the content-rect height (frame minus
-        // titlebar), and `resizeSessionToFitView` — already ungated by then —
-        // delivered a transient 28-row winsize to the child, then 30 once the
-        // full height arrived. The shrink-then-grow strands two blank rows
-        // under the prompt of anything the child printed in between.
-        window.styleMask.insert(.fullSizeContentView)
-        window.titlebarAppearsTransparent = true
-        // The Metal layer clears to a translucent colour; the window has to
-        // stop painting its own opaque background for that to show through.
-        window.isOpaque = false
-        window.backgroundColor = .clear
-        window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
-        window.contentMinSize = NSSize(
-            width: CGFloat(minimumColumns) * metrics.cellWidth + TerminalLayout.insetWidth,
-            height: CGFloat(minimumRows) * metrics.cellHeight + verticalInsets)
-        window.setContentSize(NSSize(
-            width: CGFloat(defaultColumns) * metrics.cellWidth + TerminalLayout.insetWidth,
-            height: CGFloat(defaultRows) * metrics.cellHeight + verticalInsets))
-        // Nothing else claims first responder, and without one the view
-        // hierarchy — the terminal view, this controller — is not in the
-        // responder chain at all: keyDown never fires and menu actions
-        // targeting First Responder (⌘V, ⌘=) dispatch from the window down,
-        // past the controller. The terminal view is where keys belong.
-        window.makeFirstResponder(terminalView)
-    }
-
     override func viewDidLayout() {
         super.viewDidLayout()
         // Layout can change the drawable's size or backing scale without any
@@ -331,8 +381,10 @@ class ViewController: NSViewController {
         guard needsRedraw || hasOutput else { return false }
         // The OSC 0/2 title (M2.8) arrives as output; applying it here keeps
         // the window — and with native tabbing (M4.7), the tab label —
-        // current without a timer.
-        if hasOutput, let title = session.windowTitle, let window = view.window,
+        // current without a timer. The window's title is the focused
+        // pane's (M5.2); an unfocused pane's title applies when it takes
+        // focus (`SplitViewController.noteFocus`).
+        if hasOutput, isFocusedPane, let title = session.windowTitle, let window = view.window,
             window.title != title
         {
             window.title = title
@@ -359,7 +411,7 @@ class ViewController: NSViewController {
         // more when it draws and picks up anything that arrived since.
         let damaged = terminalRenderer.updateInstances(
             grid: grid, scrollOffset: scrollOffset,
-            cursorVisible: scrollOffset == 0, selection: selection,
+            cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
             searchMatches: searchMatches.map { TerminalSelection($0, grid: grid) },
             currentSearchMatchIndex: currentSearchMatchIndex)
         return forced || damaged
@@ -394,8 +446,8 @@ class ViewController: NSViewController {
         terminalView.setNeedsRedraw()
     }
 
-    private func resizeSessionToFitView() {
-        // Nothing reaches the child until `viewWillAppear` has made the
+    func resizeSessionToFitView() {
+        // Nothing reaches the child until `SplitViewController` has made the
         // window's style mask final (`.fullSizeContentView` decides how tall
         // the content view is) and pinned the content size — before that,
         // layouts run at transient sizes the child's early output would be
@@ -403,16 +455,20 @@ class ViewController: NSViewController {
         // stranded two blank rows under the prompt). The session is
         // constructed at the target size already, so skipping early layouts
         // loses nothing.
-        guard didSizeWindow, session != nil, let terminalRenderer, let window = view.window
-        else { return }
+        //
         // The style-mask insertion lands one layout pass late: the first
-        // layout after `setContentSize` still runs at the content-rect height
-        // (frame minus titlebar — observed 522pt against the final 554pt),
-        // and delivering that size shrinks the grid and strands content
-        // exactly as above. With `.fullSizeContentView` effective the content
-        // view spans the whole frame, so a view that does not fill its
-        // window's frame is transient by construction; skip it.
-        guard abs(view.bounds.height - window.frame.height) < 1 else { return }
+        // layout after `setContentSize` still runs at the content-rect
+        // height (frame minus titlebar — observed 522pt against the final
+        // 554pt), and delivering that size shrinks the grid and strands
+        // content exactly as above. That check runs one level up now
+        // (`SplitViewController.sizeSettled`): a pane in a split tree
+        // legitimately does not fill its window's frame, so it cannot run
+        // the check against its own bounds — the content view always fills
+        // the frame, split or not (M5) — and the one-time frame correction
+        // for the `setContentSize` chrome mismeasurement must have run too.
+        guard didSizeWindow, session != nil, let terminalRenderer, view.window != nil,
+            let splitController, splitController.sizeSettled
+        else { return }
         let usable = CGSize(
             width: view.bounds.width - TerminalLayout.insetWidth,
             height: view.bounds.height - verticalInsets)
@@ -421,9 +477,13 @@ class ViewController: NSViewController {
         let size = TerminalSize(rows: rows, columns: columns)
         guard size != lastRequestedSize else { return }
         lastRequestedSize = size
-        // During a live drag, coalesce; otherwise (initial layout,
-        // programmatic resize) deliver immediately.
-        resizeDebouncer.resize(to: size, coalesce: view.window?.inLiveResize ?? false)
+        // Always coalesced to the trailing edge of a resize stream: window
+        // drags, divider drags and the zoom animation all fire per-frame
+        // layouts, and each immediate delivery would rewrap the grid
+        // mid-gesture — the visible "text jumps" (M2.9, M5.4). The initial
+        // size needs no delivery at all: the session is born at it and the
+        // startup gate (`sizeSettled`) holds back the transient frames.
+        resizeDebouncer.resize(to: size, coalesce: true)
     }
 
     /// Runs at vsync, on the main thread — reads the latest grid without
@@ -440,7 +500,7 @@ class ViewController: NSViewController {
                 gridHeight: CGFloat(grid.rows) * terminalRenderer.metrics.cellHeight,
                 topInset: topInset),
             drawableSize: drawableSize,
-            cursorVisible: scrollOffset == 0, selection: selection,
+            cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
             searchMatches: searchMatches.map { TerminalSelection($0, grid: grid) },
             currentSearchMatchIndex: currentSearchMatchIndex,
             renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
@@ -451,17 +511,22 @@ class ViewController: NSViewController {
     /// The grid's rectangle inside the drawable, in pixels.
     ///
     /// Pixel space has its origin at the drawable's top-left
-    /// (`Shaders.metal`). The grid is anchored to the *bottom*: rounding rows
-    /// down leaves a remainder, and at the bottom that reads as a gap under
-    /// the prompt — the one place a terminal's spacing gets noticed. At the
-    /// top it lands in the titlebar band instead.
+    /// (`Shaders.metal`). When the grid fits, it anchors to the *top*: the
+    /// rounding remainder of the view height over whole cells then sits at
+    /// the bottom edge, not as a visible band under the titlebar. When the
+    /// grid is momentarily taller than the drawable — mid-drag, before the
+    /// debounced winsize lands (M2.9) — it anchors to the *bottom* instead,
+    /// so the live edge (the prompt) stays put and the top clips; pinning
+    /// the top in that case was the visible "text jumps" of a divider drag
+    /// (M5.4).
     static func contentRect(
         in drawableSize: CGSize, scale: CGFloat, gridHeight: CGFloat, topInset: CGFloat
     ) -> CGRect {
         let bottom = drawableSize.height - TerminalLayout.insets.bottom * scale
+        let fits = topInset * scale + gridHeight <= bottom
         return CGRect(
             x: TerminalLayout.insets.left * scale,
-            y: max(topInset * scale, bottom - gridHeight),
+            y: fits ? topInset * scale : bottom - gridHeight,
             width: max(0, drawableSize.width - TerminalLayout.insetWidth * scale),
             height: gridHeight)
     }
@@ -471,4 +536,17 @@ class ViewController: NSViewController {
             // Update the view, if already loaded.
         }
     }
+
+    /// The dim wash over unfocused panes (M5.2). Called by
+    /// `SplitViewController.noteFocus` for both the old and the new focused
+    /// pane.
+    func applyFocusAppearance() {
+        focusDimView?.isHidden = isFocusedPane
+    }
+}
+
+/// Covers a pane to dim it without intercepting input — clicks, scrolls
+/// and hovers fall through to the terminal view beneath.
+private final class PassthroughView: NSView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }

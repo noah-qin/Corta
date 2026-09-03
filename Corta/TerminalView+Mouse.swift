@@ -6,18 +6,25 @@ import AppKit
 /// `cellSize`) live on the class itself — extensions cannot add storage.
 extension TerminalView {
     override func mouseDown(with event: NSEvent) {
+        // M5.2: a click focuses its pane — keyboard input follows focus, and
+        // focus is the only routing rule a split window has. Not while the
+        // pane's search bar owns the keyboard, though: clicking a match with
+        // the bar open must not strand the bar.
+        if paneController?.searchBar == nil {
+            window?.makeFirstResponder(self)
+        }
         // ⌘-click opens a link (M4.6) before anything else sees the click —
         // it is neither an SGR report nor the start of a selection.
         if event.modifierFlags.contains(.command),
-            let controller = window?.contentViewController as? ViewController,
+            let controller = paneController,
             controller.handleLinkClick(event, in: self)
         { return }
         if report(event, phase: .press(.left)) { return }
         // Mouse reporting is off, so the left button selects text (M3.7).
         // The shell owns the selection state; it is reached through the
-        // window rather than a stored closure because extensions cannot add
-        // storage to the class.
-        guard let controller = window?.contentViewController as? ViewController else {
+        // responder chain rather than a stored closure because extensions
+        // cannot add storage to the class.
+        guard let controller = paneController else {
             super.mouseDown(with: event)
             return
         }
@@ -29,7 +36,18 @@ extension TerminalView {
     }
 
     override func rightMouseDown(with event: NSEvent) {
-        guard report(event, phase: .press(.right)) else { super.rightMouseDown(with: event); return }
+        if report(event, phase: .press(.right)) { return }
+        // Mouse reporting is off: the right button belongs to the pane's
+        // context menu (copy/paste, split, close). The click focuses the
+        // pane first so the menu acts on what the user is looking at.
+        if paneController?.searchBar == nil {
+            window?.makeFirstResponder(self)
+        }
+        if let menu = paneController?.contextMenu(for: self) {
+            NSMenu.popUpContextMenu(menu, with: event, for: self)
+            return
+        }
+        super.rightMouseDown(with: event)
     }
 
     override func rightMouseUp(with event: NSEvent) {
@@ -91,7 +109,7 @@ extension TerminalView {
     // MARK: - ⌘-hover link feedback (M4.6)
 
     override func mouseMoved(with event: NSEvent) {
-        guard let controller = window?.contentViewController as? ViewController else {
+        guard let controller = paneController else {
             super.mouseMoved(with: event)
             return
         }
@@ -99,14 +117,13 @@ extension TerminalView {
     }
 
     override func mouseExited(with event: NSEvent) {
-        NSCursor.arrow.set()
-        toolTip = nil
+        paneController?.resetLinkHover(self)
     }
 
     /// ⌘ pressed or released while the pointer rests still: `locationInWindow`
     /// is valid on flags-changed events, so hover feedback refreshes in place.
     override func flagsChanged(with event: NSEvent) {
-        guard let controller = window?.contentViewController as? ViewController else {
+        guard let controller = paneController else {
             super.flagsChanged(with: event)
             return
         }

@@ -1,0 +1,56 @@
+import XCTest
+
+/// M5, against the live app: ⌘D splits the window, ⌘W closes the focused
+/// pane before it closes the window. The panes themselves are Metal
+/// surfaces with no accessibility content, so the assertions are about the
+/// window surviving exactly as long as it has a pane.
+final class SplitPaneUITests: XCTestCase {
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+    }
+
+    @MainActor
+    func testSplitThenClosePaneThenCloseWindow() throws {
+        let app = XCUIApplication()
+        app.launch()
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 5))
+
+        // ⌘D splits the focused pane right; the window must survive as one
+        // window with two panes.
+        app.typeKey("d", modifierFlags: .command)
+        XCTAssertTrue(window.waitForExistence(timeout: 2), "split must not disturb the window")
+
+        // ⌘W closes the focused pane — the new one — and the window stays.
+        app.typeKey("w", modifierFlags: .command)
+        XCTAssertTrue(window.waitForExistence(timeout: 2), "⌘W must close the pane, not the window")
+
+        // ⌘W on the last pane closes the window, as before splits existed.
+        app.typeKey("w", modifierFlags: .command)
+        let noWindows = NSPredicate(format: "count == 0")
+        expectation(for: noWindows, evaluatedWith: app.windows)
+        waitForExpectations(timeout: 5)
+    }
+
+    /// A visual record rather than an assertion: the panes are Metal
+    /// surfaces, so the divider, the dim wash on the unfocused pane and the
+    /// 50/50 geometry are verified by looking at the attachment in the
+    /// test report, not by the accessibility tree.
+    @MainActor
+    func testSplitScreenshot() throws {
+        let app = XCUIApplication()
+        app.launch()
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 5))
+
+        app.typeKey("d", modifierFlags: .command)  // two columns
+        app.typeKey("D", modifierFlags: [.command, .shift])  // split the new pane down
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+
+        let shot = window.screenshot()
+        let attachment = XCTAttachment(screenshot: shot)
+        attachment.lifetime = .keepAlways
+        attachment.name = "split-2x2"
+        add(attachment)
+    }
+}

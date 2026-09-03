@@ -280,24 +280,131 @@ and aligns correctly, and copy/paste is trustworthy.
 If M1.15 and M1.19 were built against a rect and a session, this
 milestone is mostly composition rather than new mechanism.
 
-- [ ] **M5.1** Binary layout tree with horizontal and vertical splits.
-- [ ] **M5.2** Focus routing: keyboard and mouse input to the focused
+- [x] **M5.1** Binary layout tree with horizontal and vertical splits.
+      *Done when:* `SplitTree` keeps every internal node at exactly two
+      children across nested splits and closes (`SplitTreeTests`).
+- [x] **M5.2** Focus routing: keyboard and mouse input to the focused
       pane only.
-- [ ] **M5.3** Render each session into its own rect, one pass.
-- [ ] **M5.4** Per-pane resize propagated to each PTY.
-- [ ] **M5.5** New panes inherit the cwd via OSC 7 (M2.8).
+      *Done when:* click focuses a pane, ⌘⌥ arrows move focus
+      geometrically, and only the focused pane draws a cursor or sets
+      the window title.
+- [x] **M5.3** Render each session into its own rect, one pass.
+      *Done when:* each pane renders its own session into its own
+      drawable in the same single pass the one-pane window used — no
+      renderer change was needed, which is what M1.15/M1.19 bought.
+- [x] **M5.4** Per-pane resize propagated to each PTY.
+      *Done when:* dragging a divider resizes both panes' sessions
+      (debounced like a window drag), the divider clamps at each pane's
+      minimum grid size, and the window's minimum size is the tree's.
+- [x] **M5.5** New panes inherit the cwd via OSC 7 (M2.8).
+      *Done when:* a pane split out of a shell in some directory opens
+      its shell in the same directory.
 
 ---
 
-## M6 — Polish
+## M6 — Polish and Hardening
 
-- [ ] **M6.1** Config file — one text file, no settings UI. Prefer a
-      format needing no third-party parser.
-- [ ] **M6.2** Colour themes.
+Two halves, one milestone. The polish half is the settings page and what
+hangs off it. The hardening half closes the query-response class: the
+184 esctest failures are dominated by unimplemented query sequences that
+the tests probe and that time out by design (see the M2 tracking note),
+and every one answered is measurable points on a number this repository
+already records. All query responses are fixed-format — they never echo
+stream-supplied text back to the child's stdin (`SECURITY.md`
+§2.1/§2.2). Everything in this milestone is pure Swift: no new
+dependencies, no new platform surface.
+
+### Polish
+
+- [ ] **M6.1** Settings page — a native settings window, opened from a
+      menu placed in the menu bar alongside Edit and Shell (⌘,). It is
+      backed by one text file in a format needing no third-party parser:
+      the page edits that file and the file remains the single source of
+      truth — hand-edits are picked up, there is no second store.
+      *Done when:* changing a setting in the page writes the file, a
+      hand-edit to the file is reflected in the page, and a fresh launch
+      honours both.
+- [ ] **M6.2** Colour themes, selectable from the settings page.
 - [ ] **M6.3** Long-task completion notification.
 - [ ] **M6.4** Reassess the deferred list in `DESIGN.md` §6: OSC 133
       shell integration is the best value per line; the kitty graphics
       protocol matters most for viewing plots from ML work.
+
+### Conformance and hardening
+
+- [ ] **M6.5** DECRQM (mode query) and XTVERSION (`ESC [ > 0 q`)
+      responses — the capability probes tmux and Neovim fall back from
+      when unanswered (`CONFORMANCE.md` §1.2).
+      *Done when:* esctest's DECRQM probes stop timing out and the
+      pass / xterm-compatibility rate is re-recorded in the tracking
+      table.
+- [ ] **M6.6** The remaining fixed-format query class from the M2
+      esctest failure list: dynamic colour reports (the query forms of
+      OSC 10/11/12) and the other timed-out probes. Set forms stay
+      governed by config, as elsewhere.
+      *Done when:* the failure class is re-run and the 184 drops; the
+      delta is recorded.
+- [ ] **M6.7** Focus reporting (`?1004`).
+      *Done when:* Neovim `autoread` and tmux `focus-events` work in a
+      live session.
+- [ ] **M6.8** OSC 8 hyperlinks: rendered as links, ⌘-click routed
+      through the same scheme allowlist and show-the-real-target path
+      as M4.6 (`SECURITY.md` §2.4).
+      *Done when:* `ls --hyperlink` output is clickable and the target
+      shown is the real one.
+- [ ] **M6.9** Kitty keyboard protocol — distinguishes `Ctrl+I` from
+      `Tab`, reports key release (`DESIGN.md` §6, pulled in from
+      deferred).
+      *Done when:* a Neovim mapping that binds `Ctrl+I` and `Tab`
+      differently works in a live session.
+- [ ] **M6.10** Selection anchoring fix: a monotonic line counter on
+      `Scrollback` so a selection tracks its text even while a full ring
+      floods (`DESIGN.md` §2.7, the known limit).
+      *Done when:* a test selects text, floods past ring capacity, and
+      the highlight still covers the same content.
+- [ ] **M6.11** Parser fuzzing: libFuzzer over the feed path
+      (`-sanitize=fuzzer`), asserting the `SECURITY.md` §3 caps — no
+      crash, no hang, bounded allocation. This is the harness
+      `CONFORMANCE.md` §4.3 already promises.
+      *Done when:* a corpus run completes clean and the caps are
+      asserted inside the harness.
+- [ ] **M6.12** Keypress → pixel measured with Typometer against a
+      release build — the last empty column in the tracking table
+      (`PERFORMANCE.md` §5).
+
+### Native macOS integration and distribution
+
+The differentiators a self-drawn toolkit cannot match for free — this is
+where being a pure AppKit citizen pays off.
+
+- [ ] **M6.13** Follow the system appearance: light and dark variants of
+      the active theme (M6.2), switching live in every pane when macOS
+      switches.
+      *Done when:* toggling Dark Mode re-themes all open windows without
+      a restart, and an explicit light/dark/Auto choice exists in the
+      settings page.
+- [ ] **M6.14** Pinch-to-zoom font size: the trackpad magnification
+      gesture drives the same scale path as ⌘+/⌘− (M4.5), clamped to the
+      same steps.
+      *Done when:* a live pinch rescales smoothly, the atlas rebuilds,
+      and the grid re-fits exactly as the keyboard path does.
+- [ ] **M6.15** Native integrations AppKit gives cheaply: dragging a
+      file or folder onto a pane pastes its shell-quoted path; Force
+      Touch / three-finger tap on a word opens Look Up; the Services
+      menu works on the selection.
+      *Done when:* each works in a live window — the drag lands as a
+      quoted path at the prompt, Look Up shows the dictionary popover,
+      and a Services item receives the selected text.
+- [ ] **M6.16** Distribution: a notarized release build and a Homebrew
+      cask (`SECURITY.md` §4.1 — hardened runtime on, sandbox off).
+      Features nobody can install are not features.
+      *Done when:* `brew install --cask corta` installs a build that
+      Gatekeeper opens without a warning.
+
+**M6 is done when** the settings page and themes ship, the native
+integration items work in a live window, the esctest
+xterm-compatibility rate is re-recorded and measurably above the 67.6%
+carried since M2, and the tracking table has no empty columns.
 
 ---
 
@@ -310,7 +417,6 @@ If time runs short, drop in this order. None of these blocks daily use.
 3. Colour themes beyond one good default
 4. Completion notifications
 5. Tabs — splits alone are sufficient
-6. Kitty keyboard protocol
 
 Never cut: character widths, query responses, bracketed paste, the
 security rules in `SECURITY.md` §6.
@@ -324,13 +430,13 @@ Trends matter more than absolute values.
 
 | Metric                    | M1     | M2 | M3 | M4 | M5 | M6 |
 | ------------------------- | ------ | -- | -- | -- | -- | -- |
-| Parse throughput (MB/s)   | 109.9  | 80.0 | 80.8 | 75.5 |    |    |
-| Frame CPU (ms)            | 1.67   | 1.72 | 2.32 | 2.26 |    |    |
-| Idle CPU (%)              | ~4     | ~0   | ~0   | ~0   |    |    |
-| Memory @ 100k lines (MB)  | 265.7  | 265.7 | 265.7 | 184.6 |    |    |
+| Parse throughput (MB/s)   | 109.9  | 80.0 | 80.8 | 75.5 | 76.7 |    |
+| Frame CPU (ms)            | 1.67   | 1.72 | 2.32 | 2.26 | 2.40 |    |
+| Idle CPU (%)              | ~4     | ~0   | ~0   | ~0   | ~0   |    |
+| Memory @ 100k lines (MB)  | 265.7  | 265.7 | 265.7 | 184.6 | 184.6 |    |
 | Keypress → pixel (ms)     | —      | —    | —    | —    |    |    |
-| `esctest` pass rate (%)   | —      | 8.8 (50/568) | 8.8 (50/568) | 8.8 (50/568, M3 carry) |    |    |
-| Core LOC                  | 2,547  | 3,972 | 4,247 | 4,908 |    |    |
+| `esctest` pass rate (%)   | —      | 8.8 (50/568) | 8.8 (50/568) | 8.8 (50/568, M3 carry) | 8.8 (M3 carry) |    |
+| Core LOC                  | 2,547  | 3,972 | 4,247 | 4,908 | 4,959 |    |
 
 Expect roughly 6,000–10,000 lines in `CortaTerminal` by M4
 (`DESIGN.md` §1). Reaching 3,000 does not mean the work is nearly done —
@@ -454,3 +560,28 @@ a launched release build sampled with `top`; see `PERFORMANCE.md` §5):**
   `ViewController.updateDamage`). M4.2's "dragging stays smooth"
   likewise needs a human hand on the window edge; the numbers above are
   the automatable half.
+
+**How measured (M5, same methods as M4 unless noted):**
+
+- *Parse throughput / memory @ 100k lines* — `corta-bench`: 76.7 MB/s and
+  184.6 MB, both level with M4. M5 touched no core code; the +51 LOC of
+  core growth predates the split work (it is the M4 tail).
+- *Frame CPU* — `FrameCPUBaselineTests`, 2.401 ms avg / 4.700 ms p95.
+  Level with M4's 2.255: splits add no work to the per-pane render path —
+  each pane renders its own session into its own drawable in the same
+  single pass (M5.3), and an unfocused pane's display link parks exactly
+  like a focused one's.
+- *Idle CPU* — Release build with a real shell child, `top -pid` per-process
+  rows at one-second intervals after settling: 0.0% on all samples.
+- *`esctest`* — not re-run; M5 changed nothing on the escape-sequence
+  surface, so the M3 figure carries over.
+- *Split behaviour* — `SplitTreeTests` (tree surgery, geometric focus,
+  minimum sizes, all with plain `NSView`s — no sessions spawned),
+  `SplitPaneUITests` (⌘D splits, ⌘W closes the focused pane before the
+  window), and the §4.4 live-app check with a probe shell: `stty size`
+  reports 30 120 at launch (no transient winsize through the
+  `SplitViewController.layoutSettled` gate), scrolling fills every row.
+  Divider-drag smoothness and cwd inheritance (M5.5) need a human hand —
+  the mechanisms are `ResizeDebouncer` (divider drags coalesce like window
+  drags) and `TerminalSession.workingDirectory` (OSC 7, unit-tested in
+  `OSCTests`) read at split time.

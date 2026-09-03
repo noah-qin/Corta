@@ -111,7 +111,8 @@ core, not the shell:
 One known limit: the anchoring shift is computed from the scrollback's
 count, which stops growing once the ring is full, so a selection made
 while a full ring floods stays put instead of tracking its text. Exact
-anchoring under eviction needs a monotonic line counter on `Scrollback`.
+anchoring under eviction needs a monotonic line counter on `Scrollback`;
+that fix is scheduled as M6.10.
 
 Reflow (M4.2) and search (M4.4) must preserve these invariants: reflow
 rewrites document rows wholesale and must invalidate or re-anchor any
@@ -149,8 +150,9 @@ coordinates so a match can be selected verbatim.
 Data flows one way: **bytes in → grid → pixels**. Input flows the other
 way: **key/IME → PTY → child**. Nothing else crosses those arrows.
 
-Windows are cheap composition: each window is its own `ViewController`
-and `TerminalSession` (⌘N instantiates the storyboard scene again;
+Windows are cheap composition: each window is a `SplitViewController`
+owning a binary split tree whose leaves are `ViewController` +
+`TerminalSession` pairs (⌘N instantiates the storyboard scene again;
 `AppDelegate` retains the window controllers until their windows close).
 Nothing is shared between windows — that is what §2.4 buys.
 
@@ -191,7 +193,7 @@ The two thread boundaries are the interesting part of this diagram:
 | **M3 — CJK & input** | IME composition and candidates correct, no width drift, bracketed paste |
 | **M4 — Modern**      | ⌘F search, font zoom, URL click, tabs                                  |
 | **M5 — Splits**      | Layout tree, focus routing, multi-viewport rendering                   |
-| **M6 — Polish**      | Config file, themes, bell, notifications                               |
+| **M6 — Polish & hardening** | Settings page, themes, notifications; query-response class closed (esctest score up), OSC 8, focus reporting, kitty keyboard, fuzzing; native macOS integration, notarized distribution |
 
 **M2 is the checkpoint.** Do not change scope, add features, or refactor
 the architecture before M2 is done. By M2 most of the learning value is
@@ -216,10 +218,13 @@ Explicitly out of scope. Each has been considered and rejected.
 | Cross-platform                                | Forfeits Metal and Core Text, the entire premise            |
 | tmux control mode (`-CC`)                     | A second protocol *and* a second window model; same cost class as building a multiplexer |
 | AI features, command blocks, cloud sync       | Conflicts with "small, not heavy"                           |
-| A graphical settings UI                       | One text config file                                        |
 | Implementing SSH or git                       | They are programs running on a PTY; rendering correctly is the whole job |
 | Bidirectional text (RTL)                      | Large complexity, and a security footgun (see `SECURITY.md`) |
 | Terminal title *query* responses              | Command injection vector; see `SECURITY.md` §2.2            |
+
+A graphical settings UI was on this list until M6 planning reversed it:
+M6.1 adds one native settings page, kept honest by remaining a thin
+front over the single text config file.
 
 ### Deferred, not rejected
 
@@ -230,8 +235,9 @@ Worth doing eventually, deliberately not in the M1–M6 path:
 - **Shell integration / OSC 133** — jump to previous prompt, command
   duration, exit-code marks. High value per line of code; consider
   pulling forward if M4 finishes early.
-- **Kitty keyboard protocol** — distinguishes `Ctrl+I` from `Tab`,
-  reports key release. Wanted by heavy Neovim users.
+
+The kitty keyboard protocol was on this list; it is now scheduled as
+M6.9.
 
 ---
 

@@ -149,16 +149,18 @@ extension ViewController {
 
     /// The pure half of the mapping, kept static and nonisolated so tests
     /// can exercise it without a window. Mirrors
-    /// `contentRect(in:scale:gridHeight:)`: the grid is inset from the
-    /// view's edges and anchored to the bottom — the rounding remainder of
-    /// `viewHeight` over whole cells lands at the top.
+    /// `contentRect(in:scale:gridHeight:)`: the grid is top-anchored when it
+    /// fits (the rounding remainder lands at the bottom) and bottom-anchored
+    /// mid-resize while it overflows (the top clips, the prompt stays).
     nonisolated static func documentPosition(
         for point: CGPoint, viewHeight: CGFloat, metrics: CellMetrics, grid: Grid,
         scrollOffset: Int, topInset: CGFloat
     ) -> SelectionPoint {
-        let gridTop = max(
-            topInset,
-            viewHeight - TerminalLayout.insets.bottom - CGFloat(grid.rows) * metrics.cellHeight)
+        let gridHeight = CGFloat(grid.rows) * metrics.cellHeight
+        let gridTop =
+            topInset + gridHeight <= viewHeight - TerminalLayout.insets.bottom
+            ? topInset
+            : viewHeight - TerminalLayout.insets.bottom - gridHeight
         let column = Int(((point.x - TerminalLayout.insets.left) / metrics.cellWidth).rounded(.down))
         let row = Int(((point.y - gridTop) / metrics.cellHeight).rounded(.down))
         return SelectionPoint(

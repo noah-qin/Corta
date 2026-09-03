@@ -185,8 +185,11 @@ extension ViewController {
         view.addSubview(container)
         NSLayoutConstraint.activate([
             container.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -14),
+            // `topInset`, not `windowChrome`: in a split tree only a pane
+            // touching the window's top edge sits under the chrome — the
+            // bar hugs its own pane's top, not the window's (M5).
             container.topAnchor.constraint(
-                equalTo: view.topAnchor, constant: windowChrome + 10),
+                equalTo: view.topAnchor, constant: topInset + 2),
         ])
         // A pill: half the bar's own height, resolved after layout rather
         // than guessed. A fixed 12 on a 36pt bar is a rounded rectangle, and

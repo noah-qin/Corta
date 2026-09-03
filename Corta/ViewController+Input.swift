@@ -22,6 +22,12 @@ extension ViewController {
         session.write(Paste.bytes(for: sanitized, bracketedPasteEnabled: bracketedPasteEnabled()))
     }
 
+    /// The Edit menu's Paste lands on `TerminalView.paste(_:)`; the context
+    /// menu targets the pane controller directly, which is what this is for.
+    @objc func paste(_ sender: Any?) {
+        pasteFromClipboard()
+    }
+
     /// The core's ?2004 bracketed-paste flag (M2.6). When on, pastes are
     /// wrapped in `ESC[200~`…`ESC[201~` and the newline warning is skipped.
     func bracketedPasteEnabled() -> Bool {

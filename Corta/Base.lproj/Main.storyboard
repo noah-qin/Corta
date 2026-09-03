@@ -123,6 +123,48 @@
                                     </items>
                                 </menu>
                             </menuItem>
+                            <menuItem title="Shell" id="M5S-hE-ll1">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" title="Shell" id="M5S-sU-bm1">
+                                    <items>
+                                        <menuItem title="Split Pane Right" keyEquivalent="d" id="M5S-sR-001">
+                                            <connections>
+                                                <action selector="splitRight:" target="Ady-hI-5gd" id="M5S-sR-002"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Split Pane Down" keyEquivalent="D" id="M5S-sD-001">
+                                            <connections>
+                                                <action selector="splitDown:" target="Ady-hI-5gd" id="M5S-sD-002"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="M5S-sP-001"/>
+                                        <menuItem title="Move Focus Left" keyEquivalent="" id="M5S-fL-001">
+                                            <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="moveFocusLeft:" target="Ady-hI-5gd" id="M5S-fL-002"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Move Focus Right" keyEquivalent="" id="M5S-fR-001">
+                                            <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="moveFocusRight:" target="Ady-hI-5gd" id="M5S-fR-002"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Move Focus Up" keyEquivalent="" id="M5S-fU-001">
+                                            <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="moveFocusUp:" target="Ady-hI-5gd" id="M5S-fU-002"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Move Focus Down" keyEquivalent="" id="M5S-fD-001">
+                                            <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="moveFocusDown:" target="Ady-hI-5gd" id="M5S-fD-002"/>
+                                            </connections>
+                                        </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
                             <menuItem title="Edit" id="5QF-Oa-p0T">
                                 <modifierMask key="keyEquivalentModifierMask"/>
                                 <menu key="submenu" title="Edit" id="W48-6f-4Dl">
@@ -463,8 +505,8 @@
         <!--View Controller-->
         <scene sceneID="hIz-AP-VOD">
             <objects>
-                <viewController id="XfG-lQ-9wD" customClass="ViewController" customModule="Corta" customModuleProvider="target" sceneMemberID="viewController">
-                    <view key="view" id="m2S-Jp-Qdl">
+                <viewController id="XfG-lQ-9wD" customClass="SplitViewController" customModule="Corta" customModuleProvider="target" sceneMemberID="viewController">
+                    <view key="view" id="m2S-Jp-Qdl" customClass="WindowContentView" customModule="Corta" customModuleProvider="target">
                         <rect key="frame" x="0.0" y="0.0" width="480" height="270"/>
                         <autoresizingMask key="autoresizingMask"/>
                     </view>
