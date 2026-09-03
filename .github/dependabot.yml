@@ -1,5 +1,6 @@
-# Corta has no third-party code dependencies by design, so the only thing
-# to keep current is the actions used by CI.
+# The terminal core (CortaTerminal) has no third-party dependencies. The
+# app shell has exactly one — Sparkle, for update checks — plus the
+# GitHub Actions used by CI, both tracked here.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -8,3 +9,10 @@ updates:
       interval: monthly
     commit-message:
       prefix: "ci"
+
+  - package-ecosystem: swift
+    directory: "/"
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "build"
