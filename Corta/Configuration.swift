@@ -86,6 +86,11 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// M7.5 — ask before closing a pane whose shell still has a child
     /// process running.
     var confirmClose: Bool = true
+    /// Whether Sparkle checks for updates in the background, on the
+    /// interval `INFOPLIST_KEY_SUScheduledCheckInterval` sets. Check for
+    /// Updates… (`AppDelegate+Menus`, `UpdateController`) always works,
+    /// on or off — this only gates the unattended check nobody asked for.
+    var updateAutoCheck: Bool = true
 
     /// Themes defined in the config file itself (M7.6), in file order.
     var customThemes: [Theme] = []
@@ -197,6 +202,8 @@ nonisolated struct Configuration: Equatable, Sendable {
             restoreWindows = Self.parseBool(value) ?? true
         case "confirm-close":
             confirmClose = Self.parseBool(value) ?? true
+        case "update-auto-check":
+            updateAutoCheck = Self.parseBool(value) ?? true
         default:
             return false
         }
@@ -355,6 +362,7 @@ nonisolated struct Configuration: Equatable, Sendable {
             "allow-clipboard-write = \(allowClipboardWrite)",
             "restore-windows = \(restoreWindows)",
             "confirm-close = \(confirmClose)",
+            "update-auto-check = \(updateAutoCheck)",
             "",
             "# Notifications",
             "notify-on-long-task = \(notifyOnLongTask)",

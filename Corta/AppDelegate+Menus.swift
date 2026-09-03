@@ -21,6 +21,7 @@ extension AppDelegate {
     func installMenus() {
         guard let mainMenu = NSApp.mainMenu else { return }
         installAboutItem(in: mainMenu)
+        installUpdateItem(in: mainMenu)
         installShellMenuItems(in: mainMenu)
         installViewMenuItems(in: mainMenu)
         installHelpMenuItems(in: mainMenu)
@@ -245,6 +246,25 @@ extension AppDelegate {
 
     @objc func showAboutWindow(_ sender: Any?) {
         AboutWindowController.shared.show(sender)
+    }
+
+    /// "Check for Updates…", directly under About — the position every
+    /// Sparkle-using Mac app puts it in, found by habit rather than by
+    /// reading the menu. Inserted by index rather than appended, so it
+    /// lands next to About even if the app menu template ever grows an
+    /// item between them.
+    private func installUpdateItem(in mainMenu: NSMenu) {
+        guard let appMenu = mainMenu.items.first?.submenu,
+            let about = appMenu.items.first(where: {
+                $0.action == #selector(showAboutWindow(_:))
+            }),
+            let aboutIndex = appMenu.items.firstIndex(of: about)
+        else { return }
+        let item = NSMenuItem(
+            title: L10n.text("menu.checkForUpdates"),
+            action: #selector(UpdateController.checkForUpdates(_:)), keyEquivalent: "")
+        item.target = UpdateController.shared
+        appMenu.insertItem(item, at: aboutIndex + 1)
     }
 
     /// Pane geometry (M7.8) and command-to-command jumping (M7.2), under

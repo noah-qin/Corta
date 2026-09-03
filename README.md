@@ -7,14 +7,14 @@
 **An uncompromisingly native macOS terminal emulator.**
 
 Built from scratch in pure Swift — a hand-written VT engine, Metal rendering,<br>
-first-class CJK input, and not one third-party dependency.
+first-class CJK input, and a terminal core with zero third-party dependencies.
 
 <br>
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-2f81f7?style=flat-square)](LICENSE)
 ![Platform](https://img.shields.io/badge/macOS-26.0%2B-4d4d4d?style=flat-square)
 ![Swift](https://img.shields.io/badge/Swift-6-f05138?style=flat-square)
-![Dependencies](https://img.shields.io/badge/dependencies-0-00c2c7?style=flat-square)
+![Core dependencies](https://img.shields.io/badge/core%20dependencies-0-00c2c7?style=flat-square)
 [![Release](https://img.shields.io/github/v/release/noah-qin/Corta?style=flat-square&label=release)](https://github.com/noah-qin/Corta/releases/latest)
 
 <br>
@@ -46,7 +46,7 @@ at home there.
 
 ### One language
 
-The VT parser is written in Swift in this repository, not bound from C. No FFI, no bridging header, no dependency to audit — the whole program is readable end to end.
+The VT parser is written in Swift in this repository, not bound from C. No FFI, no bridging header — the terminal core (`CortaTerminal`) has zero dependencies and is readable end to end. The app shell has exactly one: [Sparkle](https://sparkle-project.org), for updates.
 
 </td>
 <td width="33%" valign="top">
@@ -119,6 +119,8 @@ Numbers that have not been measured are left blank rather than estimated.
   and closing something that still has a job running asks first.
 - A command palette (⇧⌘P) over every command, which is also the list the
   menus and the keybindings are generated from.
+- Check for Updates… over a signed feed (Sparkle) — a manual check, or a
+  daily background one you can turn off in `~/.config/corta/config`.
 
 **The shell**
 - OSC 133 shell integration: a status mark beside each prompt showing

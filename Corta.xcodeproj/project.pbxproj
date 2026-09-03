@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		4F2E2B293047183A0037705B /* corta-exec in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000730465E2000E8DD20 /* corta-exec */; };
+		4F9658043049C77E005C56CD /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 4F9658033049C77E005C56CD /* Sparkle */; };
 		A1C0A001030465E2000E8DD20 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = A1C0A000030465E2000E8DD20 /* AppIcon.icon */; };
 		C07A000130465E2000E8DD20 /* CortaTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000530465E2000E8DD20 /* CortaTerminal */; };
 		C07A000230465E2000E8DD20 /* CortaTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000630465E2000E8DD20 /* CortaTerminal */; };
@@ -75,6 +76,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4F9658043049C77E005C56CD /* Sparkle in Frameworks */,
 				4F2E2B293047183A0037705B /* corta-exec in Frameworks */,
 				C07A000130465E2000E8DD20 /* CortaTerminal in Frameworks */,
 			);
@@ -142,6 +144,7 @@
 			packageProductDependencies = (
 				C07A000530465E2000E8DD20 /* CortaTerminal */,
 				C07A000730465E2000E8DD20 /* corta-exec */,
+				4F9658033049C77E005C56CD /* Sparkle */,
 			);
 			productName = Corta;
 			productReference = 4F17769F30465E1F00E8DD20 /* Corta.app */;
@@ -236,6 +239,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				C07A000430465E2000E8DD20 /* XCLocalSwiftPackageReference "CortaTerminal" */,
+				4F9658023049C77E005C56CD /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4F1776A030465E1F00E8DD20 /* Products */;
@@ -453,6 +457,9 @@
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Noah Qin. Apache License 2.0.";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				INFOPLIST_KEY_SUFeedURL = "https://raw.githubusercontent.com/noah-qin/Corta/main/appcast.xml";
+				INFOPLIST_KEY_SUPublicEDKey = "qA5ohnw34Yjg0pfWN0AJ4KCxYfia3jNLdvgudVzPgog=";
+				INFOPLIST_KEY_SUScheduledCheckInterval = 86400;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -475,7 +482,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
+				// A plain `xcodebuild build` picks a Development certificate under
+				// Automatic signing regardless of a Developer ID identity's
+				// presence unless told otherwise, and a Development-signed build
+				// cannot be notarized (M6.16, SECURITY.md §4.1). Manual style is
+				// required to name an identity explicitly — Automatic conflicts
+				// with it — matching the signed path .github/workflows/release.yml
+				// already uses.
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
@@ -486,6 +501,9 @@
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Noah Qin. Apache License 2.0.";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				INFOPLIST_KEY_SUFeedURL = "https://raw.githubusercontent.com/noah-qin/Corta/main/appcast.xml";
+				INFOPLIST_KEY_SUPublicEDKey = "qA5ohnw34Yjg0pfWN0AJ4KCxYfia3jNLdvgudVzPgog=";
+				INFOPLIST_KEY_SUScheduledCheckInterval = 86400;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -637,7 +655,23 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		4F9658023049C77E005C56CD /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.9.6;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
+		4F9658033049C77E005C56CD /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4F9658023049C77E005C56CD /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
 		C07A000530465E2000E8DD20 /* CortaTerminal */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C07A000430465E2000E8DD20 /* XCLocalSwiftPackageReference "CortaTerminal" */;

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Corta's Sparkle update feed. Read by every launched Corta at the interval
+  `INFOPLIST_KEY_SUScheduledCheckInterval` sets, and on demand from
+  Check for Updates… (`Corta/UpdateController.swift`).
+
+  Hosted from this path, unmodified, via raw.githubusercontent.com — see
+  `INFOPLIST_KEY_SUFeedURL` in Corta.xcodeproj/project.pbxproj. No separate
+  server: pushing an updated copy of this file to `main` *is* publishing an
+  update.
+
+  <item> entries are appended by `scripts/release.sh` against the archive
+  `.github/workflows/release.yml` builds, signs and notarizes — never
+  written by hand. Each one carries an `sparkle:edSignature` over the exact
+  archive it describes, produced by Sparkle's own `generate_appcast` against
+  the private half of `INFOPLIST_KEY_SUPublicEDKey`. A hand-typed entry is a
+  hand-typed signature, which defeats the point of having one.
+-->
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Corta</title>
+    <link>https://raw.githubusercontent.com/noah-qin/Corta/main/appcast.xml</link>
+    <description>Corta release updates.</description>
+    <language>en</language>
+    <!-- No releases published yet. The first `scripts/release.sh` run adds
+         the first <item>. -->
+  </channel>
+</rss>

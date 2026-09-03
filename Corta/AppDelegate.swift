@@ -144,6 +144,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// the default colours and visibly re-themes a frame later.
     func applicationWillFinishLaunching(_ notification: Notification) {
         _ = ConfigurationStore.shared
+        _ = UpdateController.shared
         AppearanceController.shared.start()
         installMenus()
     }

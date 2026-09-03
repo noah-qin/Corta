@@ -87,6 +87,19 @@ the timer and 1.5 s of output silence ends it — which is why the feature
 is off by default. The notification carries the pane's title and the exit
 status, never the command text (`SECURITY.md` §5).
 
+### Updates
+
+| Key | Values | Default | Notes |
+| --- | --- | --- | --- |
+| `update-auto-check` | boolean | `true` | Whether Corta checks `appcast.xml` in the background, once a day. |
+
+Check for Updates… (the Corta menu, directly under About) always works,
+on or off — this key only gates the unattended check nobody asked for.
+Updates are fetched over HTTPS and verified against an EdDSA signature
+before installing (`UpdateController.swift`, `docs/DESIGN.md` — Sparkle is
+the one third-party dependency in the app shell; the terminal core has
+none).
+
 ---
 
 ## 3. A complete example
@@ -244,3 +257,4 @@ search away.
 | `columns`, `rows` | The next window opened. |
 | `scrollback-lines` | Sessions started afterwards; a running shell keeps the history it has. |
 | `restore-windows` | The next launch. |
+| `update-auto-check` | Immediately — applied to the live Sparkle updater on every file change. |
