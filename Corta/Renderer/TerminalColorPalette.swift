@@ -28,6 +28,12 @@ nonisolated enum TerminalColorPalette {
     /// appearance changes; the panes redraw themselves afterwards.
     static func apply(_ variant: Theme.Variant) { active = variant }
 
+    /// The live variant, for a caller that resolves many cells: reading the
+    /// global once per frame and indexing a local is measurably cheaper than
+    /// going through the static accessor per cell, which the renderer does
+    /// tens of thousands of times.
+    static var activeVariant: Theme.Variant { active }
+
     static var defaultForeground: SIMD4<Float> { active.foreground }
     static var defaultBackground: SIMD4<Float> { active.background }
     static var cursorColor: SIMD4<Float> { active.cursor }
@@ -47,32 +53,49 @@ nonisolated enum TerminalColorPalette {
             backgroundOpacity)
     }
 
-    private static func rgb(_ r: UInt8, _ g: UInt8, _ b: UInt8) -> SIMD4<Float> {
-        SIMD4<Float>(Float(r) / 255, Float(g) / 255, Float(b) / 255, 1)
-    }
-
     /// The colour a cell would show if it *is* the foreground, i.e. resolves
     /// `.default` to `defaultForeground` rather than `defaultBackground`.
     static func resolveForeground(_ color: Color) -> SIMD4<Float> {
-        color.isDefault ? defaultForeground : resolve(color)
+        active.resolveForeground(color)
     }
 
     static func resolveBackground(_ color: Color) -> SIMD4<Float> {
-        color.isDefault ? defaultBackground : resolve(color)
+        active.resolveBackground(color)
+    }
+}
+
+nonisolated extension Theme.Variant {
+    /// Resolution against one variant. On the variant rather than on
+    /// `TerminalColorPalette` so the render loop can hold it in a local: the
+    /// static accessors go through a global and retain the ANSI array on
+    /// every cell, and there are tens of thousands of cells per frame.
+    @inline(__always)
+    func resolveForeground(_ color: Color) -> SIMD4<Float> {
+        color.isDefault ? foreground : resolve(color)
     }
 
-    private static func resolve(_ color: Color) -> SIMD4<Float> {
+    @inline(__always)
+    func resolveBackground(_ color: Color) -> SIMD4<Float> {
+        color.isDefault ? background : resolve(color)
+    }
+
+    @inline(__always)
+    func resolve(_ color: Color) -> SIMD4<Float> {
         if let components = color.components {
-            return rgb(components.red, components.green, components.blue)
+            return SIMD4<Float>(
+                Float(components.red) / 255, Float(components.green) / 255,
+                Float(components.blue) / 255, 1)
         }
-        guard let index = color.index else { return defaultForeground }
-        if index < 16 { return active.ansi[Int(index)] }
+        guard let index = color.index else { return foreground }
+        if index < 16 { return ansi[Int(index)] }
+        // The 6x6x6 cube and the 24-step ramp are xterm's, defined
+        // numerically and the same under every theme.
         if index < 232 {
             let i = Int(index) - 16
-            let levels: [UInt8] = [0, 95, 135, 175, 215, 255]
-            return rgb(levels[i / 36], levels[(i / 6) % 6], levels[i % 6])
+            let levels: [Float] = [0, 95 / 255, 135 / 255, 175 / 255, 215 / 255, 1]
+            return SIMD4<Float>(levels[i / 36], levels[(i / 6) % 6], levels[i % 6], 1)
         }
-        let level = 8 + (Int(index) - 232) * 10
-        return rgb(UInt8(level), UInt8(level), UInt8(level))
+        let level = Float(8 + (Int(index) - 232) * 10) / 255
+        return SIMD4<Float>(level, level, level, 1)
     }
 }

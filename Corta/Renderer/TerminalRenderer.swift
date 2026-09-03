@@ -100,6 +100,13 @@ nonisolated final class TerminalRenderer {
     private var rowColorGlyphs: [QuadInstance] = []
     private var overlayScratch: [QuadInstance] = []
 
+    /// Underline, strikethrough and invisible together — the attributes that
+    /// make a cell need more than a glyph. One mask test rejects the
+    /// overwhelming majority of cells, which carry none of them.
+    private static let ruleAttributeMask: UInt16 =
+        CellAttributes.underline.rawValue | CellAttributes.strikethrough.rawValue
+        | CellAttributes.invisible.rawValue
+
     /// Test hook: how many viewport rows the last `updateInstances` rebuilt.
     private(set) var lastRebuiltRowCount = 0
 
@@ -403,11 +410,15 @@ nonisolated final class TerminalRenderer {
         let cellWidth = Float(metrics.cellWidth)
         let cellHeight = Float(metrics.cellHeight)
         let baseline = Float(metrics.baselineOffset)
+        // Read once per row, not per cell: the static accessor goes through
+        // a global and retains the theme's ANSI array every time it is
+        // touched, and this loop runs tens of thousands of times a frame.
+        let palette = TerminalColorPalette.activeVariant
         for column in 0..<line.count {
             let cell = line[column]
             let reversed = cell.attributes.contains(.reverse)
-            let fg = TerminalColorPalette.resolveForeground(reversed ? cell.background : cell.foreground)
-            let bg = TerminalColorPalette.resolveBackground(reversed ? cell.foreground : cell.background)
+            let fg = palette.resolveForeground(reversed ? cell.background : cell.foreground)
+            let bg = palette.resolveBackground(reversed ? cell.foreground : cell.background)
 
             let origin = SIMD2<Float>(Float(column) * cellWidth, Float(row) * cellHeight)
             if !(reversed ? cell.foreground : cell.background).isDefault || reversed {
@@ -420,8 +431,17 @@ nonisolated final class TerminalRenderer {
             // draws the same underline whether or not the program also set
             // SGR 4 — that rule is what makes it read as a link, and
             // `ls --hyperlink` sets no rendition at all.
-            let isInvisible = cell.attributes.contains(.invisible)
-            if !isInvisible, cell.attributes.contains(.underline) || !cell.hyperlink.isNone {
+            // One mask test for the whole rule/visibility group. Three
+            // `OptionSet.contains` calls plus `hyperlink.isNone` per cell is
+            // three unelided function calls in a debug build, and this loop
+            // runs once per cell per frame (`PERFORMANCE.md` §3).
+            let attributes = cell.attributes.rawValue
+            let hasRuleOrHiddenWork =
+                attributes & Self.ruleAttributeMask != 0 || !cell.hyperlink.isNone
+            let isInvisible = attributes & CellAttributes.invisible.rawValue != 0
+            if hasRuleOrHiddenWork, !isInvisible,
+                attributes & CellAttributes.underline.rawValue != 0 || !cell.hyperlink.isNone
+            {
                 // One device pixel, sitting just below the baseline. A
                 // wide pair's spacer draws it too, so the rule runs the
                 // full width of a double-width character rather than
@@ -432,7 +452,9 @@ nonisolated final class TerminalRenderer {
                         origin: .init(origin.x, origin.y + baseline + thickness),
                         size: .init(cellWidth, thickness), color: fg))
             }
-            if !isInvisible, cell.attributes.contains(.strikethrough) {
+            if hasRuleOrHiddenWork, !isInvisible,
+                attributes & CellAttributes.strikethrough.rawValue != 0
+            {
                 let thickness = max(1, Float(scale).rounded(.down))
                 background.append(
                     QuadInstance(
@@ -446,8 +468,7 @@ nonisolated final class TerminalRenderer {
             // A wide pair's spacer holds a space scalar and draws nothing;
             // the flag check keeps that true even if the scalar ever
             // changes.
-            guard !cell.attributes.contains(.invisible),
-                !cell.attributes.contains(.wideSpacer)
+            guard !isInvisible, attributes & CellAttributes.wideSpacer.rawValue == 0
             else { continue }
             // Block elements are geometry, not glyphs: rounding the cell up
             // from a fractional advance leaves every glyph a point short of
