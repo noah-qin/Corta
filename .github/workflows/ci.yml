@@ -1,10 +1,14 @@
 name: CI
 
+# Manual for now. The workflow has never been run: neither the macos-26
+# runner label nor ad-hoc signing of the test host has been verified on a
+# hosted runner. Run it from the Actions tab first, fix what it finds, then
+# uncomment the automatic triggers and add the checks to the branch ruleset.
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
+  # push:
+  #   branches: [main]
+  # pull_request:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
