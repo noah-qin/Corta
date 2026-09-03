@@ -23,15 +23,9 @@ first-class CJK input, and not one third-party dependency.
 
 </div>
 
-<!--
-TODO before the repository goes public: add a screenshot at
-docs/brand/screenshot.png and uncomment the block below. A terminal
-emulator without a screenshot is a terminal emulator nobody tries.
-
 <div align="center">
-  <img src="docs/brand/screenshot.png" width="840" alt="A Corta window running vim and htop in a vertical split">
+  <img src="docs/brand/screenshot.png" width="860" alt="A Corta window: a coloured git log graph, a column ruler showing CJK, kana, combining marks and emoji each landing on the column they claim, and 16-colour, 256-colour and true-colour ramps">
 </div>
--->
 
 ---
 

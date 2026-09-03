@@ -70,6 +70,19 @@ reachable by building from source — see the README.
 - Apache 2.0 licence, a security policy, a code of conduct and issue and
   pull request templates.
 
+### Fixed
+
+- A flag emoji is one grapheme cluster again. A pair of regional indicators
+  (`🇯🇵` = U+1F1EF U+1F1F5) was stored as two independent wide cells and
+  occupied four columns instead of two, so every character after it on the
+  line landed two columns late — visible as a broken box-drawn table.
+  UAX #29 GB12/GB13.
+- Switching the theme, or the appearance between light and dark, no longer
+  leaves the terminal apparently blank. Cell colours are resolved into the
+  instance buffer when a row is built, but only the clear colour was read
+  fresh each frame: forcing a redraw without forcing a rebuild painted the
+  new background behind the previous theme's glyph colours.
+
 ### Known gaps
 
 - Parser throughput is **75.1 MB/s** against a target of 100 MB/s.
