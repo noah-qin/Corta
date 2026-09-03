@@ -26,6 +26,13 @@ extension AppDelegate {
         installViewMenuItems(in: mainMenu)
         installHelpMenuItems(in: mainMenu)
         pruneInapplicableEditItems(in: mainMenu)
+        // `pruneInjectedEditItems` otherwise runs only from `menuNeedsUpdate`,
+        // which fires when the Edit menu is opened — never, in a test host
+        // that reads `NSApp.mainMenu` without interacting with it. Called
+        // here too so the items AppKit injects at launch are deduplicated
+        // deterministically rather than only when and if a human opens the
+        // menu first.
+        if let edit = AppDelegate.editMenu { pruneInjectedEditItems(edit) }
         localizeStoryboardMenuTitles(in: mainMenu)
         applyKeybindings()
         NotificationCenter.default.addObserver(
@@ -205,7 +212,32 @@ extension AppDelegate {
             guard matchesAction || matchesAutoFill else { continue }
             menu.removeItem(item)
         }
+        deduplicateInjectedItems(menu)
         tidySeparators(in: menu)
+    }
+
+    /// AppKit's own injection of Emoji & Symbols is not tied to a selector
+    /// this file names (unlike AutoFill/Dictation above) — it is entirely
+    /// system-controlled, and the check AppKit normally uses to avoid
+    /// injecting it twice appears to be window-server-dependent: a hosted
+    /// CI runner, with no interactive session behind the menu, produced two
+    /// "Edit > Emoji & Symbols" entries sharing one key equivalent
+    /// (`MenuShortcutTests.noKeystrokeIsClaimedByTwoMenuItems`, never once
+    /// reproduced on a normal Mac with a real session). Rather than key off
+    /// AppKit's exact injection mechanism — which this app does not
+    /// control and which may change — remove same-title, same-keystroke
+    /// duplicates generically, keeping the first.
+    private func deduplicateInjectedItems(_ menu: NSMenu) {
+        var seen: Set<String> = []
+        for item in menu.items.reversed() {
+            guard !item.title.isEmpty else { continue }
+            let identity = "\(item.title)\u{0}\(item.keyEquivalent)\u{0}\(item.keyEquivalentModifierMask.rawValue)"
+            if seen.contains(identity) {
+                menu.removeItem(item)
+            } else {
+                seen.insert(identity)
+            }
+        }
     }
 
     /// Drops leading, trailing and doubled separators — what is left after
