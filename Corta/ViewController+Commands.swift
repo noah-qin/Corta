@@ -65,6 +65,24 @@ extension ViewController {
     /// from the cell — keeping the grid's row/column count unchanged; with
     /// splits the pane frames belong to the tree, and the grid re-fits
     /// instead (`SplitViewController.setFontSizeForAllPanes`).
+    /// The window moved to a display with a different backing scale. Glyphs
+    /// are rasterised at `font size * scale` into an atlas built for one
+    /// density (`TerminalRenderer.init`), so the atlas has to be rebuilt or
+    /// the text is resampled and goes soft. The cell box is snapped to whole
+    /// *device* pixels too, so the grid geometry follows the new scale as
+    /// well — that is why this goes through the same `setFont` path a font
+    /// change does, and refits the session afterwards.
+    func rebuildAtlas(forBackingScale scale: CGFloat) {
+        guard scale > 0, scale != terminalRenderer.scale else { return }
+        terminalRenderer.setFont(TerminalFont.primary(ofSize: fontSize), scale: scale)
+        let metrics = terminalRenderer.pointMetrics
+        terminalView.cellSize = CGSize(width: metrics.cellWidth, height: metrics.cellHeight)
+        view.window?.contentResizeIncrements = NSSize(
+            width: metrics.cellWidth, height: metrics.cellHeight)
+        resizeSessionToFitView()
+        invalidateDisplay()
+    }
+
     func setFontSize(_ newSize: CGFloat) {
         // A clamp, not a policy: below ~8pt the primary font's metrics round
         // to a degenerate cell, above 64pt a cell is wider than the minimum

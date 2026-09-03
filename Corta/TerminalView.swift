@@ -59,6 +59,11 @@ final class TerminalView: NSView, CALayerDelegate {
     /// split controller can track which pane owns input (M5.2).
     var onFocus: (() -> Void)?
 
+    /// The window's backing scale factor changed — the view moved to a
+    /// display with a different pixel density. The renderer's glyph atlas is
+    /// rasterised per scale and has to be rebuilt.
+    var onBackingScaleChange: ((CGFloat) -> Void)?
+
     /// The pane's controller, found by walking the responder chain (the view
     /// → its controller → the split controller). With splits the pane is no
     /// longer the window's content view controller, so `contentViewController`
@@ -173,6 +178,17 @@ final class TerminalView: NSView, CALayerDelegate {
         super.layout()
         updateDrawableSize()
         updateExteriorCornerMask()
+    }
+
+    /// Moving between displays of different backing scales — Retina to an
+    /// external 1x panel and back — changes the drawable's pixel density.
+    /// The glyph atlas is rasterised for one scale (`TerminalRenderer.init`),
+    /// so without this the glyphs keep the old density and the text goes
+    /// soft on the new display.
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        updateDrawableSize()
+        if let window { onBackingScaleChange?(window.backingScaleFactor) }
     }
 
     /// Rounds only the window's top corners this pane actually touches (see

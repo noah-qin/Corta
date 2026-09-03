@@ -297,6 +297,9 @@ class ViewController: NSViewController {
         view.onLiveResizeEnded = { [weak self] in
             self?.endLiveResize()
         }
+        view.onBackingScaleChange = { [weak self] scale in
+            self?.rebuildAtlas(forBackingScale: scale)
+        }
         view.onPaste = { [weak self] in
             self?.pasteFromClipboard()
         }
