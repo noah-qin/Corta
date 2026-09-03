@@ -164,7 +164,7 @@ extension AppDelegate {
                 find.items.contains(where: {
                     $0.action == #selector(NSResponder.performTextFinderAction(_:))
                         || $0.action
-                            == Selector(("performFindPanelAction:"))
+                            == #selector(ViewController.performFindPanelAction(_:))
                 })
             else { continue }
             for candidate in find.items.reversed()
