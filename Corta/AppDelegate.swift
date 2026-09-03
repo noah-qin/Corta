@@ -206,17 +206,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // state forever, and the file is rewritten at the next quit anyway.
         SessionRestore.clear()
 
-        for (index, state) in states.enumerated() {
-            if index == 0, let existing = windowControllers.first,
-                let split = existing.contentViewController as? SplitViewController
-            {
-                // The window is already on screen and its root pane spawned in
-                // the home directory; only the frame and the splits can be
-                // applied now.
-                existing.window?.setFrame(state.frame.rect, display: true)
-                split.restore(layout: state.layout)
-                continue
-            }
+        // The storyboard's window is already on screen, which means its root
+        // pane has already spawned a shell — in the home directory, because
+        // nothing had told it otherwise yet. That is the one thing a restore
+        // cannot repair afterwards: setting the pane's directory now would
+        // relabel it while leaving the child process where it started, so the
+        // first restored window used to be the only one that came back in the
+        // wrong place. Every saved state therefore gets a window built from
+        // scratch, with `pendingRestore` in place before `viewDidLoad`, and
+        // the pre-opened one is closed once at least one replacement is up.
+        //
+        // `contentViewController` returns the controller without loading its
+        // view; the view (and with it the pane's session) loads at
+        // `showWindow`, after `pendingRestore` has been set.
+        let preopened = windowControllers.first
+        var restored = 0
+        for state in states {
             guard let controller = instantiateWindowController(),
                 let split = controller.contentViewController as? SplitViewController
             else { continue }
@@ -225,6 +230,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             split.pendingRestore = state
             controller.showWindow(nil)
             controller.window?.makeKeyAndOrderFront(nil)
+            restored += 1
+        }
+        // Only if something replaced it — closing the sole window on a failed
+        // restore would leave the app running with nothing on screen.
+        if restored > 0, let preopened, preopened.window?.isVisible == true {
+            preopened.window?.close()
         }
     }
 

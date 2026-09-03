@@ -26,6 +26,47 @@ nonisolated struct WindowState: Codable, Equatable, Sendable {
         }
 
         var rect: NSRect { NSRect(x: x, y: y, width: width, height: height) }
+
+        /// The saved rectangle, moved and shrunk until it is somewhere the
+        /// user can actually reach it.
+        ///
+        /// A frame is saved in global screen coordinates against the displays
+        /// that existed at the time. Unplug the external monitor, change its
+        /// resolution, or restore on a laptop that was docked, and the saved
+        /// origin names a point no display covers — so the window opens
+        /// entirely off-screen, with no titlebar to drag and no entry in
+        /// Window > Zoom that brings it back. AppKit does not correct this
+        /// for a frame set programmatically.
+        ///
+        /// The rule: pick the screen the saved frame overlaps most (falling
+        /// back to the main screen when it overlaps none), clamp the size to
+        /// that screen's visible frame, and then push the origin back inside
+        /// it. `visibleFrame`, not `frame`, so a restored window never opens
+        /// under the menu bar or behind the Dock.
+        func onScreen(_ screens: [NSScreen] = NSScreen.screens) -> NSRect {
+            let saved = rect
+            let target =
+                screens.max(by: {
+                    $0.visibleFrame.intersection(saved).area
+                        < $1.visibleFrame.intersection(saved).area
+                }) ?? NSScreen.main
+            guard let visible = target?.visibleFrame, !visible.isEmpty else { return saved }
+            var result = saved
+            result.size.width = min(result.width, visible.width)
+            result.size.height = min(result.height, visible.height)
+            result.origin.x = min(max(result.minX, visible.minX), visible.maxX - result.width)
+            result.origin.y = min(max(result.minY, visible.minY), visible.maxY - result.height)
+            return result
+        }
+    }
+}
+
+extension NSRect {
+    /// Zero for a null rectangle, which is what `intersection` returns when
+    /// there is no overlap at all — and what makes "the screen it overlaps
+    /// most" a total ordering.
+    fileprivate nonisolated var area: CGFloat {
+        isNull || isEmpty ? 0 : width * height
     }
 }
 
