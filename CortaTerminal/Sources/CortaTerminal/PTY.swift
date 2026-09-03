@@ -254,11 +254,7 @@ public final class PTY: @unchecked Sendable {
     /// useful dialog.
     public var foregroundProcessName: String? {
         guard let group = foregroundProcessGroup, group != processIdentifier else { return nil }
-        var buffer = [CChar](repeating: 0, count: 256)
-        let length = proc_name(group, &buffer, UInt32(buffer.count))
-        guard length > 0 else { return nil }
-        let name = String(cString: buffer)
-        return name.isEmpty ? nil : name
+        return Self.processName(ofGroup: group)
     }
 
     /// The name of whatever owns the terminal right now — the shell while it
@@ -269,10 +265,19 @@ public final class PTY: @unchecked Sendable {
     /// still running", and a title bar very much wants to say "zsh".
     public var activeProcessName: String? {
         guard let group = foregroundProcessGroup else { return nil }
+        return Self.processName(ofGroup: group)
+    }
+
+    /// `proc_name` writes into a fixed buffer and returns the name's length,
+    /// excluding the terminator; `String(cString:)` is deprecated for a
+    /// `[CChar]` buffer, and unlike this, scans for that terminator itself
+    /// rather than trusting the length the syscall already gave.
+    private static func processName(ofGroup group: pid_t) -> String? {
         var buffer = [CChar](repeating: 0, count: 256)
         let length = proc_name(group, &buffer, UInt32(buffer.count))
         guard length > 0 else { return nil }
-        let name = String(cString: buffer)
+        let bytes = buffer.prefix(Int(length)).map { UInt8(bitPattern: $0) }
+        let name = String(decoding: bytes, as: UTF8.self)
         return name.isEmpty ? nil : name
     }
 
