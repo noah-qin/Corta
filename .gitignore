@@ -34,10 +34,14 @@ xcuserdata/
 .swiftpm/
 Packages/
 Package.resolved
+# ...except the Xcode-managed resolution for Corta.xcodeproj itself:
+# Dependabot's swift ecosystem needs it committed to see Sparkle's pinned
+# version and propose bumps, and it is what makes a build reproducible now
+# that there is a real dependency to pin.
+!Corta.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 
 # Local direct-download archives (GitHub Releases owns published artifacts)
 /dist/
-*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 
 # Instruments / profiling
 *.trace
