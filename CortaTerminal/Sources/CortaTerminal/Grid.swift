@@ -159,6 +159,17 @@ public struct Grid: Sendable {
             combine(scalar, row: target.row, column: target.column)
             return
         }
+        // A flag is a *pair* of regional indicators and one grapheme (UAX #29
+        // GB12/GB13), so the second indicator joins the first's cell instead
+        // of claiming a wide pair of its own. Without this a two-letter flag
+        // occupies four columns and every border drawn after it on the line
+        // lands two columns late.
+        if Self.isRegionalIndicator(scalar), let target = clusterJoinTarget(),
+            endsWithLoneRegionalIndicator(target)
+        {
+            combine(scalar, row: target.row, column: target.column)
+            return
+        }
         switch displayWidth(of: value) {
         case 0:
             writeZeroWidth(scalar)
@@ -281,6 +292,28 @@ public struct Grid: Sendable {
         let cell = lines[target.row][target.column]
         guard !cell.grapheme.isNone else { return false }
         return graphemes.scalars(for: cell.grapheme)?.last == 0x200D
+    }
+
+    private static func isRegionalIndicator(_ scalar: UInt32) -> Bool {
+        (0x1F1E6...0x1F1FF).contains(scalar)
+    }
+
+    /// Whether the cell at `target` ends in an *unpaired* regional indicator,
+    /// which is the join condition for the second half of a flag. GB12/GB13
+    /// break between indicators only after an even number of them, so the
+    /// trailing run decides: one indicator is still waiting for its pair, two
+    /// are a finished flag and a third starts a new cell.
+    private func endsWithLoneRegionalIndicator(_ target: (row: Int, column: Int)) -> Bool {
+        let cell = lines[target.row][target.column]
+        guard !cell.grapheme.isNone, let cluster = graphemes.scalars(for: cell.grapheme) else {
+            return Self.isRegionalIndicator(cell.scalar)
+        }
+        var trailing = 0
+        for scalar in cluster.reversed() {
+            guard Self.isRegionalIndicator(scalar) else { break }
+            trailing += 1
+        }
+        return trailing % 2 == 1
     }
 
     /// Appends `scalar` to the grapheme cluster of the cell at (`row`,

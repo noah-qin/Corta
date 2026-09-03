@@ -1,0 +1,4 @@
+rows: 2 columns: 10
+cursor: row 0 column 8
+   0 |🇯 🇩 🇦 ab  |
+   1 |          |
