@@ -31,6 +31,53 @@ final class ShortcutTests: XCTestCase {
         waitForExpectations(timeout: 5)
     }
 
+    /// The pre-display layout briefly has the requested frame, then AppKit
+    /// applies `.fullSizeContentView` and removes one titlebar height. The
+    /// session must stay at the configured grid through that final adjustment
+    /// (a 120×30 window previously settled at 120×27).
+    @MainActor
+    func testNewWindowKeepsConfiguredGridAfterAppearing() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
+        app.launch()
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 5))
+
+        let expected = configuredGridSize()
+        let suffix = "\(expected.columns)×\(expected.rows)"
+        let deadline = Date().addingTimeInterval(5)
+        while Date() < deadline {
+            if window.title.hasSuffix(suffix) { return }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+        XCTFail("new window did not keep configured grid \(suffix); title is \(window.title)")
+    }
+
+    /// Mirrors only the two integer keys this UI assertion needs. A missing
+    /// file means the app defaults; values are clamped exactly as the app
+    /// clamps them so a developer's local configuration does not make the
+    /// test brittle.
+    private func configuredGridSize() -> (columns: Int, rows: Int) {
+        var columns = 120
+        var rows = 30
+        let url = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".config/corta/config")
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+            return (columns, rows)
+        }
+        for rawLine in text.split(separator: "\n") {
+            let line = rawLine.split(separator: "#", maxSplits: 1).first?
+                .trimmingCharacters(in: .whitespaces) ?? ""
+            let pair = line.split(separator: "=", maxSplits: 1).map {
+                $0.trimmingCharacters(in: .whitespaces)
+            }
+            guard pair.count == 2, let value = Int(pair[1]) else { continue }
+            if pair[0] == "columns" { columns = min(500, max(20, value)) }
+            if pair[0] == "rows" { rows = min(300, max(5, value)) }
+        }
+        return (columns, rows)
+    }
+
     /// Polls the window's width: `NSPredicate` expectations evaluate against
     /// a cached snapshot and never see the resize.
     @MainActor

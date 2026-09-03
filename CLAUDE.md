@@ -17,6 +17,7 @@ source of truth; this file is an index.
 
 | Document                | Covers                                                     |
 | ----------------------- | ---------------------------------------------------------- |
+| `docs/CONFIGURATION.md` | Every config-file key: settings, themes, keybindings, and when each applies |
 | `docs/DESIGN.md`        | Goals, locked decisions, architecture, modules, milestones, non-goals |
 | `docs/ROADMAP.md`       | The ordered step-by-step plan — start here when implementing |
 | `docs/CONFORMANCE.md`   | Feature priorities (P0/P1/P2), the daily-driver checklist, test strategy |
@@ -53,13 +54,24 @@ Do not reopen these without a concrete new reason. Each is explained in
   the menu bar next to Edit/Shell, backed by a single text config file
   (M6.1) — the page edits the file, which remains the source of truth.
 - **The config file at `~/.config/corta/config` is the only settings
-  store.** `ConfigurationStore` reads it, writes it and watches it; the
+  store, and `docs/CONFIGURATION.md` is its reference.** A key added to
+  `Configuration` without a row in that document is a key nobody can
+  find. `ConfigurationStore` reads it, writes it and watches it; the
   settings page is a front over that and holds no state of its own. Do
   not add a `UserDefaults` key for something the config file could
   carry — two stores drift, and the file has to win because a user can
   edit it. This is not hypothetical: `BellMode` kept reading a
   `UserDefaults` key after the settings page started writing `bell` to
   the file, so the Bell setting silently did nothing until M7.13.
+- **Corta offers one theme and one font; it resolves several.** The
+  settings page and the View menu list `Theme.builtIn` (just `corta`) and
+  no font family picker at all — the system monospaced face is the one
+  Corta stands behind. `Theme.known` still resolves `solarized` and
+  `mono`, and `font-family` still accepts any family
+  `MonospacedFontCatalog` vouches for, so a config file naming either
+  keeps working. Offering a palette or a face means having read text in it
+  for a working day; passing a mechanical check is not the same claim. Add
+  to the offered list only after that, not because the code supports it.
 - **A font family is verified, never trusted.** `isFixedPitch` on one
   face does not mean the family's bold, italic and bold-italic faces
   advance the same; `MonospacedFontCatalog` measures every ASCII
@@ -135,9 +147,10 @@ bypass the gate.
 mask.** On macOS 26, inserting that style flag changes what
 `setContentSize` means mid-flight: the value lands as the *frame* size,
 and the first call mismeasures the chrome by a full titlebar height.
-`SplitViewController` corrects the frame once at the first settled
-layout (`correctInitialWindowSize`); do not "fix" the size earlier in
-`viewWillAppear`, where the measurement is stale.
+`SplitViewController` corrects the frame once in `viewDidAppear`
+(`correctInitialWindowSize`), after AppKit's final adjustment; do not
+"fix" the size earlier in `viewWillAppear` or `viewWillLayout`, where the
+measurement is stale.
 
 **Testing.** Golden-file grid tests are built during M1, not later:
 feed a byte stream, serialise the grid to text, diff against a checked-in

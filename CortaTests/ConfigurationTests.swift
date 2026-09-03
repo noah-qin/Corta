@@ -6,6 +6,13 @@ import Testing
 /// so what these assert is that a value survives the round trip out to text
 /// and back, and that a broken file still starts a terminal.
 struct ConfigurationTests {
+    @Test("a new window defaults to a 120 by 30 grid")
+    func defaultWindowGrid() {
+        let configuration = Configuration()
+        #expect(configuration.columns == 120)
+        #expect(configuration.rows == 30)
+    }
+
     @Test("a written configuration parses back to itself")
     func roundTrip() {
         var configuration = Configuration()
@@ -103,10 +110,15 @@ struct ConfigurationTests {
 }
 
 /// M6.2 and M6.13 — the theme tables themselves.
+///
+/// Over `Theme.known`, not `Theme.builtIn`: only one theme is *offered* in
+/// the UI, but the others stay defined and stay reachable by name — a config
+/// file that already selects one, or inherits from one, must still get a
+/// complete theme back.
 struct ThemeTests {
-    @Test("every built-in theme has both variants fully populated")
+    @Test("every known theme has both variants fully populated")
     func themesAreComplete() {
-        for theme in Theme.builtIn {
+        for theme in Theme.known {
             for variant in [theme.dark, theme.light] {
                 #expect(variant.ansi.count == 16, "\(theme.name) needs all sixteen ANSI colours")
             }
@@ -115,7 +127,7 @@ struct ThemeTests {
 
     @Test("a theme's two variants differ in luminance the way their names say")
     func darkIsDarkerThanLight() {
-        for theme in Theme.builtIn {
+        for theme in Theme.known {
             let dark = theme.dark.background
             let light = theme.light.background
             #expect(
@@ -127,7 +139,7 @@ struct ThemeTests {
     @Test("theme names are unique and resolvable")
     func namesResolve() {
         var seen = Set<String>()
-        for theme in Theme.builtIn {
+        for theme in Theme.known {
             #expect(seen.insert(theme.name).inserted, "duplicate theme name \(theme.name)")
             #expect(Theme.named(theme.name)?.name == theme.name)
         }

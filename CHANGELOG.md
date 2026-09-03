@@ -10,7 +10,67 @@ what to edit.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- `columns` and `rows` in the config file, and a "New window" row in
+  Settings: the grid a new window opens with, in cells. It was hardcoded
+  at 120×30. The window's pixel size is that grid times the font's cell
+  metrics, so two terminals showing the same grid are still different
+  sizes on screen when their fonts differ.
+- [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) — every config-file
+  key: its values, its default, when it takes effect, the theme and
+  keybinding key families, the full command table with default
+  shortcuts, and what is deliberately not configurable.
+- A copy confirmation. Copying — from ⌘C or from copy-on-select — shows a
+  short-lived label in the corner of the pane, so the clipboard never
+  changes with nothing to show for it.
+- An About window of Corta's own: icon, version and build, the version the
+  terminal reports over XTVERSION when it differs, links to the project,
+  the release notes and the licence, and the copyright line the standard
+  panel had no value for.
+
+### Changed
+
+- **`copy-on-select` now defaults to `true`.** It was off because copying
+  replaced the clipboard silently; the copy is now confirmed on screen,
+  which was the whole objection. Set `copy-on-select = false` to restore
+  the old behaviour.
+- **One theme and one font are offered.** The settings page and the View
+  menu list the `corta` theme, and the font family picker is gone: Corta
+  uses the system monospaced face. Neither is a removal — `theme =
+  solarized`, `theme = mono`, `theme.<name>.inherit = solarized` and
+  `font-family = <any verified family>` all keep working from the config
+  file. What is gone is Corta recommending faces and palettes it has not
+  vouched for.
+- The settings page is a tabbed preference window — Appearance, Terminal,
+  General — that resizes to the tab it is showing. Every control sits in
+  one value column, each explanation is one line under the control it
+  belongs to, and the config file's path is pinned under a hairline at the
+  bottom instead of scrolling away. It was a single scrolling page 534×819
+  points tall for eleven settings.
+- ⌘+ / ⌘− / pinch write the new font size to the config file. The size
+  used to live only in memory, so the next config change of any kind
+  reset the zoom and a relaunch forgot it.
+
+### Fixed
+
+- `SGR 2` (dim) renders. The attribute was parsed and stored since M1 and
+  drawn nowhere, so the secondary text every CLI marks this way — `git
+  log`'s hashes, `ls -l`'s metadata, a spinner's hint line — came out at
+  full strength.
+- The Bell setting survives a rename. The chosen mode was recovered from
+  the pop-up's *title*, which worked only while every display name was its
+  raw value capitalised.
+- Selecting a theme the settings page does not list no longer overwrites
+  it. A config file naming an unoffered theme left the pop-up with nothing
+  selected, and the next click on any control in the page wrote the first
+  item back over the user's choice.
+- The notification threshold is disabled while notifications are off, and
+  says that it only fires for a background window.
+- XTVERSION reports the real version. It was a string literal in the
+  query code that a release bump had no reason to visit; it now comes from
+  `CortaVersion`, next to the note about keeping it and `MARKETING_VERSION`
+  in step.
 
 ## [0.1.0] - 2026-09-03
 

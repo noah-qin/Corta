@@ -112,6 +112,12 @@ nonisolated final class TerminalRenderer {
         CellAttributes.underline.rawValue | CellAttributes.strikethrough.rawValue
         | CellAttributes.invisible.rawValue
 
+    /// How much foreground alpha SGR 2 (dim) keeps. Chosen the way every
+    /// other terminal does it — visibly secondary, still readable on both a
+    /// dark and a light background. Blending to zero would make dim text
+    /// invisible, which is `invisible`'s job, not this one's.
+    private static let dimAlpha: Float = 0.55
+
     /// Test hook: how many viewport rows the last `updateInstances` rebuilt.
     private(set) var lastRebuiltRowCount = 0
 
@@ -457,9 +463,27 @@ nonisolated final class TerminalRenderer {
         }
         for column in 0..<line.count {
             let cell = line[column]
-            let reversed = cell.attributes.contains(.reverse)
-            let fg = palette.resolveForeground(reversed ? cell.background : cell.foreground)
+            // Read once as a raw bitfield and test with masks. Every
+            // `OptionSet.contains` in this loop is an unelided call in a
+            // debug build, and the loop runs once per cell per frame
+            // (`PERFORMANCE.md` §3).
+            let attributes = cell.attributes.rawValue
+            let reversed = attributes & CellAttributes.reverse.rawValue != 0
+            var fg = palette.resolveForeground(reversed ? cell.background : cell.foreground)
             let bg = palette.resolveBackground(reversed ? cell.foreground : cell.background)
+            // SGR 2 (dim). Parsed since M1 and drawn nowhere until now, so
+            // `git log --oneline`'s hashes, `ls -l`'s metadata and every
+            // spinner's hint line came out at full strength and the
+            // distinction the program was drawing was simply lost.
+            //
+            // Applied as alpha on the foreground rather than as a blend
+            // towards the background: the glyph quads already carry a
+            // per-instance alpha (the block-element path above uses it), so
+            // this costs one multiply and no extra branch downstream, and it
+            // stays correct over a cell that has its own background colour —
+            // interpolating towards the *default* background would tint dim
+            // text on a coloured run.
+            if attributes & CellAttributes.dim.rawValue != 0 { fg.w *= Self.dimAlpha }
 
             let origin = SIMD2<Float>(Float(column) * cellWidth, Float(row) * cellHeight)
             if !(reversed ? cell.foreground : cell.background).isDefault || reversed {
@@ -472,11 +496,8 @@ nonisolated final class TerminalRenderer {
             // draws the same underline whether or not the program also set
             // SGR 4 — that rule is what makes it read as a link, and
             // `ls --hyperlink` sets no rendition at all.
-            // One mask test for the whole rule/visibility group. Three
-            // `OptionSet.contains` calls plus `hyperlink.isNone` per cell is
-            // three unelided function calls in a debug build, and this loop
-            // runs once per cell per frame (`PERFORMANCE.md` §3).
-            let attributes = cell.attributes.rawValue
+            // One mask test for the whole rule/visibility group, off the
+            // `attributes` already loaded at the top of the iteration.
             let hasRuleOrHiddenWork =
                 attributes & Self.ruleAttributeMask != 0 || !cell.hyperlink.isNone
             let isInvisible = attributes & CellAttributes.invisible.rawValue != 0

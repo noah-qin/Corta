@@ -125,11 +125,29 @@ extension Theme {
                 rgb(60, 95, 175), rgb(150, 75, 160), rgb(50, 140, 150), rgb(10, 10, 10),
             ]))
 
-    /// Every theme Corta ships, in the order the settings page lists them.
-    nonisolated static let builtIn: [Theme] = [.corta, .solarized, .mono]
+    /// The theme Corta *offers*: one, listed in the settings page and the
+    /// View menu.
+    ///
+    /// Shipping three meant shipping two that had never been looked at in
+    /// anger — a theme is nineteen colours in two variants, and "it parses"
+    /// is not the same as "it reads well at 12pt on a laptop panel for eight
+    /// hours". One theme that is right is a better first release than three
+    /// of which two are guesses.
+    ///
+    /// This is a presentation decision, not a deletion: `solarized` and
+    /// `mono` stay defined and stay resolvable by name below, so a config
+    /// file that already says `theme = solarized` keeps working and
+    /// `theme.<name>.inherit = solarized` still has something to inherit
+    /// from (M7.6). Promoting one back into the offered list is one entry
+    /// here.
+    nonisolated static let builtIn: [Theme] = [.corta]
+
+    /// Every theme this binary can resolve by name, offered or not. Wider
+    /// than `builtIn` on purpose — see the note there.
+    nonisolated static let known: [Theme] = [.corta, .solarized, .mono]
 
     nonisolated static func named(_ name: String) -> Theme? {
-        builtIn.first { $0.name == name }
+        known.first { $0.name == name }
     }
 
     /// A built-in *or* user-defined theme (M7.6). Custom themes win on a
@@ -140,11 +158,23 @@ extension Theme {
     }
 
     /// Every theme available under `configuration`, in list order: the
-    /// built-ins first, then the user's own.
+    /// offered built-ins first, then the user's own.
+    ///
+    /// The theme the file currently selects is always in the list, even when
+    /// it is one of the unoffered built-ins. Otherwise a config that says
+    /// `theme = solarized` would leave the settings popup with nothing
+    /// selected, and the next click on any control in the page would write
+    /// the first item back over the user's choice.
     nonisolated static func all(in configuration: Configuration) -> [Theme] {
         let custom = configuration.customThemes
         let customNames = Set(custom.map(\.name))
-        return builtIn.filter { !customNames.contains($0.name) } + custom
+        var themes = builtIn.filter { !customNames.contains($0.name) } + custom
+        if !themes.contains(where: { $0.name == configuration.theme }),
+            let active = named(configuration.theme)
+        {
+            themes.append(active)
+        }
+        return themes
     }
 }
 

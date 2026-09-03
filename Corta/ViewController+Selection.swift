@@ -48,6 +48,12 @@ extension ViewController {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
+        // Confirmation *after* the write, and only when there was something
+        // to write: an empty selection returns above, and a toast for a copy
+        // that did not happen is worse than no toast. This is what makes
+        // copy-on-select safe to have on by default (M7.10) — the clipboard
+        // no longer changes silently.
+        terminalView?.showToast("Copied")
     }
 
     /// ⌘A: the whole document — scrollback plus screen.

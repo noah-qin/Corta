@@ -15,9 +15,12 @@ extension Performer {
     /// XTVERSION — `CSI > Ps q`, answered `DCS > | text ST`.
     ///
     /// The name is a compile-time constant, so the answer cannot carry
-    /// stream-supplied bytes. xterm's own answer is `XTerm(<patch>)`; the
-    /// convention every consumer parses is `Name(version)`.
-    private static let versionReport = Array("\u{1B}P>|Corta(0.1.0)\u{1B}\\".utf8)
+    /// stream-supplied bytes. The version itself comes from `CortaVersion`,
+    /// which is the single place it is written — it used to be spelled out
+    /// here, where a release bump had no reason to look, and the answer went
+    /// stale the moment `MARKETING_VERSION` moved.
+    private static let versionReport = Array(
+        "\u{1B}P>|\(CortaVersion.report)\u{1B}\\".utf8)
 
     mutating func reportVersion(_ parameters: Parameters) {
         // `CSI > 0 q` and `CSI > q` are the same request; any other Ps is a

@@ -325,9 +325,12 @@ dependencies, no new platform surface.
       hand-edit to the file is reflected in the page, and a fresh launch
       honours both.
 - [x] **M6.2** Colour themes, selectable from the settings page.
-      Three built in (Corta, Solarized, Mono), each with a light and a
+      Three defined (Corta, Solarized, Mono), each with a light and a
       dark variant; the low sixteen plus foreground, background and
-      cursor. The 6x6x6 cube and the greyscale ramp stay xterm's — a
+      cursor. One of them — Corta — is *offered*: `Theme.builtIn` is what
+      the settings page and the View menu list, `Theme.known` is what a
+      config file can name or inherit from. Shipping a palette means
+      vouching for it at 12pt for eight hours, and only one has been. The 6x6x6 cube and the greyscale ramp stay xterm's — a
       program asking for colour 137 means one specific colour.
 - [x] **M6.3** Long-task completion notification. A heuristic, and off
       by default because of it: without OSC 133 a terminal cannot see

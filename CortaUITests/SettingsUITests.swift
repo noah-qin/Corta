@@ -30,12 +30,27 @@ final class SettingsUITests: XCTestCase {
 
         let settings = app.windows["Corta Settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 5), "the settings page must open")
-        // Theme, appearance, font family, bell and link activation are
-        // pop-ups; size, scrollback and the notification threshold are
-        // fields; the five toggles are switches.
-        XCTAssertEqual(settings.popUpButtons.count, 5)
-        XCTAssertEqual(settings.textFields.count, 3)
-        XCTAssertEqual(settings.switches.count, 5)
+        // Three tabs in a preference-style toolbar, and the pane behind
+        // whichever is selected. Asserted as tabs rather than as a count of
+        // every control in the window: only the showing tab's controls
+        // exist, so a control count would say more about which tab opened
+        // first than about the page.
+        for tab in ["Appearance", "Terminal", "General"] {
+            XCTAssertTrue(
+                settings.toolbars.buttons[tab].waitForExistence(timeout: 3),
+                "the \(tab) tab must be in the toolbar")
+        }
+        // The Appearance pane: light-or-dark, the font family (a label, not
+        // a picker — Corta ships one font) and the size field. The theme
+        // pop-up is hidden while only one theme is offered.
+        XCTAssertEqual(settings.popUpButtons.count, 1)
+
+        settings.toolbars.buttons["Terminal"].click()
+        XCTAssertTrue(settings.switches.firstMatch.waitForExistence(timeout: 3))
+        // Bell and link activation are pop-ups; copy-on-select and the OSC 52
+        // toggle are switches; scrollback is a field.
+        XCTAssertEqual(settings.popUpButtons.count, 2)
+        XCTAssertEqual(settings.switches.count, 2)
     }
 
     /// The theme and appearance lists live under View — where "what the
@@ -58,9 +73,10 @@ final class SettingsUITests: XCTestCase {
         XCTAssertTrue(viewMenu.exists)
         viewMenu.click()
         viewMenu.menuItems["Theme"].click()
-        for theme in ["Corta", "Solarized", "Mono"] {
-            XCTAssertTrue(viewMenu.menuItems[theme].exists, "\(theme) must be listed")
-        }
+        // One offered theme (`Theme.builtIn`). The others stay defined and
+        // resolvable by name for a config file that asks for them; they are
+        // not recommended from the menu.
+        XCTAssertTrue(viewMenu.menuItems["Corta"].exists, "the built-in theme must be listed")
         app.typeKey(.escape, modifierFlags: [])
         app.typeKey(.escape, modifierFlags: [])
     }

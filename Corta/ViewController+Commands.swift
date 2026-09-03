@@ -108,6 +108,28 @@ extension ViewController {
         } else {
             setFontSize(newSize)
         }
+        persistFontSize(newSize)
+    }
+
+    /// Writes the new size to the config file, which is the only store there
+    /// is (`CLAUDE.md`: two stores drift, and the file has to win).
+    ///
+    /// Without this, ⌘+ / ⌘− / pinch changed a size that lived nowhere:
+    /// the file still said 12, and the *next* config change of any kind —
+    /// picking a theme, opening the settings page, saving the file in an
+    /// editor — ran `configurationChanged`, which re-applies `font-size` and
+    /// silently threw the zoom away. It also meant a zoom did not survive a
+    /// relaunch, and a new window opened at the old size while the one beside
+    /// it was zoomed.
+    ///
+    /// `ConfigurationStore.update` is a no-op when the value is unchanged, so
+    /// the write happens once per whole-point step and a pinch that ends
+    /// where it started writes nothing at all. `setFontSize` is likewise
+    /// guarded, so the change notification this posts costs every pane a
+    /// comparison and nothing more.
+    private func persistFontSize(_ newSize: CGFloat) {
+        let clamped = Double(min(64, max(8, newSize)))
+        ConfigurationStore.shared.update { $0.fontSize = clamped }
     }
 
     /// A font change rebuilds the renderer: the glyph atlas is rasterised

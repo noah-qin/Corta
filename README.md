@@ -143,6 +143,9 @@ Numbers that have not been measured are left blank rather than estimated.
   bind.close =              # an empty value unbinds
   ```
 
+- Every key, its values, its default and when it takes effect:
+  [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md).
+
 <details>
 <summary><strong>What Corta deliberately does not do</strong></summary>
 
@@ -200,6 +203,7 @@ index.
 
 | Document | Covers |
 | :--- | :--- |
+| [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) | Every config-file key: settings, themes, keybindings |
 | [`docs/DESIGN.md`](docs/DESIGN.md) | Goals, locked decisions, architecture, milestones, non-goals |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | The ordered implementation plan and the tracking record |
 | [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) | Feature priorities, the daily-driver checklist, test strategy |

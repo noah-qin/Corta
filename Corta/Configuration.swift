@@ -44,6 +44,12 @@ nonisolated struct Configuration: Equatable, Sendable {
     var theme: String = Theme.corta.name
     var appearance: Appearance = .auto
     var scrollbackLines: Int = 10_000
+    /// The grid a new window opens with (M7.14). In *cells*, not points: the
+    /// window's pixel size is this grid times the font's cell metrics plus
+    /// the pane insets, which is what keeps `columns × rows` meaning the same
+    /// thing after a font or size change.
+    var columns: Int = 120
+    var rows: Int = 30
     var bell: BellMode = .visual
     /// Whether a command that ran longer than `notificationThreshold` posts
     /// a notification when it finishes (M6.3).
@@ -53,10 +59,15 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// watching.
     var notificationThreshold: Double = 30
     /// M7.10 — a finished selection goes straight to the pasteboard, the way
-    /// X11 and every terminal that grew up beside it behave. Off by default:
-    /// it silently replaces the clipboard, which surprises anyone who did not
-    /// ask for it.
-    var copyOnSelect: Bool = false
+    /// X11 and every terminal that grew up beside it behave.
+    ///
+    /// On by default. It was off because copying silently replaces the
+    /// clipboard and that surprises anyone who did not ask for it — but the
+    /// copy is no longer silent: a confirmation appears in the corner of the
+    /// pane (`TerminalView.showToast`), which is exactly the objection
+    /// answered. What is left is the behaviour most people selecting text in
+    /// a terminal already expect.
+    var copyOnSelect: Bool = true
     /// M7.9 — see `LinkActivation`.
     var linkActivation: LinkActivation = .command
     /// M7.11 — whether OSC 52 may write the system pasteboard.
@@ -159,6 +170,13 @@ nonisolated struct Configuration: Equatable, Sendable {
             theme = value.isEmpty ? Theme.corta.name : value
         case "appearance":
             appearance = Appearance(rawValue: value) ?? .auto
+        case "columns":
+            // Clamped to what a window can actually show: below the minimum
+            // grid the window cannot be built, and an absurd value would open
+            // a window larger than every display.
+            if let value = Int(value) { columns = min(500, max(20, value)) }
+        case "rows":
+            if let value = Int(value) { rows = min(300, max(5, value)) }
         case "scrollback-lines":
             // Capped: scrollback is unbounded input and every unbounded
             // input needs a cap (`SECURITY.md` §3).
@@ -170,7 +188,7 @@ nonisolated struct Configuration: Equatable, Sendable {
         case "notification-threshold":
             if let seconds = Double(value) { notificationThreshold = max(1, seconds) }
         case "copy-on-select":
-            copyOnSelect = Self.parseBool(value) ?? false
+            copyOnSelect = Self.parseBool(value) ?? true
         case "link-activation":
             linkActivation = LinkActivation(rawValue: value) ?? .command
         case "allow-clipboard-write":
@@ -328,6 +346,8 @@ nonisolated struct Configuration: Equatable, Sendable {
             "font-size = \(Self.number(fontSize))",
             "",
             "# Terminal",
+            "columns = \(columns)",
+            "rows = \(rows)",
             "scrollback-lines = \(scrollbackLines)",
             "bell = \(bell.rawValue)",
             "copy-on-select = \(copyOnSelect)",

@@ -16,12 +16,37 @@ extension AppDelegate {
     /// keyboard shortcuts to every item in the bar.
     func installMenus() {
         guard let mainMenu = NSApp.mainMenu else { return }
+        installAboutItem(in: mainMenu)
         installShellMenuItems(in: mainMenu)
         installViewMenuItems(in: mainMenu)
         applyKeybindings()
         NotificationCenter.default.addObserver(
             self, selector: #selector(applyKeybindings), name: ConfigurationStore.didChange,
             object: nil)
+    }
+
+    /// Points "About Corta" at Corta's own About window.
+    ///
+    /// Retargeted here rather than rewired in the storyboard, for the same
+    /// reason the shortcuts are applied here: the storyboard's version of an
+    /// item is a starting point, and the app menu's About item is the one
+    /// item a storyboard cannot express — it is created by AppKit's template
+    /// with `orderFrontStandardAboutPanel:` already attached.
+    ///
+    /// Matched by action, not by title: the title is localised by AppKit and
+    /// "About Corta" is only what it happens to say in English.
+    private func installAboutItem(in mainMenu: NSMenu) {
+        guard let appMenu = mainMenu.items.first?.submenu,
+            let about = appMenu.items.first(where: {
+                $0.action == #selector(NSApplication.orderFrontStandardAboutPanel(_:))
+            })
+        else { return }
+        about.action = #selector(showAboutWindow(_:))
+        about.target = self
+    }
+
+    @objc func showAboutWindow(_ sender: Any?) {
+        AboutWindowController.shared.show(sender)
     }
 
     /// Pane geometry (M7.8) and command-to-command jumping (M7.2), under

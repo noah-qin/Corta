@@ -17,6 +17,13 @@ final class TerminalView: NSView, CALayerDelegate {
     /// Mouse-moved tracking for ⌘-hover link feedback (M4.6); `.inVisibleRect`
     /// keeps it glued to the visible area across resizes.
     private var mouseTrackingArea: NSTrackingArea?
+    /// The transient confirmation in the pane's bottom-right corner
+    /// (`showToast`), and the work item that takes it away again. Stored so a
+    /// second toast replaces the first instead of stacking on top of it —
+    /// copy-on-select fires once per drag, and a user selecting three things
+    /// in a row must not end up with three overlapping labels.
+    private var toastLayer: CALayer?
+    private var toastDismissal: DispatchWorkItem?
 
     /// Called once per frame, on the main thread, with the drawable's render
     /// pass descriptor and pixel size. `nil` drawable (window occluded,
@@ -204,6 +211,7 @@ final class TerminalView: NSView, CALayerDelegate {
         super.layout()
         updateDrawableSize()
         updateExteriorCornerMask()
+        positionToast()
     }
 
     /// Moving between displays of different backing scales — Retina to an
@@ -299,6 +307,119 @@ final class TerminalView: NSView, CALayerDelegate {
         flash.add(fade, forKey: "flash")
         CATransaction.commit()
     }
+
+    // MARK: - Transient confirmation
+
+    /// A short-lived label in the pane's bottom-right corner — "Copied", and
+    /// anything else that is worth confirming but not worth a dialog.
+    ///
+    /// This exists because copy-on-select is now on by default. Copying
+    /// silently was the whole argument against that default: the clipboard
+    /// changes under the user with nothing to show for it. A confirmation
+    /// they can ignore is the smallest thing that answers it.
+    ///
+    /// A `CALayer`, not a subview: this view is layer-*hosting* (see
+    /// `commonInit`), so its layer tree is the only place to put a decoration
+    /// — the same reason `flashBell` is drawn this way. Nothing here touches
+    /// the Metal drawable, so a toast never costs the render loop a frame.
+    func showToast(_ text: String) {
+        toastDismissal?.cancel()
+        toastLayer?.removeFromSuperlayer()
+
+        let scale = window?.backingScaleFactor ?? 2
+        let font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        let label = CATextLayer()
+        label.string = NSAttributedString(
+            string: text,
+            attributes: [.font: font, .foregroundColor: NSColor.white])
+        label.contentsScale = scale
+        label.alignmentMode = .center
+
+        let textSize = (text as NSString).size(withAttributes: [.font: font])
+        let size = CGSize(
+            width: (textSize.width).rounded(.up) + 2 * Self.toastPadding.width,
+            height: (textSize.height).rounded(.up) + 2 * Self.toastPadding.height)
+
+        let capsule = CALayer()
+        capsule.bounds = CGRect(origin: .zero, size: size)
+        capsule.anchorPoint = .zero
+        capsule.cornerRadius = size.height / 2
+        capsule.contentsScale = scale
+        // Blue, and deliberately not one of the theme's colours: the toast
+        // has to be legible over whatever the terminal is showing under it,
+        // and a colour taken from the palette would be the one element that
+        // vanishes exactly when the theme is low-contrast or when a program
+        // has painted that colour across the screen. `systemBlue` rather
+        // than `controlAccentColor` for the same reason — the accent colour
+        // is the user's and can be grey.
+        capsule.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.92).cgColor
+        capsule.borderColor = NSColor.white.withAlphaComponent(0.22).cgColor
+        capsule.borderWidth = 1
+        // A little lift, so the capsule reads as sitting above the text
+        // rather than as a coloured run inside it.
+        capsule.shadowColor = NSColor.black.cgColor
+        capsule.shadowOpacity = 0.28
+        capsule.shadowRadius = 6
+        capsule.shadowOffset = CGSize(width: 0, height: 1)
+        label.frame = CGRect(
+            x: 0, y: (size.height - textSize.height).rounded() / 2,
+            width: size.width, height: textSize.height.rounded(.up))
+        capsule.addSublayer(label)
+
+        layer?.addSublayer(capsule)
+        toastLayer = capsule
+        positionToast()
+
+        let appear = CABasicAnimation(keyPath: "opacity")
+        appear.fromValue = 0.0
+        appear.toValue = 1.0
+        appear.duration = 0.12
+        capsule.add(appear, forKey: "appear")
+
+        // Held on the main queue rather than a `Timer`: the view may go away
+        // with the pane, and a cancelled work item leaves nothing behind.
+        let dismissal = DispatchWorkItem { [weak self] in self?.dismissToast() }
+        toastDismissal = dismissal
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.toastDuration, execute: dismissal)
+    }
+
+    private func dismissToast() {
+        guard let capsule = toastLayer else { return }
+        toastLayer = nil
+        toastDismissal = nil
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 1.0
+        fade.toValue = 0.0
+        fade.duration = 0.25
+        fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { capsule.removeFromSuperlayer() }
+        capsule.opacity = 0
+        capsule.add(fade, forKey: "fade")
+        CATransaction.commit()
+    }
+
+    /// Bottom-right, inside the same inset the text grid uses so it lines up
+    /// with the content rather than with the pane edge. The hosted layer's
+    /// geometry runs top-down with the flipped view (see `commonInit`), so
+    /// "bottom" is `maxY`. Re-run from `layout()`: a pane resized while a
+    /// toast is up must not leave it stranded mid-air.
+    private func positionToast() {
+        guard let capsule = toastLayer else { return }
+        let size = capsule.bounds.size
+        CATransaction.begin()
+        // No implicit animation: this is a correction, not a move.
+        CATransaction.setDisableActions(true)
+        capsule.position = CGPoint(
+            x: bounds.maxX - size.width - TerminalLayout.insets.right,
+            y: bounds.maxY - size.height - TerminalLayout.insets.bottom)
+        CATransaction.commit()
+    }
+
+    /// Long enough to read four words without looking for it, short enough
+    /// that it is gone before it becomes something to dismiss.
+    private static let toastDuration: TimeInterval = 1.1
+    private static let toastPadding = CGSize(width: 10, height: 5)
 
     private func updateDrawableSize() {
         let scale = window?.backingScaleFactor ?? 1

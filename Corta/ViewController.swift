@@ -101,6 +101,11 @@ class ViewController: NSViewController {
     /// Coalesces `session.resize` during a live drag (M2.9); the last size
     /// actually requested, so no-op layouts don't re-send the same winsize.
     private var resizeDebouncer: ResizeDebouncer!
+    /// Backing store for `refreshProcessFactsIfStale`.
+    private var cachedProcessName: String?
+    private var cachedDirectory: String?
+    private var lastProcessFactsRefresh: CFTimeInterval = 0
+
     /// The last grid size sent (or about to be sent) to the child; ⌘+/⌘−
     /// re-fit the window to keep this grid size at the new cell metrics.
     var lastRequestedSize: TerminalSize?
@@ -132,11 +137,19 @@ class ViewController: NSViewController {
         resizeDebouncer.flush()
     }
 
-    /// Initial and minimum grid sizes. The window's content size is derived
-    /// from these and the font's cell metrics, never from hardcoded points,
-    /// so it follows a font or size change.
-    private let defaultColumns = 120
-    private let defaultRows = 30
+    /// The grid a new window opens with, from the config file (M7.14). The
+    /// window's content size is derived from this and the font's cell
+    /// metrics, never from hardcoded points, so it follows a font or size
+    /// change — and `columns × rows` keeps meaning cells rather than pixels.
+    ///
+    /// Read per pane rather than cached at launch: a change to the file
+    /// applies to the next window opened, which is the only moment an initial
+    /// size can apply at all.
+    private var configuredGridSize: TerminalSize {
+        let configuration = ConfigurationStore.shared.configuration
+        return TerminalSize(
+            rows: UInt16(configuration.rows), columns: UInt16(configuration.columns))
+    }
     /// Titlebar plus, when the window is tabbed, the tab bar. AppKit
     /// reports the pair as the difference between the frame and the content
     /// layout rect, which is the only value that follows a tab bar
@@ -197,14 +210,17 @@ class ViewController: NSViewController {
     /// `setContentSize` sizes the frame on this OS — so this is the *frame*
     /// size: grid cells plus this pane's insets and the measured chrome.
     /// The first pane's pre-layout frame and the window's initial sizing
-    /// both derive from it, so the session is born at its final size.
+    /// both derive from it, so the session is born at its final size. Use
+    /// the whole window chrome here, not `topInset`: before the root pane's
+    /// constraints settle, its temporary position can make it look as if it
+    /// does not touch the top of the window and omit the titlebar entirely.
     var initialWindowContentSize: NSSize {
         let metrics = terminalRenderer.pointMetrics
-        let grid = initialGridSize
-            ?? TerminalSize(rows: UInt16(defaultRows), columns: UInt16(defaultColumns))
+        let grid = initialGridSize ?? configuredGridSize
         return NSSize(
             width: CGFloat(grid.columns) * metrics.cellWidth + TerminalLayout.insetWidth,
-            height: CGFloat(grid.rows) * metrics.cellHeight + verticalInsets)
+            height: CGFloat(grid.rows) * metrics.cellHeight + TerminalLayout.insetHeight
+                + windowChrome)
     }
 
     override func viewDidLoad() {
@@ -289,8 +305,7 @@ class ViewController: NSViewController {
         focusDimView = dim
 
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        let initialSize = initialGridSize
-            ?? TerminalSize(rows: UInt16(defaultRows), columns: UInt16(defaultColumns))
+        let initialSize = initialGridSize ?? configuredGridSize
         session = try! TerminalSession(
             executable: shell, arguments: ["-l"],
             // Launched from Finder the app inherits "/" as its working
@@ -428,15 +443,15 @@ class ViewController: NSViewController {
             return was
         }
         guard needsRedraw || hasOutput else { return false }
-        // The OSC 0/2 title (M2.8) arrives as output; applying it here keeps
-        // the window — and with native tabbing (M4.7), the tab label —
-        // current without a timer. The window's title is the focused
-        // pane's (M5.2); an unfocused pane's title applies when it takes
-        // focus (`SplitViewController.noteFocus`).
-        if hasOutput, isFocusedPane, let title = session.windowTitle, let window = view.window,
-            window.title != title
-        {
-            window.title = title
+        // The title's ingredients — the OSC 0/2 title (M2.8), the OSC 7
+        // working directory and the foreground process — all arrive as
+        // output, so applying it here keeps the window and, with native
+        // tabbing (M4.7), the tab label current without a timer. The
+        // window's title is the focused pane's (M5.2); an unfocused pane's
+        // title applies when it takes focus
+        // (`SplitViewController.noteFocus`).
+        if hasOutput, isFocusedPane {
+            applyWindowTitle()
         }
         // While the search bar is open, output shifts what matches: re-run
         // the query against the new snapshot before this frame diffs it
@@ -546,6 +561,128 @@ class ViewController: NSViewController {
         // size needs no delivery at all: the session is born at it and the
         // startup gate (`sizeSettled`) holds back the transient frames.
         resizeDebouncer.resize(to: size, coalesce: true)
+        // The title carries the grid size, so it changes with the drag —
+        // which is what makes the live size visible while resizing, the way
+        // Terminal.app shows it.
+        if isFocusedPane {
+            invalidateProcessFacts()
+            applyWindowTitle()
+        }
+    }
+
+    // MARK: - Window title
+
+    /// What the title bar says for this pane: what is running, where, and
+    /// how big the grid is — the same three facts Terminal.app shows, for
+    /// the same reason. "Corta" alone answered none of the questions asked
+    /// of a title bar with four windows open.
+    ///
+    /// `<title or directory> — <process> — <columns>×<rows>`, with any part
+    /// that is unknown left out rather than filled with a placeholder. The
+    /// first part prefers the OSC 0/2 title, because a program that sets one
+    /// (an editor, `claude`, a long build) is saying something more useful
+    /// than its own name; a shell that sets none falls back to the working
+    /// directory, abbreviated with `~`.
+    ///
+    /// Every ingredient except the size comes from the child, which is
+    /// hostile input (`SECURITY.md` §2). Each is capped and stripped of
+    /// control characters: a title is drawn by AppKit, not by the terminal,
+    /// and an unbounded one is an unbounded allocation per output batch.
+    var composedWindowTitle: String {
+        guard session != nil else { return "Corta" }
+        refreshProcessFactsIfStale()
+        var parts: [String] = []
+        if let title = Self.sanitizedTitleComponent(session.windowTitle) {
+            parts.append(title)
+        } else if let directory = cachedDirectory {
+            parts.append(Self.abbreviated(directory))
+        }
+        if let process = Self.sanitizedTitleComponent(cachedProcessName) {
+            parts.append(process)
+        }
+        // The size last delivered to the child, which is the grid the
+        // programs in it are drawing against — not the view's own bounds,
+        // which lead a resize by a debounce interval.
+        if let size = lastRequestedSize {
+            parts.append("\(size.columns)×\(size.rows)")
+        }
+        return parts.isEmpty ? "Corta" : parts.joined(separator: " — ")
+    }
+
+    /// Applies this pane's title to the window, plus the proxy icon for its
+    /// working directory — the folder in the title bar, which makes the path
+    /// draggable and ⌘-clickable the way every document window's is.
+    ///
+    /// The represented URL is only set for a directory that exists: the path
+    /// arrives over OSC 7 from the child, and a proxy icon is something the
+    /// user can drag into another application.
+    func applyWindowTitle() {
+        guard let window = view.window else { return }
+        let title = composedWindowTitle
+        if window.title != title { window.title = title }
+
+        var isDirectory: ObjCBool = false
+        if let path = cachedDirectory,
+            FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
+            isDirectory.boolValue
+        {
+            let url = URL(fileURLWithPath: path)
+            if window.representedURL != url { window.representedURL = url }
+        } else if window.representedURL != nil {
+            window.representedURL = nil
+        }
+    }
+
+    /// The process name and directory behind the title, and when they were
+    /// last read.
+    ///
+    /// Both are syscalls — `tcgetpgrp`, `proc_name`, `proc_pidinfo` — and the
+    /// title is rebuilt on every output batch, which during a `yes` or a
+    /// build is thousands of batches a second. Refreshed on an interval
+    /// instead: a directory that changed a quarter of a second ago is not
+    /// worth three syscalls per frame, and the OSC 0/2 title (the part a
+    /// program updates deliberately) is read fresh every time regardless.
+    private func refreshProcessFactsIfStale() {
+        let now = CACurrentMediaTime()
+        guard now - lastProcessFactsRefresh >= Self.processFactsInterval else { return }
+        lastProcessFactsRefresh = now
+        cachedProcessName = session.activeProcessName
+        cachedDirectory = session.currentDirectory
+    }
+
+    /// Forces the next title to re-read them — for the moments where waiting
+    /// out the interval would show something stale to the user: taking focus,
+    /// and a command boundary the shell reported.
+    func invalidateProcessFacts() {
+        lastProcessFactsRefresh = 0
+    }
+
+    private static let processFactsInterval: CFTimeInterval = 0.4
+
+    /// Trims a child-supplied component to something a title bar can hold:
+    /// control characters out (a newline in a title truncates it visually and
+    /// a private-use scalar can be unrenderable), and a hard length cap.
+    private static func sanitizedTitleComponent(_ text: String?) -> String? {
+        guard let text else { return nil }
+        let cleaned =
+            text
+            .components(separatedBy: .controlCharacters).joined(separator: " ")
+            .trimmingCharacters(in: .whitespaces)
+        guard !cleaned.isEmpty else { return nil }
+        guard cleaned.count > titleComponentLimit else { return cleaned }
+        return cleaned.prefix(titleComponentLimit) + "…"
+    }
+
+    private static let titleComponentLimit = 80
+
+    /// `/Users/noah/Developer` → `~/Developer`, and a bare directory name for
+    /// anything deeper — the whole path in a title bar is noise, and the
+    /// proxy icon carries it for anyone who wants it.
+    private static func abbreviated(_ path: String) -> String {
+        let home = NSHomeDirectory()
+        if path == home { return "~" }
+        let name = (path as NSString).lastPathComponent
+        return name.isEmpty ? path : name
     }
 
     /// Runs at vsync, on the main thread — reads the latest grid without

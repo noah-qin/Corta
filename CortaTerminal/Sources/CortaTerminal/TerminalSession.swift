@@ -220,6 +220,21 @@ public final class TerminalSession: @unchecked Sendable {
     /// The name of that command, when it can be read.
     public var foregroundProcessName: String? { pty.foregroundProcessName }
 
+    /// What owns the terminal right now, shell included — for a title bar
+    /// rather than for a confirmation dialog. See `PTY.activeProcessName`.
+    public var activeProcessName: String? { pty.activeProcessName }
+
+    /// Where this session is, by whichever route answers.
+    ///
+    /// OSC 7 first: a shell that reports its directory is reporting the one
+    /// it believes it is in, which is the right answer when a program has
+    /// changed directory internally. Otherwise the kernel's answer for the
+    /// foreground process group, because a stock macOS zsh sends no OSC 7 to
+    /// anything but Terminal.app (`PTY.currentWorkingDirectory`).
+    public var currentDirectory: String? {
+        state.withLock { $0.terminal.workingDirectory } ?? pty.currentWorkingDirectory
+    }
+
     /// Whether the shell reports a command running via OSC 133 (M7.2).
     public var isCommandRunning: Bool {
         state.withLock { $0.terminal.isCommandRunning }

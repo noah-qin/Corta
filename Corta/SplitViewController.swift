@@ -110,8 +110,8 @@ final class SplitViewController: NSViewController {
         // On this OS, once `.fullSizeContentView` is in the mask,
         // `setContentSize` sizes the *frame* (the content view spans the
         // frame) — and it still miscalculates the chrome by a full titlebar
-        // height on the first call. The size is therefore corrected once at
-        // the first settled layout (`correctInitialWindowSize`); the
+        // height on the first call. The size is therefore corrected once in
+        // `viewDidAppear`, after AppKit's final adjustment; the
         // session is born at the target grid size and nothing is delivered
         // before then (`sizeSettled` gate), so no transient winsize reaches
         // the child (D.1).
@@ -147,10 +147,25 @@ final class SplitViewController: NSViewController {
         // the frame is only final once the sizing above has run.
         if let restore = pendingRestore {
             pendingRestore = nil
+            // The saved frame is authoritative; the default-grid correction
+            // must not overwrite it after the window appears.
+            didCorrectWindowSize = true
             if window.tabbedWindows == nil { window.setFrame(restore.frame.rect, display: false) }
             view.layoutSubtreeIfNeeded()
             self.restore(layout: restore.layout)
         }
+    }
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        // AppKit applies `.fullSizeContentView`'s final frame adjustment after
+        // the last pre-display layout. Correcting in `viewWillLayout` saw the
+        // still-correct frame, marked the work done, and then AppKit removed
+        // one titlebar height — turning a configured 120×30 into 120×27.
+        // At this point that adjustment is complete, while the session is
+        // still protected by the `sizeSettled` gate.
+        correctInitialWindowSize()
+        view.layoutSubtreeIfNeeded()
     }
 
     override func viewWillLayout() {
@@ -163,7 +178,6 @@ final class SplitViewController: NSViewController {
             abs(view.bounds.height - window.frame.height) < 1
         {
             layoutSettled = true
-            correctInitialWindowSize()
         }
     }
 
@@ -211,13 +225,19 @@ final class SplitViewController: NSViewController {
     private func correctInitialWindowSize() {
         guard !didCorrectWindowSize, let window = view.window, let pane = focusedPane
         else { return }
-        didCorrectWindowSize = true
         // A tab takes the group's frame; nothing to correct.
-        guard window.tabbedWindows == nil else { return }
+        guard window.tabbedWindows == nil else {
+            didCorrectWindowSize = true
+            return
+        }
         let target = pane.initialWindowContentSize
         guard abs(window.frame.height - target.height) > 1
             || abs(window.frame.width - target.width) > 1
-        else { return }
+        else {
+            didCorrectWindowSize = true
+            return
+        }
+        didCorrectWindowSize = true
         var frame = window.frame
         frame.origin.y += frame.height - target.height
         frame.size = target
@@ -395,12 +415,17 @@ final class SplitViewController: NSViewController {
         applyWindowTitle()
     }
 
-    /// The window's title is the focused pane's OSC 0/2 title (M2.8); a
-    /// title arriving in an unfocused pane waits for focus.
+    /// The window's title is the focused pane's (M2.8, M5.2) — what is
+    /// running, where, and the grid size (`ViewController.applyWindowTitle`).
+    /// A title arriving in an unfocused pane waits for focus.
     func applyWindowTitle() {
         guard let window = view.window else { return }
-        let title = focusedPane?.session.windowTitle
-        window.title = title?.isEmpty == false ? title! : "Corta"
+        guard let focusedPane else {
+            window.title = "Corta"
+            window.representedURL = nil
+            return
+        }
+        focusedPane.applyWindowTitle()
     }
 
     @objc func moveFocusLeft(_ sender: Any?) { moveFocus(.left) }

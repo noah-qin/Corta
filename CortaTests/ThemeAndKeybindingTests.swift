@@ -179,7 +179,8 @@ import Testing
     @Test("the new terminal and window settings round-trip")
     func newSettingsRoundTrip() {
         var configuration = Configuration()
-        configuration.copyOnSelect = true
+        // The non-default: copy-on-select ships on (M7.10).
+        configuration.copyOnSelect = false
         configuration.linkActivation = .click
         configuration.allowClipboardWrite = true
         configuration.restoreWindows = false
