@@ -68,7 +68,13 @@ final class SplitViewController: NSViewController {
         guard !didSetUpWindow, let window = view.window, let pane = focusedPane else { return }
         didSetUpWindow = true
         pane.didSizeWindow = true
-        let metrics = pane.terminalRenderer.pointMetrics
+        // A pane that failed to build (`PaneFailureView`) has no atlas to
+        // measure, so the window falls back to the storyboard's size rather
+        // than to a trap.
+        guard let metrics = pane.terminalRenderer?.pointMetrics else {
+            didSetUpWindow = false
+            return
+        }
         window.title = "Corta"
         // Tabs (M4.7) are native window tabbing: `.automatic` here, and File >
         // New Tab joins the key window's tab group. The tab label follows
@@ -141,7 +147,7 @@ final class SplitViewController: NSViewController {
         // once, so without this every new window and every new tab flashes
         // the desktop for a frame or two.
         view.layoutSubtreeIfNeeded()
-        pane.terminalView.drawNow()
+        pane.terminalView?.drawNow()
 
         // The splits, last: they need the window's final frame to halve, and
         // the frame is only final once the sizing above has run.
@@ -150,7 +156,10 @@ final class SplitViewController: NSViewController {
             // The saved frame is authoritative; the default-grid correction
             // must not overwrite it after the window appears.
             didCorrectWindowSize = true
-            if window.tabbedWindows == nil { window.setFrame(restore.frame.rect, display: false) }
+            // Clamped to a display that exists now — see `Frame.onScreen`.
+            if window.tabbedWindows == nil {
+                window.setFrame(restore.frame.onScreen(), display: false)
+            }
             view.layoutSubtreeIfNeeded()
             self.restore(layout: restore.layout)
         }
@@ -297,7 +306,7 @@ final class SplitViewController: NSViewController {
         // the "split flashes, then settles" jank.
         let oldFrame = focusedPane.view.frame
         let pane = makePane(
-            workingDirectory: workingDirectory ?? focusedPane.session.workingDirectory,
+            workingDirectory: workingDirectory ?? focusedPane.session?.workingDirectory,
             initialGridSize: halvedGridSize(of: focusedPane, orientation: orientation))
         let node = tree.split(
             leaf: focusedPane.view, orientation: orientation, newLeaf: pane.view)
@@ -366,7 +375,7 @@ final class SplitViewController: NSViewController {
         // The bar's key monitor outlives the pane if it is left open.
         pane.closeSearchBar()
         pane.taskNotifier.cancel()
-        pane.session.stop()
+        pane.session?.stop()
         let survivingSubtree = tree.close(leaf: pane.view)
         pane.removeFromParent()
         installRoot()

@@ -76,6 +76,22 @@ class ViewController: NSViewController {
     /// cursor alone was too subtle. Above the terminal canvas, below the
     /// search bar's glass; it never intercepts input (`PassthroughView`).
     var focusDimView: NSView?
+    /// The accent ring around the pane that owns the keyboard (M5.2, revised)
+    /// — the positive half of the focus signal, so an unfocused pane no
+    /// longer has to be dimmed to the point of looking disabled.
+    var focusRingView: NSView?
+    /// Shown instead of a terminal when this pane could not be built —
+    /// no Metal device, no glyph atlas, or no child process (`PaneFailureView`).
+    /// Non-nil is the one state in which `isOperable` is false.
+    var failureView: PaneFailureView?
+    /// A one-line report that the session started, but not the way it was
+    /// asked to (a fallback shell or directory). Shown once the view is on
+    /// screen, where the toast can actually be seen.
+    private var pendingSessionNotice: String?
+    /// Notification observers are process-lifetime and `setUpPane` can run
+    /// twice (a retry after a failure); registering again would double every
+    /// config change.
+    private var didInstallObservers = false
     /// The focus state last reported to the child (`?1004`, M6.7). `nil`
     /// until the first report, so the first one always goes out. Storage
     /// lives here because `ViewController+Focus` is an extension.
@@ -105,6 +121,10 @@ class ViewController: NSViewController {
     private var cachedProcessName: String?
     private var cachedDirectory: String?
     private var lastProcessFactsRefresh: CFTimeInterval = 0
+    /// True for a moment after a resize, while the title carries the grid
+    /// size (see `composedWindowTitle`).
+    private var isShowingTransientSize = false
+    private var transientSizeReset: DispatchWorkItem?
 
     /// The last grid size sent (or about to be sent) to the child; ⌘+/⌘−
     /// re-fit the window to keep this grid size at the new cell metrics.
@@ -134,7 +154,7 @@ class ViewController: NSViewController {
     /// the debounce window expires. Wired to `TerminalView`'s
     /// `viewDidEndLiveResize` (live-resize notifications live on the view).
     func endLiveResize() {
-        resizeDebouncer.flush()
+        resizeDebouncer?.flush()
     }
 
     /// The grid a new window opens with, from the config file (M7.14). The
@@ -182,6 +202,30 @@ class ViewController: NSViewController {
     /// cursor, which doubles as the focus indicator.
     var isFocusedPane: Bool { splitController?.focusedPane === self }
 
+    /// Whether this pane has a terminal at all. False means `setUpPane`
+    /// failed and `failureView` is showing: there is nothing to render, no
+    /// child to write to, and no cell metrics measured from a real atlas.
+    /// Everything the window and the split tree call into has to survive
+    /// that state rather than trap on an implicitly-unwrapped nil.
+    var isOperable: Bool { terminalRenderer != nil && session != nil }
+
+    /// The cell metrics geometry is measured from, or an estimate from the
+    /// system face when the renderer could not be built. A broken pane still
+    /// has to answer the split tree's minimum-size walk and the window's
+    /// initial sizing; answering with an estimate keeps it from taking the
+    /// whole window's layout down with it.
+    private var cellMetrics: (cellWidth: CGFloat, cellHeight: CGFloat) {
+        if let terminalRenderer {
+            let metrics = terminalRenderer.pointMetrics
+            return (metrics.cellWidth, metrics.cellHeight)
+        }
+        let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .medium)
+        return (
+            cellWidth: font.maximumAdvancement.width,
+            cellHeight: (font.ascender - font.descender + font.leading).rounded(.up)
+        )
+    }
+
     let minimumColumns = 20
     let minimumRows = 5
 
@@ -189,7 +233,7 @@ class ViewController: NSViewController {
     /// metrics — the leaf value of the split tree's minimum-size walk
     /// (M5.4).
     var minimumContentSize: CGSize {
-        let metrics = terminalRenderer.pointMetrics
+        let metrics = cellMetrics
         return CGSize(
             width: CGFloat(minimumColumns) * metrics.cellWidth + TerminalLayout.insetWidth,
             height: CGFloat(minimumRows) * metrics.cellHeight + TerminalLayout.insetHeight)
@@ -199,7 +243,7 @@ class ViewController: NSViewController {
     /// and this pane's insets — how a split predicts the new pane's winsize
     /// before layout settles it exactly.
     func gridSize(fitting size: CGSize) -> TerminalSize {
-        let metrics = terminalRenderer.pointMetrics
+        let metrics = cellMetrics
         return TerminalSize(
             rows: UInt16(max(1, (size.height - verticalInsets) / metrics.cellHeight)),
             columns: UInt16(max(1, (size.width - TerminalLayout.insetWidth) / metrics.cellWidth)))
@@ -215,7 +259,7 @@ class ViewController: NSViewController {
     /// constraints settle, its temporary position can make it look as if it
     /// does not touch the top of the window and omit the titlebar entirely.
     var initialWindowContentSize: NSSize {
-        let metrics = terminalRenderer.pointMetrics
+        let metrics = cellMetrics
         let grid = initialGridSize ?? configuredGridSize
         return NSSize(
             width: CGFloat(grid.columns) * metrics.cellWidth + TerminalLayout.insetWidth,
@@ -225,7 +269,21 @@ class ViewController: NSViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        setUpPane()
+    }
 
+    /// Builds the pane: renderer, session, view hierarchy, wiring.
+    ///
+    /// Separate from `viewDidLoad` because it is also the retry path. Three
+    /// things have to exist before a pane can draw — a Metal device, an atlas
+    /// for the configured face, and a child on a PTY — and each can fail on a
+    /// machine Corta is otherwise fine on: a `$SHELL` pointing at a shell that
+    /// was uninstalled, a restored working directory on an unmounted volume.
+    /// Until M7 each of those was a `fatalError` or a `try!`, so the answer to
+    /// "your login shell moved" was a crash report. Now the recoverable ones
+    /// degrade (`startSession`, `makeRenderer`) and the rest present
+    /// `PaneFailureView`, whose Try Again runs this again.
+    private func setUpPane() {
         // The settings page's font and size (M6.1). Read here rather than
         // pushed in later: a pane created at any time — a split, a new tab —
         // gets the current values by asking, and nothing has to remember to
@@ -233,14 +291,44 @@ class ViewController: NSViewController {
         let configuration = ConfigurationStore.shared.configuration
         fontSize = min(64, max(8, configuration.fontSize))
         fontFamily = configuration.fontFamily
-        let font = TerminalFont.primary(ofSize: fontSize, family: fontFamily)
-        guard let device = MTLCreateSystemDefaultDevice() else {
-            fatalError("Metal is required")
+        guard let device = self.device ?? MTLCreateSystemDefaultDevice() else {
+            // Not retryable: a Mac that reports no Metal device will not grow
+            // one while the app is running.
+            presentFailure(
+                title: L10n.text("failure.title.metal"),
+                detail: L10n.text("failure.detail.metal"), canRetry: false)
+            return
         }
         self.device = device
         let scale = NSScreen.main?.backingScaleFactor ?? 2
-        terminalRenderer = try! TerminalRenderer(device: device, font: font, scale: scale)
+        do {
+            terminalRenderer = try makeRenderer(device: device, scale: scale)
+        } catch {
+            presentFailure(
+                title: L10n.text("failure.title.renderer"),
+                detail: Self.describe(error), canRetry: true)
+            return
+        }
         commandQueue = device.makeCommandQueue()
+
+        // The session comes before the view hierarchy: with no child there is
+        // no terminal to lay out, and the failure view should take the pane
+        // rather than sit behind a live canvas with nothing driving it.
+        let initialSize = initialGridSize ?? configuredGridSize
+        let started: StartedSession
+        do {
+            started = try Self.startSession(
+                size: initialSize, directory: inheritedWorkingDirectory,
+                scrollbackLimit: configuration.scrollbackLines)
+        } catch {
+            presentFailure(
+                title: L10n.text("failure.title.session"),
+                detail: Self.describe(error), canRetry: true)
+            return
+        }
+        session = started.session
+        pendingSessionNotice = started.notice
+        lastRequestedSize = initialSize
 
         let contentSize = initialWindowContentSize
         // Size the container to the target content size *before* the first
@@ -292,7 +380,7 @@ class ViewController: NSViewController {
         // Layer-backed: a subview without a backing layer never composites
         // over the Metal layer and the dim would be silently invisible.
         dim.wantsLayer = true
-        dim.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.22).cgColor
+        dim.layer?.backgroundColor = NSColor.black.withAlphaComponent(Self.unfocusedDim).cgColor
         dim.isHidden = true
         dim.translatesAutoresizingMaskIntoConstraints = false
         self.view.addSubview(dim)
@@ -304,27 +392,49 @@ class ViewController: NSViewController {
         ])
         focusDimView = dim
 
-        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        let initialSize = initialGridSize ?? configuredGridSize
-        session = try! TerminalSession(
-            executable: shell, arguments: ["-l"],
-            // Launched from Finder the app inherits "/" as its working
-            // directory, so the shell opened in the filesystem root. A
-            // terminal should start where a login shell would — and a split
-            // pane starts where the pane it was split from is (M5.5).
-            size: initialSize,
-            workingDirectory: inheritedWorkingDirectory ?? NSHomeDirectory(),
-            // Per session: a running child's history cannot be re-limited
-            // without discarding lines, so a change applies to sessions
-            // opened after it.
-            scrollbackLimit: configuration.scrollbackLines)
-        lastRequestedSize = initialSize
+        // The focus *indicator*, as opposed to the dim.
+        //
+        // A 22%-black wash over every pane but one was the whole signal, and
+        // it said the wrong thing: a heavily dimmed pane reads as disabled or
+        // suspended, not as "running, just not typing here" — and it took a
+        // fifth of the contrast off text the user was still reading, in a
+        // split whose entire purpose is watching two things at once. The
+        // signal is now positive and on the active pane: an accent-coloured
+        // ring around the pane that has the keyboard, with the dim reduced to
+        // a hint. A ring is also the convention every other split UI on this
+        // platform uses, so it needs no learning.
+        let ring = PassthroughView()
+        ring.wantsLayer = true
+        ring.layer?.borderWidth = Self.focusRingWidth
+        ring.layer?.cornerRadius = TerminalLayout.windowCornerRadius
+        ring.layer?.borderColor = NSColor.controlAccentColor.cgColor
+        ring.isHidden = true
+        ring.translatesAutoresizingMaskIntoConstraints = false
+        self.view.addSubview(ring)
+        // Inset by the border's own width: drawn flush to the pane's edge,
+        // half of a 2pt border falls outside the view and the ring reads as
+        // 1pt on the window's outer edges and 2pt against a divider.
+        NSLayoutConstraint.activate([
+            ring.leadingAnchor.constraint(
+                equalTo: self.view.leadingAnchor, constant: Self.focusRingWidth / 2),
+            ring.trailingAnchor.constraint(
+                equalTo: self.view.trailingAnchor, constant: -Self.focusRingWidth / 2),
+            ring.topAnchor.constraint(
+                equalTo: self.view.topAnchor, constant: Self.focusRingWidth / 2),
+            ring.bottomAnchor.constraint(
+                equalTo: self.view.bottomAnchor, constant: -Self.focusRingWidth / 2),
+        ])
+        focusRingView = ring
+
         resizeDebouncer = ResizeDebouncer { [weak self] size in
-            self?.session.resize(to: size)
+            self?.session?.resize(to: size)
+        }
+        if !didInstallObservers {
+            didInstallObservers = true
+            observeWindowFocus()
+            observeConfiguration()
         }
         // Fires on the reader thread after every parse batch.
-        observeWindowFocus()
-        observeConfiguration()
         session.onOutput = { [weak self] in
             self?.noteOutput()
         }
@@ -347,6 +457,9 @@ class ViewController: NSViewController {
         }
         view.onLiveResizeEnded = { [weak self] in
             self?.endLiveResize()
+        }
+        view.isNewLineMode = { [weak self] in
+            self?.session?.isNewLineModeEnabled ?? false
         }
         view.keyboardEnhancements = { [weak self] in
             self?.session?.keyboardEnhancements ?? []
@@ -407,6 +520,24 @@ class ViewController: NSViewController {
         // (`documentPosition`) — a raw divide of the view point by the cell
         // size reports a cell off by the insets. scrollOffset is 0 here:
         // the report is about what is on screen, not the document.
+        // Accessibility (`TerminalView+Accessibility.swift`). The view draws
+        // with Metal and so has no text for AppKit to derive an accessibility
+        // tree from; these two closures are that text.
+        view.accessibilitySnapshotProvider = { [weak self] in
+            guard let self, let session else { return nil }
+            let grid = session.snapshot()
+            return TerminalAccessibilitySnapshot(
+                grid: grid,
+                selection: selection.map { selectionRange(for: $0, in: grid) })
+        }
+        view.accessibilityCellFrameProvider = { [weak self] row, column in
+            guard let self, let terminalRenderer else { return .zero }
+            let metrics = terminalRenderer.pointMetrics
+            return CGRect(
+                x: TerminalLayout.insets.left + CGFloat(column) * metrics.cellWidth,
+                y: topInset + CGFloat(row) * metrics.cellHeight,
+                width: metrics.cellWidth, height: metrics.cellHeight)
+        }
         view.cellAtPoint = { [weak self] point in
             guard let self, let terminalRenderer, session != nil, let terminalView
             else { return (column: 0, row: 0) }
@@ -434,6 +565,7 @@ class ViewController: NSViewController {
     /// output did arrive, the snapshot is diffed against the renderer's
     /// line-granular cache and the frame happens only on damage.
     private func updateDamage() -> Bool {
+        guard let session, terminalRenderer != nil else { return false }
         if session.takeBell() {
             handleBell()
         }
@@ -460,6 +592,10 @@ class ViewController: NSViewController {
             updateSearchResults(scrollsToMatch: false)
         }
         if hasOutput {
+            // A screen reader following a build log has to hear the new lines,
+            // not the ones from when it last asked. Rate-limited and gated on
+            // VoiceOver actually running, inside the call.
+            terminalView?.noteAccessibilityValueChanged()
             // Two things the child asked for, drained on the same batch
             // boundary every other "the child told us something" hand-off
             // uses: a clipboard write (OSC 52, M7.11) and the command
@@ -509,9 +645,19 @@ class ViewController: NSViewController {
     /// Called from the reader thread after each parse batch: record that the
     /// grid may have changed and wake the (possibly parked) display link.
     nonisolated private func noteOutput() {
+        // A parse batch has landed on the grid. Emitted from the reader
+        // thread, so it is a point rather than an interval — the interval it
+        // would close began in `keyDown` on another thread
+        // (`InputLatencySignposts`).
+        InputLatencySignposts.emit(.output)
         outputPending.withLock { $0 = true }
+        // The MainActor hop, measured separately: this is the stage a busy
+        // main thread lengthens, and the one an end-to-end number cannot
+        // tell apart from a slow parse.
+        let wake = InputLatencySignposts.begin(.wake)
         Task { @MainActor [weak self] in
-            self?.terminalView.setNeedsRedraw()
+            InputLatencySignposts.end(.wake, wake)
+            self?.terminalView?.setNeedsRedraw()
             self?.taskNotifier.noteOutput()
         }
     }
@@ -520,7 +666,7 @@ class ViewController: NSViewController {
     /// (layout, scrolling) that produce no PTY output.
     func invalidateDisplay() {
         needsRedraw = true
-        terminalView.setNeedsRedraw()
+        terminalView?.setNeedsRedraw()
     }
 
     func resizeSessionToFitView() {
@@ -566,6 +712,7 @@ class ViewController: NSViewController {
         // Terminal.app shows it.
         if isFocusedPane {
             invalidateProcessFacts()
+            noteTransientSizeChange()
             applyWindowTitle()
         }
     }
@@ -600,10 +747,17 @@ class ViewController: NSViewController {
         if let process = Self.sanitizedTitleComponent(cachedProcessName) {
             parts.append(process)
         }
-        // The size last delivered to the child, which is the grid the
-        // programs in it are drawing against — not the view's own bounds,
-        // which lead a resize by a debounce interval.
-        if let size = lastRequestedSize {
+        // The grid size, only while it is changing.
+        //
+        // It used to be appended permanently, so the title read
+        // "~/Corta — zsh — 120×27" for the whole life of the window: a third
+        // of the space, and with tabs a third of every tab label, spent on a
+        // number that is interesting for the two seconds of a drag and never
+        // again. Terminal.app shows it during a resize for exactly that
+        // reason. With tabs the cost is worse than cosmetic — the tab label
+        // truncates from the right, so the directory or task name the user is
+        // actually distinguishing tabs by was the first thing to disappear.
+        if let size = lastRequestedSize, isShowingTransientSize {
             parts.append("\(size.columns)×\(size.rows)")
         }
         return parts.isEmpty ? "Corta" : parts.joined(separator: " — ")
@@ -632,6 +786,24 @@ class ViewController: NSViewController {
             window.representedURL = nil
         }
     }
+
+    /// Shows the grid size in the title for a moment after a resize, then
+    /// takes it away again. Called from `resizeSessionToFitView`, which is
+    /// the only place the size changes.
+    func noteTransientSizeChange() {
+        isShowingTransientSize = true
+        transientSizeReset?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            isShowingTransientSize = false
+            transientSizeReset = nil
+            applyWindowTitle()
+        }
+        transientSizeReset = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.transientSizeDuration, execute: work)
+    }
+
+    private static let transientSizeDuration: TimeInterval = 1.5
 
     /// The process name and directory behind the title, and when they were
     /// last read.
@@ -690,7 +862,9 @@ class ViewController: NSViewController {
     private func render(
         into renderPassDescriptor: MTLRenderPassDescriptor, drawableSize: CGSize, drawable: CAMetalDrawable
     ) {
-        guard let commandBuffer = commandQueue.makeCommandBuffer() else { return }
+        guard let session, let terminalRenderer, let commandQueue,
+            let commandBuffer = commandQueue.makeCommandBuffer()
+        else { return }
         let grid = session.snapshot()
         terminalRenderer.render(
             grid: grid, scrollOffset: scrollOffset,
@@ -703,8 +877,19 @@ class ViewController: NSViewController {
             searchMatches: searchMatches.map { TerminalSelection($0, grid: grid) },
             currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink,
             renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
+        // `commit` covers encode-and-submit; `gpu` runs from submission to
+        // the completion handler, which is the only place the GPU's own time
+        // — and any wait for a drawable to be recycled — becomes visible.
+        let gpu = InputLatencySignposts.begin(.gpu)
+        if gpu != nil {
+            commandBuffer.addCompletedHandler { _ in
+                InputLatencySignposts.end(.gpu, gpu)
+            }
+        }
+        let commit = InputLatencySignposts.begin(.commit)
         commandBuffer.present(drawable)
         commandBuffer.commit()
+        InputLatencySignposts.end(.commit, commit)
     }
 
     /// The grid's rectangle inside the drawable, in pixels.
@@ -736,13 +921,168 @@ class ViewController: NSViewController {
         }
     }
 
+    // MARK: - Failure paths
+
+    /// The atlas for the configured face, falling back to the system face at
+    /// the default size.
+    ///
+    /// `MonospacedFontCatalog` verifies a family before Corta offers it, but a
+    /// family named in the config file only has to pass that check — the atlas
+    /// can still fail to build for a face it vouched for, or for a size at
+    /// which the metrics degenerate. The system monospaced face at the default
+    /// size is the one combination Corta stands behind (`CLAUDE.md`), so it is
+    /// the fallback rather than a failure.
+    private func makeRenderer(device: MTLDevice, scale: CGFloat) throws -> TerminalRenderer {
+        do {
+            return try TerminalRenderer(
+                device: device,
+                font: TerminalFont.primary(ofSize: fontSize, family: fontFamily), scale: scale)
+        } catch {
+            fontSize = Self.defaultFontSize
+            fontFamily = Configuration.systemFontFamily
+            return try TerminalRenderer(
+                device: device,
+                font: TerminalFont.primary(ofSize: fontSize, family: fontFamily), scale: scale)
+        }
+    }
+
+    struct StartedSession {
+        let session: TerminalSession
+        /// Set when a fallback was used, so the pane can say it is running
+        /// something other than what was asked for instead of leaving the
+        /// user to wonder why their prompt looks wrong.
+        let notice: String?
+    }
+
+    /// Starts the child, degrading rather than failing whenever only *part* of
+    /// the request is impossible.
+    ///
+    /// Two ingredients come from outside Corta and can both be stale: `$SHELL`
+    /// (a shell that was uninstalled, a Homebrew prefix that moved) and the
+    /// working directory (a restored session's directory on a volume that is
+    /// no longer mounted, or one that has been deleted). Either alone used to
+    /// abort the entire pane. The chain drops the failing ingredient first and
+    /// only then the other, so a bad directory still gets you your shell and a
+    /// bad shell still gets you your directory. `/bin/sh` in `/` is the last
+    /// rung because POSIX guarantees both exist.
+    private static func startSession(
+        size: TerminalSize, directory: String?, scrollbackLimit: Int
+    ) throws(PTYError) -> StartedSession {
+        let configured = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let home = NSHomeDirectory()
+        // Launched from Finder the app inherits "/" as its working directory,
+        // so the shell opened in the filesystem root. A terminal should start
+        // where a login shell would — and a split pane starts where the pane
+        // it was split from is (M5.5).
+        let preferred = directory ?? home
+        let attempts: [(shell: String, directory: String, notice: String?)] = [
+            (configured, preferred, nil),
+            (configured, home, L10n.text("failure.notice.fallbackDirectory")),
+            ("/bin/zsh", preferred, L10n.format("failure.notice.fallbackShell", "/bin/zsh")),
+            ("/bin/zsh", home, L10n.format("failure.notice.fallbackShell", "/bin/zsh")),
+            ("/bin/sh", "/", L10n.format("failure.notice.fallbackShell", "/bin/sh")),
+        ]
+        var attempted = Set<String>()
+        var lastError = PTYError.spawnFailed(code: ENOENT)
+        for attempt in attempts {
+            // With no `$SHELL` and no inherited directory several rungs are
+            // the same command; re-running a spawn that just failed only
+            // delays the failure view.
+            guard attempted.insert("\(attempt.shell)\u{0}\(attempt.directory)").inserted
+            else { continue }
+            do {
+                let session = try TerminalSession(
+                    executable: attempt.shell, arguments: ["-l"], size: size,
+                    workingDirectory: attempt.directory,
+                    // Per session: a running child's history cannot be
+                    // re-limited without discarding lines, so a change
+                    // applies to sessions opened after it.
+                    scrollbackLimit: scrollbackLimit)
+                return StartedSession(session: session, notice: attempt.notice)
+            } catch {
+                lastError = error
+            }
+        }
+        throw lastError
+    }
+
+    /// One line a person can act on. `PTYError` writes its description for
+    /// exactly this purpose; anything else falls back to Foundation's.
+    private static func describe(_ error: Error) -> String {
+        (error as? CustomStringConvertible)?.description ?? error.localizedDescription
+    }
+
+    /// Replaces the pane's content with an explanation and the two actions
+    /// that can help. The terminal view is never built in this state, so
+    /// `isOperable` is false and every geometry and render entry point
+    /// short-circuits.
+    private func presentFailure(title: String, detail: String, canRetry: Bool) {
+        failureView?.removeFromSuperview()
+        let failure = PaneFailureView(title: title, detail: detail, canRetry: canRetry)
+        failure.onRetry = { [weak self] in self?.retryAfterFailure() }
+        failure.onOpenSettings = { SettingsWindowController.shared.show(nil) }
+        failure.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(failure)
+        NSLayoutConstraint.activate([
+            failure.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            failure.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            failure.topAnchor.constraint(equalTo: view.topAnchor),
+            failure.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
+        failureView = failure
+    }
+
+    private func retryAfterFailure() {
+        failureView?.removeFromSuperview()
+        failureView = nil
+        terminalView?.removeFromSuperview()
+        terminalView = nil
+        focusDimView?.removeFromSuperview()
+        focusDimView = nil
+        setUpPane()
+        guard isOperable, let terminalView else { return }
+        // The window settled long before this retry, so the startup gate that
+        // holds back transient layouts has nothing left to protect against —
+        // and the pane needs a winsize measured at real cell metrics, which it
+        // did not have while the failure view was up.
+        didSizeWindow = true
+        view.window?.makeFirstResponder(terminalView)
+        resizeSessionToFitView()
+        invalidateDisplay()
+    }
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        // Reported here rather than at construction: a toast needs a view on
+        // screen to appear over.
+        if let notice = pendingSessionNotice {
+            pendingSessionNotice = nil
+            terminalView?.showToast(notice, kind: .warning)
+        }
+    }
+
     /// The dim wash over unfocused panes (M5.2). Called by
     /// `SplitViewController.noteFocus` for both the old and the new focused
     /// pane.
     func applyFocusAppearance() {
-        focusDimView?.isHidden = isFocusedPane
+        // A single pane needs neither: there is nothing to distinguish it
+        // from, and a ring around the only pane is decoration.
+        let inSplit = splitController?.hasMultiplePanes == true
+        focusDimView?.isHidden = isFocusedPane || !inSplit
+        focusRingView?.isHidden = !isFocusedPane || !inSplit
+        // The accent colour is the user's and can change while the app runs;
+        // Increase Contrast also needs a heavier ring than a tinted hairline.
+        focusRingView?.layer?.borderColor = NSColor.controlAccentColor.cgColor
+        focusRingView?.layer?.borderWidth =
+            SystemAccessibility.increaseContrast ? Self.focusRingWidth + 1 : Self.focusRingWidth
         reportFocusIfNeeded()
     }
+
+    /// 8% rather than 22%: enough to tell two panes apart at a glance
+    /// alongside the ring, little enough that the unfocused pane's text is
+    /// still text you can read.
+    static let unfocusedDim: CGFloat = 0.08
+    static let focusRingWidth: CGFloat = 2
 }
 
 /// Covers a pane to dim it without intercepting input — clicks, scrolls
