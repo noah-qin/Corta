@@ -45,4 +45,41 @@ final class SearchAndTabUITests: XCTestCase {
         expectation(for: twoTabs, evaluatedWith: tabGroup)
         waitForExpectations(timeout: 5)
     }
+
+    /// Every ⌘T used to take a chrome height off the shared window frame —
+    /// four tabs collapsed a 451pt window to the 49pt minimum — because
+    /// inserting `.fullSizeContentView` re-derives the frame from the
+    /// content size and a tab, unlike a standalone window, never overwrites
+    /// the frame afterwards.
+    ///
+    /// The tab bar appearing does grow the frame once, by its own height, so
+    /// that the panes keep their row count; after that the frame is fixed.
+    @MainActor
+    func testTabsDoNotShrinkTheWindow() throws {
+        let app = XCUIApplication()
+        app.launch()
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        let beforeAnyTab = window.frame
+
+        app.typeKey("t", modifierFlags: .command)
+        RunLoop.current.run(until: Date().addingTimeInterval(1.5))
+        let withTabBar = app.windows.firstMatch.frame
+        XCTAssertGreaterThanOrEqual(
+            withTabBar.height, beforeAnyTab.height,
+            "the tab bar must not eat into the window's height")
+
+        for tab in 2...4 {
+            app.typeKey("t", modifierFlags: .command)
+            RunLoop.current.run(until: Date().addingTimeInterval(1.5))
+            let frame = app.windows.firstMatch.frame
+            XCTAssertEqual(
+                frame.height, withTabBar.height, accuracy: 1,
+                "tab \(tab) resized the window: \(frame) vs \(withTabBar)")
+            XCTAssertEqual(
+                frame.width, withTabBar.width, accuracy: 1,
+                "tab \(tab) resized the window: \(frame) vs \(withTabBar)")
+        }
+    }
 }

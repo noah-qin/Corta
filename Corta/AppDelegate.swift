@@ -48,6 +48,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // then resized by the tab group reads as a flash.
             window.setFrame(keyWindow.frame, display: false)
             keyWindow.addTabbedWindow(window, ordered: .above)
+            // The tab bar appearing grows the chrome, and AppKit answers by
+            // shrinking the content area — every pane in the group silently
+            // loses the bar's worth of rows. The key window absorbs that
+            // delta into its frame instead; it has to be told, because it is
+            // the window the new tab covers and it never lays out again.
+            (keyWindow.contentViewController as? SplitViewController)?
+                .absorbChromeChange()
         }
         controller.showWindow(sender)
         window.makeKeyAndOrderFront(sender)

@@ -75,7 +75,20 @@ final class SplitViewController: NSViewController {
         // mask must be final before the window's first layout — see
         // `resizeSessionToFitView` in `ViewController` for what a transient
         // size strands in the child.
+        //
+        // Inserting the flag re-derives the frame from the content size, so
+        // the window silently loses a chrome height at that moment. The
+        // frame is captured here and restored below for the one caller that
+        // does not overwrite it anyway.
+        let frameBeforeStyleChange = window.frame
         window.styleMask.insert(.fullSizeContentView)
+        // A terminal window has nothing to restore: its content is a live
+        // child process, not a document. Left restorable, AppKit re-applied
+        // a saved frame *after* the deliberate sizing below — the window
+        // opened at a stale size, and the stale size was whatever the tab
+        // bug had shrunk it to last time, so the two compounded across
+        // launches.
+        window.isRestorable = false
         // The Metal layer clears to a translucent colour; the window has to
         // stop painting its own opaque background for that to show through.
         window.isOpaque = false
@@ -98,6 +111,14 @@ final class SplitViewController: NSViewController {
         // the visible "the whole window moves when a tab opens" jump.
         if window.tabbedWindows == nil {
             window.setContentSize(pane.initialWindowContentSize)
+        } else if window.frame != frameBeforeStyleChange {
+            // The chrome height the style-mask insert took off the frame
+            // (see above). A standalone window's `setContentSize` overwrites
+            // the frame and hides it; a tab keeps the group's frame, so it
+            // kept the loss — which is why every ⌘T shrank the shared window
+            // by a chrome (32pt, then 68pt once the tab bar was up) until it
+            // bottomed out at the minimum size.
+            window.setFrame(frameBeforeStyleChange, display: false)
         }
         // Nothing else claims first responder, and without one the view
         // hierarchy — the terminal view, the controllers — is not in the
@@ -129,22 +150,39 @@ final class SplitViewController: NSViewController {
 
     override func viewDidLayout() {
         super.viewDidLayout()
-        guard let window = view.window, didSetUpWindow else { return }
-        // A tab bar appearing or disappearing changes the chrome height
-        // without any user resize; AppKit answers by shrinking the content
-        // area, which visibly pushes the grid down. Absorb the delta into
-        // the frame instead: the window grows downward (the titlebar stays
-        // put) and every pane keeps its row count.
+        absorbChromeChange()
+    }
+
+    /// A tab bar appearing or disappearing changes the chrome height without
+    /// any user resize; AppKit answers by shrinking the content area, which
+    /// visibly pushes the grid down and costs every pane the bar's worth of
+    /// rows. Absorb the delta into the frame instead: the window grows
+    /// downward (the titlebar stays put) and every pane keeps its row count.
+    ///
+    /// Called from `viewDidLayout` for the changes this window sees, and
+    /// from `AppDelegate.newTab` for the one it cannot: the window whose
+    /// chrome grows when a tab joins is the window the new tab covers, so it
+    /// never lays out again on its own.
+    func absorbChromeChange() {
+        // `isVisible` and `sizeSettled` together mean setup is over. Before
+        // that `contentLayoutRect` is still the pre-`setContentSize` content
+        // area (observed once at an origin of -302), and the chrome measured
+        // off it is nonsense that absorbs into a visible startup jump.
+        guard let window = view.window, didSetUpWindow, sizeSettled, window.isVisible
+        else { return }
         let chrome = window.frame.height - window.contentLayoutRect.height
-        if let last = lastChromeHeight, chrome != last, !window.inLiveResize,
-            !window.styleMask.contains(.fullScreen)
-        {
-            var frame = window.frame
-            frame.origin.y -= chrome - last
-            frame.size.height += chrome - last
-            window.setFrame(frame, display: true)
-        }
+        let last = lastChromeHeight
+        // Recorded before the resize, not after: `setFrame` lays out
+        // reentrantly, and the nested call would otherwise read the stale
+        // value and absorb the same delta a second time.
         lastChromeHeight = chrome
+        guard let last, chrome != last, !window.inLiveResize,
+            !window.styleMask.contains(.fullScreen)
+        else { return }
+        var frame = window.frame
+        frame.origin.y -= chrome - last
+        frame.size.height += chrome - last
+        window.setFrame(frame, display: true)
     }
 
     /// The one-time correction for `setContentSize` mismeasuring the chrome
