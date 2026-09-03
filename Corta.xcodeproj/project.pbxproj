@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		4F2E2B293047183A0037705B /* corta-exec in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000730465E2000E8DD20 /* corta-exec */; };
+		A1C0A001030465E2000E8DD20 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = A1C0A000030465E2000E8DD20 /* AppIcon.icon */; };
 		C07A000130465E2000E8DD20 /* CortaTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000530465E2000E8DD20 /* CortaTerminal */; };
 		C07A000230465E2000E8DD20 /* CortaTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000630465E2000E8DD20 /* CortaTerminal */; };
 		C07A000830465E2000E8DD20 /* corta-exec in Embed corta-exec */ = {isa = PBXBuildFile; productRef = C07A000730465E2000E8DD20 /* corta-exec */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
@@ -48,6 +49,7 @@
 		4F17769F30465E1F00E8DD20 /* Corta.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Corta.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4F1776AF30465E2000E8DD20 /* CortaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CortaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4F1776B930465E2000E8DD20 /* CortaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CortaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1C0A000030465E2000E8DD20 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -99,6 +101,7 @@
 		4F17769630465E1F00E8DD20 = {
 			isa = PBXGroup;
 			children = (
+				A1C0A000030465E2000E8DD20 /* AppIcon.icon */,
 				4F1776A130465E1F00E8DD20 /* Corta */,
 				4F1776B230465E2000E8DD20 /* CortaTests */,
 				4F1776BC30465E2000E8DD20 /* CortaUITests */,
@@ -243,6 +246,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1C0A001030465E2000E8DD20 /* AppIcon.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
