@@ -19,11 +19,17 @@ extension TerminalView {
             let controller = paneController,
             controller.handleLinkClick(event, in: self)
         { return }
-        if report(event, phase: .press(.left)) { return }
-        // Mouse reporting is off, so the left button selects text (M3.7).
-        // The shell owns the selection state; it is reached through the
-        // responder chain rather than a stored closure because extensions
-        // cannot add storage to the class.
+        // ⌥-held overrides mouse reporting so text stays selectable in an
+        // app that has turned tracking on for itself (Claude Code and any
+        // full-screen mouse UI): every other terminal treats Option-drag as
+        // "select regardless," and without it a program that wants the
+        // mouse makes local selection unreachable for as long as it runs.
+        let optionOverridesReporting = event.modifierFlags.contains(.option)
+        if !optionOverridesReporting, report(event, phase: .press(.left)) { return }
+        // Mouse reporting is off (or overridden), so the left button selects
+        // text (M3.7). The shell owns the selection state; it is reached
+        // through the responder chain rather than a stored closure because
+        // extensions cannot add storage to the class.
         guard let controller = paneController else {
             super.mouseDown(with: event)
             return
