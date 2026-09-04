@@ -69,12 +69,20 @@ extension ViewController {
 
     // MARK: - Mouse selection (M3.7)
 
-    /// A left mouse down with mouse reporting off (the view checks that
-    /// first — SGR reports keep precedence). Tracks the drag in a local
-    /// event loop so the anchor and the gesture's unit never need storage:
-    /// plain drag selects characters, double-click-drag words,
+    /// Every left mouse down, reporting on or off. Tracks the drag in a
+    /// local event loop so the anchor and the gesture's unit never need
+    /// storage: plain drag selects characters, double-click-drag words,
     /// triple-click-drag logical lines, shift-click extends the existing
-    /// selection. A plain click without movement clears the selection.
+    /// selection.
+    ///
+    /// Reporting only wins when the gesture resolves as a plain click that
+    /// never moved — decided here, at mouse-up, rather than up front in
+    /// `TerminalView`, because a drag starting exactly the same way means
+    /// the user wants to select text and gets it, whatever the child asked
+    /// for. That is what makes the click reportable-or-not rather than
+    /// simply not reportable: an app that has turned on mouse tracking for
+    /// its own clickable UI (Claude Code among them) still gets an
+    /// unmoved click, just not a drag.
     func handleSelectionMouseDown(_ event: NSEvent, in terminalView: TerminalView) {
         guard let window = terminalView.window, session != nil, terminalRenderer != nil
         else { return }
@@ -117,6 +125,11 @@ extension ViewController {
                     // on every intermediate drag position would rewrite the
                     // clipboard dozens of times per gesture.
                     if ConfigurationStore.shared.configuration.copyOnSelect { copy(nil) }
+                } else if mouseReportingEnabled() {
+                    // A click that never moved, with the child asking for
+                    // every click (M2.7): only now, knowing it was not the
+                    // start of a drag, is it safe to say the report wins.
+                    terminalView.reportClick(down: event, up: next)
                 } else {
                     // A click that never moved, with no modifier: in
                     // `link-activation = click` this is how a link opens
