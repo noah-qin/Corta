@@ -147,6 +147,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         _ = UpdateController.shared
         AppearanceController.shared.start()
         installMenus()
+        // Before any window opens: a "move to Applications, then relaunch"
+        // answer should not have to first show — and tear down — a shell
+        // window in the instance about to quit.
+        ApplicationsFolderMover.promptIfNeeded()
     }
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {

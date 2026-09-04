@@ -92,6 +92,7 @@ status, never the command text (`SECURITY.md` §5).
 | Key | Values | Default | Notes |
 | --- | --- | --- | --- |
 | `update-auto-check` | boolean | `true` | Whether Corta checks `appcast.xml` in the background, once a day. |
+| `suggest-applications-folder` | boolean | `true` | Whether Corta offers to move itself into `/Applications` on launch, when it is not already there. |
 
 Check for Updates… (the Corta menu, directly under About) always works,
 on or off — this key only gates the unattended check nobody asked for.
@@ -99,6 +100,15 @@ Updates are fetched over HTTPS and verified against an EdDSA signature
 before installing (`UpdateController.swift`, `docs/DESIGN.md` — Sparkle is
 the one third-party dependency in the app shell; the terminal core has
 none).
+
+`suggest-applications-folder` turns itself off the first time the prompt
+is answered either way — accepting moves the app and there is nothing
+left to ask about, and "Don't Ask Again" writes `false` directly
+(`ApplicationsFolderMover.swift`). Direct-download distribution (M6.16)
+ships a plain `.zip` with no drag-to-install step, so without this, a
+Corta run from wherever it was unzipped never gets asked to relocate —
+and Sparkle's update path and Spotlight/Launchpad both assume
+`/Applications`.
 
 ---
 
@@ -258,3 +268,4 @@ search away.
 | `scrollback-lines` | Sessions started afterwards; a running shell keeps the history it has. |
 | `restore-windows` | The next launch. |
 | `update-auto-check` | Immediately — applied to the live Sparkle updater on every file change. |
+| `suggest-applications-folder` | The next launch. |

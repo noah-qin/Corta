@@ -92,6 +92,10 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// works, on or off — this only gates the unattended check nobody
     /// asked for.
     var updateAutoCheck: Bool = true
+    /// Offer to move Corta into /Applications on launch when it is not
+    /// already there (`ApplicationsFolderMover`). Off after the user
+    /// either moves it or says not to ask again.
+    var suggestApplicationsFolder: Bool = true
 
     /// Themes defined in the config file itself (M7.6), in file order.
     var customThemes: [Theme] = []
@@ -205,6 +209,8 @@ nonisolated struct Configuration: Equatable, Sendable {
             confirmClose = Self.parseBool(value) ?? true
         case "update-auto-check":
             updateAutoCheck = Self.parseBool(value) ?? true
+        case "suggest-applications-folder":
+            suggestApplicationsFolder = Self.parseBool(value) ?? true
         default:
             return false
         }
@@ -364,6 +370,7 @@ nonisolated struct Configuration: Equatable, Sendable {
             "restore-windows = \(restoreWindows)",
             "confirm-close = \(confirmClose)",
             "update-auto-check = \(updateAutoCheck)",
+            "suggest-applications-folder = \(suggestApplicationsFolder)",
             "",
             "# Notifications",
             "notify-on-long-task = \(notifyOnLongTask)",
