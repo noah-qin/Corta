@@ -102,19 +102,13 @@ nonisolated final class QuadRenderer {
         // is a startup-latency optimisation; it does not change what gets
         // drawn if it is unavailable.
         //
-        // `binaryArchiveLock` covers everything from here through the
-        // `serialize` call below. `loadOrCreateBinaryArchive` no longer
-        // reads a file back at all (its own doc comment says why), which
-        // was the reproduced segfault site — but `-[_MTLDevice
-        // recordBinaryArchiveUsage:]`, seen in that same crash's stack,
-        // names it as *device-wide* bookkeeping, undocumented as to
-        // whether creating and registering a fresh archive with no file
-        // involved is safe from two threads at once against the same
-        // device. Kept as defense in depth given how fragile this specific
-        // Metal surface has already shown itself to be on this machine;
-        // the lock only ever serialises this one-time-per-renderer setup,
-        // never a frame, so the cost of being conservative here is nothing
-        // measurable.
+        // `binaryArchiveLock` serialises everything from here through the
+        // `serialize` call below against every other `QuadRenderer.init` —
+        // `-[_MTLDevice recordBinaryArchiveUsage:]` is device-wide
+        // bookkeeping, undocumented as to whether it tolerates two threads
+        // registering an archive at once. The lock only ever serialises
+        // this one-time-per-renderer setup, never a frame, so the cost of
+        // being conservative here is nothing measurable.
         QuadRenderer.binaryArchiveLock.lock()
         defer { QuadRenderer.binaryArchiveLock.unlock() }
         let archive = QuadRenderer.loadOrCreateBinaryArchive(device: device)
@@ -172,19 +166,11 @@ nonisolated final class QuadRenderer {
     /// Application Support: this is disposable, regenerable content the
     /// system is free to purge, never something a user's session depends on.
     ///
-    /// Named with `buildFingerprint` — **not** a fixed filename — because
-    /// "a stale entry falls through to an ordinary compile" turned out to
-    /// be false: `-[_MTLBinaryArchive initWithOptions:device:url:error:]`
-    /// segfaulted (`EXC_BAD_ACCESS`, inside Metal's own framework code, a
-    /// null C-string reaching `strlen`) loading an archive this same cache
-    /// path had accumulated across a Debug build and a Release build with
-    /// a different ad-hoc code signature — `try?` around the call cannot
-    /// catch a crash the callee itself does not survive, so the only real
-    /// fix is never handing Metal a file from a different build at all.
-    /// Fingerprinting the path by the running executable's own mtime means
-    /// a rebuild's cache is simply never found by an older build's path
-    /// (and vice versa) — no stale file is ever opened, rather than opened
-    /// and trusted not to crash.
+    /// Named with `buildFingerprint` — **not** a fixed filename — so a
+    /// rebuild's cache is never confused with an older build's: this is a
+    /// belt-and-braces measure alongside `isRunningUnderXCTest` below, not
+    /// the fix for what that guards (see its doc comment for the actual
+    /// crash this file's history is about).
     ///
     /// One file for all three pipelines; keyed by nothing beyond its path.
     /// Not `private`: `QuadRendererTests` checks the file this writes.
@@ -240,17 +226,8 @@ nonisolated final class QuadRenderer {
     /// file at that path: serializes to a uniquely-named temp file in the
     /// same directory first, then atomically replaces `url` with it
     /// (`FileManager.replaceItemAt`, a single `rename(2)` on the same
-    /// volume). Without this, `loadOrCreateBinaryArchive` reading the same
-    /// path a concurrent `QuadRenderer.init` on another thread was still
-    /// writing to (multiple panes constructing renderers together — a
-    /// session restore reopening several windows, or this test target's
-    /// own parallel test execution, is exactly this shape) could open a
-    /// torn file — observed as `-[_MTLBinaryArchive loadFromURL:error:]`
-    /// segfaulting inside Metal's own framework code on one, which no
-    /// amount of `try?` on the Corta side can catch, since the crash is in
-    /// code Corta only calls into, not code it can wrap a recovery around.
-    /// A reader either sees the old complete file or the new complete one,
-    /// never a mix, because `rename(2)` cannot expose an in-between state.
+    /// volume) — so a reader can never open a half-written file, only the
+    /// old complete one or the new complete one.
     private static func serialize(_ archive: any MTLBinaryArchive, to url: URL) {
         let temporaryURL =
             url.deletingLastPathComponent()
@@ -266,29 +243,56 @@ nonisolated final class QuadRenderer {
         }
     }
 
-    /// Creates an empty archive for this launch to populate — `init` above
-    /// adds this launch's three pipeline descriptors to it and serialises
-    /// it to `binaryArchiveURL`, so a *later* build of Metal, or a later OS
-    /// release, has a file to read once loading one back is safe. `nil` on
-    /// any failure (no archive support, no writable cache directory):
-    /// callers fall back to an ordinary synchronous compile, unconditionally
-    /// correct either way.
+    /// `true` while running as (or hosted inside) an XCTest bundle —
+    /// `XCTestConfigurationFilePath` is the standard, Apple-set environment
+    /// variable for this, present whether the test is unit (`CortaTests`,
+    /// which `TEST_HOST`s directly into `Corta` — this process *is* the
+    /// test) or UI-driven.
     ///
-    /// **Deliberately never loads a previous launch's archive back**, which
-    /// is most of the point M9.4 built this for — found broken, not left
-    /// unbuilt: `descriptor.url = <an existing archive file>` reproduced a
-    /// segfault in `-[_MTLDevice recordBinaryArchiveUsage:]` (a null
-    /// C-string reaching `strlen`, inside Metal's own framework code, not
-    /// Corta's) on a same-session round trip — one launch's `serialize(to:)`
-    /// writing the file, the very next launch's `loadOrCreateBinaryArchive`
-    /// reading that exact file straight back in, same build, same machine,
-    /// no concurrency, no staleness. `try?`/`try catch` around Corta's own
-    /// call cannot protect against a crash the callee does not survive, so
-    /// disabling the read side is the only fix available from here — a
-    /// deliberately incomplete implementation of what M9.4 called for,
-    /// carried in `ROADMAP.md` as such rather than silently claimed done.
+    /// Exists for exactly one reason: `loadOrCreateBinaryArchive` reading a
+    /// previous archive back segfaulted — `-[_MTLDevice
+    /// recordBinaryArchiveUsage:]`, a null C-string reaching `strlen`,
+    /// inside Metal's own framework code — reproducibly under `CortaTests`.
+    /// A standalone command-line reproduction of the identical write-then-
+    /// load round trip (same archive, same device, no app, no test
+    /// infrastructure) did **not** crash, and neither did two real,
+    /// consecutive, bare `Corta.app` launches sharing a cache file (the
+    /// scenario this feature exists for) — which points at the *hosted
+    /// test* launch path specifically, not the load itself: `CortaTests`
+    /// runs injected into `Corta` via `TEST_HOST`, a fundamentally
+    /// different launch mechanism from opening the app, and a filed
+    /// upstream report of the same crash signature attributes it to
+    /// `MTLGetShaderCachePath()` returning nil when something denies
+    /// Metal's own internal shader-cache directory — plausible for
+    /// whatever container Xcode's hosted-test launch applies that a plain
+    /// launch does not.
+    ///
+    /// Disabling the read path unconditionally (an earlier version of this
+    /// fix) traded away a real, working optimisation for real users to
+    /// silence a test-harness-only crash; this only disables it under that
+    /// harness.
+    private static var isRunningUnderXCTest: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
+    /// Opens the cached archive from a previous launch if one exists at
+    /// `binaryArchiveURL` — unless `isRunningUnderXCTest`, in which case a
+    /// fresh, empty archive is created instead and the file is never read
+    /// (its doc comment has the full account of why). Either way, `init`
+    /// above adds this launch's three pipeline descriptors to it and
+    /// re-serialises it, so a first-ever launch — or every hosted-test
+    /// launch — seeds or refreshes the cache a later real launch benefits
+    /// from. `nil` on any failure (no archive support, no writable cache
+    /// directory): callers fall back to an ordinary synchronous compile,
+    /// unconditionally correct either way.
     private static func loadOrCreateBinaryArchive(device: MTLDevice) -> (any MTLBinaryArchive)? {
-        try? device.makeBinaryArchive(descriptor: MTLBinaryArchiveDescriptor())
+        let descriptor = MTLBinaryArchiveDescriptor()
+        if !isRunningUnderXCTest, let url = binaryArchiveURL,
+            FileManager.default.fileExists(atPath: url.path)
+        {
+            descriptor.url = url
+        }
+        return try? device.makeBinaryArchive(descriptor: descriptor)
     }
 
     /// Draws solid-colour `instances` into `rect` (pixels, relative to the

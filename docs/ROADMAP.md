@@ -769,19 +769,29 @@ than once per item — see the note at the end of this section.
       through `appendRowInstances`' per-cell Core Text/atlas lookups —
       only the newly exposed rows rebuild for real.
 - [x] **M9.4** `MTLBinaryArchive` caches `QuadRenderer`'s three compiled
-      pipelines to `~/Library/Caches` — write-only, not the look-up-instead-
-      of-recompile this item originally called for. A full test-suite pass
-      found `-[_MTLDevice recordBinaryArchiveUsage:]` segfaulting (a null
-      C-string reaching `strlen`, inside Metal's own framework code) loading
-      an archive straight back on this machine — a same-build, same-session
-      round trip, no staleness, no concurrency, reproduced repeatedly.
-      `QuadRenderer.loadOrCreateBinaryArchive`'s doc comment has the full
-      account. `try?`/`try catch` around Corta's own call cannot protect
-      against a crash the callee does not survive, so the read side is
-      disabled outright rather than shipped crashing; each launch still
-      writes a fresh archive (file-name fingerprinted to the running
-      executable's own mtime, so a rebuild's file is never confused with an
-      older one) for whenever a future Metal/OS makes loading one back safe.
+      pipelines to `~/Library/Caches`, looked up instead of recompiled on a
+      later real launch. A full test-suite pass first found
+      `-[_MTLDevice recordBinaryArchiveUsage:]` segfaulting (a null
+      C-string reaching `strlen`, inside Metal's own framework code)
+      loading an archive back — but a standalone command-line reproduction
+      of the identical round trip did not crash, and neither did two real,
+      consecutive, bare `Corta.app` launches sharing a cache file (M9.4's
+      actual use case). The crash traces specifically to `CortaTests`,
+      which `TEST_HOST`s directly into `Corta` (a fundamentally different,
+      more restrictive launch than opening the app), matching a filed
+      upstream report of the same signature attributing it to
+      `MTLGetShaderCachePath()` returning nil under a denied sandbox
+      directory. `QuadRenderer.loadOrCreateBinaryArchive` now reads a
+      previous archive back for every real launch and skips only that one
+      launch path (`isRunningUnderXCTest`, keyed off the standard
+      `XCTestConfigurationFilePath` environment variable) — the optimisation
+      ships for users; the test harness gets a fresh archive it never
+      reads, and still exercises writing it every run. The write itself is
+      atomic (temp file + rename) and the file name is fingerprinted to the
+      running executable's own mtime, so a rebuild's cache is never
+      confused with an older one — both defensive, not what the crash
+      traced to. `QuadRenderer.loadOrCreateBinaryArchive`'s doc comment has
+      the full account.
 - [x] **M9.5** `TerminalRenderBackend` protocol (`QuadRenderer`
       conforms); `Metal4Backend` is a real, capability-gated
       (`MTLGPUFamily.metal4`) second conformance that is, today, a
