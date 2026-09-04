@@ -964,9 +964,16 @@ class ViewController: NSViewController {
         // the completion handler, which is the only place the GPU's own time
         // — and any wait for a drawable to be recycled — becomes visible.
         let gpu = InputLatencySignposts.begin(.gpu)
-        if gpu != nil {
+        let gpuStart = RenderMetrics.isEnabled ? DispatchTime.now() : nil
+        if gpu != nil || gpuStart != nil {
             commandBuffer.addCompletedHandler { _ in
                 InputLatencySignposts.end(.gpu, gpu)
+                if let gpuStart {
+                    let ms =
+                        Double(DispatchTime.now().uptimeNanoseconds - gpuStart.uptimeNanoseconds)
+                        / 1_000_000
+                    RenderMetrics.record(.gpu, milliseconds: ms)
+                }
             }
         }
         let commit = InputLatencySignposts.begin(.commit)

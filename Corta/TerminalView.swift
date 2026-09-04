@@ -545,13 +545,34 @@ final class TerminalView: NSView, CALayerDelegate {
     @objc private func frameTick() {
         let frameInterval = InputLatencySignposts.begin(.frame)
         defer { InputLatencySignposts.end(.frame, frameInterval) }
+        // Same span as the `frame` signpost above, so a `RenderMetrics` dump
+        // and a signpost trace of the same run describe the same interval.
+        let frameStart = RenderMetrics.isEnabled ? DispatchTime.now() : nil
+        defer {
+            if let frameStart {
+                let ms =
+                    Double(DispatchTime.now().uptimeNanoseconds - frameStart.uptimeNanoseconds)
+                    / 1_000_000
+                RenderMetrics.record(.cpuFrame, milliseconds: ms)
+            }
+        }
         if let shouldRenderFrame, !shouldRenderFrame() {
             // Nothing to draw: park the link. The shell un-parks it via
             // `setNeedsRedraw()` when output arrives or the viewport changes.
             displayLink?.isPaused = true
             return
         }
+        // `nextDrawable()` can block waiting for one to be recycled
+        // (`PERFORMANCE.md` §5.4) — timed separately from the frame total so
+        // a stall shows up as its own number, not folded into "frame".
+        let drawableWaitStart = RenderMetrics.isEnabled ? DispatchTime.now() : nil
         guard let drawable = metalLayer.nextDrawable() else { return }
+        if let drawableWaitStart {
+            let ms =
+                Double(DispatchTime.now().uptimeNanoseconds - drawableWaitStart.uptimeNanoseconds)
+                / 1_000_000
+            RenderMetrics.record(.drawableWait, milliseconds: ms)
+        }
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = drawable.texture
         pass.colorAttachments[0].loadAction = .clear
