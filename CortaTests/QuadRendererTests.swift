@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 import Metal
 import Testing
 
@@ -154,5 +155,49 @@ struct QuadRendererTests {
             #expect(texture.width == pointsWide * scale)
             #expect(texture.height == pointsHigh * scale)
         }
+    }
+
+    // MARK: - M9: compiled-pipeline cache
+
+    /// `init` writes a `MTLBinaryArchive` to disk so a later launch can look
+    /// its three pipelines up instead of compiling them — this only checks
+    /// that the file lands where `binaryArchiveURL` says it should; the
+    /// compile-time saving itself is not something a unit test can observe
+    /// (Metal does not expose "was this pipeline looked up or compiled").
+    @Test func initWritesAPipelineCacheFile() throws {
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            Issue.record("No Metal device available in this environment")
+            return
+        }
+        guard let url = QuadRenderer.binaryArchiveURL else {
+            Issue.record("No cache directory available in this environment")
+            return
+        }
+        try? FileManager.default.removeItem(at: url)
+
+        _ = try QuadRenderer(device: device)
+        #expect(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    /// A second `QuadRenderer` finds the first one's cache file already on
+    /// disk (`loadOrCreateBinaryArchive`'s `descriptor.url` branch) and must
+    /// still construct successfully — a stale-format or otherwise
+    /// unreadable archive falls back to an ordinary compile rather than
+    /// throwing (`init`'s `try?` around every archive operation).
+    @Test func aSecondRendererReusesAnExistingCacheFileWithoutFailing() throws {
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            Issue.record("No Metal device available in this environment")
+            return
+        }
+        guard let url = QuadRenderer.binaryArchiveURL else {
+            Issue.record("No cache directory available in this environment")
+            return
+        }
+        try? FileManager.default.removeItem(at: url)
+
+        _ = try QuadRenderer(device: device)
+        #expect(FileManager.default.fileExists(atPath: url.path))
+        // Must not throw, whether it actually used the cache or fell back.
+        _ = try QuadRenderer(device: device)
     }
 }

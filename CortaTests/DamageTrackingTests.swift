@@ -140,4 +140,98 @@ import Testing
         #expect(renderer.updateInstances(grid: grid, scrollOffset: 1, cursorVisible: false, selection: nil))
         #expect(renderer.lastRebuiltRowCount == 4)
     }
+
+    // MARK: - M9: scroll shift
+
+    /// A whole-screen scroll (M9) only rebuilds the newly exposed row —
+    /// the survivors' instances are shifted in place, not rebuilt — so
+    /// `lastRebuiltRowCount` after a one-line scroll is 1, not the whole
+    /// screen, and the content each row shows afterward is still correct.
+    @Test func oneLineScrollRebuildsOnlyTheExposedRow() throws {
+        let renderer = try #require(Self.makeRenderer())
+        var terminal = Terminal(rows: 4, columns: 10, scrollbackLimit: 100)
+        terminal.feed(Array("aaaa\r\nbbbb\r\ncccc\r\ndddd".utf8))
+        renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
+
+        // One newline past the bottom margin scrolls the whole screen up by
+        // exactly one row and pushes row 0 ("aaaa") into scrollback.
+        terminal.feed(Array("\r\neeee".utf8))
+        #expect(renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil))
+        #expect(renderer.lastRebuiltRowCount == 1)
+
+        // And it settles: the same scrolled screen reports no further damage.
+        #expect(!renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil))
+    }
+
+    /// A batch with several newlines scrolls more than one row in a single
+    /// frame — the shift has to account for the *cumulative* amount since
+    /// the cache was last synced, not just one `rotateUp` call.
+    @Test func multiLineScrollInOneBatchShiftsByTheWholeAmount() throws {
+        let renderer = try #require(Self.makeRenderer())
+        var terminal = Terminal(rows: 4, columns: 10, scrollbackLimit: 100)
+        terminal.feed(Array("aaaa\r\nbbbb\r\ncccc\r\ndddd".utf8))
+        renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
+
+        // Three newlines in one feed, never diffed in between — three rows
+        // scroll off before the renderer ever sees an intermediate state.
+        terminal.feed(Array("\r\neeee\r\nffff\r\ngggg".utf8))
+        #expect(renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil))
+        #expect(renderer.lastRebuiltRowCount == 3)
+        #expect(!renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil))
+    }
+
+    /// A scroll followed, in the same batch, by an edit to a row that
+    /// survived the scroll (not the newly exposed one) — the shift and the
+    /// ordinary per-row damage check must both apply; the edited row is not
+    /// allowed to slip through just because it was also shifted.
+    @Test func editToASurvivingRowIsNotMaskedByTheShift() throws {
+        let renderer = try #require(Self.makeRenderer())
+        var terminal = Terminal(rows: 4, columns: 10, scrollbackLimit: 100)
+        terminal.feed(Array("aaaa\r\nbbbb\r\ncccc\r\ndddd".utf8))
+        renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
+
+        // Scroll one row, then jump up to the row that is now row 0
+        // (old row 1, "bbbb") and overwrite it.
+        terminal.feed(Array("\r\neeee\u{1B}[1;1HZZZZ".utf8))
+        #expect(renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil))
+        // The exposed row (row 3) and the independently edited row (row 0):
+        // two rebuilt rows, not one, and not the whole screen.
+        #expect(renderer.lastRebuiltRowCount == 2)
+    }
+
+    /// A scroll of the whole screen's height or more leaves nothing to
+    /// shift — every row differs from the cache regardless — and must not
+    /// crash trying to shift more rows than the cache holds.
+    @Test func scrollPastAFullScreenDoesNotCrash() throws {
+        let renderer = try #require(Self.makeRenderer())
+        var terminal = Terminal(rows: 4, columns: 10, scrollbackLimit: 100)
+        terminal.feed(Array("aaaa\r\nbbbb\r\ncccc\r\ndddd".utf8))
+        renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
+
+        for i in 0..<10 { terminal.feed(Array("row\(i)\r\n".utf8)) }
+        #expect(renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil))
+        #expect(renderer.lastRebuiltRowCount == 4)
+    }
+
+    /// Entering and leaving the alternate screen swaps in a wholesale
+    /// different `ScreenLines` with its own revision numbering
+    /// (`ScreenLines.generation`) — a coincidental match with the cache's
+    /// low early revision numbers must not be mistaken for "unchanged".
+    @Test func alternateScreenSwapForcesAFullRebuildEvenWithMatchingDimensions() throws {
+        let renderer = try #require(Self.makeRenderer())
+        var terminal = Terminal(rows: 4, columns: 10, scrollbackLimit: 100)
+        terminal.feed(Array("aaaa".utf8))
+        renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
+
+        terminal.feed(Array("\u{1B}[?1049h".utf8))  // enter alternate screen
+        #expect(renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil))
+        #expect(renderer.lastRebuiltRowCount == 4)
+
+        terminal.feed(Array("bbbb".utf8))
+        renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
+
+        terminal.feed(Array("\u{1B}[?1049l".utf8))  // exit alternate screen
+        #expect(renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil))
+        #expect(renderer.lastRebuiltRowCount == 4)
+    }
 }

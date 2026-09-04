@@ -34,15 +34,33 @@ import simd
 /// premultiplied). The renderer draws those quads in a separate pass whose
 /// fragment returns the texture sample directly instead of tinting coverage.
 ///
-/// **Eviction** (M3, `DESIGN.md` §7 hard part 4): a CJK session exhausts a
-/// single 2048×2048 page, and shelf packing cannot reclaim individual slots
-/// without fragmenting, so on exhaustion the whole atlas is reset — every
-/// cache cleared, the allocator rewound — and glyphs re-rasterise on demand
-/// (the strategy Alacritty uses for the same reason). Every `GlyphInfo`
-/// handed out before a reset holds stale UVs, so `generation` counts resets
-/// and the renderer rebuilds all rows when it changes mid-frame. A screen
-/// whose live content alone exceeds the atlas cannot be served by any
-/// eviction policy; after one retry those cells draw blank.
+/// **Pages (M9).** The grayscale texture is split into two independently
+/// packed and independently evicted regions — `asciiPage` (the ASCII fast
+/// path, plus the reserved white texel row) and `shapedPage` (everything
+/// that goes through `CTLine` shaping: single non-ASCII scalars and
+/// multi-scalar clusters, which is where CJK and combining-mark content
+/// lands) — and the color texture's `colorPage` is a third, on its own
+/// texture as before. Each `AtlasPage` owns its own shelf allocator and its
+/// own glyph/cluster cache, so a CJK-heavy screen overflowing `shapedPage`
+/// no longer evicts `asciiPage`'s cache, and an emoji-heavy screen
+/// overflowing `colorPage` no longer evicts either grayscale page. Before
+/// this, all three shared one allocator pair and one cache pair per
+/// texture, so any one of them filling up reset everything sharing its
+/// texture, including content that never came close to the limit.
+///
+/// **Eviction stays per-page, mid-build safety stays global** (M3,
+/// `DESIGN.md` §7 hard part 4): a page whose shelf cannot fit the next
+/// glyph resets *that page only* — its cache cleared, its allocator
+/// rewound — and glyphs re-rasterise on demand (the strategy Alacritty uses
+/// for the same reason, just now scoped per page rather than per texture).
+/// `generation` and `evictionCount` stay single counters across every page,
+/// though, and bump on *any* page's eviction: a row mid-build can have
+/// already grabbed a UV from a page that then evicts before the row
+/// finishes, and the renderer's one-retry full rebuild
+/// (`TerminalRenderer.updateInstances`) has to catch that regardless of
+/// which page caused it. A screen whose live content alone exceeds a page
+/// cannot be served by any eviction policy; after one retry those cells
+/// draw blank.
 /// **Single-threaded.** The cache, the shelf allocator and the texture are
 /// plain mutable state with no synchronisation, and Core Text's run and line
 /// objects are not safe to share either — rasterising the same atlas from two
@@ -103,6 +121,51 @@ nonisolated final class GlyphAtlas {
         var isMissing: Bool = false
     }
 
+    /// One independently packed, independently evicted region of a shared
+    /// atlas texture — see the type's doc comment on why the atlas is split
+    /// this way. A plain shelf packer (`allocate`) over a fixed rectangle,
+    /// plus the glyph/cluster cache for whatever lands in that rectangle.
+    private final class AtlasPage {
+        let regionOrigin: (x: Int, y: Int)
+        let regionSize: (width: Int, height: Int)
+        var cache: [GlyphKey: GlyphInfo] = [:]
+        var clusterCache: [ClusterKey: GlyphInfo] = [:]
+        private var nextOrigin: (x: Int, y: Int)
+        private var rowHeight: Int
+
+        /// - Parameter reservedFirstRow: when true, packing starts one row
+        ///   down and that row's height counts as already claimed — for
+        ///   `asciiPage`, which shares its region with the reserved white
+        ///   texel at the atlas origin (`GlyphAtlas.solidWhiteUV`).
+        init(regionOrigin: (x: Int, y: Int), regionSize: (width: Int, height: Int), reservedFirstRow: Bool) {
+            self.regionOrigin = regionOrigin
+            self.regionSize = regionSize
+            self.nextOrigin = reservedFirstRow ? (regionOrigin.x, regionOrigin.y + 1) : regionOrigin
+            self.rowHeight = reservedFirstRow ? 1 : 0
+        }
+
+        func allocate(width: Int, height: Int) -> (x: Int, y: Int)? {
+            if nextOrigin.x + width > regionOrigin.x + regionSize.width {
+                nextOrigin = (regionOrigin.x, nextOrigin.y + rowHeight)
+                rowHeight = 0
+            }
+            guard nextOrigin.y + height <= regionOrigin.y + regionSize.height else { return nil }
+            let origin = nextOrigin
+            nextOrigin.x += width
+            rowHeight = max(rowHeight, height)
+            return origin
+        }
+
+        /// Resets this page only — see the type's doc comment on why a
+        /// sibling page's cache and allocator are untouched.
+        func evict(reservedFirstRow: Bool) {
+            cache.removeAll(keepingCapacity: true)
+            clusterCache.removeAll(keepingCapacity: true)
+            nextOrigin = reservedFirstRow ? (regionOrigin.x, regionOrigin.y + 1) : regionOrigin
+            rowHeight = reservedFirstRow ? 1 : 0
+        }
+    }
+
     /// The one-texel border `rasterize` pads every bitmap with so linear
     /// sampling cannot bleed in a neighbouring glyph. Callers comparing a
     /// glyph's bitmap against the cell box have to subtract it from both
@@ -121,13 +184,16 @@ nonisolated final class GlyphAtlas {
     /// have its weight faked because the family has no real bold face.
     private var fonts: [CTFont]
     private var isSyntheticBold: [Bool]
-    private var cache: [GlyphKey: GlyphInfo] = [:]
-    private var clusterCache: [ClusterKey: GlyphInfo] = [:]
-    private var nextOrigin = (x: 0, y: 1)  // row 0 is reserved: see `solidWhiteUV`
-    private var rowHeight = 1
-    /// The color atlas packs its own shelves (no reserved row on this one).
-    private var nextColorOrigin = (x: 0, y: 0)
-    private var colorRowHeight = 0
+
+    /// The ASCII fast path's page — the top half of the grayscale texture,
+    /// including the reserved white texel row. See the type's doc comment.
+    private var asciiPage: AtlasPage
+    /// Every shaped (non-ASCII) glyph and cluster's page — the bottom half
+    /// of the grayscale texture.
+    private var shapedPage: AtlasPage
+    /// Color emoji's page — the whole color texture; on its own texture
+    /// already, this only decouples its cache from the grayscale pages'.
+    private var colorPage: AtlasPage
 
     /// Counters for tests: prove the ASCII path never shapes, and that
     /// fallback and eviction happen when they should.
@@ -136,14 +202,18 @@ nonisolated final class GlyphAtlas {
     /// How many shaped runs resolved to a font other than the requested one —
     /// Core Text's cascade list at work (M3.5).
     private(set) var fallbackHits = 0
-    /// How many times a full atlas was reset (see the type comment).
+    /// How many times any single page was reset (see the type comment) —
+    /// one count across all three pages, not one per page.
     private(set) var evictionCount = 0
-    /// Bumped on every eviction reset. UVs issued before a bump are stale.
+    /// Bumped on every page eviction, from any page. UVs issued before a
+    /// bump may be stale — see the type comment on why this stays a single,
+    /// global counter even though eviction itself is now per-page.
     private(set) var generation = 0
 
     /// A 1×1 fully-opaque texel at the atlas origin, sampled by cursor and
     /// selection quads so they can share the glyph pipeline instead of a
-    /// third one.
+    /// third one. Lives in `asciiPage`'s region (which reserves this row),
+    /// never evicted along with it — see `AtlasPage.evict`.
     static let solidWhiteUV = SIMD4<Float>(0, 0, 0, 0)
 
     /// - Parameter atlasPixelSize: edge length of the square atlas texture.
@@ -170,9 +240,28 @@ nonisolated final class GlyphAtlas {
         colorDescriptor.storageMode = .managed
         self.colorTexture = device.makeTexture(descriptor: colorDescriptor)!
 
+        (self.asciiPage, self.shapedPage, self.colorPage) = Self.makePages(atlasPixelSize: atlasPixelSize)
+
         var white: UInt8 = 255
         texture.replace(
             region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: &white, bytesPerRow: 1)
+    }
+
+    /// The three pages' fixed regions — the grayscale texture split into
+    /// top (ASCII) and bottom (shaped) halves, the color texture as one
+    /// page on its own. A fresh triple every call, for `init` and `reset`
+    /// alike, so neither has to separately remember to rewind three
+    /// allocators and clear three cache pairs by hand.
+    private static func makePages(atlasPixelSize: Int) -> (ascii: AtlasPage, shaped: AtlasPage, color: AtlasPage) {
+        let half = atlasPixelSize / 2
+        let ascii = AtlasPage(
+            regionOrigin: (0, 0), regionSize: (atlasPixelSize, half), reservedFirstRow: true)
+        let shaped = AtlasPage(
+            regionOrigin: (0, half), regionSize: (atlasPixelSize, atlasPixelSize - half),
+            reservedFirstRow: false)
+        let color = AtlasPage(
+            regionOrigin: (0, 0), regionSize: (atlasPixelSize, atlasPixelSize), reservedFirstRow: false)
+        return (ascii, shaped, color)
     }
 
     /// Re-points the atlas at a new font, reusing the texture.
@@ -184,13 +273,9 @@ nonisolated final class GlyphAtlas {
     func reset(font newFont: CTFont) {
         let base = TerminalFont.pinningCascadeList(newFont, size: CTFontGetSize(newFont))
         (fonts, isSyntheticBold) = Self.faces(of: base)
-        cache.removeAll(keepingCapacity: true)
-        clusterCache.removeAll(keepingCapacity: true)
-        nextOrigin = (x: 0, y: 1)
-        rowHeight = 1
-        nextColorOrigin = (x: 0, y: 0)
-        colorRowHeight = 0
+        (asciiPage, shapedPage, colorPage) = Self.makePages(atlasPixelSize: atlasPixelSize)
         evictionCount += 1
+        generation += 1
         var white: UInt8 = 255
         texture.replace(
             region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: &white, bytesPerRow: 1)
@@ -214,7 +299,7 @@ nonisolated final class GlyphAtlas {
     /// ASCII fast path — see the type comment.
     func glyph(forASCII scalar: UInt32, style: Style) -> GlyphInfo? {
         let key = GlyphKey(scalar: scalar, style: style)
-        if let cached = cache[key] { return cached }
+        if let cached = asciiPage.cache[key] { return cached }
         var utf16 = [UniChar(scalar)]
         var glyphs: [CGGlyph] = [0]
         let f = fonts[Int(style.rawValue)]
@@ -228,26 +313,26 @@ nonisolated final class GlyphAtlas {
             // all, which reads as the terminal having lost the output.
             // Cached so the lookup does not repeat every frame.
             let missing = GlyphInfo(uvRect: .zero, size: .zero, bearing: .zero, isMissing: true)
-            cache[key] = missing
+            asciiPage.cache[key] = missing
             return missing
         }
         let info = rasterize(
             [(glyphs: glyphs, positions: [CGPoint.zero], font: f, isColor: false, ctRun: nil, ctLine: nil)],
-            style: style)
-        cache[key] = info
+            style: style, page: asciiPage)
+        asciiPage.cache[key] = info
         return info
     }
 
     /// Non-ASCII single-scalar path — shapes via `CTLine`, once per key.
     func glyph(shaping scalar: UInt32, style: Style) -> GlyphInfo? {
         let key = GlyphKey(scalar: scalar, style: style)
-        if let cached = cache[key] { return cached }
+        if let cached = shapedPage.cache[key] { return cached }
         guard let scalarValue = Unicode.Scalar(scalar) else { return nil }
         shapingHits += 1
         let shaped = shape(String(Character(scalarValue)), style: style)
-        var info = rasterize(shaped.runs, style: style)
+        var info = rasterize(shaped.runs, style: style, page: shapedPage)
         if shaped.runs.isEmpty, shaped.sawNotdef { info.isMissing = true }
-        cache[key] = info
+        shapedPage.cache[key] = info
         return info
     }
 
@@ -271,7 +356,7 @@ nonisolated final class GlyphAtlas {
     /// shaper rather than stacked by hand.
     func glyph(forCluster scalars: [UInt32], style: Style) -> GlyphInfo? {
         let key = ClusterKey(scalars: scalars, style: style)
-        if let cached = clusterCache[key] { return cached }
+        if let cached = shapedPage.clusterCache[key] { return cached }
         var view = String.UnicodeScalarView()
         for scalar in scalars {
             guard let value = Unicode.Scalar(scalar) else { return nil }
@@ -280,9 +365,9 @@ nonisolated final class GlyphAtlas {
         guard !view.isEmpty else { return nil }
         shapingHits += 1
         let shaped = shape(String(view), style: style)
-        var info = rasterize(shaped.runs, style: style)
+        var info = rasterize(shaped.runs, style: style, page: shapedPage)
         if shaped.runs.isEmpty, shaped.sawNotdef { info.isMissing = true }
-        clusterCache[key] = info
+        shapedPage.clusterCache[key] = info
         return info
     }
 
@@ -357,10 +442,11 @@ nonisolated final class GlyphAtlas {
         return (runs, sawNotdef)
     }
 
-    /// Rasterises one shaped glyph run list into the atlas. An empty list —
+    /// Rasterises one shaped glyph run list into `page`. An empty list —
     /// or one whose glyphs have no ink (a space) — yields a cached empty
-    /// `GlyphInfo`, so a blank cell is never shaped twice.
-    private func rasterize(_ runs: [ShapedRun], style: Style) -> GlyphInfo {
+    /// `GlyphInfo`, so a blank cell is never shaped twice. A color run
+    /// ignores `page` and always goes to `colorPage` — see `rasterizeColor`.
+    private func rasterize(_ runs: [ShapedRun], style: Style, page: AtlasPage) -> GlyphInfo {
         if runs.contains(where: \.isColor) {
             return rasterizeColor(runs)
         }
@@ -394,11 +480,12 @@ nonisolated final class GlyphAtlas {
         let bbox = bounds.insetBy(dx: -pad, dy: -pad)
         let width = max(1, Int(bbox.width.rounded(.up)))
         let height = max(1, Int(bbox.height.rounded(.up)))
-        var allocation = allocate(width: width, height: height)
+        var allocation = page.allocate(width: width, height: height)
         if allocation == nil {
-            // The page is full: reset and retry once (see the type comment).
-            evict()
-            allocation = allocate(width: width, height: height)
+            // The page is full: reset just this page and retry once (see
+            // the type comment).
+            evict(page)
+            allocation = page.allocate(width: width, height: height)
         }
         guard let origin = allocation,
             let context = CGContext(
@@ -448,7 +535,7 @@ nonisolated final class GlyphAtlas {
 
     /// The color half of `rasterize` (see the type comment): at least one
     /// run shaped to a color font, so the bitmap goes into `colorTexture`
-    /// (premultiplied bgra) instead of the coverage atlas.
+    /// (premultiplied bgra) instead of the coverage atlas, via `colorPage`.
     ///
     /// Color runs draw with `CTRunDraw` — the only Core Text entry point
     /// that renders bitmap glyphs; `CTFontDrawGlyphs` is outlines only. The
@@ -483,11 +570,12 @@ nonisolated final class GlyphAtlas {
         let bbox = bounds.insetBy(dx: -CGFloat(Self.bitmapPadding), dy: -CGFloat(Self.bitmapPadding))
         let width = max(1, Int(bbox.width.rounded(.up)))
         let height = max(1, Int(bbox.height.rounded(.up)))
-        var allocation = allocateColor(width: width, height: height)
+        var allocation = colorPage.allocate(width: width, height: height)
         if allocation == nil {
-            // The page is full: reset and retry once (see the type comment).
-            evict()
-            allocation = allocateColor(width: width, height: height)
+            // The page is full: reset just this page and retry once (see
+            // the type comment).
+            evict(colorPage)
+            allocation = colorPage.allocate(width: width, height: height)
         }
         guard let origin = allocation,
             let context = CGContext(
@@ -530,48 +618,16 @@ nonisolated final class GlyphAtlas {
         )
     }
 
-    /// Full-atlas reset on exhaustion — see the type comment. The textures
-    /// themselves are kept: the allocators rewind to their origins and every
-    /// lookup is a cache miss that re-rasterises into freshly allocated (and
-    /// thus freshly written) regions, so stale texels are never sampled. The
-    /// reserved white texel at (0, 0) sits below the grayscale allocator's
-    /// first row and survives. Both allocators rewind together: an eviction
-    /// clears both caches, so a kept color shelf would only ever be
-    /// re-allocated over.
-    private func evict() {
-        cache.removeAll(keepingCapacity: true)
-        clusterCache.removeAll(keepingCapacity: true)
-        nextOrigin = (x: 0, y: 1)
-        rowHeight = 1
-        nextColorOrigin = (x: 0, y: 0)
-        colorRowHeight = 0
+    /// Resets one page in place — see the type comment on why this no
+    /// longer touches its sibling pages. The textures themselves are kept:
+    /// only `page`'s allocator rewinds and `page`'s caches clear, so a
+    /// lookup on a *different* page is entirely unaffected, and every
+    /// lookup on `page` itself is a cache miss that re-rasterises into
+    /// freshly allocated (and thus freshly written) regions of the shared
+    /// texture — stale texels are never sampled.
+    private func evict(_ page: AtlasPage) {
+        page.evict(reservedFirstRow: page === asciiPage)
         evictionCount += 1
         generation += 1
-    }
-
-    private func allocate(width: Int, height: Int) -> (x: Int, y: Int)? {
-        if nextOrigin.x + width > atlasPixelSize {
-            nextOrigin = (0, nextOrigin.y + rowHeight)
-            rowHeight = 0
-        }
-        guard nextOrigin.y + height <= atlasPixelSize else { return nil }
-        let origin = nextOrigin
-        nextOrigin.x += width
-        rowHeight = max(rowHeight, height)
-        return origin
-    }
-
-    /// The color atlas's shelf packer — the same scheme as `allocate`, over
-    /// its own state, starting at row 0 (no reserved texel on this page).
-    private func allocateColor(width: Int, height: Int) -> (x: Int, y: Int)? {
-        if nextColorOrigin.x + width > atlasPixelSize {
-            nextColorOrigin = (0, nextColorOrigin.y + colorRowHeight)
-            colorRowHeight = 0
-        }
-        guard nextColorOrigin.y + height <= atlasPixelSize else { return nil }
-        let origin = nextColorOrigin
-        nextColorOrigin.x += width
-        colorRowHeight = max(colorRowHeight, height)
-        return origin
     }
 }

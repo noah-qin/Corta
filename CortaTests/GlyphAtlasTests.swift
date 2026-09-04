@@ -140,6 +140,69 @@ import Testing
         #expect(again?.size != .zero)
     }
 
+    // MARK: - M9: independent pages
+
+    /// The actual point of splitting the atlas into pages: exhausting the
+    /// shaped (CJK/cluster) page must not evict the ASCII page's cache —
+    /// before M9, both shared one allocator and one cache pair per
+    /// texture, so any one of them filling up reset everything sharing its
+    /// texture.
+    @Test func exhaustingTheShapedPageDoesNotEvictASCII() throws {
+        guard let device = Self.makeDevice() else {
+            Issue.record("No Metal device available in this environment")
+            return
+        }
+        let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
+        let atlas = GlyphAtlas(device: device, font: font, atlasPixelSize: 64)
+
+        _ = atlas.glyph(forASCII: UInt32(Character("A").asciiValue!), bold: false)
+        let asciiHitsBeforeOverflow = atlas.fastPathHits
+
+        for i: UInt32 in 0..<80 {
+            _ = atlas.glyph(shaping: 0x4E00 + i, bold: false)
+            if atlas.evictionCount > 0 { break }
+        }
+        #expect(atlas.evictionCount > 0, "80 CJK glyphs must overflow the shaped page's half of a 64x64 atlas")
+
+        // A cache hit on 'A' does not call into the fast-path lookup at all
+        // (`glyph(forASCII:)` returns before touching `fastPathHits`), so if
+        // the ASCII page survived the shaped page's eviction, this count is
+        // unchanged.
+        _ = atlas.glyph(forASCII: UInt32(Character("A").asciiValue!), bold: false)
+        #expect(atlas.fastPathHits == asciiHitsBeforeOverflow, "the ASCII cache must have survived the shaped page's eviction")
+    }
+
+    /// The same claim in the other direction: exhausting the ASCII page
+    /// must not evict already-cached CJK content.
+    @Test func exhaustingTheASCIIPageDoesNotEvictShapedContent() throws {
+        guard let device = Self.makeDevice() else {
+            Issue.record("No Metal device available in this environment")
+            return
+        }
+        let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
+        let atlas = GlyphAtlas(device: device, font: font, atlasPixelSize: 64)
+
+        _ = atlas.glyph(shaping: 0x4E00, bold: false)
+        let shapingHitsBeforeOverflow = atlas.shapingHits
+
+        // Every printable ASCII scalar, across all four styles, repeatedly —
+        // enough distinct glyphs to overflow the ASCII page's half of a
+        // small atlas (bold and italic synthesise wider strokes than a
+        // single pass of the printable range alone reliably overflows).
+        outer: for _ in 0..<4 {
+            for scalar in UInt32(0x21)...UInt32(0x7E) {
+                for style: GlyphAtlas.Style in [.regular, .bold, .italic, .boldItalic] {
+                    _ = atlas.glyph(forASCII: scalar, style: style)
+                    if atlas.evictionCount > 0 { break outer }
+                }
+            }
+        }
+        #expect(atlas.evictionCount > 0, "four styles of the printable ASCII range must overflow the ASCII page's half of a 64x64 atlas")
+
+        _ = atlas.glyph(shaping: 0x4E00, bold: false)
+        #expect(atlas.shapingHits == shapingHitsBeforeOverflow, "the shaped-page cache must have survived the ASCII page's eviction")
+    }
+
     @Test func aGlyphProducesInkInsideItsCellAndNoneOutside() throws {
         guard let device = Self.makeDevice() else {
             Issue.record("No Metal device available in this environment")

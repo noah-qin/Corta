@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 import Metal
 
 enum QuadRendererError: Error {
@@ -87,6 +88,17 @@ nonisolated final class QuadRenderer {
             throw QuadRendererError.functionUnavailable
         }
 
+        // M9: load a cached `MTLBinaryArchive` if one exists from a
+        // previous launch, so these three pipelines are looked up instead of
+        // compiled — the cold-start cost this exists to remove is entirely
+        // on first window paint, first glyph, first emoji and a font switch,
+        // never inside a frame. `nil` (no archive support on this device, no
+        // write access to the cache directory, first launch ever) falls
+        // straight through to the ordinary synchronous compile below; this
+        // is a startup-latency optimisation; it does not change what gets
+        // drawn if it is unavailable.
+        let archive = QuadRenderer.loadOrCreateBinaryArchive(device: device)
+
         func makePipeline(fragment: MTLFunction, premultipliedSource: Bool = false) throws -> MTLRenderPipelineState {
             let descriptor = MTLRenderPipelineDescriptor()
             descriptor.vertexFunction = vertexFunction
@@ -107,12 +119,24 @@ nonisolated final class QuadRenderer {
             attachment.sourceAlphaBlendFactor = .one
             attachment.destinationRGBBlendFactor = .oneMinusSourceAlpha
             attachment.destinationAlphaBlendFactor = .oneMinusSourceAlpha
+            if let archive {
+                descriptor.binaryArchives = [archive]
+                // Duplicates across launches are silently accepted (Metal's
+                // own doc comment on this method) — this both seeds a
+                // first-ever-launch archive and keeps a stale one current,
+                // with no need to first check whether today's descriptor is
+                // already in it.
+                try? archive.addRenderPipelineFunctions(descriptor: descriptor)
+            }
             return try device.makeRenderPipelineState(descriptor: descriptor)
         }
 
         self.solidPipeline = try makePipeline(fragment: solidFragment)
         self.glyphPipeline = try makePipeline(fragment: glyphFragment)
         self.colorGlyphPipeline = try makePipeline(fragment: colorGlyphFragment, premultipliedSource: true)
+        if let archive, let url = QuadRenderer.binaryArchiveURL {
+            try? archive.serialize(to: url)
+        }
 
         let samplerDescriptor = MTLSamplerDescriptor()
         samplerDescriptor.minFilter = .linear
@@ -121,6 +145,41 @@ nonisolated final class QuadRenderer {
             throw QuadRendererError.samplerUnavailable
         }
         self.sampler = sampler
+    }
+
+    /// Where a compiled-pipeline cache from a previous launch is looked for,
+    /// and where this launch's (re)writes it — `~/Library/Caches`, not
+    /// Application Support: this is disposable, regenerable content the
+    /// system is free to purge, never something a user's session depends on.
+    /// One file for all three pipelines; keyed by nothing beyond its path,
+    /// since a stale entry (an OS or driver update, per `MTLBinaryArchive`'s
+    /// own doc comment) just falls through to an ordinary compile, the same
+    /// as no file at all.
+    /// Not `private`: `QuadRendererTests` checks the file this writes.
+    static var binaryArchiveURL: URL? {
+        guard
+            let cachesDirectory = FileManager.default.urls(
+                for: .cachesDirectory, in: .userDomainMask
+            ).first
+        else { return nil }
+        let directory = cachesDirectory.appendingPathComponent("dev.noahqin.Corta", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory.appendingPathComponent("QuadRenderer.metallib-archive")
+    }
+
+    /// Opens the cached archive from a previous launch if one exists at
+    /// `binaryArchiveURL`, or creates an empty one to populate this launch —
+    /// either way, `init` above adds this launch's three pipeline
+    /// descriptors to it and re-serialises it, so a first-ever launch seeds
+    /// the cache the next one benefits from. `nil` on any failure (no
+    /// archive support, no writable cache directory): callers fall back to
+    /// an ordinary synchronous compile, unconditionally correct either way.
+    private static func loadOrCreateBinaryArchive(device: MTLDevice) -> (any MTLBinaryArchive)? {
+        let descriptor = MTLBinaryArchiveDescriptor()
+        if let url = binaryArchiveURL, FileManager.default.fileExists(atPath: url.path) {
+            descriptor.url = url
+        }
+        return try? device.makeBinaryArchive(descriptor: descriptor)
     }
 
     /// Draws solid-colour `instances` into `rect` (pixels, relative to the

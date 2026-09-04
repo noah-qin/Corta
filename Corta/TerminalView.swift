@@ -15,6 +15,14 @@ import QuartzCore
 final class TerminalView: NSView, CALayerDelegate {
     private let metalLayer = CAMetalLayer()
     private lazy var frameScheduler = FrameScheduler(metalLayer: metalLayer)
+    /// Recreated alongside `frameScheduler` each time the view moves to a
+    /// new window (`viewDidMoveToWindow`) — it observes that specific
+    /// window's key/resign state, so a stale instance watching the wrong
+    /// window would silently stop tracking focus after a tab is dragged
+    /// into a different one. Not `private`: `TerminalView+Scroll.swift`
+    /// reports scroll-gesture phase changes to it, and extensions cannot
+    /// add their own storage.
+    var renderPolicy: RenderPolicy?
     /// A window occluded (covered, minimized, off-screen) still fires vsync
     /// callbacks unless the scheduler is paused explicitly — vsync alone
     /// doesn't know visibility. Removed and re-added alongside the window in
@@ -261,8 +269,10 @@ final class TerminalView: NSView, CALayerDelegate {
             self.occlusionObserver = nil
         }
         frameScheduler.attach(to: window)
+        renderPolicy = nil
         guard let window else { return }
         updateDrawableSize()
+        renderPolicy = RenderPolicy(scheduler: frameScheduler, window: window)
         // Vsync alone doesn't know the window isn't visible — an occluded,
         // minimized, or off-screen window would otherwise keep resolving
         // drawables it never shows. This never touches the PTY reader: it

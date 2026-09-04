@@ -45,6 +45,10 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
 
     private let metalLayer: CAMetalLayer
     private var link: CAMetalDisplayLink?
+    /// Survives `attach(to:)` recreating `link` (a window change) — without
+    /// this, moving a tab to a new window would silently drop back to the
+    /// full, unrestricted rate regardless of what `RenderPolicy` had set.
+    private var desiredFrameRateRange = CAFrameRateRange.default
 
     init(metalLayer: CAMetalLayer) {
         self.metalLayer = metalLayer
@@ -64,6 +68,7 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         newLink.delegate = self
         newLink.add(to: .main, forMode: .common)
         newLink.isPaused = true
+        newLink.preferredFrameRateRange = desiredFrameRateRange
         link = newLink
     }
 
@@ -76,6 +81,19 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
     var isPaused: Bool {
         get { link?.isPaused ?? true }
         set { link?.isPaused = newValue }
+    }
+
+    /// The vsync rate ceiling, adapted by `RenderPolicy` to window focus,
+    /// Low Power Mode, thermal pressure and active scrolling. Lowering it
+    /// only widens the gap between wakeups on a link that is already
+    /// running — it has no effect on `isPaused`, which is what actually
+    /// decides whether the link fires at all (`PERFORMANCE.md` §3).
+    var preferredFrameRateRange: CAFrameRateRange {
+        get { desiredFrameRateRange }
+        set {
+            desiredFrameRateRange = newValue
+            link?.preferredFrameRateRange = newValue
+        }
     }
 
     /// Forces one frame to render and present before returning — used only

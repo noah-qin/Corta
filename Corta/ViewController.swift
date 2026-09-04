@@ -128,6 +128,13 @@ class ViewController: NSViewController {
     /// when it is set, so a truly idle frame costs a boolean check rather
     /// than a line-by-line comparison.
     private let outputPending = Mutex(false)
+    /// Built by `prepareFrame()` and consumed once by `render(into:...)`,
+    /// which always runs immediately after it in the same
+    /// `FrameScheduler.metalDisplayLink` callback — the two `session.
+    /// snapshot()` calls (one per method) this replaced could see different
+    /// grid states a PTY-heavy frame apart; sharing one avoids that as well
+    /// as the redundant work (M9). `nil` only before the first frame.
+    private var pendingFrameContext: FrameContext?
     /// Coalesces `session.resize` during a live drag (M2.9); the last size
     /// actually requested, so no-op layouts don't re-send the same winsize.
     private var resizeDebouncer: ResizeDebouncer!
@@ -158,6 +165,11 @@ class ViewController: NSViewController {
     /// The scroll position from before the search bar opened, restored on
     /// Esc.
     var scrollOffsetBeforeSearch: Int?
+    /// Bumped by every `scheduleBackgroundSearchRefresh` call (M9); a
+    /// background sweep applies its result only if this still matches what
+    /// it captured when it started, so a superseded or late-arriving one is
+    /// silently discarded instead of clobbering a newer result.
+    var searchRefreshGeneration = 0
     /// Local key monitor for Esc while the bar is open: the field editor
     /// turns Esc into `cancelOperation:`, which NSSearchField can swallow
     /// without ever calling the delegate — a monitor sees the key before
@@ -250,6 +262,24 @@ class ViewController: NSViewController {
         )
     }
 
+    /// `ws_xpixel`/`ws_ypixel` for `TIOCSWINSZ` — real device pixels, not
+    /// points, at a given grid size. A Kitty-graphics client (M10) that asks
+    /// "how many pixels is a cell" needs this to size an image correctly,
+    /// and `kitten icat` refuses to run at all without it: it was the first
+    /// thing a real client verification found, since `TerminalSize`'s zero
+    /// default (truthful before any image protocol existed) had never been
+    /// overridden by either call site that actually reaches `TIOCSWINSZ`.
+    private func pixelSize(columns: Int, rows: Int, metrics: CellMetrics) -> (
+        width: UInt16, height: UInt16
+    ) {
+        let width = CGFloat(columns) * metrics.cellWidth
+        let height = CGFloat(rows) * metrics.cellHeight
+        return (
+            UInt16(min(CGFloat(UInt16.max), max(0, width))),
+            UInt16(min(CGFloat(UInt16.max), max(0, height)))
+        )
+    }
+
     let minimumColumns = 20
     let minimumRows = 5
 
@@ -338,7 +368,15 @@ class ViewController: NSViewController {
         // The session comes before the view hierarchy: with no child there is
         // no terminal to lay out, and the failure view should take the pane
         // rather than sit behind a live canvas with nothing driving it.
-        let initialSize = initialGridSize ?? configuredGridSize
+        var initialSize = initialGridSize ?? configuredGridSize
+        if let terminalRenderer {
+            let pixels = pixelSize(
+                columns: Int(initialSize.columns), rows: Int(initialSize.rows),
+                metrics: terminalRenderer.metrics)
+            initialSize = TerminalSize(
+                rows: initialSize.rows, columns: initialSize.columns,
+                pixelWidth: pixels.width, pixelHeight: pixels.height)
+        }
         let started: StartedSession
         do {
             started = try Self.startSession(
@@ -498,7 +536,7 @@ class ViewController: NSViewController {
             self?.render(into: pass, drawableSize: drawableSize, drawable: drawable)
         }
         view.shouldRenderFrame = { [weak self] in
-            self?.updateDamage() ?? false
+            self?.prepareFrame() ?? false
         }
         view.onKeyBytes = { [weak self] bytes in
             guard let self else { return }
@@ -646,9 +684,10 @@ class ViewController: NSViewController {
     /// and this reports "nothing pending," which is what lets
     /// `FrameScheduler` pause itself again and a static screen idle at ~0%
     /// CPU (`PERFORMANCE.md` §3). When output did arrive, the snapshot is
-    /// diffed against the renderer's line-granular cache and the frame
-    /// happens only on damage.
-    private func updateDamage() -> Bool {
+    /// diffed against the renderer's line-granular cache, the result is
+    /// cached in `pendingFrameContext` for `render(into:...)` to draw
+    /// without diffing again (M9), and the frame happens only on damage.
+    private func prepareFrame() -> Bool {
         guard let session, terminalRenderer != nil else { return false }
         if session.takeBell() {
             handleBell()
@@ -669,11 +708,16 @@ class ViewController: NSViewController {
         if hasOutput, isFocusedPane {
             applyWindowTitle()
         }
-        // While the search bar is open, output shifts what matches: re-run
-        // the query against the new snapshot before this frame diffs it
-        // (M4.4). Recomputed, not patched — `updateSearchResults` explains.
+        // While the search bar is open, output shifts what matches — but
+        // recomputing them is a full-scrollback sweep (`Search.swift`), and
+        // running it synchronously, here, on every output batch put it on
+        // the render path: a flood with the bar open competed with the
+        // frame budget for no reason a background thread couldn't do
+        // instead (M9). `scheduleBackgroundSearchRefresh` hands the
+        // recompute to a detached task and applies the result once it
+        // lands, whenever that is — this frame does not wait on it.
         if hasOutput, searchBar != nil {
-            updateSearchResults(scrollsToMatch: false)
+            scheduleBackgroundSearchRefresh()
         }
         if hasOutput {
             // A screen reader following a build log has to hear the new lines,
@@ -703,12 +747,16 @@ class ViewController: NSViewController {
         needsRedraw = false
         wasSynchronizedOutputActive = false
         let grid = session.snapshot()
-        // The rebuilt rows land in the renderer's cache; `render` diffs once
-        // more when it draws and picks up anything that arrived since.
+        let mappedSearchMatches = searchMatches.map { TerminalSelection($0, grid: grid) }
         let damaged = terminalRenderer.updateInstances(
             grid: grid, scrollOffset: scrollOffset,
             cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
-            searchMatches: searchMatches.map { TerminalSelection($0, grid: grid) },
+            searchMatches: mappedSearchMatches,
+            currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink)
+        pendingFrameContext = FrameContext(
+            grid: grid, scrollOffset: scrollOffset,
+            cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
+            searchMatches: mappedSearchMatches,
             currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink)
         return forced || damaged
     }
@@ -784,7 +832,9 @@ class ViewController: NSViewController {
             height: view.bounds.height - verticalInsets)
         let columns = UInt16(max(1, usable.width / terminalRenderer.pointMetrics.cellWidth))
         let rows = UInt16(max(1, usable.height / terminalRenderer.pointMetrics.cellHeight))
-        let size = TerminalSize(rows: rows, columns: columns)
+        let pixels = pixelSize(columns: Int(columns), rows: Int(rows), metrics: terminalRenderer.metrics)
+        let size = TerminalSize(
+            rows: rows, columns: columns, pixelWidth: pixels.width, pixelHeight: pixels.height)
         guard size != lastRequestedSize else { return }
         lastRequestedSize = size
         // Always coalesced to the trailing edge of a resize stream: window
@@ -944,29 +994,58 @@ class ViewController: NSViewController {
         return name.isEmpty ? path : name
     }
 
-    /// Runs at vsync, on the main thread — reads the latest grid without
+    /// Runs at vsync, on the main thread, immediately after `prepareFrame()`
+    /// in the same `FrameScheduler` callback — reads the latest grid without
     /// ever blocking the reader thread (`PERFORMANCE.md` §2.1).
+    ///
+    /// Draws `pendingFrameContext` rather than snapshotting and diffing the
+    /// grid again: `prepareFrame()` already did both, moments ago in the
+    /// same callback, and doing it twice was the whole cache rebuilt and
+    /// diffed a second time on every drawn frame for no reason (M9). The
+    /// fallback snapshot below is defensive only — every real call path
+    /// (`FrameScheduler.metalDisplayLink`, `presentSynchronously`) always
+    /// runs `shouldRenderFrame` (`prepareFrame`) first.
     private func render(
         into renderPassDescriptor: MTLRenderPassDescriptor, drawableSize: CGSize, drawable: CAMetalDrawable
     ) {
         guard let session, let terminalRenderer, let commandQueue,
             let commandBuffer = commandQueue.makeCommandBuffer()
         else { return }
-        let grid = session.snapshot()
-        terminalRenderer.render(
-            grid: grid, scrollOffset: scrollOffset,
+        guard let context = pendingFrameContext else {
+            // Should not happen on any real call path — see the doc comment
+            // above — but if it ever does, diff-and-draw the old way rather
+            // than draw whatever the cache happens to hold.
+            let grid = session.snapshot()
+            terminalRenderer.render(
+                grid: grid, scrollOffset: scrollOffset,
+                rect: Self.contentRect(
+                    in: drawableSize, scale: terminalRenderer.scale,
+                    gridHeight: CGFloat(grid.rows) * terminalRenderer.metrics.cellHeight,
+                    topInset: topInset),
+                drawableSize: drawableSize,
+                cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
+                searchMatches: searchMatches.map { TerminalSelection($0, grid: grid) },
+                currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink,
+                renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
+            presentAndCommit(commandBuffer: commandBuffer, drawable: drawable)
+            return
+        }
+        terminalRenderer.draw(
             rect: Self.contentRect(
                 in: drawableSize, scale: terminalRenderer.scale,
-                gridHeight: CGFloat(grid.rows) * terminalRenderer.metrics.cellHeight,
+                gridHeight: CGFloat(context.grid.rows) * terminalRenderer.metrics.cellHeight,
                 topInset: topInset),
             drawableSize: drawableSize,
-            cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
-            searchMatches: searchMatches.map { TerminalSelection($0, grid: grid) },
-            currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink,
             renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
-        // `commit` covers encode-and-submit; `gpu` runs from submission to
-        // the completion handler, which is the only place the GPU's own time
-        // — and any wait for a drawable to be recycled — becomes visible.
+        presentAndCommit(commandBuffer: commandBuffer, drawable: drawable)
+    }
+
+    /// `commit` covers encode-and-submit; `gpu` runs from submission to the
+    /// completion handler, which is the only place the GPU's own time — and
+    /// any wait for a drawable to be recycled — becomes visible. Shared by
+    /// `render(into:...)`'s normal path and its defensive
+    /// `pendingFrameContext == nil` fallback.
+    private func presentAndCommit(commandBuffer: MTLCommandBuffer, drawable: CAMetalDrawable) {
         let gpu = InputLatencySignposts.begin(.gpu)
         let gpuStart = RenderMetrics.isEnabled ? DispatchTime.now() : nil
         if gpu != nil || gpuStart != nil {
