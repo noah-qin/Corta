@@ -140,7 +140,7 @@ coordinates so a match can be selected verbatim.
 │  NSWindow / tabs / split layout tree / key bindings           │
 │  NSTextInputClient (CJK IME, marked text)                     │
 └──────────┬──────────────────────────────────┬─────────────────┘
-           │ key, mouse, paste                │ CVDisplayLink (vsync)
+           │ key, mouse, paste                │ CAMetalDisplayLink (vsync)
            │                                  │
            ▼                                  ▼
 ┌──────────────────────┐         ┌──────────────────────────────┐
@@ -241,8 +241,16 @@ front over the single text config file.
 
 Worth doing eventually, deliberately not in the M1–M6 path:
 
-- **Kitty graphics protocol** — inline images. Genuinely useful for
-  viewing plots from ML work without leaving the terminal.
+- ~~**Kitty graphics protocol**~~ — shipped as M10: direct (base64,
+  in-band) transmission and placement in RGB, RGBA and PNG, exactly the
+  side table the M6.4 reassessment below predicted it would cost.
+  File-based transmission (`t=f`/`t=t`/`t=s` — the remote stream names a
+  local path to read) is not implemented and will not be: `SECURITY.md`
+  §1 assumes every PTY byte is hostile, and a stream that can make Corta
+  open an arbitrary local file is exactly what that threat model exists
+  to reject. Animation frames and Unicode placeholder ("virtual")
+  placement are also not implemented — real protocol features, out of
+  scope for a first pass rather than attempted badly.
 - ~~**Shell integration / OSC 133**~~ — shipped as M7.2: prompt and
   exit-status marks on the line, command-to-command jumping, and an exact
   long-task notification. It cost four sequences and a per-line mark, as
@@ -274,17 +282,19 @@ It is that the marks only exist if the user's shell emits them, which
 means shipping and installing shell snippets for zsh, bash and fish —
 distribution work, and M6.16 shows distribution is not yet solved.
 
-**The kitty graphics protocol stays deferred, and its cost went up.**
-The M6 estimate of it has moved in the wrong direction. Cells are
-16 bytes and now full: the OSC 8 hyperlink id (M6.8) took the last of
-the scalar's spare bits, so an image placement cannot be a per-cell
-field without growing the cell — and `PERFORMANCE.md` §4 measures what a
-byte per cell costs across a 100k-line scrollback. It would need a
-placement side table keyed by document position, kept correct across
-reflow (M4.2) and scrollback eviction, plus a second texture path in a
-renderer that currently has exactly two pipelines. That is a milestone,
-not a step, and nothing in the daily-driver checklist
-(`CONFORMANCE.md` §2) is blocked on it.
+**The kitty graphics protocol stayed deferred through M6-M8, and shipped
+as M10.** The M6 estimate — a placement side table keyed by document
+position, plus a second texture path — held: `ImagePlacementTable`
+(`CortaTerminal/Sources/CortaTerminal/ImagePlacementTable.swift`) is
+exactly that table, addressed by document row the same way
+`TerminalSelection` is, and images draw through the existing color quad
+pipeline (`Corta/Renderer/KittyImageRenderer.swift`) rather than a third
+one — a placed image is geometrically a rect, which the instanced-quad
+path already draws. What the M6 estimate did not anticipate: reflow
+across a column resize is not attempted — a resize drops every live
+placement rather than re-wrapping image geometry, on the reasoning that
+a wrongly-positioned image is worse than a missing one that a client can
+re-place without re-transmitting (`ImagePlacementTable`'s doc comment).
 
 ---
 

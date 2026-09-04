@@ -118,6 +118,65 @@ struct SplitTreeTests {
         #expect(tree.leaf(from: a, direction: .up, inContainer: container) == nil)
     }
 
+    /// A 2×2 split — columns, then each column split into rows, exactly the
+    /// shape ⌘D then ⌘⇧D on each half produces — must tile the window
+    /// completely once AppKit has laid the split views out: the four leaves
+    /// share only the hairline dividers, with no gap and no overlap
+    /// anywhere. A screenshot test alone (`SplitPaneUITests`) can show this
+    /// to a person but asserts nothing; this is the geometric check behind
+    /// it.
+    @Test func twoByTwoSplitTilesTheContainerWithNoGapOrOverlap() {
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        let topLeft = leaf()
+        let tree = SplitTree(root: topLeft)
+        let topRight = leaf()
+        let columns = tree.split(leaf: topLeft, orientation: .columns, newLeaf: topRight)
+        let bottomLeft = leaf()
+        let leftColumn = tree.split(leaf: topLeft, orientation: .rows, newLeaf: bottomLeft)
+        let bottomRight = leaf()
+        let rightColumn = tree.split(leaf: topRight, orientation: .rows, newLeaf: bottomRight)
+
+        columns.translatesAutoresizingMaskIntoConstraints = true
+        columns.frame = container.bounds
+        container.addSubview(columns)
+        container.layoutSubtreeIfNeeded()
+        // Explicit divider positions, exactly as `SplitViewController` sets
+        // them after a split, rather than whatever default AppKit chose.
+        columns.setPosition(container.bounds.width / 2, ofDividerAt: 0)
+        leftColumn.setPosition(leftColumn.bounds.height / 2, ofDividerAt: 0)
+        rightColumn.setPosition(rightColumn.bounds.height / 2, ofDividerAt: 0)
+        container.layoutSubtreeIfNeeded()
+
+        let leaves = [topLeft, topRight, bottomLeft, bottomRight]
+        let frames = leaves.map { $0.convert($0.bounds, to: container) }
+
+        // No two leaves claim the same pixel — the dividers sit in the gaps
+        // between them, never inside a leaf's own frame.
+        for i in 0..<frames.count {
+            for j in (i + 1)..<frames.count {
+                let overlap = frames[i].intersection(frames[j])
+                #expect(overlap.isEmpty || overlap.width * overlap.height < 1)
+            }
+        }
+
+        // Together the four reach every edge of the container — a leaf
+        // stranded away from the frame it should touch is exactly the "top
+        // border missing" shape this suite exists to catch.
+        let union = frames.reduce(NSRect.null) { $0.union($1) }
+        #expect(abs(union.minX - container.bounds.minX) < 1)
+        #expect(abs(union.minY - container.bounds.minY) < 1)
+        #expect(abs(union.maxX - container.bounds.maxX) < 1)
+        #expect(abs(union.maxY - container.bounds.maxY) < 1)
+
+        // Their combined area accounts for the whole container save for the
+        // two hairline dividers — nothing else is unaccounted for.
+        let totalLeafArea = frames.reduce(CGFloat(0)) { $0 + $1.width * $1.height }
+        let containerArea = container.bounds.width * container.bounds.height
+        let dividerAllowance =
+            2 * 1 * max(container.bounds.width, container.bounds.height)
+        #expect(containerArea - totalLeafArea <= dividerAllowance)
+    }
+
     /// The window's minimum size is the tree's minimum: along a split's
     /// axis the children add (plus the divider), across it they max.
     @Test func minimumSizeCombinesAlongTheAxisAndMaxesAcrossIt() {

@@ -35,11 +35,21 @@ extension TerminalView: NSTextInputClient {
 
     /// Committed text is the only IME output that reaches the child: as
     /// UTF-8 bytes through the same `onKeyBytes` path a physical key takes.
+    ///
+    /// This is the path *ordinary* typing takes, composed or not — Cocoa's
+    /// input-context pipeline commits even a plain, uncomposed character
+    /// through here, not through `deliverBytes`. `InputLatencySignposts
+    /// .keyDown` originally only wrapped `deliverBytes`, so a real-client
+    /// trace of a normal typing session (M8.19) showed zero `keyDown`
+    /// events despite real keystrokes reaching the child — the chain's
+    /// first link was silently only covering the control-sequence bypass
+    /// path (`TerminalView+Keyboard.swift`'s doc comment), never the one
+    /// most keystrokes actually take.
     func insertText(_ string: Any, replacementRange: NSRange) {
         clearMarkedText()
         let text = (string as? NSAttributedString)?.string ?? (string as? String) ?? ""
         guard !text.isEmpty else { return }
-        onKeyBytes?(Array(text.utf8))
+        InputLatencySignposts.measure(.keyDown) { onKeyBytes?(Array(text.utf8)) }
     }
 
     /// Preedit updates reposition the overlay at the cursor and redraw it;
@@ -118,17 +128,24 @@ extension TerminalView: NSTextInputClient {
     /// behaving identically whether or not an IME is selected (M3.4) — an
     /// IME that answers `handleEvent` with `true` for Return must not eat
     /// the key.
+    ///
+    /// Signposted the same way `insertText` is, for the same reason: this
+    /// is a real, common part of the keypress-to-pixel chain (M8.19),
+    /// not the control-sequence bypass path.
     override func doCommand(by selector: Selector) {
+        let bytes: [UInt8]?
         switch selector {
-        case #selector(insertNewline(_:)): onKeyBytes?([0x0D])
-        case #selector(deleteBackward(_:)): onKeyBytes?([0x7F])
-        case #selector(cancelOperation(_:)): onKeyBytes?([0x1B])
-        case #selector(moveUp(_:)): onKeyBytes?(Array("\u{1B}[A".utf8))
-        case #selector(moveDown(_:)): onKeyBytes?(Array("\u{1B}[B".utf8))
-        case #selector(moveRight(_:)): onKeyBytes?(Array("\u{1B}[C".utf8))
-        case #selector(moveLeft(_:)): onKeyBytes?(Array("\u{1B}[D".utf8))
-        default: break
+        case #selector(insertNewline(_:)): bytes = [0x0D]
+        case #selector(deleteBackward(_:)): bytes = [0x7F]
+        case #selector(cancelOperation(_:)): bytes = [0x1B]
+        case #selector(moveUp(_:)): bytes = Array("\u{1B}[A".utf8)
+        case #selector(moveDown(_:)): bytes = Array("\u{1B}[B".utf8)
+        case #selector(moveRight(_:)): bytes = Array("\u{1B}[C".utf8)
+        case #selector(moveLeft(_:)): bytes = Array("\u{1B}[D".utf8)
+        default: bytes = nil
         }
+        guard let bytes else { return }
+        InputLatencySignposts.measure(.keyDown) { onKeyBytes?(bytes) }
     }
 }
 

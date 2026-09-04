@@ -47,6 +47,13 @@ extension ViewController {
     }
 
     @objc func appearanceChanged() {
+        // The OSC 10/11/12 answer has to track the switch too — a program
+        // that queried the background before this point chose its palette
+        // for the variant that was live then, and a live theme swap (M6.13)
+        // means the screen underneath it just changed colour.
+        session?.dynamicColors =
+            AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)
+            .dynamicColors
         // Every cell's colours are resolved into the instance buffer when its
         // row is built, so a theme change invalidates the whole buffer — the
         // clear colour alone is read fresh each frame. Forcing a frame

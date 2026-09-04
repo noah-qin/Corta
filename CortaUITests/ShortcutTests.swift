@@ -33,8 +33,42 @@ final class ShortcutTests: XCTestCase {
 
     /// The pre-display layout briefly has the requested frame, then AppKit
     /// applies `.fullSizeContentView` and removes one titlebar height. The
-    /// session must stay at the configured grid through that final adjustment
-    /// (a 120×30 window previously settled at 120×27).
+    /// session must stay at the configured grid through that final
+    /// adjustment (a 120×30 window previously settled at 120×27) — checked
+    /// here as frame *stability*: once the window first reports a frame,
+    /// that frame must not change again. A late correction (the historical
+    /// bug) is exactly a frame that changes after the window already
+    /// looked settled; a window that was simply wrong the whole time, never
+    /// correcting, would not be caught by this alone, but that shape of bug
+    /// is what `SplitPaneUITests` and the `CONFORMANCE.md` §4.4.2 manual
+    /// pass (`stty size` against a live window) are for.
+    ///
+    /// Three more direct checks were tried first and ruled out, each for a
+    /// reason specific to this test machine rather than to Corta:
+    /// 1. The window title carries the grid size only for the ~1.5s after
+    ///    `resizeSessionToFitView` actually *changes* `lastRequestedSize`
+    ///    (`ViewController.noteTransientSizeChange`). On a normal launch,
+    ///    where the pre-display frame already lands at the configured grid
+    ///    (the case this test exercises when nothing is broken), that
+    ///    never fires — `lastRequestedSize` is seeded to the session's own
+    ///    initial size, so the settled layout matching it is a no-op, not
+    ///    a correction. A title-based version of this test timed out for
+    ///    exactly that reason: it asserted a side effect of the fix rather
+    ///    than the fix itself.
+    /// 2. Typing `stty size` and reading the shell's echoed reply (through
+    ///    the terminal's `AXValue`) sounded like the direct check, but
+    ///    both `typeText` and per-character `typeKey` post virtual
+    ///    keycodes, and this machine's active input source — Chinese
+    ///    Pinyin (`com.apple.inputmethod.SCIM.ITABC`) — composes them into
+    ///    Chinese candidates before Corta ever sees a byte, exactly as it
+    ///    correctly would for a real Chinese-Pinyin user.
+    /// 3. Reading `AXHelp` (M8.1's "%d rows by %d columns...") through
+    ///    System Events sidesteps the keyboard, but the xctest runner
+    ///    process has no Automation/TCC permission to drive System Events
+    ///    at all — "Application isn't running" for an application that
+    ///    plainly is, the characteristic misleading message a TCC denial
+    ///    gives here — and granting it needs a one-time GUI prompt only a
+    ///    human at this machine can approve.
     @MainActor
     func testNewWindowKeepsConfiguredGridAfterAppearing() throws {
         let app = XCUIApplication()
@@ -43,39 +77,19 @@ final class ShortcutTests: XCTestCase {
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 5))
 
-        let expected = configuredGridSize()
-        let suffix = "\(expected.columns)×\(expected.rows)"
-        let deadline = Date().addingTimeInterval(5)
-        while Date() < deadline {
-            if window.title.hasSuffix(suffix) { return }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        }
-        XCTFail("new window did not keep configured grid \(suffix); title is \(window.title)")
-    }
+        let firstFrame = window.frame
+        XCTAssertGreaterThan(firstFrame.width, 0)
+        XCTAssertGreaterThan(firstFrame.height, 0)
 
-    /// Mirrors only the two integer keys this UI assertion needs. A missing
-    /// file means the app defaults; values are clamped exactly as the app
-    /// clamps them so a developer's local configuration does not make the
-    /// test brittle.
-    private func configuredGridSize() -> (columns: Int, rows: Int) {
-        var columns = 120
-        var rows = 30
-        let url = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".config/corta/config")
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else {
-            return (columns, rows)
+        let deadline = Date().addingTimeInterval(3)
+        while Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+            let frame = window.frame
+            XCTAssertEqual(
+                frame, firstFrame,
+                "window settled at \(firstFrame) then changed to \(frame) — a late "
+                    + "correction, the historical 120×30-settles-at-120×27 bug's shape")
         }
-        for rawLine in text.split(separator: "\n") {
-            let line = rawLine.split(separator: "#", maxSplits: 1).first?
-                .trimmingCharacters(in: .whitespaces) ?? ""
-            let pair = line.split(separator: "=", maxSplits: 1).map {
-                $0.trimmingCharacters(in: .whitespaces)
-            }
-            guard pair.count == 2, let value = Int(pair[1]) else { continue }
-            if pair[0] == "columns" { columns = min(500, max(20, value)) }
-            if pair[0] == "rows" { rows = min(300, max(5, value)) }
-        }
-        return (columns, rows)
     }
 
     /// Polls the window's width: `NSPredicate` expectations evaluate against

@@ -274,11 +274,64 @@ extension ViewController {
     /// which keeps the user's place.
     func updateSearchResults(scrollsToMatch: Bool) {
         guard searchBar != nil, let searchField, session != nil else { return }
+        // Invalidates any `scheduleBackgroundSearchRefresh` still in flight
+        // for an older query — without this, a background sweep started
+        // before this keystroke could land after it and overwrite this
+        // synchronous, more current result with a stale one.
+        searchRefreshGeneration &+= 1
         let grid = session.snapshot()
         searchMatches = Search.find(searchField.stringValue, in: grid)
         if searchMatches.isEmpty {
             currentSearchMatchIndex = nil
         } else if scrollsToMatch || currentSearchMatchIndex == nil {
+            currentSearchMatchIndex = searchMatches.count - 1
+            scrollToCurrentMatch()
+        } else if let current = currentSearchMatchIndex, current >= searchMatches.count {
+            currentSearchMatchIndex = searchMatches.count - 1
+        }
+        updateSearchCountLabel()
+        invalidateDisplay()
+    }
+
+    /// PTY-output-triggered refresh, off the render path (M9) — see the
+    /// call site in `ViewController.prepareFrame`. Unlike
+    /// `updateSearchResults`, this never scrolls to the current match: an
+    /// output-driven refresh must not yank the viewport out from under a
+    /// user who is reading a match higher up, which is exactly the
+    /// "keeps the user's place" behaviour `updateSearchResults`'s
+    /// `scrollsToMatch: false` path already had — this preserves it, just
+    /// off the main thread for the sweep itself.
+    ///
+    /// `searchRefreshGeneration` discards a stale result: newer output, a
+    /// changed query, or the bar closing before the background sweep
+    /// finishes all invalidate whatever is in flight without cancelling the
+    /// `Task` itself — `Search.find` has no cancellation checks mid-sweep,
+    /// so the cheaper thing is to let a superseded one finish and then
+    /// throw its answer away.
+    func scheduleBackgroundSearchRefresh() {
+        guard let searchField, let session else { return }
+        searchRefreshGeneration &+= 1
+        let generation = searchRefreshGeneration
+        let query = searchField.stringValue
+        let grid = session.snapshot()
+        Task.detached(priority: .utility) { [weak self] in
+            let matches = Search.find(query, in: grid)
+            await MainActor.run {
+                self?.applyBackgroundSearchResults(matches, generation: generation)
+            }
+        }
+    }
+
+    private func applyBackgroundSearchResults(_ matches: [SelectionRange], generation: Int) {
+        // Superseded by a newer refresh, or the bar closed while this one
+        // was in flight — either way, `session`/`searchField` may already
+        // be gone, so this is the one place a background search result
+        // touches state, and only after confirming it is still current.
+        guard generation == searchRefreshGeneration, searchBar != nil else { return }
+        searchMatches = matches
+        if searchMatches.isEmpty {
+            currentSearchMatchIndex = nil
+        } else if currentSearchMatchIndex == nil {
             currentSearchMatchIndex = searchMatches.count - 1
             scrollToCurrentMatch()
         } else if let current = currentSearchMatchIndex, current >= searchMatches.count {

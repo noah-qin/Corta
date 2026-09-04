@@ -42,7 +42,7 @@ PTY read (blocking read / DispatchIO, batched — never byte-at-a-time)
         ▼
 Parser → Grid                     runs as fast as bytes arrive
         │
-        ▼  CVDisplayLink (vsync)  snapshot taken here, at most 1× per frame
+        ▼  CAMetalDisplayLink (vsync)  snapshot taken here, at most 1× per frame
 Metal renderer
 ```
 
@@ -100,6 +100,59 @@ cheap. The win from damage tracking is **not rebuilding the instance
 buffer** on the CPU when nothing changed. Track damage at line
 granularity; per-cell damage tracking is complexity that does not pay for
 itself.
+
+**M9** replaced the live screen's line-granularity check itself —
+comparing each row's full `Line` value against the cache — with a
+`UInt64` stamp (`Grid.lineRevision(_:)`, bumped centrally by
+`ScreenLines` on every row it touches: `ScreenLines.swift`). The
+granularity is unchanged, still one row, not one cell; only the cost of
+asking "did this row change" dropped, from an `O(row length)` comparison
+to one integer compare. Scrolled into history the rows come from
+immutable scrollback storage with no such stamp, so that path still
+compares `Line` values directly, exactly as before this change
+(`TerminalRenderer.rebuildDamagedRows`). The same milestone also merged
+the shell's two per-frame `session.snapshot()` + diff calls
+(`ViewController.updateDamage`/`render`, now `prepareFrame`/`render`)
+into one, since the second was diffing a grid the first had just
+diffed moments earlier in the same vsync callback.
+
+Because a `ScreenLines` swap (an alternate-screen enter/exit, a column
+resize replacing `lines` outright) restarts row revisions from small
+numbers a moment-ago screen's cache could coincidentally already hold,
+`ScreenLines.generation` — a process-wide unique value set once per
+instance — is checked alongside `lineRevision` so that coincidence can
+never be mistaken for "unchanged" (`Grid.linesGeneration`).
+
+**On scrolling specifically:** a whole-screen scroll used to look like
+every row changed — the ring-buffer rotation `ScreenLines.rotateUp`
+uses to make scrolling O(1) also (correctly) gives every surviving row
+a new *position*, and the old value-based diff had no way to tell "this
+row's content moved" from "this row's content changed". `Grid.
+linesRotated` (`ScreenLines.totalRotated`, bumped in `rotateUp`) lets
+`TerminalRenderer.applyScrollShift` tell the difference: retained rows'
+instances are shifted by a Y-coordinate offset — a bulk arithmetic pass —
+instead of rebuilt through `appendRowInstances`' per-cell Core Text/atlas
+lookups, and only the newly exposed rows at the bottom get a real
+rebuild. A scroll larger than the screen (nothing survives to shift) and
+scrolling within a partial scroll region (an application's own scroll
+region, e.g. a status line — outside `Grid.scrollUp`'s history-saving
+path, so `totalRotated` does not move for it) both fall back to the
+ordinary per-row check, unoptimised but correct.
+
+**Considered and not done:** shifting the CPU-side cache is the win here,
+not shrinking what gets copied into the GPU instance buffer afterward.
+`QuadRenderer`'s ring buffers already copy the whole array in one
+`memcpy` per draw (steady-state zero allocation, `PERFORMANCE.md` §3),
+and true byte-range partial updates into a *triple-buffered* ring would
+need each of the three slots to independently track which generation of
+the array it holds and replay every dirty range accumulated since — and
+because a row's rebuilt instance count can change (an edit that adds or
+removes a glyph), a row's byte offset in the array is not stable across
+rebuilds the way a fixed-size slot's would be, so a naive partial copy
+risks splicing the wrong bytes into a shifted position. Solving that
+properly means fixed-size per-row instance slots, a larger rewrite not
+justified here: a full array copy is a sub-millisecond `memcpy`
+(hundreds of KB at a typical window size), not the measured cost.
 
 ---
 
@@ -204,9 +257,22 @@ subsystem `dev.noahqin.Corta`, category `input-latency`:
 | `gpu`     | submission → the command buffer's completion handler |
 
 ```sh
-xcrun xctrace record --template 'os_signpost' --launch -- \
-    /path/to/Corta.app/Contents/MacOS/Corta
+xcrun xctrace record --attach Corta --instrument 'os_signpost' \
+    --output /path/to/output.trace
 ```
+
+`--instrument`, not `--template`: `os_signpost` is not one of
+`xctrace list templates`' entries on current Xcode (it is one of
+`xctrace list instruments`' entries instead), so `--template 'os_signpost'` — this
+document's own earlier wording — fails outright with "Cannot find
+template matching name". `--attach` to an already-running, already-
+launched Corta, not `--launch`, for the reason the paragraph below this
+one explains: launching *through* xctrace/Instruments does not hand the
+new process window focus, so typing right after fails silently instead.
+`scripts/record-signpost-trace.sh` runs the whole sequence (launch,
+activate, attach, save to `.build/traces/` — not `~/Desktop`, which
+needs a one-time Files-and-Folders permission grant Terminal does not
+have by default and `xctrace` fails on outright).
 
 Everything is behind `OSSignposter.isEnabled`, which is false unless a
 trace is recording, so the render path pays one atomic load per stage.
@@ -221,14 +287,12 @@ frame and waits a whole refresh period. In a trace this is visible
 directly — an `output` event landing after that frame's `frame` interval
 has begun, with the next `frame` an interval later.
 
-**Attempted, no valid data.** Two Instruments recordings against the
-Release build both showed zero `keyDown` and `output` events — only
+**First two attempts: no valid data.** Two Instruments recordings against
+the Release build both showed zero `keyDown` and `output` events — only
 `wake`/`frame`/`commit`/`gpu` from idle cursor-blink activity — because
 the typing done immediately after launching Corta from Instruments'
 Record button never reached `TerminalView` (launching a target this way
-does not appear to hand it window focus). The question above is still
-open; it needs a recording where `keyDown` is confirmed non-zero before
-its `output`/`frame` ordering means anything.
+does not appear to hand it window focus).
 
 One incidental result from those two recordings, unrelated to the
 missed-frame question but relevant to §5.4: Instruments' own
@@ -236,6 +300,58 @@ missed-frame question but relevant to §5.4: Instruments' own
 redraws alone — 146 stalls averaging 30.6 ms in the first recording, 305
 stalls averaging 30.5 ms in the second. Drawable stalling is happening on
 this machine at rest, not only under load.
+
+**Answered.** Two more things had to be fixed before a valid recording
+was possible, both real gaps rather than test-environment noise:
+
+1. Launching *through* `xctrace`/Instruments never hands the new process
+   focus, confirmed again — the fix is `scripts/record-signpost-trace.sh`:
+   launch Corta normally (it gets focus the way it always does), block
+   until System Events itself confirms it is frontmost, *then* attach a
+   trace to the already-running process. An unguarded `activate` that
+   silently swallowed its own failure (`2>/dev/null || true`) was the
+   actual reason two further attempts still showed a mistyped-into-the-
+   wrong-window session — the script now surfaces that failure instead of
+   hiding it.
+2. `InputLatencySignposts.keyDown` only wrapped `TerminalView
+   .deliverBytes` — the control-sequence bypass path (⌘/⌃, or an event
+   the input context declines). Ordinary typing, composed or not, commits
+   through `TerminalView.insertText` instead (Cocoa's input-context
+   pipeline, not a Corta choice), and Return/Delete/Escape/the arrows
+   through `doCommand(by:)` — neither had ever been instrumented. A trace
+   of a completely normal typing session showed real keystrokes reaching
+   the child (bytes on the PTY, grid updates, frames) with zero `keyDown`
+   signposts the whole time, which is what exposed this: the chain's
+   first link was silently only covering the path a small minority of
+   real keystrokes take. Both paths are now wrapped in
+   `InputLatencySignposts.measure(.keyDown)`, matching `deliverBytes`.
+
+With both fixed, a 12-second recording of ordinary typing (122
+keystrokes) gives:
+
+| Stage | n | min | p50 | p99 | max |
+| --- | --- | --- | --- | --- | --- |
+| `keyDown` → next `output` | 122 | 0.07 ms | 0.13 ms | 0.19 ms | 0.43 ms |
+| `output` → next `frame` begin | 131 | 0.56 ms | 9.46 ms | 15.61 ms | 15.73 ms |
+
+The core-side chain (`keyDown` → `output`) stays sub-millisecond, in line
+with `corta-bench`'s separately-measured 0.005 ms average for the same
+span — confirms this is not where the M6.12 45.5 ms figure goes.
+
+`output` → `frame` spreads roughly uniformly across the whole 0–16 ms
+window this machine's frame-begin-to-frame-begin gaps cluster around
+(§5.2's fixed-environment table was not held for this run — power and
+foreground load were not controlled — so the exact frame period is a
+observation of this run, not a citable number). That shape is what
+*ordinary* vsync alignment looks like — a keystroke lands at a random
+phase of the refresh clock, and the closer to the start of the current
+period it lands, the nearer to a full period it waits for the next one.
+**No `output` → `frame` gap in this recording exceeded roughly one frame
+period** — the specific pattern a genuinely missed frame would show
+(waiting for the vsync *after* the one that should have caught it) did
+not appear. One 12-second sample is not exhaustive — a longer or busier
+session could still catch a rarer double-miss — but this is a real answer
+where none existed before, not another inconclusive attempt.
 
 ### 5.4 `maximumDrawableCount`
 
@@ -251,7 +367,56 @@ comparison is two launches of the same binary rather than a code change.
 Pair it with a signpost trace: if double buffering is costing rather than
 saving, it appears as the `frame` interval growing at its front.
 
-**Not yet measured.**
+**Preliminary signal, not the A/B itself.** `RenderMetrics`
+(`Corta/RenderMetrics.swift`, `CORTA_RENDER_METRICS=1`,
+`scripts/measure-render-metrics.sh`) reports `drawableWait` — how long
+`nextDrawable()` blocks — directly, without Typometer or Instruments. One
+informal run at the default drawable count (3), auto-repeat plus `yes`
+for a few seconds, held nothing else about the machine fixed the way
+§5.2 requires:
+
+| Metric | n | avg | p50 | p99 | max |
+| --- | --- | --- | --- | --- | --- |
+| `drawableWait` | 600 | 0.00 ms | 0.00 ms | 0.00 ms | 0.00 ms |
+| `cpuFrame` | 600 | 0.38 ms | 0.34 ms | 0.78 ms | 3.79 ms |
+| `gpu` | 600 | 0.93 ms | 0.89 ms | 1.22 ms | 8.22 ms |
+
+`drawableWait` never left zero — at the default count, `nextDrawable()`
+is not blocking on this machine under this load, which is the condition
+under which dropping to 2 has nothing to buy back and can plausibly only
+cost (more frequent blocking, not less). Not a substitute for the actual
+Typometer A/B this section is still waiting on — that is the only way to
+turn "probably not worth it" into a number — but reason enough to
+de-prioritize it behind M8.19 and M9's own measurement pass.
+
+**The Typometer A/B itself.** `scripts/measure-drawable-ab.sh` launches
+the same Release build twice, back to back, so the only variable between
+the two Typometer runs is `CORTA_MAX_DRAWABLES`. Same machine, same
+Typometer settings as §5.5 (200 chars / 150 ms delay / 50 ms period /
+1,000 ms length, synchronous mode, no intermediate pauses), mains power,
+Corta frontmost with nothing else running:
+
+| Run | Min, ms | Max, ms | Avg, ms | SD, ms |
+| --- | ------- | ------- | ------- | ------ |
+| A — default (`maximumDrawableCount = 3`) | 45.4 | 99.4 | 70.1 | 13.9 |
+| B — `CORTA_MAX_DRAWABLES=2`              | 46.2 | 95.4 | 70.4 | 13.5 |
+
+Run A and Run B are within noise of each other on every column — the
+gap in the mean (0.3 ms) is far smaller than either run's own standard
+deviation (13.5–13.9 ms). This matches the `drawableWait` finding above:
+`nextDrawable()` is not blocking at the default count on this machine, so
+there is nothing for a smaller count to buy back, and it does not cost
+anything either. **Conclusion: leave the default (3).** Forcing 2 has no
+measured benefit and is not worth the added blocking risk on a slower
+frame or a busier machine.
+
+(These two runs' Avg/SD are higher across the board than §5.5's earlier
+single-run numbers for Corta — 70 ms vs. 45 ms — despite identical
+Typometer settings; §5.2's environment table was not fully controlled for
+this pair either, e.g. other background load on the machine varied
+between sessions. The A vs. B *comparison* is still valid, since both
+runs shared whatever that day's uncontrolled conditions were — only the
+absolute numbers should not be cross-cited against §5.5's.)
 
 ### 5.5 Cross-terminal comparison
 

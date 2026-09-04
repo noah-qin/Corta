@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 import Metal
 
 enum QuadRendererError: Error {
@@ -74,6 +75,10 @@ nonisolated final class QuadRenderer {
     /// use — the pipelines are built against it up front.
     static let pixelFormat: MTLPixelFormat = .bgra8Unorm
 
+    /// Serialises every `QuadRenderer.init`'s binary-archive load/write
+    /// against every other's — see the lock's use-site in `init` for why.
+    private static let binaryArchiveLock = NSLock()
+
     init(device: MTLDevice) throws {
         self.device = device
         guard let library = device.makeDefaultLibrary() else {
@@ -86,6 +91,27 @@ nonisolated final class QuadRenderer {
         else {
             throw QuadRendererError.functionUnavailable
         }
+
+        // M9: load a cached `MTLBinaryArchive` if one exists from a
+        // previous launch, so these three pipelines are looked up instead of
+        // compiled — the cold-start cost this exists to remove is entirely
+        // on first window paint, first glyph, first emoji and a font switch,
+        // never inside a frame. `nil` (no archive support on this device, no
+        // write access to the cache directory, first launch ever) falls
+        // straight through to the ordinary synchronous compile below; this
+        // is a startup-latency optimisation; it does not change what gets
+        // drawn if it is unavailable.
+        //
+        // `binaryArchiveLock` serialises everything from here through the
+        // `serialize` call below against every other `QuadRenderer.init` —
+        // `-[_MTLDevice recordBinaryArchiveUsage:]` is device-wide
+        // bookkeeping, undocumented as to whether it tolerates two threads
+        // registering an archive at once. The lock only ever serialises
+        // this one-time-per-renderer setup, never a frame, so the cost of
+        // being conservative here is nothing measurable.
+        QuadRenderer.binaryArchiveLock.lock()
+        defer { QuadRenderer.binaryArchiveLock.unlock() }
+        let archive = QuadRenderer.loadOrCreateBinaryArchive(device: device)
 
         func makePipeline(fragment: MTLFunction, premultipliedSource: Bool = false) throws -> MTLRenderPipelineState {
             let descriptor = MTLRenderPipelineDescriptor()
@@ -107,12 +133,24 @@ nonisolated final class QuadRenderer {
             attachment.sourceAlphaBlendFactor = .one
             attachment.destinationRGBBlendFactor = .oneMinusSourceAlpha
             attachment.destinationAlphaBlendFactor = .oneMinusSourceAlpha
+            if let archive {
+                descriptor.binaryArchives = [archive]
+                // Duplicates across launches are silently accepted (Metal's
+                // own doc comment on this method) — this both seeds a
+                // first-ever-launch archive and keeps a stale one current,
+                // with no need to first check whether today's descriptor is
+                // already in it.
+                try? archive.addRenderPipelineFunctions(descriptor: descriptor)
+            }
             return try device.makeRenderPipelineState(descriptor: descriptor)
         }
 
         self.solidPipeline = try makePipeline(fragment: solidFragment)
         self.glyphPipeline = try makePipeline(fragment: glyphFragment)
         self.colorGlyphPipeline = try makePipeline(fragment: colorGlyphFragment, premultipliedSource: true)
+        if let archive, let url = QuadRenderer.binaryArchiveURL {
+            QuadRenderer.serialize(archive, to: url)
+        }
 
         let samplerDescriptor = MTLSamplerDescriptor()
         samplerDescriptor.minFilter = .linear
@@ -121,6 +159,140 @@ nonisolated final class QuadRenderer {
             throw QuadRendererError.samplerUnavailable
         }
         self.sampler = sampler
+    }
+
+    /// Where a compiled-pipeline cache from a previous launch is looked for,
+    /// and where this launch's (re)writes it — `~/Library/Caches`, not
+    /// Application Support: this is disposable, regenerable content the
+    /// system is free to purge, never something a user's session depends on.
+    ///
+    /// Named with `buildFingerprint` — **not** a fixed filename — so a
+    /// rebuild's cache is never confused with an older build's: this is a
+    /// belt-and-braces measure alongside `isRunningUnderXCTest` below, not
+    /// the fix for what that guards (see its doc comment for the actual
+    /// crash this file's history is about).
+    ///
+    /// One file for all three pipelines; keyed by nothing beyond its path.
+    /// Not `private`: `QuadRendererTests` checks the file this writes.
+    static var binaryArchiveURL: URL? {
+        guard
+            let cachesDirectory = FileManager.default.urls(
+                for: .cachesDirectory, in: .userDomainMask
+            ).first
+        else { return nil }
+        let directory = cachesDirectory.appendingPathComponent("dev.noahqin.Corta", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        pruneStaleBinaryArchives(in: directory)
+        return directory.appendingPathComponent("QuadRenderer-\(buildFingerprint).metallib-archive")
+    }
+
+    /// The running executable's modification time, as a filename-safe
+    /// integer — changes on every rebuild (a fresh compile writes a new
+    /// binary), which is exactly the granularity a Metal-compiled-shader
+    /// cache needs to invalidate at. `"unknown"` only if the executable's
+    /// own attributes cannot be read, which never happens for a running
+    /// process's own binary in practice; a shared, stable "unknown" still
+    /// behaves correctly (one cache file, reused within that condition)
+    /// rather than crashing or refusing to cache at all.
+    private static var buildFingerprint: String {
+        guard let url = Bundle.main.executableURL,
+            let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+            let modified = attributes[.modificationDate] as? Date
+        else { return "unknown" }
+        return String(Int(modified.timeIntervalSince1970))
+    }
+
+    /// Removes every `QuadRenderer-*.metallib-archive` in `directory` that
+    /// is not this build's own — otherwise each rebuild during development
+    /// leaves the last one behind forever, unbounded, since nothing else
+    /// ever revisits this directory. Best-effort: a failed removal here is
+    /// not worth surfacing, the file just sits unused like it would have
+    /// before this existed.
+    private static func pruneStaleBinaryArchives(in directory: URL) {
+        let current = "QuadRenderer-\(buildFingerprint).metallib-archive"
+        guard
+            let entries = try? FileManager.default.contentsOfDirectory(
+                at: directory, includingPropertiesForKeys: nil)
+        else { return }
+        for entry in entries
+        where entry.lastPathComponent.hasPrefix("QuadRenderer-")
+            && entry.lastPathComponent != current
+        {
+            try? FileManager.default.removeItem(at: entry)
+        }
+    }
+
+    /// Writes `archive` to `url` without ever exposing a partially-written
+    /// file at that path: serializes to a uniquely-named temp file in the
+    /// same directory first, then atomically replaces `url` with it
+    /// (`FileManager.replaceItemAt`, a single `rename(2)` on the same
+    /// volume) — so a reader can never open a half-written file, only the
+    /// old complete one or the new complete one.
+    private static func serialize(_ archive: any MTLBinaryArchive, to url: URL) {
+        let temporaryURL =
+            url.deletingLastPathComponent()
+            .appendingPathComponent("\(UUID().uuidString).tmp")
+        guard (try? archive.serialize(to: temporaryURL)) != nil else {
+            try? FileManager.default.removeItem(at: temporaryURL)
+            return
+        }
+        do {
+            _ = try FileManager.default.replaceItemAt(url, withItemAt: temporaryURL)
+        } catch {
+            try? FileManager.default.removeItem(at: temporaryURL)
+        }
+    }
+
+    /// `true` while running as (or hosted inside) an XCTest bundle —
+    /// `XCTestConfigurationFilePath` is the standard, Apple-set environment
+    /// variable for this, present whether the test is unit (`CortaTests`,
+    /// which `TEST_HOST`s directly into `Corta` — this process *is* the
+    /// test) or UI-driven.
+    ///
+    /// Exists for exactly one reason: `loadOrCreateBinaryArchive` reading a
+    /// previous archive back segfaulted — `-[_MTLDevice
+    /// recordBinaryArchiveUsage:]`, a null C-string reaching `strlen`,
+    /// inside Metal's own framework code — reproducibly under `CortaTests`.
+    /// A standalone command-line reproduction of the identical write-then-
+    /// load round trip (same archive, same device, no app, no test
+    /// infrastructure) did **not** crash, and neither did two real,
+    /// consecutive, bare `Corta.app` launches sharing a cache file (the
+    /// scenario this feature exists for) — which points at the *hosted
+    /// test* launch path specifically, not the load itself: `CortaTests`
+    /// runs injected into `Corta` via `TEST_HOST`, a fundamentally
+    /// different launch mechanism from opening the app, and a filed
+    /// upstream report of the same crash signature attributes it to
+    /// `MTLGetShaderCachePath()` returning nil when something denies
+    /// Metal's own internal shader-cache directory — plausible for
+    /// whatever container Xcode's hosted-test launch applies that a plain
+    /// launch does not.
+    ///
+    /// Disabling the read path unconditionally (an earlier version of this
+    /// fix) traded away a real, working optimisation for real users to
+    /// silence a test-harness-only crash; this only disables it under that
+    /// harness.
+    private static var isRunningUnderXCTest: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
+    /// Opens the cached archive from a previous launch if one exists at
+    /// `binaryArchiveURL` — unless `isRunningUnderXCTest`, in which case a
+    /// fresh, empty archive is created instead and the file is never read
+    /// (its doc comment has the full account of why). Either way, `init`
+    /// above adds this launch's three pipeline descriptors to it and
+    /// re-serialises it, so a first-ever launch — or every hosted-test
+    /// launch — seeds or refreshes the cache a later real launch benefits
+    /// from. `nil` on any failure (no archive support, no writable cache
+    /// directory): callers fall back to an ordinary synchronous compile,
+    /// unconditionally correct either way.
+    private static func loadOrCreateBinaryArchive(device: MTLDevice) -> (any MTLBinaryArchive)? {
+        let descriptor = MTLBinaryArchiveDescriptor()
+        if !isRunningUnderXCTest, let url = binaryArchiveURL,
+            FileManager.default.fileExists(atPath: url.path)
+        {
+            descriptor.url = url
+        }
+        return try? device.makeBinaryArchive(descriptor: descriptor)
     }
 
     /// Draws solid-colour `instances` into `rect` (pixels, relative to the

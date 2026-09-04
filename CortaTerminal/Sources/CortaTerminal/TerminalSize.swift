@@ -3,8 +3,12 @@ import Darwin
 /// The size of a terminal, in character cells and (optionally) pixels.
 ///
 /// Pixel dimensions are reported to the child through `TIOCSWINSZ`; some
-/// programs use them for sixel and image protocols. Corta does not
-/// implement those yet, so zero is a truthful answer.
+/// programs use them for sixel and image protocols. The app layer
+/// (`ViewController.pixelSize(columns:rows:metrics:)`) fills these in from
+/// the real device-pixel cell metrics before a size reaches the pty — a
+/// Kitty-graphics client such as `kitten icat` (M10) refuses outright
+/// without them. The zero default here stays truthful for callers with no
+/// renderer to measure from (`corta-bench`, the core's own tests).
 public struct TerminalSize: Equatable, Sendable {
     public var rows: UInt16
     public var columns: UInt16

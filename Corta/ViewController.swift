@@ -9,6 +9,7 @@ import Cocoa
 import CoreText
 import CortaTerminal
 import Metal
+import QuartzCore
 import Synchronization
 
 /// Owns one `TerminalSession` and the `TerminalRenderer`/`TerminalView` that
@@ -76,10 +77,23 @@ class ViewController: NSViewController {
     /// cursor alone was too subtle. Above the terminal canvas, below the
     /// search bar's glass; it never intercepts input (`PassthroughView`).
     var focusDimView: NSView?
+    /// A very light accent wash over the pane that actually holds the
+    /// keyboard right now — `hasUserFocus`, not merely `isFocusedPane` — so
+    /// the split still reads correctly with the ring itself turned down to
+    /// a hairline. Hidden the moment the window resigns key, same as the
+    /// ring: neither is a claim about which pane the keyboard *would* go to,
+    /// only about where it goes this instant.
+    var focusHighlightView: NSView?
     /// The accent ring around the pane that owns the keyboard (M5.2, revised)
     /// — the positive half of the focus signal, so an unfocused pane no
     /// longer has to be dimmed to the point of looking disabled.
     var focusRingView: NSView?
+    /// The ring's top constraint, re-tensioned on every layout: chrome
+    /// overlap (titlebar, and the tab bar when tabbed) changes when a tab
+    /// bar shows, hides or is dragged out, and a top pane's ring must clear
+    /// it or the tab bar paints over the ring's top edge (see
+    /// `updateFocusRingLayout`).
+    private var focusRingTopConstraint: NSLayoutConstraint?
     /// Shown instead of a terminal when this pane could not be built —
     /// no Metal device, no glyph atlas, or no child process (`PaneFailureView`).
     /// Non-nil is the one state in which `isOperable` is false.
@@ -114,6 +128,13 @@ class ViewController: NSViewController {
     /// when it is set, so a truly idle frame costs a boolean check rather
     /// than a line-by-line comparison.
     private let outputPending = Mutex(false)
+    /// Built by `prepareFrame()` and consumed once by `render(into:...)`,
+    /// which always runs immediately after it in the same
+    /// `FrameScheduler.metalDisplayLink` callback — the two `session.
+    /// snapshot()` calls (one per method) this replaced could see different
+    /// grid states a PTY-heavy frame apart; sharing one avoids that as well
+    /// as the redundant work (M9). `nil` only before the first frame.
+    private var pendingFrameContext: FrameContext?
     /// Coalesces `session.resize` during a live drag (M2.9); the last size
     /// actually requested, so no-op layouts don't re-send the same winsize.
     private var resizeDebouncer: ResizeDebouncer!
@@ -144,6 +165,11 @@ class ViewController: NSViewController {
     /// The scroll position from before the search bar opened, restored on
     /// Esc.
     var scrollOffsetBeforeSearch: Int?
+    /// Bumped by every `scheduleBackgroundSearchRefresh` call (M9); a
+    /// background sweep applies its result only if this still matches what
+    /// it captured when it started, so a superseded or late-arriving one is
+    /// silently discarded instead of clobbering a newer result.
+    var searchRefreshGeneration = 0
     /// Local key monitor for Esc while the bar is open: the field editor
     /// turns Esc into `cancelOperation:`, which NSSearchField can swallow
     /// without ever calling the delegate — a monitor sees the key before
@@ -185,11 +211,21 @@ class ViewController: NSViewController {
     /// actually overlaps it and just its own inset otherwise (M5 — a
     /// bottom-row pane has no titlebar above it).
     var topInset: CGFloat {
-        guard let window = view.window else {
+        guard view.window != nil else {
             return TerminalLayout.titlebarHeight + TerminalLayout.insets.top
         }
+        return TerminalLayout.insets.top + chromeOverlap
+    }
+    /// The chrome (titlebar, and the tab bar when tabbed) that overlaps this
+    /// pane specifically — zero for a pane that does not touch the window's
+    /// top edge. `topInset` is this plus the grid's own breathing room; the
+    /// focus ring (`updateFocusRingLayout`) wants only this part, since it is
+    /// drawn flush to the pane's edge already.
+    private var chromeOverlap: CGFloat {
+        guard let window = view.window else { return 0 }
         let distanceFromTop = window.frame.height - view.convert(view.bounds, to: nil).maxY
-        return TerminalLayout.insets.top + max(0, windowChrome - distanceFromTop)
+        return TerminalLayout.chromeOverlap(
+            windowChrome: windowChrome, paneDistanceFromTop: distanceFromTop)
     }
     /// Total vertical space the grid does not get.
     var verticalInsets: CGFloat { topInset + TerminalLayout.insets.bottom }
@@ -223,6 +259,24 @@ class ViewController: NSViewController {
         return (
             cellWidth: font.maximumAdvancement.width,
             cellHeight: (font.ascender - font.descender + font.leading).rounded(.up)
+        )
+    }
+
+    /// `ws_xpixel`/`ws_ypixel` for `TIOCSWINSZ` — real device pixels, not
+    /// points, at a given grid size. A Kitty-graphics client (M10) that asks
+    /// "how many pixels is a cell" needs this to size an image correctly,
+    /// and `kitten icat` refuses to run at all without it: it was the first
+    /// thing a real client verification found, since `TerminalSize`'s zero
+    /// default (truthful before any image protocol existed) had never been
+    /// overridden by either call site that actually reaches `TIOCSWINSZ`.
+    private func pixelSize(columns: Int, rows: Int, metrics: CellMetrics) -> (
+        width: UInt16, height: UInt16
+    ) {
+        let width = CGFloat(columns) * metrics.cellWidth
+        let height = CGFloat(rows) * metrics.cellHeight
+        return (
+            UInt16(min(CGFloat(UInt16.max), max(0, width))),
+            UInt16(min(CGFloat(UInt16.max), max(0, height)))
         )
     }
 
@@ -314,7 +368,15 @@ class ViewController: NSViewController {
         // The session comes before the view hierarchy: with no child there is
         // no terminal to lay out, and the failure view should take the pane
         // rather than sit behind a live canvas with nothing driving it.
-        let initialSize = initialGridSize ?? configuredGridSize
+        var initialSize = initialGridSize ?? configuredGridSize
+        if let terminalRenderer {
+            let pixels = pixelSize(
+                columns: Int(initialSize.columns), rows: Int(initialSize.rows),
+                metrics: terminalRenderer.metrics)
+            initialSize = TerminalSize(
+                rows: initialSize.rows, columns: initialSize.columns,
+                pixelWidth: pixels.width, pixelHeight: pixels.height)
+        }
         let started: StartedSession
         do {
             started = try Self.startSession(
@@ -327,6 +389,12 @@ class ViewController: NSViewController {
             return
         }
         session = started.session
+        // OSC 11 must answer with what is actually on screen (M6.6) — a
+        // program that queries the background before choosing its own
+        // colours needs the live theme's variant, not the type's default.
+        session.dynamicColors =
+            AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)
+            .dynamicColors
         pendingSessionNotice = started.notice
         lastRequestedSize = initialSize
 
@@ -403,6 +471,26 @@ class ViewController: NSViewController {
         // ring around the pane that has the keyboard, with the dim reduced to
         // a hint. A ring is also the convention every other split UI on this
         // platform uses, so it needs no learning.
+        // The light background lift under the ring, only on the pane that
+        // truly has the keyboard right now. On top of the terminal canvas
+        // like the dim, but a positive tint rather than a negative one —
+        // low enough alpha that it reads as an elevation, not a recolour of
+        // the text underneath.
+        let highlight = PassthroughView()
+        highlight.wantsLayer = true
+        highlight.layer?.backgroundColor =
+            NSColor.controlAccentColor.withAlphaComponent(Self.focusHighlightAlpha).cgColor
+        highlight.isHidden = true
+        highlight.translatesAutoresizingMaskIntoConstraints = false
+        self.view.addSubview(highlight)
+        NSLayoutConstraint.activate([
+            highlight.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
+            highlight.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
+            highlight.topAnchor.constraint(equalTo: self.view.topAnchor),
+            highlight.bottomAnchor.constraint(equalTo: self.view.bottomAnchor),
+        ])
+        focusHighlightView = highlight
+
         let ring = PassthroughView()
         ring.wantsLayer = true
         ring.layer?.borderWidth = Self.focusRingWidth
@@ -412,18 +500,23 @@ class ViewController: NSViewController {
         ring.translatesAutoresizingMaskIntoConstraints = false
         self.view.addSubview(ring)
         // Inset by the border's own width: drawn flush to the pane's edge,
-        // half of a 2pt border falls outside the view and the ring reads as
-        // 1pt on the window's outer edges and 2pt against a divider.
+        // half the border falls outside the view and the ring reads as
+        // half-weight on the window's outer edges and full weight against a
+        // divider. The top constraint is retensioned per layout
+        // (`updateFocusRingLayout`) to clear the chrome on a top pane, so it
+        // is kept rather than folded into this literal block.
+        let ringTop = ring.topAnchor.constraint(
+            equalTo: self.view.topAnchor, constant: Self.focusRingWidth / 2)
         NSLayoutConstraint.activate([
             ring.leadingAnchor.constraint(
                 equalTo: self.view.leadingAnchor, constant: Self.focusRingWidth / 2),
             ring.trailingAnchor.constraint(
                 equalTo: self.view.trailingAnchor, constant: -Self.focusRingWidth / 2),
-            ring.topAnchor.constraint(
-                equalTo: self.view.topAnchor, constant: Self.focusRingWidth / 2),
+            ringTop,
             ring.bottomAnchor.constraint(
                 equalTo: self.view.bottomAnchor, constant: -Self.focusRingWidth / 2),
         ])
+        focusRingTopConstraint = ringTop
         focusRingView = ring
 
         resizeDebouncer = ResizeDebouncer { [weak self] size in
@@ -443,7 +536,7 @@ class ViewController: NSViewController {
             self?.render(into: pass, drawableSize: drawableSize, drawable: drawable)
         }
         view.shouldRenderFrame = { [weak self] in
-            self?.updateDamage() ?? false
+            self?.prepareFrame() ?? false
         }
         view.onKeyBytes = { [weak self] bytes in
             guard let self else { return }
@@ -556,15 +649,45 @@ class ViewController: NSViewController {
         // grid change the damage diff would notice — force one frame.
         invalidateDisplay()
         resizeSessionToFitView()
+        updateFocusRingLayout()
     }
 
-    /// Runs at vsync before a drawable is acquired. Cheap path: nothing
-    /// arrived and nothing local changed, so no snapshot, no diff, no frame —
-    /// and the display link parks itself (`TerminalView.frameTick`), which is
-    /// what lets a static screen idle at ~0% CPU (`PERFORMANCE.md` §3). When
-    /// output did arrive, the snapshot is diffed against the renderer's
-    /// line-granular cache and the frame happens only on damage.
-    private func updateDamage() -> Bool {
+    /// Keeps the focus ring inside the pane's actually-visible area and its
+    /// rounded corners on only the corners that are also the window's.
+    /// Chrome overlap changes whenever the tab bar appears, hides or is
+    /// dragged out into its own window (M4.7) — all three are layout passes
+    /// on this window, so this needs no observer beyond `viewDidLayout`.
+    private func updateFocusRingLayout() {
+        guard focusRingView != nil else { return }
+        focusRingTopConstraint?.constant = chromeOverlap + Self.focusRingWidth / 2
+        updateFocusRingCornerMask()
+    }
+
+    /// Rounds only the ring's corners that are also the window's rounded top
+    /// corners — the same rule `TerminalView.updateExteriorCornerMask` applies
+    /// to the drawable, so an interior or edge pane's ring reads as a clean
+    /// rectangle instead of curving away from a divider it should butt flush
+    /// against. Unlike that view, `self.view` is not flipped, so here `MaxY`
+    /// is the top of the layer, not `MinY`.
+    private func updateFocusRingCornerMask() {
+        guard let window = view.window, let ring = focusRingView else { return }
+        let edges = TerminalLayout.exteriorEdges(
+            paneFrameInWindow: view.convert(view.bounds, to: nil), windowSize: window.frame.size)
+        var mask: CACornerMask = []
+        if edges.top && edges.left { mask.insert(.layerMinXMaxYCorner) }
+        if edges.top && edges.right { mask.insert(.layerMaxXMaxYCorner) }
+        ring.layer?.maskedCorners = mask
+    }
+
+    /// Runs once per accepted vsync, before the frame is built. Cheap path:
+    /// nothing arrived and nothing local changed, so no snapshot, no diff —
+    /// and this reports "nothing pending," which is what lets
+    /// `FrameScheduler` pause itself again and a static screen idle at ~0%
+    /// CPU (`PERFORMANCE.md` §3). When output did arrive, the snapshot is
+    /// diffed against the renderer's line-granular cache, the result is
+    /// cached in `pendingFrameContext` for `render(into:...)` to draw
+    /// without diffing again (M9), and the frame happens only on damage.
+    private func prepareFrame() -> Bool {
         guard let session, terminalRenderer != nil else { return false }
         if session.takeBell() {
             handleBell()
@@ -585,11 +708,16 @@ class ViewController: NSViewController {
         if hasOutput, isFocusedPane {
             applyWindowTitle()
         }
-        // While the search bar is open, output shifts what matches: re-run
-        // the query against the new snapshot before this frame diffs it
-        // (M4.4). Recomputed, not patched — `updateSearchResults` explains.
+        // While the search bar is open, output shifts what matches — but
+        // recomputing them is a full-scrollback sweep (`Search.swift`), and
+        // running it synchronously, here, on every output batch put it on
+        // the render path: a flood with the bar open competed with the
+        // frame budget for no reason a background thread couldn't do
+        // instead (M9). `scheduleBackgroundSearchRefresh` hands the
+        // recompute to a detached task and applies the result once it
+        // lands, whenever that is — this frame does not wait on it.
         if hasOutput, searchBar != nil {
-            updateSearchResults(scrollsToMatch: false)
+            scheduleBackgroundSearchRefresh()
         }
         if hasOutput {
             // A screen reader following a build log has to hear the new lines,
@@ -619,12 +747,16 @@ class ViewController: NSViewController {
         needsRedraw = false
         wasSynchronizedOutputActive = false
         let grid = session.snapshot()
-        // The rebuilt rows land in the renderer's cache; `render` diffs once
-        // more when it draws and picks up anything that arrived since.
+        let mappedSearchMatches = searchMatches.map { TerminalSelection($0, grid: grid) }
         let damaged = terminalRenderer.updateInstances(
             grid: grid, scrollOffset: scrollOffset,
             cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
-            searchMatches: searchMatches.map { TerminalSelection($0, grid: grid) },
+            searchMatches: mappedSearchMatches,
+            currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink)
+        pendingFrameContext = FrameContext(
+            grid: grid, scrollOffset: scrollOffset,
+            cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
+            searchMatches: mappedSearchMatches,
             currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink)
         return forced || damaged
     }
@@ -655,7 +787,10 @@ class ViewController: NSViewController {
         // main thread lengthens, and the one an end-to-end number cannot
         // tell apart from a slow parse.
         let wake = InputLatencySignposts.begin(.wake)
-        Task { @MainActor [weak self] in
+        // `.userInitiated`: this hop is on the output → wake → frame chain
+        // the keypress-to-pixel budget is measured against, not background
+        // bookkeeping — the default task priority gives it no such claim.
+        Task(priority: .userInitiated) { @MainActor [weak self] in
             InputLatencySignposts.end(.wake, wake)
             self?.terminalView?.setNeedsRedraw()
             self?.taskNotifier.noteOutput()
@@ -697,7 +832,9 @@ class ViewController: NSViewController {
             height: view.bounds.height - verticalInsets)
         let columns = UInt16(max(1, usable.width / terminalRenderer.pointMetrics.cellWidth))
         let rows = UInt16(max(1, usable.height / terminalRenderer.pointMetrics.cellHeight))
-        let size = TerminalSize(rows: rows, columns: columns)
+        let pixels = pixelSize(columns: Int(columns), rows: Int(rows), metrics: terminalRenderer.metrics)
+        let size = TerminalSize(
+            rows: rows, columns: columns, pixelWidth: pixels.width, pixelHeight: pixels.height)
         guard size != lastRequestedSize else { return }
         lastRequestedSize = size
         // Always coalesced to the trailing edge of a resize stream: window
@@ -857,33 +994,69 @@ class ViewController: NSViewController {
         return name.isEmpty ? path : name
     }
 
-    /// Runs at vsync, on the main thread — reads the latest grid without
+    /// Runs at vsync, on the main thread, immediately after `prepareFrame()`
+    /// in the same `FrameScheduler` callback — reads the latest grid without
     /// ever blocking the reader thread (`PERFORMANCE.md` §2.1).
+    ///
+    /// Draws `pendingFrameContext` rather than snapshotting and diffing the
+    /// grid again: `prepareFrame()` already did both, moments ago in the
+    /// same callback, and doing it twice was the whole cache rebuilt and
+    /// diffed a second time on every drawn frame for no reason (M9). The
+    /// fallback snapshot below is defensive only — every real call path
+    /// (`FrameScheduler.metalDisplayLink`, `presentSynchronously`) always
+    /// runs `shouldRenderFrame` (`prepareFrame`) first.
     private func render(
         into renderPassDescriptor: MTLRenderPassDescriptor, drawableSize: CGSize, drawable: CAMetalDrawable
     ) {
         guard let session, let terminalRenderer, let commandQueue,
             let commandBuffer = commandQueue.makeCommandBuffer()
         else { return }
-        let grid = session.snapshot()
-        terminalRenderer.render(
-            grid: grid, scrollOffset: scrollOffset,
+        guard let context = pendingFrameContext else {
+            // Should not happen on any real call path — see the doc comment
+            // above — but if it ever does, diff-and-draw the old way rather
+            // than draw whatever the cache happens to hold.
+            let grid = session.snapshot()
+            terminalRenderer.render(
+                grid: grid, scrollOffset: scrollOffset,
+                rect: Self.contentRect(
+                    in: drawableSize, scale: terminalRenderer.scale,
+                    gridHeight: CGFloat(grid.rows) * terminalRenderer.metrics.cellHeight,
+                    topInset: topInset),
+                drawableSize: drawableSize,
+                cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
+                searchMatches: searchMatches.map { TerminalSelection($0, grid: grid) },
+                currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink,
+                renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
+            presentAndCommit(commandBuffer: commandBuffer, drawable: drawable)
+            return
+        }
+        terminalRenderer.draw(
             rect: Self.contentRect(
                 in: drawableSize, scale: terminalRenderer.scale,
-                gridHeight: CGFloat(grid.rows) * terminalRenderer.metrics.cellHeight,
+                gridHeight: CGFloat(context.grid.rows) * terminalRenderer.metrics.cellHeight,
                 topInset: topInset),
             drawableSize: drawableSize,
-            cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
-            searchMatches: searchMatches.map { TerminalSelection($0, grid: grid) },
-            currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink,
             renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
-        // `commit` covers encode-and-submit; `gpu` runs from submission to
-        // the completion handler, which is the only place the GPU's own time
-        // — and any wait for a drawable to be recycled — becomes visible.
+        presentAndCommit(commandBuffer: commandBuffer, drawable: drawable)
+    }
+
+    /// `commit` covers encode-and-submit; `gpu` runs from submission to the
+    /// completion handler, which is the only place the GPU's own time — and
+    /// any wait for a drawable to be recycled — becomes visible. Shared by
+    /// `render(into:...)`'s normal path and its defensive
+    /// `pendingFrameContext == nil` fallback.
+    private func presentAndCommit(commandBuffer: MTLCommandBuffer, drawable: CAMetalDrawable) {
         let gpu = InputLatencySignposts.begin(.gpu)
-        if gpu != nil {
+        let gpuStart = RenderMetrics.isEnabled ? DispatchTime.now() : nil
+        if gpu != nil || gpuStart != nil {
             commandBuffer.addCompletedHandler { _ in
                 InputLatencySignposts.end(.gpu, gpu)
+                if let gpuStart {
+                    let ms =
+                        Double(DispatchTime.now().uptimeNanoseconds - gpuStart.uptimeNanoseconds)
+                        / 1_000_000
+                    RenderMetrics.record(.gpu, milliseconds: ms)
+                }
             }
         }
         let commit = InputLatencySignposts.begin(.commit)
@@ -1076,8 +1249,16 @@ class ViewController: NSViewController {
         // A single pane needs neither: there is nothing to distinguish it
         // from, and a ring around the only pane is decoration.
         let inSplit = splitController?.hasMultiplePanes == true
+        // The dim is structural — which pane owns the keyboard in this
+        // window — and stays lit even while the app is not frontmost. The
+        // ring and the highlight are a claim about where keys go *right
+        // now*: `hasUserFocus`, not `isFocusedPane`, so cmd-tabbing away
+        // does not leave a ring around a pane that is not actually receiving
+        // anything.
         focusDimView?.isHidden = isFocusedPane || !inSplit
-        focusRingView?.isHidden = !isFocusedPane || !inSplit
+        let highlighted = hasUserFocus && inSplit
+        focusRingView?.isHidden = !highlighted
+        focusHighlightView?.isHidden = !highlighted
         // The accent colour is the user's and can change while the app runs;
         // Increase Contrast also needs a heavier ring than a tinted hairline.
         focusRingView?.layer?.borderColor = NSColor.controlAccentColor.cgColor
@@ -1090,7 +1271,14 @@ class ViewController: NSViewController {
     /// alongside the ring, little enough that the unfocused pane's text is
     /// still text you can read.
     static let unfocusedDim: CGFloat = 0.08
-    static let focusRingWidth: CGFloat = 2
+    /// A hairline: heavy enough to find at a glance, light enough that it
+    /// does not compete with the terminal content for attention, especially
+    /// in a small window where a 2pt border read as most of the signal on
+    /// screen.
+    static let focusRingWidth: CGFloat = 1
+    /// Deliberately faint — an elevation cue alongside the ring, not a
+    /// second copy of it. Anything stronger recoloured the text underneath.
+    static let focusHighlightAlpha: CGFloat = 0.05
 }
 
 /// Covers a pane to dim it without intercepting input — clicks, scrolls

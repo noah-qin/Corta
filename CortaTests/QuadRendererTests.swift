@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 import Metal
 import Testing
 
@@ -154,5 +155,55 @@ struct QuadRendererTests {
             #expect(texture.width == pointsWide * scale)
             #expect(texture.height == pointsHigh * scale)
         }
+    }
+
+    // MARK: - M9: compiled-pipeline cache
+
+    /// `init` writes a `MTLBinaryArchive` to disk so a later launch can look
+    /// its three pipelines up instead of compiling them — this only checks
+    /// that the file lands where `binaryArchiveURL` says it should; the
+    /// compile-time saving itself is not something a unit test can observe
+    /// (Metal does not expose "was this pipeline looked up or compiled").
+    @Test func initWritesAPipelineCacheFile() throws {
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            Issue.record("No Metal device available in this environment")
+            return
+        }
+        guard let url = QuadRenderer.binaryArchiveURL else {
+            Issue.record("No cache directory available in this environment")
+            return
+        }
+        try? FileManager.default.removeItem(at: url)
+
+        _ = try QuadRenderer(device: device)
+        #expect(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    /// A second `QuadRenderer` must construct successfully with the first
+    /// one's cache file already on disk. Running here, under `CortaTests`,
+    /// `loadOrCreateBinaryArchive.isRunningUnderXCTest` keeps this from
+    /// ever actually reading that file back — `-[_MTLDevice
+    /// recordBinaryArchiveUsage:]` segfaulted inside Metal's own framework
+    /// code doing exactly that under a hosted test launch (its doc comment
+    /// has the full account, including why a real launch is not the same
+    /// launch path and is not affected). What this test can still assert
+    /// from inside that same hosted launch: the file is written every
+    /// time regardless, and a second construction finding one already on
+    /// disk — from itself or an earlier run — must never be what breaks
+    /// construction.
+    @Test func aSecondRendererConstructsWithACacheFileAlreadyOnDisk() throws {
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            Issue.record("No Metal device available in this environment")
+            return
+        }
+        guard let url = QuadRenderer.binaryArchiveURL else {
+            Issue.record("No cache directory available in this environment")
+            return
+        }
+        try? FileManager.default.removeItem(at: url)
+
+        _ = try QuadRenderer(device: device)
+        #expect(FileManager.default.fileExists(atPath: url.path))
+        _ = try QuadRenderer(device: device)
     }
 }

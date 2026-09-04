@@ -49,5 +49,10 @@ extension ViewController {
     @objc private func windowFocusChanged(_ note: Notification) {
         guard let window = note.object as? NSWindow, window === view.window else { return }
         reportFocusIfNeeded()
+        // The ring and its highlight are keyed to `hasUserFocus`, which this
+        // changes even for the pane that stays `isFocusedPane` throughout —
+        // cmd-tabbing away must drop the ring without moving focus within
+        // the split.
+        applyFocusAppearance()
     }
 }

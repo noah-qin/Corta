@@ -3,12 +3,35 @@
 A native macOS terminal emulator in pure Swift. Metal rendering, Core
 Text shaping, AppKit shell, a hand-written VT parser.
 
-**Status: 0.1.0. M7 and M8 done, M6 has one open step.** M1–M5 are complete.
-M6.12 was measured with Typometer at 45.5 ms average keypress-to-pixel
-latency; the sole open step is M6.16 (signed, notarized direct-download
-packaging, pending signing credentials). M7 closed the places the
-terminal was still guessing — font behaviour, command boundaries (OSC
-133), and window lifecycle. `docs/ROADMAP.md` is the tracking record.
+**Status: 0.1.0. M7, M8 and M10 done; M6 has one open step (a release
+decision, no code gap); M9's closing measurement is recorded but not
+apples-to-apples with its own baseline.** M1–M5 are complete. M6.12 was
+measured with Typometer at 45.5 ms average keypress-to-pixel latency;
+M6's sole open step is M6.16 (signed, notarized direct-download
+packaging) — both blockers it names are now cleared (a valid Developer
+ID identity on the build machine, all six `MACOS_*` CI secrets present)
+and the pipeline verifies locally through `spctl`'s `Unnotarized
+Developer ID` rejection, the correct state one step before submission;
+what remains is the maintainer choosing to cut a release
+(`CHANGELOG.md`'s checklist), not a credentials or code gap. M7 closed
+the places the terminal was still guessing — font behaviour, command
+boundaries (OSC 133), and window lifecycle. M8 is fully done: M8.19
+closed with a real `os_signpost` trace after fixing two real gaps (a
+silently-swallowed launch-focus failure, and
+`InputLatencySignposts.keyDown` never having instrumented the path
+ordinary typing actually takes) — `scripts/record-signpost-trace.sh`
+carries the fix; M8.18 closed with a real Typometer A/B
+(`scripts/measure-drawable-ab.sh`) showing default vs.
+`CORTA_MAX_DRAWABLES=2` within noise of each other, so the default
+stays. M9's mechanism is done and its Typometer number is recorded
+(70.1 ms average, default configuration) but `docs/ROADMAP.md`'s M9
+section flags why it isn't a clean before/after against M6.12's 45.5 ms
+figure — the fixed-benchmark-environment table (`PERFORMANCE.md` §5.2)
+wasn't fully held for that run, and a same-conditions re-measurement is
+what would turn it into one. M10 (Kitty graphics) is done, including a
+real-client verification pass against `kitten icat` that found and
+fixed four protocol bugs no hand-written test had caught.
+`docs/ROADMAP.md` is the tracking record.
 
 ## Documentation
 

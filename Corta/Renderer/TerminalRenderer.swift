@@ -33,25 +33,45 @@ nonisolated struct TerminalSelection: Equatable {
 /// rectangle — two draw calls (background, glyphs), plus a third for color
 /// emoji when a frame contains any (see `cachedColorGlyphs`).
 ///
-/// **Damage tracking** (`PERFORMANCE.md` §3, roadmap M4.1): the core exposes
-/// no version or damage signal (`TerminalSession.snapshot()` is a plain COW
-/// copy), so damage is computed here instead — each frame's snapshot lines
-/// are compared against the lines the cached instances were built from, at
-/// line granularity, and only the damaged rows' instances are rebuilt and
-/// spliced into the cached arrays. `Line` is a value type over
-/// `ContiguousArray<Cell>`, so an unchanged row typically shares storage with
-/// the snapshot and compares by a cheap `memcmp`. A fully static frame
-/// rebuilds nothing and reports "no damage", which is what lets the shell
-/// skip the frame entirely (no drawable, no command buffer, ~0% idle CPU).
+/// **Damage tracking** (`PERFORMANCE.md` §3, roadmap M4.1 and M9): the
+/// live screen (`offset == 0`) is diffed at line granularity using
+/// `Grid.lineRevision(_:)` — a stamp `ScreenLines` bumps on every row it
+/// touches (`ScreenLines.swift`), compared as a single `UInt64` rather than
+/// the row's full `Line` value. Scrolled into history (`offset > 0`), rows
+/// come from immutable scrollback storage that carries no such stamp, so
+/// that path still compares `Line` values directly, exactly as the whole
+/// cache used to (see `rebuildDamagedRows`). Either way, only the damaged
+/// rows' instances are rebuilt and spliced into the cached arrays. A fully
+/// static frame rebuilds nothing and reports "no damage", which is what lets
+/// the shell skip the frame entirely (no drawable, no command buffer, ~0%
+/// idle CPU).
 ///
 /// Cursor and selection are extra background-pass quads, not a third
 /// pipeline: a cursor (block, bar or underline — `Grid.cursorStyle`,
 /// blinking variants drawn steady) and a selection highlight are colour
 /// under the glyph, exactly like a cell's own background.
 nonisolated final class TerminalRenderer {
-    let quadRenderer: QuadRenderer
+    /// The GPU-encoding backend — `QuadRenderer` (`MTLCommandQueue`/
+    /// `MTLRenderCommandEncoder`) unless `Metal4Backend.isOptedIn` and
+    /// `.isSupported(by:)` both hold, in which case a `Metal4Backend`. The
+    /// stored name predates the `TerminalRenderBackend` abstraction
+    /// (M9) and stays for source compatibility with the tests that
+    /// already reach through it (`ShellIntegrationRenderTests` and others);
+    /// its declared type is the protocol, not the concrete `QuadRenderer`.
+    let quadRenderer: any TerminalRenderBackend
     let glyphAtlas: GlyphAtlas
     private(set) var metrics: CellMetrics
+    /// M10 — Kitty graphics image placements, drawn after everything else
+    /// each frame (`draw`). Its own small texture cache, not folded into
+    /// `glyphAtlas`: an image is not a glyph, has no reason to share an
+    /// eviction policy built for many small bitmaps, and is drawn through
+    /// the color pipeline directly rather than through any atlas UV.
+    let kittyImageRenderer: KittyImageRenderer
+    /// `grid.imagePlacements` as of the last `updateInstances` — cached the
+    /// same way `cachedOffset`/`cachedScrollbackCount` are, so `draw` (which
+    /// deliberately takes no `Grid` — see its doc comment) still has
+    /// something current to hand `kittyImageRenderer`.
+    private var cachedImagePlacements = ImagePlacementTable()
 
     /// Alpha for the cursor block and selection highlight, over the cell's
     /// own background.
@@ -67,6 +87,12 @@ nonisolated final class TerminalRenderer {
 
     /// The line each viewport row's cached instances were built from.
     private var cachedLines: [Line] = []
+    /// `Grid.lineRevision(_:)` for each viewport row when it was last
+    /// rebuilt — the live-screen (`offset == 0`) fast path in
+    /// `rebuildDamagedRows` compares this instead of `cachedLines[row]`.
+    /// Meaningless (left at whatever it was) for a row rebuilt while
+    /// scrolled into history, where the revision fast path does not apply.
+    private var cachedRevisions: [UInt64] = []
     /// How many instances each viewport row contributes to the cached arrays;
     /// a row's slice starts at the sum of the counts before it.
     private var backgroundCounts: [Int] = []
@@ -84,6 +110,17 @@ nonisolated final class TerminalRenderer {
     private var cachedColumns = 0
     private var cachedOffset = -1
     private var cachedScrollbackCount = -1
+    /// `Grid.linesGeneration` when the cache was last built. A mismatch means
+    /// the live screen's `ScreenLines` was wholesale-replaced since (an
+    /// alternate-screen swap, a column resize) — see `ScreenLines.generation`
+    /// for why row revisions alone cannot be trusted to catch that.
+    private var cachedLinesGeneration: UInt64?
+    /// `Grid.linesRotated` when the live-screen cache was last fully in
+    /// sync. The difference from the current value is exactly how many rows
+    /// a whole-screen scroll has shifted since, which `rebuildDamagedRows`
+    /// uses to shift the cache instead of rebuilding every retained row from
+    /// scratch (`applyScrollShift`).
+    private var cachedLinesRotated: UInt64 = 0
     private var cachedCursor: Cursor?
     private var cachedCursorStyle: CursorStyle?
     private var cachedCursorVisible = false
@@ -138,8 +175,19 @@ nonisolated final class TerminalRenderer {
     init(device: MTLDevice, font: CTFont, scale: CGFloat, atlasPixelSize: Int = GlyphAtlas.atlasSize) throws {
         let atlasFont = CTFontCreateCopyWithAttributes(
             font, CTFontGetSize(font) * scale, nil, nil)
-        self.quadRenderer = try QuadRenderer(device: device)
+        // `Metal4Backend` is opt-in and, today, a pass-through to
+        // `QuadRenderer` under the hood regardless — see its doc comment —
+        // so a failed `Metal4Backend(device:)` falls back to `QuadRenderer`
+        // directly rather than failing `TerminalRenderer.init` outright.
+        if Metal4Backend.isOptedIn, Metal4Backend.isSupported(by: device),
+            let metal4 = try? Metal4Backend(device: device)
+        {
+            self.quadRenderer = metal4
+        } else {
+            self.quadRenderer = try QuadRenderer(device: device)
+        }
         self.glyphAtlas = GlyphAtlas(device: device, font: atlasFont, atlasPixelSize: atlasPixelSize)
+        self.kittyImageRenderer = KittyImageRenderer(device: device)
         self.pointMetrics = CellMetrics(font: font, scale: scale)
         self.metrics = self.pointMetrics.scaled(by: scale)
         self.scale = scale
@@ -187,6 +235,11 @@ nonisolated final class TerminalRenderer {
             // Scrolled into history, the viewport is a window over a ring
             // buffer that output keeps shifting — every row moves.
             || (offset > 0 && cachedScrollbackCount != grid.scrollback.count)
+            // The live screen's `ScreenLines` was swapped wholesale (alt
+            // screen, a column resize) — its rows' revisions restart at
+            // small numbers independently of this cache's, so a coincidental
+            // match cannot be trusted (`ScreenLines.generation`).
+            || (offset == 0 && cachedLinesGeneration != grid.linesGeneration)
 
         var changed = fullRebuild
         // An atlas eviction mid-build invalidates every UV handed out so far
@@ -224,6 +277,11 @@ nonisolated final class TerminalRenderer {
         cachedColumns = grid.columns
         cachedOffset = offset
         cachedScrollbackCount = grid.scrollback.count
+        if offset == 0 {
+            cachedLinesGeneration = grid.linesGeneration
+            cachedLinesRotated = grid.linesRotated
+        }
+        cachedImagePlacements = grid.imagePlacements
         cachedCursor = grid.cursor
         cachedCursorStyle = grid.cursorStyle
         cachedCursorVisible = cursorVisible
@@ -235,11 +293,18 @@ nonisolated final class TerminalRenderer {
         return changed
     }
 
-    /// Draws `grid` into `rect` of `renderPassDescriptor`. `cursorVisible`
-    /// lets the shell blink the cursor without touching the grid.
+    /// Diffs `grid` against the cache (`updateInstances`) and draws it into
+    /// `rect` of `renderPassDescriptor` in one call. `cursorVisible` lets the
+    /// shell blink the cursor without touching the grid.
     /// - Parameter scrollOffset: lines of scrollback above the screen to
     ///   show instead of it, clamped to what history actually holds. `0` is
     ///   the live screen (`M1.20`).
+    ///
+    /// A convenience for callers that have not already diffed this frame —
+    /// every test and benchmark in `CortaTests` calls it this way. The
+    /// shell's real render loop has usually just called `updateInstances`
+    /// itself (as `ViewController.prepareFrame`) and calls `draw(rect:...)`
+    /// directly instead, so the diff does not run twice a frame (M9).
     func render(
         grid: Grid,
         scrollOffset: Int = 0,
@@ -257,7 +322,20 @@ nonisolated final class TerminalRenderer {
             grid: grid, scrollOffset: scrollOffset, cursorVisible: cursorVisible,
             selection: selection, searchMatches: searchMatches,
             currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink)
+        draw(rect: rect, drawableSize: drawableSize, renderPassDescriptor: renderPassDescriptor,
+            commandBuffer: commandBuffer)
+    }
 
+    /// Draws whatever `updateInstances` last cached into `rect` of
+    /// `renderPassDescriptor`, without diffing anything first. Split out of
+    /// `render` so a caller that has already called `updateInstances` this
+    /// frame (`ViewController.render(into:...)`, fed by `prepareFrame`)
+    /// draws the same cached instances without diffing the grid a second
+    /// time (M9) — see the type's doc comment.
+    func draw(
+        rect: CGRect, drawableSize: CGSize, renderPassDescriptor: MTLRenderPassDescriptor,
+        commandBuffer: MTLCommandBuffer
+    ) {
         quadRenderer.drawSolidQuads(
             cachedBackground, rect: rect, drawableSize: drawableSize,
             renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
@@ -278,6 +356,17 @@ nonisolated final class TerminalRenderer {
                 drawableSize: drawableSize, renderPassDescriptor: renderPassDescriptor,
                 commandBuffer: commandBuffer)
         }
+        // M10: Kitty graphics, drawn last (over the text) — see
+        // `KittyImageRenderer`'s doc comment. Skipped outright when nothing
+        // is placed, same as the color pass above.
+        if cachedImagePlacements.placementCount > 0 {
+            kittyImageRenderer.draw(
+                table: cachedImagePlacements, cellWidth: Float(metrics.cellWidth),
+                cellHeight: Float(metrics.cellHeight), rows: cachedLines.count, offset: cachedOffset,
+                scrollbackCount: cachedScrollbackCount, rect: rect, drawableSize: drawableSize,
+                quadRenderer: quadRenderer, renderPassDescriptor: renderPassDescriptor,
+                commandBuffer: commandBuffer)
+        }
     }
 
     /// Full rebuild: every row's instances, straight into the cached arrays.
@@ -289,8 +378,10 @@ nonisolated final class TerminalRenderer {
         glyphCounts.removeAll(keepingCapacity: true)
         colorGlyphCounts.removeAll(keepingCapacity: true)
         cachedLines.removeAll(keepingCapacity: true)
+        cachedRevisions.removeAll(keepingCapacity: true)
         cachedBackground.reserveCapacity(grid.rows * grid.columns / 4 + 2)
         cachedGlyphs.reserveCapacity(grid.rows * grid.columns / 2)
+        let liveScreen = offset == 0
         for row in 0..<grid.rows {
             let line = Self.visibleLine(grid: grid, row: row, offset: offset)
             let backgroundStart = cachedBackground.count
@@ -304,42 +395,69 @@ nonisolated final class TerminalRenderer {
             glyphCounts.append(cachedGlyphs.count - glyphStart)
             colorGlyphCounts.append(cachedColorGlyphs.count - colorGlyphStart)
             cachedLines.append(line)
+            cachedRevisions.append(liveScreen ? grid.lineRevision(row) : 0)
         }
         overlayCount = 0
         lastRebuiltRowCount = grid.rows
     }
 
-    /// Line-granular damage: rebuild only the rows whose line changed and
-    /// splice their instances in place. Walking rows in order keeps each
-    /// splice point correct, because every later row sits after it.
+    /// Line-granular damage: rebuild only the rows that changed and splice
+    /// their instances in place. Walking rows in order keeps each splice
+    /// point correct, because every later row sits after it.
+    ///
+    /// The live screen (`offset == 0`) is checked with `Grid.lineRevision`,
+    /// a single `UInt64` compare, instead of the full `Line` comparison this
+    /// used before M9 — see the type's doc comment and
+    /// `ScreenLines.swift`. Scrolled into history, rows are immutable
+    /// scrollback storage with no revision to compare, so that path is
+    /// unchanged: `visibleLine` is fetched and compared by value every row,
+    /// every call, same as the whole cache always did.
     private func rebuildDamagedRows(grid: Grid, offset: Int) -> Bool {
         var changed = false
         var rebuilt = 0
         var backgroundStart = 0
         var glyphStart = 0
         var colorGlyphStart = 0
+        let liveScreen = offset == 0
+        if liveScreen {
+            let rotated = grid.linesRotated - cachedLinesRotated
+            // `< grid.rows`: at or past a full screen's worth, nothing
+            // survived to shift — every row differs anyway, and the normal
+            // per-row loop below rebuilds them all just as a full rebuild
+            // would, only row by row instead of in one pass.
+            if rotated > 0, rotated < UInt64(grid.rows) {
+                applyScrollShift(Int(rotated), cellHeight: Float(metrics.cellHeight))
+            }
+        }
         for row in 0..<grid.rows {
-            let line = Self.visibleLine(grid: grid, row: row, offset: offset)
-            if line != cachedLines[row] {
-                rowBackground.removeAll(keepingCapacity: true)
-                rowGlyphs.removeAll(keepingCapacity: true)
-                rowColorGlyphs.removeAll(keepingCapacity: true)
-                appendRowInstances(
-                    line: line, row: row, graphemes: grid.graphemes,
-                    background: &rowBackground, glyphs: &rowGlyphs,
-                    colorGlyphs: &rowColorGlyphs)
-                cachedBackground.replaceSubrange(
-                    backgroundStart..<(backgroundStart + backgroundCounts[row]), with: rowBackground)
-                cachedGlyphs.replaceSubrange(
-                    glyphStart..<(glyphStart + glyphCounts[row]), with: rowGlyphs)
-                cachedColorGlyphs.replaceSubrange(
-                    colorGlyphStart..<(colorGlyphStart + colorGlyphCounts[row]), with: rowColorGlyphs)
-                backgroundCounts[row] = rowBackground.count
-                glyphCounts[row] = rowGlyphs.count
-                colorGlyphCounts[row] = rowColorGlyphs.count
-                cachedLines[row] = line
-                changed = true
-                rebuilt += 1
+            let revision = liveScreen ? grid.lineRevision(row) : 0
+            // `!liveScreen` always re-checks by value below, matching the
+            // pre-M9 behaviour exactly for the scrolled-into-history case.
+            let possiblyChanged = !liveScreen || revision != cachedRevisions[row]
+            if possiblyChanged {
+                let line = Self.visibleLine(grid: grid, row: row, offset: offset)
+                if liveScreen || line != cachedLines[row] {
+                    rowBackground.removeAll(keepingCapacity: true)
+                    rowGlyphs.removeAll(keepingCapacity: true)
+                    rowColorGlyphs.removeAll(keepingCapacity: true)
+                    appendRowInstances(
+                        line: line, row: row, graphemes: grid.graphemes,
+                        background: &rowBackground, glyphs: &rowGlyphs,
+                        colorGlyphs: &rowColorGlyphs)
+                    cachedBackground.replaceSubrange(
+                        backgroundStart..<(backgroundStart + backgroundCounts[row]), with: rowBackground)
+                    cachedGlyphs.replaceSubrange(
+                        glyphStart..<(glyphStart + glyphCounts[row]), with: rowGlyphs)
+                    cachedColorGlyphs.replaceSubrange(
+                        colorGlyphStart..<(colorGlyphStart + colorGlyphCounts[row]), with: rowColorGlyphs)
+                    backgroundCounts[row] = rowBackground.count
+                    glyphCounts[row] = rowGlyphs.count
+                    colorGlyphCounts[row] = rowColorGlyphs.count
+                    cachedLines[row] = line
+                    cachedRevisions[row] = revision
+                    changed = true
+                    rebuilt += 1
+                }
             }
             backgroundStart += backgroundCounts[row]
             glyphStart += glyphCounts[row]
@@ -347,6 +465,62 @@ nonisolated final class TerminalRenderer {
         }
         lastRebuiltRowCount = rebuilt
         return changed
+    }
+
+    /// Reflects a whole-screen scroll of `count` rows (`Grid.scrollUp`'s
+    /// history-saving path, `ScreenLines.rotateUp`) onto the cache without
+    /// rebuilding every retained row's instances from scratch: their
+    /// content did not change, only which screen row shows it, so shifting
+    /// each surviving instance's Y coordinate by `count` cells is a bulk
+    /// arithmetic pass rather than a Core Text/atlas lookup per cell.
+    ///
+    /// Only the `count` rows this exposes at the bottom need a real
+    /// rebuild — their cached revision is set to a sentinel no real row can
+    /// ever have, so the per-row loop that runs immediately after this
+    /// unconditionally treats them as changed, exactly like any other
+    /// damaged row. A row among the *retained* ones that also happens to
+    /// have changed in the same batch (a scroll followed by an edit
+    /// somewhere further up) is caught the same way: its shifted-over
+    /// cached revision no longer matches `grid.lineRevision` at its new
+    /// position, so the per-row loop rebuilds it too, on top of the shift.
+    private func applyScrollShift(_ count: Int, cellHeight: Float) {
+        let droppedBackground = backgroundCounts[0..<count].reduce(0, +)
+        let droppedGlyphs = glyphCounts[0..<count].reduce(0, +)
+        let droppedColorGlyphs = colorGlyphCounts[0..<count].reduce(0, +)
+        cachedBackground.removeFirst(droppedBackground)
+        cachedGlyphs.removeFirst(droppedGlyphs)
+        cachedColorGlyphs.removeFirst(droppedColorGlyphs)
+        backgroundCounts.removeFirst(count)
+        glyphCounts.removeFirst(count)
+        colorGlyphCounts.removeFirst(count)
+        cachedLines.removeFirst(count)
+        cachedRevisions.removeFirst(count)
+
+        // The selection/cursor overlay lives in the *tail* `overlayCount`
+        // entries of `cachedBackground` (`rebuildOverlay`) and must not
+        // shift: a cell's row is a fixed screen position (row 5 is always
+        // `5 * cellHeight`) — scrolling moves which *content* sits at that
+        // position, not the position itself, and the overlay is already
+        // rebuilt fresh whenever the cursor's row or the selection changes.
+        let shift = Float(count) * cellHeight
+        let rowInstanceCount = cachedBackground.count - overlayCount
+        for i in 0..<rowInstanceCount { cachedBackground[i].origin.y -= shift }
+        for i in cachedGlyphs.indices { cachedGlyphs[i].origin.y -= shift }
+        for i in cachedColorGlyphs.indices { cachedColorGlyphs[i].origin.y -= shift }
+
+        for _ in 0..<count {
+            backgroundCounts.append(0)
+            glyphCounts.append(0)
+            colorGlyphCounts.append(0)
+            cachedLines.append(Line())
+            // `ScreenLines.revision(at:)` starts at 1 for any touched row
+            // and only grows (`ScreenLines.stamp`), so `.max` can never
+            // coincide with a real row's revision — the per-row loop right
+            // after this always rebuilds these rows for real, rather than
+            // risking a coincidental match with a genuinely blank new row's
+            // low revision number.
+            cachedRevisions.append(.max)
+        }
     }
 
     /// Selection, search-match and cursor quads, rebuilt when any changes

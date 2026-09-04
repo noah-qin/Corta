@@ -59,4 +59,30 @@ final class SplitPaneUITests: XCTestCase {
         attachment.name = "split-2x2"
         add(attachment)
     }
+
+    /// `SplitViewController.absorbChromeChange`'s whole reason to exist: a
+    /// tab bar joining the window must grow the frame downward, not shrink
+    /// the content area — the naive AppKit behaviour costs every pane the
+    /// bar's worth of rows the moment a second tab exists. Asserted on the
+    /// window's frame because the panes are Metal surfaces with no
+    /// accessibility content to query directly (see `testSplitScreenshot`);
+    /// a shrunk content area cannot grow the frame without also shrinking
+    /// it, so this is an equivalent, externally observable proxy for it.
+    @MainActor
+    func testOpeningATabDoesNotShrinkTheWindow() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
+        app.launch()
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 5))
+        let before = window.frame
+
+        app.typeKey("t", modifierFlags: .command)  // File > New Tab
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+
+        let after = app.windows.firstMatch.frame
+        XCTAssertGreaterThanOrEqual(
+            after.height, before.height - 1,
+            "a tab bar appearing must grow the window, not shrink the pane's content area")
+    }
 }

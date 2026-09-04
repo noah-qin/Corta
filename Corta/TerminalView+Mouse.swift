@@ -1,9 +1,11 @@
 import AppKit
 
 /// Mouse reporting (M2.7, SGR ?1006): click and release events are
-/// translated to SGR report bytes when the child asked for them. The stored
-/// properties these methods use (`isMouseReportingEnabled`, `onMouseBytes`,
-/// `cellSize`) live on the class itself — extensions cannot add storage.
+/// translated to SGR report bytes when the child asked for them — except
+/// the left button, whose gesture might turn into a drag, so it is decided
+/// in `handleSelectionMouseDown` rather than here. The stored properties
+/// these methods use (`isMouseReportingEnabled`, `onMouseBytes`, `cellSize`)
+/// live on the class itself — extensions cannot add storage.
 extension TerminalView {
     override func mouseDown(with event: NSEvent) {
         // M5.2: a click focuses its pane — keyboard input follows focus, and
@@ -19,19 +21,25 @@ extension TerminalView {
             let controller = paneController,
             controller.handleLinkClick(event, in: self)
         { return }
-        if report(event, phase: .press(.left)) { return }
-        // Mouse reporting is off, so the left button selects text (M3.7).
-        // The shell owns the selection state; it is reached through the
-        // responder chain rather than a stored closure because extensions
-        // cannot add storage to the class.
+        // A left mouse down never picks between reporting and selection by
+        // itself — whether the child gets it depends on what the gesture
+        // turns out to be, which isn't known until it ends (see
+        // `handleSelectionMouseDown`'s doc comment). With no controller to
+        // make that call there is no selection state to defer to, so an
+        // unwired view (tests) keeps the old immediate-report-or-not
+        // behaviour.
         guard let controller = paneController else {
-            super.mouseDown(with: event)
+            if !report(event, phase: .press(.left)) { super.mouseDown(with: event) }
             return
         }
         controller.handleSelectionMouseDown(event, in: self)
     }
 
     override func mouseUp(with event: NSEvent) {
+        // The left button's up event is consumed inside
+        // `handleSelectionMouseDown`'s own tracking loop and never reaches
+        // here through the normal responder chain; this override only ever
+        // fires for the unwired fallback above, or another button.
         guard report(event, phase: .release(.left)) else { super.mouseUp(with: event); return }
     }
 
@@ -65,6 +73,15 @@ extension TerminalView {
     private enum MousePhase {
         case press(SGRMouse.Button)
         case release(SGRMouse.Button)
+    }
+
+    /// Sends the press-then-release pair for a left click that
+    /// `handleSelectionMouseDown` has determined, only once the gesture is
+    /// over, never turned into a drag — the report was withheld until that
+    /// was known, so it goes out retroactively, both halves at once.
+    func reportClick(down: NSEvent, up: NSEvent) {
+        _ = report(down, phase: .press(.left))
+        _ = report(up, phase: .release(.left))
     }
 
     /// Sends the SGR report for one event; returns false when mouse reporting

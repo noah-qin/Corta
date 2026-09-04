@@ -158,31 +158,45 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.setHuggingPriority(.defaultLow, for: .vertical)
 
-        let content = NSVisualEffectView()
-        // Reduce Transparency means background content must not show through,
-        // so the material is swapped for an opaque window background rather
-        // than merely dimmed — and the panel then needs a drawn border,
-        // because the material edge that separated it from the desktop is
-        // gone with it.
+        // M9: a floating control over content is exactly where Liquid
+        // Glass belongs (`ViewController.swift`'s rationale for the search
+        // bar, `:383-390` — the terminal canvas is content and stays
+        // opaque; the palette is chrome, like the search bar). One surface,
+        // so no `NSGlassEffectContainerView` merge to set up — that exists
+        // for *neighbouring* glass elements, and the palette has none.
+        let content = NSGlassEffectView()
+        content.style = .regular
+        // Reduce Transparency means background content must not show
+        // through, so the glass gets an opaque tint rather than a lowered
+        // alpha — same as the search bar — and the panel then needs a
+        // drawn border, because the material edge that separated it from
+        // the desktop is gone with it.
         if SystemAccessibility.reduceTransparency {
-            content.material = .windowBackground
-            content.blendingMode = .withinWindow
+            content.tintColor = .windowBackgroundColor
+        }
+        if SystemAccessibility.increaseContrast || SystemAccessibility.reduceTransparency {
             content.wantsLayer = true
             let border = SystemAccessibility.panelBorder
             content.layer?.borderColor = border.color.cgColor
             content.layer?.borderWidth = border.width
-        } else {
-            content.material = .popover
-            content.blendingMode = .behindWindow
         }
-        content.state = .active
-        content.addSubview(stack)
+        let contentWrapper = NSView()
+        contentWrapper.addSubview(stack)
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            stack.topAnchor.constraint(equalTo: content.topAnchor),
-            stack.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: contentWrapper.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: contentWrapper.trailingAnchor),
+            stack.topAnchor.constraint(equalTo: contentWrapper.topAnchor),
+            stack.bottomAnchor.constraint(equalTo: contentWrapper.bottomAnchor),
         ])
+        content.contentView = contentWrapper
+        // The panel's own contentRect is fixed at construction (`init`,
+        // `NSRect(x: 0, y: 0, width: 520, height: 360)`), unlike the search
+        // bar's — which waits on live layout — so the radius is knowable
+        // immediately. Matches the window-corner radius used elsewhere
+        // (`TerminalView.swift`'s `metalLayer.cornerRadius = 10`) rather
+        // than the search bar's full pill: a whole panel reads as a window,
+        // not a control.
+        content.cornerRadius = 10
         return content
     }
 

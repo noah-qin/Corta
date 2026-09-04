@@ -3,17 +3,33 @@ import CortaTerminal
 import Metal
 import QuartzCore
 
-/// An `NSView` backed by a `CAMetalLayer`, driven by `CADisplayLink`
-/// (the current display-link API for this deployment target;
-/// `CVDisplayLink` in the roadmap is descriptive, not prescriptive).
+/// An `NSView` backed by a `CAMetalLayer`, driven by a `CAMetalDisplayLink`
+/// (owned by `FrameScheduler`) rather than `CADisplayLink` +
+/// `nextDrawable()`.
 ///
-/// This file owns the layer, the display link and the frame tick. Input
-/// lives in extensions by concern: `TerminalView+Keyboard.swift`,
-/// `TerminalView+IME.swift` (Track A), `TerminalView+Mouse.swift` and
-/// `TerminalView+Scroll.swift` (Track C).
+/// This file owns the layer and the drawable size; the display link and the
+/// frame callback live in `FrameScheduler`. Input lives in extensions by
+/// concern: `TerminalView+Keyboard.swift`, `TerminalView+IME.swift`
+/// (Track A), `TerminalView+Mouse.swift` and `TerminalView+Scroll.swift`
+/// (Track C).
 final class TerminalView: NSView, CALayerDelegate {
     private let metalLayer = CAMetalLayer()
-    private var displayLink: CADisplayLink?
+    private lazy var frameScheduler = FrameScheduler(metalLayer: metalLayer)
+    /// Recreated alongside `frameScheduler` each time the view moves to a
+    /// new window (`viewDidMoveToWindow`) — it observes that specific
+    /// window's key/resign state, so a stale instance watching the wrong
+    /// window would silently stop tracking focus after a tab is dragged
+    /// into a different one. Not `private`: `TerminalView+Scroll.swift`
+    /// reports scroll-gesture phase changes to it, and extensions cannot
+    /// add their own storage.
+    var renderPolicy: RenderPolicy?
+    /// A window occluded (covered, minimized, off-screen) still fires vsync
+    /// callbacks unless the scheduler is paused explicitly — vsync alone
+    /// doesn't know visibility. Removed and re-added alongside the window in
+    /// `viewDidMoveToWindow`. `NotificationCenter.removeObserver` is
+    /// thread-safe, so this can be read from `deinit`, which runs
+    /// nonisolated even on a MainActor-isolated class.
+    nonisolated(unsafe) private var occlusionObserver: NSObjectProtocol?
     /// Mouse-moved tracking for ⌘-hover link feedback (M4.6); `.inVisibleRect`
     /// keeps it glued to the visible area across resizes.
     private var mouseTrackingArea: NSTrackingArea?
@@ -39,20 +55,26 @@ final class TerminalView: NSView, CALayerDelegate {
     var cachedAccessibilitySnapshotTime: CFTimeInterval = 0
     var lastAccessibilityPost: CFTimeInterval = 0
 
-    /// Called once per frame, on the main thread, with the drawable's render
-    /// pass descriptor and pixel size. `nil` drawable (window occluded,
-    /// zero-size layer) means the frame is silently skipped.
-    var onRenderFrame: ((MTLRenderPassDescriptor, CGSize, CAMetalDrawable) -> Void)?
+    /// Called once per accepted frame, on the main thread, with the
+    /// drawable's render pass descriptor and pixel size. Forwarded to
+    /// `frameScheduler`, which owns the actual `CAMetalDisplayLink` — see
+    /// `FrameScheduler` for why there is no `nil`-drawable case anymore.
+    var onRenderFrame: ((MTLRenderPassDescriptor, CGSize, CAMetalDrawable) -> Void)? {
+        get { frameScheduler.onRenderFrame }
+        set { frameScheduler.onRenderFrame = newValue }
+    }
 
-    /// Asked before each vsync's drawable is acquired; a `false` answer
-    /// skips the frame entirely — no drawable, no command buffer, no present
-    /// — and parks the display link until `setNeedsRedraw()` is called, so a
-    /// static screen does not even pay for the vsync wakeups (`PERFORMANCE.md`
-    /// §3: idle CPU ~0%). The check must happen *before* `nextDrawable()`:
-    /// an acquired drawable that is never presented is not recycled, so
-    /// acquiring one per skipped frame would exhaust the pool and block the
-    /// main thread.
-    var shouldRenderFrame: (() -> Bool)?
+    /// Run once per accepted frame to do the prepare/diff work and report
+    /// whether anything is still pending; forwarded to `frameScheduler`.
+    /// `false` no longer skips the drawable itself (there is none left to
+    /// skip ahead of) — it only decides whether the scheduler pauses again
+    /// right after, which is what keeps a static screen from paying for
+    /// vsync wakeups (`PERFORMANCE.md` §3: idle CPU ~0%). See
+    /// `FrameScheduler` for the full reasoning.
+    var shouldRenderFrame: (() -> Bool)? {
+        get { frameScheduler.shouldRenderFrame }
+        set { frameScheduler.shouldRenderFrame = newValue }
+    }
 
     /// Called with raw bytes to write to the PTY for one key event.
     var onKeyBytes: (([UInt8]) -> Void)?
@@ -242,15 +264,45 @@ final class TerminalView: NSView, CALayerDelegate {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        displayLink?.invalidate()
-        guard let window else {
-            displayLink = nil
-            return
+        if let occlusionObserver {
+            NotificationCenter.default.removeObserver(occlusionObserver)
+            self.occlusionObserver = nil
         }
-        let link = window.displayLink(target: self, selector: #selector(frameTick))
-        link.add(to: .main, forMode: .common)
-        displayLink = link
+        frameScheduler.attach(to: window)
+        renderPolicy = nil
+        guard let window else { return }
         updateDrawableSize()
+        renderPolicy = RenderPolicy(scheduler: frameScheduler, window: window)
+        // Vsync alone doesn't know the window isn't visible — an occluded,
+        // minimized, or off-screen window would otherwise keep resolving
+        // drawables it never shows. This never touches the PTY reader: it
+        // keeps draining regardless (`TerminalSession.runReaderLoop`,
+        // `PERFORMANCE.md` §2.1), so a hidden pane's output is waiting, not
+        // lost, when the window is shown again.
+        occlusionObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main
+        ) { [weak self] _ in
+            // `queue: .main` above guarantees this runs on the main thread;
+            // `MainActor.assumeIsolated` tells the type system what the
+            // queue already promises at runtime.
+            MainActor.assumeIsolated { self?.updateOcclusionState() }
+        }
+        updateOcclusionState()
+    }
+
+    private func updateOcclusionState() {
+        guard let window else { return }
+        if window.occlusionState.contains(.visible) {
+            frameScheduler.resume()
+        } else {
+            frameScheduler.isPaused = true
+        }
+    }
+
+    deinit {
+        if let occlusionObserver {
+            NotificationCenter.default.removeObserver(occlusionObserver)
+        }
     }
 
     override func layout() {
@@ -290,14 +342,12 @@ final class TerminalView: NSView, CALayerDelegate {
         }
         // Window base coordinates are y-up; with `.fullSizeContentView` the
         // content spans the whole frame, so the window's top is its height.
-        let frame = convert(bounds, to: nil)
-        let touchesTop = abs(frame.maxY - window.frame.height) < 1
+        let edges = TerminalLayout.exteriorEdges(
+            paneFrameInWindow: convert(bounds, to: nil), windowSize: window.frame.size)
         var mask: CACornerMask = []
         // The hosted layer is flipped: MinY is the top.
-        if touchesTop && abs(frame.minX) < 1 { mask.insert(.layerMinXMinYCorner) }
-        if touchesTop && abs(frame.maxX - window.frame.width) < 1 {
-            mask.insert(.layerMaxXMinYCorner)
-        }
+        if edges.top && edges.left { mask.insert(.layerMinXMinYCorner) }
+        if edges.top && edges.right { mask.insert(.layerMaxXMinYCorner) }
         metalLayer.maskedCorners = mask
     }
 
@@ -317,20 +367,21 @@ final class TerminalView: NSView, CALayerDelegate {
         mouseTrackingArea = area
     }
 
-    /// Wakes the parked display link; the next vsync asks
-    /// `shouldRenderFrame`. Main thread only, like everything on a view.
+    /// Wakes the parked scheduler; the next vsync asks `shouldRenderFrame`.
+    /// Main thread only, like everything on a view.
     func setNeedsRedraw() {
-        displayLink?.isPaused = false
+        frameScheduler.resume()
     }
 
-    /// Renders and presents one frame immediately, if one is due. Used to
-    /// paint before the window is ordered on screen: the window's
-    /// background is transparent until the Metal layer has presented, so
-    /// without this every new window and every new tab flashes whatever is
-    /// behind it for a frame or two.
+    /// Renders and presents one frame immediately. Used to paint before the
+    /// window is ordered on screen: the window's background is transparent
+    /// until the Metal layer has presented, so without this every new window
+    /// and every new tab flashes whatever is behind it for a frame or two.
+    /// See `FrameScheduler.presentSynchronously` for why this cannot just
+    /// call `metalLayer.nextDrawable()` directly.
     func drawNow() {
         updateDrawableSize()
-        frameTick()
+        frameScheduler.presentSynchronously()
     }
 
     /// The default visual bell (M4.8): a brief flash of the terminal
@@ -544,25 +595,6 @@ final class TerminalView: NSView, CALayerDelegate {
         metalLayer.drawableSize = CGSize(width: bounds.width * scale, height: bounds.height * scale)
     }
 
-    @objc private func frameTick() {
-        let frameInterval = InputLatencySignposts.begin(.frame)
-        defer { InputLatencySignposts.end(.frame, frameInterval) }
-        if let shouldRenderFrame, !shouldRenderFrame() {
-            // Nothing to draw: park the link. The shell un-parks it via
-            // `setNeedsRedraw()` when output arrives or the viewport changes.
-            displayLink?.isPaused = true
-            return
-        }
-        guard let drawable = metalLayer.nextDrawable() else { return }
-        let pass = MTLRenderPassDescriptor()
-        pass.colorAttachments[0].texture = drawable.texture
-        pass.colorAttachments[0].loadAction = .clear
-        let bg = TerminalColorPalette.clearColor
-        pass.colorAttachments[0].clearColor = MTLClearColorMake(
-            Double(bg.x), Double(bg.y), Double(bg.z), Double(bg.w))
-        pass.colorAttachments[0].storeAction = .store
-        onRenderFrame?(pass, metalLayer.drawableSize, drawable)
-    }
 }
 
 /// One scroll input, already resolved to what it means for the scrollback

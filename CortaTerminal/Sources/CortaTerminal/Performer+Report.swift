@@ -91,7 +91,25 @@ public struct PerformerState: Sendable {
     /// primitive, and it stays unimplemented (`SECURITY.md` §6).
     public internal(set) var pendingClipboardCopy: String?
 
+    /// M10 — a Kitty graphics transmission still being assembled across
+    /// `m=1`-chunked APC sequences, or `nil` between transmissions. Purely
+    /// parser-transient: unlike `ImagePlacementTable` (on `Grid`, since a
+    /// renderer needs to read it), nothing outside `Performer+KittyGraphics`
+    /// looks at this.
+    var pendingImageTransmission: PendingImageTransmission?
+
     public init() {}
+}
+
+/// One image transmission in progress — accumulated base64 *text* across
+/// chunks (not decoded bytes: a chunk boundary is not guaranteed to land on
+/// a 4-character base64 boundary, so decoding has to wait for the whole
+/// thing), capped well below `KittyGraphics.maximumImageBytes`'s *decoded*
+/// budget to account for base64's ~4:3 expansion.
+struct PendingImageTransmission: Sendable {
+    var header: KittyGraphics.TransmitHeader
+    var display: KittyGraphics.DisplayHeader?
+    var base64: [UInt8]
 }
 
 /// The three colours the OSC 10/11/12 pair of set and query forms names:

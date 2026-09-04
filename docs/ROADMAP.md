@@ -455,14 +455,24 @@ where being a pure AppKit citizen pays off.
       Features nobody can install are not features.
       *Done when:* the downloadable archive contains a stapled app that
       Gatekeeper opens without a warning after copying it to Applications.
-      **Not done.** The Apple team has Developer ID certificates, but this
-      Mac does not yet have a valid Developer ID Application identity
-      (certificate paired with its private key), and the workflow still
-      needs App Store Connect notarization credentials. Those are the
-      maintainer's sensitive credentials and release decision. The
-      build settings the item names are already right —
-      `ENABLE_HARDENED_RUNTIME = YES`, `ENABLE_APP_SANDBOX = NO` — so
-      what remains is the signing and publishing, not the project.
+      **Both blockers this item named are now cleared.** This Mac now has
+      a valid Developer ID Application identity (`Developer ID Application:
+      Fuyao Qin (646VSJ9K5F)`, certificate paired with its private key in
+      the login keychain), and `.github/workflows/release.yml`'s six
+      `MACOS_*` repository secrets are all present. Verified locally:
+      `xcodebuild archive` + `-exportArchive` (method `developer-id`) —
+      not a plain `build`, which leaves `com.apple.security.get-task-allow`
+      set and notarization refuses that — produces a `Corta.app` that
+      `codesign --verify --deep --strict` reports valid on disk, carries
+      no entitlements at all, and `spctl -a -vv --type execute` rejects
+      for exactly one reason: `source=Unnotarized Developer ID` — the
+      correct, expected state one step before submitting it.
+      That submission itself is the maintainer's release decision, not a
+      code gap or a credentials gap any more: `CHANGELOG.md`'s release
+      checklist (bump the version, tag `vx.y.z`, push) is what actually
+      runs the CI pipeline end to end (build, sign, notarize, staple,
+      draft release) — not attempted here, since pushing a tag opens a
+      real, visible GitHub release.
 
 **M6 is done when** the settings page and themes ship, the native
 integration items work in a live window, the esctest
@@ -473,9 +483,10 @@ carried since M2, and the tracking table has no empty columns.
 ship; the native integrations work in a live window; the compatibility
 rate is re-recorded at **77.6%** (106 passed, 335 known bugs, 127 failed
 of 568 — 184 → 127 failures, no regressions). M6.12 is measured at
-45.5 ms average keypress-to-pixel latency. The sole open item is M6.16,
-pending the maintainer's signing credentials; it is the release gate rather
-than a code gap.
+45.5 ms average keypress-to-pixel latency. The sole open item is M6.16 —
+both blockers it named are cleared and the pipeline verifies locally;
+what remains is the maintainer choosing to cut a release, which is a
+release decision, not a code gap.
 
 ---
 
@@ -689,26 +700,42 @@ test can assert what a pixel is and not who can read it.
       Terminal.app is missing and the figures are Typometer's min/max/
       avg/SD rather than a §5.1 percentile distribution (§5.5 notes
       both).
-- [ ] **M8.18** Measure `CAMetalLayer.maximumDrawableCount = 2`. The
+- [x] **M8.18** Measure `CAMetalLayer.maximumDrawableCount = 2`. The
       knob exists (`CORTA_MAX_DRAWABLES=2`, one launch, no code change)
       and the trace that answers it exists (M8.15); the measurement needs
-      Typometer and a controlled A/B, which has not been run.
-      **Not started.**
-- [ ] **M8.19** Confirm whether an input-triggered partial redraw ever
+      Typometer and a controlled A/B.
+      **Done.** `scripts/measure-drawable-ab.sh` ran the same Release
+      build twice, back to back, varying only `CORTA_MAX_DRAWABLES`:
+      default (3) averaged 70.1 ms (SD 13.9), `=2` averaged 70.4 ms
+      (SD 13.5) — within noise of each other on every column. Matches the
+      preliminary `RenderMetrics` signal below: `drawableWait` was already
+      0.00 ms at the default count on this machine, so there was nothing
+      for a smaller count to buy back. **Conclusion: keep the default.**
+      Full table in `PERFORMANCE.md` §5.4.
+- [x] **M8.19** Confirm whether an input-triggered partial redraw ever
       misses the current display frame and waits a refresh period. The
       signpost trace shows it directly — an `output` event landing after
       that frame's `frame` interval opened.
-      **Attempted, no valid data.** Two `os_signpost` recordings were
-      taken with Instruments against the Release build. Both captured
-      real `wake`/`frame`/`commit`/`gpu` activity from Corta's idle
-      cursor-blink redraw, but zero `keyDown` or `output` events in
-      either — the keystrokes typed during recording never reached
-      `TerminalView`, most likely because launching the target from
-      Instruments' Record button does not hand its window focus, so
-      typing immediately after launch lands elsewhere. The chain this
-      item needs to inspect never fired, so there is nothing to read a
-      missed frame from. Still open; needs a recording where `keyDown`
-      is confirmed non-zero before trusting the rest of the trace.
+      **Done, after two real gaps were found and fixed, not just a
+      test-environment retry.** The first two attempts' zero-`keyDown`
+      recordings traced to two separate causes, both closed:
+      `InputLatencySignposts.keyDown` only wrapped the control-sequence
+      bypass path (`TerminalView.deliverBytes`) — ordinary typing commits
+      through `insertText`/`doCommand(by:)` instead and had never been
+      instrumented at all, so a normal typing session showed real
+      keystrokes reaching the child with zero `keyDown` signposts the
+      whole time — and the launch-focus problem itself needed
+      `scripts/record-signpost-trace.sh` (launch, confirm frontmost via
+      System Events before proceeding, then attach) because an unguarded
+      `activate` had been silently swallowing its own failures.
+      With both fixed, a 12-second real-typing recording (122 keystrokes)
+      answers the question: `output` → next `frame`-begin ranges 0.56–
+      15.73 ms, roughly uniform across this run's ~16 ms frame period —
+      ordinary vsync-alignment cost, not evidence of a genuinely missed
+      frame (which would show as a gap exceeding one full period). One
+      12-second sample is not exhaustive, but it is a real answer where
+      two attempts previously produced none. Full account and numbers in
+      `PERFORMANCE.md` §5.3.
 - [x] **M8.20** Recorded real-program pass for the five P0 behavioural
       areas — cursor, scroll regions, margins and wide characters,
       insert/delete, erase — driven by `vim`, `tmux`, `htop` and `less`
@@ -726,12 +753,209 @@ reader, no failure path is a crash or a false success, and every latency
 number in `PERFORMANCE.md` is a distribution taken in a stated
 environment.
 
-**Status: 18 of 20 done.** M8.17 is checked off as a bounded partial
+**Status: 20 of 20 done.** M8.17 is checked off as a bounded partial
 result (§5.5's caveats stand), not a full four-way, all-metric
-comparison. The two open items (M8.18–M8.19) are measurement that needs
-Typometer and Instruments respectively. M8.20 also surfaced one open bug
-(the `less` search-highlight regression above) that is not itself one of
-the four measurement items and remains untracked as a numbered step.
+comparison. M8.19 closed with a real trace and a real answer, after
+fixing the two gaps that blocked it — one launch-focus, one a genuine
+instrumentation blind spot (`PERFORMANCE.md` §5.3). M8.18 closed with a
+real Typometer A/B: default vs. `CORTA_MAX_DRAWABLES=2` came back within
+noise of each other, matching the preliminary `RenderMetrics` signal
+(§5.4) — the default stays. M8.20 also surfaced one open bug (the `less`
+search-highlight regression above) that is not itself one of the four
+measurement items and remains untracked as a numbered step.
+
+---
+
+## M9 — Render Pipeline
+
+Motivated by M6.12's 45.5 ms keypress-to-pixel figure (`PERFORMANCE.md`
+§5.5, behind both iTerm2 and Ghostty on the same machine) and the
+`CAMetalLayer.Stalls` M8.19 recorded from idle cursor-blink activity
+alone. Code and tests are in; the before/after measurement pass
+(Typometer, Instruments, `corta-bench`) that would turn each of these
+into a number is its own step, run once for the whole milestone rather
+than once per item — see the note at the end of this section.
+
+- [x] **M9.1** `FrameScheduler`: `CAMetalDisplayLink` in place of
+      `CADisplayLink` + `metalLayer.nextDrawable()`. `isPaused` is the
+      only gate (idle CPU stays ~0%); a window pauses on occlusion
+      (`NSWindow.didChangeOcclusionStateNotification`) without ever
+      touching the PTY reader thread, which keeps draining regardless
+      (`PERFORMANCE.md` §2.1). `RenderMetrics` (ring-buffer percentiles,
+      no Instruments session needed) and `.userInitiated` QoS on the
+      reader thread and the output→wake `Task` shipped alongside it.
+- [x] **M9.2** Line-granular damage moved from comparing full `Line`
+      values to comparing `Grid.lineRevision(_:)`, a `UInt64` stamp
+      `ScreenLines` bumps centrally on every row it touches — one
+      `UInt64` compare instead of an `O(row length)` one, same
+      granularity. `ScreenLines.generation` catches a wholesale
+      `ScreenLines` replacement (alternate-screen swap, column resize)
+      that per-row revisions alone cannot distinguish from a coincidental
+      match. `ViewController.updateDamage`/`render` merged into
+      `prepareFrame`/`render`, sharing one `session.snapshot()` and one
+      diff a frame instead of two.
+- [x] **M9.3** Whole-screen scroll shift: `ScreenLines.totalRotated` lets
+      `TerminalRenderer.applyScrollShift` reposition surviving rows'
+      instances by a Y-coordinate offset instead of rebuilding them
+      through `appendRowInstances`' per-cell Core Text/atlas lookups —
+      only the newly exposed rows rebuild for real.
+- [x] **M9.4** `MTLBinaryArchive` caches `QuadRenderer`'s three compiled
+      pipelines to `~/Library/Caches`, looked up instead of recompiled on a
+      later real launch. A full test-suite pass first found
+      `-[_MTLDevice recordBinaryArchiveUsage:]` segfaulting (a null
+      C-string reaching `strlen`, inside Metal's own framework code)
+      loading an archive back — but a standalone command-line reproduction
+      of the identical round trip did not crash, and neither did two real,
+      consecutive, bare `Corta.app` launches sharing a cache file (M9.4's
+      actual use case). The crash traces specifically to `CortaTests`,
+      which `TEST_HOST`s directly into `Corta` (a fundamentally different,
+      more restrictive launch than opening the app), matching a filed
+      upstream report of the same signature attributing it to
+      `MTLGetShaderCachePath()` returning nil under a denied sandbox
+      directory. `QuadRenderer.loadOrCreateBinaryArchive` now reads a
+      previous archive back for every real launch and skips only that one
+      launch path (`isRunningUnderXCTest`, keyed off the standard
+      `XCTestConfigurationFilePath` environment variable) — the optimisation
+      ships for users; the test harness gets a fresh archive it never
+      reads, and still exercises writing it every run. The write itself is
+      atomic (temp file + rename) and the file name is fingerprinted to the
+      running executable's own mtime, so a rebuild's cache is never
+      confused with an older one — both defensive, not what the crash
+      traced to. `QuadRenderer.loadOrCreateBinaryArchive`'s doc comment has
+      the full account.
+- [x] **M9.5** `TerminalRenderBackend` protocol (`QuadRenderer`
+      conforms); `Metal4Backend` is a real, capability-gated
+      (`MTLGPUFamily.metal4`) second conformance that is, today, a
+      pass-through to an internally owned `QuadRenderer` — see its doc
+      comment for why the actual `MTL4CommandQueue`/argument-table
+      encoding is deliberately not attempted blind, and what would need
+      to be true to land it for real.
+- [x] **M9.6** `RenderPolicy`: `FrameScheduler.preferredFrameRateRange`
+      adapts to window focus, Low Power Mode, thermal pressure and an
+      active trackpad scroll gesture. `preferredFrameLatency` is
+      deliberately left alone — no default/unit documented in the SDK
+      header to tune it against without a measurement, same reasoning as
+      not guessing at the frame-rate numbers themselves.
+- [x] **M9.7** `GlyphAtlas` split into independently packed,
+      independently evicted pages (ASCII, shaped/CJK, color) on the same
+      shared textures — a CJK-heavy screen filling the shaped page no
+      longer evicts the ASCII cache, and vice versa; same for emoji
+      against either grayscale page.
+- [x] **M9.8** `CommandPaletteController`'s `NSVisualEffectView` replaced
+      with `NSGlassEffectView`, matching the search bar's existing
+      pattern. Settings/Shortcuts/About windows left alone — they have no
+      existing material to convert, and adding one where none exists
+      today is a design decision, not a swap.
+- [x] **M9.9** The search bar's PTY-output-triggered refresh
+      (`Search.find`'s full-scrollback sweep) moved off `prepareFrame`
+      onto a detached background task, generation-stamped so a stale or
+      superseded result is discarded rather than applied.
+
+**M9 is done when** the measurement pass below is run and its numbers are
+recorded here. This milestone lands the mechanism each item describes,
+verified by the core/renderer unit tests listed next to each area
+(`ScreenLinesRevisionTests`, `DamageTrackingTests`'s scroll-shift and
+alternate-screen additions, `TerminalRenderBackendTests`,
+`RenderPolicyTests`, `GlyphAtlasTests`'s page-isolation additions,
+`QuadRendererTests`'s pipeline-cache additions) and by launching the app.
+
+**Typometer, post-M9, default configuration** (the same "Run A" as
+M8.18, since default is the configuration M9 actually ships): 45.4 ms
+min, 99.4 ms max, 70.1 ms average, 13.9 ms SD — `PERFORMANCE.md` §5.4.
+**This is not a clean before/after against M6.12's 45.5 ms baseline.**
+§5.2's fixed-benchmark-environment table was not fully held for this
+run — in particular, other background load on the machine was not
+controlled the way M6.12's was — so a 70.1 ms average next to a 45.5 ms
+one is not evidence of a regression; it is two numbers taken under
+different conditions. A same-conditions re-run is the only way to turn
+this into a real before/after, and is not something a scriptable client
+can stand in for (needs a human running Typometer with nothing else on
+the machine, `PERFORMANCE.md` §5.2). The Instruments half (an
+`os_signpost` trace against the post-M9 build, to see whether the
+mechanism actually moved the `output` → `frame` distribution
+`PERFORMANCE.md` §5.3 records for M8.19) has also not been rerun
+post-M9, though the recording method itself is now known-working
+(`scripts/record-signpost-trace.sh`).
+
+## M10 — Kitty Graphics
+
+Inline images (`sw.kovidgoyal.net/kitty/graphics-protocol`), deferred
+since M6.4 (`DESIGN.md` §6) until a placement side table was worth
+building. Ghostty and iTerm2 — the two terminals `PERFORMANCE.md` §5.5
+already compares Corta against — both implement some or all of the same
+wire format.
+
+- [x] **M10.1** Protocol parser (`KittyGraphicsParser.swift`) and core
+      side table (`ImagePlacementTable.swift`, addressed by document
+      position like `TerminalSelection`, not a `Cell` field — `CLAUDE.md`
+      on why). Direct (base64, in-band) transmission only, in RGB, RGBA
+      and PNG; placement and deletion. File/temp-file/shared-memory
+      transmission is not implemented and will not be — it asks the
+      terminal to open a path the remote stream names, which
+      `SECURITY.md` §1's "every PTY byte is hostile" rejects outright.
+      Animation frames and Unicode placeholder placement are also not
+      implemented — real protocol features, out of scope for a first
+      pass. A column resize drops every live placement rather than
+      attempting to re-wrap image geometry across it; the alternate
+      screen parks and restores placements the same way it does the rest
+      of the main screen's state.
+- [x] **M10.2** App-layer rendering (`KittyImageRenderer.swift`): RGB/RGBA
+      reordered to premultiplied bgra by hand, PNG decoded via
+      `CGImageSource` into a premultiplied bgra `CGContext` (the same
+      technique `GlyphAtlas.rasterizeColor` already uses for color
+      emoji), one texture per image id, drawn as one instanced quad per
+      placement through `QuadRenderer`'s existing color pipeline — no new
+      pipeline, no mesh shader: a placed image is geometrically a rect.
+- [x] **M10.3** Real-client verification against `kitten icat`
+      (`--transfer-mode=stream`, a Release build, launched headless with
+      its shell driving `icat` directly so no synthetic keystroke ever
+      touches the window — a UI-scripted keystroke stream was tried first
+      and produces silently reordered characters, unrelated to Corta;
+      `CLAUDE.md`'s "never change the machine to test" applied to the
+      launch environment throughout). Four real bugs, found only because
+      an actual client was on the other end and each invisible to every
+      test that existed before this pass:
+      - `TIOCSWINSZ` never carried pixel dimensions (`TerminalSize`'s
+        zero default predates M10 and was never overridden by either
+        call site that reaches the pty) — `icat` refuses outright without
+        them. Fixed in `ViewController.pixelSize(columns:rows:metrics:)`,
+        wired into both `setUpPane` and `resizeSessionToFitView`.
+      - No response protocol at all: `icat` sends `a=q` before ever
+        transmitting a real image and refuses when nothing answers.
+        Added `a=q` and the `<ESC>_G...OK/error<ESC>\` acknowledgment
+        every non-quiet command now gets (`q=` 0/1/2, `Performer+
+        KittyGraphics.swift`'s `respond`), fixed-format exactly like the
+        DA1/DSR/OSC 10-12 responses `SECURITY.md` §2.1/§2.2 already
+        governs.
+      - A positive `i=` was required; real `icat`'s plain (non-`--place`,
+        non-reused) display omits `i=` entirely — its most common shape,
+        not a malformed one. `KittyGraphicsParser.transmitHeader` now
+        defaults absent `i=` to 0.
+      - `Data(base64Encoded:)` silently rejects unpadded base64, which
+        `icat` sends in practice (valid per RFC 4648 §3.2). Every
+        hand-written test in `KittyGraphicsTests` used
+        `Data.base64EncodedString()`, which always pads, so this shipped
+        invisibly; `Performer+KittyGraphics.swift`'s `padded(_:)` fixes
+        it. `KittyGraphicsTests` carries the exact captured bytes from
+        the failing run as a permanent regression case, alongside
+        targeted cases for each of the other three.
+      Local same-machine `icat` defaults to its `file`/shared-memory
+      transfer mode, which Corta correctly refuses
+      (`KittyGraphics.swift`'s doc comment, `SECURITY.md` §1) — that is
+      the deliberate scope boundary working as designed, not a fifth bug,
+      and is why the verification forces `--transfer-mode=stream`: that
+      is also what a real remote/SSH session uses, since file and shared-
+      memory transfer are unavailable over one regardless of client
+      support.
+
+**M10 is done.** A real client (`kitten icat`) transmits, and Corta
+displays, a correctly-positioned image, confirmed by screenshot against a
+PID-verified, single running instance. The frame-budget half of the
+measurement pass this item originally deferred to M9 is still unrun —
+that needs a Typometer run, the same tool M8.18 and M9's own closing
+measurement are waiting on, and it was not attempted here: it needs a
+human at the keyboard operating the tool and watching the screen, not a
+scriptable client on the other end of a pty.
 
 ---
 

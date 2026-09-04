@@ -19,10 +19,10 @@ import OSLog
 ///
 /// | Stage | Interval | Where |
 /// | --- | --- | --- |
-/// | key event → bytes on the PTY | `keyDown` | `TerminalView.deliverBytes` |
+/// | key event → bytes on the PTY | `keyDown` | `TerminalView.deliverBytes` (the control-sequence bypass — ⌘/⌃, or an event the input context declines), `TerminalView.insertText` (ordinary typing, composed or not — most keystrokes), `TerminalView.doCommand(by:)` (Return, Delete, Escape, the arrows) |
 /// | reader wakes, parses, writes the grid | `output` | `ViewController.noteOutput` |
 /// | MainActor hop that wakes the display link | `wake` | `ViewController.noteOutput` |
-/// | vsync callback, damage diff, instance build | `frame` | `TerminalView.frameTick` |
+/// | vsync callback, damage diff, instance build | `frame` | `FrameScheduler.metalDisplayLink(_:needsUpdate:)` |
 /// | encode + commit | `commit` | `ViewController.render` |
 /// | GPU work through to completion | `gpu` | `ViewController.render` |
 ///
@@ -32,14 +32,23 @@ import OSLog
 /// safe to leave in a release build (`PERFORMANCE.md` §2: no per-frame
 /// allocation, no ObjC bridging on the hot path).
 ///
-/// **How to record one.** With Instruments' "os_signpost" instrument, or:
+/// **How to record one.** `scripts/record-signpost-trace.sh` runs the whole
+/// sequence below — launch, confirm focus, attach, save — for exactly the
+/// reason the next paragraph explains. By hand, with Instruments' own
+/// "os_signpost" instrument (`--instrument`, not `--template`: this is an
+/// *instrument*, not one of `xctrace list templates`' entries), attached to
+/// an already-running, already-focused process:
 ///
 /// ```sh
-/// xcrun xctrace record --template 'os_signpost' --launch -- \
-///     /path/to/Corta.app/Contents/MacOS/Corta
+/// xcrun xctrace record --attach Corta --instrument 'os_signpost' \
+///     --output /path/to/output.trace
 /// ```
 ///
 /// Then filter on subsystem `dev.noahqin.Corta`, category `input-latency`.
+/// Launching Corta *through* `xctrace`/Instruments (`--launch`, or
+/// Instruments' Record button) does not hand the new process window focus,
+/// so keystrokes typed right after launch land elsewhere and the trace
+/// shows zero `keyDown` — `PERFORMANCE.md` §5.3 has the fuller account.
 /// `nonisolated`: the chain crosses threads by design — `keyDown` is on the
 /// main thread, `output` is on the reader thread — so nothing here may be
 /// actor-bound. `OSSignposter` is itself thread-safe.

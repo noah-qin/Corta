@@ -36,6 +36,22 @@ nonisolated struct Theme: Equatable, Sendable {
     func variant(dark isDark: Bool) -> Variant { isDark ? dark : light }
 }
 
+nonisolated extension Theme.Variant {
+    /// This variant's three colours in OSC 10/11/12's terms, so a query
+    /// answers with what is actually painted on screen (M6.6) — a program
+    /// that asks before choosing its own palette must not be told the dark
+    /// theme's background while the light theme is live, or vice versa.
+    var dynamicColors: DynamicColors {
+        func byte(_ component: Float) -> UInt8 { UInt8((component * 255).rounded()) }
+        func triple(_ color: SIMD4<Float>) -> (red: UInt8, green: UInt8, blue: UInt8) {
+            (byte(color.x), byte(color.y), byte(color.z))
+        }
+        return DynamicColors(
+            foreground: triple(foreground), background: triple(background),
+            cursor: triple(cursor))
+    }
+}
+
 /// A colour literal for the theme tables: 8-bit sRGB, opaque.
 private nonisolated func rgb(_ r: UInt8, _ g: UInt8, _ b: UInt8) -> SIMD4<Float> {
     SIMD4<Float>(Float(r) / 255, Float(g) / 255, Float(b) / 255, 1)

@@ -4,6 +4,7 @@ import AppKit
 /// `ScrollGesture` the shell applies to the scrollback viewport.
 extension TerminalView {
     override func scrollWheel(with event: NSEvent) {
+        noteScrollGesturePhase(event)
         guard event.scrollingDeltaY != 0 else { return }
         // With mouse reporting on, the wheel belongs to the child (SGR 64/65
         // per notch), not to the scrollback.
@@ -28,6 +29,34 @@ extension TerminalView {
 
     override func scrollPageUp(_ sender: Any?) { onScroll?(.page(up: true)) }
     override func scrollPageDown(_ sender: Any?) { onScroll?(.page(up: false)) }
+
+    /// M9 — reports a trackpad gesture's begin/end to `RenderPolicy`, so
+    /// it can lift the frame-rate ceiling for the couple of seconds a
+    /// scroll actually lasts. A plain mouse wheel carries no phase
+    /// (`event.phase` and `.momentumPhase` are both `[]`) and so never
+    /// calls this at all — see `RenderPolicy.scrollingStateChanged`'s doc
+    /// comment on why that is a missed enhancement for that device, not a
+    /// correctness gap.
+    private func noteScrollGesturePhase(_ event: NSEvent) {
+        // `.contains`, not `==`: both `phase` and `momentumPhase` are
+        // option sets, and Apple's own guidance checks membership rather
+        // than exact equality even though a single event's phase is
+        // ordinarily just one bit in practice.
+        if event.phase.contains(.began) {
+            renderPolicy?.scrollingStateChanged(true)
+        } else if event.phase.contains(.ended) || event.phase.contains(.cancelled) {
+            renderPolicy?.scrollingStateChanged(false)
+        }
+        // Momentum (the deceleration after fingers lift) is its own phase
+        // sequence, disjoint from `event.phase` above — without this, the
+        // rate would drop back down the instant fingers lift even though
+        // the scroll is visibly still moving.
+        if event.momentumPhase.contains(.began) {
+            renderPolicy?.scrollingStateChanged(true)
+        } else if event.momentumPhase.contains(.ended) || event.momentumPhase.contains(.cancelled) {
+            renderPolicy?.scrollingStateChanged(false)
+        }
+    }
 
     /// ⌘↑ / ⌘↓ jump to the top and bottom of scrollback, the same gesture
     /// most terminals and pagers use — checked before `bytes(for:)` so a

@@ -33,6 +33,13 @@ public protocol ParserPerformer {
     /// already bounded by `Parser.maxStringLength`. Raw bytes, because an
     /// OSC payload is not necessarily text.
     mutating func oscDispatch(_ bytes: ArraySlice<UInt8>)
+
+    /// A complete APC string: everything between `ESC _` and its
+    /// terminator, bounded by `Parser.maxAPCStringLength` (M10: the Kitty
+    /// graphics protocol is the one user of APC — `KittyGraphics.swift`).
+    /// Raw bytes, for the same reason `oscDispatch` is: the payload is a
+    /// base64-encoded image, not text.
+    mutating func apcDispatch(_ bytes: ArraySlice<UInt8>)
 }
 
 extension ParserPerformer {
@@ -43,4 +50,5 @@ extension ParserPerformer {
     public mutating func escapeDispatch(intermediates: Intermediates, final: UInt8) {}
     public mutating func csiDispatch(_ sequence: CSISequence) {}
     public mutating func oscDispatch(_ bytes: ArraySlice<UInt8>) {}
+    public mutating func apcDispatch(_ bytes: ArraySlice<UInt8>) {}
 }
