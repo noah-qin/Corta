@@ -641,12 +641,13 @@ class ViewController: NSViewController {
         ring.layer?.maskedCorners = mask
     }
 
-    /// Runs at vsync before a drawable is acquired. Cheap path: nothing
-    /// arrived and nothing local changed, so no snapshot, no diff, no frame —
-    /// and the display link parks itself (`TerminalView.frameTick`), which is
-    /// what lets a static screen idle at ~0% CPU (`PERFORMANCE.md` §3). When
-    /// output did arrive, the snapshot is diffed against the renderer's
-    /// line-granular cache and the frame happens only on damage.
+    /// Runs once per accepted vsync, before the frame is built. Cheap path:
+    /// nothing arrived and nothing local changed, so no snapshot, no diff —
+    /// and this reports "nothing pending," which is what lets
+    /// `FrameScheduler` pause itself again and a static screen idle at ~0%
+    /// CPU (`PERFORMANCE.md` §3). When output did arrive, the snapshot is
+    /// diffed against the renderer's line-granular cache and the frame
+    /// happens only on damage.
     private func updateDamage() -> Bool {
         guard let session, terminalRenderer != nil else { return false }
         if session.takeBell() {
@@ -738,7 +739,10 @@ class ViewController: NSViewController {
         // main thread lengthens, and the one an end-to-end number cannot
         // tell apart from a slow parse.
         let wake = InputLatencySignposts.begin(.wake)
-        Task { @MainActor [weak self] in
+        // `.userInitiated`: this hop is on the output → wake → frame chain
+        // the keypress-to-pixel budget is measured against, not background
+        // bookkeeping — the default task priority gives it no such claim.
+        Task(priority: .userInitiated) { @MainActor [weak self] in
             InputLatencySignposts.end(.wake, wake)
             self?.terminalView?.setNeedsRedraw()
             self?.taskNotifier.noteOutput()

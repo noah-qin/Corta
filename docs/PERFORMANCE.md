@@ -42,7 +42,7 @@ PTY read (blocking read / DispatchIO, batched — never byte-at-a-time)
         ▼
 Parser → Grid                     runs as fast as bytes arrive
         │
-        ▼  CVDisplayLink (vsync)  snapshot taken here, at most 1× per frame
+        ▼  CAMetalDisplayLink (vsync)  snapshot taken here, at most 1× per frame
 Metal renderer
 ```
 

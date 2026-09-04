@@ -140,7 +140,7 @@ coordinates so a match can be selected verbatim.
 │  NSWindow / tabs / split layout tree / key bindings           │
 │  NSTextInputClient (CJK IME, marked text)                     │
 └──────────┬──────────────────────────────────┬─────────────────┘
-           │ key, mouse, paste                │ CVDisplayLink (vsync)
+           │ key, mouse, paste                │ CAMetalDisplayLink (vsync)
            │                                  │
            ▼                                  ▼
 ┌──────────────────────┐         ┌──────────────────────────────┐

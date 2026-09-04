@@ -22,7 +22,7 @@ import OSLog
 /// | key event → bytes on the PTY | `keyDown` | `TerminalView.deliverBytes` |
 /// | reader wakes, parses, writes the grid | `output` | `ViewController.noteOutput` |
 /// | MainActor hop that wakes the display link | `wake` | `ViewController.noteOutput` |
-/// | vsync callback, damage diff, instance build | `frame` | `TerminalView.frameTick` |
+/// | vsync callback, damage diff, instance build | `frame` | `FrameScheduler.metalDisplayLink(_:needsUpdate:)` |
 /// | encode + commit | `commit` | `ViewController.render` |
 /// | GPU work through to completion | `gpu` | `ViewController.render` |
 ///

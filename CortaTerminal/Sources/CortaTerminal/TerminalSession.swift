@@ -315,6 +315,13 @@ private final class ReaderBox: NSObject {
         }
         thread.name = "com.corta.terminal.reader"
         thread.stackSize = 1 << 20
+        // Left at the default QoS, this thread can be deprioritised under
+        // CPU contention exactly like any other background thread — but it
+        // gates the output → wake → frame chain and must never stop
+        // draining regardless of what else is running (`PERFORMANCE.md`
+        // §2.1: "never stop draining the PTY"). `.userInitiated` asks the
+        // scheduler to treat it accordingly.
+        thread.qualityOfService = .userInitiated
         thread.start()
     }
 }
