@@ -284,9 +284,19 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         window.toolbar?.selectedItemIdentifier = tab.identifier
 
         let pane = self.pane(for: tab)
+        // Panes stay attached once added, swapped by hiding and deactivating
+        // constraints rather than by removeFromSuperview/addSubview on every
+        // switch — Xcode's Thread Performance Checker flagged the old
+        // remove-everything loop as a hang risk (a lower-QoS thread it was
+        // apparently waiting on), and this sidesteps the view-hierarchy
+        // churn entirely instead of chasing what inside AppKit's teardown
+        // was actually blocking.
+        if pane.superview == nil {
+            pane.isHidden = true
+            paneContainer.addSubview(pane)
+        }
         NSLayoutConstraint.deactivate(paneConstraints)
-        paneContainer.subviews.forEach { $0.removeFromSuperview() }
-        paneContainer.addSubview(pane)
+        paneContainer.subviews.forEach { $0.isHidden = ($0 !== pane) }
         paneConstraints = [
             pane.leadingAnchor.constraint(equalTo: paneContainer.leadingAnchor),
             pane.trailingAnchor.constraint(equalTo: paneContainer.trailingAnchor),
