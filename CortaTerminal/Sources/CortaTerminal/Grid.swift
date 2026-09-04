@@ -74,6 +74,11 @@ public struct Grid: Sendable {
     /// longer resolves would render as a link that goes nowhere.
     public var hyperlinks: HyperlinkTable
 
+    /// Kitty graphics image placements (M10) — a side table, not a `Cell`
+    /// field; see `ImagePlacementTable`'s doc comment. Cleared on a column
+    /// resize (`resize(rows:columns:)`), kept across a row-only one.
+    public var imagePlacements = ImagePlacementTable()
+
     /// Rows that have scrolled off the top.
     public var scrollback: Scrollback
 
@@ -671,6 +676,15 @@ public struct Grid: Sendable {
         let newColumns = min(max(1, newColumns), Self.maxColumns)
         guard newRows != rows || newColumns != columns else { return }
 
+        // A placement's position is exact cell coordinates that a column
+        // change invalidates regardless of whether this is the reflowing
+        // path below or the alternate screen's non-reflowing one — see
+        // `ImagePlacementTable`'s doc comment on why dropping placements is
+        // the safe choice rather than trying to re-wrap image geometry.
+        if newColumns != columns {
+            imagePlacements.removeAllPlacements()
+        }
+
         if newColumns != columns, !isAlternateScreenActive {
             resizeTabStops(to: newColumns)
             reflow(toColumns: newColumns, newRows: newRows)
@@ -903,6 +917,12 @@ public struct Grid: Sendable {
         lines = ScreenLines(repeating: Line(), count: rows)
         scrollback = Scrollback(limit: 0)
         graphemes = GraphemeTable()
+        // The main screen's placements are parked whole inside
+        // `suspendedMain` along with everything else and come back on
+        // `exitAlternateScreen`'s `self = main` — a fresh table here is
+        // just the alternate screen starting with none of its own, the
+        // same as it starting blank.
+        imagePlacements = ImagePlacementTable()
         marginTop = 0
         marginBottom = rows - 1
         isAlternateScreenActive = true

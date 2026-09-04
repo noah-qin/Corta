@@ -30,14 +30,32 @@ public struct Parser: Sendable {
         case dcsParam
         case dcsIntermediate
         case dcsIgnore
-        /// SOS, PM and APC strings, consumed and dropped.
-        case sosPmApcString
+        /// SOS and PM strings, consumed and dropped — nothing this project
+        /// implements uses either.
+        case sosPmString
+        /// An APC string, collected for `apcDispatch` (M10: Kitty graphics is
+        /// the one user of APC).
+        case apcString
+        /// An APC string that exceeded `maxAPCStringLength`; consumed to its
+        /// terminator and never dispatched.
+        case apcIgnore
     }
 
     /// The hard limit on an OSC payload. Long enough for any real title, URL
     /// or clipboard payload; short enough that a hostile stream cannot use it
     /// as an allocator.
     public static let maxStringLength = 4096
+
+    /// The hard limit on one APC chunk. The Kitty graphics protocol is
+    /// designed around chunked transmission specifically so no single
+    /// escape sequence has to be arbitrarily long — every reference client
+    /// chunks a base64 payload at 4096 bytes and continues with `m=1` — so
+    /// this affords a full chunk (4096 bytes of payload) plus generous
+    /// headroom for the `key=value,...;` control-data prefix, while still
+    /// being a hard, explicit cap (`SECURITY.md` §3): an unterminated APC
+    /// string must not accumulate without bound any more than an
+    /// unterminated OSC one may.
+    public static let maxAPCStringLength = 6144
 
     public private(set) var state: State = .ground
 
@@ -92,6 +110,7 @@ public struct Parser: Sendable {
             return
         case 0x1B:
             if state == .oscString { dispatchString(performer: &performer) }
+            if state == .apcString { dispatchAPCString(performer: &performer) }
             clear()
             state = .escape
             return
@@ -111,8 +130,10 @@ public struct Parser: Sendable {
         case .oscIgnore: oscIgnore(byte)
         case .dcsEntry, .dcsParam, .dcsIntermediate, .dcsIgnore:
             dcs(byte, performer: &performer)
-        case .sosPmApcString:
+        case .sosPmString:
             break  // Consumed until ESC, handled above.
+        case .apcString: apcString(byte)
+        case .apcIgnore: apcIgnore(byte)
         }
     }
 
@@ -155,8 +176,11 @@ public struct Parser: Sendable {
             if state == .escape { state = .escapeIntermediate }
         case 0x50:  // ESC P — DCS
             state = .dcsEntry
-        case 0x58, 0x5E, 0x5F:  // ESC X / ESC ^ / ESC _ — SOS, PM, APC
-            state = .sosPmApcString
+        case 0x58, 0x5E:  // ESC X / ESC ^ — SOS, PM: consumed and dropped.
+            state = .sosPmString
+        case 0x5F:  // ESC _ — APC (M10: Kitty graphics)
+            stringBuffer.removeAll(keepingCapacity: true)
+            state = .apcString
         case 0x5B:  // ESC [ — CSI
             state = .csiEntry
         case 0x5D:  // ESC ] — OSC
@@ -284,6 +308,33 @@ public struct Parser: Sendable {
         if byte == 0x07 { state = .ground }
     }
 
+    /// Collects an APC string's payload — see `maxAPCStringLength`'s doc
+    /// comment for the cap. APC's only terminator is ST (`ESC \`), unlike
+    /// OSC's BEL-or-ST, so unlike `oscString` there is no in-state
+    /// terminator byte to watch for here: ESC always outranks this state
+    /// (the "anywhere" handling in `advance`), which dispatches and clears
+    /// before this is ever reached again.
+    private mutating func apcString(_ byte: UInt8) {
+        switch byte {
+        case 0x00...0x1F:
+            break  // Controls inside a string are dropped, not executed.
+        default:
+            guard stringBuffer.count < Self.maxAPCStringLength else {
+                // Discard the whole sequence rather than a truncated one —
+                // same reasoning as `oscString`'s overflow: a half-decoded
+                // image is worse than none.
+                stringBuffer.removeAll(keepingCapacity: true)
+                state = .apcIgnore
+                return
+            }
+            stringBuffer.append(byte)
+        }
+    }
+
+    /// An overflowed APC string's remaining bytes: discarded, same as
+    /// `oscIgnore`, until the "anywhere" ESC handling in `advance` ends it.
+    private mutating func apcIgnore(_ byte: UInt8) {}
+
     /// DCS is recognised so that its payload is consumed rather than printed.
     /// Nothing is dispatched; device control strings are P2.
     private mutating func dcs<P: ParserPerformer>(_ byte: UInt8, performer: inout P) {
@@ -330,6 +381,11 @@ public struct Parser: Sendable {
 
     private mutating func dispatchString<P: ParserPerformer>(performer: inout P) {
         performer.oscDispatch(stringBuffer[...])
+        stringBuffer.removeAll(keepingCapacity: true)
+    }
+
+    private mutating func dispatchAPCString<P: ParserPerformer>(performer: inout P) {
+        performer.apcDispatch(stringBuffer[...])
         stringBuffer.removeAll(keepingCapacity: true)
     }
 
