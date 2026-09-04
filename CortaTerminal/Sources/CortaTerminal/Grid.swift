@@ -147,6 +147,29 @@ public struct Grid: Sendable {
         return lines[row]
     }
 
+    /// The row's mutation stamp (`ScreenLines.revision(at:)`) — a cheap
+    /// "has this row possibly changed" check for a renderer's damage pass,
+    /// in place of comparing full `Line` values. Out-of-range answers `0`,
+    /// which a renderer that has never seen the row (an empty damage cache)
+    /// should already treat as "different" — see `TerminalRenderer`.
+    public func lineRevision(_ row: Int) -> UInt64 {
+        guard row >= 0, row < rows else { return 0 }
+        return lines.revision(at: row)
+    }
+
+    /// Identifies which `ScreenLines` instance backs the live screen right
+    /// now — see `ScreenLines.generation`'s doc comment for why a renderer
+    /// needs this alongside `lineRevision(_:)`: `enterAlternateScreen`/
+    /// `exitAlternateScreen` and a column resize each swap in a fresh
+    /// `ScreenLines` whose revisions restart independently of whatever a
+    /// renderer's cache already holds.
+    public var linesGeneration: UInt64 { lines.generation }
+
+    /// Cumulative rows a whole-screen scroll has rotated off the top, for
+    /// the live screen's current `ScreenLines` generation — see
+    /// `ScreenLines.totalRotated`.
+    public var linesRotated: UInt64 { lines.totalRotated }
+
     // MARK: - Writing
 
     /// Writes one scalar in the current pen at the cursor, then advances by
