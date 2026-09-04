@@ -455,14 +455,24 @@ where being a pure AppKit citizen pays off.
       Features nobody can install are not features.
       *Done when:* the downloadable archive contains a stapled app that
       Gatekeeper opens without a warning after copying it to Applications.
-      **Not done.** The Apple team has Developer ID certificates, but this
-      Mac does not yet have a valid Developer ID Application identity
-      (certificate paired with its private key), and the workflow still
-      needs App Store Connect notarization credentials. Those are the
-      maintainer's sensitive credentials and release decision. The
-      build settings the item names are already right —
-      `ENABLE_HARDENED_RUNTIME = YES`, `ENABLE_APP_SANDBOX = NO` — so
-      what remains is the signing and publishing, not the project.
+      **Both blockers this item named are now cleared.** This Mac now has
+      a valid Developer ID Application identity (`Developer ID Application:
+      Fuyao Qin (646VSJ9K5F)`, certificate paired with its private key in
+      the login keychain), and `.github/workflows/release.yml`'s six
+      `MACOS_*` repository secrets are all present. Verified locally:
+      `xcodebuild archive` + `-exportArchive` (method `developer-id`) —
+      not a plain `build`, which leaves `com.apple.security.get-task-allow`
+      set and notarization refuses that — produces a `Corta.app` that
+      `codesign --verify --deep --strict` reports valid on disk, carries
+      no entitlements at all, and `spctl -a -vv --type execute` rejects
+      for exactly one reason: `source=Unnotarized Developer ID` — the
+      correct, expected state one step before submitting it.
+      That submission itself is the maintainer's release decision, not a
+      code gap or a credentials gap any more: `CHANGELOG.md`'s release
+      checklist (bump the version, tag `vx.y.z`, push) is what actually
+      runs the CI pipeline end to end (build, sign, notarize, staple,
+      draft release) — not attempted here, since pushing a tag opens a
+      real, visible GitHub release.
 
 **M6 is done when** the settings page and themes ship, the native
 integration items work in a live window, the esctest
@@ -473,9 +483,10 @@ carried since M2, and the tracking table has no empty columns.
 ship; the native integrations work in a live window; the compatibility
 rate is re-recorded at **77.6%** (106 passed, 335 known bugs, 127 failed
 of 568 — 184 → 127 failures, no regressions). M6.12 is measured at
-45.5 ms average keypress-to-pixel latency. The sole open item is M6.16,
-pending the maintainer's signing credentials; it is the release gate rather
-than a code gap.
+45.5 ms average keypress-to-pixel latency. The sole open item is M6.16 —
+both blockers it named are cleared and the pipeline verifies locally;
+what remains is the maintainer choosing to cut a release, which is a
+release decision, not a code gap.
 
 ---
 
@@ -689,26 +700,42 @@ test can assert what a pixel is and not who can read it.
       Terminal.app is missing and the figures are Typometer's min/max/
       avg/SD rather than a §5.1 percentile distribution (§5.5 notes
       both).
-- [ ] **M8.18** Measure `CAMetalLayer.maximumDrawableCount = 2`. The
+- [x] **M8.18** Measure `CAMetalLayer.maximumDrawableCount = 2`. The
       knob exists (`CORTA_MAX_DRAWABLES=2`, one launch, no code change)
       and the trace that answers it exists (M8.15); the measurement needs
-      Typometer and a controlled A/B, which has not been run.
-      **Not started.**
-- [ ] **M8.19** Confirm whether an input-triggered partial redraw ever
+      Typometer and a controlled A/B.
+      **Done.** `scripts/measure-drawable-ab.sh` ran the same Release
+      build twice, back to back, varying only `CORTA_MAX_DRAWABLES`:
+      default (3) averaged 70.1 ms (SD 13.9), `=2` averaged 70.4 ms
+      (SD 13.5) — within noise of each other on every column. Matches the
+      preliminary `RenderMetrics` signal below: `drawableWait` was already
+      0.00 ms at the default count on this machine, so there was nothing
+      for a smaller count to buy back. **Conclusion: keep the default.**
+      Full table in `PERFORMANCE.md` §5.4.
+- [x] **M8.19** Confirm whether an input-triggered partial redraw ever
       misses the current display frame and waits a refresh period. The
       signpost trace shows it directly — an `output` event landing after
       that frame's `frame` interval opened.
-      **Attempted, no valid data.** Two `os_signpost` recordings were
-      taken with Instruments against the Release build. Both captured
-      real `wake`/`frame`/`commit`/`gpu` activity from Corta's idle
-      cursor-blink redraw, but zero `keyDown` or `output` events in
-      either — the keystrokes typed during recording never reached
-      `TerminalView`, most likely because launching the target from
-      Instruments' Record button does not hand its window focus, so
-      typing immediately after launch lands elsewhere. The chain this
-      item needs to inspect never fired, so there is nothing to read a
-      missed frame from. Still open; needs a recording where `keyDown`
-      is confirmed non-zero before trusting the rest of the trace.
+      **Done, after two real gaps were found and fixed, not just a
+      test-environment retry.** The first two attempts' zero-`keyDown`
+      recordings traced to two separate causes, both closed:
+      `InputLatencySignposts.keyDown` only wrapped the control-sequence
+      bypass path (`TerminalView.deliverBytes`) — ordinary typing commits
+      through `insertText`/`doCommand(by:)` instead and had never been
+      instrumented at all, so a normal typing session showed real
+      keystrokes reaching the child with zero `keyDown` signposts the
+      whole time — and the launch-focus problem itself needed
+      `scripts/record-signpost-trace.sh` (launch, confirm frontmost via
+      System Events before proceeding, then attach) because an unguarded
+      `activate` had been silently swallowing its own failures.
+      With both fixed, a 12-second real-typing recording (122 keystrokes)
+      answers the question: `output` → next `frame`-begin ranges 0.56–
+      15.73 ms, roughly uniform across this run's ~16 ms frame period —
+      ordinary vsync-alignment cost, not evidence of a genuinely missed
+      frame (which would show as a gap exceeding one full period). One
+      12-second sample is not exhaustive, but it is a real answer where
+      two attempts previously produced none. Full account and numbers in
+      `PERFORMANCE.md` §5.3.
 - [x] **M8.20** Recorded real-program pass for the five P0 behavioural
       areas — cursor, scroll regions, margins and wide characters,
       insert/delete, erase — driven by `vim`, `tmux`, `htop` and `less`
@@ -726,12 +753,16 @@ reader, no failure path is a crash or a false success, and every latency
 number in `PERFORMANCE.md` is a distribution taken in a stated
 environment.
 
-**Status: 18 of 20 done.** M8.17 is checked off as a bounded partial
+**Status: 20 of 20 done.** M8.17 is checked off as a bounded partial
 result (§5.5's caveats stand), not a full four-way, all-metric
-comparison. The two open items (M8.18–M8.19) are measurement that needs
-Typometer and Instruments respectively. M8.20 also surfaced one open bug
-(the `less` search-highlight regression above) that is not itself one of
-the four measurement items and remains untracked as a numbered step.
+comparison. M8.19 closed with a real trace and a real answer, after
+fixing the two gaps that blocked it — one launch-focus, one a genuine
+instrumentation blind spot (`PERFORMANCE.md` §5.3). M8.18 closed with a
+real Typometer A/B: default vs. `CORTA_MAX_DRAWABLES=2` came back within
+noise of each other, matching the preliminary `RenderMetrics` signal
+(§5.4) — the default stays. M8.20 also surfaced one open bug (the `less`
+search-highlight regression above) that is not itself one of the four
+measurement items and remains untracked as a numbered step.
 
 ---
 
@@ -821,15 +852,30 @@ than once per item — see the note at the end of this section.
       superseded result is discarded rather than applied.
 
 **M9 is done when** the measurement pass below is run and its numbers are
-recorded here. **Not yet run** — this milestone lands the mechanism each
-item describes, verified by the core/renderer unit tests listed next to
-each area (`ScreenLinesRevisionTests`, `DamageTrackingTests`'s scroll-shift
-and alternate-screen additions, `TerminalRenderBackendTests`,
+recorded here. This milestone lands the mechanism each item describes,
+verified by the core/renderer unit tests listed next to each area
+(`ScreenLinesRevisionTests`, `DamageTrackingTests`'s scroll-shift and
+alternate-screen additions, `TerminalRenderBackendTests`,
 `RenderPolicyTests`, `GlyphAtlasTests`'s page-isolation additions,
-`QuadRendererTests`'s pipeline-cache additions) and by launching the app,
-not by a keypress-to-pixel number yet: that needs Typometer and
-Instruments runs this milestone did not include, the same two tools
-M8.18–M8.19 are still waiting on.
+`QuadRendererTests`'s pipeline-cache additions) and by launching the app.
+
+**Typometer, post-M9, default configuration** (the same "Run A" as
+M8.18, since default is the configuration M9 actually ships): 45.4 ms
+min, 99.4 ms max, 70.1 ms average, 13.9 ms SD — `PERFORMANCE.md` §5.4.
+**This is not a clean before/after against M6.12's 45.5 ms baseline.**
+§5.2's fixed-benchmark-environment table was not fully held for this
+run — in particular, other background load on the machine was not
+controlled the way M6.12's was — so a 70.1 ms average next to a 45.5 ms
+one is not evidence of a regression; it is two numbers taken under
+different conditions. A same-conditions re-run is the only way to turn
+this into a real before/after, and is not something a scriptable client
+can stand in for (needs a human running Typometer with nothing else on
+the machine, `PERFORMANCE.md` §5.2). The Instruments half (an
+`os_signpost` trace against the post-M9 build, to see whether the
+mechanism actually moved the `output` → `frame` distribution
+`PERFORMANCE.md` §5.3 records for M8.19) has also not been rerun
+post-M9, though the recording method itself is now known-working
+(`scripts/record-signpost-trace.sh`).
 
 ## M10 — Kitty Graphics
 
@@ -906,10 +952,10 @@ wire format.
 displays, a correctly-positioned image, confirmed by screenshot against a
 PID-verified, single running instance. The frame-budget half of the
 measurement pass this item originally deferred to M9 is still unrun —
-that needs Typometer and Instruments, the same two tools M8.18, M8.19 and
-M9's own closing measurement are waiting on, and none of the three were
-attempted here for the same reason: each needs a human operating the
-tool, not a scriptable client on the other end of a pty.
+that needs a Typometer run, the same tool M8.18 and M9's own closing
+measurement are waiting on, and it was not attempted here: it needs a
+human at the keyboard operating the tool and watching the screen, not a
+scriptable client on the other end of a pty.
 
 ---
 
