@@ -10,79 +10,10 @@ what to edit.
 
 ## [Unreleased]
 
-## [0.1.1] - 2026-09-05
+## [0.1.0] - 2026-09-05
 
-M9 (render pipeline) and M10 (Kitty graphics), plus a round of mouse,
-theme and focus-ring fixes found while using the app day to day.
-
-### Added
-
-- Kitty graphics protocol: images placed and displayed inline via the
-  APC-based control/payload sequences, verified against a real client
-  (`kitten icat`), which found and fixed four protocol bugs no
-  hand-written test had caught.
-- `CAMetalDisplayLink` in place of `CADisplayLink` +
-  `metalLayer.nextDrawable()`, gated on window occlusion without ever
-  pausing the PTY reader thread.
-- `RenderMetrics`: ring-buffer percentiles for drawable-wait, frame-CPU
-  and GPU time, dumped to the unified log behind `CORTA_RENDER_METRICS`
-  — a before/after number without opening Instruments each time.
-- Damage tracking moved to a per-row revision stamp instead of
-  comparing full row contents, and a whole-screen scroll shift
-  repositions surviving rows by offset instead of rebuilding them.
-- Compiled render pipelines are cached to disk (`MTLBinaryArchive`) and
-  read back on a later launch instead of recompiled.
-- The glyph atlas is split into independently packed, independently
-  evicted pages (ASCII, shaped/CJK, colour), so a CJK-heavy screen no
-  longer evicts the ASCII cache and vice versa.
-- The frame-rate range now adapts to window focus, Low Power Mode,
-  thermal pressure and an active trackpad scroll gesture.
-- A first-launch offer to move Corta to `/Applications` when it is
-  running unzipped somewhere else — direct-download distribution has no
-  drag-to-install step, and both Sparkle's update path and Spotlight
-  expect an installed location.
-- `os_signpost` coverage extended to the two keypress paths it had
-  missed: ordinary typing (`insertText`) and Return/Delete/Escape/the
-  arrows (`doCommand(by:)`) now show up in a latency trace the same way
-  ⌘/⌃ shortcuts already did.
-
-### Changed
-
-- A mouse drag now always selects text past an app-owned mouse
-  reporting mode (SGR, etc.) — no modifier held, and no more terminals
-  where a program that turned on mouse reporting (Claude Code, `vim`
-  with `mouse=a`, `htop`) made its own output unselectable. A click that
-  never leaves its starting cell still reports to the child as before.
-- The General settings tab is grouped into Window / Closing /
-  Notifications sections instead of one flat list.
-- The focus ring is thinner (2pt → 1pt), gets a faint accent highlight,
-  and only shows while a pane truly holds the keyboard — ⌘-Tabbing away
-  now clears it instead of leaving it on the split's last-focused pane.
-
-### Fixed
-
-- OSC 10/11/12 (background/foreground colour queries) answer with the
-  live theme instead of a hardcoded dark palette, which had a program
-  that queries its background before choosing its own colours (Claude
-  Code among them) painting near-white text over a near-white
-  background under the light theme.
-- The focus ring no longer draws partly under the tab bar on a top
-  pane, and no longer shows a false curve at a divider junction on an
-  interior or edge pane — both now share the same chrome-overlap
-  geometry the grid's own inset already used.
-- A settings row whose label wrapped to two lines no longer silently
-  loses the second line, and the notification-permission row no longer
-  sits visible-but-empty the first time General is opened.
-- A crash loading a cached render pipeline traced to the test target's
-  own launch path (`CortaTests` `TEST_HOST`-launches directly into
-  `Corta`, a more restrictive launch than opening the app) rather than
-  real use; the cache now loads back on every real launch and only
-  skips the one launch path that crashed.
-
-## [0.1.0] - 2026-09-03
-
-The first release. Everything below is what `main` had accumulated
-through M1–M8.
+The first release. Everything below is what `main` accumulated through
+M1–M10.
 
 ### Added
 
@@ -113,10 +44,33 @@ through M1–M8.
 - Metal renderer: a GPU glyph atlas, instanced quads, one draw call per
   screen, and a triple-buffered instance buffer.
 - Damage tracking at line granularity — a static screen rebuilds nothing,
-  and idle CPU measures 0.0%.
+  and idle CPU measures 0.0%. The check itself compares a per-row
+  revision stamp (`Grid.lineRevision`, bumped centrally by `ScreenLines`)
+  rather than full row contents, and a whole-screen scroll shift
+  repositions surviving rows by a Y-coordinate offset instead of
+  rebuilding them through Core Text/atlas lookups.
+- `CAMetalDisplayLink` in place of `CADisplayLink` +
+  `metalLayer.nextDrawable()`, gated on window occlusion without ever
+  pausing the PTY reader thread.
+- Compiled render pipelines are cached to disk (`MTLBinaryArchive`) and
+  read back on a later launch instead of recompiled.
+- The glyph atlas is split into independently packed, independently
+  evicted pages (ASCII, shaped/CJK, colour), so a CJK-heavy screen no
+  longer evicts the ASCII cache and vice versa.
+- The frame-rate range adapts to window focus, Low Power Mode, thermal
+  pressure and an active trackpad scroll gesture.
+- `RenderMetrics`: ring-buffer percentiles for drawable-wait, frame-CPU
+  and GPU time, dumped to the unified log behind `CORTA_RENDER_METRICS`
+  — a before/after number without opening Instruments each time.
 - Cursor styles (block, bar, underline) with blink; bold, italic,
   underline and strikethrough; selection drawn as document-anchored quads
   that follow their text as output scrolls.
+
+**Graphics**
+- The Kitty graphics protocol: images placed and displayed inline via
+  the APC-based control/payload sequences, verified against a real
+  client (`kitten icat`), which found and fixed four protocol bugs no
+  hand-written test had caught.
 
 **Text and input**
 - Full `NSTextInputClient` conformance: marked text, a candidate window
@@ -187,6 +141,10 @@ through M1–M8.
   it. ⌘-click remains the default.
 - OSC 52 clipboard *write*, off by default (`SECURITY.md` §2.6). The read
   form is not implemented and will not be.
+- A first-launch offer to move Corta to `/Applications` when it is
+  running unzipped somewhere else — direct-download distribution has no
+  drag-to-install step, and both Sparkle's update path and Spotlight
+  expect an installed location.
 
 **Accessibility**
 - VoiceOver and every other assistive technology can now read the
@@ -207,7 +165,12 @@ through M1–M8.
 - `os_signpost` across the whole input chain — keyDown → PTY write → grid
   revision → MainActor wake → display-link callback → GPU completion —
   so a latency regression is one interval wide in a trace instead of
-  invisible to every passing test.
+  invisible to every passing test. Coverage reaches every keypress path,
+  not only the ⌘/⌃ control-sequence bypass: ordinary typing
+  (`insertText`) and Return/Delete/Escape/the arrows (`doCommand(by:)`)
+  are signposted too — a real-client trace of ordinary typing once
+  showed zero `keyDown` events despite real keystrokes reaching the
+  child, which is what exposed the gap.
 - Apache 2.0 licence, a security policy, a code of conduct and issue and
   pull request templates.
 
@@ -235,6 +198,16 @@ through M1–M8.
   reset the zoom and a relaunch forgot it.
 - **Deployment target raised to macOS 26.0**, across every build
   configuration and the `CortaTerminal` package.
+- A mouse drag now always selects text past an app-owned mouse
+  reporting mode (SGR, etc.) — no modifier held, and no more terminals
+  where a program that turned on mouse reporting (Claude Code, `vim`
+  with `mouse=a`, `htop`) made its own output unselectable. A click that
+  never leaves its starting cell still reports to the child as before.
+- The General settings tab is grouped into Window / Closing /
+  Notifications sections instead of one flat list.
+- The focus ring is thinner (2pt → 1pt), gets a faint accent highlight,
+  and only shows while a pane truly holds the keyboard — ⌘-Tabbing away
+  now clears it instead of leaving it on the split's last-focused pane.
 
 ### Fixed
 
@@ -309,6 +282,28 @@ through M1–M8.
   cell whose colours were both `.default` — the common case for a plain
   highlight — re-resolved back to the same default colours regardless of
   the swap, so the highlight was computed but never visible.
+- OSC 10/11/12 (background/foreground colour queries) answer with the
+  live theme instead of a hardcoded dark palette, which had a program
+  that queries its background before choosing its own colours (Claude
+  Code among them) painting near-white text over a near-white
+  background under the light theme.
+- The focus ring no longer draws partly under the tab bar on a top
+  pane, and no longer shows a false curve at a divider junction on an
+  interior or edge pane — both now share the same chrome-overlap
+  geometry the grid's own inset already used.
+- A settings row whose label wrapped to two lines no longer silently
+  loses the second line, and the notification-permission row no longer
+  sits visible-but-empty the first time General is opened.
+- A crash loading a cached render pipeline traced to the test target's
+  own launch path (`CortaTests` `TEST_HOST`-launches directly into
+  `Corta`, a more restrictive launch than opening the app) rather than
+  real use; the cache now loads back on every real launch and only
+  skips the one launch path that crashed.
+- Switching settings tabs no longer tears the whole pane subtree down
+  and rebuilds it on every click. Xcode's Thread Performance Checker
+  flagged the remove-everything loop as a hang risk (the main thread
+  waiting on a lower-QoS thread); panes are built once and now stay
+  attached, shown and hidden instead of detached and reattached.
 
 ### Known gaps
 
@@ -326,9 +321,18 @@ through M1–M8.
   rebuild, inside the 4 ms budget.
 - OSC 133 marks only appear if the user's shell emits them; Corta ships no
   shell snippets yet.
-- Whether `maximumDrawableCount = 2` helps or costs latency, and whether
-  an input-triggered redraw ever misses its display frame, are both
-  instrumented (`docs/PERFORMANCE.md` §5.3, §5.4) but not yet measured.
+- `maximumDrawableCount = 2` measured within noise of the default —
+  70.1 ms vs. 70.4 ms average across a real Typometer A/B, so the
+  default (3) ships (`docs/PERFORMANCE.md` §5.4). A 12-second real-typing
+  `os_signpost` trace found no `output` → `frame` gap exceeding one
+  frame period — no evidence, in that sample, of a redraw missing its
+  display frame (§5.3). Neither of those two numbers is a controlled
+  before/after against the 45.5 ms figure above: `docs/PERFORMANCE.md`
+  §5.2's fixed-environment table (in particular, other background load
+  on the machine) wasn't held for either run. The render-pipeline
+  rewrite (M9) landed and is covered by its own unit tests, but a
+  same-conditions Typometer re-measurement against the 45.5 ms baseline
+  is still open.
 
 ---
 
@@ -349,6 +353,5 @@ For the maintainer, cutting any release:
    push that file — that is what makes the update visible to every
    already-installed Corta.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v0.1.1...HEAD
-[0.1.1]: https://github.com/noah-qin/Corta/releases/tag/v0.1.1
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/noah-qin/Corta/releases/tag/v0.1.0

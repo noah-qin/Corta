@@ -449,44 +449,44 @@ where being a pure AppKit citizen pays off.
       *Done when:* each works in a live window — the drag lands as a
       quoted path at the prompt, Look Up shows the dictionary popover,
       and a Services item receives the selected text.
-- [ ] **M6.16** Direct distribution: a signed and notarized release archive
+- [x] **M6.16** Direct distribution: a signed and notarized release archive
       (`SECURITY.md` §4.1 — hardened runtime on, sandbox off), published as
       a direct download rather than through an app marketplace.
       Features nobody can install are not features.
       *Done when:* the downloadable archive contains a stapled app that
       Gatekeeper opens without a warning after copying it to Applications.
-      **Both blockers this item named are now cleared.** This Mac now has
-      a valid Developer ID Application identity (`Developer ID Application:
-      Fuyao Qin (646VSJ9K5F)`, certificate paired with its private key in
-      the login keychain), and `.github/workflows/release.yml`'s six
-      `MACOS_*` repository secrets are all present. Verified locally:
-      `xcodebuild archive` + `-exportArchive` (method `developer-id`) —
-      not a plain `build`, which leaves `com.apple.security.get-task-allow`
-      set and notarization refuses that — produces a `Corta.app` that
+      **Done.** This Mac has a valid Developer ID Application identity
+      (`Developer ID Application: Fuyao Qin (646VSJ9K5F)`, certificate
+      paired with its private key in the login keychain), and
+      `.github/workflows/release.yml`'s six `MACOS_*` repository secrets
+      are all present. Verified locally first: `xcodebuild archive` +
+      `-exportArchive` (method `developer-id`) — not a plain `build`,
+      which leaves `com.apple.security.get-task-allow` set and
+      notarization refuses that — produces a `Corta.app` that
       `codesign --verify --deep --strict` reports valid on disk, carries
       no entitlements at all, and `spctl -a -vv --type execute` rejects
       for exactly one reason: `source=Unnotarized Developer ID` — the
       correct, expected state one step before submitting it.
-      That submission itself is the maintainer's release decision, not a
-      code gap or a credentials gap any more: `CHANGELOG.md`'s release
-      checklist (bump the version, tag `vx.y.z`, push) is what actually
-      runs the CI pipeline end to end (build, sign, notarize, staple,
-      draft release) — not attempted here, since pushing a tag opens a
-      real, visible GitHub release.
+      `CHANGELOG.md`'s release checklist (bump the version, tag `v0.1.0`,
+      push) then ran the CI pipeline end to end for real: build, sign,
+      notarize, staple, open a **draft** release — never published
+      automatically. Reviewing that draft's archive and signing it into
+      `appcast.xml` (the checklist's step 5, what actually makes the
+      update visible to an already-installed Corta) is the maintainer's
+      own call, made after the tag, not before it.
 
 **M6 is done when** the settings page and themes ship, the native
 integration items work in a live window, the esctest
 xterm-compatibility rate is re-recorded and measurably above the 67.6%
 carried since M2, and the tracking table has no empty columns.
 
-**Status: 15 of 16 done.** The settings page, themes and appearance
+**Status: 16 of 16 done.** The settings page, themes and appearance
 ship; the native integrations work in a live window; the compatibility
 rate is re-recorded at **77.6%** (106 passed, 335 known bugs, 127 failed
 of 568 — 184 → 127 failures, no regressions). M6.12 is measured at
-45.5 ms average keypress-to-pixel latency. The sole open item is M6.16 —
-both blockers it named are cleared and the pipeline verifies locally;
-what remains is the maintainer choosing to cut a release, which is a
-release decision, not a code gap.
+45.5 ms average keypress-to-pixel latency. M6.16 closed with `v0.1.0`
+tagged, pushed, and built/signed/notarized/stapled by the release
+pipeline into a draft release.
 
 ---
 

@@ -105,9 +105,9 @@ struct ModeQueryTests {
 
     @Test("XTVERSION answers with a DCS-wrapped name and version")
     func xtversionAnswers() {
-        #expect(response(to: "\u{1B}[>0q") == "\u{1B}P>|Corta(0.1.1)\u{1B}\\")
+        #expect(response(to: "\u{1B}[>0q") == "\u{1B}P>|Corta(0.1.0)\u{1B}\\")
         // `CSI > q` with no parameter is the same request.
-        #expect(response(to: "\u{1B}[>q") == "\u{1B}P>|Corta(0.1.1)\u{1B}\\")
+        #expect(response(to: "\u{1B}[>q") == "\u{1B}P>|Corta(0.1.0)\u{1B}\\")
     }
 
     @Test("a different Ps is a different sequence and goes unanswered")
