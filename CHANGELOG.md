@@ -10,6 +10,75 @@ what to edit.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-05
+
+M9 (render pipeline) and M10 (Kitty graphics), plus a round of mouse,
+theme and focus-ring fixes found while using the app day to day.
+
+### Added
+
+- Kitty graphics protocol: images placed and displayed inline via the
+  APC-based control/payload sequences, verified against a real client
+  (`kitten icat`), which found and fixed four protocol bugs no
+  hand-written test had caught.
+- `CAMetalDisplayLink` in place of `CADisplayLink` +
+  `metalLayer.nextDrawable()`, gated on window occlusion without ever
+  pausing the PTY reader thread.
+- `RenderMetrics`: ring-buffer percentiles for drawable-wait, frame-CPU
+  and GPU time, dumped to the unified log behind `CORTA_RENDER_METRICS`
+  — a before/after number without opening Instruments each time.
+- Damage tracking moved to a per-row revision stamp instead of
+  comparing full row contents, and a whole-screen scroll shift
+  repositions surviving rows by offset instead of rebuilding them.
+- Compiled render pipelines are cached to disk (`MTLBinaryArchive`) and
+  read back on a later launch instead of recompiled.
+- The glyph atlas is split into independently packed, independently
+  evicted pages (ASCII, shaped/CJK, colour), so a CJK-heavy screen no
+  longer evicts the ASCII cache and vice versa.
+- The frame-rate range now adapts to window focus, Low Power Mode,
+  thermal pressure and an active trackpad scroll gesture.
+- A first-launch offer to move Corta to `/Applications` when it is
+  running unzipped somewhere else — direct-download distribution has no
+  drag-to-install step, and both Sparkle's update path and Spotlight
+  expect an installed location.
+- `os_signpost` coverage extended to the two keypress paths it had
+  missed: ordinary typing (`insertText`) and Return/Delete/Escape/the
+  arrows (`doCommand(by:)`) now show up in a latency trace the same way
+  ⌘/⌃ shortcuts already did.
+
+### Changed
+
+- A mouse drag now always selects text past an app-owned mouse
+  reporting mode (SGR, etc.) — no modifier held, and no more terminals
+  where a program that turned on mouse reporting (Claude Code, `vim`
+  with `mouse=a`, `htop`) made its own output unselectable. A click that
+  never leaves its starting cell still reports to the child as before.
+- The General settings tab is grouped into Window / Closing /
+  Notifications sections instead of one flat list.
+- The focus ring is thinner (2pt → 1pt), gets a faint accent highlight,
+  and only shows while a pane truly holds the keyboard — ⌘-Tabbing away
+  now clears it instead of leaving it on the split's last-focused pane.
+
+### Fixed
+
+- OSC 10/11/12 (background/foreground colour queries) answer with the
+  live theme instead of a hardcoded dark palette, which had a program
+  that queries its background before choosing its own colours (Claude
+  Code among them) painting near-white text over a near-white
+  background under the light theme.
+- The focus ring no longer draws partly under the tab bar on a top
+  pane, and no longer shows a false curve at a divider junction on an
+  interior or edge pane — both now share the same chrome-overlap
+  geometry the grid's own inset already used.
+- A settings row whose label wrapped to two lines no longer silently
+  loses the second line, and the notification-permission row no longer
+  sits visible-but-empty the first time General is opened.
+- A crash loading a cached render pipeline traced to the test target's
+  own launch path (`CortaTests` `TEST_HOST`-launches directly into
+  `Corta`, a more restrictive launch than opening the app) rather than
+  real use; the cache now loads back on every real launch and only
+  skips the one launch path that crashed.
+
 ## [0.1.0] - 2026-09-03
 
 The first release. Everything below is what `main` had accumulated
@@ -280,5 +349,6 @@ For the maintainer, cutting any release:
    push that file — that is what makes the update visible to every
    already-installed Corta.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/noah-qin/Corta/releases/tag/v0.1.1
 [0.1.0]: https://github.com/noah-qin/Corta/releases/tag/v0.1.0
