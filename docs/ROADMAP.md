@@ -735,6 +735,163 @@ the four measurement items and remains untracked as a numbered step.
 
 ---
 
+## M9 — Render Pipeline
+
+Motivated by M6.12's 45.5 ms keypress-to-pixel figure (`PERFORMANCE.md`
+§5.5, behind both iTerm2 and Ghostty on the same machine) and the
+`CAMetalLayer.Stalls` M8.19 recorded from idle cursor-blink activity
+alone. Code and tests are in; the before/after measurement pass
+(Typometer, Instruments, `corta-bench`) that would turn each of these
+into a number is its own step, run once for the whole milestone rather
+than once per item — see the note at the end of this section.
+
+- [x] **M9.1** `FrameScheduler`: `CAMetalDisplayLink` in place of
+      `CADisplayLink` + `metalLayer.nextDrawable()`. `isPaused` is the
+      only gate (idle CPU stays ~0%); a window pauses on occlusion
+      (`NSWindow.didChangeOcclusionStateNotification`) without ever
+      touching the PTY reader thread, which keeps draining regardless
+      (`PERFORMANCE.md` §2.1). `RenderMetrics` (ring-buffer percentiles,
+      no Instruments session needed) and `.userInitiated` QoS on the
+      reader thread and the output→wake `Task` shipped alongside it.
+- [x] **M9.2** Line-granular damage moved from comparing full `Line`
+      values to comparing `Grid.lineRevision(_:)`, a `UInt64` stamp
+      `ScreenLines` bumps centrally on every row it touches — one
+      `UInt64` compare instead of an `O(row length)` one, same
+      granularity. `ScreenLines.generation` catches a wholesale
+      `ScreenLines` replacement (alternate-screen swap, column resize)
+      that per-row revisions alone cannot distinguish from a coincidental
+      match. `ViewController.updateDamage`/`render` merged into
+      `prepareFrame`/`render`, sharing one `session.snapshot()` and one
+      diff a frame instead of two.
+- [x] **M9.3** Whole-screen scroll shift: `ScreenLines.totalRotated` lets
+      `TerminalRenderer.applyScrollShift` reposition surviving rows'
+      instances by a Y-coordinate offset instead of rebuilding them
+      through `appendRowInstances`' per-cell Core Text/atlas lookups —
+      only the newly exposed rows rebuild for real.
+- [x] **M9.4** `MTLBinaryArchive` caches `QuadRenderer`'s three compiled
+      pipelines to `~/Library/Caches`, looked up instead of recompiled on
+      a later launch.
+- [x] **M9.5** `TerminalRenderBackend` protocol (`QuadRenderer`
+      conforms); `Metal4Backend` is a real, capability-gated
+      (`MTLGPUFamily.metal4`) second conformance that is, today, a
+      pass-through to an internally owned `QuadRenderer` — see its doc
+      comment for why the actual `MTL4CommandQueue`/argument-table
+      encoding is deliberately not attempted blind, and what would need
+      to be true to land it for real.
+- [x] **M9.6** `RenderPolicy`: `FrameScheduler.preferredFrameRateRange`
+      adapts to window focus, Low Power Mode, thermal pressure and an
+      active trackpad scroll gesture. `preferredFrameLatency` is
+      deliberately left alone — no default/unit documented in the SDK
+      header to tune it against without a measurement, same reasoning as
+      not guessing at the frame-rate numbers themselves.
+- [x] **M9.7** `GlyphAtlas` split into independently packed,
+      independently evicted pages (ASCII, shaped/CJK, color) on the same
+      shared textures — a CJK-heavy screen filling the shaped page no
+      longer evicts the ASCII cache, and vice versa; same for emoji
+      against either grayscale page.
+- [x] **M9.8** `CommandPaletteController`'s `NSVisualEffectView` replaced
+      with `NSGlassEffectView`, matching the search bar's existing
+      pattern. Settings/Shortcuts/About windows left alone — they have no
+      existing material to convert, and adding one where none exists
+      today is a design decision, not a swap.
+- [x] **M9.9** The search bar's PTY-output-triggered refresh
+      (`Search.find`'s full-scrollback sweep) moved off `prepareFrame`
+      onto a detached background task, generation-stamped so a stale or
+      superseded result is discarded rather than applied.
+
+**M9 is done when** the measurement pass below is run and its numbers are
+recorded here. **Not yet run** — this milestone lands the mechanism each
+item describes, verified by the core/renderer unit tests listed next to
+each area (`ScreenLinesRevisionTests`, `DamageTrackingTests`'s scroll-shift
+and alternate-screen additions, `TerminalRenderBackendTests`,
+`RenderPolicyTests`, `GlyphAtlasTests`'s page-isolation additions,
+`QuadRendererTests`'s pipeline-cache additions) and by launching the app,
+not by a keypress-to-pixel number yet: that needs Typometer and
+Instruments runs this milestone did not include, the same two tools
+M8.18–M8.19 are still waiting on.
+
+## M10 — Kitty Graphics
+
+Inline images (`sw.kovidgoyal.net/kitty/graphics-protocol`), deferred
+since M6.4 (`DESIGN.md` §6) until a placement side table was worth
+building. Ghostty and iTerm2 — the two terminals `PERFORMANCE.md` §5.5
+already compares Corta against — both implement some or all of the same
+wire format.
+
+- [x] **M10.1** Protocol parser (`KittyGraphicsParser.swift`) and core
+      side table (`ImagePlacementTable.swift`, addressed by document
+      position like `TerminalSelection`, not a `Cell` field — `CLAUDE.md`
+      on why). Direct (base64, in-band) transmission only, in RGB, RGBA
+      and PNG; placement and deletion. File/temp-file/shared-memory
+      transmission is not implemented and will not be — it asks the
+      terminal to open a path the remote stream names, which
+      `SECURITY.md` §1's "every PTY byte is hostile" rejects outright.
+      Animation frames and Unicode placeholder placement are also not
+      implemented — real protocol features, out of scope for a first
+      pass. A column resize drops every live placement rather than
+      attempting to re-wrap image geometry across it; the alternate
+      screen parks and restores placements the same way it does the rest
+      of the main screen's state.
+- [x] **M10.2** App-layer rendering (`KittyImageRenderer.swift`): RGB/RGBA
+      reordered to premultiplied bgra by hand, PNG decoded via
+      `CGImageSource` into a premultiplied bgra `CGContext` (the same
+      technique `GlyphAtlas.rasterizeColor` already uses for color
+      emoji), one texture per image id, drawn as one instanced quad per
+      placement through `QuadRenderer`'s existing color pipeline — no new
+      pipeline, no mesh shader: a placed image is geometrically a rect.
+- [x] **M10.3** Real-client verification against `kitten icat`
+      (`--transfer-mode=stream`, a Release build, launched headless with
+      its shell driving `icat` directly so no synthetic keystroke ever
+      touches the window — a UI-scripted keystroke stream was tried first
+      and produces silently reordered characters, unrelated to Corta;
+      `CLAUDE.md`'s "never change the machine to test" applied to the
+      launch environment throughout). Four real bugs, found only because
+      an actual client was on the other end and each invisible to every
+      test that existed before this pass:
+      - `TIOCSWINSZ` never carried pixel dimensions (`TerminalSize`'s
+        zero default predates M10 and was never overridden by either
+        call site that reaches the pty) — `icat` refuses outright without
+        them. Fixed in `ViewController.pixelSize(columns:rows:metrics:)`,
+        wired into both `setUpPane` and `resizeSessionToFitView`.
+      - No response protocol at all: `icat` sends `a=q` before ever
+        transmitting a real image and refuses when nothing answers.
+        Added `a=q` and the `<ESC>_G...OK/error<ESC>\` acknowledgment
+        every non-quiet command now gets (`q=` 0/1/2, `Performer+
+        KittyGraphics.swift`'s `respond`), fixed-format exactly like the
+        DA1/DSR/OSC 10-12 responses `SECURITY.md` §2.1/§2.2 already
+        governs.
+      - A positive `i=` was required; real `icat`'s plain (non-`--place`,
+        non-reused) display omits `i=` entirely — its most common shape,
+        not a malformed one. `KittyGraphicsParser.transmitHeader` now
+        defaults absent `i=` to 0.
+      - `Data(base64Encoded:)` silently rejects unpadded base64, which
+        `icat` sends in practice (valid per RFC 4648 §3.2). Every
+        hand-written test in `KittyGraphicsTests` used
+        `Data.base64EncodedString()`, which always pads, so this shipped
+        invisibly; `Performer+KittyGraphics.swift`'s `padded(_:)` fixes
+        it. `KittyGraphicsTests` carries the exact captured bytes from
+        the failing run as a permanent regression case, alongside
+        targeted cases for each of the other three.
+      Local same-machine `icat` defaults to its `file`/shared-memory
+      transfer mode, which Corta correctly refuses
+      (`KittyGraphics.swift`'s doc comment, `SECURITY.md` §1) — that is
+      the deliberate scope boundary working as designed, not a fifth bug,
+      and is why the verification forces `--transfer-mode=stream`: that
+      is also what a real remote/SSH session uses, since file and shared-
+      memory transfer are unavailable over one regardless of client
+      support.
+
+**M10 is done.** A real client (`kitten icat`) transmits, and Corta
+displays, a correctly-positioned image, confirmed by screenshot against a
+PID-verified, single running instance. The frame-budget half of the
+measurement pass this item originally deferred to M9 is still unrun —
+that needs Typometer and Instruments, the same two tools M8.18, M8.19 and
+M9's own closing measurement are waiting on, and none of the three were
+attempted here for the same reason: each needs a human operating the
+tool, not a scriptable client on the other end of a pty.
+
+---
+
 ## Cut List
 
 If time runs short, drop in this order. None of these blocks daily use.

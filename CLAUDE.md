@@ -3,12 +3,18 @@
 A native macOS terminal emulator in pure Swift. Metal rendering, Core
 Text shaping, AppKit shell, a hand-written VT parser.
 
-**Status: 0.1.0. M7 and M8 done, M6 has one open step.** M1–M5 are complete.
-M6.12 was measured with Typometer at 45.5 ms average keypress-to-pixel
-latency; the sole open step is M6.16 (signed, notarized direct-download
-packaging, pending signing credentials). M7 closed the places the
-terminal was still guessing — font behaviour, command boundaries (OSC
-133), and window lifecycle. `docs/ROADMAP.md` is the tracking record.
+**Status: 0.1.0. M7 and M10 done; M6, M8 and M9 each have open steps, all
+measurement.** M1–M5 are complete. M6.12 was measured with Typometer at
+45.5 ms average keypress-to-pixel latency; M6's sole open step is M6.16
+(signed, notarized direct-download packaging, pending signing
+credentials). M7 closed the places the terminal was still guessing — font
+behaviour, command boundaries (OSC 133), and window lifecycle. M8's two
+open steps (M8.18, M8.19) and M9's closing measurement pass all need
+Typometer and Instruments run by a human at the keyboard, not something
+a scriptable client can stand in for. M10 (Kitty graphics) is done,
+including a real-client verification pass against `kitten icat` that
+found and fixed four protocol bugs no hand-written test had caught.
+`docs/ROADMAP.md` is the tracking record.
 
 ## Documentation
 

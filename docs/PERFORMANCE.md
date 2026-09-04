@@ -101,6 +101,59 @@ buffer** on the CPU when nothing changed. Track damage at line
 granularity; per-cell damage tracking is complexity that does not pay for
 itself.
 
+**M9** replaced the live screen's line-granularity check itself —
+comparing each row's full `Line` value against the cache — with a
+`UInt64` stamp (`Grid.lineRevision(_:)`, bumped centrally by
+`ScreenLines` on every row it touches: `ScreenLines.swift`). The
+granularity is unchanged, still one row, not one cell; only the cost of
+asking "did this row change" dropped, from an `O(row length)` comparison
+to one integer compare. Scrolled into history the rows come from
+immutable scrollback storage with no such stamp, so that path still
+compares `Line` values directly, exactly as before this change
+(`TerminalRenderer.rebuildDamagedRows`). The same milestone also merged
+the shell's two per-frame `session.snapshot()` + diff calls
+(`ViewController.updateDamage`/`render`, now `prepareFrame`/`render`)
+into one, since the second was diffing a grid the first had just
+diffed moments earlier in the same vsync callback.
+
+Because a `ScreenLines` swap (an alternate-screen enter/exit, a column
+resize replacing `lines` outright) restarts row revisions from small
+numbers a moment-ago screen's cache could coincidentally already hold,
+`ScreenLines.generation` — a process-wide unique value set once per
+instance — is checked alongside `lineRevision` so that coincidence can
+never be mistaken for "unchanged" (`Grid.linesGeneration`).
+
+**On scrolling specifically:** a whole-screen scroll used to look like
+every row changed — the ring-buffer rotation `ScreenLines.rotateUp`
+uses to make scrolling O(1) also (correctly) gives every surviving row
+a new *position*, and the old value-based diff had no way to tell "this
+row's content moved" from "this row's content changed". `Grid.
+linesRotated` (`ScreenLines.totalRotated`, bumped in `rotateUp`) lets
+`TerminalRenderer.applyScrollShift` tell the difference: retained rows'
+instances are shifted by a Y-coordinate offset — a bulk arithmetic pass —
+instead of rebuilt through `appendRowInstances`' per-cell Core Text/atlas
+lookups, and only the newly exposed rows at the bottom get a real
+rebuild. A scroll larger than the screen (nothing survives to shift) and
+scrolling within a partial scroll region (an application's own scroll
+region, e.g. a status line — outside `Grid.scrollUp`'s history-saving
+path, so `totalRotated` does not move for it) both fall back to the
+ordinary per-row check, unoptimised but correct.
+
+**Considered and not done:** shifting the CPU-side cache is the win here,
+not shrinking what gets copied into the GPU instance buffer afterward.
+`QuadRenderer`'s ring buffers already copy the whole array in one
+`memcpy` per draw (steady-state zero allocation, `PERFORMANCE.md` §3),
+and true byte-range partial updates into a *triple-buffered* ring would
+need each of the three slots to independently track which generation of
+the array it holds and replay every dirty range accumulated since — and
+because a row's rebuilt instance count can change (an edit that adds or
+removes a glyph), a row's byte offset in the array is not stable across
+rebuilds the way a fixed-size slot's would be, so a naive partial copy
+risks splicing the wrong bytes into a shifted position. Solving that
+properly means fixed-size per-row instance slots, a larger rewrite not
+justified here: a full array copy is a sub-millisecond `memcpy`
+(hundreds of KB at a typical window size), not the measured cost.
+
 ---
 
 ## 4. Memory
