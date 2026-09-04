@@ -1,14 +1,15 @@
 name: CI
 
-# Manual for now. The workflow has never been run: neither the macos-26
-# runner label nor ad-hoc signing of the test host has been verified on a
-# hosted runner. Run it from the Actions tab first, fix what it finds, then
-# uncomment the automatic triggers and add the checks to the branch ruleset.
+# Verified 2026-09-05: both the macos-26 runner label and ad-hoc signing of
+# the test host work on a hosted runner (workflow_dispatch run 33895022048,
+# noah-qin/Corta#8) — both jobs passed clean on the first try. The branch
+# ruleset already names both jobs as required checks; automatic triggers on
+# now so a PR's checks actually populate instead of sitting unfulfilled.
 on:
   workflow_dispatch:
-  # push:
-  #   branches: [main]
-  # pull_request:
+  push:
+    branches: [main]
+  pull_request:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
