@@ -9,6 +9,7 @@ import Cocoa
 import CoreText
 import CortaTerminal
 import Metal
+import QuartzCore
 import Synchronization
 
 /// Owns one `TerminalSession` and the `TerminalRenderer`/`TerminalView` that
@@ -76,10 +77,23 @@ class ViewController: NSViewController {
     /// cursor alone was too subtle. Above the terminal canvas, below the
     /// search bar's glass; it never intercepts input (`PassthroughView`).
     var focusDimView: NSView?
+    /// A very light accent wash over the pane that actually holds the
+    /// keyboard right now — `hasUserFocus`, not merely `isFocusedPane` — so
+    /// the split still reads correctly with the ring itself turned down to
+    /// a hairline. Hidden the moment the window resigns key, same as the
+    /// ring: neither is a claim about which pane the keyboard *would* go to,
+    /// only about where it goes this instant.
+    var focusHighlightView: NSView?
     /// The accent ring around the pane that owns the keyboard (M5.2, revised)
     /// — the positive half of the focus signal, so an unfocused pane no
     /// longer has to be dimmed to the point of looking disabled.
     var focusRingView: NSView?
+    /// The ring's top constraint, re-tensioned on every layout: chrome
+    /// overlap (titlebar, and the tab bar when tabbed) changes when a tab
+    /// bar shows, hides or is dragged out, and a top pane's ring must clear
+    /// it or the tab bar paints over the ring's top edge (see
+    /// `updateFocusRingLayout`).
+    private var focusRingTopConstraint: NSLayoutConstraint?
     /// Shown instead of a terminal when this pane could not be built —
     /// no Metal device, no glyph atlas, or no child process (`PaneFailureView`).
     /// Non-nil is the one state in which `isOperable` is false.
@@ -185,11 +199,21 @@ class ViewController: NSViewController {
     /// actually overlaps it and just its own inset otherwise (M5 — a
     /// bottom-row pane has no titlebar above it).
     var topInset: CGFloat {
-        guard let window = view.window else {
+        guard view.window != nil else {
             return TerminalLayout.titlebarHeight + TerminalLayout.insets.top
         }
+        return TerminalLayout.insets.top + chromeOverlap
+    }
+    /// The chrome (titlebar, and the tab bar when tabbed) that overlaps this
+    /// pane specifically — zero for a pane that does not touch the window's
+    /// top edge. `topInset` is this plus the grid's own breathing room; the
+    /// focus ring (`updateFocusRingLayout`) wants only this part, since it is
+    /// drawn flush to the pane's edge already.
+    private var chromeOverlap: CGFloat {
+        guard let window = view.window else { return 0 }
         let distanceFromTop = window.frame.height - view.convert(view.bounds, to: nil).maxY
-        return TerminalLayout.insets.top + max(0, windowChrome - distanceFromTop)
+        return TerminalLayout.chromeOverlap(
+            windowChrome: windowChrome, paneDistanceFromTop: distanceFromTop)
     }
     /// Total vertical space the grid does not get.
     var verticalInsets: CGFloat { topInset + TerminalLayout.insets.bottom }
@@ -409,6 +433,26 @@ class ViewController: NSViewController {
         // ring around the pane that has the keyboard, with the dim reduced to
         // a hint. A ring is also the convention every other split UI on this
         // platform uses, so it needs no learning.
+        // The light background lift under the ring, only on the pane that
+        // truly has the keyboard right now. On top of the terminal canvas
+        // like the dim, but a positive tint rather than a negative one —
+        // low enough alpha that it reads as an elevation, not a recolour of
+        // the text underneath.
+        let highlight = PassthroughView()
+        highlight.wantsLayer = true
+        highlight.layer?.backgroundColor =
+            NSColor.controlAccentColor.withAlphaComponent(Self.focusHighlightAlpha).cgColor
+        highlight.isHidden = true
+        highlight.translatesAutoresizingMaskIntoConstraints = false
+        self.view.addSubview(highlight)
+        NSLayoutConstraint.activate([
+            highlight.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
+            highlight.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
+            highlight.topAnchor.constraint(equalTo: self.view.topAnchor),
+            highlight.bottomAnchor.constraint(equalTo: self.view.bottomAnchor),
+        ])
+        focusHighlightView = highlight
+
         let ring = PassthroughView()
         ring.wantsLayer = true
         ring.layer?.borderWidth = Self.focusRingWidth
@@ -418,18 +462,23 @@ class ViewController: NSViewController {
         ring.translatesAutoresizingMaskIntoConstraints = false
         self.view.addSubview(ring)
         // Inset by the border's own width: drawn flush to the pane's edge,
-        // half of a 2pt border falls outside the view and the ring reads as
-        // 1pt on the window's outer edges and 2pt against a divider.
+        // half the border falls outside the view and the ring reads as
+        // half-weight on the window's outer edges and full weight against a
+        // divider. The top constraint is retensioned per layout
+        // (`updateFocusRingLayout`) to clear the chrome on a top pane, so it
+        // is kept rather than folded into this literal block.
+        let ringTop = ring.topAnchor.constraint(
+            equalTo: self.view.topAnchor, constant: Self.focusRingWidth / 2)
         NSLayoutConstraint.activate([
             ring.leadingAnchor.constraint(
                 equalTo: self.view.leadingAnchor, constant: Self.focusRingWidth / 2),
             ring.trailingAnchor.constraint(
                 equalTo: self.view.trailingAnchor, constant: -Self.focusRingWidth / 2),
-            ring.topAnchor.constraint(
-                equalTo: self.view.topAnchor, constant: Self.focusRingWidth / 2),
+            ringTop,
             ring.bottomAnchor.constraint(
                 equalTo: self.view.bottomAnchor, constant: -Self.focusRingWidth / 2),
         ])
+        focusRingTopConstraint = ringTop
         focusRingView = ring
 
         resizeDebouncer = ResizeDebouncer { [weak self] size in
@@ -562,6 +611,34 @@ class ViewController: NSViewController {
         // grid change the damage diff would notice — force one frame.
         invalidateDisplay()
         resizeSessionToFitView()
+        updateFocusRingLayout()
+    }
+
+    /// Keeps the focus ring inside the pane's actually-visible area and its
+    /// rounded corners on only the corners that are also the window's.
+    /// Chrome overlap changes whenever the tab bar appears, hides or is
+    /// dragged out into its own window (M4.7) — all three are layout passes
+    /// on this window, so this needs no observer beyond `viewDidLayout`.
+    private func updateFocusRingLayout() {
+        guard focusRingView != nil else { return }
+        focusRingTopConstraint?.constant = chromeOverlap + Self.focusRingWidth / 2
+        updateFocusRingCornerMask()
+    }
+
+    /// Rounds only the ring's corners that are also the window's rounded top
+    /// corners — the same rule `TerminalView.updateExteriorCornerMask` applies
+    /// to the drawable, so an interior or edge pane's ring reads as a clean
+    /// rectangle instead of curving away from a divider it should butt flush
+    /// against. Unlike that view, `self.view` is not flipped, so here `MaxY`
+    /// is the top of the layer, not `MinY`.
+    private func updateFocusRingCornerMask() {
+        guard let window = view.window, let ring = focusRingView else { return }
+        let edges = TerminalLayout.exteriorEdges(
+            paneFrameInWindow: view.convert(view.bounds, to: nil), windowSize: window.frame.size)
+        var mask: CACornerMask = []
+        if edges.top && edges.left { mask.insert(.layerMinXMaxYCorner) }
+        if edges.top && edges.right { mask.insert(.layerMaxXMaxYCorner) }
+        ring.layer?.maskedCorners = mask
     }
 
     /// Runs at vsync before a drawable is acquired. Cheap path: nothing
@@ -1082,8 +1159,16 @@ class ViewController: NSViewController {
         // A single pane needs neither: there is nothing to distinguish it
         // from, and a ring around the only pane is decoration.
         let inSplit = splitController?.hasMultiplePanes == true
+        // The dim is structural — which pane owns the keyboard in this
+        // window — and stays lit even while the app is not frontmost. The
+        // ring and the highlight are a claim about where keys go *right
+        // now*: `hasUserFocus`, not `isFocusedPane`, so cmd-tabbing away
+        // does not leave a ring around a pane that is not actually receiving
+        // anything.
         focusDimView?.isHidden = isFocusedPane || !inSplit
-        focusRingView?.isHidden = !isFocusedPane || !inSplit
+        let highlighted = hasUserFocus && inSplit
+        focusRingView?.isHidden = !highlighted
+        focusHighlightView?.isHidden = !highlighted
         // The accent colour is the user's and can change while the app runs;
         // Increase Contrast also needs a heavier ring than a tinted hairline.
         focusRingView?.layer?.borderColor = NSColor.controlAccentColor.cgColor
@@ -1096,7 +1181,14 @@ class ViewController: NSViewController {
     /// alongside the ring, little enough that the unfocused pane's text is
     /// still text you can read.
     static let unfocusedDim: CGFloat = 0.08
-    static let focusRingWidth: CGFloat = 2
+    /// A hairline: heavy enough to find at a glance, light enough that it
+    /// does not compete with the terminal content for attention, especially
+    /// in a small window where a 2pt border read as most of the signal on
+    /// screen.
+    static let focusRingWidth: CGFloat = 1
+    /// Deliberately faint — an elevation cue alongside the ring, not a
+    /// second copy of it. Anything stronger recoloured the text underneath.
+    static let focusHighlightAlpha: CGFloat = 0.05
 }
 
 /// Covers a pane to dim it without intercepting input — clicks, scrolls

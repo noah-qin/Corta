@@ -426,31 +426,84 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
                     help: L10n.text("settings.help.allowClipboardCopy")),
             ]
         case .general:
+            let windowHeader = sectionHeader(L10n.text("settings.section.window"))
+            let closingHeader = sectionHeader(L10n.text("settings.section.closing"))
+            let notificationsHeader = sectionHeader(L10n.text("settings.section.notifications"))
             rows = [
+                windowHeader,
                 row(
                     L10n.text("settings.label.newWindow"), makeWindowSizeRow(),
                     help: L10n.text("settings.help.newWindow")),
                 row(L10n.text("settings.label.restoreWindows"), restoreWindowsSwitch),
+                closingHeader,
                 row(
                     L10n.text("settings.label.confirmClose"), confirmCloseSwitch,
                     help: L10n.text("settings.help.confirmClose")),
+                notificationsHeader,
                 row(
                     L10n.text("settings.label.notifyOnLongTasks"), notifySwitch,
                     help: L10n.text("settings.help.notifyOnLongTasks")),
                 permissionRow(),
                 makeThresholdFormRow(),
             ]
+            let generalStack = stack(rows)
+            // Three unrelated concerns — what a new window looks like,
+            // whether closing asks first, whether a long task can notify —
+            // used to read as one flat list of five rows with no seams. The
+            // gap above a header is what actually separates the groups; the
+            // uniform `rowSpacing` elsewhere in the tab is deliberately
+            // tighter than this.
+            for header in [windowHeader, closingHeader, notificationsHeader] {
+                generalStack.setCustomSpacing(Self.sectionSpacing, after: header)
+            }
+            panes[tab] = generalStack
+            // `notificationPermissionRow` just came into existence with
+            // AppKit's default `isHidden == false` — `populate`'s own call to
+            // this already ran, back when the tab (and the row) did not
+            // exist yet, since panes build lazily on first visit. Without
+            // this, the row sits visible-but-empty the first time a user
+            // opens General, reserving `SettingsStatusView`'s minimum height
+            // for nothing.
+            applyNotificationPermission()
+            return generalStack
         }
         let pane = stack(rows)
         panes[tab] = pane
         return pane
     }
 
+    /// Extra space above a section header — see `sectionHeader`. Wider than
+    /// `rowSpacing` on purpose: it is the only thing separating one group
+    /// from the next, since the header itself is meant to read as a small
+    /// aside rather than a card title.
+    private static let sectionSpacing: CGFloat = 20
+
+    /// A light, left-flush label above a run of related rows — not a card,
+    /// not a box, just a seam. Introduced only where a tab mixes distinctly
+    /// different concerns (`.general`); a tab with one concern and four rows
+    /// does not need a heading to say so.
+    private func sectionHeader(_ title: String) -> NSView {
+        let label = NSTextField(labelWithString: title.uppercased())
+        label.font = .systemFont(ofSize: NSFont.smallSystemFontSize, weight: .semibold)
+        label.textColor = .secondaryLabelColor
+        label.translatesAutoresizingMaskIntoConstraints = false
+        let container = NSView()
+        container.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            label.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor),
+            label.topAnchor.constraint(equalTo: container.topAnchor),
+            label.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+        ])
+        return container
+    }
+
     /// Rows in a column. A stack view earns its place here for one reason:
     /// the theme row is hidden while there is a single theme, and collapsing
     /// a hidden arranged subview is the one thing a chain of constraints
     /// would have to be rebuilt to do.
-    private func stack(_ rows: [NSView]) -> NSView {
+    private func stack(_ rows: [NSView]) -> NSStackView {
         let stack = NSStackView(views: rows)
         stack.orientation = .vertical
         stack.alignment = .leading
@@ -519,6 +572,13 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
             // right across a pop-up, a switch and a text field at once.
             title.centerYAnchor.constraint(equalTo: control.centerYAnchor),
             title.topAnchor.constraint(greaterThanOrEqualTo: container.topAnchor),
+            // A label longer than its control (two lines against a switch's
+            // one) used to have nowhere to put its second line: the row's
+            // height came only from the control/note chain below, so a tall
+            // label simply ran past the container's bottom and lost whatever
+            // did not fit. The row's height is now whichever of the two
+            // needs more room.
+            container.bottomAnchor.constraint(greaterThanOrEqualTo: title.bottomAnchor),
 
             control.leadingAnchor.constraint(
                 equalTo: container.leadingAnchor,
@@ -547,11 +607,11 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
                 note.widthAnchor.constraint(
                     greaterThanOrEqualToConstant: Self.valueColumnWidth),
                 note.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-                note.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+                Self.naturalBottom(note, of: container),
             ]
             helpNotes.append(note)
         } else {
-            constraints.append(control.bottomAnchor.constraint(equalTo: container.bottomAnchor))
+            constraints.append(Self.naturalBottom(control, of: container))
         }
 
         // A pop-up sizes itself to its longest item, which puts every pop-up
@@ -573,6 +633,21 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
 
     private func label(_ text: String) -> NSTextField {
         NSTextField(labelWithString: text)
+    }
+
+    /// Pins `view`'s bottom to `container`'s at one shy of required: the
+    /// exact height for the overwhelmingly common row, where the label is no
+    /// taller than the control beside it. `row`'s other, *required*
+    /// `container.bottomAnchor >= title.bottomAnchor` only has room to act
+    /// when the label needs more than this gives it — a plain `==` here
+    /// would conflict with that constraint outright, and a plain `>=` here
+    /// leaves the container's height genuinely ambiguous (nothing pins it to
+    /// the smallest satisfying value), which is what let "Notify on long
+    /// tasks" open a blank gap before the row under it.
+    private static func naturalBottom(_ view: NSView, of container: NSView) -> NSLayoutConstraint {
+        let constraint = view.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+        constraint.priority = .required - 1
+        return constraint
     }
 
     private func makeFontSizeRow() -> NSView {
@@ -668,6 +743,13 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         // nothing about.
         fontFamilyLabel.toolTip = L10n.text("settings.font.tooltip")
 
+        // A rounded bezel reads unambiguously as an editable box next to a
+        // pop-up, a switch and a plain label; the default square bezel was
+        // close enough to a disabled field's own greyed border that the two
+        // were hard to tell apart at a glance.
+        for field in [scrollbackField, fontSizeField, columnsField, rowsField, thresholdField] {
+            field.bezelStyle = .roundedBezel
+        }
         fontSizeField.alignment = .right
         fontSizeField.target = self
         fontSizeField.action = #selector(commit)

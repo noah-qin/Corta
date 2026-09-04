@@ -290,14 +290,12 @@ final class TerminalView: NSView, CALayerDelegate {
         }
         // Window base coordinates are y-up; with `.fullSizeContentView` the
         // content spans the whole frame, so the window's top is its height.
-        let frame = convert(bounds, to: nil)
-        let touchesTop = abs(frame.maxY - window.frame.height) < 1
+        let edges = TerminalLayout.exteriorEdges(
+            paneFrameInWindow: convert(bounds, to: nil), windowSize: window.frame.size)
         var mask: CACornerMask = []
         // The hosted layer is flipped: MinY is the top.
-        if touchesTop && abs(frame.minX) < 1 { mask.insert(.layerMinXMinYCorner) }
-        if touchesTop && abs(frame.maxX - window.frame.width) < 1 {
-            mask.insert(.layerMaxXMinYCorner)
-        }
+        if edges.top && edges.left { mask.insert(.layerMinXMinYCorner) }
+        if edges.top && edges.right { mask.insert(.layerMaxXMinYCorner) }
         metalLayer.maskedCorners = mask
     }
 
