@@ -179,12 +179,16 @@ struct QuadRendererTests {
         #expect(FileManager.default.fileExists(atPath: url.path))
     }
 
-    /// A second `QuadRenderer` finds the first one's cache file already on
-    /// disk (`loadOrCreateBinaryArchive`'s `descriptor.url` branch) and must
-    /// still construct successfully — a stale-format or otherwise
-    /// unreadable archive falls back to an ordinary compile rather than
-    /// throwing (`init`'s `try?` around every archive operation).
-    @Test func aSecondRendererReusesAnExistingCacheFileWithoutFailing() throws {
+    /// A second `QuadRenderer` must construct successfully with the first
+    /// one's cache file already on disk. `loadOrCreateBinaryArchive`
+    /// deliberately never reads that file back — `-[_MTLDevice
+    /// recordBinaryArchiveUsage:]` segfaulted inside Metal's own framework
+    /// code loading one on this machine, a same-build, same-session round
+    /// trip with no staleness and no concurrency involved (its doc comment
+    /// has the full account) — but the file is still written every launch,
+    /// so a second construction finding one already there, from itself or
+    /// an earlier run, must never be what breaks it.
+    @Test func aSecondRendererConstructsWithACacheFileAlreadyOnDisk() throws {
         guard let device = MTLCreateSystemDefaultDevice() else {
             Issue.record("No Metal device available in this environment")
             return
@@ -197,7 +201,6 @@ struct QuadRendererTests {
 
         _ = try QuadRenderer(device: device)
         #expect(FileManager.default.fileExists(atPath: url.path))
-        // Must not throw, whether it actually used the cache or fell back.
         _ = try QuadRenderer(device: device)
     }
 }

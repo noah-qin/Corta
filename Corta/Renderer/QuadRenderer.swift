@@ -75,6 +75,10 @@ nonisolated final class QuadRenderer {
     /// use — the pipelines are built against it up front.
     static let pixelFormat: MTLPixelFormat = .bgra8Unorm
 
+    /// Serialises every `QuadRenderer.init`'s binary-archive load/write
+    /// against every other's — see the lock's use-site in `init` for why.
+    private static let binaryArchiveLock = NSLock()
+
     init(device: MTLDevice) throws {
         self.device = device
         guard let library = device.makeDefaultLibrary() else {
@@ -97,6 +101,22 @@ nonisolated final class QuadRenderer {
         // straight through to the ordinary synchronous compile below; this
         // is a startup-latency optimisation; it does not change what gets
         // drawn if it is unavailable.
+        //
+        // `binaryArchiveLock` covers everything from here through the
+        // `serialize` call below. `loadOrCreateBinaryArchive` no longer
+        // reads a file back at all (its own doc comment says why), which
+        // was the reproduced segfault site — but `-[_MTLDevice
+        // recordBinaryArchiveUsage:]`, seen in that same crash's stack,
+        // names it as *device-wide* bookkeeping, undocumented as to
+        // whether creating and registering a fresh archive with no file
+        // involved is safe from two threads at once against the same
+        // device. Kept as defense in depth given how fragile this specific
+        // Metal surface has already shown itself to be on this machine;
+        // the lock only ever serialises this one-time-per-renderer setup,
+        // never a frame, so the cost of being conservative here is nothing
+        // measurable.
+        QuadRenderer.binaryArchiveLock.lock()
+        defer { QuadRenderer.binaryArchiveLock.unlock() }
         let archive = QuadRenderer.loadOrCreateBinaryArchive(device: device)
 
         func makePipeline(fragment: MTLFunction, premultipliedSource: Bool = false) throws -> MTLRenderPipelineState {
@@ -135,7 +155,7 @@ nonisolated final class QuadRenderer {
         self.glyphPipeline = try makePipeline(fragment: glyphFragment)
         self.colorGlyphPipeline = try makePipeline(fragment: colorGlyphFragment, premultipliedSource: true)
         if let archive, let url = QuadRenderer.binaryArchiveURL {
-            try? archive.serialize(to: url)
+            QuadRenderer.serialize(archive, to: url)
         }
 
         let samplerDescriptor = MTLSamplerDescriptor()
@@ -151,10 +171,22 @@ nonisolated final class QuadRenderer {
     /// and where this launch's (re)writes it — `~/Library/Caches`, not
     /// Application Support: this is disposable, regenerable content the
     /// system is free to purge, never something a user's session depends on.
-    /// One file for all three pipelines; keyed by nothing beyond its path,
-    /// since a stale entry (an OS or driver update, per `MTLBinaryArchive`'s
-    /// own doc comment) just falls through to an ordinary compile, the same
-    /// as no file at all.
+    ///
+    /// Named with `buildFingerprint` — **not** a fixed filename — because
+    /// "a stale entry falls through to an ordinary compile" turned out to
+    /// be false: `-[_MTLBinaryArchive initWithOptions:device:url:error:]`
+    /// segfaulted (`EXC_BAD_ACCESS`, inside Metal's own framework code, a
+    /// null C-string reaching `strlen`) loading an archive this same cache
+    /// path had accumulated across a Debug build and a Release build with
+    /// a different ad-hoc code signature — `try?` around the call cannot
+    /// catch a crash the callee itself does not survive, so the only real
+    /// fix is never handing Metal a file from a different build at all.
+    /// Fingerprinting the path by the running executable's own mtime means
+    /// a rebuild's cache is simply never found by an older build's path
+    /// (and vice versa) — no stale file is ever opened, rather than opened
+    /// and trusted not to crash.
+    ///
+    /// One file for all three pipelines; keyed by nothing beyond its path.
     /// Not `private`: `QuadRendererTests` checks the file this writes.
     static var binaryArchiveURL: URL? {
         guard
@@ -164,22 +196,99 @@ nonisolated final class QuadRenderer {
         else { return nil }
         let directory = cachesDirectory.appendingPathComponent("dev.noahqin.Corta", isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        return directory.appendingPathComponent("QuadRenderer.metallib-archive")
+        pruneStaleBinaryArchives(in: directory)
+        return directory.appendingPathComponent("QuadRenderer-\(buildFingerprint).metallib-archive")
     }
 
-    /// Opens the cached archive from a previous launch if one exists at
-    /// `binaryArchiveURL`, or creates an empty one to populate this launch —
-    /// either way, `init` above adds this launch's three pipeline
-    /// descriptors to it and re-serialises it, so a first-ever launch seeds
-    /// the cache the next one benefits from. `nil` on any failure (no
-    /// archive support, no writable cache directory): callers fall back to
-    /// an ordinary synchronous compile, unconditionally correct either way.
-    private static func loadOrCreateBinaryArchive(device: MTLDevice) -> (any MTLBinaryArchive)? {
-        let descriptor = MTLBinaryArchiveDescriptor()
-        if let url = binaryArchiveURL, FileManager.default.fileExists(atPath: url.path) {
-            descriptor.url = url
+    /// The running executable's modification time, as a filename-safe
+    /// integer — changes on every rebuild (a fresh compile writes a new
+    /// binary), which is exactly the granularity a Metal-compiled-shader
+    /// cache needs to invalidate at. `"unknown"` only if the executable's
+    /// own attributes cannot be read, which never happens for a running
+    /// process's own binary in practice; a shared, stable "unknown" still
+    /// behaves correctly (one cache file, reused within that condition)
+    /// rather than crashing or refusing to cache at all.
+    private static var buildFingerprint: String {
+        guard let url = Bundle.main.executableURL,
+            let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+            let modified = attributes[.modificationDate] as? Date
+        else { return "unknown" }
+        return String(Int(modified.timeIntervalSince1970))
+    }
+
+    /// Removes every `QuadRenderer-*.metallib-archive` in `directory` that
+    /// is not this build's own — otherwise each rebuild during development
+    /// leaves the last one behind forever, unbounded, since nothing else
+    /// ever revisits this directory. Best-effort: a failed removal here is
+    /// not worth surfacing, the file just sits unused like it would have
+    /// before this existed.
+    private static func pruneStaleBinaryArchives(in directory: URL) {
+        let current = "QuadRenderer-\(buildFingerprint).metallib-archive"
+        guard
+            let entries = try? FileManager.default.contentsOfDirectory(
+                at: directory, includingPropertiesForKeys: nil)
+        else { return }
+        for entry in entries
+        where entry.lastPathComponent.hasPrefix("QuadRenderer-")
+            && entry.lastPathComponent != current
+        {
+            try? FileManager.default.removeItem(at: entry)
         }
-        return try? device.makeBinaryArchive(descriptor: descriptor)
+    }
+
+    /// Writes `archive` to `url` without ever exposing a partially-written
+    /// file at that path: serializes to a uniquely-named temp file in the
+    /// same directory first, then atomically replaces `url` with it
+    /// (`FileManager.replaceItemAt`, a single `rename(2)` on the same
+    /// volume). Without this, `loadOrCreateBinaryArchive` reading the same
+    /// path a concurrent `QuadRenderer.init` on another thread was still
+    /// writing to (multiple panes constructing renderers together — a
+    /// session restore reopening several windows, or this test target's
+    /// own parallel test execution, is exactly this shape) could open a
+    /// torn file — observed as `-[_MTLBinaryArchive loadFromURL:error:]`
+    /// segfaulting inside Metal's own framework code on one, which no
+    /// amount of `try?` on the Corta side can catch, since the crash is in
+    /// code Corta only calls into, not code it can wrap a recovery around.
+    /// A reader either sees the old complete file or the new complete one,
+    /// never a mix, because `rename(2)` cannot expose an in-between state.
+    private static func serialize(_ archive: any MTLBinaryArchive, to url: URL) {
+        let temporaryURL =
+            url.deletingLastPathComponent()
+            .appendingPathComponent("\(UUID().uuidString).tmp")
+        guard (try? archive.serialize(to: temporaryURL)) != nil else {
+            try? FileManager.default.removeItem(at: temporaryURL)
+            return
+        }
+        do {
+            _ = try FileManager.default.replaceItemAt(url, withItemAt: temporaryURL)
+        } catch {
+            try? FileManager.default.removeItem(at: temporaryURL)
+        }
+    }
+
+    /// Creates an empty archive for this launch to populate — `init` above
+    /// adds this launch's three pipeline descriptors to it and serialises
+    /// it to `binaryArchiveURL`, so a *later* build of Metal, or a later OS
+    /// release, has a file to read once loading one back is safe. `nil` on
+    /// any failure (no archive support, no writable cache directory):
+    /// callers fall back to an ordinary synchronous compile, unconditionally
+    /// correct either way.
+    ///
+    /// **Deliberately never loads a previous launch's archive back**, which
+    /// is most of the point M9.4 built this for — found broken, not left
+    /// unbuilt: `descriptor.url = <an existing archive file>` reproduced a
+    /// segfault in `-[_MTLDevice recordBinaryArchiveUsage:]` (a null
+    /// C-string reaching `strlen`, inside Metal's own framework code, not
+    /// Corta's) on a same-session round trip — one launch's `serialize(to:)`
+    /// writing the file, the very next launch's `loadOrCreateBinaryArchive`
+    /// reading that exact file straight back in, same build, same machine,
+    /// no concurrency, no staleness. `try?`/`try catch` around Corta's own
+    /// call cannot protect against a crash the callee does not survive, so
+    /// disabling the read side is the only fix available from here — a
+    /// deliberately incomplete implementation of what M9.4 called for,
+    /// carried in `ROADMAP.md` as such rather than silently claimed done.
+    private static func loadOrCreateBinaryArchive(device: MTLDevice) -> (any MTLBinaryArchive)? {
+        try? device.makeBinaryArchive(descriptor: MTLBinaryArchiveDescriptor())
     }
 
     /// Draws solid-colour `instances` into `rect` (pixels, relative to the

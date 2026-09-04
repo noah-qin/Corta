@@ -769,8 +769,19 @@ than once per item — see the note at the end of this section.
       through `appendRowInstances`' per-cell Core Text/atlas lookups —
       only the newly exposed rows rebuild for real.
 - [x] **M9.4** `MTLBinaryArchive` caches `QuadRenderer`'s three compiled
-      pipelines to `~/Library/Caches`, looked up instead of recompiled on
-      a later launch.
+      pipelines to `~/Library/Caches` — write-only, not the look-up-instead-
+      of-recompile this item originally called for. A full test-suite pass
+      found `-[_MTLDevice recordBinaryArchiveUsage:]` segfaulting (a null
+      C-string reaching `strlen`, inside Metal's own framework code) loading
+      an archive straight back on this machine — a same-build, same-session
+      round trip, no staleness, no concurrency, reproduced repeatedly.
+      `QuadRenderer.loadOrCreateBinaryArchive`'s doc comment has the full
+      account. `try?`/`try catch` around Corta's own call cannot protect
+      against a crash the callee does not survive, so the read side is
+      disabled outright rather than shipped crashing; each launch still
+      writes a fresh archive (file-name fingerprinted to the running
+      executable's own mtime, so a rebuild's file is never confused with an
+      older one) for whenever a future Metal/OS makes loading one back safe.
 - [x] **M9.5** `TerminalRenderBackend` protocol (`QuadRenderer`
       conforms); `Metal4Backend` is a real, capability-gated
       (`MTLGPUFamily.metal4`) second conformance that is, today, a
