@@ -327,6 +327,12 @@ class ViewController: NSViewController {
             return
         }
         session = started.session
+        // OSC 11 must answer with what is actually on screen (M6.6) — a
+        // program that queries the background before choosing its own
+        // colours needs the live theme's variant, not the type's default.
+        session.dynamicColors =
+            AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)
+            .dynamicColors
         pendingSessionNotice = started.notice
         lastRequestedSize = initialSize
 
