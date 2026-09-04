@@ -263,7 +263,7 @@ xcrun xctrace record --attach Corta --instrument 'os_signpost' \
 
 `--instrument`, not `--template`: `os_signpost` is not one of
 `xctrace list templates`' entries on current Xcode (it is one of
-`xctrace list instruments`'), so `--template 'os_signpost'` — this
+`xctrace list instruments`' entries instead), so `--template 'os_signpost'` — this
 document's own earlier wording — fails outright with "Cannot find
 template matching name". `--attach` to an already-running, already-
 launched Corta, not `--launch`, for the reason the paragraph below this

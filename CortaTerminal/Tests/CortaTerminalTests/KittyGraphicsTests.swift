@@ -292,6 +292,38 @@ struct KittyGraphicsTests {
         #expect(terminal.takeOutput() == Array("\u{1B}_Gi=12;EINVAL:bad size\u{1B}\\".utf8))
     }
 
+    /// A PR review caught this: the per-chunk budget guard in
+    /// `receiveChunk` used to drop the pending transmission and return with
+    /// no response at all, contradicting `respond`'s own doc comment that
+    /// every non-quiet command is acknowledged — a real client would be
+    /// left waiting on an OK/error that never comes.
+    @Test("a chunked transmission that overflows the byte budget still answers, not silence")
+    func oversizedChunkedTransmissionStillAnswers() {
+        var terminal = Terminal(rows: 10, columns: 40)
+        let budget = KittyGraphics.maximumImageBytes / 3 * 4 + 4
+        // Each wire chunk is itself capped at Parser.maxAPCStringLength
+        // (6144), so crossing the accumulator's ~85 MB budget takes many
+        // legitimate-sized chunks, not one large one — chosen well under
+        // that cap to leave room for the control-data prefix.
+        let chunkPayload = String(repeating: "A", count: 6000)
+        let continuationChunk = Self.apc("i=15,m=1", payload: chunkPayload)
+
+        var stream = Self.apc("a=T,i=15,f=32,s=2,v=2,m=1", payload: chunkPayload)
+        var accumulated = chunkPayload.utf8.count
+        // Stop as soon as one more chunk would cross the budget, then send
+        // exactly that one chunk — the stream ends there, so the response
+        // it triggers is the only one in the output.
+        while accumulated + chunkPayload.utf8.count <= budget {
+            stream += continuationChunk
+            accumulated += chunkPayload.utf8.count
+        }
+        stream += continuationChunk
+
+        terminal.feed(stream)
+        #expect(terminal.takeOutput() == Array("\u{1B}_Gi=15;EINVAL:too large\u{1B}\\".utf8))
+        #expect(terminal.grid.imagePlacements.imageCount == 0)
+    }
+
     @Test("a bare a=p answers with both the image and placement ids")
     func bareDisplayAnswersWithImageAndPlacementIDs() {
         var terminal = Terminal(rows: 10, columns: 40)

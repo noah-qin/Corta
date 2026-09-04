@@ -89,7 +89,20 @@ extension Performer {
         // (`SECURITY.md` §3).
         let budget = KittyGraphics.maximumImageBytes / 3 * 4 + 4
         guard state.pendingImageTransmission!.base64.count + payloadBase64.count <= budget else {
+            // Still acknowledged, same as every other non-quiet command
+            // (`respond`'s doc comment) — a real client left waiting for
+            // this OK/error is exactly the failure mode dropping silently
+            // here would cause. `imageID`/`quiet` come from the pending
+            // transmission's own resolved header, not this chunk's: a
+            // continuation chunk's header carries no `q=` of its own
+            // (`KittyGraphicsParser`'s doc comment), so re-parsing it here
+            // would silently un-quiet a transmission the client asked to
+            // keep quiet.
+            let pending = state.pendingImageTransmission!
             state.pendingImageTransmission = nil
+            respond(
+                imageID: pending.header.imageID, placementID: nil, quiet: pending.header.quiet,
+                error: "EINVAL:too large")
             return
         }
         state.pendingImageTransmission!.base64.append(contentsOf: payloadBase64)
