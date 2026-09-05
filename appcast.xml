@@ -22,8 +22,6 @@
         <link>https://raw.githubusercontent.com/noah-qin/Corta/main/appcast.xml</link>
         <description>Corta release updates.</description>
         <language>en</language>
-        <!-- No releases published yet. The first `scripts/release.sh` run adds
-         the first <item>. -->
         <item>
             <title>0.1.0</title>
             <pubDate>Sat, 05 Sep 2026 11:36:23 +0800</pubDate>
