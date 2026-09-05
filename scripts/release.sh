@@ -21,6 +21,19 @@ fi
 archive=$1
 test -f "$archive" || { echo "error: no such file: $archive" >&2; exit 1; }
 
+# "Corta-0.1.0.zip" -> "v0.1.0": the tag whose GitHub Release actually
+# hosts this exact archive. Without --download-url-prefix,
+# generate_appcast defaults the enclosure URL to raw.githubusercontent.com
+# on main, which hosts appcast.xml itself but never the archive — every
+# update would advertise successfully and then 404 on download.
+archive_name=$(basename "$archive")
+version=$(echo "$archive_name" | sed -E 's/^Corta-(.+)\.zip$/\1/')
+if [ "$version" = "$archive_name" ]; then
+  echo "error: expected a filename like Corta-X.Y.Z.zip, got: $archive_name" >&2
+  exit 1
+fi
+download_url_prefix="https://github.com/noah-qin/Corta/releases/download/v${version}/"
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 work="$repo_root/.build/appcast-sign"
 rm -rf "$work"
@@ -47,7 +60,8 @@ if [ -z "$sparkle_bin" ] || [ ! -x "$sparkle_bin/generate_appcast" ]; then
 fi
 
 echo "==> Signing $archive into the update feed"
-"$sparkle_bin/generate_appcast" "$work"
+echo "    Download URL prefix: $download_url_prefix"
+"$sparkle_bin/generate_appcast" --download-url-prefix "$download_url_prefix" "$work"
 cp "$work/appcast.xml" "$repo_root/appcast.xml"
 
 cat <<EOF

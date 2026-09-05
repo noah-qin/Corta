@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <!--
   Corta's Sparkle update feed. Read by every launched Corta at the interval
   `INFOPLIST_KEY_SUScheduledCheckInterval` sets, and on demand from
@@ -16,13 +16,21 @@
   the private half of `INFOPLIST_KEY_SUPublicEDKey`. A hand-typed entry is a
   hand-typed signature, which defeats the point of having one.
 -->
-<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
-  <channel>
-    <title>Corta</title>
-    <link>https://raw.githubusercontent.com/noah-qin/Corta/main/appcast.xml</link>
-    <description>Corta release updates.</description>
-    <language>en</language>
-    <!-- No releases published yet. The first `scripts/release.sh` run adds
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>Corta</title>
+        <link>https://raw.githubusercontent.com/noah-qin/Corta/main/appcast.xml</link>
+        <description>Corta release updates.</description>
+        <language>en</language>
+        <!-- No releases published yet. The first `scripts/release.sh` run adds
          the first <item>. -->
-  </channel>
+        <item>
+            <title>0.1.0</title>
+            <pubDate>Sat, 05 Sep 2026 11:36:23 +0800</pubDate>
+            <sparkle:version>1</sparkle:version>
+            <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/noah-qin/Corta/releases/download/v0.1.0/Corta-0.1.0.zip" length="6320622" type="application/octet-stream" sparkle:edSignature="73X50efcLMSiRUwYod0qD/nPdBXUnk8SAsU5EfBFEETSkHf/Jcwq9jT+4ng44pYtEWuB8k4y3hkudiLHkFCQBw=="/>
+        </item>
+    </channel>
 </rss>
