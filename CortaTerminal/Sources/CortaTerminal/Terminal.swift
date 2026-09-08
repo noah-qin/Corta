@@ -24,6 +24,15 @@ public struct Terminal: Sendable {
         set { performer.grid = newValue }
     }
 
+    /// U11 — a full reset, as `RIS` (`ESC c`) performs it: modes, screens,
+    /// tab stops, title, cursor, the screen and the scrollback. Exposed so
+    /// the app can offer "Reset Terminal" without writing a control sequence
+    /// to the child's *input*, which is a channel reserved for what the user
+    /// actually typed (`SECURITY.md` §6).
+    public mutating func reset() {
+        feed(Array("\u{1B}c".utf8))
+    }
+
     /// Consumes a chunk of PTY output. A chunk boundary may fall anywhere —
     /// in the middle of a UTF-8 character or an escape sequence — so all
     /// decoding state lives in the terminal, not in a call.
@@ -51,6 +60,20 @@ public struct Terminal: Sendable {
     /// the shell must present no frame; when it goes false, present once.
     public var isSynchronizedOutputEnabled: Bool { performer.state.synchronizedOutputEnabled }
 
+    /// Rising-edge counter for `?2026` episodes — see
+    /// `PerformerState.synchronizedOutputEpisode` for why a bool compare is
+    /// not enough.
+    public var synchronizedOutputEpisode: Int { performer.state.synchronizedOutputEpisode }
+
+    /// Ends a synchronized-output episode (`?2026`) without waiting for the
+    /// child's DECRST. The mode is a promise the child may fail to keep — a
+    /// crashed or buggy child never sends the reset, and gating presents on
+    /// it would freeze the pane — so the session's bounded-wait timeout and
+    /// child-exit path end the episode from this side.
+    public mutating func endSynchronizedOutput() {
+        performer.state.synchronizedOutputEnabled = false
+    }
+
     /// `?1004` — whether the child has asked to be told about focus changes
     /// (M6.7). The app sends `CSI I` / `CSI O` while this is true.
     public var isFocusReportingEnabled: Bool { performer.state.focusReportingEnabled }
@@ -58,6 +81,19 @@ public struct Terminal: Sendable {
     /// LNM (`CSI 20 h`). While set the Return key sends CR LF rather than
     /// CR — the app encodes keys, so it has to be able to ask.
     public var isNewLineModeEnabled: Bool { performer.state.newLineModeEnabled }
+
+    /// DECCKM (`CSI ? 1 h`). While set the cursor keys and Home/End send
+    /// their SS3 (application) forms — the app encodes keys, so it has to
+    /// be able to ask.
+    public var applicationCursorKeysEnabled: Bool {
+        performer.state.applicationCursorKeysEnabled
+    }
+
+    /// DECKPAM / DECKPNM (U04) — while set, the numeric keypad sends its SS3
+    /// forms.
+    public var applicationKeypadEnabled: Bool {
+        performer.state.applicationKeypadEnabled
+    }
 
     /// The colours OSC 10/11/12 report (M6.6). The app seeds these from its
     /// palette so a query answers with what is actually drawn; the child can

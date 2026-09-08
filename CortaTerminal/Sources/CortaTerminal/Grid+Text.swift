@@ -70,14 +70,31 @@ extension Grid {
         LogicalLineSequence(grid: self)
     }
 
+    /// Newest-first counterpart of `logicalLines()` (P04): a search with a
+    /// match cap collects from the live screen backwards, so a truncated
+    /// result keeps the most recent matches — the ones the user was looking
+    /// at when they typed — rather than the document's oldest.
+    public func reversedLogicalLines() -> ReversedLogicalLineSequence {
+        ReversedLogicalLineSequence(grid: self)
+    }
+
     /// The logical line containing `row` — the chain of wrapped rows it
     /// belongs to, joined start to end.
     public func logicalLine(containing row: Int) -> LogicalLine {
+        let span = logicalLineRowSpan(containing: row)
+        return joinedLogicalLine(firstRow: span.first, lastRow: span.last)
+    }
+
+    /// The wrap chain's row span containing `row`, without joining any
+    /// text. Callers whose cost scales with the chain's size (hit-testing
+    /// on every mouse-moved, P08) check the span first and skip the join
+    /// for chains past their budget.
+    func logicalLineRowSpan(containing row: Int) -> (first: Int, last: Int) {
         var top = row
         while documentLine(top - 1).wrapped { top -= 1 }
         var bottom = row
         while documentLine(bottom).wrapped, bottom < rows - 1 { bottom += 1 }
-        return joinedLogicalLine(firstRow: top, lastRow: bottom)
+        return (top, bottom)
     }
 
     /// One document row's text, trailing blanks trimmed. The only text
@@ -181,6 +198,44 @@ public struct LogicalLineSequence: Sequence {
             var last = first
             while grid.documentLine(last).wrapped, last < end - 1 { last += 1 }
             nextRow = last + 1
+            return grid.joinedLogicalLine(firstRow: first, lastRow: last)
+        }
+    }
+}
+
+/// Newest-first counterpart of `LogicalLineSequence`, walking wrap chains
+/// from the live screen towards the oldest scrollback line. See
+/// `Grid.reversedLogicalLines()`.
+public struct ReversedLogicalLineSequence: Sequence {
+    private let grid: Grid
+
+    fileprivate init(grid: Grid) {
+        self.grid = grid
+    }
+
+    public func makeIterator() -> Iterator {
+        Iterator(grid: grid)
+    }
+
+    public struct Iterator: IteratorProtocol {
+        private let grid: Grid
+        /// The bottommost row not yet emitted; the chain containing it is
+        /// next.
+        private var nextRow: Int
+        private let lowerBound: Int
+
+        fileprivate init(grid: Grid) {
+            self.grid = grid
+            self.nextRow = grid.rows - 1
+            self.lowerBound = grid.documentRowRange.lowerBound
+        }
+
+        public mutating func next() -> LogicalLine? {
+            guard nextRow >= lowerBound else { return nil }
+            let last = nextRow
+            var first = last
+            while grid.documentLine(first - 1).wrapped { first -= 1 }
+            nextRow = first - 1
             return grid.joinedLogicalLine(firstRow: first, lastRow: last)
         }
     }

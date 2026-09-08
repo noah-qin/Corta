@@ -61,6 +61,13 @@ import simd
 /// which page caused it. A screen whose live content alone exceeds a page
 /// cannot be served by any eviction policy; after one retry those cells
 /// draw blank.
+/// **Allocation failure (S07).** If the device cannot allocate the atlas
+/// textures at the requested size, `init` retries at halving sizes down to
+/// `minimumAtlasPixelSize` and sets `isDegraded` — the pages and eviction
+/// machinery are size-agnostic, so a memory-pressured machine keeps
+/// rendering with reduced cache capacity instead of trapping on a force
+/// unwrap. Only failure at the minimum size still traps, deliberately: a
+/// device that cannot allocate a 64×64 texture cannot render anything.
 /// **Single-threaded.** The cache, the shelf allocator and the texture are
 /// plain mutable state with no synchronisation, and Core Text's run and line
 /// objects are not safe to share either — rasterising the same atlas from two
@@ -174,7 +181,22 @@ nonisolated final class GlyphAtlas {
 
     static let atlasSize = 2048
 
-    let atlasPixelSize: Int
+    /// The smallest atlas edge length `init` will settle for when the
+    /// device cannot allocate the requested size (S07): at this size the
+    /// shelf allocator still fits dozens of glyphs and the page-eviction
+    /// machinery absorbs the churn, so a memory-pressured Mac degrades to
+    /// re-rasterising instead of crashing.
+    static let minimumAtlasPixelSize = 64
+
+    /// The edge length the atlas textures were actually allocated at —
+    /// smaller than the requested size when allocation had to fall back
+    /// (see `init`).
+    private(set) var atlasPixelSize: Int
+    /// True when texture allocation failed at the requested size and the
+    /// atlas fell back to a smaller one (S07). Everything keeps working —
+    /// the pages and eviction machinery are size-agnostic — but cache
+    /// capacity is reduced, so the shell can log/observe the degradation.
+    private(set) var isDegraded = false
     private(set) var texture: MTLTexture
     /// The RGBA atlas color glyphs rasterise into (see the type comment).
     /// Premultiplied bgra, matching what `CTRunDraw` produces and what the
@@ -219,28 +241,55 @@ nonisolated final class GlyphAtlas {
     /// - Parameter atlasPixelSize: edge length of the square atlas texture.
     ///   Tests pass a small size to exercise eviction without rasterising
     ///   thousands of glyphs.
-    init(device: MTLDevice, font: CTFont, atlasPixelSize: Int = GlyphAtlas.atlasSize) {
+    /// - Parameter makeTexture: allocation hook for tests (S07) — inject a
+    ///   closure that fails for some descriptors to exercise the fallback
+    ///   path. Production callers leave it nil, which uses the device.
+    init(
+        device: MTLDevice, font: CTFont, atlasPixelSize: Int = GlyphAtlas.atlasSize,
+        makeTexture: ((MTLTextureDescriptor) -> MTLTexture?)? = nil
+    ) {
         // Pinning here — not only at the font's creation site — makes the
         // atlas the single choke point: the cascade list then holds whatever
         // font a caller hands in, and `TerminalFont.bold` re-pins after the
         // trait copy that would otherwise drop it (see `TerminalFont`).
         let base = TerminalFont.pinningCascadeList(font, size: CTFontGetSize(font))
         (self.fonts, self.isSyntheticBold) = Self.faces(of: base)
-        self.atlasPixelSize = atlasPixelSize
 
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: .r8Unorm, width: atlasPixelSize, height: atlasPixelSize, mipmapped: false)
-        descriptor.usage = [.shaderRead]
-        descriptor.storageMode = .managed
-        self.texture = device.makeTexture(descriptor: descriptor)!
+        let allocate = makeTexture ?? { device.makeTexture(descriptor: $0) }
+        // Texture allocation failure is recoverable (S07): halve the atlas
+        // and retry down to `minimumAtlasPixelSize`. The pages are built
+        // from whatever size actually succeeded, and eviction absorbs the
+        // reduced capacity. Only a device that cannot allocate even the
+        // minimum — one that cannot render anything at all — traps, which
+        // is a deliberate assertion, not an unconsidered force unwrap.
+        var size = max(1, atlasPixelSize)
+        var allocated: (gray: MTLTexture, color: MTLTexture)?
+        while true {
+            let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+                pixelFormat: .r8Unorm, width: size, height: size, mipmapped: false)
+            descriptor.usage = [.shaderRead]
+            descriptor.storageMode = .managed
+            let colorDescriptor = MTLTextureDescriptor.texture2DDescriptor(
+                pixelFormat: .bgra8Unorm, width: size, height: size, mipmapped: false)
+            colorDescriptor.usage = [.shaderRead]
+            colorDescriptor.storageMode = .managed
+            if let gray = allocate(descriptor), let color = allocate(colorDescriptor) {
+                allocated = (gray, color)
+                break
+            }
+            guard size > Self.minimumAtlasPixelSize else { break }
+            size = max(size / 2, Self.minimumAtlasPixelSize)
+        }
+        guard let allocated else {
+            preconditionFailure(
+                "Metal device could not allocate even a \(Self.minimumAtlasPixelSize)-pixel glyph atlas")
+        }
+        self.texture = allocated.gray
+        self.colorTexture = allocated.color
+        self.atlasPixelSize = size
+        self.isDegraded = size < atlasPixelSize
 
-        let colorDescriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: .bgra8Unorm, width: atlasPixelSize, height: atlasPixelSize, mipmapped: false)
-        colorDescriptor.usage = [.shaderRead]
-        colorDescriptor.storageMode = .managed
-        self.colorTexture = device.makeTexture(descriptor: colorDescriptor)!
-
-        (self.asciiPage, self.shapedPage, self.colorPage) = Self.makePages(atlasPixelSize: atlasPixelSize)
+        (self.asciiPage, self.shapedPage, self.colorPage) = Self.makePages(atlasPixelSize: size)
 
         var white: UInt8 = 255
         texture.replace(
