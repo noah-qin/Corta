@@ -39,7 +39,7 @@ extension ViewController {
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
             do {
-                try text.write(to: url, atomically: true, encoding: .utf8)
+                try Self.write(text, to: url)
                 self?.terminalView?.showToast(L10n.text("toast.exported"))
             } catch {
                 // The panel already granted access, so a failure here is a
@@ -50,6 +50,18 @@ extension ViewController {
                 alert.beginSheetModal(for: window)
             }
         }
+    }
+
+    /// The write itself, separated from the panel so the bytes that land on
+    /// disk are testable — the panel is AppKit's and is not in doubt, the
+    /// encoding and the trailing newline are ours (U15).
+    ///
+    /// UTF-8, and a trailing newline when the text does not already end in
+    /// one: the file is going to be read by `grep`, `less` and a diff, and
+    /// every one of them treats a file without a final newline as malformed.
+    static func write(_ text: String, to url: URL) throws {
+        let payload = text.hasSuffix("\n") ? text : text + "\n"
+        try Data(payload.utf8).write(to: url, options: .atomic)
     }
 
     /// The text a save would write: the selection, or the whole document.
