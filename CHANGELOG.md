@@ -10,6 +10,13 @@ what to edit.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-08
+
+The quality release. Nothing here changes what Corta is; all of it is
+work on what was already there — the places it could be made to
+misbehave, the places it was slower than it had to be, and the places it
+was guessing at what the user meant.
+
 ### Added
 
 - **U11 (2026-09-08)** — Clear Screen (⌘K), Clear History and Reset
@@ -433,6 +440,41 @@ M1–M10.
   same-conditions Typometer re-measurement against the 45.5 ms baseline
   is still open.
 
+### Verification
+
+- **esctest (2026-09-08)** — 110 passed, 335 known bugs, 123 failed of
+  568, against M6's 106 / 335 / 127. xterm-compatibility is 78.3%, up
+  from 77.6%. The failures are classified by real application impact in
+  `docs/V0.1.1-QUALITY-PLAN.md` Q01, and every failing test name is kept
+  in `docs/esctest/0.1.1-results.txt` so the next run is a diff. The
+  largest single cause is one absence: OSC 4/5 indexed palette set and
+  query are not implemented.
+- **Nightly CI (2026-09-08)** — a lane for the checks a pull request
+  cannot carry: the core suite under thread and address sanitizers, and
+  a twenty-million-iteration fuzz run on a rotating seed. Both are clean;
+  the sanitizer lane found a test that had been asserting a property it
+  never established, and it is fixed. Pull-request checks gain job
+  timeouts, `contents: read`, and the `.xcresult` bundle and fuzz corpus
+  uploaded on failure.
+- **Real-workflow harness (2026-09-08)** — 12 passed, 1 skipped, 0
+  failed against zsh, fish, tmux, Neovim, vim, less, fzf, mouse
+  reporting and 20k lines of sustained output, each driven on a real PTY
+  and replayed through the core. `corta-dump --serve` answers a client's
+  terminal queries from that same core, which is what lets fish — which
+  waits for Primary DA before it prints a prompt — run under it at all.
+- **Same-machine comparison (2026-09-08)** — 19.1 MB through the tty:
+  Corta 0.204 s, Ghostty 0.164 s, Terminal.app 0.305 s, with Corta the
+  smallest resident set of the three at idle. Input latency and IME are
+  not in that comparison; they need the fixed benchmark environment held
+  by hand and are on the maintainer's list in
+  `docs/V0.1.1-MANUAL-VERIFICATION.md`.
+
+### Fixed
+
+- The terminal answered XTVERSION with `Corta(0.1.0)` regardless of the
+  version it was built as. `CortaVersion.string` and
+  `MARKETING_VERSION` are now pinned against each other by a test.
+
 ---
 
 ## Release checklist
@@ -441,8 +483,12 @@ For the maintainer, cutting any release:
 
 1. Move the relevant `[Unreleased]` entries under a new `## [x.y.z]`
    heading with the date, and leave `[Unreleased]` empty above it.
-2. Update `MARKETING_VERSION` in `Corta.xcodeproj/project.pbxproj` to
-   match.
+2. Update **both** hand-written version numbers to match:
+   `MARKETING_VERSION` in `Corta.xcodeproj/project.pbxproj` (all six
+   build configurations) and `CortaVersion.string` in
+   `CortaTerminal/Sources/CortaTerminal/Version.swift`, which is what
+   XTVERSION answers a program with. `VersionAgreementTests` fails if
+   only one of them moves.
 3. Re-record the tracking table in `docs/ROADMAP.md` if any number moved.
 4. Commit as `chore: release x.y.z`, then tag `vx.y.z` and push the tag.
    The release workflow builds from the tag and opens a **draft** release
@@ -452,5 +498,6 @@ For the maintainer, cutting any release:
    push that file — that is what makes the update visible to every
    already-installed Corta.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/noah-qin/Corta/releases/tag/v0.1.1
 [0.1.0]: https://github.com/noah-qin/Corta/releases/tag/v0.1.0

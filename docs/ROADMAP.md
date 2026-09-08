@@ -13,6 +13,13 @@ implementation record:
 - [Accepted quality and feature work](V0.1.1-QUALITY-PLAN.md)
 - [Engineering, menu, lifecycle and CI audit](V0.1.1-ENGINEERING-AUDIT.md)
 - [Modern technology direction and adoption work](TECHNOLOGY-DIRECTION.md)
+- [The checks that need a person](V0.1.1-MANUAL-VERIFICATION.md) — VoiceOver,
+  IME, non-US layouts, the `copy-on-select` default, and the Typometer
+  measurements, including M9's owed re-measurement
+
+Status: Stages 1-3 of the quality programme are closed, and Stage 4 is closed
+except Q07's latency and IME halves (the manual list above) and Q08, the
+pre-release soak, which is the maintainer's.
 
 An unchecked finding is pending work, not a completed fix. Verify actual code
 and current SDK availability before implementing historical review conclusions.
@@ -876,7 +883,10 @@ alternate-screen additions, `TerminalRenderBackendTests`,
 **Typometer, post-M9, default configuration** (the same "Run A" as
 M8.18, since default is the configuration M9 actually ships): 45.4 ms
 min, 99.4 ms max, 70.1 ms average, 13.9 ms SD — `PERFORMANCE.md` §5.4.
-**This is not a clean before/after against M6.12's 45.5 ms baseline.**
+**This is not a clean before/after against M6.12's 45.5 ms baseline**, and
+0.1.1 did not close it — the re-measurement is item 5c of
+[V0.1.1-MANUAL-VERIFICATION.md](V0.1.1-MANUAL-VERIFICATION.md), where it is
+written up with the environment table it has to be held to.
 §5.2's fixed-benchmark-environment table was not fully held for this
 run — in particular, other background load on the machine was not
 controlled the way M6.12's was — so a 70.1 ms average next to a 45.5 ms
@@ -993,16 +1003,28 @@ security rules in `SECURITY.md` §6.
 Fill these in at each milestone. `PERFORMANCE.md` §1 has the targets.
 Trends matter more than absolute values.
 
-| Metric                    | M1     | M2 | M3 | M4 | M5 | M6 |
-| ------------------------- | ------ | -- | -- | -- | -- | -- |
-| Core feed throughput (MiB/s) | 109.9 | 80.0 | 80.8 | 75.5 | 76.7 | 130.0 (5-run mean) |
-| Frame CPU (ms)            | 1.67   | 1.72 | 2.32 | 2.26 | 2.40 | 2.32 |
-| Idle CPU (%)              | ~4     | ~0   | ~0   | ~0   | ~0   | 0.0 |
-| Memory @ 100k lines (MB)  | 265.7  | 265.7 | 265.7 | 184.6 | 184.6 | 185.0 |
-| Keypress → pixel (ms)     | —      | —    | —    | —    | —    | 45.5 avg / 24.8 min / 56.4 max / 6.8 SD |
-| `esctest` pass rate (%)   | —      | 8.8 (50/568) | 8.8 (50/568) | 8.8 (50/568, M3 carry) | 8.8 (M3 carry) | 18.7 (106/568) |
-| `esctest` xterm-compat (%)| —      | 67.6 | 67.6 | 67.6 | 67.6 | 77.6 |
-| Core LOC                  | 2,547  | 3,972 | 4,247 | 4,908 | 4,959 | 5,884 |
+| Metric                    | M1     | M2 | M3 | M4 | M5 | M6 | 0.1.1 |
+| ------------------------- | ------ | -- | -- | -- | -- | -- | ----- |
+| Core feed throughput (MiB/s) | 109.9 | 80.0 | 80.8 | 75.5 | 76.7 | 130.0 (5-run mean) | — |
+| Frame CPU (ms)            | 1.67   | 1.72 | 2.32 | 2.26 | 2.40 | 2.32 | — |
+| Idle CPU (%)              | ~4     | ~0   | ~0   | ~0   | ~0   | 0.0 | — |
+| Memory @ 100k lines (MB)  | 265.7  | 265.7 | 265.7 | 184.6 | 184.6 | 185.0 | — |
+| Keypress → pixel (ms)     | —      | —    | —    | —    | —    | 45.5 avg / 24.8 min / 56.4 max / 6.8 SD | not re-measured |
+| `esctest` pass rate (%)   | —      | 8.8 (50/568) | 8.8 (50/568) | 8.8 (50/568, M3 carry) | 8.8 (M3 carry) | 18.7 (106/568) | 19.4 (110/568) |
+| `esctest` xterm-compat (%)| —      | 67.6 | 67.6 | 67.6 | 67.6 | 77.6 | 78.3 |
+| Core LOC                  | 2,547  | 3,972 | 4,247 | 4,908 | 4,959 | 5,884 | — |
+
+A blank in the 0.1.1 column is a number that was not re-measured in this
+release, not a number that stayed the same. Keypress → pixel is called
+out rather than blanked because it is owed twice over: the M9 figure
+below, and a same-conditions run against M6.12's 45.5 ms. Both are item
+5 of [V0.1.1-MANUAL-VERIFICATION.md](V0.1.1-MANUAL-VERIFICATION.md).
+
+0.1.1 also measured what M6 could not: **19.1 MB driven through the tty
+in 0.204 s, against Ghostty's 0.164 s and Terminal.app's 0.305 s on the
+same machine**, with the smallest idle resident set of the three (89.5
+MB). The method and its limits — it is a drain rate, not a
+render-completion time — are in `V0.1.1-QUALITY-PLAN.md` Q07.
 
 The two esctest rows measure different things and both are worth
 keeping. **Pass rate** counts only tests that passed outright.
