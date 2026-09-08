@@ -14,7 +14,20 @@ extension SplitViewController {
     // MARK: - Capture
 
     func windowState(frame: NSRect) -> WindowState? {
-        guard let root = view.subviews.first else { return nil }
+        // The *tree*, not `view.subviews.first`. While a pane is zoomed
+        // (U13) the controller's view holds that pane alone, and reading the
+        // hierarchy would save "one pane" as the arrangement — discarding
+        // the splits, and, since U07 writes the arrangement as it changes,
+        // writing that loss straight to disk. Zoom is temporary and the saved
+        // layout has to keep saying so.
+        // While zoomed the tree is not whole — the zoomed pane's view is out
+        // of it, so the split it came from has one subview and would read as
+        // a plain pane. The layout recorded on the way in is what the
+        // arrangement still is.
+        if let zoomed = layoutBeforeZoom {
+            return WindowState(frame: WindowState.Frame(frame), layout: zoomed)
+        }
+        guard let root = layoutRoot else { return nil }
         return WindowState(frame: WindowState.Frame(frame), layout: layout(of: root))
     }
 
@@ -77,6 +90,15 @@ extension SplitViewController {
     /// laid out. Done separately because splitting re-halves everything it
     /// touches, so positions set during the build would be overwritten by the
     /// next split below them.
+    /// Re-applies a recorded arrangement's dividers to the tree as it stands
+    /// — used on the way out of zoom (U13), where the pane's view left its
+    /// split and came back, and AppKit re-halved what was left behind.
+    func reapplyDividerPositions(_ layout: PaneLayout) {
+        view.layoutSubtreeIfNeeded()
+        applyDividerPositions(layout, subtree: layoutRoot)
+        view.layoutSubtreeIfNeeded()
+    }
+
     private func applyDividerPositions(_ node: PaneLayout, subtree: NSView?) {
         guard case .split(_, let position, let first, let second) = node,
             let split = subtree as? NSSplitView, split.subviews.count == 2
