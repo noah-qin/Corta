@@ -43,7 +43,12 @@ jobs:
       # The core is where the concurrency is — the write queue, the reader
       # thread, the session teardown — and it is the part that runs without a
       # window server, so it is the part a sanitizer can reach here.
+      # Instrumentation costs roughly an order of magnitude, and the suite's
+      # wedged-child ceilings are sized for an uninstrumented run. Scaling
+      # them here keeps a slow run from being reported as a hang.
       - name: Test
+        env:
+          CORTA_TEST_TIMEOUT_SCALE: "10"
         run: swift test --package-path CortaTerminal --sanitize=${{ matrix.sanitizer }}
 
   fuzz:

@@ -1,3 +1,4 @@
+import Foundation
 import Darwin
 import Testing
 
@@ -75,4 +76,20 @@ extension PTY {
 func fields(of text: String) -> [String] {
     text.split(whereSeparator: \Character.isWhitespace)
         .map(String.init)
+}
+
+/// A ceiling, scaled for the environment the tests are running in.
+///
+/// The ceilings here exist to stop a wedged child hanging the run, and are
+/// deliberately generous so that reaching one means something is genuinely
+/// wrong rather than that the machine was busy. Under a sanitizer that stops
+/// being true: thread sanitizer instrumentation costs roughly an order of
+/// magnitude, and `catOfALargeFileDoesNotStallTheChild` reached its 30-second
+/// ceiling on a run that found no data race at all. The nightly sanitizer
+/// lane sets `CORTA_TEST_TIMEOUT_SCALE`; nothing else does, so every other
+/// run keeps the original number.
+func testTimeout(_ seconds: Int) -> Duration {
+    let scale = ProcessInfo.processInfo.environment["CORTA_TEST_TIMEOUT_SCALE"]
+        .flatMap(Int.init) ?? 1
+    return .seconds(seconds * max(1, scale))
 }
