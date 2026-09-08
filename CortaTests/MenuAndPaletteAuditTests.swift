@@ -1,4 +1,5 @@
 import AppKit
+import Foundation
 import Testing
 
 @testable import Corta
@@ -119,35 +120,83 @@ struct MenuAndPaletteAuditTests {
 ///
 /// Corta ships nine languages. A key with no entry in one of them falls back
 /// to English at runtime and looks, to a reader of that language, like a bug
-/// in the sentence next to it rather than a missing translation. This asserts
-/// against the *built* `.lproj`s, not the `.xcstrings` source, so it measures
-/// what is actually installed.
+/// in the sentence next to it rather than a missing translation. The 0.1.1
+/// command, settings and toast work added 41 such keys; they are translated
+/// now, and this is what keeps the next batch from shipping the same way.
 @MainActor
 struct LocalizationCoverageTests {
 
-    /// The strings this release adds and does not yet translate. Every one is
-    /// from the 0.1.1 command, settings and toast work; the rest of the app is
-    /// translated into all nine. Listing them makes the debt countable and
-    /// makes the test fail the moment a *new* untranslated key appears —
-    /// delete a line here when its translations land.
-    static let untranslated: Set<String> = [
-        "clear.history.detail", "clear.history.discard", "clear.history.title",
-        "clear.reset.title", "command.clearHistory", "command.clearScreen",
-        "command.copyLastCommandOutput", "command.exportText",
-        "command.nextFailedCommand", "command.previousFailedCommand",
-        "command.reopenClosedPane", "command.resetTerminal", "command.unzoomPane",
-        "command.zoomPane", "commandPalette.category.terminal",
-        "export.message.history", "export.message.selection", "link.fileNoLine",
-        "menu.presetInWindow", "menu.presets", "scrollback.newOutput",
-        "scrollback.position", "scrollback.returnToBottom", "search.caseSensitive",
-        "search.invalidPattern", "search.patternTooSlow", "search.regex",
-        "settings.help.openFileCommand", "settings.help.optionAsMeta",
-        "settings.label.openFileCommand", "settings.label.optionAsMeta",
-        "settings.status.openFileCommand", "toast.badOpenFileCommand",
-        "toast.clearedHistory", "toast.clearedScreen", "toast.copiedCommandOutput",
-        "toast.exported", "toast.noCommandOutput", "toast.noShellIntegration",
-        "toast.nothingToExport", "toast.resetTerminal",
+    /// The catalog in the repository rather than the built `.lproj`s: it is
+    /// the whole key set, so this is a total check rather than a sample of
+    /// whichever keys someone thought to list. Located from this file, which
+    /// is the only fixed point a test has.
+    private static var catalogURL: URL {
+        URL(fileURLWithPath: #filePath)  // CortaTests/MenuAndPaletteAuditTests.swift
+            .deletingLastPathComponent()  // CortaTests
+            .deletingLastPathComponent()  // repository root
+            .appendingPathComponent("Corta/Localizable.xcstrings")
+    }
+
+    private static let shippedLanguages: Set<String> = [
+        "en", "zh-Hans", "zh-Hant", "ja", "ko", "de", "fr", "es", "pt-BR",
     ]
+
+    @Test("every string in the catalog exists in every shipped language")
+    func theCatalogIsComplete() throws {
+        let data = try Data(contentsOf: Self.catalogURL)
+        let catalog = try #require(
+            try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let strings = try #require(catalog["strings"] as? [String: Any])
+        #expect(strings.count > 150, "the catalog looks truncated: \(strings.count) keys")
+
+        var incomplete: [String: [String]] = [:]
+        for (key, value) in strings {
+            let entry = value as? [String: Any] ?? [:]
+            let localizations = entry["localizations"] as? [String: Any] ?? [:]
+            let missing = Self.shippedLanguages.subtracting(localizations.keys)
+            if !missing.isEmpty { incomplete[key] = missing.sorted() }
+        }
+        #expect(incomplete.isEmpty, "untranslated: \(incomplete.sorted { $0.key < $1.key })")
+    }
+
+    /// A translation that drops or reorders a format specifier is a crash
+    /// rather than a typo, and it crashes only for the reader whose language
+    /// it is.
+    @Test("every translation carries the same format specifiers as its source")
+    func formatSpecifiersSurviveTranslation() throws {
+        let data = try Data(contentsOf: Self.catalogURL)
+        let catalog = try #require(
+            try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let strings = try #require(catalog["strings"] as? [String: Any])
+        let specifier = try NSRegularExpression(
+            pattern: "%(?:\\d+\\$)?(?:@|lld|ld|d|s)")
+
+        func specifiers(in text: String) -> [String] {
+            let range = NSRange(text.startIndex..., in: text)
+            return specifier.matches(in: text, range: range)
+                .compactMap { Range($0.range, in: text).map { String(text[$0]) } }
+                .sorted()
+        }
+
+        var mismatched: [String] = []
+        for (key, value) in strings {
+            let entry = value as? [String: Any] ?? [:]
+            let localizations = entry["localizations"] as? [String: Any] ?? [:]
+            func text(_ language: String) -> String? {
+                ((localizations[language] as? [String: Any])?["stringUnit"]
+                    as? [String: Any])?["value"] as? String
+            }
+            guard let source = text("en") else { continue }
+            let expected = specifiers(in: source)
+            for language in Self.shippedLanguages where language != "en" {
+                guard let translated = text(language) else { continue }
+                if specifiers(in: translated) != expected {
+                    mismatched.append("\(key) [\(language)]")
+                }
+            }
+        }
+        #expect(mismatched.isEmpty, "format specifiers differ: \(mismatched.sorted())")
+    }
 
     @Test("every shipped language is a real localization, not just a folder")
     func shippedLanguagesResolve() throws {
@@ -166,32 +215,32 @@ struct LocalizationCoverageTests {
         }
     }
 
-    @Test("no key outside the recorded gap is missing from a shipped language")
-    func onlyTheRecordedKeysAreUntranslated() throws {
+    /// The built bundle, not the source: a key present in the catalog but
+    /// dropped by the build is the same failure to a reader.
+    @Test("the strings this release added resolve in every built language")
+    func thisReleasesKeysResolveInTheBundle() throws {
         let sentinel = "\u{0}missing"
         var missing: [String: [String]] = [:]
-        for language in Bundle.main.localizations where language != "Base" && language != "en" {
+        for language in Bundle.main.localizations
+        where language != "Base" && language != "en" {
             guard let path = Bundle.main.path(forResource: language, ofType: "lproj"),
                 let bundle = Bundle(path: path)
             else { continue }
-            for key in Self.keysUnderTest {
+            for key in Self.keysAddedByThisRelease {
                 let resolved = bundle.localizedString(forKey: key, value: sentinel, table: nil)
-                if resolved == sentinel, !Self.untranslated.contains(key) {
-                    missing[language, default: []].append(key)
-                }
+                if resolved == sentinel { missing[language, default: []].append(key) }
             }
         }
-        #expect(missing.isEmpty, "untranslated and unrecorded: \(missing)")
+        #expect(missing.isEmpty, "not in the built bundle: \(missing)")
     }
 
-    /// A sample across the areas the release touched, plus keys that predate
-    /// it — enough to catch a whole language regressing, without restating
-    /// the string table.
-    private static let keysUnderTest = [
-        "command.newWindow", "command.newTab", "command.close", "command.find",
-        "command.settings", "command.commandPalette", "command.zoomPane",
-        "command.clearScreen", "command.exportText", "menu.presets",
-        "search.regex", "toast.exported", "settings.label.optionAsMeta",
-        "commandPalette.category.terminal", "commandPalette.category.window",
+    /// A sample of the 41, spread across the areas the release touched.
+    private static let keysAddedByThisRelease = [
+        "command.zoomPane", "command.clearScreen", "command.exportText",
+        "command.copyLastCommandOutput", "command.resetTerminal", "menu.presets",
+        "search.regex", "search.caseSensitive", "toast.exported",
+        "settings.label.optionAsMeta", "settings.label.openFileCommand",
+        "commandPalette.category.terminal", "scrollback.newOutput",
+        "clear.history.title", "export.message.history",
     ]
 }
