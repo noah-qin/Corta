@@ -130,3 +130,92 @@ struct ScrollPositionIndicatorTests {
         #expect(ScrollPositionIndicator.formatted(12340).contains(","))
     }
 }
+
+/// U12 — the pill driven by real scroll events on a real pane, rather than by
+/// setting `scrollOffset` directly.
+///
+/// The earlier record said the appearance "was not driven by a real
+/// trackpad". A trackpad cannot be attached from here, but the events one
+/// produces can: `scrollWheel` is the same entry point AppKit calls, and the
+/// pane, its session and its renderer are all real. What is closed is the
+/// path from a gesture to the pill; what remains open is what the hardware
+/// emits, which is `NSEvent`'s business and not Corta's.
+@MainActor
+@Suite(.serialized)
+struct ScrollIndicatorIntegrationTests {
+    private func makePane() -> ViewController {
+        let pane = ViewController()
+        _ = pane.view
+        pane.view.setFrameSize(CGSize(width: 800, height: 400))
+        pane.view.layoutSubtreeIfNeeded()
+        return pane
+    }
+
+    /// A wheel notch, built the way `TerminalViewScrollTests` builds one —
+    /// through `CGEvent`, which is where a real device's event comes from.
+    private static func wheel(lines: Int32) -> NSEvent {
+        let cg = CGEvent(
+            scrollWheelEvent2Source: nil, units: .line, wheelCount: 1,
+            wheel1: lines, wheel2: 0, wheel3: 0)!
+        return NSEvent(cgEvent: cg)!
+    }
+
+    /// Fills the pane's scrollback with output from its **own child**, so the
+    /// history the pill counts is real history. Returns whether enough
+    /// arrived before the deadline.
+    @discardableResult
+    private func fill(_ pane: ViewController, atLeast lines: Int) -> Bool {
+        guard let session = pane.session else { return false }
+        session.write(Array("printf 'scrollback %s\\n' $(seq 1 400)\n".utf8))
+        let deadline = Date().addingTimeInterval(15)
+        while session.snapshot().scrollback.count < lines, Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
+        }
+        return session.snapshot().scrollback.count >= lines
+    }
+
+    @Test func scrollingUpShowsThePillAndReturningHidesIt() throws {
+        let pane = makePane()
+        defer { pane.teardown() }
+        try #require(pane.isOperable)
+        try #require(fill(pane, atLeast: 60), "the child produced no scrollback")
+
+        #expect(pane.scrollPositionIndicator == nil, "nothing to say at the bottom")
+
+        pane.terminalView?.scrollWheel(with: Self.wheel(lines: 12))
+        #expect(pane.scrollOffset > 0)
+        let pill = try #require(pane.scrollPositionIndicator)
+        #expect(pill.superview === pane.terminalView)
+        #expect(pill.accessibilityLabel()?.isEmpty == false)
+
+        // The affordance itself: pressing it goes back, and the pill goes.
+        #expect(pill.accessibilityPerformPress())
+        #expect(pane.scrollOffset == 0)
+        #expect(pane.scrollPositionIndicator == nil)
+    }
+
+    /// Output arriving while scrolled changes the pill's words — the fact a
+    /// person who scrolled up to wait is waiting for.
+    @Test func outputWhileScrolledChangesTheWording() throws {
+        let pane = makePane()
+        defer { pane.teardown() }
+        try #require(pane.isOperable)
+        try #require(fill(pane, atLeast: 60), "the child produced no scrollback")
+
+        pane.terminalView?.scrollWheel(with: Self.wheel(lines: 12))
+        let pill = try #require(pane.scrollPositionIndicator)
+        let resting = try #require(pill.accessibilityLabel())
+        #expect(!pill.hasNewOutput)
+
+        pane.sawOutputWhileScrolled = true
+        pane.updateScrollPositionIndicator()
+        let alerted = try #require(pill.accessibilityLabel())
+        #expect(pill.hasNewOutput)
+        #expect(alerted != resting)
+
+        // Returning to the bottom clears the state, so the next scroll does
+        // not still claim there is new output below.
+        pane.scroll(.toBottom)
+        #expect(!pane.sawOutputWhileScrolled)
+    }
+}

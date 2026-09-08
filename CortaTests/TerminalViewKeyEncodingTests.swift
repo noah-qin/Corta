@@ -145,6 +145,86 @@ struct TerminalViewKeyEncodingTests {
         #expect(TerminalView.bytes(for: commandV) == Array("v".utf8))
     }
 
+    // MARK: - International layouts and dead keys (U05)
+
+    /// **What `option-as-meta` has to not break.** On macOS ⌥ is text input:
+    /// on a US layout ⌥e begins a dead-key acute accent, and on a German
+    /// layout ⌥5 is `[`. The two modes read *different* fields of the event
+    /// — `characters` with the setting off, `charactersIgnoringModifiers`
+    /// with it on — and that is the whole compatibility argument, so it is
+    /// asserted on the events those layouts actually produce rather than
+    /// argued from the code.
+    @Test func optionOffKeepsTheLayoutsAlternateCharacter() {
+        // German layout: ⌥5 produces "[" while the unmodified key is "5".
+        let bracket = Self.keyEvent(characters: "[", charactersIgnoringModifiers: "5",
+            modifiers: .option, keyCode: 23)
+        #expect(TerminalView.bytes(for: bracket) == Array("[".utf8))
+
+        // A dead key mid-compose: the IME path aside, an ⌥e that produced no
+        // character yet sends nothing rather than a stray "e".
+        let deadKey = Self.keyEvent(
+            characters: "", charactersIgnoringModifiers: "e", modifiers: .option, keyCode: 14)
+        #expect(TerminalView.bytes(for: deadKey) == nil)
+
+        // The composed result arrives as an ordinary character event.
+        let composed = Self.keyEvent(characters: "é", charactersIgnoringModifiers: "e", keyCode: 14)
+        #expect(TerminalView.bytes(for: composed) == Array("é".utf8))
+
+        // Scandinavian layouts put ø on ⌥o.
+        let slashedO = Self.keyEvent(
+            characters: "ø", charactersIgnoringModifiers: "o", modifiers: .option, keyCode: 31)
+        #expect(TerminalView.bytes(for: slashedO) == Array("ø".utf8))
+    }
+
+    /// With the setting on, the *base* character is what is sent after ESC —
+    /// so ⌥e is `ESC e` immediately instead of waiting to compose, which is
+    /// what a program binding `M-e` is waiting for. The layout's alternate
+    /// character is deliberately given up; that is the trade the setting
+    /// exists to make, and it is off by default because most people want the
+    /// character.
+    @Test func optionAsMetaSendsTheBaseCharacter() {
+        let deadKey = Self.keyEvent(
+            characters: "", charactersIgnoringModifiers: "e", modifiers: .option, keyCode: 14)
+        #expect(
+            TerminalView.bytes(for: deadKey, optionAsMeta: true) == Array("\u{1B}e".utf8))
+
+        let bracket = Self.keyEvent(
+            characters: "[", charactersIgnoringModifiers: "5", modifiers: .option, keyCode: 23)
+        #expect(
+            TerminalView.bytes(for: bracket, optionAsMeta: true) == Array("\u{1B}5".utf8))
+
+        // Shift survives, because `charactersIgnoringModifiers` keeps it.
+        let shifted = Self.keyEvent(
+            characters: "Ø", charactersIgnoringModifiers: "O", modifiers: [.option, .shift],
+            keyCode: 31)
+        #expect(
+            TerminalView.bytes(for: shifted, optionAsMeta: true) == Array("\u{1B}O".utf8))
+    }
+
+    /// ⌘ disqualifies the combination in both modes: the app's own shortcuts
+    /// keep their key, and no ESC prefix is invented for them.
+    ///
+    /// The event is the one macOS actually delivers — with ⌘ held it does not
+    /// compose the layout's alternate character, so `characters` is the base
+    /// letter rather than `π`.
+    @Test func commandIsNeverMeta() {
+        let event = Self.keyEvent(
+            characters: "p", charactersIgnoringModifiers: "p", modifiers: [.option, .command],
+            keyCode: 35)
+        let bytes = TerminalView.bytes(for: event, optionAsMeta: true)
+        #expect(bytes == Array("p".utf8))
+        #expect(bytes?.first != 0x1B, "no ESC prefix belongs on a ⌘ combination")
+    }
+
+    /// A special key is unaffected either way — ⌥ already reaches the child
+    /// there as the xterm modifier parameter, so neither mode may add an ESC.
+    @Test func specialKeysAreUnaffectedByMeta() {
+        let optionLeft = Self.functionKeyEvent("\u{F702}", keyCode: 123, modifiers: .option)
+        let expected = Array("\u{1B}[1;3D".utf8)
+        #expect(TerminalView.bytes(for: optionLeft) == expected)
+        #expect(TerminalView.bytes(for: optionLeft, optionAsMeta: true) == expected)
+    }
+
     // MARK: - The keypad (U04)
 
     private static func keypadEvent(_ keyCode: UInt16, characters: String) -> NSEvent {
