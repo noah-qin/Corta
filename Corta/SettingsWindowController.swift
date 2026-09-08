@@ -102,6 +102,7 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
     private let rowsField = NSTextField()
     private let bellPopUp = NSPopUpButton()
     private let optionAsMetaSwitch = NSSwitch()
+    private let openFileCommandField = NSTextField()
     private let copyOnSelectSwitch = NSSwitch()
     private let linkActivationPopUp = NSPopUpButton()
     private let clipboardWriteSwitch = NSSwitch()
@@ -438,6 +439,9 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
                 row(
                     L10n.text("settings.label.allowClipboardCopy"), clipboardWriteSwitch,
                     help: L10n.text("settings.help.allowClipboardCopy")),
+                row(
+                    L10n.text("settings.label.openFileCommand"), openFileCommandField,
+                    help: L10n.text("settings.help.openFileCommand")),
             ]
         case .general:
             let windowHeader = sectionHeader(L10n.text("settings.section.window"))
@@ -846,6 +850,7 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         rowsField.stringValue = String(configuration.rows)
         bellPopUp.selectItem(at: Self.bellModes.firstIndex(of: configuration.bell) ?? 0)
         optionAsMetaSwitch.state = configuration.optionAsMeta ? .on : .off
+        openFileCommandField.stringValue = configuration.openFileCommand
         copyOnSelectSwitch.state = configuration.copyOnSelect ? .on : .off
         linkActivationPopUp.selectItem(at: configuration.linkActivation == .click ? 1 : 0)
         clipboardWriteSwitch.state = configuration.allowClipboardWrite ? .on : .off
@@ -959,6 +964,18 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
             }
             if bellIndex < Self.bellModes.count { configuration.bell = Self.bellModes[bellIndex] }
             configuration.optionAsMeta = optionAsMetaSwitch.state == .on
+            // Refused rather than written: the page is a front over the
+            // config file, and writing a template that cannot be launched
+            // would make the file say something the app will not do (U17).
+            // Reported through the same channel a clamped number uses, for
+            // the same reason — silently keeping the old value looks exactly
+            // like the app ignoring what was typed.
+            let template = openFileCommandField.stringValue.trimmingCharacters(in: .whitespaces)
+            if Configuration.isUsableOpenFileCommand(template) {
+                configuration.openFileCommand = template
+            } else {
+                clamps.append(L10n.text("settings.status.openFileCommand"))
+            }
             configuration.copyOnSelect = copyOnSelectSwitch.state == .on
             configuration.linkActivation =
                 linkActivationPopUp.indexOfSelectedItem == 1 ? .click : .command

@@ -9557,6 +9557,105 @@
           }
         }
       }
+    },
+    "search.patternTooSlow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pattern too slow"
+          }
+        }
+      }
+    },
+    "settings.label.openFileCommand": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open file with"
+          }
+        }
+      }
+    },
+    "settings.help.openFileCommand": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runs when a path:line reference in output is ⌘-clicked. {file}, {line} and {column} are substituted. The command must be an absolute path; leave empty to use the default app, which cannot be told a line number."
+          }
+        }
+      }
+    },
+    "settings.status.openFileCommand": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“Open file with” needs an absolute path and only {file}, {line} and {column}; it was left unchanged."
+          }
+        }
+      }
+    },
+    "clear.history.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear this pane’s history?"
+          }
+        }
+      }
+    },
+    "clear.reset.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset this terminal?"
+          }
+        }
+      }
+    },
+    "clear.history.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld lines of scrollback will be discarded. This cannot be undone."
+          }
+        }
+      }
+    },
+    "clear.history.discard": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discard"
+          }
+        }
+      }
+    },
+    "menu.presetInWindow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ in New Window"
+          }
+        }
+      }
     }
   },
   "duration.seconds": {
