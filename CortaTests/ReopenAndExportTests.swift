@@ -131,3 +131,53 @@ struct ExportTextTests {
         #expect(history != selection)
     }
 }
+
+/// U15 — the bytes that land on disk. The save panel is AppKit's and is not
+/// in doubt; the encoding and the trailing newline are ours.
+@MainActor
+struct ExportWriteTests {
+    private func temporaryURL() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("corta-export-\(UUID().uuidString).txt")
+    }
+
+    @Test("the file is UTF-8 and reads back byte for byte")
+    func writesUTF8() throws {
+        let url = temporaryURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        try ViewController.write("héllo 中文 🙂\nsecond line\n", to: url)
+        let read = try String(contentsOf: url, encoding: .utf8)
+        #expect(read == "héllo 中文 🙂\nsecond line\n")
+    }
+
+    /// grep, less and diff all treat a file with no final newline as
+    /// malformed, and terminal output routinely ends mid-line.
+    @Test("a missing final newline is added, and an existing one is not doubled")
+    func trailingNewline() throws {
+        let url = temporaryURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        try ViewController.write("no newline", to: url)
+        #expect(try String(contentsOf: url, encoding: .utf8) == "no newline\n")
+        try ViewController.write("has newline\n", to: url)
+        #expect(try String(contentsOf: url, encoding: .utf8) == "has newline\n")
+    }
+
+    /// Atomic: a failed write leaves the previous file intact rather than a
+    /// truncated one, which matters when the export is over a file the user
+    /// already keeps.
+    @Test("writing over an existing file replaces it whole")
+    func atomicReplacement() throws {
+        let url = temporaryURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        try ViewController.write("first\n", to: url)
+        try ViewController.write("second\n", to: url)
+        #expect(try String(contentsOf: url, encoding: .utf8) == "second\n")
+    }
+
+    @Test("a write to an unwritable location throws rather than failing silently")
+    func unwritableLocationThrows() {
+        #expect(throws: (any Error).self) {
+            try ViewController.write("x\n", to: URL(fileURLWithPath: "/no/such/dir/x.txt"))
+        }
+    }
+}
