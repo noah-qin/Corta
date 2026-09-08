@@ -21,6 +21,7 @@ import Testing
     @Test func readsChildOutputIntoTheGrid() throws {
         let session = try TerminalSession(executable: "/bin/echo", arguments: ["hello"])
         defer { session.stop() }
+        session.start()
 
         let text = waitForGrid(session) { $0.contains("hello") }
         #expect(
@@ -33,6 +34,7 @@ import Testing
         // without the batch cap ever hanging (`PERFORMANCE.md` §2.1).
         let session = try TerminalSession(executable: "/usr/bin/yes")
         defer { session.stop() }
+        session.start()
 
         let text = waitForGrid(session) { $0.contains("y") }
         #expect(
@@ -59,6 +61,7 @@ import Testing
 
         let session = try TerminalSession(executable: "/bin/cat", arguments: [path.path])
         defer { session.stop() }
+        session.start()
 
         let exit = session.pty.waitForExit(timeout: .seconds(30))
         #expect(exit != nil, "cat of a 100 MB file should finish well within 30s if the reader never stalls it")
@@ -71,6 +74,7 @@ import Testing
         // write path is never blocked behind the read path.
         let session = try TerminalSession(executable: "/usr/bin/yes")
         defer { session.stop() }
+        session.start()
 
         // Establish the precondition by condition, not by the clock: the
         // flood is visible in the grid before ETX is sent, so this test
@@ -88,6 +92,7 @@ import Testing
     @Test func writeDeliversBytesToTheChild() throws {
         let session = try TerminalSession(executable: "/bin/cat")
         defer { session.stop() }
+        session.start()
 
         session.write(Array("hi\n".utf8))
 
@@ -105,9 +110,9 @@ import Testing
     @Test func resizeAppliesAsynchronouslyAndSignalsOnOutput() throws {
         let session = try TerminalSession(executable: "/bin/cat")
         defer { session.stop() }
-
         let signaled = Mutex(false)
         session.onOutput = { signaled.withLock { $0 = true } }
+        session.start()
 
         session.resize(to: TerminalSize(rows: 30, columns: 100))
 
@@ -118,6 +123,74 @@ import Testing
         #expect(session.snapshot().rows == 30)
         #expect(session.snapshot().columns == 100)
         #expect(signaled.withLock { $0 })
+    }
+
+    /// P03 regression (user-reported: claude/kimi TUIs redrew garbled after
+    /// a window drag): the child must never be signalled a size the grid
+    /// has not adopted yet, or its new-size redraw is parsed into old-size
+    /// cells — permanent on the alternate screen, which is resized, never
+    /// reflowed.
+    ///
+    /// The child arms a WINCH trap on the alternate screen; on `SIGWINCH`
+    /// it redraws for the new width, drawing `END120` at row 5, column 100
+    /// (1-based). `resizeWorkGate` holds the queued resize work so the test
+    /// can observe what happens in the window between the resize request
+    /// and its application: a wrongly-ordered implementation has already
+    /// sent `TIOCSWINSZ`, so the redraw is parsed into the still-80-column
+    /// grid and `END120` clamps to the right edge and wraps; the ordered
+    /// one signals only after the commit, so the text lands at column 100.
+    @Test func childIsNotSignalledASizeTheGridHasNotAdopted() throws {
+        let script = #"printf '\033[?1049h'; trap 'printf "\033[2J\033[1;1HTOP120"; printf "\033[5;100HEND120"; printf "WINCH-DONE\n"' WINCH; printf 'ARMED\n'; while :; do sleep 0.05; done"#
+        let session = try TerminalSession(
+            executable: "/bin/sh",
+            arguments: ["-c", script],
+            size: TerminalSize(rows: 24, columns: 80))
+        defer { session.stop() }
+        session.start()
+
+        let armed = waitForGrid(session) { $0.contains("ARMED") }
+        #expect(
+            armed.contains("ARMED"),
+            "precondition: the child should have armed its WINCH trap; grid held:\n\(armed)")
+
+        let gateOpen = Mutex(false)
+        session.resizeWorkGate = {
+            while !gateOpen.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.001) }
+        }
+        session.resize(to: TerminalSize(rows: 24, columns: 120))
+
+        // With the resize held, a wrongly-ordered implementation still
+        // reaches the child: its redraw is parsed into the stale grid. Give
+        // that window a real chance to happen; with the ordered
+        // implementation the child has not been signalled at all, so this
+        // poll simply expires.
+        _ = waitForGrid(session, timeout: .seconds(1)) { $0.contains("WINCH-DONE") }
+        gateOpen.withLock { $0 = true }
+
+        let text = waitForGrid(session) { $0.contains("WINCH-DONE") }
+        #expect(
+            text.contains("WINCH-DONE"),
+            "expected the child's SIGWINCH redraw in the grid; grid held:\n\(text)")
+        #expect(
+            text.contains("rows: 24 columns: 120"),
+            "expected the grid at the new size; grid held:\n\(text)")
+
+        // Row 5 (0-based row 4) must hold END120 starting at column 100
+        // (0-based 99) — neither clamped to the old right edge nor wrapped
+        // onto the next row, which is how the stale-grid parse shows up.
+        let row5 = dumpRow(text, row: 4)
+        let expected = String(repeating: " ", count: 99) + "END120"
+        #expect(
+            row5?.contains(expected) == true,
+            "expected END120 at row 5, column 100; row 5 held: \(row5 ?? "<missing>")\nfull grid:\n\(text)")
+    }
+
+    /// The content of dump row `row` (0-based screen row), or nil if the
+    /// dump has no such row.
+    private func dumpRow(_ dump: String, row: Int) -> String? {
+        let digits = String(row)
+        let prefix = String(repeating: " ", count: max(0, 4 - digits.count)) + "\(row) |"
+        return dump.split(separator: "\n").first(where: { $0.hasPrefix(prefix) }).map(String.init)
     }
 
     /// Polls the grid until `condition` accepts its dump, or the hang

@@ -170,7 +170,12 @@ public final class PTY: @unchecked Sendable {
     ///
     /// On Darwin a primary descriptor whose replica has closed reports `EIO`
     /// rather than a zero-length read; that is end of file, not a failure.
+    ///
+    /// Throws `.closed` after `close()`: the descriptor number is free for
+    /// the kernel to recycle the instant close runs, so carrying on with the
+    /// stored number could hit an unrelated descriptor's new owner.
     public func read(into buffer: UnsafeMutableRawBufferPointer) throws(PTYError) -> Int {
+        guard !state.withLock({ $0.isClosed }) else { throw .closed }
         guard let base = buffer.baseAddress, !buffer.isEmpty else { return 0 }
         while true {
             let count = Darwin.read(fileDescriptor, base, buffer.count)
@@ -184,7 +189,9 @@ public final class PTY: @unchecked Sendable {
     }
 
     /// Writes as much as the pty accepts, and returns how much that was.
+    /// Throws `.closed` after `close()` — see `read`.
     public func write(_ bytes: UnsafeRawBufferPointer) throws(PTYError) -> Int {
+        guard !state.withLock({ $0.isClosed }) else { throw .closed }
         guard let base = bytes.baseAddress, !bytes.isEmpty else { return 0 }
         while true {
             let count = Darwin.write(fileDescriptor, base, bytes.count)
@@ -207,16 +214,19 @@ public final class PTY: @unchecked Sendable {
     // MARK: - Window size
 
     /// Sets the window size and lets the kernel raise `SIGWINCH` on the
-    /// child's foreground process group.
+    /// child's foreground process group. Throws `.closed` after `close()` —
+    /// see `read`.
     public func resize(to size: TerminalSize) throws(PTYError) {
+        guard !state.withLock({ $0.isClosed }) else { throw .closed }
         var windowSize = size.winsize
         guard ioctl(fileDescriptor, TIOCSWINSZ, &windowSize) == 0 else {
             throw .resizeFailed(code: errno)
         }
     }
 
-    /// The size the child currently sees.
+    /// The size the child currently sees. Throws `.closed` after `close()`.
     public func size() throws(PTYError) -> TerminalSize {
+        guard !state.withLock({ $0.isClosed }) else { throw .closed }
         var windowSize = Darwin.winsize()
         guard ioctl(fileDescriptor, TIOCGWINSZ, &windowSize) == 0 else {
             throw .resizeFailed(code: errno)
@@ -230,13 +240,16 @@ public final class PTY: @unchecked Sendable {
     public var exitStatus: ChildExit? { state.withLock { $0.exit } }
 
     /// The process group that currently owns the terminal, or `nil` when the
-    /// descriptor has no controlling terminal any more (the child exited).
+    /// descriptor has no controlling terminal any more (the child exited) or
+    /// has been closed — a closed descriptor's number may already belong to
+    /// an unrelated file, whose terminal is not ours to inspect.
     ///
     /// This is how a terminal answers "is anything running in here?" without
     /// shell integration: the shell puts a job it starts into its own process
     /// group and hands that group the terminal, so a foreground group that is
     /// not the shell itself *is* a running command.
     public var foregroundProcessGroup: pid_t? {
+        guard !state.withLock({ $0.isClosed }) else { return nil }
         let group = tcgetpgrp(fileDescriptor)
         return group > 0 ? group : nil
     }
@@ -315,9 +328,13 @@ public final class PTY: @unchecked Sendable {
     ///
     /// The group, not the process: the child is a shell, and its own children
     /// are what the user actually cares about stopping (`SECURITY.md` §4.4).
+    /// Once the child has been reaped the group id is the kernel's to
+    /// recycle, so a signal then could land on an unrelated group and is
+    /// refused instead.
     @discardableResult
     public func signalProcessGroup(_ signal: Int32) -> Bool {
-        kill(-processIdentifier, signal) == 0
+        guard state.withLock({ $0.exit == nil }) else { return false }
+        return kill(-processIdentifier, signal) == 0
     }
 
     /// Hangs up the child's process group, the way closing a window should.
