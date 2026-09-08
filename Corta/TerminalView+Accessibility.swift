@@ -72,8 +72,13 @@ extension TerminalView {
         return (snapshot.text as NSString).substring(with: snapshot.selectedRange)
     }
 
+    /// The *visible* line the cursor is on. `cursorRow` is a document row,
+    /// and the two differ by the scroll offset — scrolled into the history,
+    /// the cursor's line number was being reported as if the live screen were
+    /// still on top of the viewport (U01).
     override func accessibilityInsertionPointLineNumber() -> Int {
-        accessibilitySnapshot()?.cursorRow ?? 0
+        guard let snapshot = accessibilitySnapshot() else { return 0 }
+        return min(max(0, snapshot.cursorRow + snapshot.scrollOffset), max(0, snapshot.rows - 1))
     }
 
     // MARK: - Lines
@@ -101,30 +106,52 @@ extension TerminalView {
         return NSRange(location: start, length: end - start)
     }
 
+    /// The character under a point, which the protocol gives in **screen**
+    /// coordinates.
+    ///
+    /// Two conversions were wrong here (U01). `convert(_:from: nil)` converts
+    /// from *window* coordinates, not screen, so every answer was off by the
+    /// window's origin — the further from the bottom-left of the display the
+    /// window sat, the further Voice Control's click landed from the cell the
+    /// user named. And the offset was `line.location + cell.column`, which
+    /// treats a UTF-16 offset and a grid column as the same number; they are
+    /// the same number only for ASCII.
     override func accessibilityRange(for point: NSPoint) -> NSRange {
         guard let snapshot = accessibilitySnapshot(), let cellAtPoint else {
             return NSRange(location: 0, length: 0)
         }
-        let local = convert(point, from: nil)
+        // Screen -> window -> view. Without a window there is no screen
+        // space to come from, so the point cannot be resolved at all.
+        guard let window else { return NSRange(location: 0, length: 0) }
+        let local = convert(window.convertPoint(fromScreen: point), from: nil)
+        // `cellAtPoint` answers in viewport rows (it is shared with mouse
+        // reporting, which names on-screen cells); the snapshot indexes by
+        // document row, so the scroll offset comes back off here.
         let cell = cellAtPoint(local)
         guard cell.row >= 0, cell.row < snapshot.lineStarts.count else {
             return NSRange(location: 0, length: 0)
         }
-        let line = accessibilityRange(forLine: cell.row)
-        let offset = min(line.location + cell.column, line.location + line.length)
-        return NSRange(location: offset, length: 0)
+        let documentRow = cell.row - snapshot.scrollOffset
+        return NSRange(
+            location: snapshot.offset(documentRow: documentRow, column: cell.column), length: 0)
     }
 
     /// Where a character range is on screen, so VoiceOver's cursor outline
     /// lands on the text it is reading rather than around the whole pane.
+    ///
+    /// The columns come from the snapshot's boundary table, not from
+    /// `offset - lineStart` (U01): on a row of CJK that subtraction is half
+    /// the true column, and the outline lands on the wrong half of the line.
+    /// The range's last *character* is what bounds the rectangle, so a
+    /// zero-length range still outlines one cell.
     override func accessibilityFrame(for range: NSRange) -> NSRect {
-        guard let cellFrame = accessibilityCellFrameProvider else { return .zero }
-        let line = accessibilityLine(for: range.location)
-        let lineRange = accessibilityRange(forLine: line)
-        let startColumn = max(0, range.location - lineRange.location)
-        let endColumn = max(startColumn + 1, startColumn + range.length)
-        let first = cellFrame(line, startColumn)
-        let last = cellFrame(line, endColumn - 1)
+        guard let cellFrame = accessibilityCellFrameProvider,
+            let snapshot = accessibilitySnapshot()
+        else { return .zero }
+        let start = snapshot.cell(forOffset: range.location)
+        let end = snapshot.cell(forOffset: range.location + max(0, range.length - 1))
+        let first = cellFrame(start.row, start.column)
+        let last = cellFrame(end.row, end.column)
         let rect = first.union(last)
         return window?.convertToScreen(convert(rect, to: nil)) ?? rect
     }
