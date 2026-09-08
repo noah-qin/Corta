@@ -75,7 +75,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     /// One storyboard window controller, tracked so it lives as long as its
     /// window does.
-    private func instantiateWindowController() -> NSWindowController? {
+    func instantiateWindowController() -> NSWindowController? {
         guard let controller = NSStoryboard(name: "Main", bundle: nil)
             .instantiateInitialController() as? NSWindowController
         else { return nil }
@@ -234,17 +234,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// otherwise a restore would always leave one empty extra window behind.
     private func restoreWindowsIfConfigured() {
         guard Self.isRestoreEnabled else { return }
-        // A restore that crashed last time is not tried again: the marker
-        // outlives only a launch that died mid-restore, so the saved layout
-        // is what killed it (U07). Dropped rather than repaired — the
-        // arrangement is the suspect, and a fresh window always works.
-        guard !SessionRestore.previousRestoreFailed else {
+        let states: [WindowState]
+        switch SessionRestore.decideRestore() {
+        case .skipAfterFailure:
+            // A restore that crashed last time is not tried again: the marker
+            // outlives only a launch that died mid-restore, so the saved
+            // layout is what killed it (U07). Dropped rather than repaired —
+            // the arrangement is the suspect, and a fresh window always works.
             SessionRestore.clear()
             SessionRestore.endRestore()
             return
+        case .nothingToRestore:
+            return
+        case .restore(let saved):
+            states = saved
         }
-        let states = SessionRestore.load()
-        guard !states.isEmpty else { return }
         SessionRestore.beginRestore()
         // Cleared once every window is up. The state file itself is *kept*:
         // it is rewritten by `noteLayoutChanged` as the arrangement changes,

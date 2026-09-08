@@ -54,10 +54,18 @@ final class SplitViewController: NSViewController {
     /// applied afterwards.
     var pendingRestore: WindowState?
 
+    /// U16 — the preset this window's first pane should spawn from. Set
+    /// before the view loads, for the same reason `pendingRestore` is: the
+    /// root pane needs its shell, directory and environment at spawn time,
+    /// and a preset applied afterwards would relabel a child that had already
+    /// started somewhere else.
+    var pendingPreset: Preset?
+
     override func viewDidLoad() {
         super.viewDidLoad()
         let pane = makePane(
-            workingDirectory: pendingRestore?.layout.firstDirectory, initialGridSize: nil)
+            workingDirectory: pendingRestore?.layout.firstDirectory, initialGridSize: nil,
+            preset: pendingPreset)
         focusedPane = pane
         tree = SplitTree(root: pane.view)
         installRoot()
