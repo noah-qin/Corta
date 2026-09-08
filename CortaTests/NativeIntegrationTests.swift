@@ -60,4 +60,19 @@ struct NativeIntegrationTests {
         #expect(ViewController.shellQuoted("/tmp/a'b") == "'/tmp/a'\\''b'")
         #expect(ViewController.shellQuoted("/tmp/$(touch hacked)") == "'/tmp/$(touch hacked)'")
     }
+
+    @Test("dropped paths are sanitised before quoting")
+    func dropTextSanitisesControls() {
+        // ESC and the other C0 controls are stripped before quoting, and a
+        // path reduced to nothing is left out of the run entirely.
+        #expect(ViewController.quotedDropText(["/tmp/a\u{1B}[2Jb"]) == "'/tmp/a[2Jb'")
+        #expect(ViewController.quotedDropText(["\u{7}", "/tmp/ok"]) == "/tmp/ok")
+    }
+
+    @Test("a newline in a dropped filename stays inside the quotes")
+    func dropTextQuotesNewline() {
+        // Inside single quotes a newline is a literal character, not an
+        // executed line; the paste-path newline warning covers the rest.
+        #expect(ViewController.quotedDropText(["/tmp/a\nb"]) == "'/tmp/a\nb'")
+    }
 }
