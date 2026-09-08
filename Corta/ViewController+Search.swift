@@ -405,41 +405,59 @@ extension ViewController {
         _ query: String, in grid: Grid, caseSensitive: Bool, regex: Bool
     ) -> SweepOutcome {
         guard regex else {
+            let matches = Search.find(
+                query, in: grid, caseSensitive: caseSensitive,
+                maxMatches: Search.defaultMatchLimit, shouldStop: { Task.isCancelled })
             return SweepOutcome(
-                matches: Search.find(
-                    query, in: grid, caseSensitive: caseSensitive,
-                    maxMatches: Search.defaultMatchLimit, shouldStop: { Task.isCancelled }),
-                isInvalidPattern: false, skippedLongLines: 0)
+                matches: matches,
+                status: matches.count >= Search.defaultMatchLimit ? .incomplete : .complete)
         }
-        // An unfinishable pattern is the normal state of one being typed;
-        // "no results" is the wrong thing to say about it, so the bar is
-        // told the difference (U16).
+        // Three states, not two. A half-typed pattern is the normal state of
+        // one being typed and "no results" would send the user looking for
+        // missing text instead of a missing bracket; a pattern whose shape
+        // makes a backtracking engine take exponential time is refused
+        // before it runs, and saying "no results" there would be a lie about
+        // a search that never happened (U16).
         guard Search.isValidRegex(query, caseSensitive: caseSensitive) else {
-            return SweepOutcome(matches: [], isInvalidPattern: true, skippedLongLines: 0)
+            return SweepOutcome(matches: [], status: .invalidPattern)
+        }
+        guard !Search.isCatastrophic(query) else {
+            return SweepOutcome(matches: [], status: .patternTooSlow)
         }
         let result = Search.findRegex(
             query, in: grid, caseSensitive: caseSensitive,
             maxMatches: Search.defaultMatchLimit, shouldStop: { Task.isCancelled })
         return SweepOutcome(
-            matches: result.matches, isInvalidPattern: false,
-            skippedLongLines: result.skippedLongLines)
+            matches: result.matches,
+            status: result.isIncomplete ? .incomplete : .complete)
     }
 
-    /// What one sweep produced, including the two things a plain match list
-    /// cannot say: the pattern did not compile, and some lines were too long
-    /// to run it against.
+    /// What one sweep produced, plus the things a plain match list cannot
+    /// say — which are the difference between a count the user can trust and
+    /// one they cannot.
     struct SweepOutcome: Sendable {
         var matches: [SelectionRange]
-        var isInvalidPattern: Bool
-        var skippedLongLines: Int
+        var status: Status
+
+        enum Status: Sendable {
+            /// The whole document was searched.
+            case complete
+            /// The sweep hit the match cap, a line too long to run a pattern
+            /// against, or its time budget. The count is a floor.
+            case incomplete
+            /// The pattern does not compile.
+            case invalidPattern
+            /// The pattern's shape makes a backtracking engine take
+            /// exponential time, so it was refused before it ran (U16).
+            case patternTooSlow
+        }
     }
 
     private func applySearchResults(
         _ outcome: SweepOutcome, generation: Int, scrollsToMatch: Bool, totalPushed: Int
     ) {
         let matches = outcome.matches
-        searchPatternIsInvalid = outcome.isInvalidPattern
-        searchSkippedLongLines = outcome.skippedLongLines
+        searchStatus = outcome.status
         guard generation == searchRefreshGeneration, searchBar != nil else { return }
         // A generation match means this was the last sweep scheduled, so
         // `searchTask` is this (now finished) task.
@@ -553,22 +571,24 @@ extension ViewController {
             .arrangedSubviews.compactMap { $0 as? NSTextField }
             .first { !($0 is NSSearchField) }
         guard let label else { return }
-        if searchPatternIsInvalid {
+        if searchStatus == .invalidPattern {
             // Not "No Results": the pattern never ran, and saying it found
             // nothing would send the user looking for the missing text
             // instead of the missing bracket (U16).
             label.stringValue = L10n.text("search.invalidPattern")
+        } else if searchStatus == .patternTooSlow {
+            label.stringValue = L10n.text("search.patternTooSlow")
         } else if searchMatches.isEmpty {
             label.stringValue = searchField?.stringValue.isEmpty == false ? "No Results" : ""
         } else if let current = currentSearchMatchIndex {
             // "+" when the sweep stopped at the match cap: the document may
             // hold more matches than were kept (`Search.defaultMatchLimit`).
-            // "+" when the sweep stopped at the match cap or skipped a line
-            // too long to run a pattern against: either way the document may
-            // hold matches that were never counted.
-            let incomplete = searchMatchesTruncated || searchSkippedLongLines > 0
+            // "+" when the sweep stopped early — the match cap, a line too
+            // long to run a pattern against, or the time budget. Either way
+            // the document may hold matches that were never counted.
             label.stringValue =
-                "\(current + 1)/\(searchMatches.count)" + (incomplete ? "+" : "")
+                "\(current + 1)/\(searchMatches.count)"
+                + (searchStatus == .incomplete ? "+" : "")
         }
     }
 
