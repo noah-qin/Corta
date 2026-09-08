@@ -10,6 +10,85 @@ what to edit.
 
 ## [Unreleased]
 
+### Added
+
+- **U11 (2026-09-08)** — Clear Screen (⌘K), Clear History and Reset
+  Terminal, as three separate commands with a table in
+  `docs/CONFIGURATION.md` §5 saying what each one discards. They act on
+  Corta's grid, not on the child's input, so a running job is undisturbed.
+  Clear History and Reset ship unbound.
+- **U12 (2026-09-08)** — A **Match Case** toggle in the Find bar, backed by
+  `search-case-sensitive`; and a pill in the corner of a scrolled pane
+  saying how far back the viewport is, changing its wording when new output
+  has arrived, and returning to the live screen when clicked.
+- **U13 (2026-09-08)** — Zoom Pane (⇧⌘⏎): fills the window with the focused
+  pane and puts the split back. Temporary — no pane is closed, no child
+  disturbed, and the saved arrangement still describes the splits.
+- **U14 (2026-09-08)** — Copy Last Command Output, and Previous/Next Failed
+  Command (⇧⌘↑ / ⇧⌘↓), on the OSC 133 marks Corta already records.
+- **U15 (2026-09-08)** — Reopen Closed Pane (⇧⌘T), which restores the
+  arrangement a closed pane had and never claims to restore its process;
+  and Export Text… (⇧⌘S), which writes the selection — or the whole
+  scrollback — to a file.
+- **U16 (2026-09-08)** — Regular-expression search behind a `*` toggle
+  (`search-regex`), budgeted and cancellable, with a per-line length bound
+  and a distinct "bad pattern" state; and named shell/directory/environment
+  presets (`preset.<name>.*`) under Shell ▸ New Pane with Preset.
+- **U17 (2026-09-08)** — ⌘-click on `path:line:column` in program output
+  opens the file, optionally through `open-file-command`. Local only: a
+  pane inside `ssh` resolves nothing. The URL scheme allowlist is unchanged.
+- **U05 (2026-09-08)** — `option-as-meta` is now readable from the config
+  file and has a switch in Settings; it was previously written but never
+  parsed, so setting it did nothing.
+- **U04 (2026-09-08)** — Application keypad mode (DECKPAM / DECKPNM). The
+  keypad sends its SS3 forms to programs that asked for them via `smkx`.
+
+### Fixed
+
+- **U01 (2026-09-08)** — Accessibility hit-testing converted a *screen*
+  point as if it were a window point, and both directions of the
+  UTF-16-offset-to-column conversion assumed the two counts were equal —
+  wrong for any CJK, emoji or combining text. The exposed text also ignored
+  the scroll position, so a screen reader scrolled into the history read
+  the live screen.
+- **U02 (2026-09-08)** — The preedit overlay carried a copy of the cell
+  metrics that nothing read; sizing came from the cursor rect all along.
+- **U07 (2026-09-08)** — The window arrangement was written only at quit —
+  the one moment a crash never reaches — and the state file was deleted at
+  launch, so a crash lost it entirely. It is now written debounced as the
+  layout changes, with a marker file separating "crashed during a restore"
+  from "crashed at any other time". Restored geometry and split trees are
+  validated: non-finite or impossibly small frames, divider fractions
+  outside a usable range, and trees nested past 12 levels are repaired.
+- **U08 (2026-09-07)** — Three shortcuts were hard-coded and so outlived
+  their bindings: ⌘V pasted even after Paste was rebound or unbound, ⌘↑
+  scrolled to the top of the scrollback once Previous Command was unbound,
+  and ⌘F opened the Find bar after Find was rebound.
+- **U09 (2026-09-08)** — A pane that failed to start was silent to a screen
+  reader and left nothing focused for the keyboard.
+
+### Changed
+
+- **UI02 (2026-09-06)** — The Find bar's glass is now tinted with the
+  window background (fully opaque only under Reduce Transparency), and its
+  match-count label uses the secondary label colour instead of tertiary, so
+  the query and "n/m" stay readable over bright terminal output in both
+  light and dark themes.
+- **UI03 (2026-09-06)** — The active-pane focus ring is drawn at half
+  accent-colour strength instead of full-strength blue, so it marks the
+  pane without outshouting the text it frames; full colour returns under
+  Increase Contrast.
+- **UI06 (2026-09-06, extended 2026-09-08)** — The Shell menu is regrouped
+  as presets, create (splits), move (focus moves, then the command jumps),
+  terminal state (U11), resize (zoom, grow/shrink pairs, then Equalize
+  Panes); command jumping no longer sits behind the geometry group.
+- **UI07 (2026-09-06)** — View's separate Theme and Appearance submenus are
+  merged into one Theme submenu: the appearance choice (Follow System /
+  Light / Dark) heads the list, the themes follow below a separator, each a
+  plain checkmarked single choice.
+- **C03 (2026-09-06)** — Removed the assertion-less `testExample` template
+  test from `CortaUITests`.
+
 ## [0.1.0] - 2026-09-05
 
 The first release. Everything below is what `main` accumulated through
