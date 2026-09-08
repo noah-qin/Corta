@@ -39,13 +39,20 @@ extension Performer {
         return true
     }
 
-    /// ESC sequences. Only DECSC/DECRC are implemented; charset selection
-    /// and everything else are ignored cleanly (`SECURITY.md` §3).
+    /// ESC sequences. Charset selection and everything else are ignored
+    /// cleanly (`SECURITY.md` §3).
     public mutating func escapeDispatch(intermediates: Intermediates, final: UInt8) {
         guard intermediates.count == 0 else { return }
         switch final {
         case 0x37: grid.saveCursor()     // DECSC — VT510 §DECSC
         case 0x38: grid.restoreCursor()  // DECRC — VT510 §DECRC
+        // DECKPAM / DECKPNM (U04). `xterm-256color`'s `smkx` is
+        // `\E[?1h\E=`, so a program turning on application cursor keys turns
+        // this on in the same breath — ignoring it left the keypad sending
+        // plain digits to a program that had asked for `SS3` and was waiting
+        // for them.
+        case 0x3D: state.applicationKeypadEnabled = true   // ESC = (DECKPAM)
+        case 0x3E: state.applicationKeypadEnabled = false  // ESC > (DECKPNM)
         case 0x44: grid.lineFeed()       // IND
         case 0x45:                       // NEL
             grid.carriageReturn()
