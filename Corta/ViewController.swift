@@ -195,15 +195,11 @@ class ViewController: NSViewController {
     /// (`Grid+Marks.swift`).
     var currentSearchMatchAnchor: Int?
 
-    /// U16 — the search field holds a regular expression that does not
-    /// compile. Distinct from "no matches", which is what it used to look
-    /// like.
-    var searchPatternIsInvalid = false
-
-    /// Logical lines the regex sweep was too long to run against
-    /// (`Search.regexLineLimit`) — the count is why the match total is shown
-    /// with a "+".
-    var searchSkippedLongLines = 0
+    /// U16 — what the last sweep was able to do. Four states, because
+    /// "no matches", "that pattern does not compile", "that pattern would
+    /// never finish" and "there may be more than this" are four different
+    /// things to tell someone.
+    var searchStatus: SweepOutcome.Status = .complete
     /// True when the last sweep stopped at the match cap — the count label
     /// reads "N+" rather than claiming a total it does not have. A sweep
     /// that found exactly the cap's worth of matches reads "+" too; the
@@ -1254,15 +1250,22 @@ class ViewController: NSViewController {
     /// only then the other, so a bad directory still gets you your shell and a
     /// bad shell still gets you your directory. `/bin/sh` in `/` is the last
     /// rung because POSIX guarantees both exist.
-    private static func startSession(
-        size: TerminalSize, directory: String?, scrollbackLimit: Int, preset: Preset? = nil
+    /// - Parameter configuredShell: the ladder's first rung. Defaults to
+    ///   `$SHELL`, and is a parameter so the ladder can be staged with a
+    ///   shell that does not exist without setting `$SHELL` for anything
+    ///   else — the project's rule is that a test never changes the machine
+    ///   (U09).
+    static func startSession(
+        size: TerminalSize, directory: String?, scrollbackLimit: Int, preset: Preset? = nil,
+        configuredShell: String? = nil
     ) throws(PTYError) -> StartedSession {
         // U16 — a preset supplies the first rung's shell and directory; every
         // rung below it is the ordinary ladder, so a preset naming a shell
         // that has been uninstalled degrades to a working terminal instead of
         // to a failure panel.
         let configured =
-            preset?.shell ?? ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+            preset?.shell ?? configuredShell
+            ?? ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         let arguments = preset.map { $0.arguments.isEmpty ? ["-l"] : $0.arguments } ?? ["-l"]
         // Added on top of the sanitised inherited environment
         // (`SECURITY.md` §4.3): a preset can add and override, never remove.

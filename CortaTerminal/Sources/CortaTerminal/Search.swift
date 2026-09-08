@@ -25,29 +25,50 @@ public enum Search {
 
     /// The longest logical line a *regular expression* is run against (U16).
     ///
-    /// Plain substring search is linear and safe on any line. A regular
-    /// expression is not: `NSRegularExpression` backtracks, a pattern like
-    /// `(a+)+b` is exponential in the input's length, and there is no
-    /// timeout to hand it — the only cancellation `shouldStop` provides is
-    /// *between* lines, so a single pathological line would hang the sweep
-    /// with the cancellation check unreachable. A megabyte-long logical line
-    /// is a real thing (one `cat` of a binary produces several), so the
-    /// bound is on the input rather than on the pattern, which cannot be
-    /// analysed cheaply. Lines longer than this are skipped by the regex
-    /// path and reported through `Result.skippedLongLines`, so the UI can
-    /// say the search was incomplete instead of quietly finding nothing.
+    /// This bounds an *ordinary* pattern's per-line cost and the work a
+    /// single line can represent — a megabyte-long logical line is a real
+    /// thing (`cat` of a binary produces several), and running any regex over
+    /// one on every keystroke is not something to do.
+    ///
+    /// **It is deliberately not the guard against catastrophic patterns, and
+    /// could not be.** `(a+)+b` doubles its cost every two characters:
+    /// measured on this machine at 0.016 s for 18 characters, 0.52 s for 24
+    /// and 8.0 s for 28. There is no line length at which such a pattern is
+    /// affordable, so a length cap cannot be the answer — `isCatastrophic`
+    /// is. Lines longer than this are skipped and counted in
+    /// `RegexResult.skippedLongLines`, so the UI says the search was
+    /// incomplete instead of quietly finding nothing.
     public static let regexLineLimit = 64_000
+
+    /// How long a whole regex sweep may run before it stops and reports
+    /// itself incomplete (U16).
+    ///
+    /// The cooperative `shouldStop` is polled between lines and per match,
+    /// which covers a superseded query but not a pattern that is merely slow
+    /// on every line. This is the wall clock that does. It is generous — a
+    /// full-scrollback sweep of an ordinary pattern is milliseconds — so
+    /// tripping it means the pattern, not the document.
+    public static let regexTimeBudget: Duration = .milliseconds(500)
 
     /// What a regex sweep found, plus what it could not look at.
     public struct RegexResult: Sendable {
         public var matches: [SelectionRange]
         /// Logical lines skipped for exceeding `regexLineLimit`.
         public var skippedLongLines: Int
+        /// Whether the sweep stopped on `regexTimeBudget` rather than
+        /// finishing. The count it reports is a floor, not a total.
+        public var timedOut: Bool
 
-        public init(matches: [SelectionRange] = [], skippedLongLines: Int = 0) {
+        public init(
+            matches: [SelectionRange] = [], skippedLongLines: Int = 0, timedOut: Bool = false
+        ) {
             self.matches = matches
             self.skippedLongLines = skippedLongLines
+            self.timedOut = timedOut
         }
+
+        /// Whether anything kept this sweep from seeing the whole document.
+        public var isIncomplete: Bool { skippedLongLines > 0 || timedOut }
     }
 
     /// A pattern that could not be compiled — surfaced rather than treated
@@ -55,6 +76,146 @@ public enum Search {
     /// regex being typed and "no results" is the wrong thing to say about it.
     public static func isValidRegex(_ pattern: String, caseSensitive: Bool) -> Bool {
         compileRegex(pattern, caseSensitive: caseSensitive) != nil
+    }
+
+    /// Whether a pattern has the shape that makes a backtracking engine take
+    /// exponential time — an unbounded quantifier applied to a group that
+    /// itself repeats or alternates (`(a+)+`, `(a*)*`, `(a|a)+`).
+    ///
+    /// **Why a shape check and not a timeout.** Neither
+    /// `NSRegularExpression` nor Swift's `Regex` exposes ICU's own time
+    /// limit, so a single match attempt cannot be interrupted from outside:
+    /// once ICU is handed such a pattern, the thread runs until it finishes.
+    /// `regexTimeBudget` bounds the sweep *between* attempts and cannot
+    /// bound one, and a length cap cannot either — the measurements on
+    /// `regexLineLimit` show `(a+)+b` costing 8 seconds at 28 characters. The
+    /// only place to stop it is before it starts.
+    ///
+    /// **Conservative on purpose.** It rejects some patterns that would in
+    /// fact have been fine — `(\w+\s*)+` is refused along with `(a+)+` —
+    /// because the alternative is a search that never returns and a core
+    /// pinned for the life of the app. A refused pattern is reported as too
+    /// slow, distinctly from one that does not compile, so the user knows to
+    /// rewrite rather than to hunt for a typo. Every one of these has a
+    /// linear equivalent: `(\w+\s*)+` is `[\w\s]+`.
+    public static func isCatastrophic(_ pattern: String) -> Bool {
+        let characters = Array(pattern)
+        var index = 0
+        while index < characters.count {
+            let character = characters[index]
+            if character == "\\" {
+                index += 2
+                continue
+            }
+            if character == "[" {
+                // A character class: `(`, `|` and `+` inside it are literal.
+                index += 1
+                while index < characters.count, characters[index] != "]" {
+                    index += characters[index] == "\\" ? 2 : 1
+                }
+                index += 1
+                continue
+            }
+            guard character == "(", let close = groupEnd(characters, from: index) else {
+                index += 1
+                continue
+            }
+            let body = Array(characters[(index + 1)..<close])
+            guard let quantified = unboundedQuantifierEnd(characters, after: close) else {
+                // Not a repeated group — step into it, since a nested one may
+                // still be.
+                index += 1
+                continue
+            }
+            if bodyCanBacktrack(body) { return true }
+            index = quantified
+        }
+        return false
+    }
+
+    /// The index of the `)` closing the group that opens at `start`, honouring
+    /// nesting, escapes and character classes.
+    private static func groupEnd(_ characters: [Character], from start: Int) -> Int? {
+        var depth = 0
+        var index = start
+        while index < characters.count {
+            let character = characters[index]
+            if character == "\\" {
+                index += 2
+                continue
+            }
+            if character == "[" {
+                index += 1
+                while index < characters.count, characters[index] != "]" {
+                    index += characters[index] == "\\" ? 2 : 1
+                }
+                index += 1
+                continue
+            }
+            if character == "(" { depth += 1 }
+            if character == ")" {
+                depth -= 1
+                if depth == 0 { return index }
+            }
+            index += 1
+        }
+        return nil
+    }
+
+    /// The index just past an unbounded quantifier (`*`, `+`, `{n,}`) sitting
+    /// immediately after `close`, or `nil` if there is none.
+    private static func unboundedQuantifierEnd(_ characters: [Character], after close: Int)
+        -> Int?
+    {
+        var index = close + 1
+        guard index < characters.count else { return nil }
+        switch characters[index] {
+        case "*", "+":
+            index += 1
+        case "{":
+            guard let brace = characters[index...].firstIndex(of: "}") else { return nil }
+            let inside = String(characters[(index + 1)..<brace])
+            // `{2,}` is unbounded; `{2,4}` and `{2}` are not.
+            guard inside.hasSuffix(",") else { return nil }
+            index = brace + 1
+        default:
+            return nil
+        }
+        // A lazy or possessive marker does not change the shape.
+        if index < characters.count, characters[index] == "?" || characters[index] == "+" {
+            index += 1
+        }
+        return index
+    }
+
+    /// Whether a repeated group's body can match the same text more than one
+    /// way — an unbounded quantifier inside it, or an alternation.
+    private static func bodyCanBacktrack(_ body: [Character]) -> Bool {
+        var index = 0
+        while index < body.count {
+            let character = body[index]
+            if character == "\\" {
+                index += 2
+                continue
+            }
+            if character == "[" {
+                index += 1
+                while index < body.count, body[index] != "]" {
+                    index += body[index] == "\\" ? 2 : 1
+                }
+                index += 1
+                continue
+            }
+            if character == "|" { return true }
+            if character == "*" || character == "+" { return true }
+            if character == "{", let brace = body[index...].firstIndex(of: "}") {
+                if String(body[(index + 1)..<brace]).hasSuffix(",") { return true }
+                index = brace + 1
+                continue
+            }
+            index += 1
+        }
+        return false
     }
 
     private static func compileRegex(_ pattern: String, caseSensitive: Bool)
@@ -80,16 +241,25 @@ public enum Search {
     /// spin.
     public static func findRegex(
         _ pattern: String, in grid: Grid, caseSensitive: Bool = false,
-        maxMatches: Int = .max, shouldStop: () -> Bool = { false }
+        maxMatches: Int = .max, timeBudget: Duration = regexTimeBudget,
+        shouldStop: () -> Bool = { false }
     ) -> RegexResult {
-        guard maxMatches > 0,
+        guard maxMatches > 0, !isCatastrophic(pattern),
             let regex = compileRegex(pattern, caseSensitive: caseSensitive)
         else { return RegexResult() }
         var result = RegexResult()
+        let deadline = ContinuousClock.now + timeBudget
         lineLoop: for logicalLine in grid.reversedLogicalLines() {
             let text = logicalLine.text
             guard !text.isEmpty else { continue }
             if shouldStop() { break }
+            // Checked here as well as inside the match callback: a pattern
+            // that is merely slow on every line never trips a per-match
+            // check, because a line with no match calls the block no times.
+            if ContinuousClock.now >= deadline {
+                result.timedOut = true
+                break
+            }
             guard text.utf16.count <= regexLineLimit else {
                 result.skippedLongLines += 1
                 continue
@@ -114,7 +284,9 @@ public enum Search {
                                 row: startPosition.row, column: startPosition.column),
                             end: SelectionPoint(row: endPosition.row, column: endPosition.column)))
                 }
-                if result.matches.count + found.count >= maxMatches || shouldStop() {
+                if result.matches.count + found.count >= maxMatches || shouldStop()
+                    || ContinuousClock.now >= deadline
+                {
                     stop.pointee = true
                 }
             }
@@ -123,6 +295,10 @@ public enum Search {
             // the whole list is reversed once at the end.
             result.matches.append(contentsOf: found.reversed())
             if result.matches.count >= maxMatches || shouldStop() { break lineLoop }
+            if ContinuousClock.now >= deadline {
+                result.timedOut = true
+                break lineLoop
+            }
         }
         result.matches.reverse()
         return result

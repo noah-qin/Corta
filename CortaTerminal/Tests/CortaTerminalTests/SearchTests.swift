@@ -245,3 +245,70 @@ struct SearchTests {
         #expect(result.skippedLongLines == 1)
     }
 }
+
+/// U16 — the shape check that stops a pattern before it reaches a
+/// backtracking engine that cannot be interrupted.
+///
+/// The measurements behind it: `(a+)+b` against a run of "a" took 0.016 s at
+/// 18 characters, 0.52 s at 24 and 8.0 s at 28 on this machine — doubling
+/// every two characters. There is no line length at which it is affordable,
+/// which is why a length cap cannot be the guard and this is.
+@Suite struct CatastrophicPatternTests {
+    @Test("the classic exponential shapes are refused")
+    func exponentialShapesRefused() {
+        for pattern in [
+            "(a+)+b", "(a*)*b", "(a|a)+b", "(a+|b)*c", "([a-z]+)+", "(\\d+)+",
+            "(x(y+))+", "(a{2,})+",
+        ] {
+            #expect(Search.isCatastrophic(pattern), "\(pattern) should be refused")
+        }
+    }
+
+    /// The patterns a person actually types must go through. A check that
+    /// refuses ordinary searches is worse than the problem it solves.
+    @Test("ordinary patterns are not refused")
+    func ordinaryPatternsAllowed() {
+        for pattern in [
+            "error", "error \\d+", "^\\s*fatal", "TODO|FIXME", "[a-z]+@[a-z]+",
+            "(abc)+", "(?:abc)+", "(a{2})+", "(a|b)", "foo.*bar$", "\\(a+\\)+",
+            "warning: .*\\.swift:\\d+", "[(]a+[)]+",
+        ] {
+            #expect(!Search.isCatastrophic(pattern), "\(pattern) should be allowed")
+        }
+    }
+
+    /// A refused pattern never reaches the engine, so the sweep returns at
+    /// once rather than after however long ICU would have taken.
+    @Test("a refused pattern finds nothing, immediately")
+    func refusedPatternsDoNotRun() {
+        var terminal = Terminal(rows: 4, columns: 200, scrollbackLimit: 10)
+        terminal.feed(Array(String(repeating: "a", count: 120).utf8))
+        let start = ContinuousClock.now
+        let result = Search.findRegex("(a+)+b", in: terminal.grid)
+        let elapsed = ContinuousClock.now - start
+        #expect(result.matches.isEmpty)
+        // 120 characters of that pattern would not finish in this universe.
+        #expect(elapsed < .milliseconds(50))
+    }
+
+    /// A pattern that is merely slow — not exponential — stops on the time
+    /// budget and says the count is a floor rather than a total.
+    @Test("a sweep that runs long reports itself incomplete")
+    func timeBudgetIsReported() {
+        var terminal = Terminal(rows: 8, columns: 80, scrollbackLimit: 4000)
+        for index in 0..<3000 { terminal.feed(Array("line \(index) of text\r\n".utf8)) }
+        let result = Search.findRegex(
+            "l.*e", in: terminal.grid, timeBudget: .milliseconds(1))
+        #expect(result.timedOut)
+        #expect(result.isIncomplete)
+    }
+
+    @Test("an ordinary sweep is complete")
+    func ordinarySweepIsComplete() {
+        var terminal = Terminal(rows: 8, columns: 80, scrollbackLimit: 100)
+        terminal.feed(Array("hello world\r\n".utf8))
+        let result = Search.findRegex("world", in: terminal.grid)
+        #expect(result.matches.count == 1)
+        #expect(!result.isIncomplete)
+    }
+}
