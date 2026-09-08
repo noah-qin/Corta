@@ -18,6 +18,26 @@ struct MenuAndPaletteAuditTests {
         menu.items.flatMap { item in [item] + (item.submenu.map { items(in: $0) } ?? []) }
     }
 
+    /// The menus Corta builds, which is what an audit of Corta's menus can
+    /// speak to. AppKit populates the Window and Services menus itself: the
+    /// window list is one item per open window (two windows named "Corta" are
+    /// a legitimate duplicate), and macOS's own Move & Resize submenu is
+    /// built from section headers, which by definition carry no action. Both
+    /// failed the two structural checks below on CI while passing here,
+    /// because how much of that AppKit injects depends on the system rather
+    /// than on this project. Section headers are excluded everywhere for the
+    /// same reason — a header is a label, not a row that should do something.
+    private static func auditableItems(in menu: NSMenu) -> [NSMenuItem] {
+        let systemOwned = [NSApp.windowsMenu, NSApp.servicesMenu].compactMap { $0 }
+        func walk(_ menu: NSMenu) -> [NSMenuItem] {
+            guard !systemOwned.contains(where: { $0 === menu }) else { return [] }
+            return menu.items.flatMap { item in
+                (item.isSectionHeader ? [] : [item]) + (item.submenu.map(walk) ?? [])
+            }
+        }
+        return walk(menu)
+    }
+
     /// A row that is neither a separator, nor a submenu, nor a message is a
     /// row that does nothing when clicked. AppKit enables such an item
     /// unconditionally — `validateMenuItem` is never consulted for an item
@@ -26,7 +46,7 @@ struct MenuAndPaletteAuditTests {
     @Test("no item in the menu bar is enabled with nothing behind it")
     func everyItemLeadsSomewhere() throws {
         let menu = try #require(NSApp.mainMenu)
-        let dead = Self.items(in: menu).filter { item in
+        let dead = Self.auditableItems(in: menu).filter { item in
             !item.isSeparatorItem && item.submenu == nil && item.action == nil && !item.isHidden
         }
         #expect(dead.isEmpty, "actionless rows: \(dead.map(\.title))")
@@ -38,8 +58,12 @@ struct MenuAndPaletteAuditTests {
     @Test("no menu offers the same words twice")
     func noMenuRepeatsATitle() throws {
         let menu = try #require(NSApp.mainMenu)
+        let systemOwned = [NSApp.windowsMenu, NSApp.servicesMenu].compactMap { $0 }
         func check(_ menu: NSMenu) {
-            let titles = menu.items.filter { !$0.isSeparatorItem && !$0.isHidden }.map(\.title)
+            guard !systemOwned.contains(where: { $0 === menu }) else { return }
+            let titles = menu.items
+                .filter { !$0.isSeparatorItem && !$0.isHidden && !$0.isSectionHeader }
+                .map(\.title)
             let duplicated = Set(titles.filter { title in titles.filter { $0 == title }.count > 1 })
             #expect(duplicated.isEmpty, "\(menu.title) repeats: \(duplicated.sorted())")
             for item in menu.items { item.submenu.map(check) }
@@ -74,7 +98,8 @@ struct MenuAndPaletteAuditTests {
     func menuTitlesComeFromTheTable() throws {
         let menu = try #require(NSApp.mainMenu)
         let byAction = Dictionary(
-            grouping: Self.items(in: menu).filter { $0.action != nil }, by: { $0.action! })
+            grouping: Self.auditableItems(in: menu).filter { $0.action != nil },
+            by: { $0.action! })
         // Commands the menu bar deliberately does not carry: the palette
         // itself is reached from a menu item whose title names the palette,
         // and the directional focus moves are keyboard-only by design.
