@@ -12,7 +12,7 @@ import Testing
 /// the frame and idle at ~0% CPU.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
-@Suite(.serialized) struct DamageTrackingTests {
+@Suite(.serialized, .metalSerialized) struct DamageTrackingTests {
     private static func makeRenderer() -> TerminalRenderer? {
         guard let device = MTLCreateSystemDefaultDevice() else { return nil }
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
@@ -84,11 +84,8 @@ import Testing
 
         let width = Int(renderer.metrics.cellWidth * 10)
         let height = Int(renderer.metrics.cellHeight * 4)
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: QuadRenderer.pixelFormat, width: width, height: height, mipmapped: false)
-        descriptor.usage = [.renderTarget, .shaderRead]
-        descriptor.storageMode = .managed
-        let texture = device.makeTexture(descriptor: descriptor)!
+        let texture = MetalRenderTarget.make(
+            device: device, width: width, height: height)
 
         func draw() {
             let pass = MTLRenderPassDescriptor()

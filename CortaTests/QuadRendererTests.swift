@@ -7,7 +7,7 @@ import Testing
 
 /// Renders offscreen and asserts actual pixel values — never visual
 /// inspection (roadmap M1.15's "Testing the GPU" note).
-struct QuadRendererTests {
+@Suite(.serialized, .metalSerialized) struct QuadRendererTests {
     /// Reads back one BGRA8 pixel from `texture` at `x, y`.
     private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (
         r: UInt8, g: UInt8, b: UInt8, a: UInt8
@@ -20,11 +20,7 @@ struct QuadRendererTests {
     }
 
     private static func makeTexture(device: MTLDevice, width: Int, height: Int) -> MTLTexture {
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: QuadRenderer.pixelFormat, width: width, height: height, mipmapped: false)
-        descriptor.usage = [.renderTarget, .shaderRead]
-        descriptor.storageMode = .managed
-        return device.makeTexture(descriptor: descriptor)!
+        MetalRenderTarget.make(device: device, width: width, height: height)
     }
 
     private static func renderPass(target: MTLTexture, clear: Bool) -> MTLRenderPassDescriptor {

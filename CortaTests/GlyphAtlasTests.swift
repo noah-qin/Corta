@@ -7,7 +7,7 @@ import Testing
 
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
-@Suite(.serialized) struct GlyphAtlasTests {
+@Suite(.serialized, .metalSerialized) struct GlyphAtlasTests {
     private static func makeDevice() -> MTLDevice? { MTLCreateSystemDefaultDevice() }
 
     private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (
@@ -225,12 +225,8 @@ import Testing
             origin: .init(info.bearing.x, cellHeight - info.bearing.y - info.size.y),
             size: info.size, color: .init(1, 1, 1, 1), uvRect: info.uvRect)
 
-        let targetDescriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: QuadRenderer.pixelFormat, width: Int(cellWidth), height: Int(cellHeight),
-            mipmapped: false)
-        targetDescriptor.usage = [.renderTarget, .shaderRead]
-        targetDescriptor.storageMode = .managed
-        let target = device.makeTexture(descriptor: targetDescriptor)!
+        let target = MetalRenderTarget.make(
+            device: device, width: Int(cellWidth), height: Int(cellHeight))
 
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = target

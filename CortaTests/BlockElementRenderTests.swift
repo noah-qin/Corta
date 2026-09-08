@@ -8,7 +8,7 @@ import Testing
 @testable import Corta
 
 /// `.serialized`: builds a `GlyphAtlas`, which is single-threaded by design.
-@Suite("Block elements", .serialized) struct BlockElementRenderTests {
+@Suite("Block elements", .serialized, .metalSerialized) struct BlockElementRenderTests {
     /// The defect: a cell is `advance.rounded(.up)` wide, so a font whose
     /// advance is 8.4pt gets a 9pt cell and every glyph leaves a point bare on
     /// its right. Between letters that is invisible; between block characters
@@ -48,11 +48,8 @@ import Testing
         let grid = terminal.grid
         let w = Int(renderer.metrics.cellWidth), h = Int(renderer.metrics.cellHeight)
 
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: QuadRenderer.pixelFormat, width: w, height: h, mipmapped: false)
-        descriptor.usage = [.renderTarget, .shaderRead]
-        descriptor.storageMode = .managed
-        let texture = device.makeTexture(descriptor: descriptor)!
+        let texture = MetalRenderTarget.make(
+            device: device, width: w, height: h)
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = texture
         pass.colorAttachments[0].loadAction = .clear
