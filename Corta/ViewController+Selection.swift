@@ -110,10 +110,21 @@ extension ViewController {
             applySelection(anchor: anchor, head: anchor, unit: unit, grid: grid)
         }
 
+        // Edge auto-scroll (U19) rides on periodic events rather than a
+        // Timer because nextEvent(matching:)'s modal wait does not run the
+        // main run loop — a Timer scheduled there would never fire for the
+        // whole drag. Periodic events arrive in the same event stream, so
+        // they coexist with the local loop unchanged.
+        NSEvent.startPeriodicEvents(afterDelay: 0.2, withPeriod: 1.0 / 30.0)
+        defer { NSEvent.stopPeriodicEvents() }
         while true {
-            guard let next = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp])
+            guard let next = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp, .periodic])
             else { continue }
             grid = session.snapshot()
+            if next.type == .periodic {
+                dragAutoScrollTick(in: terminalView, grid: grid, anchor: anchor, unit: unit)
+                continue
+            }
             let head = documentPosition(for: next, in: terminalView, grid: grid)
             if next.type == .leftMouseUp {
                 // The mouse-up lands the final range — except for a plain
@@ -142,6 +153,33 @@ extension ViewController {
             if head != anchor || unit != .character {
                 applySelection(anchor: anchor, head: head, unit: unit, grid: grid)
             }
+        }
+    }
+
+    /// One auto-scroll tick during a selection drag (U19): while the pointer
+    /// is parked past the grid's top or bottom edge, scroll the viewport by
+    /// the graded amount the overshoot calls for and re-extend the head to
+    /// the pointer's (edge-clamped) document position under the new offset.
+    /// The clamp inside `autoScrollTick` is what stops the gesture at the
+    /// scrollback's ends.
+    private func dragAutoScrollTick(
+        in terminalView: TerminalView, grid: Grid, anchor: SelectionPoint, unit: SelectionUnit
+    ) {
+        guard let window = terminalView.window else { return }
+        // The current pointer position, not the periodic event's: a parked
+        // pointer past the edge is exactly the case being handled.
+        let point = terminalView.convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        guard let tick = Self.autoScrollTick(
+            at: point, viewHeight: terminalView.bounds.height,
+            metrics: terminalRenderer.pointMetrics, grid: grid,
+            scrollOffset: scrollOffset, historyDepth: grid.scrollback.count, topInset: topInset)
+        else { return }
+        scrollOffset = tick.scrollOffset
+        // Scrolling moves the viewport without any grid output; same redraw
+        // contract as `scroll(_:)`.
+        invalidateDisplay()
+        if tick.head != anchor || unit != .character {
+            applySelection(anchor: anchor, head: tick.head, unit: unit, grid: grid)
         }
     }
 
@@ -204,6 +242,40 @@ extension ViewController {
         return SelectionPoint(
             row: min(max(0, row), grid.rows - 1) - scrollOffset,
             column: min(max(0, column), grid.columns - 1))
+    }
+
+    /// One tick of drag auto-scroll (U19), pure for tests: nil while the
+    /// pointer is inside the grid's vertical extent; otherwise the clamped
+    /// new scroll offset and the head position under it. Returns nil too
+    /// when the offset cannot move further — the scrollback's top and
+    /// bottom are where the gesture stops.
+    ///
+    /// The pace grades with overshoot: one row per tick near the edge, plus
+    /// one for every further two cell heights, capped so a pointer flung
+    /// far past the window does not make the scrollback race. At 30 ticks
+    /// per second that is 30 to 240 rows per second.
+    nonisolated static func autoScrollTick(
+        at point: CGPoint, viewHeight: CGFloat, metrics: CellMetrics, grid: Grid,
+        scrollOffset: Int, historyDepth: Int, topInset: CGFloat
+    ) -> (scrollOffset: Int, head: SelectionPoint)? {
+        let gridHeight = CGFloat(grid.rows) * metrics.cellHeight
+        let gridTop =
+            topInset + gridHeight <= viewHeight - TerminalLayout.insets.bottom
+            ? topInset
+            : viewHeight - TerminalLayout.insets.bottom - gridHeight
+        let upward = point.y < gridTop
+        let overshoot =
+            upward
+            ? gridTop - point.y
+            : max(0, point.y - (gridTop + gridHeight))
+        guard overshoot > 0 else { return nil }
+        let rows = min(1 + Int(overshoot / (2 * metrics.cellHeight)), 8)
+        let newOffset = min(max(0, scrollOffset + (upward ? rows : -rows)), max(0, historyDepth))
+        guard newOffset != scrollOffset else { return nil }
+        let head = documentPosition(
+            for: point, viewHeight: viewHeight, metrics: metrics, grid: grid,
+            scrollOffset: newOffset, topInset: topInset)
+        return (scrollOffset: newOffset, head: head)
     }
 }
 
