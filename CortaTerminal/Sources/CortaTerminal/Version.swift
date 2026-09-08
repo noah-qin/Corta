@@ -17,7 +17,7 @@
 /// constant, and the `CHANGELOG.md` heading together.
 public enum CortaVersion {
     /// Semantic version, matching `MARKETING_VERSION` and the changelog.
-    public static let string = "0.1.0"
+    public static let string = "0.1.1"
 
     /// The XTVERSION payload: the convention every consumer parses is
     /// `Name(version)`, the way xterm answers `XTerm(<patch>)`.
