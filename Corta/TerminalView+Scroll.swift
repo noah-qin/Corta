@@ -1,7 +1,57 @@
 import AppKit
 
-/// Scrolling (M1.20): the wheel, page keys and ⌘↑/⌘↓ resolve to a
-/// `ScrollGesture` the shell applies to the scrollback viewport.
+/// U03: the leftover sub-line scroll distance for one view, kept per device
+/// class. Trackpads report *precise* deltas in points, wheel mice report
+/// lines (usually whole, occasionally fractional); rounding each event on
+/// its own rounded small trackpad deltas away to nothing and dropped a
+/// wheel notch entirely (a 1-line notch is 1/10 of the old per-event
+/// threshold). Accumulating instead keeps the totals faithful in both
+/// units. The two remainders never combine: a trackpad's leftover points
+/// must not make a wheel notch count as more than a notch.
+final class ScrollWheelAccumulator {
+    /// Trackpad points per scrollback line — the constant M1.20 picked so
+    /// momentum scrolling stays proportionate without a config knob.
+    static let pointsPerLine: CGFloat = 10
+
+    private var precisePoints: CGFloat = 0
+    private var discreteLines: CGFloat = 0
+
+    func lines(for event: NSEvent) -> Int {
+        event.hasPreciseScrollingDeltas
+            ? lines(precisePoints: event.scrollingDeltaY)
+            : lines(discreteLines: event.scrollingDeltaY)
+    }
+
+    /// Truncating (not rounding) division keeps the signed remainder, so
+    /// sub-line deltas sum across events, and a reverse flick cancels what
+    /// it undid instead of emitting a phantom line.
+    func lines(precisePoints delta: CGFloat) -> Int {
+        let total = precisePoints + delta
+        let lines = Int(total / Self.pointsPerLine)
+        precisePoints = total - CGFloat(lines) * Self.pointsPerLine
+        return lines
+    }
+
+    /// Wheel deltas are already in lines, so they pass through 1:1; the
+    /// remainder handling only matters for the rare fractional step.
+    func lines(discreteLines delta: CGFloat) -> Int {
+        let total = discreteLines + delta
+        let lines = Int(total)
+        discreteLines = total - CGFloat(lines)
+        return lines
+    }
+}
+
+/// Extensions can't add stored properties, and two side-by-side panes must
+/// not share leftovers, so each view's accumulator hangs off this
+/// weak-keyed table. `scrollWheel` is an AppKit responder callback and
+/// only ever runs on the main thread, so the table needs no locking.
+private let scrollWheelAccumulators = NSMapTable<TerminalView, ScrollWheelAccumulator>(
+    keyOptions: .weakMemory, valueOptions: .strongMemory)
+
+/// Scrolling (M1.20): the wheel, the page keys and the keystrokes bound to
+/// Scroll to Top / Scroll to Bottom resolve to a `ScrollGesture` the shell
+/// applies to the scrollback viewport.
 extension TerminalView {
     override func scrollWheel(with event: NSEvent) {
         noteScrollGesturePhase(event)
@@ -20,11 +70,19 @@ extension TerminalView {
         // terminal does. AppKit has already applied the user's natural-
         // scrolling preference to `scrollingDeltaY`, so the raw sign is the
         // one to follow — negating it here inverted the gesture for everyone.
-        // One line per ~10pt keeps momentum scrolling proportionate without
-        // needing a config knob.
-        let lines = Int((event.scrollingDeltaY / 10).rounded())
+        // Momentum deltas arrive through the same accumulator: each event is
+        // consumed exactly once, so the deceleration tail sums to whole
+        // lines rather than freezing at the first sub-line event.
+        let lines = scrollWheelAccumulator.lines(for: event)
         guard lines != 0 else { return }
         onScroll?(.lines(lines))
+    }
+
+    private var scrollWheelAccumulator: ScrollWheelAccumulator {
+        if let existing = scrollWheelAccumulators.object(forKey: self) { return existing }
+        let created = ScrollWheelAccumulator()
+        scrollWheelAccumulators.setObject(created, forKey: self)
+        return created
     }
 
     override func scrollPageUp(_ sender: Any?) { onScroll?(.page(up: true)) }
@@ -58,15 +116,26 @@ extension TerminalView {
         }
     }
 
-    /// ⌘↑ / ⌘↓ jump to the top and bottom of scrollback, the same gesture
-    /// most terminals and pagers use — checked before `bytes(for:)` so a
-    /// held ⌘ never leaks an arrow escape sequence to the child.
-    static func scrollGesture(for event: NSEvent) -> ScrollGesture? {
-        guard event.modifierFlags.contains(.command) else { return nil }
-        switch event.specialKey {
-        case .some(.upArrow): return .toTop
-        case .some(.downArrow): return .toBottom
-        default: return nil
-        }
+    /// The keystrokes bound to Scroll to Top and Scroll to Bottom, checked
+    /// before `bytes(for:)` so neither leaks an escape sequence to the child.
+    ///
+    /// This used to read ⌘↑ / ⌘↓ literally, from M1.20 — before M7.2 gave
+    /// those two keys to `previous-command` and `next-command` and M7.7 gave
+    /// Scroll to Top and Scroll to Bottom their own bindings (⇧Home / ⇧End).
+    /// The literal outlived both. It was masked in a default install, because
+    /// the Shell menu's Previous Command claims ⌘↑ and AppKit dispatches a
+    /// menu key equivalent before `keyDown` runs, but `bind.previous-command
+    /// =` uncovered it: unbinding one command silently turned on a different,
+    /// undocumented one that Help ▸ Keyboard Shortcuts never listed (U08).
+    ///
+    /// The View menu's own items claim these keystrokes first, so this is the
+    /// path for a keystroke AppKit did not dispatch — a menu item that failed
+    /// validation, or a binding on a key AppKit will not take as a menu key
+    /// equivalent — and it can now only ever answer for a key those two
+    /// commands are actually bound to.
+    static func scrollGesture(for event: NSEvent, bindings: Keybindings) -> ScrollGesture? {
+        if bindings[.scrollToTop]?.matches(event) == true { return .toTop }
+        if bindings[.scrollToBottom]?.matches(event) == true { return .toBottom }
+        return nil
     }
 }
