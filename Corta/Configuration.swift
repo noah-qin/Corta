@@ -92,6 +92,28 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// `{line}` and `{column}` substituted. Empty means the system default
     /// application, which cannot be told a line number.
     var openFileCommand: String = ""
+
+    /// Whether an `open-file-command` template could actually be run: empty
+    /// (meaning the system default application), or a command whose first
+    /// word is an absolute path. A template that names no `{file}` is
+    /// allowed — an editor that takes the path last is a real shape — but
+    /// one that names an unknown placeholder is not, because the placeholder
+    /// would be passed through as a literal argument.
+    static func isUsableOpenFileCommand(_ template: String) -> Bool {
+        let parts = template.split(separator: " ").map(String.init)
+        guard let executable = parts.first else { return true }
+        guard executable.hasPrefix("/") else { return false }
+        let known = ["{file}", "{line}", "{column}"]
+        for part in parts {
+            var rest = part
+            while let open = rest.firstIndex(of: "{") {
+                guard let close = rest[open...].firstIndex(of: "}") else { return false }
+                guard known.contains(String(rest[open...close])) else { return false }
+                rest = String(rest[rest.index(after: close)...])
+            }
+        }
+        return true
+    }
     /// M7.11 — whether OSC 52 may write the system pasteboard.
     ///
     /// Off by default, as `SECURITY.md` §2.6 requires: any output at all
@@ -249,6 +271,14 @@ nonisolated struct Configuration: Equatable, Sendable {
             guard let seconds = Double(value) else { return false }
             notificationThreshold = max(1, seconds)
         case "open-file-command":
+            // Validated when it is *set*, not only when it is run (U17). An
+            // executable that is not an absolute path can never be launched
+            // — resolving a bare name would mean consulting a `PATH` that the
+            // user's shell, not Corta, controls — and finding that out at
+            // click time, as a toast, is finding it out in the wrong place.
+            // Malformed means the line is preserved and the default applies,
+            // the same as every other unparseable value.
+            guard Self.isUsableOpenFileCommand(value) else { return false }
             openFileCommand = value
         case "search-regex":
             guard let parsed = Self.parseBool(value) else { return false }
