@@ -8,13 +8,16 @@ import Foundation
 /// comes back, so a click and a hand-edit in `$EDITOR` travel the exact same
 /// path. Anything else drifts.
 ///
-/// Watching is a `DispatchSource` on the file itself, plus one on its
-/// directory. Both are needed: most editors do not write in place, they
-/// write a temporary file and rename it over the target, which the file's
-/// own descriptor sees as a delete and never as a write.
+/// Watching is a `DispatchSource` on the file itself, plus one on the
+/// deepest existing ancestor of its directory. Both are needed: most editors
+/// do not write in place, they write a temporary file and rename it over the
+/// target, which the file's own descriptor sees as a delete and never as a
+/// write — and on a first launch the config's directory may not exist yet,
+/// so the watcher starts at an ancestor that does and re-points itself
+/// deeper once the missing piece appears.
 @MainActor
 final class ConfigurationStore {
-    static let shared = ConfigurationStore()
+    static let shared = ConfigurationStore(fileURL: ConfigurationStore.fileURL)
 
     /// Posted after the configuration changes, from either direction. Panes
     /// observe this rather than being pushed to, so a window opened later
@@ -40,11 +43,19 @@ final class ConfigurationStore {
 
     private var fileSource: DispatchSourceFileSystemObject?
     private var directorySource: DispatchSourceFileSystemObject?
-    /// Set around our own write, so the watcher does not treat it as an
-    /// external edit and reload in the middle of applying one.
-    private var isWriting = false
+    /// The exact text of our last successful write, so the watcher can tell
+    /// the events that write raises apart from an external edit by comparing
+    /// contents. A time-based "we are writing" flag was tried first: any
+    /// window long enough to cover a slow save also swallows an editor save
+    /// that lands inside it.
+    private var lastWrittenText: String?
     /// The coalescing timer for watcher events.
     private var pendingReload: DispatchWorkItem?
+
+    /// The file this instance reads, writes and watches — injected so a
+    /// test can point a store at a temporary directory instead of the real
+    /// config.
+    let fileURL: URL
 
     /// `~/.config/corta/config` — the XDG-ish location a terminal user will
     /// look in first, and one no sandbox container hides.
@@ -53,17 +64,33 @@ final class ConfigurationStore {
             .appendingPathComponent(".config/corta/config")
     }
 
-    private init() {
+    init(fileURL: URL) {
+        self.fileURL = fileURL
         reload()
         startWatching()
     }
 
+    isolated deinit {
+        pendingReload?.cancel()
+        fileSource?.cancel()
+        directorySource?.cancel()
+    }
+
     // MARK: - Reading
 
-    /// Reads the file, or keeps the defaults when there is none. A missing
-    /// config is the normal first-launch state, not an error.
+    /// Reads the file. An absent file — the normal first-launch state, or a
+    /// deletion under a running Corta — means the defaults, so no surface
+    /// keeps reporting settings that nothing persists. A read or decode
+    /// failure takes the same path: a config Corta cannot read is no config.
     func reload() {
-        guard let text = try? String(contentsOf: Self.fileURL, encoding: .utf8) else { return }
+        guard let text = try? String(contentsOf: fileURL, encoding: .utf8) else {
+            unknownKeys = []
+            let defaults = Configuration()
+            guard configuration != defaults else { return }
+            configuration = defaults
+            NotificationCenter.default.post(name: Self.didChange, object: nil)
+            return
+        }
         let (parsed, unknown) = Configuration.parse(text)
         unknownKeys = unknown
         guard parsed != configuration else { return }
@@ -103,22 +130,17 @@ final class ConfigurationStore {
     /// first launch.
     @discardableResult
     func write() -> Bool {
-        let url = Self.fileURL
-        isWriting = true
-        defer {
-            // The watcher fires asynchronously; clear the flag after it
-            // would have.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.isWriting = false }
-        }
+        let url = fileURL
+        let text = configuration.serialized(preserving: unknownKeys)
         do {
             try FileManager.default.createDirectory(
                 at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try configuration.serialized(preserving: unknownKeys)
-                .write(to: url, atomically: true, encoding: .utf8)
+            try text.write(to: url, atomically: true, encoding: .utf8)
         } catch {
             noteWriteResult(error)
             return false
         }
+        lastWrittenText = text
         noteWriteResult(nil)
         // An atomic write replaces the inode, so the descriptor the file
         // watcher holds now points at a file nothing will ever write again.
@@ -140,9 +162,24 @@ final class ConfigurationStore {
     private func startWatching() {
         fileSource?.cancel()
         directorySource?.cancel()
-        fileSource = watch(Self.fileURL, mask: [.write, .extend, .delete, .rename])
+        fileSource = watch(fileURL, mask: [.write, .extend, .delete, .rename])
         directorySource = watch(
-            Self.fileURL.deletingLastPathComponent(), mask: [.write, .delete, .rename])
+            Self.deepestExistingDirectory(under: fileURL.deletingLastPathComponent()),
+            mask: [.write, .delete, .rename])
+    }
+
+    /// The nearest ancestor of `url` that exists. The config's directory is
+    /// created on first write, so at launch there may be nothing to watch
+    /// but its parent — and that parent's `.write` is exactly the event that
+    /// says the directory (and then the file) has appeared.
+    private static func deepestExistingDirectory(under url: URL) -> URL {
+        var url = url
+        while url.pathComponents.count > 1,
+              !FileManager.default.fileExists(atPath: url.path)
+        {
+            url = url.deletingLastPathComponent()
+        }
+        return url
     }
 
     private func watch(_ url: URL, mask: DispatchSource.FileSystemEvent)
@@ -153,7 +190,20 @@ final class ConfigurationStore {
         let source = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: descriptor, eventMask: mask, queue: .main)
         source.setEventHandler { [weak self] in
-            guard let self, !self.isWriting else { return }
+            guard let self else { return }
+            // Our own write raises these events too, and it needs no reload:
+            // the store already holds exactly those values. Compare contents
+            // rather than suppressing events for a window, so an external
+            // edit that lands moments after our write is not swallowed.
+            if let written = self.lastWrittenText {
+                if (try? String(contentsOf: self.fileURL, encoding: .utf8)) == written {
+                    return
+                }
+                // The file no longer holds what we wrote — an external edit
+                // owns it now, and later events must not be measured against
+                // our text.
+                self.lastWrittenText = nil
+            }
             // Coalesce: an editor's save is often several events in a row,
             // and re-reading per event would apply the file mid-rewrite.
             self.pendingReload?.cancel()
