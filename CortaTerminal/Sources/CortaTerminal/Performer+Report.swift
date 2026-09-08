@@ -21,6 +21,12 @@ public struct PerformerState: Sendable {
     /// the mode.
     public internal(set) var synchronizedOutputEnabled = false
 
+    /// Bumped on every `?2026` rising edge — including a BSU that shares a
+    /// batch with the previous episode's DECRST, which a before/after bool
+    /// compare cannot see. `TerminalSession` arms its recovery timeout per
+    /// episode from this counter.
+    public internal(set) var synchronizedOutputEpisode = 0
+
     /// Set by a BEL (M4.8, core side). The core decides nothing about
     /// audible, visual or muted — that is the app's business. `Terminal`
     /// exposes this write-only-from-here via `takeBell()`.
@@ -56,6 +62,17 @@ public struct PerformerState: Sendable {
     /// classic staircase — each line starting where the last one ended — for
     /// anything that trusted the answer.
     public internal(set) var newLineModeEnabled = false
+
+    /// DECCKM — `CSI ? 1 h` / `CSI ? 1 l` (U04). While set, the cursor keys
+    /// and Home/End send their SS3 (application) forms rather than CSI; the
+    /// app encodes keys, so it has to be able to ask.
+    public internal(set) var applicationCursorKeysEnabled = false
+
+    /// DECKPAM / DECKPNM — `ESC =` / `ESC >` (U04). While set, the numeric
+    /// keypad sends its `SS3` forms (`ESC O p` … `ESC O y`, `ESC O M` for
+    /// Enter) rather than the digits and operators printed on the keys. Like
+    /// DECCKM this is the app's to apply, so it has to be able to ask.
+    public internal(set) var applicationKeypadEnabled = false
 
     /// The kitty keyboard protocol's mode stack (M6.9). The app reads
     /// `current` to decide how to encode a key press.

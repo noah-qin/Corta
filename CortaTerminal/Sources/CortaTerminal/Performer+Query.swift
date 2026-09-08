@@ -54,6 +54,7 @@ extension Performer {
     /// claiming a mode is "reset" implies it could be set.
     private func privateModeSetting(_ mode: Int) -> Int {
         switch mode {
+        case 1: return state.applicationCursorKeysEnabled ? 1 : 2
         case 1049: return grid.isAlternateScreenActive ? 1 : 2
         case 2004: return state.bracketedPasteEnabled ? 1 : 2
         case 1006: return state.sgrMouseEncodingEnabled ? 1 : 2
