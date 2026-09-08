@@ -76,7 +76,18 @@ def scenario(name):
 class PtySession:
     """A child process on a PTY, driven by timed actions from the master."""
 
-    def __init__(self, argv, rows=ROWS, cols=COLS, env_extra=None):
+    def __init__(self, argv, rows=ROWS, cols=COLS, env_extra=None, responder=None):
+        # `responder`: a path to `corta-dump`, run as `--serve`. Every byte the
+        # child emits is fed to it and whatever the terminal answers is written
+        # back down the PTY. Without one the master is a capture device with
+        # nothing behind it, and a client that blocks on a reply — fish waits
+        # for Primary DA before it prints a prompt — simply hangs. With one,
+        # the replies are the ones Corta actually sends.
+        self.responder = None
+        if responder:
+            self.responder = subprocess.Popen(
+                [responder, "--serve"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            os.set_blocking(self.responder.stdout.fileno(), False)
         self.master, slave = os.openpty()
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
         env = dict(os.environ)
@@ -110,6 +121,35 @@ class PtySession:
             if not data:
                 return
             self.chunks.append((time.monotonic(), data))
+            self._answer(data)
+
+    def _answer(self, data):
+        """Feed `data` to the serving terminal and put its reply on the PTY."""
+        if self.responder is None:
+            return
+        try:
+            self.responder.stdin.write(data)
+            self.responder.stdin.flush()
+        except (BrokenPipeError, ValueError):
+            self.responder = None
+            return
+        # The reply, if any, is produced by the time the write returns: the
+        # serving process answers one chunk before it reads the next.
+        deadline = time.monotonic() + 0.2
+        reply = b""
+        while time.monotonic() < deadline:
+            try:
+                piece = self.responder.stdout.read(65536)
+            except BlockingIOError:
+                piece = None
+            if piece:
+                reply += piece
+                continue
+            if reply:
+                break
+            time.sleep(0.005)
+        if reply:
+            os.write(self.master, reply)
 
     def send(self, data, settle=0.3):
         os.write(self.master, data)
@@ -148,6 +188,10 @@ class PtySession:
         self.pump(0.2)
         status = self.proc.returncode
         os.close(self.master)
+        if self.responder is not None:
+            self.responder.stdin.close()
+            self.responder.wait(timeout=2)
+            self.responder = None
         return status
 
 
@@ -351,8 +395,11 @@ def vim_workflow(ctx):
 @scenario("fish: prompt, echo and clean exit")
 @needs("fish")
 def fish_workflow(ctx):
-    session = PtySession(["fish", "--no-config", "--interactive"])
-    session.pump(1.0)
+    # fish is the one client here that will not start without a terminal
+    # answering it (see `PtySession.responder`).
+    session = PtySession(
+        ["fish", "--no-config", "--interactive"], responder=ctx.dump)
+    session.pump(1.5)
     session.send(b"echo U10FISHOK\r", settle=0.6)
     before_exit = session.mark()
     session.send(b"exit\r")
