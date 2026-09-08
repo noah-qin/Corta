@@ -24,6 +24,9 @@ let usage = """
       --scrollback N    history line cap (default 1000)
       --history         print the scrollback above the screen
       --report          print the terminal's mode/clipboard state after the grid
+      --serve           answer queries instead of printing: every byte read on
+                        stdin is fed to the terminal and whatever it wants to
+                        send back is written to stdout as it is produced
       --help            this message
     """
 
@@ -51,6 +54,7 @@ var columns = 80
 var scrollbackLimit = 1_000
 var showHistory = false
 var showReport = false
+var serve = false
 
 var arguments = CommandLine.arguments.dropFirst().makeIterator()
 while let argument = arguments.next() {
@@ -66,6 +70,7 @@ while let argument = arguments.next() {
     case "--scrollback": scrollbackLimit = number()
     case "--history": showHistory = true
     case "--report": showReport = true
+    case "--serve": serve = true
     case "--help", "-h":
         FileHandle.write(usage, to: STDOUT_FILENO)
         exit(0)
@@ -80,6 +85,42 @@ var terminal = Terminal(rows: rows, columns: columns, scrollbackLimit: scrollbac
 // same thing the PTY reader will do.
 let chunkSize = 64 * 1024
 var buffer = [UInt8](repeating: 0, count: chunkSize)
+
+// `--serve`: the same feed loop, but the terminal's *answers* are the output.
+//
+// A real client blocks on them. `fish` opens by asking for the Kitty keyboard
+// flags, XTVERSION, the background colour, two XTGETTCAP capabilities and
+// finally Primary DA, and prints no prompt until the last one comes back — on
+// a bare PTY with nothing at the other end it simply waits. That is what the
+// U10 harness used to hit: not a defect in the terminal, but no terminal at
+// all. Serving the replies from the same core the app renders makes the
+// harness exercise the reply path against a real client instead of asserting
+// around it.
+if serve {
+    while true {
+        let count = buffer.withUnsafeMutableBufferPointer { pointer in
+            read(STDIN_FILENO, pointer.baseAddress, chunkSize)
+        }
+        if count < 0 {
+            if errno == EINTR { continue }
+            fail("read: \(String(cString: strerror(errno)))")
+        }
+        if count == 0 { break }
+        terminal.feed(buffer[0..<count])
+        let response = terminal.takeOutput()
+        guard !response.isEmpty else { continue }
+        var offset = 0
+        response.withUnsafeBufferPointer { pointer in
+            while offset < pointer.count {
+                let written = write(STDOUT_FILENO, pointer.baseAddress! + offset, pointer.count - offset)
+                if written <= 0 { break }
+                offset += written
+            }
+        }
+    }
+    exit(0)
+}
+
 while true {
     let count = buffer.withUnsafeMutableBufferPointer { pointer in
         read(STDIN_FILENO, pointer.baseAddress, chunkSize)
