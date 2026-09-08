@@ -89,3 +89,47 @@ jobs:
             /tmp/corta-fuzz-*
           if-no-files-found: ignore
           retention-days: 30
+
+  newest-toolchain:
+    name: Compatibility with the newest installed Xcode
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      # The other half of pinning the required lane: something still has to
+      # find out that a newer SDK broke the build, and this is where finding
+      # it out is a bug report rather than a blocked pull request.
+      - name: Select the newest installed Xcode
+        run: |
+          latest=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "Using $latest"
+          sudo xcode-select -s "$latest"
+          xcodebuild -version
+          swift --version
+
+      - name: Core build and test
+        run: swift test --package-path CortaTerminal
+
+      - name: App build and test
+        run: |
+          xcodebuild test \
+            -project Corta.xcodeproj \
+            -scheme Corta \
+            -destination 'platform=macOS' \
+            -skip-testing:CortaUITests \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGNING_REQUIRED=NO \
+            DEVELOPMENT_TEAM="" \
+            -resultBundlePath NewestToolchain.xcresult \
+            -quiet
+
+      - name: Keep the test results when the newer toolchain breaks something
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcresult-newest-toolchain
+          path: NewestToolchain.xcresult
+          if-no-files-found: ignore
+          retention-days: 14

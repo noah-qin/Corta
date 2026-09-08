@@ -20,6 +20,18 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # The required lane runs on one toolchain, not on whatever the runner
+  # image happens to ship. "Select the newest installed Xcode" made an image
+  # update an uncontrolled variable in a check that gates merges: the
+  # compiler could change under a pull request that touched nothing.
+  # This is the toolchain `docs/ROADMAP.md` declares. When the image stops
+  # carrying it the job fails loudly and the pin gets a deliberate bump —
+  # which is the point. The newest-SDK question moves to `nightly.yml`,
+  # where the answer is a bug report rather than a blocked pull request.
+  XCODE_PIN: "26.6.0"
+
+
 jobs:
   core:
     name: Terminal core (SwiftPM)
@@ -29,11 +41,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Select the newest installed Xcode
+      - name: Select the pinned Xcode
         run: |
-          latest=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
-          echo "Using $latest"
-          sudo xcode-select -s "$latest"
+          pinned="/Applications/Xcode_${XCODE_PIN}.app"
+          if [ ! -d "$pinned" ]; then
+            echo "::error::$pinned is not on this runner image."
+            echo "Installed: $(ls -d /Applications/Xcode*.app | tr '\n' ' ')"
+            echo "Bump XCODE_PIN in this workflow deliberately, or restore the image."
+            exit 1
+          fi
+          sudo xcode-select -s "$pinned"
           xcodebuild -version
           swift --version
 
@@ -74,11 +91,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Select the newest installed Xcode
+      - name: Select the pinned Xcode
         run: |
-          latest=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
-          echo "Using $latest"
-          sudo xcode-select -s "$latest"
+          pinned="/Applications/Xcode_${XCODE_PIN}.app"
+          if [ ! -d "$pinned" ]; then
+            echo "::error::$pinned is not on this runner image."
+            echo "Installed: $(ls -d /Applications/Xcode*.app | tr '\n' ' ')"
+            echo "Bump XCODE_PIN in this workflow deliberately, or restore the image."
+            exit 1
+          fi
+          sudo xcode-select -s "$pinned"
           xcodebuild -version
 
       # The runner has no signing identity and no access to the maintainer's
