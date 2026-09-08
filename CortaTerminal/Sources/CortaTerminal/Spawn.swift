@@ -140,16 +140,101 @@ enum Spawn {
 
         close(writeEnd)
         defer { close(readEnd) }
-        var reportedErrno: Int32 = 0
-        let read = withUnsafeMutableBytes(of: &reportedErrno) { buffer -> Int in
-            Darwin.read(readEnd, buffer.baseAddress, buffer.count)
+        // Bounded handshake: `corta-exec` either writes its `errno` and
+        // `_exit`s (the `execve` of `executable` failed) or its FD_CLOEXEC
+        // write end closes (it succeeded — EOF with no bytes). Without a
+        // deadline a wedged helper would freeze session creation here; the
+        // UI calls this synchronously.
+        let status = Self.readHelperStatus(
+            from: readEnd,
+            deadline: ContinuousClock.now + Self.helperHandshakeTimeout
+        )
+        switch status {
+        case .execSucceeded:
+            // EOF with nothing written: the write end closed because
+            // `corta-exec` exec'd `executable` successfully.
+            return pid
+        case .execFailed(let code):
+            Self.reapFailedChild(pid)
+            throw .spawnFailed(code: code)
+        case .truncated:
+            // A partial status is no status: the helper died mid-write.
+            Self.reapFailedChild(pid)
+            throw .spawnFailed(code: EIO)
+        case .timedOut:
+            Self.reapFailedChild(pid)
+            throw .spawnFailed(code: ETIMEDOUT)
+        case .readFailed(let code):
+            Self.reapFailedChild(pid)
+            throw .spawnFailed(code: code)
         }
-        if read > 0 {
-            throw .spawnFailed(code: reportedErrno)
+    }
+
+    /// How long `child` waits for `corta-exec`'s exec handshake before
+    /// declaring the helper wedged. Generous — the handshake is two syscalls
+    /// — because the cost of a false positive is a killed healthy shell.
+    static let helperHandshakeTimeout: Duration = .seconds(10)
+
+    /// The outcome of the helper's exec handshake: it writes its `errno`
+    /// (one `Int32`, native byte order) if the `execve` of the target fails,
+    /// and on success its `FD_CLOEXEC` write end closes — EOF with no bytes.
+    enum HelperStatus: Equatable {
+        case execSucceeded
+        case execFailed(code: Int32)
+        /// EOF after 1–3 bytes: the helper died mid-write.
+        case truncated
+        /// The deadline passed with the write end still open.
+        case timedOut
+        /// `read` on the pipe itself failed.
+        case readFailed(code: Int32)
+    }
+
+    /// Reads the handshake from `readEnd`, tolerating `EINTR` and partial
+    /// reads, and never blocking past `deadline`.
+    static func readHelperStatus(
+        from readEnd: Int32, deadline: ContinuousClock.Instant
+    ) -> HelperStatus {
+        var reported: Int32 = 0
+        let total = MemoryLayout<Int32>.size
+        var filled = 0
+        while filled < total {
+            let now = ContinuousClock.now
+            guard now < deadline else { return .timedOut }
+            let remaining = now.duration(to: deadline)
+            let milliseconds = Int32(
+                clamping: remaining.components.seconds * 1000
+                    + remaining.components.attoseconds / 1_000_000_000_000_000)
+
+            var descriptor = pollfd(fd: readEnd, events: Int16(POLLIN), revents: 0)
+            let ready = poll(&descriptor, 1, max(milliseconds, 1))
+            if ready == 0 { return .timedOut }
+            if ready < 0 {
+                if errno == EINTR { continue }
+                return .readFailed(code: errno)
+            }
+
+            let count = withUnsafeMutableBytes(of: &reported) { buffer in
+                Darwin.read(readEnd, buffer.baseAddress! + filled, total - filled)
+            }
+            if count < 0 {
+                if errno == EINTR { continue }
+                return .readFailed(code: errno)
+            }
+            if count == 0 {
+                return filled == 0 ? .execSucceeded : .truncated
+            }
+            filled += count
         }
-        // EOF with nothing written: the write end closed because `corta-exec`
-        // exec'd `executable` successfully.
-        return pid
+        return .execFailed(code: reported)
+    }
+
+    /// A child whose handshake failed is still our direct child: kill it if
+    /// it somehow lives on, and reap it either way so failure paths never
+    /// leave a zombie.
+    private static func reapFailedChild(_ pid: pid_t) {
+        kill(pid, SIGKILL)
+        var status: Int32 = 0
+        while waitpid(pid, &status, 0) < 0, errno == EINTR {}
     }
 
     /// `corta-exec`'s path, found next to wherever *this module's own code*
@@ -188,6 +273,16 @@ enum Spawn {
             directory = String(directory[directory.startIndex..<slash])
             let candidate = directory + "/corta-exec"
             if access(candidate, X_OK) == 0 { return candidate }
+            // Xcode makes a SwiftPM product linked by both the app and its
+            // test bundle a *versioned* framework in Contents/Frameworks, and
+            // from that image the helper (embedded in Contents/MacOS) is a
+            // sibling subtree, never an ancestor of the walk — so check it
+            // when the walk passes a bundle's Contents directory. This is the
+            // only layout in which app-hosted tests (CortaTests) can spawn.
+            if directory.hasSuffix("/Contents") {
+                let insideBundle = directory + "/MacOS/corta-exec"
+                if access(insideBundle, X_OK) == 0 { return insideBundle }
+            }
         }
         return nil
     }
