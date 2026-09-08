@@ -80,6 +80,18 @@ extension AppDelegate {
             item.target = self
             item.toolTip = Self.summary(of: preset)
             menu.addItem(item)
+            // U16 — holding ⌥ opens the preset in a window of its own. An
+            // alternate item is the Mac idiom for "the same command, one
+            // level bigger", and it costs no extra row until ⌥ is down.
+            let inWindow = NSMenuItem(
+                title: L10n.format("menu.presetInWindow", preset.name),
+                action: #selector(openPresetInWindow(_:)), keyEquivalent: "")
+            inWindow.tag = index
+            inWindow.target = self
+            inWindow.isAlternate = true
+            inWindow.keyEquivalentModifierMask = [.option]
+            inWindow.toolTip = Self.summary(of: preset)
+            menu.addItem(inWindow)
         }
     }
 
@@ -99,21 +111,33 @@ extension AppDelegate {
     /// Opens the preset as a split of the focused pane, or as the first pane
     /// of a new window when there is no window to split.
     @objc func openPreset(_ sender: Any?) {
+        open(sender, inNewWindow: false)
+    }
+
+    /// ⌥-choosing a preset: a window of its own rather than a split.
+    @objc func openPresetInWindow(_ sender: Any?) {
+        open(sender, inNewWindow: true)
+    }
+
+    private func open(_ sender: Any?, inNewWindow: Bool) {
         guard let item = sender as? NSMenuItem else { return }
         let presets = ConfigurationStore.shared.configuration.presets
         guard item.tag >= 0, item.tag < presets.count else { return }
         let preset = presets[item.tag]
-        guard let split = NSApp.keyWindow?.contentViewController as? SplitViewController
-        else {
-            newDocument(nil)
-            // The new window's own first pane is already spawning by the time
-            // this returns, so the preset opens as a split inside it rather
-            // than replacing it — one extra pane, and no race with a pane
-            // that is mid-spawn.
-            (NSApp.keyWindow?.contentViewController as? SplitViewController)?
-                .splitFocusedPane(orientation: .columns, preset: preset)
+        if !inNewWindow,
+            let split = NSApp.keyWindow?.contentViewController as? SplitViewController
+        {
+            split.splitFocusedPane(orientation: .columns, preset: preset)
             return
         }
-        split.splitFocusedPane(orientation: .columns, preset: preset)
+        // A new window's own first pane is created as its view loads, so the
+        // preset is set before that happens rather than opening a second pane
+        // and closing the first — which is what an extra split would be.
+        guard let controller = instantiateWindowController(),
+            let split = controller.contentViewController as? SplitViewController
+        else { return }
+        split.pendingPreset = preset
+        controller.showWindow(self)
+        controller.window?.makeKeyAndOrderFront(self)
     }
 }
