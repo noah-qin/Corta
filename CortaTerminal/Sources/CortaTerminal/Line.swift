@@ -31,10 +31,28 @@ public enum LineMark: UInt8, Sendable {
     case promptSucceeded = 2
     /// A prompt whose command finished with a non-zero status.
     case promptFailed = 3
+    /// The row a command's *output* begins on (`OSC 133 ; C`).
+    ///
+    /// Separate from the prompt mark because they answer different
+    /// questions: the prompt row is where a command starts, and this is where
+    /// the text it printed starts. Without it, "the last command's output"
+    /// has to be guessed as "one row after the prompt", which is right for a
+    /// one-line prompt with the command typed on it and one row too much for
+    /// a two-line prompt or a command continued across lines (U14).
+    case outputStart = 4
 
     /// Whether this row starts a command — what command-to-command jumping
     /// looks for, regardless of how the command ended.
-    public var isPrompt: Bool { self != .none }
+    ///
+    /// Enumerated rather than `!= .none`: an output-start mark is a mark and
+    /// is not a prompt, and jumping to one would land the viewport a line
+    /// below where the user asked to be.
+    public var isPrompt: Bool {
+        switch self {
+        case .prompt, .promptSucceeded, .promptFailed: return true
+        case .none, .outputStart: return false
+        }
+    }
 }
 
 public struct Line: Equatable, Sendable {
