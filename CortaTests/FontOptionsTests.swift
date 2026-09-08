@@ -37,6 +37,36 @@ import Testing
         return thirdPartyCandidates.first { installed.contains($0) }
     }
 
+    /// Whether the font subsystem can currently hand back a usable face for
+    /// `family` at all — a face, and glyphs for ASCII.
+    ///
+    /// This exists because of an intermittent failure that is not Corta's.
+    /// A *user-installed* family (one in `~/Library/Fonts`, as against the
+    /// ones macOS ships) is served through the font daemon, and on this
+    /// machine that lookup sometimes comes back empty inside the test host:
+    /// the run logs `mdb_txn_commit error: MDB_MAP_FULL` from the font
+    /// database as it does. `MonospacedFontCatalog.isUsable` then answers
+    /// "no" correctly — it was handed nothing to measure — and a test that
+    /// blamed the catalog for it would be reporting the machine's state as
+    /// a defect in the code.
+    ///
+    /// It is deliberately *not* a retry. A catalog that rejects a family the
+    /// system does resolve still fails these tests, which is the regression
+    /// worth catching. The equivalent in the app is worth knowing and is
+    /// recorded rather than worked around: `TerminalFont.primary` treats an
+    /// unusable family as a reason to fall back to the system face, so the
+    /// same transient silently changes the user's font for that launch.
+    private static func fontSubsystemResolves(_ family: String) -> Bool {
+        guard
+            let face = NSFont(
+                descriptor: NSFontDescriptor(fontAttributes: [.family: family]), size: 12)
+        else { return false }
+        var characters: [UniChar] = Array("Mi0".utf16)
+        var glyphs = [CGGlyph](repeating: 0, count: characters.count)
+        return CTFontGetGlyphsForCharacters(
+            face as CTFont, &characters, &glyphs, characters.count)
+    }
+
     /// How many glyphs Core Text produces for `text` in `font` — fewer than
     /// the characters means a substitution (a ligature) fired.
     private static func shapedGlyphCount(_ text: String, in font: CTFont) -> Int {
@@ -110,6 +140,10 @@ import Testing
             print("note: no ligature-capable programming font installed; nothing to check")
             return
         }
+        guard Self.fontSubsystemResolves(family) else {
+            print("note: the font subsystem is not resolving \(family) right now; see fontSubsystemResolves")
+            return
+        }
         #expect(MonospacedFontCatalog.isUsable(family: family))
         guard let device = Self.makeDevice() else { return }
         let font = TerminalFont.primary(ofSize: 24, family: family)
@@ -127,6 +161,10 @@ import Testing
     @Test func aThirdPartyFamilyResolvesFromTheConfigFile() throws {
         let family = try #require(
             Self.installedCandidate(), "no candidate monospaced family installed")
+        guard Self.fontSubsystemResolves(family) else {
+            print("note: the font subsystem is not resolving \(family) right now; see fontSubsystemResolves")
+            return
+        }
         #expect(MonospacedFontCatalog.isUsable(family: family), "\(family) was not offered")
 
         let parsed = Configuration.parse("font-family = \(family)\nfont-size = 13\n")
