@@ -1010,8 +1010,8 @@ Trends matter more than absolute values.
 | Idle CPU (%)              | ~4     | ~0   | ~0   | ~0   | ~0   | 0.0 | — |
 | Memory @ 100k lines (MB)  | 265.7  | 265.7 | 265.7 | 184.6 | 184.6 | 185.0 | — |
 | Keypress → pixel (ms)     | —      | —    | —    | —    | —    | 45.5 avg / 24.8 min / 56.4 max / 6.8 SD | not re-measured |
-| `esctest` pass rate (%)   | —      | 8.8 (50/568) | 8.8 (50/568) | 8.8 (50/568, M3 carry) | 8.8 (M3 carry) | 18.7 (106/568) | 19.4 (110/568) |
-| `esctest` xterm-compat (%)| —      | 67.6 | 67.6 | 67.6 | 67.6 | 77.6 | 78.3 |
+| `esctest` pass rate (%)   | —      | 8.8 (50/568) | 8.8 (50/568) | 8.8 (50/568, M3 carry) | 8.8 (M3 carry) | 18.7 (106/568) | 19.7 (112/568) |
+| `esctest` xterm-compat (%)| —      | 67.6 | 67.6 | 67.6 | 67.6 | 77.6 | 78.7 |
 | Core LOC                  | 2,547  | 3,972 | 4,247 | 4,908 | 4,959 | 5,884 | — |
 
 A blank in the 0.1.1 column is a number that was not re-measured in this

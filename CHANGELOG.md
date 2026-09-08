@@ -19,6 +19,12 @@ was guessing at what the user meant.
 
 ### Added
 
+- **Every string translated into all nine shipped languages.** The
+  commands, settings and toasts added in this release had shipped in
+  English only — 41 keys against 156 that were complete. A test now
+  checks the whole catalog rather than a sample, including that each
+  translation carries the same format specifiers as its source.
+
 - **U11 (2026-09-08)** — Clear Screen (⌘K), Clear History and Reset
   Terminal, as three separate commands with a table in
   `docs/CONFIGURATION.md` §5 saying what each one discards. They act on
@@ -442,8 +448,8 @@ M1–M10.
 
 ### Verification
 
-- **esctest (2026-09-08)** — 110 passed, 335 known bugs, 123 failed of
-  568, against M6's 106 / 335 / 127. xterm-compatibility is 78.3%, up
+- **esctest (2026-09-08)** — 112 passed, 335 known bugs, 121 failed of
+  568, against M6's 106 / 335 / 127. xterm-compatibility is 78.7%, up
   from 77.6%. The failures are classified by real application impact in
   `docs/V0.1.1-QUALITY-PLAN.md` Q01, and every failing test name is kept
   in `docs/esctest/0.1.1-results.txt` so the next run is a diff. The
@@ -474,6 +480,13 @@ M1–M10.
 - The terminal answered XTVERSION with `Corta(0.1.0)` regardless of the
   version it was built as. `CortaVersion.string` and
   `MARKETING_VERSION` are now pinned against each other by a test.
+- **DECID (`ESC Z`)** went unanswered. A query that is silent leaves a
+  client waiting for a reply that never arrives; it now answers exactly
+  what `CSI c` answers.
+- **DECALN (`ESC # 8`)** was not implemented — every escape sequence
+  carrying an intermediate byte was discarded. It fills the screen with
+  `E`, resets the margins and homes the cursor, which is how a program
+  asks for a completely known screen.
 
 ---
 

@@ -2,8 +2,14 @@ esctest2 (ThomasDickey/esctest2) against Corta 0.1.1, 2026-09-08
 Invocation: docs/CONFORMANCE.md 4.2 — python3 esctest.py --expected-terminal xterm --max-vt-level 3
 Build: Debug Corta.app, launched with SHELL pointing at the esctest wrapper.
 
-110 passed, 335 known bugs, 123 failed of 568.
-xterm-compatibility (passed + known bugs) = 78.3%. M6 record: 106 / 335 / 127, 77.6%.
+112 passed, 335 known bugs, 121 failed of 568.
+xterm-compatibility (passed + known bugs) = 78.7%. M6 record: 106 / 335 / 127, 77.6%.
+
+Measured twice. The first run (110 / 335 / 123) classified the failures;
+DECALN and DECID were then implemented and it was re-run, which is this
+result. Each fix moved exactly one test: implementing DECALN did not
+unlock the tests that use it as setup, so its value here is that a
+program asking for a known screen now gets one, not a higher number.
 
 Failures by test class:
     28 XtermWinopsTests
@@ -25,8 +31,6 @@ Failures by test class:
      2 DA2Tests
      2 CUBTests
      1 XtermSaveTests
-     1 DECIDTests
-     1 DECALNTests
 
 Failing tests:
   BSTests.test_BS_AfterNoWrappedInlines
@@ -77,12 +81,10 @@ Failing tests:
   DA2Tests.test_DA2_NoParameter
   DATests.test_DA_0
   DATests.test_DA_NoParameter
-  DECALNTests.test_DECALN_MovesCursorHome
   DECDSRTests.test_DECDSR_DECXCPR
   DECDSRTests.test_DECDSR_DSRKeyboard
   DECDSRTests.test_DECDSR_DSRPrinterPort
   DECDSRTests.test_DECDSR_DSRUDKLocked
-  DECIDTests.test_DECID_Basic
   DECRCTests.test_SaveRestoreCursor_AltVsMain
   DECRCTests.test_SaveRestoreCursor_Wrap
   DECRQMTests.test_DECRQM_ANSI_KAM

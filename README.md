@@ -76,8 +76,8 @@ measurements; M10 is Kitty graphics, verified against `kitten icat`.
 graphics and clipboard paths, PTY writes and search off the main thread,
 and the interaction defects an audit of the native behaviour turned up.
 
-Conformance, measured against esctest2 on 2026-09-08: 110 passed, 335
-known bugs, 123 failed of 568 — 78.3% xterm-compatibility. The
+Conformance, measured against esctest2 on 2026-09-08: 112 passed, 335
+known bugs, 121 failed of 568 — 78.7% xterm-compatibility. The
 classification is in [`docs/V0.1.1-QUALITY-PLAN.md`](docs/V0.1.1-QUALITY-PLAN.md);
 the failing test names are in
 [`docs/esctest/0.1.1-results.txt`](docs/esctest/0.1.1-results.txt).
@@ -93,7 +93,7 @@ the method is in [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md):
 | Memory, 100k × 120 lines | ~200 MB | **185.0 MB** | ✅ |
 | Core feed throughput | > 100 MB/s | **130.0 MiB/s** (5-run mean) | ✓ |
 | Keypress → pixel | < 1 frame + input | **45.5 ms avg** | ⚠️ above target |
-| `esctest` xterm conformance | — | **78.3%** — 123 of 568 failing | |
+| `esctest` xterm conformance | — | **78.7%** — 121 of 568 failing | |
 
 The number that misses its target is printed here rather than omitted.
 Numbers that have not been measured are left blank rather than estimated.

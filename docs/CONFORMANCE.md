@@ -243,14 +243,14 @@ chmod +x /tmp/corta-esctest.sh
 SHELL=/tmp/corta-esctest.sh Corta.app/Contents/MacOS/Corta
 ```
 
-**0.1.1 result (2026-09-08): 110 passed, 335 known bugs, 123 failed of
-568.** Against the M6 record (106 / 335 / 127) that is four more passing
+**0.1.1 result (2026-09-08): 112 passed, 335 known bugs, 121 failed of
+568.** Against the M6 record (106 / 335 / 127) that is six more passing
 and none regressed. The failures are classified by real application
 impact in `docs/V0.1.1-QUALITY-PLAN.md` Q01, and every failing test name
 is kept in `docs/esctest/0.1.1-results.txt` so the next run is a diff
 rather than a re-reading. The largest single cause is one absence: OSC
 4/5 indexed palette set and query are not implemented, which accounts
-for 45 of the 123.
+for 45 of the 121.
 
 **M6 result: 106 passed, 335 known bugs, 127 failed of 568.** Against the
 M2 record (50 / 334 / 184) that is 57 failures fixed and none
@@ -260,7 +260,7 @@ including the soft-reset isolation esctest itself relies on.
 
 xterm-compatibility — passes plus "known bugs", the number comparable
 across terminals — was **77.6%** at M6, up from the 67.6% carried since
-M2, and is **78.3%** at 0.1.1.
+M2, and is **78.7%** at 0.1.1.
 
 ### 4.3 Fuzzing
 
