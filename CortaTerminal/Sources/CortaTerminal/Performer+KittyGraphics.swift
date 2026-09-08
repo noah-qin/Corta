@@ -149,8 +149,17 @@ extension Performer {
             break  // Decoded (and validated) by the app layer, which owns ImageIO.
         }
         let data = KittyGraphics.ImageData(format: format, width: width, height: height, bytes: bytes)
-        guard grid.imagePlacements.store(imageID, data: data) else {
+        switch grid.imagePlacements.store(imageID, data: data) {
+        case nil:
+            break
+        case .dimensionsExceedCaps?:
+            respond(imageID: imageID, placementID: nil, quiet: quiet, error: "EINVAL:image dimensions too large")
+            return
+        case .tooManyImages?:
             respond(imageID: imageID, placementID: nil, quiet: quiet, error: "ENOSPC:too many images")
+            return
+        case .byteBudgetExceeded?:
+            respond(imageID: imageID, placementID: nil, quiet: quiet, error: "ENOSPC:image data too large")
             return
         }
         // The combined `a=T` gets one response for the whole command, not a

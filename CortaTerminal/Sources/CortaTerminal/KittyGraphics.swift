@@ -185,6 +185,45 @@ public enum KittyGraphics {
     /// chunks.
     static let maximumImageBytes = 64 * 1024 * 1024
 
+    /// The largest width or height a single image may declare, per axis.
+    /// 8192×8192 2D textures are supported by every Metal feature set on
+    /// macOS, and no terminal use case needs a larger single image — past
+    /// this the decode staging buffer alone would dwarf the per-image byte
+    /// budget.
+    public static let maximumImageDimension = 8192
+
+    /// The largest decoded pixel count a single image may occupy: 16M
+    /// pixels, twice a 4K frame. At 4 bytes per premultiplied bgra pixel
+    /// this bounds the temporary decode buffer at exactly
+    /// `maximumImageBytes`, so "decoded pixels" and "temporary buffer"
+    /// share one budget. Enforced on raw formats at `store` time (their
+    /// dimensions ride on the wire) and on PNG *before* decoding, off the
+    /// header, by `KittyImageRenderer` in the app layer.
+    public static let maximumImagePixels = 16 * 1024 * 1024
+
+    /// The per-pane cap on stored (still-encoded) image bytes across every
+    /// image the pane tracks. The protocol itself recommends a storage
+    /// quota, and kitty — the reference implementation — uses 320MB per
+    /// buffer (<https://sw.kovidgoyal.net/kitty/graphics-protocol/>);
+    /// matched here. A pane past its quota refuses new transmissions with
+    /// `ENOSPC` rather than evicting a still-visible image silently.
+    public static let maximumPaneImageBytes = 320 * 1024 * 1024
+
+    /// The per-pane cap on decoded, GPU-resident image texture bytes.
+    /// Decoded bgra is up to 4× the encoded size, so this is set under the
+    /// encoded quota deliberately: a pane that fills its encoded quota with
+    /// compressible PNGs must still fit the working set it actually draws —
+    /// what does not fit is evicted least-recently-used by
+    /// `KittyImageRenderer`, not crashed on.
+    public static let maximumPaneTextureBytes = 256 * 1024 * 1024
+
+    /// The application-wide cap on GPU-resident image texture bytes across
+    /// every pane's `KittyImageRenderer`. VRAM is shared system-wide on
+    /// Apple silicon, so image caches must have a global bound as well as a
+    /// per-pane one; a renderer whose contribution is freed (pane closed,
+    /// placement deleted) releases its share.
+    public static let maximumGlobalTextureBytes = 1024 * 1024 * 1024
+
     /// How many images this session tracks at once, transmitted-but-unused
     /// included. Beyond this, a new transmission is refused rather than
     /// evicting an old one silently out from under a still-visible
