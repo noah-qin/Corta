@@ -17,6 +17,7 @@ struct CommandOutputTests {
         var terminal = Terminal(rows: 24, columns: 40, scrollbackLimit: 500)
         for entry in commands {
             terminal.feed(Array("\u{1B}]133;A\u{7}$ \(entry.command)\r\n".utf8))
+            terminal.feed(Array("\u{1B}]133;C\u{7}".utf8))
             for line in entry.output { terminal.feed(Array("\(line)\r\n".utf8)) }
             terminal.feed(Array("\u{1B}]133;D;\(entry.status)\u{7}".utf8))
         }
@@ -53,7 +54,7 @@ struct CommandOutputTests {
             ("echo one", ["one"], 0),
             ("echo two", ["two", "and more"], 0),
         ])
-        let text = try #require(ViewController.lastCommandOutput(in: terminal.grid))
+        let text = try #require(ViewController.commandOutput(in: terminal.grid, scrollOffset: 0))
         #expect(text.contains("two"))
         #expect(text.contains("and more"))
         // Not the command line itself, and not the earlier command's output.
@@ -71,10 +72,77 @@ struct CommandOutputTests {
             ("short", ["ignored"], 0),
             ("long", lines, 0),
         ])
-        let text = try #require(ViewController.lastCommandOutput(in: terminal.grid))
+        let text = try #require(ViewController.commandOutput(in: terminal.grid, scrollOffset: 0))
         #expect(text.contains("line0"))
         #expect(text.contains("line79"))
         #expect(!text.contains("ignored"))
+    }
+
+    /// **The `OSC 133 ; C` closure.** With a two-line prompt the guess "one
+    /// row after the prompt" takes a row of what the user *typed*; the `C`
+    /// mark says where the output really starts, and the range now uses it.
+    @Test("a two-line prompt does not leak its second line into the output")
+    func twoLinePromptsAreExact() throws {
+        var terminal = Terminal(rows: 24, columns: 40, scrollbackLimit: 200)
+        // A prompt that spans two rows, as a `%~` on its own line above the
+        // `$` does — the shape powerlevel10k and friends print.
+        terminal.feed(Array("\u{1B}]133;A\u{7}~/src\r\n$ echo hi\r\n".utf8))
+        terminal.feed(Array("\u{1B}]133;C\u{7}".utf8))
+        terminal.feed(Array("hi\r\n".utf8))
+        terminal.feed(Array("\u{1B}]133;D;0\u{7}\u{1B}]133;A\u{7}$ ".utf8))
+
+        let text = try #require(
+            ViewController.commandOutput(in: terminal.grid, scrollOffset: 0))
+        #expect(text.trimmingCharacters(in: .whitespacesAndNewlines) == "hi")
+        #expect(!text.contains("echo hi"))
+        #expect(!text.contains("~/src"))
+    }
+
+    /// A shell whose integration emits `A` and `D` but not `C` still works,
+    /// on the documented one-row-after-the-prompt fallback.
+    @Test("a shell that emits no C mark falls back")
+    func fallbackWithoutOutputMark() throws {
+        var terminal = Terminal(rows: 24, columns: 40, scrollbackLimit: 200)
+        terminal.feed(Array("\u{1B}]133;A\u{7}$ echo hi\r\nhi\r\n".utf8))
+        terminal.feed(Array("\u{1B}]133;D;0\u{7}\u{1B}]133;A\u{7}$ ".utf8))
+        let text = try #require(
+            ViewController.commandOutput(in: terminal.grid, scrollOffset: 0))
+        #expect(text.contains("hi"))
+    }
+
+    /// An output-start mark is a mark and is not a prompt: jumping to one
+    /// would land the viewport a line below where the user asked to be.
+    @Test("an output mark is not a prompt")
+    func outputMarksAreNotPrompts() {
+        let terminal = Self.session(commands: [("echo hi", ["hi"], 0)])
+        let grid = terminal.grid
+        #expect(grid.outputStartRows.count == 1)
+        #expect(!grid.promptRows.contains(grid.outputStartRows[0]))
+        #expect(LineMark.outputStart.isPrompt == false)
+    }
+
+    /// **Scrolled back, the command being read is the one that is copied.**
+    /// A command has to have scrolled off the bottom before anyone scrolls to
+    /// it, and taking the last one there would copy something not on screen.
+    @Test("scrolled into the history, the visible command's output is taken")
+    func scrolledViewportSelectsItsOwnCommand() throws {
+        var terminal = Terminal(rows: 6, columns: 40, scrollbackLimit: 500)
+        for index in 0..<6 {
+            terminal.feed(Array("\u{1B}]133;A\u{7}$ run\(index)\r\n".utf8))
+            terminal.feed(Array("\u{1B}]133;C\u{7}".utf8))
+            for line in 0..<4 { terminal.feed(Array("out\(index)-\(line)\r\n".utf8)) }
+            terminal.feed(Array("\u{1B}]133;D;0\u{7}".utf8))
+        }
+        terminal.feed(Array("\u{1B}]133;A\u{7}$ ".utf8))
+        let grid = terminal.grid
+
+        let latest = try #require(ViewController.commandOutput(in: grid, scrollOffset: 0))
+        #expect(latest.contains("out5-0"))
+
+        // Scrolled up far enough that an earlier command fills the viewport.
+        let scrolled = try #require(ViewController.commandOutput(in: grid, scrollOffset: 18))
+        #expect(!scrolled.contains("out5-0"))
+        #expect(scrolled.contains("out"))
     }
 
     /// No marks at all is a shell with no integration configured; marks but
@@ -85,11 +153,11 @@ struct CommandOutputTests {
         var bare = Terminal(rows: 24, columns: 40, scrollbackLimit: 100)
         bare.feed(Array("$ ls\r\nfile\r\n".utf8))
         #expect(bare.grid.promptRows.isEmpty)
-        #expect(ViewController.lastCommandOutput(in: bare.grid) == nil)
+        #expect(ViewController.commandOutput(in: bare.grid, scrollOffset: 0) == nil)
 
         var fresh = Terminal(rows: 24, columns: 40, scrollbackLimit: 100)
         fresh.feed(Array("\u{1B}]133;A\u{7}$ ".utf8))
-        #expect(ViewController.lastCommandOutput(in: fresh.grid) == nil)
+        #expect(ViewController.commandOutput(in: fresh.grid, scrollOffset: 0) == nil)
     }
 
     /// A command that printed nothing has an empty range, not a range over
@@ -97,7 +165,7 @@ struct CommandOutputTests {
     @Test("a command that printed nothing yields no output")
     func silentCommand() {
         let terminal = Self.session(commands: [("true", [], 0)])
-        #expect(ViewController.lastCommandOutput(in: terminal.grid) == nil)
+        #expect(ViewController.commandOutput(in: terminal.grid, scrollOffset: 0) == nil)
     }
 }
 

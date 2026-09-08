@@ -71,27 +71,46 @@ extension Grid {
         return rows
     }
 
-    /// U14 — the output of the last command that has a prompt after it, as
-    /// the absolute row range `prompt + 1 ..< nextPrompt`.
+    /// Every row carrying an output-start mark (`OSC 133 ; C`), oldest
+    /// first, as absolute indices (U14).
+    public var outputStartRows: [Int] {
+        promptRows(matching: { $0 == .outputStart })
+    }
+
+    /// U14 — the output of the completed command that most recently ended at
+    /// or before `absoluteRow`, as an absolute row range.
     ///
-    /// **What this can and cannot know.** `OSC 133 ; A` marks where a prompt
-    /// begins; Corta does not implement `OSC 133 ; C`, which is what would
-    /// mark where the *command line* ends and the output begins. So the range
-    /// starts one row after the prompt, which is right for the ordinary case
-    /// — a one-line prompt with the command typed on it — and wrong for a
-    /// two-line prompt or a command continued across lines, where the first
-    /// row of the "output" is really the rest of what was typed. That is a
-    /// visible, explainable inaccuracy rather than a silent one, and closing
-    /// it means implementing `C` marks, not guessing here.
+    /// **Where the range starts.** From the command's `OSC 133 ; C` mark when
+    /// the shell emitted one — that is exactly where the output begins, after
+    /// the command line has been echoed. Only when there is no `C` mark does
+    /// it fall back to one row past the prompt, which is right for a one-line
+    /// prompt with the command typed on it and takes one row too much for a
+    /// two-line prompt or a continued command. The fallback is for shells
+    /// whose integration emits `A` and `D` but not `C`.
     ///
-    /// `nil` when there is no completed command to take the output of: no
-    /// marks at all (no shell integration), or only the prompt now waiting
-    /// for input.
-    public var lastCommandOutputRows: Range<Int>? {
+    /// - Parameter before: the absolute row to look back from. Passing the
+    ///   top of a scrolled viewport is what makes "copy this command's
+    ///   output" work on a command that is not the last one.
+    ///
+    /// `nil` when there is no completed command there: no marks at all (no
+    /// shell integration), or only the prompt now waiting for input.
+    public func commandOutputRows(before absoluteRow: Int = .max) -> Range<Int>? {
         let prompts = promptRows
-        guard prompts.count >= 2 else { return nil }
-        let start = prompts[prompts.count - 2] + 1
-        let end = prompts[prompts.count - 1]
+        // The prompt that *ends* the command — the first one at or after the
+        // command whose output is wanted.
+        guard let endIndex = prompts.lastIndex(where: { $0 <= absoluteRow }) ?? prompts.indices.last,
+            endIndex > 0
+        else { return nil }
+        let end = prompts[endIndex]
+        let promptRow = prompts[endIndex - 1]
+        // The output mark belonging to *that* command: the last one after its
+        // prompt and before the next.
+        let outputStart = outputStartRows.last { $0 > promptRow && $0 < end }
+        let start = outputStart ?? promptRow + 1
         return start < end ? start..<end : nil
     }
+
+    /// The last completed command's output. Equivalent to
+    /// `commandOutputRows(before:)` with no bound.
+    public var lastCommandOutputRows: Range<Int>? { commandOutputRows() }
 }

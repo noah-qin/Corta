@@ -83,7 +83,9 @@ extension ViewController: NSMenuItemValidation {
     @objc func copyLastCommandOutput(_ sender: Any?) {
         guard isOperable else { return }
         let grid = session.snapshot()
-        guard let text = Self.lastCommandOutput(in: grid), !text.isEmpty else {
+        guard let text = Self.commandOutput(in: grid, scrollOffset: scrollOffset),
+            !text.isEmpty
+        else {
             // No marks at all is a shell with no integration configured;
             // marks but no completed command is a fresh prompt. Neither is an
             // error, and neither is something to do silently.
@@ -100,11 +102,20 @@ extension ViewController: NSMenuItemValidation {
         terminalView?.showToast(L10n.text("toast.copiedCommandOutput"))
     }
 
-    /// The last completed command's output as text, or `nil` when there is
-    /// none. Static and pure so the row arithmetic is testable without a
-    /// pane.
-    static func lastCommandOutput(in grid: Grid) -> String? {
-        guard let rows = grid.lastCommandOutputRows else { return nil }
+    /// The output of the command the viewport is looking at, as text.
+    ///
+    /// Scrolled to the bottom this is the last command's, which is the
+    /// ordinary case. Scrolled up it is the command whose output the user is
+    /// *reading* — the one whose prompt is nearest above the top of the
+    /// viewport — because a command has to have scrolled off the bottom
+    /// before anyone wants to scroll back to it, and taking the last one
+    /// there would copy something the user cannot see (U14).
+    ///
+    /// Static and pure so the row arithmetic is testable without a pane.
+    static func commandOutput(in grid: Grid, scrollOffset: Int) -> String? {
+        let viewportTop = grid.scrollback.totalPushed - scrollOffset
+        let bound = scrollOffset > 0 ? viewportTop + grid.rows : Int.max
+        guard let rows = grid.commandOutputRows(before: bound) else { return nil }
         // Absolute rows to the document rows selection speaks in.
         let base = grid.scrollback.totalPushed
         let range = SelectionRange(
@@ -140,7 +151,8 @@ extension ViewController: NSMenuItemValidation {
             #selector(jumpToNextFailedCommand(_:)):
             return hasShellIntegration && hasFailedCommands
         case #selector(copyLastCommandOutput(_:)):
-            return isOperable && session.snapshot().lastCommandOutputRows != nil
+            guard isOperable else { return false }
+            return Self.commandOutput(in: session.snapshot(), scrollOffset: scrollOffset) != nil
         case #selector(clearScreen(_:)), #selector(clearHistory(_:)),
             #selector(resetTerminal(_:)):
             return validateTerminalStateItem(menuItem)

@@ -35,8 +35,21 @@ extension Performer {
             grid.setMark(.prompt, atAbsoluteRow: row)
         case 0x42:  // 'B' — command line starts
             break
-        case 0x43:  // 'C' — the command is running
+        case 0x43:  // 'C' — the command is running, and its output starts here
             state.isCommandRunning = true
+            // The row the shell reaches after echoing the command line, which
+            // is exactly where the output begins (U14). Marked so "the last
+            // command's output" is read rather than guessed at one row past
+            // the prompt — a two-line prompt or a continued command makes
+            // that guess take a row of what the user typed.
+            let outputRow = grid.absoluteRow(ofScreenRow: grid.cursor.row)
+            state.outputStartRow = outputRow
+            // Never over a prompt mark: a command that printed nothing leaves
+            // the next prompt on this very row, and the prompt is the one
+            // that matters for jumping.
+            if grid.line(atAbsoluteRow: outputRow)?.mark.isPrompt != true {
+                grid.setMark(.outputStart, atAbsoluteRow: outputRow)
+            }
         case 0x44:  // 'D' — the command finished
             state.isCommandRunning = false
             let status = Self.exitStatus(payload)

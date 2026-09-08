@@ -88,6 +88,10 @@ public struct PerformerState: Sendable {
     /// far the output has scrolled since.
     public internal(set) var promptRow: Int?
 
+    /// Where the running command's output began (`OSC 133 ; C`), as an
+    /// absolute row (U14). `nil` until a command reports one.
+    public internal(set) var outputStartRow: Int?
+
     /// Whether a command is running right now, between `OSC 133 ; C` and
     /// `OSC 133 ; D`. The honest answer to the question `TaskNotifier` used
     /// to guess at.
