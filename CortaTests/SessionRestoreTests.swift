@@ -202,3 +202,77 @@ struct RestoreValidationTests {
         #expect(SessionRestore.load().isEmpty)
     }
 }
+
+/// U07 — the crash path, staged.
+///
+/// A test cannot kill the app mid-restore, but it does not need to: what a
+/// crash leaves behind is a marker file next to the state, and that is the
+/// input the next launch reads. Both halves are exercised here against a real
+/// state directory — the launch after a crash *during* a restore, and the
+/// launch after a crash at any other time, which must still find its windows.
+@MainActor
+struct RestoreCrashRecoveryTests {
+    private func withTemporaryStateDirectory(_ body: () throws -> Void) rethrows {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("corta-crash-\(UUID().uuidString)")
+        let saved = SessionRestore.directory
+        SessionRestore.directory = directory
+        defer {
+            SessionRestore.directory = saved
+            try? FileManager.default.removeItem(at: directory)
+        }
+        try body()
+    }
+
+    private var state: WindowState {
+        WindowState(
+            frame: WindowState.Frame(NSRect(x: 0, y: 0, width: 900, height: 560)),
+            layout: .pane(directory: nil))
+    }
+
+    /// **A crash during a restore.** The marker is still there, so the layout
+    /// that was being applied is the suspect and is not applied again.
+    @Test func aLaunchAfterACrashDuringRestoreStartsFresh() throws {
+        try withTemporaryStateDirectory {
+            SessionRestore.save([state])
+            SessionRestore.beginRestore()  // and then the process dies here
+            #expect(SessionRestore.decideRestore() == .skipAfterFailure)
+        }
+    }
+
+    /// **A crash at any other time.** No marker, and the debounced write left
+    /// the arrangement on disk — which is the case the whole feature exists
+    /// for and the one the old delete-at-launch made impossible.
+    @Test func aLaunchAfterACrashElsewhereRestores() throws {
+        try withTemporaryStateDirectory {
+            SessionRestore.save([state])
+            SessionRestore.beginRestore()
+            SessionRestore.endRestore()  // the restore finished; later, a crash
+            #expect(SessionRestore.decideRestore() == .restore([state]))
+        }
+    }
+
+    /// A clean first run.
+    @Test func nothingSavedMeansNothingToRestore() throws {
+        try withTemporaryStateDirectory {
+            #expect(SessionRestore.decideRestore() == .nothingToRestore)
+        }
+    }
+
+    /// The skip is once, not forever: the next launch after it restores
+    /// normally, because the marker was cleared on the way past.
+    @Test func theSkipHappensOnce() throws {
+        try withTemporaryStateDirectory {
+            SessionRestore.save([state])
+            SessionRestore.beginRestore()
+            #expect(SessionRestore.decideRestore() == .skipAfterFailure)
+            // What the app does on that branch.
+            SessionRestore.clear()
+            SessionRestore.endRestore()
+            #expect(SessionRestore.decideRestore() == .nothingToRestore)
+
+            SessionRestore.save([state])
+            #expect(SessionRestore.decideRestore() == .restore([state]))
+        }
+    }
+}

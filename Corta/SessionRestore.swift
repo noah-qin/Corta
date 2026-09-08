@@ -244,6 +244,26 @@ enum SessionRestore {
         try? FileManager.default.removeItem(at: markerURL)
     }
 
+    /// What a launch should do about the saved arrangement.
+    ///
+    /// Pulled out of `AppDelegate` so the decision can be staged against a
+    /// real state directory — a marker left behind by a launch that died is
+    /// exactly the state to test, and it is a file, not a crash (U07).
+    enum RestoreDecision: Equatable {
+        /// The previous launch died while applying a restore.
+        case skipAfterFailure
+        /// No saved windows.
+        case nothingToRestore
+        /// Restore these.
+        case restore([WindowState])
+    }
+
+    static func decideRestore() -> RestoreDecision {
+        if previousRestoreFailed { return .skipAfterFailure }
+        let states = load()
+        return states.isEmpty ? .nothingToRestore : .restore(states)
+    }
+
     static func save(_ states: [WindowState]) {
         let url = fileURL
         do {
