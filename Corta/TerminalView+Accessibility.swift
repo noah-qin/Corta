@@ -149,9 +149,14 @@ extension TerminalView {
             let snapshot = accessibilitySnapshot()
         else { return .zero }
         let start = snapshot.cell(forOffset: range.location)
-        let end = snapshot.cell(forOffset: range.location + max(0, range.length - 1))
+        // The *last column of* the last character, not its first: a range
+        // ending on a wide character whose rectangle stops at that
+        // character's first column clips half of it. A live accessibility
+        // probe outlined three CJK characters as five cells instead of six
+        // before this (U01).
+        let end = snapshot.cellSpan(forOffset: range.location + max(0, range.length - 1))
         let first = cellFrame(start.row, start.column)
-        let last = cellFrame(end.row, end.column)
+        let last = cellFrame(end.row, end.column + end.columns - 1)
         let rect = first.union(last)
         return window?.convertToScreen(convert(rect, to: nil)) ?? rect
     }

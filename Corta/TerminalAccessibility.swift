@@ -162,6 +162,31 @@ struct TerminalAccessibilitySnapshot {
     /// answers with the column the tail would have been at — VoiceOver asks
     /// for the frame of a range it was given, and "no such cell" is not an
     /// answer it can draw.
+    /// The cell a UTF-16 offset falls in, **and how many columns that
+    /// character occupies** — one for ASCII, two for a wide character, and
+    /// one for a combining sequence, which adds units without adding columns.
+    ///
+    /// The width is what a caller drawing a rectangle needs and what
+    /// `cell(forOffset:)` alone cannot give: a range ending on 测 whose
+    /// rectangle stops at that character's *first* column clips half of it,
+    /// which is what a live accessibility probe showed (3 CJK characters
+    /// outlined as 5 cells instead of 6).
+    func cellSpan(forOffset offset: Int) -> (row: Int, column: Int, columns: Int) {
+        let cell = cell(forOffset: offset)
+        guard row(cell.row) else { return (cell.row, cell.column, 1) }
+        let boundaries = rowBoundaries[cell.row]
+        guard let index = boundaries.lastIndex(where: { $0.column <= cell.column })
+        else { return (cell.row, cell.column, 1) }
+        let next = index + 1 < boundaries.count ? boundaries[index + 1].column : nil
+        // The distance to the next character's column is this one's width;
+        // at the end of the row there is nothing to measure against, and a
+        // single column is the safe answer.
+        let width = next.map { max(1, $0 - boundaries[index].column) } ?? 1
+        return (cell.row, cell.column, width)
+    }
+
+    private func row(_ index: Int) -> Bool { index >= 0 && index < rowBoundaries.count }
+
     func cell(forOffset offset: Int) -> (row: Int, column: Int) {
         guard !lineStarts.isEmpty else { return (0, 0) }
         let clamped = min(max(0, offset), text.utf16.count)

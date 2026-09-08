@@ -223,8 +223,32 @@ struct AccessibilityMappingTests {
         }
         let frame = view.accessibilityFrame(for: NSRange(location: 0, length: 2))
         #expect(asked.first?.column == 0)
-        #expect(asked.last?.column == 2)  // the second character's cell
-        #expect(frame.width == 24)  // columns 0 through 2 inclusive
+        // The second character's *last* column — a rectangle that stopped at
+        // its first would clip half of it. A live accessibility probe showed
+        // exactly that: three CJK characters outlined as five cells.
+        #expect(asked.last?.column == 3)
+        #expect(frame.width == 32)  // two wide characters: four columns
+    }
+
+    /// The column span of a character, which is what a rectangle needs and
+    /// what its starting column alone cannot give.
+    @Test func cellSpansReportHowManyColumnsACharacterOccupies() {
+        var terminal = Self.terminal()
+        terminal.feed(Array("a中b".utf8))
+        let snapshot = Self.snapshot(terminal)
+        #expect(snapshot.cellSpan(forOffset: 0) == (row: 0, column: 0, columns: 1))
+        #expect(snapshot.cellSpan(forOffset: 1) == (row: 0, column: 1, columns: 2))
+        #expect(snapshot.cellSpan(forOffset: 2) == (row: 0, column: 3, columns: 1))
+    }
+
+    /// A combining sequence adds UTF-16 units without adding columns, so its
+    /// span is one column however many units it carries.
+    @Test func combiningSequencesSpanOneColumn() {
+        var terminal = Self.terminal()
+        terminal.feed(Array("e\u{301}x".utf8))
+        let snapshot = Self.snapshot(terminal)
+        #expect(snapshot.cellSpan(forOffset: 0).columns == 1)
+        #expect(snapshot.cellSpan(forOffset: 1).columns == 1)
     }
 
     /// A zero-length range still outlines one cell — an empty rectangle is
