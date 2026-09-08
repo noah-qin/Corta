@@ -42,6 +42,13 @@ extension Performer {
     /// ESC sequences. Charset selection and everything else are ignored
     /// cleanly (`SECURITY.md` §3).
     public mutating func escapeDispatch(intermediates: Intermediates, final: UInt8) {
+        // DECALN is the one intermediate form that carries meaning here:
+        // `ESC # 8`. Everything else with an intermediate — the charset
+        // designators — is still ignored cleanly.
+        if intermediates.count == 1, intermediates[0] == 0x23, final == 0x38 {
+            grid.alignmentDisplay()
+            return
+        }
         guard intermediates.count == 0 else { return }
         switch final {
         case 0x37: grid.saveCursor()     // DECSC — VT510 §DECSC
@@ -59,6 +66,11 @@ extension Performer {
             grid.lineFeed()
         case 0x48: grid.setTabStop()     // HTS
         case 0x4D: grid.reverseIndex()   // RI
+        // DECID (`ESC Z`) — the VT100 spelling of Primary DA, and answered
+        // identically. It was silent, which is the one failure mode a query
+        // must not have: a client that identifies the terminal this way waits
+        // for a reply that never arrives rather than falling back.
+        case 0x5A: reportPrimaryDeviceAttributes()
         case 0x63: resetToInitialState() // RIS
         default: break
         }

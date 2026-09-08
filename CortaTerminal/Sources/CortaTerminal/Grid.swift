@@ -582,6 +582,40 @@ public struct Grid: Sendable {
         cursorStyle = .blinkingBlock
     }
 
+    /// DECALN (`ESC # 8`) — the screen filled with `E`, margins reset, cursor
+    /// home.
+    ///
+    /// It exists to let someone adjust a CRT's geometry, which no one is
+    /// doing here. It matters because it is the cheapest way for a *program*
+    /// to put the screen into a completely known state, which is exactly what
+    /// `esctest` uses it for before checking anything else — so a terminal
+    /// that ignores it does not merely fail the alignment test, it makes
+    /// every test built on that setup meaningless.
+    ///
+    /// The fill uses the default pen rather than the current one: the point
+    /// is a uniform screen, and DEC's own description is a screen of `E`,
+    /// not a screen of `E` in whatever colour the last SGR left behind.
+    public mutating func alignmentDisplay() {
+        marginTop = 0
+        marginBottom = rows - 1
+        pen.reset()
+        pendingWrap = false
+        cursor = Cursor(row: 0, column: 0)
+        for _ in 0..<rows {
+            for _ in 0..<columns {
+                write(UInt32(UInt8(ascii: "E")))
+            }
+            // The last column of every row leaves the cursor pending-wrap
+            // rather than on the next row; move it deliberately instead.
+            pendingWrap = false
+            if cursor.row < rows - 1 {
+                cursor = Cursor(row: cursor.row + 1, column: 0)
+            }
+        }
+        cursor = Cursor(row: 0, column: 0)
+        pendingWrap = false
+    }
+
     public mutating func setTabStop() {
         tabStops[cursor.column] = true
     }
