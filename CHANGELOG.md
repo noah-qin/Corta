@@ -16,7 +16,8 @@ what to edit.
   Terminal, as three separate commands with a table in
   `docs/CONFIGURATION.md` §5 saying what each one discards. They act on
   Corta's grid, not on the child's input, so a running job is undisturbed.
-  Clear History and Reset ship unbound.
+  Clear History and Reset ship unbound and ask before discarding history,
+  honouring `confirm-close`.
 - **U12 (2026-09-08)** — A **Match Case** toggle in the Find bar, backed by
   `search-case-sensitive`; and a pill in the corner of a scrolled pane
   saying how far back the viewport is, changing its wording when new output
@@ -33,7 +34,8 @@ what to edit.
 - **U16 (2026-09-08)** — Regular-expression search behind a `*` toggle
   (`search-regex`), budgeted and cancellable, with a per-line length bound
   and a distinct "bad pattern" state; and named shell/directory/environment
-  presets (`preset.<name>.*`) under Shell ▸ New Pane with Preset.
+  presets (`preset.<name>.*`) under Shell ▸ New Pane with Preset; holding ⌥
+  opens one in a window of its own.
 - **U17 (2026-09-08)** — ⌘-click on `path:line:column` in program output
   opens the file, optionally through `open-file-command`. Local only: a
   pane inside `ssh` resolves nothing. The URL scheme allowlist is unchanged.
@@ -45,6 +47,24 @@ what to edit.
 
 ### Fixed
 
+- **U01 (2026-09-08)** — The accessibility rectangle for a range ending on a
+  wide character clipped half of it: three CJK characters were outlined as
+  five cells instead of six. Found by probing the running app through the
+  accessibility API, not by a test — the unit test's stub made the wrong
+  answer look right.
+- **U14 (2026-09-08)** — `OSC 133 ; C` is now recorded, so the last
+  command's output is read rather than guessed at one row past the prompt; a
+  two-line prompt no longer leaks its second line into the copy. Scrolled
+  back, the command copied is the one on screen.
+- **U16 (2026-09-08)** — A regular expression whose shape makes a
+  backtracking engine take exponential time is refused before it runs and
+  reported as too slow, rather than pinning a thread for the life of the
+  app: neither `NSRegularExpression` nor Swift's `Regex` exposes ICU's time
+  limit, and measurement showed no input length small enough to bound one.
+  A sweep that merely runs long stops on a time budget and says its count is
+  a floor.
+- **U17 (2026-09-08)** — `open-file-command` is validated when it is set, not
+  only when it is run, and has a Settings field.
 - **U01 (2026-09-08)** — Accessibility hit-testing converted a *screen*
   point as if it were a window point, and both directions of the
   UTF-16-offset-to-column conversion assumed the two counts were equal —
