@@ -53,9 +53,10 @@ final class SettingsUITests: XCTestCase {
         XCTAssertEqual(settings.switches.count, 2)
     }
 
-    /// The theme and appearance lists live under View — where "what the
-    /// window looks like" belongs — and there is exactly one "Settings…"
-    /// entry in the whole menu bar, the one macOS puts in the app menu.
+    /// The theme and appearance choices live under View — where "what the
+    /// window looks like" belongs — in one Theme submenu, and there is
+    /// exactly one "Settings…" entry in the whole menu bar, the one macOS
+    /// puts in the app menu.
     @MainActor
     func testThemeAndAppearanceAreListedUnderView() throws {
         let app = XCUIApplication()
@@ -72,7 +73,17 @@ final class SettingsUITests: XCTestCase {
         let viewMenu = app.menuBars.firstMatch.menuBarItems["View"]
         XCTAssertTrue(viewMenu.exists)
         viewMenu.click()
+        XCTAssertFalse(
+            viewMenu.menuItems["Appearance"].exists,
+            "appearance is a row in the Theme submenu, not a second submenu")
         viewMenu.menuItems["Theme"].click()
+        // The appearance choice heads the same submenu — one place for the
+        // whole light-or-dark-and-which-theme decision.
+        for appearance in ["Follow System", "Light", "Dark"] {
+            XCTAssertTrue(
+                viewMenu.menuItems[appearance].waitForExistence(timeout: 3),
+                "\(appearance) must be a row in the Theme submenu")
+        }
         // One offered theme (`Theme.builtIn`). The others stay defined and
         // resolvable by name for a config file that asks for them; they are
         // not recommended from the menu.
