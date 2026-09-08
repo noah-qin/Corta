@@ -1,0 +1,86 @@
+name: Nightly
+
+# The lane the PR checks deliberately are not.
+#
+# `ci.yml` has to be fast and reproducible: one fixed fuzz seed, one test
+# run, no sanitizers. That makes it a regression check a reviewer can trust
+# and rerun, and a poor way to find anything new. This runs the parts that
+# take time or that trade determinism for coverage — a rotating fuzz seed, a
+# long mutation run, and the core suite under the thread and address
+# sanitizers — on a schedule, where a failure is a bug report rather than a
+# blocked pull request.
+on:
+  schedule:
+    - cron: "17 9 * * *"  # 09:17 UTC daily, off the hour to avoid the rush
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: Fuzz seed to use (default: derived from the run number)
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  sanitizers:
+    name: Core suite under sanitizers
+    runs-on: macos-26
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [thread, address]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select the newest installed Xcode
+        run: |
+          latest=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "Using $latest"
+          sudo xcode-select -s "$latest"
+          swift --version
+
+      # The core is where the concurrency is — the write queue, the reader
+      # thread, the session teardown — and it is the part that runs without a
+      # window server, so it is the part a sanitizer can reach here.
+      - name: Test
+        run: swift test --package-path CortaTerminal --sanitize=${{ matrix.sanitizer }}
+
+  fuzz:
+    name: Long fuzz run on a rotating seed
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select the newest installed Xcode
+        run: |
+          latest=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          sudo xcode-select -s "$latest"
+
+      - name: Build
+        run: swift build --package-path CortaTerminal -c release --product corta-fuzz
+
+      # A fixed seed stops expanding coverage after its first clean run. The
+      # seed is reported in the log and in the artifact name so a failure can
+      # be reproduced exactly.
+      - name: Fuzz
+        id: fuzz
+        run: |
+          seed="${{ github.event.inputs.seed }}"
+          if [ -z "$seed" ]; then seed=$(( ${{ github.run_number }} * 7919 % 100000 )); fi
+          echo "seed=$seed" >> "$GITHUB_OUTPUT"
+          echo "Fuzzing with seed $seed"
+          CortaTerminal/.build/release/corta-fuzz --fuzz 20000000 --seed "$seed" \
+            CortaTerminal/Tests/Fuzz/corpus
+
+      - name: Keep the corpus and the seed when the fuzzer finds something
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-failure-seed-${{ steps.fuzz.outputs.seed }}
+          path: |
+            CortaTerminal/Tests/Fuzz/corpus
+            /tmp/corta-fuzz-*
+          if-no-files-found: ignore
+          retention-days: 30

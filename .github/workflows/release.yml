@@ -32,6 +32,7 @@ jobs:
   release:
     name: Build and draft a release
     runs-on: macos-26
+    timeout-minutes: 90
 
     steps:
       - uses: actions/checkout@v7
@@ -263,3 +264,15 @@ jobs:
             --notes-file release-notes.md \
             "${{ steps.package.outputs.zip }}" \
             "${{ steps.package.outputs.zip }}.sha256"
+
+      # Always, including when an earlier step failed: a signing keychain
+      # left on the runner outlives the job that needed it. The hosted
+      # runner is destroyed either way, which is why this is hygiene rather
+      # than a fix, but a workflow that only cleans up on success teaches
+      # the wrong habit to whatever runs it next.
+      - name: Remove the signing keychain
+        if: always() && steps.signing.outputs.available == 'true'
+        run: |
+          security list-keychains -d user -s login.keychain-db || true
+          security delete-keychain build.keychain || true
+          rm -f /tmp/certificate.p12 /tmp/notary.p8 /tmp/ExportOptions.plist || true

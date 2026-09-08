@@ -15,10 +15,17 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Read-only is all either job needs. Without this the workflow inherits the
+# repository default, which is broader than a build has any use for.
+permissions:
+  contents: read
+
 jobs:
   core:
     name: Terminal core (SwiftPM)
     runs-on: macos-26
+    # A hung test otherwise holds a runner for the six-hour default.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
@@ -41,14 +48,29 @@ jobs:
           CortaTerminal/.build/release/corta-fuzz \
             CortaTerminal/Tests/Fuzz/corpus/*
 
+      # Seed 1 on a PR, deliberately: a PR check has to be a regression
+      # check, and a different seed every run means a failure a reviewer
+      # cannot reproduce. Rotating seeds are the nightly lane's job.
       - name: Short mutation fuzz run
         run: |
           CortaTerminal/.build/release/corta-fuzz --fuzz 200000 --seed 1 \
             CortaTerminal/Tests/Fuzz/corpus
 
+      - name: Keep the crashing input when the fuzzer finds one
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-failure-core
+          path: |
+            CortaTerminal/Tests/Fuzz/corpus
+            /tmp/corta-fuzz-*
+          if-no-files-found: ignore
+          retention-days: 14
+
   app:
     name: App and tests (Xcode)
     runs-on: macos-26
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
 
@@ -73,7 +95,19 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             CODE_SIGNING_REQUIRED=NO \
             DEVELOPMENT_TEAM="" \
+            -resultBundlePath TestResults.xcresult \
             -quiet
+
+      # Without the bundle a failed run is a scrolled-off log line. With it
+      # the failing test, its message and its attachments come back.
+      - name: Keep the test results when something fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcresult-app
+          path: TestResults.xcresult
+          if-no-files-found: ignore
+          retention-days: 14
 
   # UI tests need a real window server session and are not run on every PR.
   # `docs/CONFORMANCE.md` §4.4 is explicit that the app-layer check is a
