@@ -41,21 +41,57 @@ extension Grid {
         }
     }
 
+    /// Every prompt row whose command finished with a non-zero status,
+    /// oldest first, as absolute indices (U14).
+    ///
+    /// Separate from `promptRows` rather than a filter over it because the
+    /// caller wants one or the other, never both, and the walk is the same
+    /// cost either way.
+    public var failedPromptRows: [Int] {
+        promptRows(matching: { $0 == .promptFailed })
+    }
+
     /// Every prompt row in the document, oldest first, as absolute indices.
     ///
     /// Walked rather than maintained as an index: a list would have to be
     /// fixed up by eviction, reflow, `resize` and the alternate-screen swap,
     /// and the walk costs one pass over lines that are already in memory —
     /// paid once per ⌘↑, not per frame.
-    public var promptRows: [Int] {
+    public var promptRows: [Int] { promptRows(matching: \.isPrompt) }
+
+    private func promptRows(matching predicate: (LineMark) -> Bool) -> [Int] {
         var rows: [Int] = []
         let base = scrollback.totalPushed - scrollback.count
-        for index in 0..<scrollback.count where scrollback[index].mark.isPrompt {
+        for index in 0..<scrollback.count where predicate(scrollback[index].mark) {
             rows.append(base + index)
         }
-        for row in 0..<self.rows where line(row).mark.isPrompt {
+        for row in 0..<self.rows where predicate(line(row).mark) {
             rows.append(scrollback.totalPushed + row)
         }
         return rows
+    }
+
+    /// U14 — the output of the last command that has a prompt after it, as
+    /// the absolute row range `prompt + 1 ..< nextPrompt`.
+    ///
+    /// **What this can and cannot know.** `OSC 133 ; A` marks where a prompt
+    /// begins; Corta does not implement `OSC 133 ; C`, which is what would
+    /// mark where the *command line* ends and the output begins. So the range
+    /// starts one row after the prompt, which is right for the ordinary case
+    /// — a one-line prompt with the command typed on it — and wrong for a
+    /// two-line prompt or a command continued across lines, where the first
+    /// row of the "output" is really the rest of what was typed. That is a
+    /// visible, explainable inaccuracy rather than a silent one, and closing
+    /// it means implementing `C` marks, not guessing here.
+    ///
+    /// `nil` when there is no completed command to take the output of: no
+    /// marks at all (no shell integration), or only the prompt now waiting
+    /// for input.
+    public var lastCommandOutputRows: Range<Int>? {
+        let prompts = promptRows
+        guard prompts.count >= 2 else { return nil }
+        let start = prompts[prompts.count - 2] + 1
+        let end = prompts[prompts.count - 1]
+        return start < end ? start..<end : nil
     }
 }
