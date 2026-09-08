@@ -14,7 +14,7 @@ import Testing
 ///
 /// `.serialized`: the atlas tests build a `GlyphAtlas`, which is
 /// single-threaded by design — see the type's comment.
-@Suite(.serialized) struct ImageMemoryAndTextureTests {
+@Suite(.serialized, .metalSerialized) struct ImageMemoryAndTextureTests {
     private static func makeDevice() -> MTLDevice? { MTLCreateSystemDefaultDevice() }
 
     /// Transmits `payload` over the wire exactly like a real client and

@@ -12,6 +12,7 @@ import Testing
 /// unmounted" on a working machine takes deliberate effort, and the panel is
 /// invisible in every render test. The contract is asserted here instead.
 @MainActor
+@Suite(.serialized, .sessionRestoreSerialized)
 struct RecoveryUITests {
     // MARK: - The failure panel
 

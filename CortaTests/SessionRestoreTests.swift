@@ -211,6 +211,7 @@ struct RestoreValidationTests {
 /// state directory — the launch after a crash *during* a restore, and the
 /// launch after a crash at any other time, which must still find its windows.
 @MainActor
+@Suite(.serialized, .sessionRestoreSerialized)
 struct RestoreCrashRecoveryTests {
     private func withTemporaryStateDirectory(_ body: () throws -> Void) rethrows {
         let directory = FileManager.default.temporaryDirectory

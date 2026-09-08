@@ -10,7 +10,7 @@ import CortaTerminal
 /// only *schedules* decodes onto an injected scheduler; reused image ids
 /// invalidate the texture decoded from the old bytes; and pruning runs even
 /// when the last placement disappears.
-@Suite("Image decode pipeline (P05)")
+@Suite("Image decode pipeline (P05)", .serialized, .metalSerialized)
 struct ImageDecodePipelineTests {
     private static func makeDevice() -> MTLDevice? { MTLCreateSystemDefaultDevice() }
 

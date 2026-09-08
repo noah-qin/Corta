@@ -8,7 +8,7 @@ import Testing
 
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
-@Suite(.serialized) struct TerminalRendererTests {
+@Suite(.serialized, .metalSerialized) struct TerminalRendererTests {
     private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (
         r: UInt8, g: UInt8, b: UInt8, a: UInt8
     ) {
@@ -42,11 +42,8 @@ import Testing
 
         let width = Int(renderer.metrics.cellWidth * 10)
         let height = Int(renderer.metrics.cellHeight * 4)
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: QuadRenderer.pixelFormat, width: width, height: height, mipmapped: false)
-        descriptor.usage = [.renderTarget, .shaderRead]
-        descriptor.storageMode = .managed
-        let texture = device.makeTexture(descriptor: descriptor)!
+        let texture = MetalRenderTarget.make(
+            device: device, width: width, height: height)
 
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = texture
@@ -87,11 +84,8 @@ import Testing
 
         let width = Int(renderer.metrics.cellWidth * 10)
         let height = Int(renderer.metrics.cellHeight * 4)
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: QuadRenderer.pixelFormat, width: width, height: height, mipmapped: false)
-        descriptor.usage = [.renderTarget, .shaderRead]
-        descriptor.storageMode = .managed
-        let texture = device.makeTexture(descriptor: descriptor)!
+        let texture = MetalRenderTarget.make(
+            device: device, width: width, height: height)
 
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = texture
@@ -139,12 +133,10 @@ import Testing
 
         let width = Int(renderer.metrics.cellWidth * 10)
         let height = Int(renderer.metrics.cellHeight * 4)
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: QuadRenderer.pixelFormat, width: width, height: height, mipmapped: false)
-        descriptor.usage = [.renderTarget, .shaderRead]
-        descriptor.storageMode = .managed
-        let liveTexture = device.makeTexture(descriptor: descriptor)!
-        let scrolledTexture = device.makeTexture(descriptor: descriptor)!
+        let liveTexture = MetalRenderTarget.make(
+            device: device, width: width, height: height)
+        let scrolledTexture = MetalRenderTarget.make(
+            device: device, width: width, height: height)
 
         func draw(into texture: MTLTexture, scrollOffset: Int) {
             let pass = MTLRenderPassDescriptor()

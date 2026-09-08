@@ -9,7 +9,7 @@ import Testing
 /// M3.7, renderer side: the selection's document rows (scrollback rows
 /// negative) are translated to viewport rows through the scroll offset and
 /// the scrollback's growth since the selection was recorded.
-struct SelectionRendererTests {
+@Suite(.serialized, .metalSerialized) struct SelectionRendererTests {
     private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (
         r: UInt8, g: UInt8, b: UInt8, a: UInt8
     ) {
@@ -51,12 +51,8 @@ struct SelectionRendererTests {
     private static func draw(
         _ fixture: Fixture, grid: Grid, scrollOffset: Int, selection: TerminalSelection?
     ) -> MTLTexture {
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: QuadRenderer.pixelFormat, width: fixture.width, height: fixture.height,
-            mipmapped: false)
-        descriptor.usage = [.renderTarget, .shaderRead]
-        descriptor.storageMode = .managed
-        let texture = fixture.renderer.quadRenderer.device.makeTexture(descriptor: descriptor)!
+        let texture = MetalRenderTarget.make(
+            device: fixture.renderer.quadRenderer.device, width: fixture.width, height: fixture.height)
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = texture
         pass.colorAttachments[0].loadAction = .clear

@@ -11,7 +11,7 @@ import Testing
 /// scroll offset exactly like a selection does.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
-@Suite(.serialized) struct SearchHighlightRenderTests {
+@Suite(.serialized, .metalSerialized) struct SearchHighlightRenderTests {
     private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (
         r: UInt8, g: UInt8, b: UInt8, a: UInt8
     ) {
@@ -52,12 +52,8 @@ import Testing
         _ fixture: Fixture, grid: Grid, scrollOffset: Int,
         searchMatches: [TerminalSelection], currentSearchMatchIndex: Int?
     ) -> MTLTexture {
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: QuadRenderer.pixelFormat, width: fixture.width, height: fixture.height,
-            mipmapped: false)
-        descriptor.usage = [.renderTarget, .shaderRead]
-        descriptor.storageMode = .managed
-        let texture = fixture.renderer.quadRenderer.device.makeTexture(descriptor: descriptor)!
+        let texture = MetalRenderTarget.make(
+            device: fixture.renderer.quadRenderer.device, width: fixture.width, height: fixture.height)
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = texture
         pass.colorAttachments[0].loadAction = .clear
