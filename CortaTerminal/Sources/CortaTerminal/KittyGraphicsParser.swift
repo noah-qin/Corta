@@ -56,6 +56,16 @@ enum KittyGraphicsParser {
         return Int(String(decoding: raw, as: UTF8.self))
     }
 
+    /// Checked `Int` → `UInt32` for every id the wire carries (`i=`, `p=`).
+    /// The protocol's ids are unsigned 32-bit; a negative or overflowing
+    /// value cannot name an image or placement under any reading of the
+    /// spec, and an unchecked conversion here is a release-build SIGTRAP on
+    /// hostile input (`SECURITY.md` §3 — S01). Callers treat `nil` as
+    /// "ignore this command", the same as any unrecognised sequence.
+    private static func uint32ID(_ value: Int?) -> UInt32? {
+        value.flatMap(UInt32.init(exactly:))
+    }
+
     private static func command(
         from fields: [UInt8: ArraySlice<UInt8>], payload: ArraySlice<UInt8>
     ) -> KittyGraphics.Command? {
@@ -64,12 +74,19 @@ enum KittyGraphicsParser {
         case "t", "T":
             guard let header = transmitHeader(fields) else { return nil }
             let moreChunks = intValue(fields, "m") == 1
-            let display = action == "T" ? displayHeader(fields, imageID: header.imageID) : nil
-            return .transmit(header, payloadBase64: payload, moreChunks: moreChunks, display: display)
+            // An unrepresentable `p=` on an `a=T` rejects the whole command,
+            // transmit included — acting on half of it would store an image
+            // the client cannot then reference the way it asked to.
+            if action == "T" {
+                guard let display = displayHeader(fields, imageID: header.imageID) else { return nil }
+                return .transmit(header, payloadBase64: payload, moreChunks: moreChunks, display: display)
+            }
+            return .transmit(header, payloadBase64: payload, moreChunks: moreChunks, display: nil)
         case "p":
-            guard let imageID = intValue(fields, "i").map({ KittyGraphics.ImageID(rawValue: UInt32($0)) })
-            else { return nil }
-            return .display(displayHeader(fields, imageID: imageID))
+            guard let rawImageID = uint32ID(intValue(fields, "i")) else { return nil }
+            let imageID = KittyGraphics.ImageID(rawValue: rawImageID)
+            guard let display = displayHeader(fields, imageID: imageID) else { return nil }
+            return .display(display)
         case "d":
             return .delete(deleteTarget(fields))
         case "q":
@@ -105,8 +122,7 @@ enum KittyGraphicsParser {
         // protocol (`KittyGraphics.swift`'s doc comment). Only a *negative*
         // or oversized value is refused; those cannot be an id under any
         // reading of the spec.
-        let imageID = intValue(fields, "i") ?? 0
-        guard imageID >= 0, imageID <= Int(UInt32.max) else { return nil }
+        guard let rawImageID = uint32ID(intValue(fields, "i") ?? 0) else { return nil }
         // `f=`/`s=`/`v=` are only meaningful on the *first* chunk of a
         // transmission — a continuation chunk (`m=1` on the previous one)
         // carries only `i=` and the next slice of payload, per the
@@ -120,16 +136,23 @@ enum KittyGraphicsParser {
         let height = intValue(fields, "v").map { min(max(0, $0), 8192) }
         let quiet = min(max(0, intValue(fields, "q") ?? 0), 2)
         return KittyGraphics.TransmitHeader(
-            imageID: KittyGraphics.ImageID(rawValue: UInt32(imageID)), format: format, width: width,
+            imageID: KittyGraphics.ImageID(rawValue: rawImageID), format: format, width: width,
             height: height, quiet: quiet)
     }
 
+    /// `nil` when a `p=` is present but not a valid id — the caller ignores
+    /// the whole command rather than guessing at a placement id the client
+    /// did not send (`uint32ID`'s doc comment).
     private static func displayHeader(
         _ fields: [UInt8: ArraySlice<UInt8>], imageID: KittyGraphics.ImageID
-    ) -> KittyGraphics.DisplayHeader {
-        let placementID =
-            intValue(fields, "p").map { KittyGraphics.PlacementID(rawValue: UInt32(max(0, $0))) }
-            ?? KittyGraphics.PlacementID(rawValue: imageID.rawValue)
+    ) -> KittyGraphics.DisplayHeader? {
+        let placementID: KittyGraphics.PlacementID
+        if let rawPlacement = intValue(fields, "p") {
+            guard let placement = uint32ID(rawPlacement) else { return nil }
+            placementID = KittyGraphics.PlacementID(rawValue: placement)
+        } else {
+            placementID = KittyGraphics.PlacementID(rawValue: imageID.rawValue)
+        }
         // Requested cell span, clamped to something no real terminal window
         // would exceed — the same defensive-clamp reasoning as the pixel
         // dimensions above.
@@ -155,13 +178,19 @@ enum KittyGraphicsParser {
         case "a":
             return .all
         case "i":
-            guard let imageID = intValue(fields, "i") else { return .unrecognised }
-            if let placementID = intValue(fields, "p"), placementID > 0 {
-                return .placement(
-                    KittyGraphics.ImageID(rawValue: UInt32(imageID)),
-                    KittyGraphics.PlacementID(rawValue: UInt32(placementID)))
+            guard let rawImageID = uint32ID(intValue(fields, "i")) else { return .unrecognised }
+            let imageID = KittyGraphics.ImageID(rawValue: rawImageID)
+            if let rawPlacement = intValue(fields, "p") {
+                // A `p=` that is present but not a valid id must not widen
+                // the delete to the whole image — refuse to delete anything
+                // instead, the same rule `DeleteTarget.unrecognised` exists
+                // for.
+                guard let placement = uint32ID(rawPlacement) else { return .unrecognised }
+                if placement > 0 {
+                    return .placement(imageID, KittyGraphics.PlacementID(rawValue: placement))
+                }
             }
-            return .image(KittyGraphics.ImageID(rawValue: UInt32(imageID)))
+            return .image(imageID)
         default:
             // `d`, `c`, `r`, `z`, `p`, `q`, `x`, `y` — by-position and
             // by-range deletes. Recognised as delete requests, not
