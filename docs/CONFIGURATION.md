@@ -70,7 +70,7 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 | `bell` | `visual`, `audible`, `muted` | `visual` | `visual` flashes the pane; `audible` is `NSSound.beep()`. |
 | `option-as-meta` | boolean | `false` | Whether ⌥ acts as Meta — an ESC prefix on the base character, the way a PC keyboard's Alt does — instead of composing the layout's alternate character. Off by default because on macOS ⌥ *is* text input: it types `é`, `ø`, `–`, and starts dead-key sequences, and an international layout needs that. Turn it on when a program wants `M-x` and `M-b`. Special keys are unaffected either way: ⌥ already reaches the child there as the xterm modifier parameter, and an IME still sees every event it would otherwise see. |
 | `open-file-command` | string | *(empty)* | The command run when a `path:line` reference in program output is ⌘-clicked. `{file}`, `{line}` and `{column}` are substituted, one argument at a time. The executable must be an **absolute path** and is run directly — never through a shell — so a path containing `;` or `$(…)` stays a path. Empty means the system default application for the file's type, which cannot be told a line number; the hover tooltip says so. |
-| `search-regex` | boolean | `false` | Whether the search field is read as a regular expression (ICU syntax, as `NSRegularExpression` accepts it). The **`*`** button in the search bar writes this key. A pattern that does not compile is reported as such — not as "no results" — and lines longer than 64,000 UTF-16 units are skipped, which the match count marks with a `+`. The bound exists because a backtracking pattern on one enormous line cannot be cancelled from outside. |
+| `search-regex` | boolean | `false` | Whether the search field is read as a regular expression (ICU syntax, as `NSRegularExpression` accepts it). The **`*`** button in the search bar writes this key. Three things are reported rather than shown as "no results": a pattern that does not compile, a pattern whose shape makes a backtracking engine take exponential time (`(a+)+`, `(a*)*`, `(a\|a)+` — every one has a linear equivalent, and it is refused *before* it runs because ICU's time limit is not reachable from Swift), and a sweep that stopped on its 500 ms budget or on a line longer than 64,000 units, which the match count marks with a `+`. |
 | `search-case-sensitive` | boolean | `false` | Whether scrollback search distinguishes case. Off by default: a person searching a log for `error` wants `Error` and `ERROR` too. The **Match Case** button in the search bar writes this key, so the choice survives closing the bar and restarting. |
 | `copy-on-select` | boolean | `true` | A finished selection goes straight to the clipboard, confirmed by a label in the corner of the pane. Set `false` for ⌘C only. |
 | `link-activation` | `command`, `click` | `command` | `command` opens a link on ⌘-click. `click` opens it on a plain click and underlines the link under the pointer; dragging across a URL still selects it. |
@@ -231,6 +231,9 @@ preset.api.env.API_ENV = staging
 preset.api.env.NO_COLOR = 1
 ```
 
+Holding ⌥ while choosing a preset opens it in a window of its own instead of
+splitting the focused pane.
+
 Every field is optional. `shell` and `directory` must be **absolute** — a
 relative path would resolve against whatever Corta was launched from, which on
 a Finder launch is `/` — and a preset that names neither an absolute path nor
@@ -363,7 +366,10 @@ All three act on Corta's own grid, not on the program running in it: nothing
 is written to the child's input, so a running job is undisturbed and redraws
 on its next frame. `clear-history` and `reset-terminal` ship unbound — both
 throw history away, and a key that discards a build log by accident is not a
-default.
+default — and both ask before discarding, naming how many lines are at stake.
+The question is skipped when the scrollback is empty, and suppressed entirely
+by `confirm-close = false`, which is the existing key for "ask me before I
+lose work".
 
 Every command in this table is also in the command palette (⇧⌘P), which
 lists the same table — so a command with no default binding is still one
