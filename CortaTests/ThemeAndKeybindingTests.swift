@@ -147,6 +147,50 @@ import Testing
         #expect(!text.contains("bind.new-tab"))
     }
 
+    // MARK: - Matching a key event (U08)
+
+    private static func event(
+        _ characters: String, ignoring: String? = nil,
+        modifiers: NSEvent.ModifierFlags = [], keyCode: UInt16 = 0
+    ) -> NSEvent {
+        NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0,
+            windowNumber: 0, context: nil, characters: characters,
+            charactersIgnoringModifiers: ignoring ?? characters, isARepeat: false,
+            keyCode: keyCode)!
+    }
+
+    /// `matches` is what stops a rebound command leaving its old key behind:
+    /// the modifiers must be exactly the shortcut's, not merely include them.
+    @Test("a shortcut matches its own keystroke and nothing else")
+    func shortcutMatchesExactly() {
+        let commandV = try! #require(Shortcut.parse("cmd+v"))
+        #expect(commandV.matches(Self.event("v", modifiers: .command)))
+        #expect(!commandV.matches(Self.event("v")))
+        // The bug: a `contains(.command)` test called ⌘⇧V and ⌥⌘V pastes too.
+        #expect(!commandV.matches(Self.event("V", ignoring: "V", modifiers: [.command, .shift])))
+        #expect(!commandV.matches(Self.event("√", ignoring: "v", modifiers: [.command, .option])))
+    }
+
+    /// AppKit hands a shifted letter over uppercased, and modifiers AppKit
+    /// sets for its own reasons (`.function`, `.numericPad`, Caps Lock) are
+    /// not part of the notation and must not defeat a match.
+    @Test("a shifted letter and AppKit's incidental flags still match")
+    func shortcutMatchingNormalises() {
+        let shifted = try! #require(Shortcut.parse("cmd+shift+d"))
+        #expect(shifted.matches(Self.event("D", ignoring: "D", modifiers: [.command, .shift])))
+        let up = try! #require(Shortcut.parse("cmd+up"))
+        let scalar = String(UnicodeScalar(NSUpArrowFunctionKey)!)
+        #expect(
+            up.matches(
+                Self.event(
+                    scalar, modifiers: [.command, .function, .numericPad], keyCode: 126)))
+        #expect(
+            up.matches(
+                Self.event(
+                    scalar, modifiers: [.command, .capsLock, .function], keyCode: 126)))
+    }
+
     @Test("every command has a distinct config key and a title")
     func commandTableIsWellFormed() {
         let keys = Set(TerminalCommand.allCases.map(\.configurationKey))
@@ -176,9 +220,27 @@ import Testing
 
     // MARK: - New scalar settings
 
+    /// U05 — `option-as-meta` was serialised but had no parse case, so a
+    /// user who typed it into the file got an "unknown key" and the setting
+    /// never applied; the settings page had no switch for it either. The
+    /// round trip is what catches a write-only key.
+    @Test("option-as-meta round-trips through the config file")
+    func optionAsMetaRoundTrips() {
+        let (parsed, unknown) = Configuration.parse("option-as-meta = true")
+        #expect(unknown.isEmpty)
+        #expect(parsed.optionAsMeta)
+        #expect(parsed.serialized().contains("option-as-meta = true"))
+        let (reparsed, reunknown) = Configuration.parse(parsed.serialized())
+        #expect(reunknown.isEmpty)
+        #expect(reparsed.optionAsMeta)
+        // The default stays off: ⌥ is text input on macOS.
+        #expect(!Configuration().optionAsMeta)
+    }
+
     @Test("the new terminal and window settings round-trip")
     func newSettingsRoundTrip() {
         var configuration = Configuration()
+        configuration.optionAsMeta = true
         // The non-default: copy-on-select ships on (M7.10).
         configuration.copyOnSelect = false
         configuration.linkActivation = .click

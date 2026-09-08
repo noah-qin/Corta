@@ -70,6 +70,28 @@ nonisolated struct Configuration: Equatable, Sendable {
     var copyOnSelect: Bool = true
     /// M7.9 — see `LinkActivation`.
     var linkActivation: LinkActivation = .command
+    /// U05 — ⌥ as Meta: an Option-modified text key sends ESC plus the base
+    /// character, the way a PC's Alt key reaches readline (`\eb` for
+    /// Option+B, and so on). Off by default: on a Mac, Option is how the
+    /// layout's alternate characters (é, ø, π) and dead keys are typed, and
+    /// taking that away is a choice only the user can make.
+    var optionAsMeta: Bool = false
+
+    /// U12 — whether scrollback search distinguishes case. Off by default:
+    /// a person searching a log for `error` wants `Error` and `ERROR` too,
+    /// and the toggle in the search bar writes here so the choice survives
+    /// closing the bar and restarting the app.
+    var searchCaseSensitive: Bool = false
+
+    /// U16 — whether the search field is read as a regular expression. Like
+    /// `search-case-sensitive`, the bar's own toggle writes it, so the mode
+    /// survives closing the bar.
+    var searchRegex: Bool = false
+
+    /// U17 — the command that opens a `path:line` reference, with `{file}`,
+    /// `{line}` and `{column}` substituted. Empty means the system default
+    /// application, which cannot be told a line number.
+    var openFileCommand: String = ""
     /// M7.11 — whether OSC 52 may write the system pasteboard.
     ///
     /// Off by default, as `SECURITY.md` §2.6 requires: any output at all
@@ -99,6 +121,10 @@ nonisolated struct Configuration: Equatable, Sendable {
 
     /// Themes defined in the config file itself (M7.6), in file order.
     var customThemes: [Theme] = []
+
+    /// U16 — named shell/directory/environment presets, in the order the
+    /// config file lists them, which is the order the menu offers them.
+    var presets: [Preset] = []
     /// Keyboard shortcuts, defaults plus the file's overrides (M7.7).
     var keybindings = Keybindings()
 
@@ -115,7 +141,10 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// the terminal has to start.
     ///
     /// Returns the parsed configuration and the keys it did not recognise,
-    /// so `serialized(preserving:)` can write them back untouched.
+    /// so `serialized(preserving:)` can write them back untouched. A
+    /// recognised key whose value cannot be parsed at all (`font-size =
+    /// banana`) is unrecognised too: the value falls back to the default and
+    /// the line is preserved rather than rewritten.
     static func parse(_ text: String) -> (configuration: Configuration, unknown: [(String, String)]) {
         var configuration = Configuration()
         var unknown: [(String, String)] = []
@@ -125,6 +154,8 @@ nonisolated struct Configuration: Equatable, Sendable {
         // one defined further down.
         var themeDrafts: [String: ThemeDraft] = [:]
         var themeOrder: [String] = []
+        var presetDrafts: [String: Preset] = [:]
+        var presetOrder: [String] = []
         for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
             let line = rawLine.trimmingCharacters(in: .whitespaces)
             // A `#` opens a comment — except as the first character of a
@@ -146,6 +177,11 @@ nonisolated struct Configuration: Equatable, Sendable {
                     continue
                 }
                 unknown.append((key, value))
+            } else if key.hasPrefix("preset.") {
+                if applyPresetKey(key, value: value, drafts: &presetDrafts, order: &presetOrder) {
+                    continue
+                }
+                unknown.append((key, value))
             } else if key.hasPrefix("bind.") {
                 if let command = TerminalCommand(rawValue: String(key.dropFirst("bind.".count))) {
                     // An empty value unbinds; a malformed one is left alone
@@ -160,11 +196,18 @@ nonisolated struct Configuration: Equatable, Sendable {
             }
         }
         configuration.customThemes = themeOrder.compactMap { themeDrafts[$0]?.resolved() }
+        // A preset that names nothing, or names a relative shell or
+        // directory, is a typo — kept out of the menu rather than offered as
+        // something that will fail at spawn time.
+        configuration.presets = presetOrder.compactMap { presetDrafts[$0] }.filter(\.isUsable)
         return (configuration, unknown)
     }
 
-    /// Applies one key. Returns false when the key is not one of ours — an
-    /// out-of-range *value* for a known key is clamped, not rejected, so the
+    /// Applies one key. Returns false when the key is not one of ours — or
+    /// when it is ours but the value cannot be parsed at all, so the line
+    /// lands in `unknown` and survives the next write verbatim: a typo the
+    /// user can see and fix, not one silently replaced by the default. An
+    /// out-of-range value that *does* parse is clamped, not rejected, so the
     /// key still counts as recognised and is rewritten in canonical form.
     private mutating func apply(key: String, value: String) -> Bool {
         switch key {
@@ -173,44 +216,70 @@ nonisolated struct Configuration: Equatable, Sendable {
         case "font-size":
             // The same clamp the ⌘+/⌘− path uses: below ~8pt the metrics
             // round to a degenerate cell.
-            if let size = Double(value) { fontSize = min(64, max(8, size)) }
+            guard let size = Double(value) else { return false }
+            fontSize = min(64, max(8, size))
         case "theme":
             // Not validated here: a custom theme may be defined further down
             // the same file, and the name is resolved when it is used.
             theme = value.isEmpty ? Theme.corta.name : value
         case "appearance":
-            appearance = Appearance(rawValue: value) ?? .auto
+            guard let parsed = Appearance(rawValue: value) else { return false }
+            appearance = parsed
         case "columns":
             // Clamped to what a window can actually show: below the minimum
             // grid the window cannot be built, and an absurd value would open
             // a window larger than every display.
-            if let value = Int(value) { columns = min(500, max(20, value)) }
+            guard let value = Int(value) else { return false }
+            columns = min(500, max(20, value))
         case "rows":
-            if let value = Int(value) { rows = min(300, max(5, value)) }
+            guard let value = Int(value) else { return false }
+            rows = min(300, max(5, value))
         case "scrollback-lines":
             // Capped: scrollback is unbounded input and every unbounded
             // input needs a cap (`SECURITY.md` §3).
-            if let lines = Int(value) { scrollbackLines = min(1_000_000, max(0, lines)) }
+            guard let lines = Int(value) else { return false }
+            scrollbackLines = min(1_000_000, max(0, lines))
         case "bell":
-            bell = BellMode(rawValue: value) ?? .visual
+            guard let mode = BellMode(rawValue: value) else { return false }
+            bell = mode
         case "notify-on-long-task":
-            notifyOnLongTask = Self.parseBool(value) ?? false
+            guard let parsed = Self.parseBool(value) else { return false }
+            notifyOnLongTask = parsed
         case "notification-threshold":
-            if let seconds = Double(value) { notificationThreshold = max(1, seconds) }
+            guard let seconds = Double(value) else { return false }
+            notificationThreshold = max(1, seconds)
+        case "open-file-command":
+            openFileCommand = value
+        case "search-regex":
+            guard let parsed = Self.parseBool(value) else { return false }
+            searchRegex = parsed
+        case "search-case-sensitive":
+            guard let parsed = Self.parseBool(value) else { return false }
+            searchCaseSensitive = parsed
+        case "option-as-meta":
+            guard let parsed = Self.parseBool(value) else { return false }
+            optionAsMeta = parsed
         case "copy-on-select":
-            copyOnSelect = Self.parseBool(value) ?? true
+            guard let parsed = Self.parseBool(value) else { return false }
+            copyOnSelect = parsed
         case "link-activation":
-            linkActivation = LinkActivation(rawValue: value) ?? .command
+            guard let activation = LinkActivation(rawValue: value) else { return false }
+            linkActivation = activation
         case "allow-clipboard-write":
-            allowClipboardWrite = Self.parseBool(value) ?? false
+            guard let parsed = Self.parseBool(value) else { return false }
+            allowClipboardWrite = parsed
         case "restore-windows":
-            restoreWindows = Self.parseBool(value) ?? true
+            guard let parsed = Self.parseBool(value) else { return false }
+            restoreWindows = parsed
         case "confirm-close":
-            confirmClose = Self.parseBool(value) ?? true
+            guard let parsed = Self.parseBool(value) else { return false }
+            confirmClose = parsed
         case "update-auto-check":
-            updateAutoCheck = Self.parseBool(value) ?? true
+            guard let parsed = Self.parseBool(value) else { return false }
+            updateAutoCheck = parsed
         case "suggest-applications-folder":
-            suggestApplicationsFolder = Self.parseBool(value) ?? true
+            guard let parsed = Self.parseBool(value) else { return false }
+            suggestApplicationsFolder = parsed
         default:
             return false
         }
@@ -271,6 +340,24 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// `theme.<name>.<field>` and `theme.<name>.<dark|light>.<field>`.
     /// Returns false for a shape this does not recognise, so it lands in
     /// `unknown` and survives the round trip.
+    /// `preset.<name>.<field>`. Unknown fields fall through to the unknown
+    /// list, so a key from a newer version survives a write by this one — the
+    /// same rule the theme keys follow.
+    private static func applyPresetKey(
+        _ key: String, value: String, drafts: inout [String: Preset], order: inout [String]
+    ) -> Bool {
+        let rest = key.dropFirst("preset.".count)
+        guard let dot = rest.firstIndex(of: ".") else { return false }
+        let name = String(rest[rest.startIndex..<dot])
+        let field = String(rest[rest.index(after: dot)...])
+        guard !name.isEmpty, !field.isEmpty else { return false }
+        if drafts[name] == nil {
+            drafts[name] = Preset(name: name)
+            order.append(name)
+        }
+        return drafts[name]!.apply(field: field, value: value)
+    }
+
     private static func applyThemeKey(
         _ key: String, value: String, drafts: inout [String: ThemeDraft], order: inout [String]
     ) -> Bool {
@@ -366,6 +453,10 @@ nonisolated struct Configuration: Equatable, Sendable {
             "bell = \(bell.rawValue)",
             "copy-on-select = \(copyOnSelect)",
             "link-activation = \(linkActivation.rawValue)",
+            "option-as-meta = \(optionAsMeta)",
+            "search-case-sensitive = \(searchCaseSensitive)",
+            "search-regex = \(searchRegex)",
+            "open-file-command = \(openFileCommand)",
             "allow-clipboard-write = \(allowClipboardWrite)",
             "restore-windows = \(restoreWindows)",
             "confirm-close = \(confirmClose)",
@@ -376,6 +467,11 @@ nonisolated struct Configuration: Equatable, Sendable {
             "notify-on-long-task = \(notifyOnLongTask)",
             "notification-threshold = \(Self.number(notificationThreshold))",
         ]
+        if !presets.isEmpty {
+            lines.append("")
+            lines.append("# Presets (U16): a shell, a directory and a few variables.")
+            for preset in presets { lines.append(contentsOf: preset.serializedLines) }
+        }
         if !customThemes.isEmpty {
             lines.append("")
             lines.append("# Themes defined here. Anything left out is inherited from")
