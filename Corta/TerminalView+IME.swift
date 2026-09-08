@@ -67,7 +67,6 @@ extension TerminalView: NSTextInputClient {
             return
         }
         let overlay = markedTextOverlay
-        overlay.cellSize = cellSize
         // Re-read on every show: the shell's provider answers with the
         // renderer's font at the *current* size, so ⌘=/⌘- mid-composition
         // is picked up on the next preedit update.
@@ -77,6 +76,17 @@ extension TerminalView: NSTextInputClient {
 
     func unmarkText() {
         clearMarkedText()
+    }
+
+    /// A pane losing the keyboard mid-composition (click into a sibling
+    /// pane, a ⌘⌥ focus move, a tab switch) drops the preedit here: once
+    /// this view's input context deactivates the composition is over as far
+    /// as the IME is concerned, and a stale overlay would sit on a pane the
+    /// user is no longer typing into. Discarded, never committed —
+    /// half-composed input must not reach the PTY.
+    override func resignFirstResponder() -> Bool {
+        clearMarkedText()
+        return super.resignFirstResponder()
     }
 
     private func clearMarkedText() {
@@ -166,10 +176,6 @@ final class MarkedTextOverlayView: NSView {
     var font = NSFont.monospacedSystemFont(
         ofSize: ViewController.defaultFontSize, weight: .medium)
 
-    /// Set by the terminal view before each `show`; needed to size and
-    /// vertically centre the text against the cell it covers.
-    var cellSize: CGSize = CGSize(width: 8, height: 17)
-
     /// Same light grey the renderer resolves `.default` foreground to
     /// (`TerminalColorPalette.defaultForeground`).
     private let textColor = NSColor(white: 0.96, alpha: 1)
@@ -193,14 +199,22 @@ final class MarkedTextOverlayView: NSView {
     }
 
     /// Shows the preedit at `cell` (the cursor cell's rect in the superview's
-    /// coordinates), wide enough for the text but never narrower than a cell.
+    /// coordinates, at the *current* font size — so ⌘=/⌘- mid-composition
+    /// arrives as a taller `cell` on the next update, and there is no second
+    /// copy of the cell metrics here to fall out of step with it),
+    /// wide enough for the text but never narrower than a cell
+    /// and never wider than what is left of the pane: AppKit does not clip
+    /// subviews to their superview, so an unclamped preedit at the last
+    /// column would paint over the divider and the sibling pane in a split.
     func show(_ attributed: NSAttributedString, at cell: CGRect) {
         let display = displayString(for: attributed)
         markedText = display
         let textSize = display.size()
+        let available = superview.map { max(0, $0.bounds.maxX - cell.minX) }
+            ?? .greatestFiniteMagnitude
         frame = CGRect(
             x: cell.minX, y: cell.minY,
-            width: max(ceil(textSize.width), cell.width),
+            width: min(max(ceil(textSize.width), cell.width), max(cell.width, available)),
             height: max(cell.height, ceil(textSize.height)))
         isHidden = false
         needsDisplay = true
