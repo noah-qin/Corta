@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       seed:
-        description: Fuzz seed to use (default: derived from the run number)
+        description: "Fuzz seed to use (default: derived from the run number)"
         required: false
 
 permissions:
