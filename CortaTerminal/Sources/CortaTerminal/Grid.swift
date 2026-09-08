@@ -71,7 +71,9 @@ public struct Grid: Sendable {
     /// OSC 8 hyperlink targets, keyed by the id a cell carries (M6.8).
     /// Shared with the alternate screen and never cleared while a link may
     /// still be on screen or in the scrollback — an id in a cell that no
-    /// longer resolves would render as a link that goes nowhere.
+    /// longer resolves would render as a link that goes nowhere. Entries no
+    /// holder references are instead swept under capacity pressure
+    /// (`internHyperlink`, P06), which keeps every live id valid.
     public var hyperlinks: HyperlinkTable
 
     /// Kitty graphics image placements (M10) — a side table, not a `Cell`
@@ -409,9 +411,16 @@ public struct Grid: Sendable {
         let cell = lines[row][column]
         var cluster = graphemes.scalars(for: cell.grapheme) ?? [cell.scalar]
         cluster.append(scalar)
-        // The table is capped (`SECURITY.md` §3); when it is full, the mark
-        // is dropped and the base character stays as it was.
-        guard let id = graphemes.intern(cluster) else { return }
+        var id = graphemes.intern(cluster)
+        if id == nil, graphemes.count >= GraphemeTable.capacity {
+            // Full (P06): sweep entries no cell references, then retry once.
+            // Still nil afterwards means the screen genuinely holds
+            // `capacity` distinct clusters — then, as before, the mark is
+            // dropped and the base character stays as it was.
+            graphemes.reclaim(keeping: liveGraphemeIDs())
+            id = graphemes.intern(cluster)
+        }
+        guard let id else { return }
         var updated = cell
         updated.grapheme = id
         lines[row][column] = updated
@@ -536,6 +545,30 @@ public struct Grid: Sendable {
         self = Grid(rows: rows, columns: columns, scrollbackLimit: scrollback.limit)
     }
 
+    /// U11 — "Clear Screen": erase the visible screen and put the cursor
+    /// home, **without** touching the scrollback.
+    ///
+    /// Deliberately not `ED 2` alone: `ED 2` erases the screen and leaves the
+    /// cursor where it was, which after a full screen of output is somewhere
+    /// in the middle and looks like a bug. Deliberately not "scroll the
+    /// screen into the scrollback" either — that is what a shell's own
+    /// `clear` does on some systems, and it makes "clear the screen" and
+    /// "keep the history" the same operation, which is the confusion this
+    /// command exists to remove. Here the screen's contents are discarded and
+    /// the history is exactly as long as it was.
+    public mutating func clearScreen() {
+        eraseDisplay(.all)
+        cursor = Cursor(row: 0, column: 0)
+        pendingWrap = false
+    }
+
+    /// U11 — "Clear History": discard the scrollback, leaving the visible
+    /// screen and the cursor untouched. The inverse of `clearScreen`, and the
+    /// one a person reaches for after pasting a secret into a build log.
+    public mutating func clearScrollback() {
+        scrollback.removeAll()
+    }
+
     /// DECSTR (soft reset) resets modes without erasing the display or
     /// moving the active cursor.
     public mutating func softReset() {
@@ -601,6 +634,76 @@ public struct Grid: Sendable {
         }
         // Below the bottom margin a line feed neither scrolls nor wraps
         // around: the cursor just stops at the last row.
+    }
+
+    // MARK: - Side-table reclamation (P06)
+
+    /// Interns `url` as the current hyperlink target, reclaiming
+    /// unreferenced entries first when the table is full: without the sweep
+    /// a session that ever interned `HyperlinkTable.capacity` distinct URLs
+    /// (a few `ls --hyperlink` runs over big directories) would never link
+    /// again. The table's own refusals — empty or over-long URLs — fall
+    /// through unchanged: reclaiming cannot admit what validation rejected.
+    public mutating func internHyperlink(_ url: String) -> HyperlinkID? {
+        if let id = hyperlinks.intern(url) { return id }
+        guard hyperlinks.count >= HyperlinkTable.capacity else { return nil }
+        hyperlinks.reclaim(keeping: liveHyperlinkIDs())
+        return hyperlinks.intern(url)
+    }
+
+    /// The id every hyperlink-holding spot in this grid can still reference:
+    /// the live screen's and scrollback's cells and both pen slots (the
+    /// current pen and the DECSC-saved one — a saved pen restores into the
+    /// current one, so its id is as live as any cell's).
+    ///
+    /// The parked main screen and renderer snapshots are deliberately *not*
+    /// scanned: each is a separate `Grid` value carrying its own copy of the
+    /// table, and reclaiming here copy-on-writes this table away from them,
+    /// so their ids keep resolving against their own copy. Scanning only
+    /// this value's holders is exactly what makes the sweep reference-safe.
+    func liveHyperlinkIDs() -> Set<HyperlinkID> {
+        var live: Set<HyperlinkID> = [pen.hyperlink]
+        if let savedPen { live.insert(savedPen.hyperlink) }
+        for row in 0..<rows {
+            for cell in lines[row].cells where !cell.hyperlink.isNone {
+                live.insert(cell.hyperlink)
+            }
+        }
+        for index in 0..<scrollback.count {
+            for cell in scrollback[index].cells where !cell.hyperlink.isNone {
+                live.insert(cell.hyperlink)
+            }
+        }
+        live.remove(.none)
+        return live
+    }
+
+    /// The grapheme counterpart of `liveHyperlinkIDs` — cells only; no pen
+    /// carries a cluster. The parked main screen keeps its own
+    /// `GraphemeTable` (`enterAlternateScreen` swaps in a fresh one), so it
+    /// is not a holder of this table's ids.
+    func liveGraphemeIDs() -> Set<GraphemeID> {
+        var live: Set<GraphemeID> = []
+        for row in 0..<rows {
+            for cell in lines[row].cells where !cell.grapheme.isNone {
+                live.insert(cell.grapheme)
+            }
+        }
+        for index in 0..<scrollback.count {
+            for cell in scrollback[index].cells where !cell.grapheme.isNone {
+                live.insert(cell.grapheme)
+            }
+        }
+        return live
+    }
+
+    /// Sweeps both side tables against what this grid actually references.
+    /// Runs on its own only from tests; in production each table sweeps
+    /// lazily, when an `intern` hits its capacity (`combine`,
+    /// `internHyperlink`).
+    mutating func compactSideTables() {
+        graphemes.reclaim(keeping: liveGraphemeIDs())
+        hyperlinks.reclaim(keeping: liveHyperlinkIDs())
     }
 
     // MARK: - Erasing

@@ -75,4 +75,173 @@ struct SearchTests {
         terminal.feed(Array("hello".utf8))
         #expect(Search.find("goodbye", in: terminal.grid).isEmpty)
     }
+
+    // P04/P08 — the cap, cooperative cancellation, newest-first collection
+    // and the bounded long-line scan.
+
+    @Test("matches report oldest first, left to right within a line")
+    func resultOrder() {
+        var terminal = Terminal(rows: 5, columns: 40)
+        terminal.feed(Array("aa bb aa\r\ncc aa".utf8))
+        let matches = Search.find("aa", in: terminal.grid)
+        #expect(
+            matches.map(\.start) == [
+                SelectionPoint(row: 0, column: 0),
+                SelectionPoint(row: 0, column: 6),
+                SelectionPoint(row: 1, column: 3),
+            ])
+    }
+
+    @Test("the match cap keeps the newest matches")
+    func capKeepsNewestMatches() {
+        var terminal = Terminal(rows: 5, columns: 40)
+        terminal.feed(Array("aa first\r\naa second\r\naa third".utf8))
+        let matches = Search.find("aa", in: terminal.grid, maxMatches: 2)
+        #expect(matches.count == 2)
+        // The oldest of the three is the one dropped, and the kept pair
+        // still reports oldest first.
+        #expect(matches[0].start.row == 1)
+        #expect(matches[1].start.row == 2)
+    }
+
+    @Test("a stop that is already true scans nothing")
+    func cancellationBeforeTheFirstLine() {
+        var terminal = Terminal(rows: 5, columns: 40)
+        terminal.feed(Array("aa\r\naa\r\naa".utf8))
+        #expect(Search.find("aa", in: terminal.grid, shouldStop: { true }).isEmpty)
+    }
+
+    @Test("a stop mid-sweep ends the scan cooperatively")
+    func cancellationMidSweep() {
+        var terminal = Terminal(rows: 5, columns: 40)
+        terminal.feed(Array("aa\r\naa\r\naa".utf8))
+        var calls = 0
+        let matches = Search.find(
+            "aa", in: terminal.grid,
+            shouldStop: {
+                calls += 1
+                return calls > 2
+            })
+        // The sweep collects newest first, so the newest line's match was
+        // found before the stop landed; the two older lines contribute
+        // nothing — the oldest was never scanned at all.
+        #expect(matches.map(\.start) == [SelectionPoint(row: 2, column: 0)])
+    }
+
+    @Test("a 1 MB match-dense logical line is bounded by the cap")
+    func megabyteLongLineIsBounded() {
+        var terminal = Terminal(rows: 50, columns: 120, scrollbackLimit: 20_000)
+        terminal.feed([UInt8](repeating: UInt8(ascii: "a"), count: 1_000_000))
+        let matches = Search.find("aa", in: terminal.grid, maxMatches: 100)
+        #expect(matches.count == 100)
+        // 1_000_000 characters over 120 columns: the chain's last row is
+        // screen row 49 (8_334 rows, 50 on screen) holding the final 40
+        // columns. The cap keeps the newest matches, so the last one ends
+        // on the line's final character.
+        #expect(matches.last?.end == SelectionPoint(row: 49, column: 39))
+    }
+
+    @Test("reversed logical-line iteration visits the same lines, backwards")
+    func reversedIteration() {
+        var terminal = Terminal(rows: 5, columns: 8, scrollbackLimit: 10)
+        terminal.feed(Array("aaaabbbbcccc\r\ndd\r\nee".utf8))
+        // The trailing "" is the empty row under the cursor — both
+        // directions visit it.
+        let forward = terminal.grid.logicalLines().map(\.text)
+        #expect(forward == ["aaaabbbbcccc", "dd", "ee", ""])
+        #expect(terminal.grid.reversedLogicalLines().map(\.text) == forward.reversed())
+    }
+}
+
+/// U16 — regular-expression search, with the budget and the cancellation the
+/// substring path already had, plus the per-line bound that makes the
+/// cancellation reachable at all.
+@Suite struct RegexSearchTests {
+    private static func terminal(_ lines: [String], columns: Int = 40) -> Terminal {
+        var terminal = Terminal(rows: 8, columns: columns, scrollbackLimit: 500)
+        for line in lines { terminal.feed(Array("\(line)\r\n".utf8)) }
+        return terminal
+    }
+
+    @Test("a pattern matches what a pattern should")
+    func basicMatching() {
+        let terminal = Self.terminal(["error 404", "error 500", "ok 200"])
+        let result = Search.findRegex("error \\d+", in: terminal.grid)
+        #expect(result.matches.count == 2)
+        #expect(result.skippedLongLines == 0)
+    }
+
+    @Test("case sensitivity applies to patterns too")
+    func caseSensitivity() {
+        let terminal = Self.terminal(["Error", "error", "ERROR"])
+        #expect(Search.findRegex("error", in: terminal.grid, caseSensitive: false).matches.count == 3)
+        #expect(Search.findRegex("error", in: terminal.grid, caseSensitive: true).matches.count == 1)
+    }
+
+    /// Anchors work because matching runs per logical line, which is the same
+    /// unit the substring path uses — a soft wrap is not a line boundary.
+    @Test("anchors bind to logical lines")
+    func anchors() {
+        let terminal = Self.terminal(["alpha beta", "beta alpha"])
+        #expect(Search.findRegex("^alpha", in: terminal.grid).matches.count == 1)
+        #expect(Search.findRegex("alpha$", in: terminal.grid).matches.count == 1)
+    }
+
+    /// A half-typed pattern is the normal state of a pattern being typed.
+    /// "Invalid" and "no matches" are different things and the caller has to
+    /// be able to tell them apart.
+    @Test("an invalid pattern is reported, not silently empty")
+    func invalidPattern() {
+        #expect(!Search.isValidRegex("(unclosed", caseSensitive: false))
+        #expect(!Search.isValidRegex("", caseSensitive: false))
+        #expect(Search.isValidRegex("a+b", caseSensitive: false))
+        let terminal = Self.terminal(["anything"])
+        #expect(Search.findRegex("(unclosed", in: terminal.grid).matches.isEmpty)
+    }
+
+    /// A pattern that matches nothing at every position must not spin.
+    @Test("zero-length matches do not loop")
+    func zeroLengthMatches() {
+        let terminal = Self.terminal(["abc"])
+        #expect(Search.findRegex("x*", in: terminal.grid).matches.isEmpty)
+        #expect(Search.findRegex("^", in: terminal.grid).matches.isEmpty)
+    }
+
+    @Test("the match cap bounds the result and keeps the newest")
+    func matchCap() {
+        let terminal = Self.terminal((0..<50).map { "hit \($0)" })
+        let capped = Search.findRegex("hit", in: terminal.grid, maxMatches: 10)
+        #expect(capped.matches.count == 10)
+        // Newest kept: the last line searched is the most recent one.
+        let all = Search.findRegex("hit", in: terminal.grid)
+        #expect(capped.matches.last == all.matches.last)
+    }
+
+    @Test("cancellation stops the sweep")
+    func cancellation() {
+        let terminal = Self.terminal((0..<200).map { "hit \($0)" })
+        var polls = 0
+        let result = Search.findRegex(
+            "hit", in: terminal.grid,
+            shouldStop: {
+                polls += 1
+                return polls > 3
+            })
+        #expect(result.matches.count < 200)
+    }
+
+    /// The bound exists because `NSRegularExpression` backtracks and cannot
+    /// be given a timeout: on one enormous line the between-lines
+    /// cancellation check is never reached. A skipped line is *counted* so
+    /// the caller can say the search was incomplete rather than finding
+    /// nothing and saying nothing.
+    @Test("a line past the length bound is skipped and counted")
+    func longLinesAreSkipped() {
+        var terminal = Terminal(rows: 4, columns: 200, scrollbackLimit: 2000)
+        terminal.feed(Array(String(repeating: "a", count: Search.regexLineLimit + 100).utf8))
+        terminal.feed(Array("\r\nshort needle\r\n".utf8))
+        let result = Search.findRegex("needle", in: terminal.grid)
+        #expect(result.matches.count == 1)
+        #expect(result.skippedLongLines == 1)
+    }
 }

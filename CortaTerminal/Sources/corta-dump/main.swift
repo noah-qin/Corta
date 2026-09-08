@@ -23,6 +23,7 @@ let usage = """
       --columns N       screen width (default 80)
       --scrollback N    history line cap (default 1000)
       --history         print the scrollback above the screen
+      --report          print the terminal's mode/clipboard state after the grid
       --help            this message
     """
 
@@ -49,6 +50,7 @@ var rows = 24
 var columns = 80
 var scrollbackLimit = 1_000
 var showHistory = false
+var showReport = false
 
 var arguments = CommandLine.arguments.dropFirst().makeIterator()
 while let argument = arguments.next() {
@@ -63,6 +65,7 @@ while let argument = arguments.next() {
     case "--columns": columns = number()
     case "--scrollback": scrollbackLimit = number()
     case "--history": showHistory = true
+    case "--report": showReport = true
     case "--help", "-h":
         FileHandle.write(usage, to: STDOUT_FILENO)
         exit(0)
@@ -93,3 +96,23 @@ FileHandle.write(
     terminal.dump(options: DumpOptions(includeScrollback: showHistory)),
     to: STDOUT_FILENO
 )
+
+// The state the grid alone cannot show (U10): the modes a real program
+// toggled and anything it asked to put on the clipboard, as `key = value`
+// lines a harness can assert on. Query responses the program provoked are
+// not printed — they would have gone back down the PTY, not to a human.
+if showReport {
+    func flag(_ name: String, _ value: Bool) -> String { "\(name) = \(value)" }
+    let lines = [
+        flag("bracketed-paste", terminal.isBracketedPasteEnabled),
+        flag("sgr-mouse-encoding", terminal.isSgrMouseEncodingEnabled),
+        flag("focus-reporting", terminal.isFocusReportingEnabled),
+        flag("synchronized-output", terminal.isSynchronizedOutputEnabled),
+        flag("new-line-mode", terminal.isNewLineModeEnabled),
+        "window-title = \(terminal.windowTitle ?? "")",
+        "working-directory = \(terminal.workingDirectory ?? "")",
+        "clipboard-copy = \(terminal.takeClipboardCopy() ?? "")",
+        "keyboard-enhancements = \(terminal.keyboardEnhancements.rawValue)",
+    ]
+    FileHandle.write("--- report ---\n" + lines.joined(separator: "\n") + "\n", to: STDOUT_FILENO)
+}
