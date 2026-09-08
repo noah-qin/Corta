@@ -3,6 +3,20 @@
 An ordered, checkable execution plan. `DESIGN.md` §5 gives the
 milestones; this document gives the steps inside them.
 
+## Active 0.1.1 programme
+
+The maintainer accepted the full quality-review backlog and explicitly prefers
+aggressive adoption of current macOS/Swift/Metal capabilities. Start new 0.1.1
+work from these linked records; the milestones below remain the historical
+implementation record:
+
+- [Accepted quality and feature work](V0.1.1-QUALITY-PLAN.md)
+- [Engineering, menu, lifecycle and CI audit](V0.1.1-ENGINEERING-AUDIT.md)
+- [Modern technology direction and adoption work](TECHNOLOGY-DIRECTION.md)
+
+An unchecked finding is pending work, not a completed fix. Verify actual code
+and current SDK availability before implementing historical review conclusions.
+
 Toolchain: Swift 6.3, Xcode 26.6, macOS 26 deployment target.
 
 **How to use this.** Work top to bottom. Each step has a *Done when*

@@ -68,6 +68,10 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 | --- | --- | --- | --- |
 | `scrollback-lines` | 0–1000000 | `10000` | Lines of history per session. **Applies to sessions opened afterwards**: a running child's history cannot be re-limited without discarding lines. |
 | `bell` | `visual`, `audible`, `muted` | `visual` | `visual` flashes the pane; `audible` is `NSSound.beep()`. |
+| `option-as-meta` | boolean | `false` | Whether ⌥ acts as Meta — an ESC prefix on the base character, the way a PC keyboard's Alt does — instead of composing the layout's alternate character. Off by default because on macOS ⌥ *is* text input: it types `é`, `ø`, `–`, and starts dead-key sequences, and an international layout needs that. Turn it on when a program wants `M-x` and `M-b`. Special keys are unaffected either way: ⌥ already reaches the child there as the xterm modifier parameter, and an IME still sees every event it would otherwise see. |
+| `open-file-command` | string | *(empty)* | The command run when a `path:line` reference in program output is ⌘-clicked. `{file}`, `{line}` and `{column}` are substituted, one argument at a time. The executable must be an **absolute path** and is run directly — never through a shell — so a path containing `;` or `$(…)` stays a path. Empty means the system default application for the file's type, which cannot be told a line number; the hover tooltip says so. |
+| `search-regex` | boolean | `false` | Whether the search field is read as a regular expression (ICU syntax, as `NSRegularExpression` accepts it). The **`*`** button in the search bar writes this key. A pattern that does not compile is reported as such — not as "no results" — and lines longer than 64,000 UTF-16 units are skipped, which the match count marks with a `+`. The bound exists because a backtracking pattern on one enormous line cannot be cancelled from outside. |
+| `search-case-sensitive` | boolean | `false` | Whether scrollback search distinguishes case. Off by default: a person searching a log for `error` wants `Error` and `ERROR` too. The **Match Case** button in the search bar writes this key, so the choice survives closing the bar and restarting. |
 | `copy-on-select` | boolean | `true` | A finished selection goes straight to the clipboard, confirmed by a label in the corner of the pane. Set `false` for ⌘C only. |
 | `link-activation` | `command`, `click` | `command` | `command` opens a link on ⌘-click. `click` opens it on a plain click and underlines the link under the pointer; dragging across a URL still selects it. |
 | `allow-clipboard-write` | boolean | `false` | Whether OSC 52 may put text on the system clipboard — the only route from inside `tmux` or an `ssh` session. Off by default because *any* output could use it. The **read** direction does not exist under any setting (`SECURITY.md` §6). |
@@ -130,6 +134,10 @@ confirm-close = true
 # Terminal
 scrollback-lines = 50000
 bell = visual
+option-as-meta = false
+search-case-sensitive = false
+search-regex = false
+open-file-command =
 copy-on-select = true
 link-activation = command
 allow-clipboard-write = false
@@ -182,6 +190,65 @@ theme.midnight.dark.cursor = #00c2c7
 theme.midnight.dark.ansi1 = #ff5f56
 ```
 
+### Following a file reference
+
+⌘-click on `src/main.rs:42:17` in program output opens that file, at that
+line where `open-file-command` can express one. A URL wins where both could
+match.
+
+Two rules bound it, and neither is negotiable:
+
+- **A bare path is not a reference.** Only `path:line` — the shape a tool
+  emits — is detected. Ordinary output is full of things that look like paths
+  (`and/or`, `n/a`, `TODO/FIXME`), and underlining a third of every line
+  teaches you to ignore underlines.
+- **Only files on this machine.** The path is resolved against the pane's
+  working directory and must name a regular file that exists locally. A pane
+  inside `ssh` has no local working directory — OSC 7 reports naming a remote
+  host are dropped by the parser — so nothing resolves there, absolute paths
+  included: an absolute path on another machine is no more this machine's
+  than a relative one.
+
+This does **not** widen the URL scheme allowlist (`SECURITY.md` §2.4). A
+`file://` string in output is still plain text and still cannot be detected as
+a link; the `file:` URL that gets opened is built by Corta from a path it has
+already resolved and confirmed. The program chooses the path, never the
+scheme, and never whether the thing is a file at all.
+
+---
+
+## 4a. Presets
+
+A preset is a named way to open a terminal: a shell, a directory and a few
+environment variables. Shell ▸ New Pane with Preset lists them, in the order
+the file defines them; the item is disabled when there are none.
+
+```
+preset.api.shell = /bin/bash
+preset.api.arguments = -l
+preset.api.directory = /Users/you/src/api
+preset.api.env.API_ENV = staging
+preset.api.env.NO_COLOR = 1
+```
+
+Every field is optional. `shell` and `directory` must be **absolute** — a
+relative path would resolve against whatever Corta was launched from, which on
+a Finder launch is `/` — and a preset that names neither an absolute path nor
+any setting at all is ignored rather than offered.
+
+`env.*` variables are added on top of the sanitised inherited environment
+(`SECURITY.md` §4.3): a preset can add and override, never remove. A preset
+whose shell has been uninstalled degrades down the same fallback ladder an
+ordinary pane uses, so it opens a working terminal rather than a failure
+panel — and the preset's `arguments` apply only to its own shell, since a
+fallback `/bin/sh` may not understand them.
+
+A preset is applied once, at spawn. A pane opened from one is an ordinary
+pane afterwards: there is nothing to leave and nothing to keep in sync. Presets
+deliberately carry no colours, fonts or keybindings — those are window- or
+app-wide in Corta (`DESIGN.md` §6), and a per-preset copy would be a second
+settings store arguing with this file.
+
 ---
 
 ## 5. Keyboard shortcuts
@@ -202,6 +269,20 @@ Unbinding is not the same as restoring the default: an empty value leaves
 the command with **no** key, which is what you want when a TUI needs one
 Corta was taking.
 
+An unbound keystroke is **passed to the child process**, encoded like any
+other key Corta does not claim — it is not swallowed. That is the point of
+unbinding: `bind.close =` is how ⌘W stops closing the pane and starts
+reaching the program running in it. It also means unbinding is uniform —
+a key Corta never bound and a key you unbound behave identically — and
+that nothing can end up doing nothing, which reads as a bug rather than as
+a setting. The command itself stays reachable from its menu and from the
+command palette (⇧⌘P); Help ▸ Keyboard Shortcuts lists it with an em dash.
+
+Nothing rejects two commands sharing one keystroke. Where AppKit decides,
+the first matching menu item in menu-bar order wins; where Corta decides,
+the first command in the table below wins. Help ▸ Keyboard Shortcuts shows
+the key against both rows, which is how you spot it.
+
 ### The commands
 
 | `bind.` key | Command | Default |
@@ -219,6 +300,8 @@ Corta was taking.
 | `shrink-pane-horizontally` | Shrink Pane Horizontally | `ctrl+cmd+left` |
 | `grow-pane-vertically` | Grow Pane Vertically | `ctrl+cmd+down` |
 | `shrink-pane-vertically` | Shrink Pane Vertically | `ctrl+cmd+up` |
+| `zoom-pane` | Zoom Pane | `shift+cmd+return` |
+| `reopen-closed-pane` | Reopen Closed Pane | `shift+cmd+t` |
 | `equalize-panes` | Equalize Panes | *(none)* |
 | `increase-font-size` | Bigger | `cmd+=` |
 | `decrease-font-size` | Smaller | `cmd+-` |
@@ -231,13 +314,56 @@ Corta was taking.
 | `scroll-page-down` | Scroll Page Down | `shift+pagedown` |
 | `scroll-to-top` | Scroll to Top | `shift+home` |
 | `scroll-to-bottom` | Scroll to Bottom | `shift+end` |
+| `previous-failed-command` | Previous Failed Command | `shift+cmd+up` |
+| `next-failed-command` | Next Failed Command | `shift+cmd+down` |
+| `copy-last-command-output` | Copy Last Command Output | *(none)* |
+| `export-text` | Export Text… | `shift+cmd+s` |
+| `clear-screen` | Clear Screen | `cmd+k` |
+| `clear-history` | Clear History | *(none)* |
+| `reset-terminal` | Reset Terminal | *(none)* |
 | `previous-command` | Previous Command | `cmd+up` |
 | `next-command` | Next Command | `cmd+down` |
 | `settings` | Settings… | `cmd+,` |
 | `command-palette` | Command Palette… | `cmd+shift+p` |
 
-`previous-command` and `next-command` need shell integration (OSC 133) to
-have anything to jump between.
+`previous-command`, `next-command`, the two failed-command jumps and
+`copy-last-command-output` all need shell integration (OSC 133) to have
+anything to work with; without it their menu items are disabled rather than
+silent. `copy-last-command-output` takes the rows between the last command's
+prompt and the next one — which is right for a one-line prompt with the
+command typed on it, and takes one row too much for a two-line prompt or a
+command continued across lines, because Corta marks `OSC 133 ; A` but not
+`OSC 133 ; C`.
+
+`reopen-closed-pane` puts a closed pane back where it was — same split, same
+side, same divider, same working directory. It restores the *arrangement*,
+never the process: the child that was running is gone, and its scrollback with
+it. The record is one pane deep, because the position of anything older is
+described against a tree the first reopen has already changed.
+
+`export-text` writes the selection — or, with nothing selected, the whole
+scrollback and screen — to a text file. It is the same text ⌘C would put on
+the clipboard, including how a soft-wrapped line is joined.
+
+`zoom-pane` fills the window with the focused pane and the same key puts the
+split back. It is temporary and changes nothing: no pane is closed, no child
+process is disturbed, and the saved arrangement still describes the splits,
+not the zoom. The menu item names whichever direction it will go next.
+
+The three terminal-state commands are separate because no two terminals mean
+the same thing by "clear", and each says what it discards:
+
+| Command | Screen | Scrollback | Modes, colours, cursor |
+| --- | --- | --- | --- |
+| Clear Screen | erased | kept | kept |
+| Clear History | kept | discarded | kept |
+| Reset Terminal | erased | discarded | reset |
+
+All three act on Corta's own grid, not on the program running in it: nothing
+is written to the child's input, so a running job is undisturbed and redraws
+on its next frame. `clear-history` and `reset-terminal` ship unbound — both
+throw history away, and a key that discards a build log by accident is not a
+default.
 
 Every command in this table is also in the command palette (⇧⌘P), which
 lists the same table — so a command with no default binding is still one
@@ -261,7 +387,7 @@ search away.
 | Change | Takes effect |
 | --- | --- |
 | `theme`, `appearance`, `font-family`, `font-size` | Immediately, in every open pane. |
-| `bell`, `copy-on-select`, `link-activation`, `allow-clipboard-write`, `confirm-close`, notification keys | Immediately — they are read when the behaviour happens. |
+| `bell`, `option-as-meta`, `search-case-sensitive`, `search-regex`, `open-file-command`, `copy-on-select`, `link-activation`, `allow-clipboard-write`, `confirm-close`, notification keys | Immediately — they are read when the behaviour happens. |
 | `bind.*` | Immediately: the menu key equivalents are re-applied on every file change. |
 | `theme.*` | Immediately, if the live theme is the one you edited. |
 | `columns`, `rows` | The next window opened. |
