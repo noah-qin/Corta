@@ -34,7 +34,9 @@ extension TerminalView {
         }
         // M3.4: offer the event to the IME first. A consumed event ends
         // here — the IME answers through `insertText`/`setMarkedText`.
-        if Self.routesEventThroughIME(event), inputContext?.handleEvent(event) == true {
+        if Self.routesEventThroughIME(event, optionAsMeta: optionAsMeta?() ?? false),
+            inputContext?.handleEvent(event) == true
+        {
             return
         }
         deliverBytes(for: event)
@@ -74,10 +76,24 @@ extension TerminalView {
         InputLatencySignposts.measure(.keyDown) { onKeyBytes?(bytes) }
     }
 
-    /// M3.4: ⌘/⌃ events bypass the IME entirely. Kept a pure function of the
-    /// event so the bypass decision is testable without a window server.
-    static func routesEventThroughIME(_ event: NSEvent) -> Bool {
-        event.modifierFlags.isDisjoint(with: [.command, .control])
+    /// M3.4: ⌘/⌃ events bypass the IME entirely — and so does ⌥ once the
+    /// user has said ⌥ is Meta. Kept a pure function of the event so the
+    /// bypass decision is testable without a window server.
+    ///
+    /// U05's encoder handled `option-as-meta` correctly from the day it
+    /// landed and the setting still did nothing, because the event never
+    /// reached it: an ⌥-only press carries neither ⌘ nor ⌃, so it was
+    /// offered to the input context first, macOS composed it into the
+    /// layout's alternate character, and it came back through `insertText`.
+    /// ⌥F arrived as `ƒ`. The encoder was tested in isolation and the
+    /// dispatch that feeds it was not, which is the gap this closes.
+    ///
+    /// With the setting off, nothing changes: ⌥ is text input on macOS and
+    /// must keep reaching the IME, which is what dead keys and every
+    /// international layout depend on.
+    static func routesEventThroughIME(_ event: NSEvent, optionAsMeta: Bool = false) -> Bool {
+        if optionAsMeta, event.modifierFlags.contains(.option) { return false }
+        return event.modifierFlags.isDisjoint(with: [.command, .control])
     }
 
     /// The keystroke bound to Paste — checked before `bytes(for:)`, which

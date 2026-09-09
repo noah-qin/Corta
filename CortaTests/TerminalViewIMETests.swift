@@ -49,6 +49,51 @@ struct TerminalViewIMETests {
             Self.keyEvent(characters: "´", modifiers: .option)))
     }
 
+    /// U05, found by turning the setting on and watching ⌥F still type `ƒ`.
+    ///
+    /// The encoder handled `option-as-meta` from the day it landed; the
+    /// event never reached it. An ⌥-only press carries neither ⌘ nor ⌃, so
+    /// it was offered to the input context, macOS composed the layout's
+    /// alternate character, and it came back through `insertText`. The
+    /// encoder had a test; the dispatch that feeds it did not.
+    @Test func optionEventsBypassTheIMEOnlyWhenOptionIsMeta() {
+        let optionF = Self.keyEvent(
+            characters: "ƒ", charactersIgnoringModifiers: "f", modifiers: .option)
+        // Off: ⌥ is text input and must keep reaching the IME, which is what
+        // dead keys and every international layout depend on.
+        #expect(TerminalView.routesEventThroughIME(optionF, optionAsMeta: false))
+        // On: it has to reach the encoder, which sends `ESC f`.
+        #expect(!TerminalView.routesEventThroughIME(optionF, optionAsMeta: true))
+        // Without ⌥ the setting changes nothing either way.
+        let plainA = Self.keyEvent(characters: "a")
+        #expect(TerminalView.routesEventThroughIME(plainA, optionAsMeta: true))
+        #expect(TerminalView.routesEventThroughIME(plainA, optionAsMeta: false))
+        // ⌘ still wins regardless.
+        let commandV = Self.keyEvent(characters: "v", modifiers: [.command, .option])
+        #expect(!TerminalView.routesEventThroughIME(commandV, optionAsMeta: true))
+        #expect(!TerminalView.routesEventThroughIME(commandV, optionAsMeta: false))
+    }
+
+    /// The other half, end to end through the view: with the setting on, an
+    /// ⌥F press produces `ESC f` rather than the composed character.
+    @Test func optionFSendsMetaFWhenOptionIsMeta() {
+        let view = Self.makeView()
+        var sent: [UInt8] = []
+        view.onKeyBytes = { sent += $0 }
+        view.optionAsMeta = { true }
+        view.keyDown(
+            with: Self.keyEvent(
+                characters: "ƒ", charactersIgnoringModifiers: "f", modifiers: .option))
+        #expect(sent == [0x1B, UInt8(ascii: "f")], "got \(sent)")
+
+        sent = []
+        view.optionAsMeta = { false }
+        view.keyDown(
+            with: Self.keyEvent(
+                characters: "ƒ", charactersIgnoringModifiers: "f", modifiers: .option))
+        #expect(sent == Array("ƒ".utf8), "got \(sent)")
+    }
+
     @Test func unhandledKeyFallsThroughToDirectBytes() {
         // No window, no input context — the IME path declines and keyDown
         // behaves exactly as the pre-M3 direct path did.
