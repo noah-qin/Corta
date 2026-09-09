@@ -161,6 +161,8 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     case growPaneVertically = "grow-pane-vertically"
     case shrinkPaneVertically = "shrink-pane-vertically"
     case equalizePanes = "equalize-panes"
+    case zoomPane = "zoom-pane"
+    case reopenClosedPane = "reopen-closed-pane"
     case increaseFontSize = "increase-font-size"
     case decreaseFontSize = "decrease-font-size"
     case resetFontSize = "reset-font-size"
@@ -174,6 +176,13 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     case scrollToBottom = "scroll-to-bottom"
     case previousCommand = "previous-command"
     case nextCommand = "next-command"
+    case previousFailedCommand = "previous-failed-command"
+    case nextFailedCommand = "next-failed-command"
+    case copyLastCommandOutput = "copy-last-command-output"
+    case exportText = "export-text"
+    case clearScreen = "clear-screen"
+    case clearHistory = "clear-history"
+    case resetTerminal = "reset-terminal"
     case settings
     case commandPalette = "command-palette"
 
@@ -194,6 +203,8 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .growPaneVertically: return L10n.text("command.growPaneVertically")
         case .shrinkPaneVertically: return L10n.text("command.shrinkPaneVertically")
         case .equalizePanes: return L10n.text("command.equalizePanes")
+        case .zoomPane: return L10n.text("command.zoomPane")
+        case .reopenClosedPane: return L10n.text("command.reopenClosedPane")
         case .increaseFontSize: return L10n.text("command.increaseFontSize")
         case .decreaseFontSize: return L10n.text("command.decreaseFontSize")
         case .resetFontSize: return L10n.text("command.resetFontSize")
@@ -207,6 +218,13 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .scrollToBottom: return L10n.text("command.scrollToBottom")
         case .previousCommand: return L10n.text("command.previousCommand")
         case .nextCommand: return L10n.text("command.nextCommand")
+        case .previousFailedCommand: return L10n.text("command.previousFailedCommand")
+        case .nextFailedCommand: return L10n.text("command.nextFailedCommand")
+        case .copyLastCommandOutput: return L10n.text("command.copyLastCommandOutput")
+        case .exportText: return L10n.text("command.exportText")
+        case .clearScreen: return L10n.text("command.clearScreen")
+        case .clearHistory: return L10n.text("command.clearHistory")
+        case .resetTerminal: return L10n.text("command.resetTerminal")
         case .settings: return L10n.text("command.settings")
         case .commandPalette: return L10n.text("command.commandPalette")
         }
@@ -235,6 +253,8 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .shrinkPaneVertically:
             return #selector(SplitViewController.shrinkPaneVertically(_:))
         case .equalizePanes: return #selector(SplitViewController.equalizePanes(_:))
+        case .zoomPane: return #selector(SplitViewController.toggleZoomPane(_:))
+        case .reopenClosedPane: return #selector(SplitViewController.reopenClosedPane(_:))
         case .increaseFontSize: return #selector(ViewController.increaseFontSize(_:))
         case .decreaseFontSize: return #selector(ViewController.decreaseFontSize(_:))
         case .resetFontSize: return #selector(ViewController.resetFontSize(_:))
@@ -248,6 +268,15 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .scrollToBottom: return #selector(ViewController.scrollHistoryToBottom(_:))
         case .previousCommand: return #selector(ViewController.jumpToPreviousCommand(_:))
         case .nextCommand: return #selector(ViewController.jumpToNextCommand(_:))
+        case .previousFailedCommand:
+            return #selector(ViewController.jumpToPreviousFailedCommand(_:))
+        case .nextFailedCommand: return #selector(ViewController.jumpToNextFailedCommand(_:))
+        case .copyLastCommandOutput:
+            return #selector(ViewController.copyLastCommandOutput(_:))
+        case .exportText: return #selector(ViewController.exportText(_:))
+        case .clearScreen: return #selector(ViewController.clearScreen(_:))
+        case .clearHistory: return #selector(ViewController.clearHistory(_:))
+        case .resetTerminal: return #selector(ViewController.resetTerminal(_:))
         case .settings: return #selector(AppDelegate.showSettings(_:))
         case .commandPalette: return #selector(AppDelegate.showCommandPalette(_:))
         }
@@ -277,6 +306,12 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .shrinkPaneVertically:
             return Shortcut(Shortcut.parse("up")!.key, [.control, .command])
         case .equalizePanes: return nil
+        // ⇧⌘⏎ is tmux's `resize-pane -Z` habit written the Mac way, and no
+        // menu item or system shortcut claims it.
+        case .zoomPane: return Shortcut("\r", [.command, .shift])
+        // ⇧⌘T is "bring back the tab I closed" in every browser; a pane is
+        // the same gesture one level down.
+        case .reopenClosedPane: return Shortcut("t", [.command, .shift])
         case .increaseFontSize: return Shortcut("=", .command)
         case .decreaseFontSize: return Shortcut("-", .command)
         case .resetFontSize: return Shortcut("0", .command)
@@ -290,6 +325,21 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .scrollToBottom: return Shortcut(Shortcut.parse("end")!.key, .shift)
         case .previousCommand: return Shortcut(Shortcut.parse("up")!.key, .command)
         case .nextCommand: return Shortcut(Shortcut.parse("down")!.key, .command)
+        // ⌘K is the key every Mac terminal puts on "clear what is on
+        // screen". The other two ship unbound: both discard history, and a
+        // key that throws away a build log by accident is not a default.
+        // ⇧⌘↑/↓ sit next to ⌘↑/↓, which jump between all commands — the
+        // shift narrows the same gesture to the ones that failed.
+        case .previousFailedCommand:
+            return Shortcut(Shortcut.parse("up")!.key, [.command, .shift])
+        case .nextFailedCommand:
+            return Shortcut(Shortcut.parse("down")!.key, [.command, .shift])
+        case .copyLastCommandOutput: return nil
+        // ⇧⌘S, the save-as of an app that has no document to save.
+        case .exportText: return Shortcut("s", [.command, .shift])
+        case .clearScreen: return Shortcut("k", .command)
+        case .clearHistory: return nil
+        case .resetTerminal: return nil
         case .settings: return Shortcut(",", .command)
         case .commandPalette: return Shortcut("p", [.command, .shift])
         }
@@ -307,12 +357,14 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .newWindow, .newTab, .close: return .window
         case .splitRight, .splitDown, .focusLeft, .focusRight, .focusUp, .focusDown,
             .growPaneHorizontally, .shrinkPaneHorizontally, .growPaneVertically,
-            .shrinkPaneVertically, .equalizePanes:
+            .shrinkPaneVertically, .equalizePanes, .zoomPane, .reopenClosedPane:
             return .panes
         case .increaseFontSize, .decreaseFontSize, .resetFontSize, .scrollPageUp,
-            .scrollPageDown, .scrollToTop, .scrollToBottom, .previousCommand, .nextCommand:
+            .scrollPageDown, .scrollToTop, .scrollToBottom, .previousCommand, .nextCommand,
+            .previousFailedCommand, .nextFailedCommand, .copyLastCommandOutput:
             return .view
-        case .find, .copy, .paste, .selectAll: return .edit
+        case .clearScreen, .clearHistory, .resetTerminal: return .terminal
+        case .find, .copy, .paste, .selectAll, .exportText: return .edit
         case .settings, .commandPalette: return .app
         }
     }
@@ -332,11 +384,13 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .focusRight: return 3
         case .focusUp: return 4
         case .focusDown: return 5
-        case .equalizePanes: return 6
-        case .growPaneHorizontally: return 7
-        case .shrinkPaneHorizontally: return 8
-        case .growPaneVertically: return 9
-        case .shrinkPaneVertically: return 10
+        case .zoomPane: return 6
+        case .reopenClosedPane: return 7
+        case .equalizePanes: return 8
+        case .growPaneHorizontally: return 9
+        case .shrinkPaneHorizontally: return 10
+        case .growPaneVertically: return 11
+        case .shrinkPaneVertically: return 12
         case .increaseFontSize: return 0
         case .decreaseFontSize: return 1
         case .resetFontSize: return 2
@@ -346,10 +400,17 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .scrollToBottom: return 6
         case .previousCommand: return 7
         case .nextCommand: return 8
+        case .previousFailedCommand: return 9
+        case .nextFailedCommand: return 10
+        case .copyLastCommandOutput: return 11
         case .copy: return 0
         case .paste: return 1
         case .selectAll: return 2
         case .find: return 3
+        case .exportText: return 4
+        case .clearScreen: return 0
+        case .clearHistory: return 1
+        case .resetTerminal: return 2
         case .settings: return 0
         case .commandPalette: return 1
         }
@@ -389,8 +450,6 @@ nonisolated struct Keybindings: Equatable, Sendable {
         set { overrides[command] = .some(newValue) }
     }
 
-    var isCustomised: Bool { !overrides.isEmpty }
-
     /// The overrides, in `TerminalCommand.allCases` order, for serialisation.
     var overriddenCommands: [(TerminalCommand, Shortcut?)] {
         TerminalCommand.allCases.compactMap { command in
@@ -405,7 +464,49 @@ nonisolated enum CommandCategory: String, CaseIterable, Sendable {
     case panes
     case view
     case edit
+    case terminal
     case app
 
     var title: String { L10n.text("commandPalette.category.\(rawValue)") }
+}
+
+nonisolated extension Shortcut {
+    /// Whether a key event is this shortcut.
+    ///
+    /// AppKit matches key equivalents for *menu items* only. The few places
+    /// `TerminalView.keyDown` still has to recognise a shortcut itself —
+    /// paste, the search bar, the scrollback jumps — used to compare against
+    /// a literal instead, which made every one of them a second, invisible
+    /// binding: rebinding the command left the literal working, and unbinding
+    /// it did not stop the literal at all (U08). They ask this instead.
+    ///
+    /// The key comes from `charactersIgnoringModifiers`, so a shifted letter
+    /// arrives uppercase and folds back through `lowercased()`. A key whose
+    /// *symbol* changes under Shift (⇧= is `+`) therefore matches on its
+    /// unshifted spelling only — the same limit AppKit's own key-equivalent
+    /// matching has, and the reason `shift+=` and `+` are two ways to write
+    /// one binding rather than two bindings.
+    func matches(_ event: NSEvent) -> Bool {
+        let relevant: NSEvent.ModifierFlags = [.command, .control, .option, .shift]
+        guard event.modifierFlags.intersection(relevant) == modifiers.intersection(relevant),
+            let characters = event.charactersIgnoringModifiers
+        else { return false }
+        return characters.lowercased() == key.lowercased()
+    }
+}
+
+nonisolated extension Keybindings {
+    /// Every command bound to `event`, in `TerminalCommand.allCases` order.
+    ///
+    /// Nothing rejects a collision: the config file is hand-edited, and two
+    /// `bind.` lines may name one keystroke. The resolution is defined rather
+    /// than arbitrary — where AppKit decides (a menu key equivalent) the
+    /// winner is the first matching item in menu-bar traversal order, and
+    /// where Corta decides (the `keyDown` fallbacks) it is the first command
+    /// in this list. A collision is still a collision, and Help ▸ Keyboard
+    /// Shortcuts is where it shows: the same key printed against two rows is
+    /// what tells a user they typed one binding twice.
+    func commands(boundTo event: NSEvent) -> [TerminalCommand] {
+        TerminalCommand.allCases.filter { self[$0]?.matches(event) == true }
+    }
 }

@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import CortaTerminal
@@ -108,5 +109,70 @@ import Testing
         var terminal = self.terminal()
         terminal.feed(Array("\u{1B}]52;c;\u{1B}\\".utf8))
         #expect(terminal.takeClipboardCopy() == nil)
+    }
+
+    /// The write form answers nothing either: no reply may carry
+    /// stream-supplied text back to the child (`SECURITY.md` §2.1–2.2).
+    @Test("a clipboard write produces no reply bytes")
+    func clipboardWriteProducesNoOutput() {
+        var terminal = self.terminal()
+        terminal.feed(Array("\u{1B}]52;c;aGVsbG8=\u{1B}\\".utf8))
+        #expect(terminal.takeOutput().isEmpty)
+    }
+
+    /// Bidi overrides can make pasted text display as something other than
+    /// what it is (Trojan Source, `SECURITY.md` §2.5). This payload is
+    /// base64 for `abc` + U+202E + `def`: the clipboard must get `abcdef`,
+    /// not a string that renders reversed.
+    @Test("bidi control characters are stripped from the copy")
+    func bidiControlsAreStripped() {
+        var terminal = self.terminal()
+        let payload = Data("abc\u{202E}def".utf8).base64EncodedString()
+        terminal.feed(Array("\u{1B}]52;c;\(payload)\u{1B}\\".utf8))
+        #expect(terminal.takeClipboardCopy() == "abcdef")
+    }
+
+    /// Zero-width and isolate format characters are stripped the same way;
+    /// ZWJ and ZWNJ stay, because emoji sequences and some scripts are
+    /// broken without them.
+    @Test("invisible format characters are stripped, ZWJ kept")
+    func invisibleCharactersAreStrippedZWJKept() {
+        var terminal = self.terminal()
+        // U+200B ZWSP and U+2066 LRI go; U+200D ZWJ and U+200C ZWNJ stay.
+        let payload = Data("a\u{200B}b\u{2066}c\u{200D}d\u{200C}e".utf8).base64EncodedString()
+        terminal.feed(Array("\u{1B}]52;c;\(payload)\u{1B}\\".utf8))
+        #expect(terminal.takeClipboardCopy() == "abc\u{200D}d\u{200C}e")
+    }
+
+    /// A payload of nothing but spoofing characters sanitises to empty,
+    /// and empty copies nothing.
+    @Test("a payload of only spoofing characters copies nothing")
+    func spoofingOnlyPayloadCopiesNothing() {
+        var terminal = self.terminal()
+        let payload = Data("\u{202E}\u{200B}\u{FEFF}".utf8).base64EncodedString()
+        terminal.feed(Array("\u{1B}]52;c;\(payload)\u{1B}\\".utf8))
+        #expect(terminal.takeClipboardCopy() == nil)
+    }
+
+    /// Data after the `=` padding is not a valid place for more base64;
+    /// accepting it would partially apply a malformed payload.
+    @Test("data trailing the base64 padding is rejected")
+    func dataAfterPaddingIsRejected() {
+        var terminal = self.terminal()
+        terminal.feed(Array("\u{1B}]52;c;aGVsbG8=b3Jn\u{1B}\\".utf8))
+        #expect(terminal.takeClipboardCopy() == nil)
+    }
+
+    /// An OSC 52 longer than the parser's string cap is discarded whole
+    /// rather than half-applied, and the stream resynchronises after it.
+    @Test("an overlong clipboard payload is discarded, then the parser resyncs")
+    func overlongClipboardPayloadIsDiscarded() {
+        var terminal = self.terminal()
+        var bytes: [UInt8] = Array("\u{1B}]52;c;".utf8)
+        bytes.append(contentsOf: repeatElement(UInt8(0x41), count: Parser.maxStringLength + 100))
+        bytes.append(contentsOf: Array("\u{1B}\\ok".utf8))
+        terminal.feed(bytes)
+        #expect(terminal.takeClipboardCopy() == nil)
+        #expect(terminal.grid.logicalLine(containing: 0).text.hasPrefix("ok"))
     }
 }

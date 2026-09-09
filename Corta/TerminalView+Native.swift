@@ -23,10 +23,10 @@ extension TerminalView {
         droppedPaths(from: sender).isEmpty ? [] : .copy
     }
 
-    /// A drop inserts the paths as text at the prompt — quoted, space
-    /// separated — rather than doing anything with the files. The shell is
-    /// what decides what a path means, and typing it is what the user would
-    /// have done by hand.
+    /// A drop inserts the paths as text at the prompt — sanitised, quoted,
+    /// space separated — rather than doing anything with the files. The
+    /// shell is what decides what a path means, and typing it is what the
+    /// user would have done by hand.
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
         let paths = droppedPaths(from: sender)
         guard !paths.isEmpty else { return false }

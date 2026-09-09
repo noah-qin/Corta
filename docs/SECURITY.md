@@ -105,6 +105,14 @@ This does not contradict §2.1. That rule forbids writing *stream-supplied*
 text back to the child — output the terminal received. A dropped path is
 a user action naming a file the user chose, which is what typing is.
 
+**As implemented (S04, 2026-09-06).** Drops and Services-returned text go
+through the exact funnel a ⌘V paste uses (`ViewController.insertAsPaste`):
+each dropped path is stripped of ESC and C0 control characters *before*
+quoting (`Paste.sanitized`), and the payload gets the §2.3 newline warning
+when the child has not enabled bracketed paste. A filename can contain a
+newline, so the earlier assumption that a dropped path never does is no
+longer relied on — quoting alone is not the whole defence.
+
 ### 2.5 Bidirectional and invisible characters
 
 Corta does not implement RTL/bidi (`DESIGN.md` §6), which removes the
@@ -262,3 +270,51 @@ For quick reference during implementation and review:
    cleanly.
 7. Request no TCC permission Corta does not itself need.
 8. Scrollback never touches the disk.
+
+---
+
+## 7. Change Log
+
+- **S05 — 2026-09-06: OSC 7 working-directory reports are host-checked.**
+  The payload of OSC 7 is a `file://host/path` URL, and a shell reached over
+  `ssh` (or a pane inside `tmux` on one) reports a directory on *that* host.
+  The report feeds local spawns — new tabs, splits, session restore — so the
+  parser now accepts only a local host (empty, `localhost`, or this machine's
+  own names, compared case-insensitively and ignoring a trailing FQDN dot)
+  and drops remote reports, leaving the app its kernel-side
+  `currentWorkingDirectory` fallback. Session state saved before this filter
+  can still carry a remote path with the host already lost, so restore drops
+  any saved directory that does not exist as a local directory.
+- **S06 — 2026-09-06: OSC 52 clipboard payloads are sanitised, and stricter
+  base64.** The write half of OSC 52 is text a *stream* chose, sight unseen —
+  unlike a user drag-selection there is no "copy what I saw" contract — so the
+  decoded text is now stripped of bidi embeddings/overrides/isolates
+  (U+202A–U+202E, U+2066–U+2069) and zero-width format characters (ZWSP,
+  word joiner, ZWNBSP/BOM) before it is recorded for the pasteboard: these
+  are what let pasted content display as something other than what it is
+  (§2.5, Trojan Source). ZWJ, ZWNJ and LRM/RLM are kept — emoji sequences
+  and real bidi text break without them. The base64 decoder now also rejects
+  data trailing the `=` padding rather than silently decoding the prefix.
+  The audit otherwise confirmed the existing boundaries stand: write is off
+  by default behind `allow-clipboard-write`, the read form is parsed only
+  far enough to be discarded and answers nothing, payloads are capped by
+  `Parser.maxStringLength` with whole-sequence discard on overflow, and no
+  reply path carries stream-supplied text back to the child (§2.1–2.2).
+- **S08 — 2026-09-06: PTY operations refuse a closed descriptor, and a
+  reaped child's group is never signalled.** A descriptor number is the
+  kernel's to recycle the instant `close()` runs, but `PTY` kept using its
+  stored number after `close()`: a write, resize or `tcgetpgrp` issued late
+  (keyboard input or the coalesced-resize queue racing a tab close) would
+  silently hit whatever unrelated file the number had been dealt to —
+  demonstrated in tests by recycling the number onto a fresh file and
+  watching a `PTY.write` land in it. `read`, `write`, `resize` and `size`
+  now throw `PTYError.closed`, and `foregroundProcessGroup` reports `nil`,
+  once the descriptor is closed; `signalProcessGroup`/`terminate` refuse to
+  run once the child has been reaped, because a dead child's group id can
+  equally be recycled onto a stranger. The audit otherwise confirmed: close
+  is idempotent under concurrency and never double-closes a recycled number,
+  the master/replica close order at spawn is exact (no gap, no leak — the
+  replica goes the instant `corta-exec` holds its own reference), failed
+  spawns and repeated spawn/close cycles leak no descriptors, and
+  foreground/background job tracking follows real job control (`tcgetpgrp`)
+  through run, suspend and background transitions.

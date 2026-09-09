@@ -49,6 +49,11 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
     /// this, moving a tab to a new window would silently drop back to the
     /// full, unrestricted rate regardless of what `RenderPolicy` had set.
     private var desiredFrameRateRange = CAFrameRateRange.default
+    /// Where the flash-guard request (`requestFirstPresent`) stands.
+    /// Stored, not derived: the stand-in `backgroundColor` must stay on the
+    /// layer until a frame has actually been presented, however the window
+    /// is closed, re-shown or resized in between.
+    private(set) var firstPresentState: FirstPresentState = .idle
 
     init(metalLayer: CAMetalLayer) {
         self.metalLayer = metalLayer
@@ -96,36 +101,41 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         }
     }
 
-    /// Forces one frame to render and present before returning — used only
-    /// to avoid a transparent-window flash before the window is shown, and
-    /// after a live theme change. `CAMetalDisplayLink` has no synchronous
-    /// "render one frame now" call of its own, and calling
-    /// `metalLayer.nextDrawable()` directly once a `CAMetalDisplayLink` owns
-    /// the layer raises `CAMetalLayerInvalidOperation` — Metal does not
-    /// allow mixing the two ways of getting a drawable on the same layer.
-    /// So this resumes the link and pumps the run loop — the same mechanism
-    /// the link already uses to deliver its callback — until that callback
-    /// has actually fired, or a generous timeout elapses and it gives up
-    /// silently (this is a best-effort flash guard, not a correctness
-    /// requirement worth hanging over).
-    func presentSynchronously(timeout: TimeInterval = 0.5) {
-        guard let link else { return }
-        var rendered = false
-        let previousHandler = onRenderFrame
-        onRenderFrame = { pass, size, drawable in
-            previousHandler?(pass, size, drawable)
-            rendered = true
-        }
-        link.isPaused = false
-        let deadline = Date().addingTimeInterval(timeout)
-        // `.common` (used to *schedule* the link, above) is a mode-set
-        // marker, not a mode the run loop can actually be run in — running
-        // it here needs one real mode from that set, and `.default` is the
-        // one the link always participates in.
-        while !rendered && Date() < deadline {
-            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.02))
-        }
-        onRenderFrame = previousHandler
+    /// Arms the first-present flash guard and returns immediately — used to
+    /// paint before the window is ordered on screen, and after a live theme
+    /// change. The old `presentSynchronously` instead resumed the link and
+    /// pumped the main run loop for up to 0.5 s with a swapped-in
+    /// `onRenderFrame` wrapper: bounded, but reentrant — every timer,
+    /// delegate and second `drawNow` the loop serviced ran nested inside
+    /// what looked like a leaf call (E05).
+    ///
+    /// The replacement is an explicit state transition, not a wait. The
+    /// window needs no pixel-perfect first frame, only a guarantee it never
+    /// shows what is behind it: the layer's `backgroundColor` is set to the
+    /// theme's clear colour — exactly what the first frame's render pass
+    /// clears to — and the link is resumed so the real frame lands at the
+    /// next vsync. `notePresentedFrame` then retires the stand-in. `nil`
+    /// link (view not yet in a window) just means the state outlives the
+    /// attach; the first frame after the next `attach(to:)` completes it.
+    func requestFirstPresent() {
+        let bg = TerminalColorPalette.clearColor
+        metalLayer.backgroundColor = CGColor(
+            red: CGFloat(bg.x), green: CGFloat(bg.y), blue: CGFloat(bg.z),
+            alpha: CGFloat(bg.w))
+        firstPresentState = .awaitingFrame
+        link?.isPaused = false
+    }
+
+    /// The transition out of `.awaitingFrame`, run only after a frame has
+    /// actually been rendered and presented. Called from
+    /// `metalDisplayLink(_:needsUpdate:)` — and directly by tests, since
+    /// driving a real `CAMetalDisplayLink` needs a visible window and a
+    /// turning run loop. A no-op in `.idle`, so a stray callback can never
+    /// strip a stand-in a *newer* request just armed.
+    func notePresentedFrame() {
+        guard firstPresentState == .awaitingFrame else { return }
+        firstPresentState = .idle
+        metalLayer.backgroundColor = nil
     }
 
     func metalDisplayLink(
@@ -154,7 +164,12 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         }
         let stillPending = shouldRenderFrame?() ?? true
         let drawable = update.drawable
-        onRenderFrame?(FrameScheduler.clearPass(for: drawable), metalLayer.drawableSize, drawable)
+        if let onRenderFrame {
+            onRenderFrame(FrameScheduler.clearPass(for: drawable), metalLayer.drawableSize, drawable)
+            // The frame is presented (the handler presents synchronously),
+            // so the first-present stand-in — if armed — is now redundant.
+            notePresentedFrame()
+        }
         if !stillPending {
             link.isPaused = true
         }
@@ -171,4 +186,14 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         pass.colorAttachments[0].storeAction = .store
         return pass
     }
+}
+
+/// The flash-guard state machine (E05) — see `FrameScheduler.requestFirstPresent`.
+enum FirstPresentState: Equatable {
+    /// Nothing outstanding; the layer shows whatever was last presented.
+    case idle
+    /// A first frame was requested but not yet presented; until it is, the
+    /// layer's `backgroundColor` (the theme's clear colour) stands in so the
+    /// transparent window can never show what is behind it.
+    case awaitingFrame
 }

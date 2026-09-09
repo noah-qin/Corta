@@ -7,7 +7,7 @@ import CortaTerminal
 /// both are viewport moves expressed in document rows; the clipboard drain is
 /// here because OSC 52 arrives through the same output path and, like the
 /// marks, is something the child told us rather than something we guessed.
-extension ViewController {
+extension ViewController: NSMenuItemValidation {
     // MARK: - Scrolling from the keyboard
 
     @objc func scrollHistoryPageUp(_ sender: Any?) { scroll(.page(up: true)) }
@@ -27,10 +27,10 @@ extension ViewController {
     /// what makes this work across the scrollback boundary without a special
     /// case: the same arithmetic finds a prompt fifty thousand lines back and
     /// one still on screen.
-    private func jumpToCommand(backwards: Bool) {
+    private func jumpToCommand(backwards: Bool, failedOnly: Bool = false) {
         guard session != nil else { return }
         let grid = session.snapshot()
-        let prompts = grid.promptRows
+        let prompts = failedOnly ? grid.failedPromptRows : grid.promptRows
         guard !prompts.isEmpty else {
             // No marks at all: the shell has no integration configured, and
             // pretending otherwise by jumping somewhere arbitrary would be
@@ -49,11 +49,118 @@ extension ViewController {
         invalidateDisplay()
     }
 
+    // MARK: - Failed commands (U14)
+
+    @objc func jumpToPreviousFailedCommand(_ sender: Any?) {
+        jumpToCommand(backwards: true, failedOnly: true)
+    }
+
+    @objc func jumpToNextFailedCommand(_ sender: Any?) {
+        jumpToCommand(backwards: false, failedOnly: true)
+    }
+
+    /// Whether any command in this pane's history is known to have failed —
+    /// the menu items are greyed out otherwise, rather than beeping at a
+    /// person who has had a good day.
+    var hasFailedCommands: Bool {
+        guard session != nil else { return false }
+        return !session.snapshot().failedPromptRows.isEmpty
+    }
+
+    // MARK: - The last command's output (U14)
+
+    /// Copies the output of the last completed command to the clipboard.
+    ///
+    /// The thing this replaces is selecting it by hand: a long build log's
+    /// output starts several screens up, and dragging to it means scrolling
+    /// while dragging, which is the gesture U19 had to make work at all. The
+    /// marks already say where the command started and where the next prompt
+    /// is; the range between them is the answer, and nothing has to be
+    /// guessed from the text.
+    ///
+    /// Reported by toast either way, because both outcomes are invisible
+    /// otherwise: a clipboard that changed silently, or one that did not.
+    @objc func copyLastCommandOutput(_ sender: Any?) {
+        guard isOperable else { return }
+        let grid = session.snapshot()
+        guard let text = Self.commandOutput(in: grid, scrollOffset: scrollOffset),
+            !text.isEmpty
+        else {
+            // No marks at all is a shell with no integration configured;
+            // marks but no completed command is a fresh prompt. Neither is an
+            // error, and neither is something to do silently.
+            terminalView?.showToast(
+                L10n.text(
+                    grid.promptRows.isEmpty
+                        ? "toast.noShellIntegration" : "toast.noCommandOutput"),
+                kind: .warning)
+            return
+        }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+        terminalView?.showToast(L10n.text("toast.copiedCommandOutput"))
+    }
+
+    /// The output of the command the viewport is looking at, as text.
+    ///
+    /// Scrolled to the bottom this is the last command's, which is the
+    /// ordinary case. Scrolled up it is the command whose output the user is
+    /// *reading* — the one whose prompt is nearest above the top of the
+    /// viewport — because a command has to have scrolled off the bottom
+    /// before anyone wants to scroll back to it, and taking the last one
+    /// there would copy something the user cannot see (U14).
+    ///
+    /// Static and pure so the row arithmetic is testable without a pane.
+    static func commandOutput(in grid: Grid, scrollOffset: Int) -> String? {
+        let viewportTop = grid.scrollback.totalPushed - scrollOffset
+        let bound = scrollOffset > 0 ? viewportTop + grid.rows : Int.max
+        guard let rows = grid.commandOutputRows(before: bound) else { return nil }
+        // Absolute rows to the document rows selection speaks in.
+        let base = grid.scrollback.totalPushed
+        let range = SelectionRange(
+            anchor: SelectionPoint(row: rows.lowerBound - base, column: 0),
+            head: SelectionPoint(row: rows.upperBound - 1 - base, column: grid.columns - 1))
+        let text = Selection.text(of: range, in: grid)
+        return text.isEmpty ? nil : text
+    }
+
     /// Whether the pane can currently jump — used to grey the menu items out
     /// on a shell with no integration rather than leaving them live and
     /// silent.
     var hasShellIntegration: Bool {
         session?.hasShellIntegration == true
+    }
+
+    // MARK: - Menu validation
+
+    /// Greys out the items that depend on shell integration, or on a
+    /// terminal existing at all, rather than leaving them live and silent.
+    ///
+    /// A command jump with no marks used to beep, which says "not now"
+    /// without saying why; a disabled item with a shell-integration section
+    /// in `CONFIGURATION.md` behind it says which. The failed-command items
+    /// go further and require a failure to actually exist — an enabled "Next
+    /// Failed Command" in a session where nothing failed is an invitation to
+    /// press it and learn nothing.
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        switch menuItem.action {
+        case #selector(jumpToPreviousCommand(_:)), #selector(jumpToNextCommand(_:)):
+            return hasShellIntegration
+        case #selector(jumpToPreviousFailedCommand(_:)),
+            #selector(jumpToNextFailedCommand(_:)):
+            return hasShellIntegration && hasFailedCommands
+        case #selector(copyLastCommandOutput(_:)):
+            guard isOperable else { return false }
+            return Self.commandOutput(in: session.snapshot(), scrollOffset: scrollOffset) != nil
+        case #selector(clearScreen(_:)), #selector(clearHistory(_:)),
+            #selector(resetTerminal(_:)):
+            return validateTerminalStateItem(menuItem)
+        case #selector(exportText(_:)):
+            return isOperable
+        default:
+            return true
+        }
     }
 
     // MARK: - OSC 52 (M7.11)

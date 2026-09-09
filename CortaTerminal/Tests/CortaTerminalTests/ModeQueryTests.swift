@@ -103,11 +103,22 @@ struct ModeQueryTests {
 
     // MARK: - XTVERSION (M6.5)
 
+    /// The envelope is the contract — `DCS > | Name(version) ST`, the shape
+    /// every consumer parses — and the version inside it is whatever the
+    /// release says it is. Spelling the number out here made the assertion a
+    /// second place to forget on a release; it stayed at 0.1.0 while the
+    /// project moved on, which is exactly the drift `CortaVersion`'s own
+    /// comment warns about.
     @Test("XTVERSION answers with a DCS-wrapped name and version")
     func xtversionAnswers() {
-        #expect(response(to: "\u{1B}[>0q") == "\u{1B}P>|Corta(0.1.0)\u{1B}\\")
+        let expected = "\u{1B}P>|Corta(\(CortaVersion.string))\u{1B}\\"
+        #expect(response(to: "\u{1B}[>0q") == expected)
         // `CSI > q` with no parameter is the same request.
-        #expect(response(to: "\u{1B}[>q") == "\u{1B}P>|Corta(0.1.0)\u{1B}\\")
+        #expect(response(to: "\u{1B}[>q") == expected)
+        // And the number really is a semantic version, not an empty string or
+        // a build identifier that slipped in.
+        #expect(CortaVersion.string.split(separator: ".").count == 3)
+        #expect(CortaVersion.string.allSatisfy { $0.isNumber || $0 == "." })
     }
 
     @Test("a different Ps is a different sequence and goes unanswered")

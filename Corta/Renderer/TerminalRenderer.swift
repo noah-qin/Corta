@@ -281,6 +281,19 @@ nonisolated final class TerminalRenderer {
             cachedLinesGeneration = grid.linesGeneration
             cachedLinesRotated = grid.linesRotated
         }
+        // M10/P05: hand the image renderer the current placement table once
+        // per frame. This is where decodes get scheduled (never in `draw`),
+        // where stale textures are pruned, and where an image-layer change
+        // registers as damage — an image delete changes no cell, so the
+        // line-granular diff alone would never notice it and the deleted
+        // image would stay on screen until unrelated output happened.
+        if cachedImagePlacements.revision != grid.imagePlacements.revision {
+            changed = true
+        }
+        kittyImageRenderer.update(
+            table: grid.imagePlacements, rows: grid.rows, offset: offset,
+            scrollbackCount: grid.scrollback.count,
+            cellWidth: Float(metrics.cellWidth), cellHeight: Float(metrics.cellHeight))
         cachedImagePlacements = grid.imagePlacements
         cachedCursor = grid.cursor
         cachedCursorStyle = grid.cursorStyle

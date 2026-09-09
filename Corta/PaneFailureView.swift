@@ -24,6 +24,19 @@ final class PaneFailureView: NSView {
     /// the config file live.
     var onOpenSettings: (() -> Void)?
 
+    /// The button keyboard focus should land on when the panel appears —
+    /// Try Again where there is one, Settings otherwise.
+    ///
+    /// A failed pane has no terminal view, so `makeFirstResponder` is handed
+    /// `nil` and focus falls back to the window itself: nothing inside the
+    /// panel is focused, and a person navigating by keyboard has to find the
+    /// button by hand on the one screen where everything else has already
+    /// gone wrong (U09).
+    private(set) var primaryAction: NSButton?
+
+    /// What VoiceOver should hear when the panel replaces the terminal.
+    var announcement: String { accessibilityLabel() ?? "" }
+
     init(title: String, detail: String, canRetry: Bool) {
         super.init(frame: .zero)
         wantsLayer = true
@@ -57,11 +70,13 @@ final class PaneFailureView: NSView {
                 action: #selector(retryTapped))
             retry.keyEquivalent = "\r"
             buttons.append(retry)
+            primaryAction = retry
         }
         let settings = NSButton(
             title: L10n.text("failure.button.settings"), target: self,
             action: #selector(settingsTapped))
         buttons.append(settings)
+        if primaryAction == nil { primaryAction = settings }
         let buttonRow = NSStackView(views: buttons)
         buttonRow.orientation = .horizontal
         buttonRow.spacing = 10

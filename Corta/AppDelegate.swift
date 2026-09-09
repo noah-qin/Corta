@@ -15,8 +15,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// nothing else retains a window controller, and a deallocated
     /// controller takes its window (and its session) down with it.
     private var windowControllers: [NSWindowController] = []
+    /// The debounced arrangement write (U07); see `noteLayoutChanged`.
+    var pendingLayoutSave: DispatchWorkItem?
+    /// Set as the app starts quitting, so the windows closing on the way out
+    /// do not each schedule a save that would end up writing an empty
+    /// arrangement over the one just flushed.
+    private var isTerminating = false
 
-    /// File > New (⌘N), wired in the storyboard to First Responder. Each
+    /// File > New Window (⌘N), wired in the storyboard to First Responder. Each
     /// window is its own `SplitViewController` composing one or more
     /// panes — each pane a `ViewController` with its own
     /// `TerminalSession` — so a new window is composition, not new
@@ -69,7 +75,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     /// One storyboard window controller, tracked so it lives as long as its
     /// window does.
-    private func instantiateWindowController() -> NSWindowController? {
+    func instantiateWindowController() -> NSWindowController? {
         guard let controller = NSStoryboard(name: "Main", bundle: nil)
             .instantiateInitialController() as? NSWindowController
         else { return nil }
@@ -85,13 +91,36 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         NotificationCenter.default.addObserver(
             self, selector: #selector(windowWillClose(_:)),
             name: NSWindow.willCloseNotification, object: controller.window)
+        // A moved or resized window is a changed arrangement (U07). Both
+        // notifications are per-window and coalesce into one debounced write.
+        for name in [NSWindow.didResizeNotification, NSWindow.didMoveNotification] {
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(noteLayoutChanged), name: name,
+                object: controller.window)
+        }
+        noteLayoutChanged()
     }
 
     @objc private func windowWillClose(_ note: Notification) {
         guard let window = note.object as? NSWindow else { return }
+        // A window close (red button, tab close) never reaches
+        // `SplitViewController.closePane`, so this is where the window's
+        // sessions, search monitors and observers are torn down — before
+        // the controller is dropped (E01).
+        if let controller = windowControllers.first(where: { $0.window === window }) {
+            (controller.contentViewController as? SplitViewController)?.teardown()
+        }
         windowControllers.removeAll { $0.window === window }
-        NotificationCenter.default.removeObserver(
-            self, name: NSWindow.willCloseNotification, object: window)
+        for name in [
+            NSWindow.willCloseNotification, NSWindow.didResizeNotification,
+            NSWindow.didMoveNotification,
+        ] {
+            NotificationCenter.default.removeObserver(self, name: name, object: window)
+        }
+        // One window fewer is a changed arrangement — but not at quit, where
+        // every window closes in turn and the last one would otherwise write
+        // an empty arrangement over a good one.
+        if !isTerminating { noteLayoutChanged() }
     }
 
     // MARK: - Settings (M6.1)
@@ -205,11 +234,27 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// otherwise a restore would always leave one empty extra window behind.
     private func restoreWindowsIfConfigured() {
         guard Self.isRestoreEnabled else { return }
-        let states = SessionRestore.load()
-        guard !states.isEmpty else { return }
-        // Consumed on launch: a crash mid-restore must not replay the same
-        // state forever, and the file is rewritten at the next quit anyway.
-        SessionRestore.clear()
+        let states: [WindowState]
+        switch SessionRestore.decideRestore() {
+        case .skipAfterFailure:
+            // A restore that crashed last time is not tried again: the marker
+            // outlives only a launch that died mid-restore, so the saved
+            // layout is what killed it (U07). Dropped rather than repaired —
+            // the arrangement is the suspect, and a fresh window always works.
+            SessionRestore.clear()
+            SessionRestore.endRestore()
+            return
+        case .nothingToRestore:
+            return
+        case .restore(let saved):
+            states = saved
+        }
+        SessionRestore.beginRestore()
+        // Cleared once every window is up. The state file itself is *kept*:
+        // it is rewritten by `noteLayoutChanged` as the arrangement changes,
+        // so a later crash still has a last-known-good layout to come back
+        // to — which deleting it here used to make impossible.
+        defer { SessionRestore.endRestore() }
 
         // The storyboard's window is already on screen, which means its root
         // pane has already spawned a shell — in the home directory, because
@@ -253,6 +298,43 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             windowControllers.compactMap { ($0 as? TerminalWindowController)?.restorableState })
     }
 
+    // MARK: - Keeping the arrangement current (U07)
+
+    /// How long the layout has to stop changing before it is written.
+    ///
+    /// A split, a close, a divider drag and a window resize all change the
+    /// arrangement, and a live drag produces a stream of them — so the write
+    /// is coalesced rather than run per event. Half a second is short enough
+    /// that a crash loses at most the last gesture and long enough that a
+    /// drag is one write, not sixty.
+    private static let layoutSaveDelay: TimeInterval = 0.5
+
+    /// Records that the arrangement changed, and writes it once things go
+    /// quiet.
+    ///
+    /// Saving only at `applicationWillTerminate` meant a crash — the case a
+    /// restore exists for — lost the arrangement entirely, because the one
+    /// moment the file was written was the one that never came (U07).
+    @objc func noteLayoutChanged() {
+        guard Self.isRestoreEnabled else { return }
+        pendingLayoutSave?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.pendingLayoutSave = nil
+            self.saveWindowStates()
+        }
+        pendingLayoutSave = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.layoutSaveDelay, execute: item)
+    }
+
+    /// Writes any pending arrangement immediately — at quit, where waiting
+    /// out the debounce would mean not writing at all.
+    private func flushLayoutSave() {
+        pendingLayoutSave?.cancel()
+        pendingLayoutSave = nil
+        saveWindowStates()
+    }
+
     /// ⌘Q with something still running. `windowShouldClose` covers closing a
     /// window; quitting bypasses it entirely, and losing a build to a
     /// mistyped ⌘Q is exactly the case the confirmation exists for (M7.5).
@@ -267,7 +349,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
-        saveWindowStates()
+        isTerminating = true
+        flushLayoutSave()
+        // Quit does not route through `windowWillClose` on every path, so
+        // tear down explicitly rather than leaving the children to the
+        // process-exit SIGHUP. Idempotent against windows already closed.
+        for controller in windowControllers {
+            (controller.contentViewController as? SplitViewController)?.teardown()
+        }
     }
 
     /// False: a terminal window has nothing to restore through AppKit's own

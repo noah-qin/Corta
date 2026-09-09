@@ -24,10 +24,17 @@ extension ViewController {
     /// selection. A plain click is deliberately not handled here — see
     /// `openLinkOnPlainClick`.
     func handleLinkClick(_ event: NSEvent, in terminalView: TerminalView) -> Bool {
-        guard event.modifierFlags.contains(.command),
-            let link = linkUnder(event, in: terminalView)
-        else { return false }
-        return open(link)
+        guard event.modifierFlags.contains(.command) else { return false }
+        if let link = linkUnder(event, in: terminalView) { return open(link) }
+        // U17 — a `path:line` reference, but only one that resolves to a file
+        // on *this* machine. A URL wins where both could match: the other
+        // detector already refuses to start inside one, so in practice they
+        // do not overlap, and the order makes that explicit rather than
+        // incidental.
+        if let reference = fileReferenceUnder(event, in: terminalView) {
+            return open(reference)
+        }
+        return false
     }
 
     /// The mouse-up half of `link-activation = click`: the click landed on a
@@ -35,10 +42,13 @@ extension ViewController {
     /// of a selection.
     @discardableResult
     func openLinkOnPlainClick(_ event: NSEvent, in terminalView: TerminalView) -> Bool {
-        guard opensLinksOnPlainClick, !event.modifierFlags.contains(.shift),
-            let link = linkUnder(event, in: terminalView)
+        guard opensLinksOnPlainClick, !event.modifierFlags.contains(.shift)
         else { return false }
-        return open(link)
+        if let link = linkUnder(event, in: terminalView) { return open(link) }
+        if let reference = fileReferenceUnder(event, in: terminalView) {
+            return open(reference)
+        }
+        return false
     }
 
     /// The hand-off. The scheme is re-checked here, not just in the
@@ -71,6 +81,24 @@ extension ViewController {
             }
             if terminalView.toolTip != link.url { terminalView.toolTip = link.url }
             setHoveredLink(link.range)
+        } else if armed, session != nil,
+            let reference = fileReferenceUnder(event, in: terminalView)
+        {
+            // U17 — the same "show the real target before it can be opened"
+            // rule (`SECURITY.md` §2.4): the tooltip names the *resolved*
+            // path, not the text under the pointer, so a relative path shows
+            // where it actually leads. It also says when the line number will
+            // be lost, which is the case with no `open-file-command` set.
+            if !hoveringLink {
+                NSCursor.pointingHand.set()
+                hoveringLink = true
+            }
+            let target = "\(reference.url.path):\(reference.line)"
+            let tip =
+                ConfigurationStore.shared.configuration.openFileCommand.isEmpty
+                ? L10n.format("link.fileNoLine", target) : target
+            if terminalView.toolTip != tip { terminalView.toolTip = tip }
+            setHoveredLink(reference.range)
         } else {
             resetLinkHover(terminalView)
         }

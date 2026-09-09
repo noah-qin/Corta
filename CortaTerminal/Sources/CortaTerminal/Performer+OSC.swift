@@ -64,7 +64,9 @@ extension Performer {
             return
         }
         let uri = String(decoding: payload[payload.index(after: separator)...], as: UTF8.self)
-        guard !uri.isEmpty, let id = grid.hyperlinks.intern(uri) else {
+        // `Grid.internHyperlink`, not the table directly: a full table gets
+        // a reference-safe sweep and one retry before failing closed (P06).
+        guard !uri.isEmpty, let id = grid.internHyperlink(uri) else {
             grid.pen.hyperlink = .none
             return
         }
@@ -87,6 +89,13 @@ extension Performer {
     ///
     /// The payload is already bounded by `Parser.maxStringLength`, so the
     /// decode cannot be made to allocate without limit.
+    ///
+    /// The decoded text passes through `sanitiseClipboardText` before it is
+    /// recorded: bidi and zero-width control characters are stripped, because
+    /// this is text a *stream* chose, sight unseen — there is no "copy what I
+    /// selected" contract to honour, and a payload whose pasted form differs
+    /// from what any display of it suggested is the Trojan Source class of
+    /// attack (`SECURITY.md` §2.5).
     private mutating func setClipboard(_ payload: ArraySlice<UInt8>) {
         guard let separator = payload.firstIndex(of: 0x3B) else { return }  // ';'
         let data = payload[payload.index(after: separator)...]
@@ -94,13 +103,39 @@ extension Performer {
         // are both declined: nothing is reported back to the child, and a
         // stream is not allowed to blank the user's clipboard either.
         guard !data.isEmpty, data.first != 0x3F else { return }
-        guard let text = Self.decodeBase64(data), !text.isEmpty else { return }
+        guard let decoded = Self.decodeBase64(data) else { return }
+        let text = Self.sanitiseClipboardText(decoded)
+        guard !text.isEmpty else { return }
         state.pendingClipboardCopy = text
+    }
+
+    /// Removes the characters that let clipboard content lie about itself:
+    /// bidi embeddings, overrides and isolates (U+202A–U+202E, U+2066–U+2069),
+    /// which can reorder how the pasted text *displays* versus what it
+    /// *is*, and the zero-width format characters (ZWSP U+200B, word joiner
+    /// U+2060, ZWNBSP/BOM U+FEFF), which hide content outright. Kept:
+    /// ZWJ and ZWNJ (emoji sequences and scripts that need them) and
+    /// LRM/RLM, which are load-bearing in real bidi text and reorder nothing
+    /// on their own.
+    static func sanitiseClipboardText(_ text: String) -> String {
+        var scalars = String.UnicodeScalarView()
+        scalars.append(contentsOf: text.unicodeScalars.filter { !isSpoofingScalar($0) })
+        return String(scalars)
+    }
+
+    private static func isSpoofingScalar(_ scalar: Unicode.Scalar) -> Bool {
+        switch scalar.value {
+        case 0x202A...0x202E, 0x2066...0x2069, 0x200B, 0x2060, 0xFEFF:
+            return true
+        default:
+            return false
+        }
     }
 
     /// Strict base64, decoded here rather than through `Data(base64Encoded:)`
     /// so the bytes never take a detour through `String` and a malformed
-    /// payload is rejected rather than partially accepted.
+    /// payload is rejected rather than partially accepted — including data
+    /// trailing the `=` padding, which is not a valid place for more data.
     ///
     /// The result is decoded as UTF-8 with replacement, not validated: this
     /// is text bound for a pasteboard, and refusing a clipboard copy because
@@ -111,13 +146,17 @@ extension Performer {
         output.reserveCapacity(bytes.count * 3 / 4)
         var accumulator: UInt32 = 0
         var bits = 0
+        var paddingSeen = false
         for byte in bytes {
-            if byte == 0x3D { break }  // '=' padding ends the data
-            guard let value = base64Value(byte) else {
-                // Whitespace inside a long payload is common enough to skip.
-                if byte == 0x20 || byte == 0x0A || byte == 0x0D || byte == 0x09 { continue }
-                return nil
+            if byte == 0x3D {  // '=' padding ends the data
+                paddingSeen = true
+                continue
             }
+            if byte == 0x20 || byte == 0x0A || byte == 0x0D || byte == 0x09 {
+                // Whitespace inside a long payload is common enough to skip.
+                continue
+            }
+            guard !paddingSeen, let value = base64Value(byte) else { return nil }
             accumulator = (accumulator << 6) | UInt32(value)
             bits += 6
             if bits >= 8 {
@@ -142,14 +181,56 @@ extension Performer {
 
     /// OSC 7 — the payload is a `file://host/path` URL. Only `file` is
     /// meaningful for a local working directory; anything else is ignored.
-    /// The hostname is deliberately not checked: the path is a hint for new
-    /// tabs and splits, and a path that does not exist locally is the app
-    /// layer's problem.
+    ///
+    /// The host part is checked, because a shell reached over `ssh` (or a
+    /// pane inside `tmux` on one) reports a directory on *that* host with
+    /// its hostname attached. The report feeds local spawns — new tabs,
+    /// splits, session restore — so a remote path kept here would be `chdir`'d
+    /// on this Mac, opening the new shell in a lookalike directory or an
+    /// unrelated one that happens to exist. Only a local host (empty,
+    /// `localhost`, or this machine's own names) is accepted; a remote
+    /// report is dropped, which leaves the app its kernel-side fallback
+    /// (`PTY.currentWorkingDirectory`).
     private mutating func setWorkingDirectory(_ payload: ArraySlice<UInt8>) {
         let string = String(decoding: payload, as: UTF8.self)
         guard let url = URL(string: string), url.scheme == "file" else { return }
+        guard Self.isLocalHost(url.host(percentEncoded: false) ?? "") else { return }
         let path = url.path(percentEncoded: false)
         guard !path.isEmpty else { return }
         state.workingDirectory = path
+    }
+
+    /// Whether an OSC 7 host names this machine. Comparison is
+    /// case-insensitive and ignores a trailing dot, so a shell reporting the
+    /// FQDN form (`host.example.`) still matches the bare name.
+    static func isLocalHost(_ host: String, localNames: Set<String> = localHostnames()) -> Bool {
+        let normalized = normalizeHostname(host)
+        return normalized.isEmpty || localNames.contains(normalized)
+    }
+
+    /// This machine's names, normalised: `localhost`, the full and short
+    /// (first-label) forms of every name the system knows itself by — a
+    /// shell usually reports `hostname`'s short answer even when the system
+    /// keeps the `.local` form.
+    static func localHostnames() -> Set<String> {
+        var names: Set<String> = ["localhost"]
+        let candidates = [
+            ProcessInfo.processInfo.hostName, Host.current().name, Host.current().localizedName,
+        ]
+        for candidate in candidates {
+            guard let candidate else { continue }
+            let normalized = normalizeHostname(candidate)
+            names.insert(normalized)
+            if let dot = normalized.firstIndex(of: ".") {
+                names.insert(String(normalized[..<dot]))
+            }
+        }
+        return names
+    }
+
+    static func normalizeHostname(_ host: String) -> String {
+        var normalized = host.lowercased()
+        while normalized.hasSuffix(".") { normalized.removeLast() }
+        return normalized
     }
 }

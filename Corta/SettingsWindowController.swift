@@ -101,6 +101,8 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
     private let columnsField = NSTextField()
     private let rowsField = NSTextField()
     private let bellPopUp = NSPopUpButton()
+    private let optionAsMetaSwitch = NSSwitch()
+    private let openFileCommandField = NSTextField()
     private let copyOnSelectSwitch = NSSwitch()
     private let linkActivationPopUp = NSPopUpButton()
     private let clipboardWriteSwitch = NSSwitch()
@@ -429,11 +431,17 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
                     L10n.text("settings.label.scrollback"), scrollbackField,
                     help: L10n.text("settings.help.scrollback")),
                 row(L10n.text("settings.label.bell"), bellPopUp),
+                row(
+                    L10n.text("settings.label.optionAsMeta"), optionAsMetaSwitch,
+                    help: L10n.text("settings.help.optionAsMeta")),
                 row(L10n.text("settings.label.copyOnSelect"), copyOnSelectSwitch),
                 row(L10n.text("settings.label.openLinksWith"), linkActivationPopUp),
                 row(
                     L10n.text("settings.label.allowClipboardCopy"), clipboardWriteSwitch,
                     help: L10n.text("settings.help.allowClipboardCopy")),
+                row(
+                    L10n.text("settings.label.openFileCommand"), openFileCommandField,
+                    help: L10n.text("settings.help.openFileCommand")),
             ]
         case .general:
             let windowHeader = sectionHeader(L10n.text("settings.section.window"))
@@ -788,8 +796,8 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         linkActivationPopUp.action = #selector(commit)
 
         for control in [
-            copyOnSelectSwitch, clipboardWriteSwitch, restoreWindowsSwitch, confirmCloseSwitch,
-            notifySwitch,
+            optionAsMetaSwitch, copyOnSelectSwitch, clipboardWriteSwitch, restoreWindowsSwitch,
+            confirmCloseSwitch, notifySwitch,
         ] {
             control.target = self
             control.action = #selector(commit)
@@ -841,6 +849,8 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         columnsField.stringValue = String(configuration.columns)
         rowsField.stringValue = String(configuration.rows)
         bellPopUp.selectItem(at: Self.bellModes.firstIndex(of: configuration.bell) ?? 0)
+        optionAsMetaSwitch.state = configuration.optionAsMeta ? .on : .off
+        openFileCommandField.stringValue = configuration.openFileCommand
         copyOnSelectSwitch.state = configuration.copyOnSelect ? .on : .off
         linkActivationPopUp.selectItem(at: configuration.linkActivation == .click ? 1 : 0)
         clipboardWriteSwitch.state = configuration.allowClipboardWrite ? .on : .off
@@ -848,27 +858,32 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         confirmCloseSwitch.state = configuration.confirmClose ? .on : .off
         notifySwitch.state = configuration.notifyOnLongTask ? .on : .off
         thresholdField.stringValue = String(Int(configuration.notificationThreshold))
-        // The threshold only means anything while notifications are on. An
-        // editable field that changes nothing is a setting that looks broken.
-        thresholdField.isEnabled = configuration.notifyOnLongTask
-        thresholdLabel.textColor =
-            configuration.notifyOnLongTask ? .labelColor : .disabledControlTextColor
-        // The whole row, not only the field: the "seconds" suffix and the
-        // row's own accessibility state have to say "off" too, or a screen
-        // reader reports an editable setting that changes nothing.
-        thresholdRow?.subviews.forEach { subview in
-            if let field = subview as? NSTextField, field !== thresholdLabel {
-                field.textColor =
-                    configuration.notifyOnLongTask ? .labelColor : .disabledControlTextColor
-            }
-            (subview as? NSStackView)?.views.forEach { view in
-                (view as? NSTextField)?.textColor =
-                    configuration.notifyOnLongTask ? .labelColor : .disabledControlTextColor
-            }
-        }
+        applyThresholdState(enabled: configuration.notifyOnLongTask)
         pathLabel.stringValue = ConfigurationStore.fileURL.path
         applyNotificationPermission()
         applySystemAccessibilityPreferences()
+    }
+
+    /// The threshold row on and off with the notification switch: the field,
+    /// its label and the "seconds" suffix all say "off" together. The whole
+    /// row, not only the field — an editable-looking row under an off switch
+    /// is a setting that looks broken, and a screen reader would report an
+    /// editable setting that changes nothing.
+    ///
+    /// Internal rather than private so the disabled-state test can drive it
+    /// directly: going through the switch would write the config file.
+    func applyThresholdState(enabled: Bool) {
+        thresholdField.isEnabled = enabled
+        thresholdLabel.textColor = enabled ? .labelColor : .disabledControlTextColor
+        thresholdRow?.subviews.forEach { subview in
+            if let field = subview as? NSTextField, field !== thresholdLabel {
+                field.textColor = enabled ? .labelColor : .disabledControlTextColor
+            }
+            (subview as? NSStackView)?.views.forEach { view in
+                (view as? NSTextField)?.textColor =
+                    enabled ? .labelColor : .disabledControlTextColor
+            }
+        }
     }
 
     /// The notice under the notification switch: shown only when the setting
@@ -948,6 +963,19 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
                     rows, 5, 300, label: L10n.text("settings.label.rows"))
             }
             if bellIndex < Self.bellModes.count { configuration.bell = Self.bellModes[bellIndex] }
+            configuration.optionAsMeta = optionAsMetaSwitch.state == .on
+            // Refused rather than written: the page is a front over the
+            // config file, and writing a template that cannot be launched
+            // would make the file say something the app will not do (U17).
+            // Reported through the same channel a clamped number uses, for
+            // the same reason — silently keeping the old value looks exactly
+            // like the app ignoring what was typed.
+            let template = openFileCommandField.stringValue.trimmingCharacters(in: .whitespaces)
+            if Configuration.isUsableOpenFileCommand(template) {
+                configuration.openFileCommand = template
+            } else {
+                clamps.append(L10n.text("settings.status.openFileCommand"))
+            }
             configuration.copyOnSelect = copyOnSelectSwitch.state == .on
             configuration.linkActivation =
                 linkActivationPopUp.indexOfSelectedItem == 1 ? .click : .command

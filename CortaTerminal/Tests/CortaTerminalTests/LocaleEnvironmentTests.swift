@@ -34,6 +34,7 @@ import Testing
             // out of the fixture before the assertion can observe it.
             executable: "/usr/bin/env", size: TerminalSize(rows: 64, columns: 100))
         defer { session.stop() }
+        session.start()
         var dump = ""
         for _ in 0..<3000 {
             dump = session.snapshot().dump()

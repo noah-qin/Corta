@@ -391,4 +391,86 @@ struct KittyGraphicsTests {
         let response = String(decoding: terminal.takeOutput(), as: UTF8.self)
         #expect(response.contains("ENOSPC"))
     }
+
+    // MARK: - Invalid ids (S01)
+
+    /// S01's three release-build SIGTRAP reproducers, plus the boundary
+    /// values on each side: every id on the wire is unsigned 32-bit, and a
+    /// negative or overflowing one must be ignored like any unrecognised
+    /// sequence (`KittyGraphicsParser.uint32ID`) — never trapped on, never
+    /// clamped into a *different* id.
+
+    @Test("a=p with a negative image id is ignored, not a trap")
+    func bareDisplayWithNegativeImageIDIsIgnored() {
+        var terminal = Terminal(rows: 10, columns: 40)
+        let payload = Self.rgba(1).base64EncodedString()
+        terminal.feed(Self.apc("a=t,i=1,f=32,s=1,v=1,q=2", payload: payload))
+
+        terminal.feed(Self.apc("a=p,i=-1"))
+        #expect(terminal.grid.imagePlacements.orderedPlacements().isEmpty)
+        #expect(terminal.grid.imagePlacements.imageCount == 1)
+    }
+
+    @Test("a=p with an overflowing placement id is ignored, not a trap")
+    func bareDisplayWithOverflowingPlacementIDIsIgnored() {
+        var terminal = Terminal(rows: 10, columns: 40)
+        let payload = Self.rgba(1).base64EncodedString()
+        terminal.feed(Self.apc("a=t,i=1,f=32,s=1,v=1,q=2", payload: payload))
+
+        terminal.feed(Self.apc("a=p,i=1,p=4294967296"))  // UInt32.max + 1
+        #expect(terminal.grid.imagePlacements.orderedPlacements().isEmpty)
+
+        // The boundary value itself is legal and must still place.
+        terminal.feed(Self.apc("a=p,i=1,p=4294967295"))  // UInt32.max
+        let placements = terminal.grid.imagePlacements.orderedPlacements()
+        #expect(placements.count == 1)
+        #expect(placements.first?.id == KittyGraphics.PlacementID(rawValue: UInt32.max))
+    }
+
+    @Test("a=d with a negative image id deletes nothing, not a trap")
+    func deleteWithNegativeImageIDDeletesNothing() {
+        var terminal = Terminal(rows: 10, columns: 40)
+        let payload = Self.rgba(1).base64EncodedString()
+        terminal.feed(Self.apc("a=T,i=5,f=32,s=1,v=1,q=2", payload: payload))
+
+        terminal.feed(Self.apc("a=d,d=i,i=-1"))
+        #expect(terminal.grid.imagePlacements.imageCount == 1)
+        #expect(terminal.grid.imagePlacements.orderedPlacements().count == 1)
+    }
+
+    @Test("a transmit-and-display with an overflowing image id is ignored, not a trap")
+    func transmitWithOverflowingImageIDIsIgnored() {
+        var terminal = Terminal(rows: 10, columns: 40)
+        let payload = Self.rgba(1).base64EncodedString()
+        terminal.feed(Self.apc("a=T,i=4294967296,f=32,s=1,v=1", payload: payload))  // UInt32.max + 1
+        #expect(terminal.grid.imagePlacements.imageCount == 0)
+        #expect(terminal.grid.imagePlacements.orderedPlacements().isEmpty)
+
+        // The boundary value itself is legal and must still transmit.
+        terminal.feed(Self.apc("a=T,i=4294967295,f=32,s=1,v=1", payload: payload))  // UInt32.max
+        #expect(terminal.grid.imagePlacements.imageCount == 1)
+        #expect(terminal.grid.imagePlacements.orderedPlacements().count == 1)
+    }
+
+    @Test("a=T with a present-but-invalid p= drops the whole command, transmit included")
+    func transmitAndDisplayWithInvalidPlacementIDDropsTheWholeCommand() {
+        var terminal = Terminal(rows: 10, columns: 40)
+        let payload = Self.rgba(1).base64EncodedString()
+        terminal.feed(Self.apc("a=T,i=1,f=32,s=1,v=1,p=4294967296", payload: payload))
+        #expect(terminal.grid.imagePlacements.imageCount == 0, "storing the image would leave an unplaceable orphan")
+        #expect(terminal.grid.imagePlacements.orderedPlacements().isEmpty)
+    }
+
+    @Test("a delete whose p= is not a valid id deletes nothing rather than widening to the whole image")
+    func deleteWithInvalidPlacementIDDeletesNothing() {
+        var terminal = Terminal(rows: 10, columns: 40)
+        let payload = Self.rgba(1).base64EncodedString()
+        terminal.feed(Self.apc("a=t,i=6,f=32,s=1,v=1,q=2", payload: payload))
+        terminal.feed(Self.apc("a=p,i=6,p=1,q=2"))
+        terminal.feed(Self.apc("a=p,i=6,p=2,q=2"))
+
+        terminal.feed(Self.apc("a=d,d=i,i=6,p=4294967296"))
+        #expect(terminal.grid.imagePlacements.imageCount == 1)
+        #expect(terminal.grid.imagePlacements.orderedPlacements().count == 2)
+    }
 }

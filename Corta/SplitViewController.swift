@@ -54,10 +54,18 @@ final class SplitViewController: NSViewController {
     /// applied afterwards.
     var pendingRestore: WindowState?
 
+    /// U16 — the preset this window's first pane should spawn from. Set
+    /// before the view loads, for the same reason `pendingRestore` is: the
+    /// root pane needs its shell, directory and environment at spawn time,
+    /// and a preset applied afterwards would relabel a child that had already
+    /// started somewhere else.
+    var pendingPreset: Preset?
+
     override func viewDidLoad() {
         super.viewDidLoad()
         let pane = makePane(
-            workingDirectory: pendingRestore?.layout.firstDirectory, initialGridSize: nil)
+            workingDirectory: pendingRestore?.layout.firstDirectory, initialGridSize: nil,
+            preset: pendingPreset)
         focusedPane = pane
         tree = SplitTree(root: pane.view)
         installRoot()
@@ -259,10 +267,18 @@ final class SplitViewController: NSViewController {
     /// session spawns with the target grid size and working directory — the
     /// shell's first output is then laid out against the right width
     /// instead of the storyboard default and reflowed after.
-    private func makePane(workingDirectory: String?, initialGridSize: TerminalSize?) -> ViewController {
+    private func makePane(
+        workingDirectory: String?, initialGridSize: TerminalSize?, preset: Preset? = nil
+    ) -> ViewController {
         let pane = ViewController()
+        // U16 — set before `pane.view` loads: the preset supplies the shell,
+        // the directory and the environment at spawn time.
+        pane.preset = preset
         // M5.5: a split pane opens where the focused pane is, via OSC 7
         // (M2.8); nil (no report yet) falls back to the home directory.
+        // `TerminalSession.workingDirectory` is already host-filtered, so a
+        // pane ssh'd into a remote machine never hands its remote path to a
+        // local spawn.
         pane.inheritedWorkingDirectory = workingDirectory
         pane.initialGridSize = initialGridSize
         pane.didSizeWindow = didSetUpWindow
@@ -279,7 +295,10 @@ final class SplitViewController: NSViewController {
     /// The root changes identity when the first split replaces the single
     /// pane and when the last split collapses back into one.
     private func installRoot() {
-        let root = tree.root
+        // U13 — while a pane is zoomed, *it* is what fills the controller's
+        // view; the split tree is still intact underneath, just not in the
+        // hierarchy.
+        let root = zoomedPane?.view ?? tree.root
         guard root.superview !== view else { return }
         view.subviews.forEach { $0.removeFromSuperview() }
         root.translatesAutoresizingMaskIntoConstraints = false
@@ -292,13 +311,145 @@ final class SplitViewController: NSViewController {
         ])
     }
 
+    /// U07 — the arrangement changed, so the saved copy is stale. The write
+    /// itself is debounced in `AppDelegate`; this only says that something
+    /// moved. A divider drag arrives through the window's own resize
+    /// notification, so only the structural changes are reported here.
+    func noteLayoutChanged() {
+        (NSApp.delegate as? AppDelegate)?.noteLayoutChanged()
+    }
+
+    // MARK: - Zoom (U13)
+
+    /// The pane filling the window on its own, or `nil` when the split tree
+    /// is on screen.
+    ///
+    /// **Temporary, and it says so.** Zoom does not change the arrangement:
+    /// the tree is untouched, nothing is closed, no child process is
+    /// disturbed, and the saved layout keeps describing the splits rather
+    /// than the zoom. That is the difference between this and closing the
+    /// other panes, and it is the reason the state lives here as one
+    /// reference instead of as a second tree.
+    private(set) var zoomedPane: ViewController?
+
+    /// Where the zoomed pane's view came from, so unzoom can put it back in
+    /// its own slot rather than somewhere that merely looks the same.
+    private var zoomOrigin: (superview: NSView, index: Int)?
+
+    /// The arrangement as it was when the zoom began.
+    ///
+    /// Two jobs, both because the tree is not whole while a pane is zoomed:
+    /// it is what `windowState` reports (so U07 never writes "one pane" over
+    /// a split), and it is what the dividers are restored from on the way
+    /// out — AppKit re-halves a split that loses a subview, so putting the
+    /// view back is not the same as putting the layout back.
+    private(set) var layoutBeforeZoom: PaneLayout?
+
+    /// U15 — where the last closed pane was, so it can be reopened there.
+    /// One deep; see `SplitViewController+Reopen.swift` for why.
+    var lastClosedPane: ClosedPane?
+
+    /// The view the saved arrangement is read from: always the split tree,
+    /// never whatever happens to be on screen.
+    var layoutRoot: NSView? { tree?.root }
+
+    /// Whether a pane is currently zoomed — read by the menu item, which
+    /// toggles rather than offering two commands for one gesture.
+    var isPaneZoomed: Bool { zoomedPane != nil }
+
+    @objc func toggleZoomPane(_ sender: Any?) {
+        if zoomedPane != nil {
+            unzoomPane()
+        } else {
+            zoomFocusedPane()
+        }
+    }
+
+    /// Fills the window with the focused pane. A single-pane window has
+    /// nothing to zoom *from*, so the command does nothing there rather than
+    /// entering a state indistinguishable from the one it started in.
+    func zoomFocusedPane() {
+        guard hasMultiplePanes, let pane = focusedPane, zoomedPane == nil,
+            let superview = pane.view.superview,
+            let index = superview.subviews.firstIndex(of: pane.view)
+        else { return }
+        zoomedPane = pane
+        zoomOrigin = (superview, index)
+        layoutBeforeZoom = windowState(frame: view.window?.frame ?? view.frame)?.layout
+        // Detached from its split before the tree root leaves the hierarchy,
+        // so AppKit is never asked to hold it in two places at once.
+        pane.view.removeFromSuperview()
+        installRoot()
+        // The pane's grid has to follow the size it now occupies; the other
+        // panes keep the size they had, and get a resize each on the way back
+        // — a child that is not on screen still has a winsize, and lying to
+        // it would strand its output when it reappears.
+        view.layoutSubtreeIfNeeded()
+        resizeAllPanes()
+        applyFocusAppearance(to: pane)
+        view.window?.makeFirstResponder(pane.terminalView)
+    }
+
+    /// Puts the split tree back exactly as it was.
+    func unzoomPane() {
+        guard let pane = zoomedPane else { return }
+        zoomedPane = nil
+        // Back into its own slot in its own split. `installRoot` re-adds the
+        // tree root, but the tree's split view lost this child when the pane
+        // was zoomed — re-adding only the root would leave a split with one
+        // subview and the pane orphaned, which looks correct in a screenshot
+        // and is not.
+        pane.view.removeFromSuperview()
+        if let origin = zoomOrigin, origin.superview.subviews.count >= origin.index {
+            origin.superview.addSubview(
+                pane.view,
+                positioned: origin.index == 0 ? .below : .above,
+                relativeTo: origin.superview.subviews.first)
+        }
+        zoomOrigin = nil
+        installRoot()
+        if let layout = layoutBeforeZoom { reapplyDividerPositions(layout) }
+        layoutBeforeZoom = nil
+        view.layoutSubtreeIfNeeded()
+        resizeAllPanes()
+        applyFocusAppearance(to: pane)
+        view.window?.makeFirstResponder(pane.terminalView)
+    }
+
+    /// Leaves zoom if `pane` is the zoomed one — a zoomed pane that closes
+    /// would otherwise leave the window showing a removed view.
+    private func unzoomIfNeeded(closing pane: ViewController) {
+        guard zoomedPane === pane else { return }
+        // Put it back before it is closed: `SplitTree.close(leaf:)` works on
+        // the tree, and a leaf whose view is not in the tree cannot be
+        // removed from it.
+        unzoomPane()
+    }
+
+    /// Every pane re-reads the size it occupies. Called after a zoom in
+    /// either direction, where every pane's geometry changed at once.
+    private func resizeAllPanes() {
+        for pane in panes { pane.resizeSessionToFitView() }
+    }
+
+    private func applyFocusAppearance(to pane: ViewController) {
+        focusedPane = pane
+        for other in panes { other.applyFocusAppearance() }
+    }
+
     // MARK: - Splitting and closing
 
     @objc func splitRight(_ sender: Any?) { splitFocusedPane(orientation: .columns) }
     @objc func splitDown(_ sender: Any?) { splitFocusedPane(orientation: .rows) }
 
-    func splitFocusedPane(orientation: SplitOrientation, workingDirectory: String? = nil) {
+    func splitFocusedPane(
+        orientation: SplitOrientation, workingDirectory: String? = nil, preset: Preset? = nil
+    ) {
         guard let focusedPane else { return }
+        defer { noteLayoutChanged() }
+        // Splitting a zoomed pane means seeing the result, so the zoom ends
+        // rather than hiding the pane that was just created.
+        unzoomPane()
         // Captured before the split: the node takes the leaf's old frame,
         // and the two halves are pre-set on the subviews so the very first
         // layout already shows a 50/50 split. Without this the new pane is
@@ -307,7 +458,8 @@ final class SplitViewController: NSViewController {
         let oldFrame = focusedPane.view.frame
         let pane = makePane(
             workingDirectory: workingDirectory ?? focusedPane.session?.workingDirectory,
-            initialGridSize: halvedGridSize(of: focusedPane, orientation: orientation))
+            initialGridSize: halvedGridSize(of: focusedPane, orientation: orientation),
+            preset: preset)
         let node = tree.split(
             leaf: focusedPane.view, orientation: orientation, newLeaf: pane.view)
         node.delegate = self
@@ -372,10 +524,12 @@ final class SplitViewController: NSViewController {
     }
 
     func closePane(_ pane: ViewController) {
-        // The bar's key monitor outlives the pane if it is left open.
-        pane.closeSearchBar()
-        pane.taskNotifier.cancel()
-        pane.session?.stop()
+        defer { noteLayoutChanged() }
+        unzoomIfNeeded(closing: pane)
+        // Recorded before the tree changes: afterwards the split it sat in no
+        // longer exists (U15).
+        noteClosing(pane)
+        pane.teardown()
         let survivingSubtree = tree.close(leaf: pane.view)
         pane.removeFromParent()
         installRoot()
@@ -391,6 +545,14 @@ final class SplitViewController: NSViewController {
 
     private func invalidateRemainingPanes() {
         for pane in panes { pane.invalidateDisplay() }
+    }
+
+    /// Whole-window teardown (E01) for the close paths that never reach
+    /// `closePane` — the red button, a tab's close, ⌘Q. Idempotent through
+    /// each pane's own guard, so a pane closed earlier in the same window
+    /// is simply skipped.
+    func teardown() {
+        for pane in panes { pane.teardown() }
     }
 
     /// The grid size a new pane will actually hold: half the focused pane's
@@ -457,6 +619,17 @@ final class SplitViewController: NSViewController {
         case #selector(moveFocusLeft(_:)), #selector(moveFocusRight(_:)),
             #selector(moveFocusUp(_:)), #selector(moveFocusDown(_:)):
             return tree != nil && tree.leafCount > 1
+        case #selector(reopenClosedPane(_:)):
+            return canReopenClosedPane
+        case #selector(toggleZoomPane(_:)):
+            // U13 — one command, two names. A checkmark would say the pane is
+            // zoomed but not what the item now does; the title says both, and
+            // there is only one gesture to learn either way. Disabled in a
+            // single-pane window, which has nothing to zoom *from*.
+            menuItem.title =
+                isPaneZoomed
+                ? L10n.text("command.unzoomPane") : L10n.text("command.zoomPane")
+            return isPaneZoomed || (tree != nil && tree.leafCount > 1)
         default:
             return true
         }

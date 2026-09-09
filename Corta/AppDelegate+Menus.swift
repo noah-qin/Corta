@@ -22,7 +22,9 @@ extension AppDelegate {
         guard let mainMenu = NSApp.mainMenu else { return }
         installAboutItem(in: mainMenu)
         installUpdateItem(in: mainMenu)
+        installFileMenuItems(in: mainMenu)
         installShellMenuItems(in: mainMenu)
+        installPresetMenu(in: mainMenu)
         installViewMenuItems(in: mainMenu)
         installHelpMenuItems(in: mainMenu)
         pruneInapplicableEditItems(in: mainMenu)
@@ -49,7 +51,11 @@ extension AppDelegate {
             "Corta": "menu.corta", "About Corta": "menu.aboutCorta", "Settings…": "command.settings",
             "Services": "menu.services", "Hide Corta": "menu.hideCorta", "Hide Others": "menu.hideOthers",
             "Show All": "menu.showAll", "Quit Corta": "menu.quitCorta", "File": "menu.file",
-            "New": "menu.new", "New Tab": "command.newTab", "Close": "command.close",
+            // File's "New" is a new window, and it says so — the palette and
+            // the shortcuts sheet already call the same command by
+            // `command.newWindow`, and three names for one action is how a
+            // user ends up unsure whether File's "New" opens a tab.
+            "New": "command.newWindow", "New Tab": "command.newTab", "Close": "command.close",
             "Shell": "menu.shell", "Split Pane Right": "command.splitRight", "Split Pane Down": "command.splitDown",
             "Move Focus Left": "command.focusLeft", "Move Focus Right": "command.focusRight",
             "Move Focus Up": "command.focusUp", "Move Focus Down": "command.focusDown", "Edit": "menu.edit",
@@ -87,6 +93,17 @@ extension AppDelegate {
     private func installHelpMenuItems(in mainMenu: NSMenu) {
         guard let help = mainMenu.items.first(where: { $0.title == "Help" })?.submenu
         else { return }
+        // The storyboard template wired "Corta Help" to `NSApplication.showHelp`,
+        // which opens Help Viewer against a help book Corta has never shipped —
+        // the menu made a promise nothing kept. Retarget it at the
+        // documentation. Matched by action, not by title, so the lookup is
+        // independent of localization.
+        if let cortaHelp = help.items.first(where: {
+            $0.action == #selector(NSApplication.showHelp(_:))
+        }) {
+            cortaHelp.action = #selector(showHelpDocumentation(_:))
+            cortaHelp.target = self
+        }
         let item = NSMenuItem(
             title: L10n.text("shortcuts.title"), action: #selector(showShortcutsWindow(_:)),
             keyEquivalent: "/")
@@ -95,6 +112,16 @@ extension AppDelegate {
         help.addItem(.separator())
         help.addItem(item)
     }
+
+    /// "Corta Help" (⌘?) opens the README — install, configuration and usage
+    /// all live there and it links on to `docs/`. There is no in-app help
+    /// book to register with Help Viewer; the repository's documentation is
+    /// the help.
+    @objc func showHelpDocumentation(_ sender: Any?) {
+        NSWorkspace.shared.open(Self.helpURL)
+    }
+
+    static let helpURL = URL(string: "https://github.com/noah-qin/Corta#readme")!
 
     @objc func showShortcutsWindow(_ sender: Any?) {
         ShortcutsWindowController.shared.show(sender)
@@ -303,20 +330,48 @@ extension AppDelegate {
 
     /// Pane geometry (M7.8) and command-to-command jumping (M7.2), under
     /// Shell where the other pane commands already live.
+    ///
+    /// The menu reads as three groups: create (the storyboard's splits),
+    /// move (its focus moves, then the command jumps — both answer "go
+    /// somewhere else"), and resize (the grow/shrink pairs by axis, then
+    /// Equalize). Command jumping used to sit after resize, which split the
+    /// two navigation families apart with a geometry group between them.
     private func installShellMenuItems(in mainMenu: NSMenu) {
         guard let shell = mainMenu.items.first(where: { $0.title == "Shell" })?.submenu
         else { return }
         shell.addItem(.separator())
         for command in [
-            TerminalCommand.growPaneHorizontally, .shrinkPaneHorizontally,
-            .growPaneVertically, .shrinkPaneVertically, .equalizePanes,
+            TerminalCommand.previousCommand, .nextCommand, .previousFailedCommand,
+            .nextFailedCommand, .copyLastCommandOutput,
+        ] {
+            shell.addItem(item(for: command))
+        }
+        // U11 — the three state commands, together and in the order of how
+        // much each throws away, so the menu itself is the explanation.
+        shell.addItem(.separator())
+        for command in [
+            TerminalCommand.clearScreen, .clearHistory, .resetTerminal,
         ] {
             shell.addItem(item(for: command))
         }
         shell.addItem(.separator())
-        for command in [TerminalCommand.previousCommand, .nextCommand] {
+        for command in [
+            TerminalCommand.zoomPane, .reopenClosedPane, .growPaneHorizontally, .shrinkPaneHorizontally,
+            .growPaneVertically, .shrinkPaneVertically, .equalizePanes,
+        ] {
             shell.addItem(item(for: command))
         }
+    }
+
+    /// Export Text…, under File — where a Mac app puts "write what is here
+    /// to a file", next to the window commands rather than among the editing
+    /// ones. (`TerminalCommand.exportText` groups with Edit in the *palette*,
+    /// which lists by what a command does, not by which menu holds it.)
+    private func installFileMenuItems(in mainMenu: NSMenu) {
+        guard let file = mainMenu.items.first(where: { $0.title == "File" })?.submenu
+        else { return }
+        file.addItem(.separator())
+        file.addItem(item(for: .exportText))
     }
 
     /// Theme, appearance, scrolling and the command palette, under View.
@@ -327,6 +382,13 @@ extension AppDelegate {
     /// and a menu bar with a Settings menu *and* a Settings item. They belong
     /// in View: they are what the window looks like, which is what View is
     /// for, and the app menu keeps the single Settings entry.
+    ///
+    /// Theme and appearance are one submenu, not two: light-or-dark *is* the
+    /// theme choice a user makes daily, and two neighbouring submenus each
+    /// holding a single-choice list made one decision look like two. The
+    /// appearance choices head the list, the themes follow below a separator;
+    /// each row is a plain checkmarked choice rather than a control of its
+    /// own.
     private func installViewMenuItems(in mainMenu: NSMenu) {
         guard let view = mainMenu.items.first(where: { $0.title == "View" })?.submenu
         else { return }
@@ -343,24 +405,13 @@ extension AppDelegate {
         let themeItem = NSMenuItem(title: L10n.text("settings.label.theme"), action: nil, keyEquivalent: "")
         themeItem.submenu = themeMenu
         view.addItem(themeItem)
-
-        let appearanceItem = NSMenuItem(title: L10n.text("settings.tab.appearance"), action: nil, keyEquivalent: "")
-        let appearanceMenu = NSMenu(title: L10n.text("settings.tab.appearance"))
-        for (index, appearance) in Configuration.Appearance.allCases.enumerated() {
-            let title = appearance == .auto ? L10n.text("settings.appearance.followSystem") : L10n.text("settings.appearance.\(appearance.rawValue)")
-            let item = NSMenuItem(
-                title: title, action: #selector(selectAppearance(_:)), keyEquivalent: "")
-            item.tag = index
-            item.target = self
-            appearanceMenu.addItem(item)
-        }
-        appearanceItem.submenu = appearanceMenu
-        view.addItem(appearanceItem)
     }
 
-    /// The theme list, rebuilt from the configuration each time the menu is
-    /// about to open — the config file can define a theme (M7.6) while the
-    /// app is running, and a menu built once at launch would never show it.
+    /// The theme and appearance list, rebuilt from the configuration each
+    /// time the menu is about to open — the config file can define a theme
+    /// (M7.6) while the app is running, and a menu built once at launch
+    /// would never show it. Rebuilding whole also keeps the appearance rows
+    /// in place without a second delegate path.
     private var themeMenu: NSMenu {
         let menu = NSMenu(title: L10n.text("settings.label.theme"))
         menu.delegate = self
@@ -370,6 +421,15 @@ extension AppDelegate {
 
     func rebuildThemeMenu(_ menu: NSMenu) {
         menu.removeAllItems()
+        for (index, appearance) in Configuration.Appearance.allCases.enumerated() {
+            let title = appearance == .auto ? L10n.text("settings.appearance.followSystem") : L10n.text("settings.appearance.\(appearance.rawValue)")
+            let item = NSMenuItem(
+                title: title, action: #selector(selectAppearance(_:)), keyEquivalent: "")
+            item.tag = index
+            item.target = self
+            menu.addItem(item)
+        }
+        menu.addItem(.separator())
         for (index, theme) in Theme.all(in: ConfigurationStore.shared.configuration).enumerated() {
             let item = NSMenuItem(
                 title: theme.displayName, action: #selector(selectTheme(_:)), keyEquivalent: "")
@@ -411,11 +471,15 @@ extension AppDelegate {
 }
 
 extension AppDelegate: NSMenuDelegate {
-    /// The theme list is data that can change while the app runs, so it is
-    /// rebuilt as the menu opens rather than at launch.
+    /// The theme/appearance list is data that can change while the app runs,
+    /// so it is rebuilt as the menu opens rather than at launch.
     public func menuNeedsUpdate(_ menu: NSMenu) {
         if menu === AppDelegate.editMenu {
             pruneInjectedEditItems(menu)
+            return
+        }
+        if menu.title == AppDelegate.presetMenuTitle {
+            rebuildPresetMenu(menu)
             return
         }
         guard menu.title == L10n.text("settings.label.theme") else { return }

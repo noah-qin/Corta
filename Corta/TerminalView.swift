@@ -79,10 +79,12 @@ final class TerminalView: NSView, CALayerDelegate {
     /// Called with raw bytes to write to the PTY for one key event.
     var onKeyBytes: (([UInt8]) -> Void)?
 
-    /// Called for a scroll gesture, a page key or ⌘↑/⌘↓ (`M1.20`).
+    /// Called for a scroll gesture, a page key, or a key bound to Scroll to
+    /// Top / Scroll to Bottom (`M1.20`).
     var onScroll: ((ScrollGesture) -> Void)?
 
-    /// Called for a paste request — ⌘V or the Edit menu's Paste. Reading the
+    /// Called for a paste request — the key bound to Paste, or the Edit
+    /// menu's Paste item. Reading the
     /// pasteboard, sanitising and warning is the shell's job
     /// (`SECURITY.md` §2.3).
     var onPaste: (() -> Void)?
@@ -92,6 +94,8 @@ final class TerminalView: NSView, CALayerDelegate {
     /// than send a raw ESC byte to the child while it's open, and ⌘F/⌘G/
     /// ⇧⌘G must not fall through to `deliverBytes`. Returns whether the
     /// event was handled; `false` (or `nil`) continues the normal routing.
+    /// The Find key is read from the bindings; ⌘G / ⇧⌘G are the storyboard's
+    /// own Find Next / Find Previous items and carry no `bind.` key.
     var onSearchKey: ((NSEvent) -> Bool)?
 
     /// Called when a live window resize ends, so the shell can deliver the
@@ -113,8 +117,29 @@ final class TerminalView: NSView, CALayerDelegate {
     /// any point, and the next keystroke has to honour the new value.
     var keyboardEnhancements: (() -> KeyboardEnhancementFlags)?
 
+    /// DECCKM (`CSI ? 1 h`) — while set, cursor keys send their SS3
+    /// (application) forms. Read per key event, like the kitty flags.
+    var applicationCursorKeys: (() -> Bool)?
+
+    /// U04 — DECKPAM (`ESC =`). While set, the numeric keypad sends its SS3
+    /// forms. Read per key event, like the other mode closures: a program
+    /// turns it on and off around its own input loop.
+    var applicationKeypad: (() -> Bool)?
+
+    /// U05 — whether ⌥ acts as Meta (ESC prefix) rather than composing the
+    /// layout's alternate characters. Read per key event so an edit to the
+    /// config file takes effect on the next keystroke.
+    var optionAsMeta: (() -> Bool)?
+
+    /// U08 — the shortcut table in force. Read per key event, like the mode
+    /// closures above, so a rebind or unbind in the config file takes effect
+    /// on the next keystroke. The keys `keyDown` still recognises itself
+    /// (paste, the scrollback jumps) are matched against this rather than
+    /// against a literal, so they cannot outlive the binding they belong to.
+    var keybindings: (() -> Keybindings)?
+
     /// M6.15 — file paths dropped on the pane, already resolved to
-    /// filesystem paths. The controller quotes and sends them.
+    /// filesystem paths. The controller sanitises, quotes and sends them.
     var onDropPaths: (([String]) -> Void)?
     /// The word under a force touch and where to anchor the dictionary
     /// popover, in this view's coordinates.
@@ -122,7 +147,8 @@ final class TerminalView: NSView, CALayerDelegate {
     /// The current selection as text, for the Services menu, or nil when
     /// nothing is selected.
     var onServicesSelection: (() -> String?)?
-    /// Text a service returned, to be sent to the child like a paste.
+    /// Text a service returned, to be sent to the child like a paste —
+    /// sanitised and newline-warned exactly as a ⌘V paste is.
     var onServicesInsert: ((String) -> Void)?
 
     /// M6.14 — the trackpad magnification gesture. The controller spends it
@@ -373,15 +399,17 @@ final class TerminalView: NSView, CALayerDelegate {
         frameScheduler.resume()
     }
 
-    /// Renders and presents one frame immediately. Used to paint before the
-    /// window is ordered on screen: the window's background is transparent
-    /// until the Metal layer has presented, so without this every new window
-    /// and every new tab flashes whatever is behind it for a frame or two.
-    /// See `FrameScheduler.presentSynchronously` for why this cannot just
-    /// call `metalLayer.nextDrawable()` directly.
+    /// Arms the first-present flash guard: the layer shows the theme's
+    /// background colour until the real first frame is presented at the next
+    /// vsync. Used before the window is ordered on screen and after a live
+    /// theme change — the window's background is transparent until the Metal
+    /// layer has presented, so without this every new window and every new
+    /// tab flashes whatever is behind it for a frame or two. Returns
+    /// immediately; see `FrameScheduler.requestFirstPresent` for why this is
+    /// a state transition and not a synchronous render.
     func drawNow() {
         updateDrawableSize()
-        frameScheduler.presentSynchronously()
+        frameScheduler.requestFirstPresent()
     }
 
     /// The default visual bell (M4.8): a brief flash of the terminal

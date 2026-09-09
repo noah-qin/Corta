@@ -58,4 +58,28 @@ struct ResizeDebouncerTests {
         try await Task.sleep(for: .milliseconds(300))
         #expect(sent.count == 1)
     }
+
+    /// P03 characterization: trailing-only means a pause longer than the
+    /// window delivers the size current at that pause — a slow drag is not
+    /// starved, it just never delivers a superseded size.
+    @Test func pauseLongerThanWindowDeliversSizeAtThePause() async throws {
+        var sent: [TerminalSize] = []
+        let debouncer = ResizeDebouncer(delay: 0.05) { sent.append($0) }
+        debouncer.resize(to: TerminalSize(rows: 24, columns: 100), coalesce: true)
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(sent == [TerminalSize(rows: 24, columns: 100)])
+        debouncer.resize(to: TerminalSize(rows: 24, columns: 90), coalesce: true)
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(sent == [TerminalSize(rows: 24, columns: 100), TerminalSize(rows: 24, columns: 90)])
+    }
+
+    /// Flushing with nothing pending delivers nothing — `endLiveResize`
+    /// fires on drags that produced no size change too.
+    @Test func flushWithNothingPendingIsANoOp() async throws {
+        var sent: [TerminalSize] = []
+        let debouncer = ResizeDebouncer(delay: 0.05) { sent.append($0) }
+        debouncer.flush()
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(sent.isEmpty)
+    }
 }

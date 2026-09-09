@@ -6,11 +6,16 @@ extension Performer {
         var index = 0
         while index < parameters.count {
             switch parameters[index] {
+            case 1:  // DECCKM — application cursor keys (U04)
+                state.applicationCursorKeysEnabled = enabled
             case 2004:  // bracketed paste (M2.6)
                 state.bracketedPasteEnabled = enabled
             case 1006:  // SGR mouse reporting (M2.7)
                 state.sgrMouseEncodingEnabled = enabled
             case 2026:  // synchronized output (M4.3)
+                if enabled, !state.synchronizedOutputEnabled {
+                    state.synchronizedOutputEpisode &+= 1
+                }
                 state.synchronizedOutputEnabled = enabled
             case 1004:  // focus reporting (M6.7)
                 state.focusReportingEnabled = enabled
