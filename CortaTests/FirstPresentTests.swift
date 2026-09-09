@@ -123,6 +123,30 @@ struct FirstPresentTests {
     /// before and after a bounds change — the guard stays armed throughout
     /// and the drawable tracks the latest bounds, with no window and no
     /// run-loop turn involved.
+    /// Found by watching a window go fullscreen: the text grew for the
+    /// length of the animation and snapped back afterwards.
+    ///
+    /// Core Animation implicitly animates a layer's bounds and scales its
+    /// contents to fit while it does, so the previous frame is drawn
+    /// magnified until a new one lands — and asking for that frame does not
+    /// help, because it arrives into a layer whose bounds are still
+    /// animating. The canvas must not animate its geometry at all, and must
+    /// pin rather than stretch what it is holding.
+    @Test func theCanvasNeitherAnimatesNorStretchesItsGeometry() throws {
+        let view = TerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        let layer = try #require(view.layer as? CAMetalLayer)
+        // The dictionary, not `action(forKey:)`: that resolves an `NSNull`
+        // entry to nil, so it cannot tell "explicitly no animation" from
+        // "nothing configured, ask the delegate".
+        let actions = try #require(layer.actions)
+        for key in ["bounds", "position", "contentsScale"] {
+            #expect(
+                actions[key] is NSNull,
+                "\(key) must not animate on the terminal canvas")
+        }
+        #expect(layer.contentsGravity == .topLeft)
+    }
+
     /// Found by resizing a window and watching the text scale with it.
     ///
     /// `CAMetalLayer` stretches the frame it is holding when its bounds

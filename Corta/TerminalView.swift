@@ -290,6 +290,30 @@ final class TerminalView: NSView, CALayerDelegate {
         metalLayer.cornerRadius = 10
         metalLayer.maskedCorners = []
         metalLayer.masksToBounds = true
+        // The canvas must never animate its own geometry, and must never
+        // stretch what it is holding.
+        //
+        // Core Animation implicitly animates a layer's bounds and position,
+        // and scales the contents to fit while it does. On a window zoom or
+        // a fullscreen transition that means the *previous* frame — a whole
+        // screen of text — is drawn magnified for the length of the
+        // animation and snaps back to its real size when a new frame lands.
+        // The text visibly grows and then shrinks, which is what it looks
+        // like when a terminal resizes its font, and it is not something
+        // asking for a frame can fix: the frame arrives into a layer whose
+        // bounds are still mid-animation.
+        //
+        // `NSNull` on each geometric key removes the implicit animation, so
+        // the bounds take their new value at once. `contentsGravity` covers
+        // the remaining gap: between the bounds changing and the next frame
+        // being presented the old contents are pinned to the top-left at
+        // their true size — the corner terminal text starts from — rather
+        // than being scaled to fill.
+        metalLayer.actions = [
+            "bounds": NSNull(), "position": NSNull(), "contents": NSNull(),
+            "contentsScale": NSNull(), "cornerRadius": NSNull(),
+        ]
+        metalLayer.contentsGravity = .topLeft
         registerForFileDrags()
     }
 
