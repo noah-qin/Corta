@@ -10,6 +10,118 @@ what to edit.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-08
+
+The quality release. Nothing here changes what Corta is; all of it is
+work on what was already there — the places it could be made to
+misbehave, the places it was slower than it had to be, and the places it
+was guessing at what the user meant.
+
+### Added
+
+- **Every string translated into all nine shipped languages.** The
+  commands, settings and toasts added in this release had shipped in
+  English only — 41 keys against 156 that were complete. A test now
+  checks the whole catalog rather than a sample, including that each
+  translation carries the same format specifiers as its source.
+
+- **U11 (2026-09-08)** — Clear Screen (⌘K), Clear History and Reset
+  Terminal, as three separate commands with a table in
+  `docs/CONFIGURATION.md` §5 saying what each one discards. They act on
+  Corta's grid, not on the child's input, so a running job is undisturbed.
+  Clear History and Reset ship unbound and ask before discarding history,
+  honouring `confirm-close`.
+- **U12 (2026-09-08)** — A **Match Case** toggle in the Find bar, backed by
+  `search-case-sensitive`; and a pill in the corner of a scrolled pane
+  saying how far back the viewport is, changing its wording when new output
+  has arrived, and returning to the live screen when clicked.
+- **U13 (2026-09-08)** — Zoom Pane (⇧⌘⏎): fills the window with the focused
+  pane and puts the split back. Temporary — no pane is closed, no child
+  disturbed, and the saved arrangement still describes the splits.
+- **U14 (2026-09-08)** — Copy Last Command Output, and Previous/Next Failed
+  Command (⇧⌘↑ / ⇧⌘↓), on the OSC 133 marks Corta already records.
+- **U15 (2026-09-08)** — Reopen Closed Pane (⇧⌘T), which restores the
+  arrangement a closed pane had and never claims to restore its process;
+  and Export Text… (⇧⌘S), which writes the selection — or the whole
+  scrollback — to a file.
+- **U16 (2026-09-08)** — Regular-expression search behind a `*` toggle
+  (`search-regex`), budgeted and cancellable, with a per-line length bound
+  and a distinct "bad pattern" state; and named shell/directory/environment
+  presets (`preset.<name>.*`) under Shell ▸ New Pane with Preset; holding ⌥
+  opens one in a window of its own.
+- **U17 (2026-09-08)** — ⌘-click on `path:line:column` in program output
+  opens the file, optionally through `open-file-command`. Local only: a
+  pane inside `ssh` resolves nothing. The URL scheme allowlist is unchanged.
+- **U05 (2026-09-08)** — `option-as-meta` is now readable from the config
+  file and has a switch in Settings; it was previously written but never
+  parsed, so setting it did nothing.
+- **U04 (2026-09-08)** — Application keypad mode (DECKPAM / DECKPNM). The
+  keypad sends its SS3 forms to programs that asked for them via `smkx`.
+
+### Fixed
+
+- **U01 (2026-09-08)** — The accessibility rectangle for a range ending on a
+  wide character clipped half of it: three CJK characters were outlined as
+  five cells instead of six. Found by probing the running app through the
+  accessibility API, not by a test — the unit test's stub made the wrong
+  answer look right.
+- **U14 (2026-09-08)** — `OSC 133 ; C` is now recorded, so the last
+  command's output is read rather than guessed at one row past the prompt; a
+  two-line prompt no longer leaks its second line into the copy. Scrolled
+  back, the command copied is the one on screen.
+- **U16 (2026-09-08)** — A regular expression whose shape makes a
+  backtracking engine take exponential time is refused before it runs and
+  reported as too slow, rather than pinning a thread for the life of the
+  app: neither `NSRegularExpression` nor Swift's `Regex` exposes ICU's time
+  limit, and measurement showed no input length small enough to bound one.
+  A sweep that merely runs long stops on a time budget and says its count is
+  a floor.
+- **U17 (2026-09-08)** — `open-file-command` is validated when it is set, not
+  only when it is run, and has a Settings field.
+- **U01 (2026-09-08)** — Accessibility hit-testing converted a *screen*
+  point as if it were a window point, and both directions of the
+  UTF-16-offset-to-column conversion assumed the two counts were equal —
+  wrong for any CJK, emoji or combining text. The exposed text also ignored
+  the scroll position, so a screen reader scrolled into the history read
+  the live screen.
+- **U02 (2026-09-08)** — The preedit overlay carried a copy of the cell
+  metrics that nothing read; sizing came from the cursor rect all along.
+- **U07 (2026-09-08)** — The window arrangement was written only at quit —
+  the one moment a crash never reaches — and the state file was deleted at
+  launch, so a crash lost it entirely. It is now written debounced as the
+  layout changes, with a marker file separating "crashed during a restore"
+  from "crashed at any other time". Restored geometry and split trees are
+  validated: non-finite or impossibly small frames, divider fractions
+  outside a usable range, and trees nested past 12 levels are repaired.
+- **U08 (2026-09-07)** — Three shortcuts were hard-coded and so outlived
+  their bindings: ⌘V pasted even after Paste was rebound or unbound, ⌘↑
+  scrolled to the top of the scrollback once Previous Command was unbound,
+  and ⌘F opened the Find bar after Find was rebound.
+- **U09 (2026-09-08)** — A pane that failed to start was silent to a screen
+  reader and left nothing focused for the keyboard.
+
+### Changed
+
+- **UI02 (2026-09-06)** — The Find bar's glass is now tinted with the
+  window background (fully opaque only under Reduce Transparency), and its
+  match-count label uses the secondary label colour instead of tertiary, so
+  the query and "n/m" stay readable over bright terminal output in both
+  light and dark themes.
+- **UI03 (2026-09-06)** — The active-pane focus ring is drawn at half
+  accent-colour strength instead of full-strength blue, so it marks the
+  pane without outshouting the text it frames; full colour returns under
+  Increase Contrast.
+- **UI06 (2026-09-06, extended 2026-09-08)** — The Shell menu is regrouped
+  as presets, create (splits), move (focus moves, then the command jumps),
+  terminal state (U11), resize (zoom, grow/shrink pairs, then Equalize
+  Panes); command jumping no longer sits behind the geometry group.
+- **UI07 (2026-09-06)** — View's separate Theme and Appearance submenus are
+  merged into one Theme submenu: the appearance choice (Follow System /
+  Light / Dark) heads the list, the themes follow below a separator, each a
+  plain checkmarked single choice.
+- **C03 (2026-09-06)** — Removed the assertion-less `testExample` template
+  test from `CortaUITests`.
+
 ## [0.1.0] - 2026-09-05
 
 The first release. Everything below is what `main` accumulated through
@@ -334,6 +446,48 @@ M1–M10.
   same-conditions Typometer re-measurement against the 45.5 ms baseline
   is still open.
 
+### Verification
+
+- **esctest (2026-09-08)** — 112 passed, 335 known bugs, 121 failed of
+  568, against M6's 106 / 335 / 127. xterm-compatibility is 78.7%, up
+  from 77.6%. The failures are classified by real application impact in
+  `docs/V0.1.1-QUALITY-PLAN.md` Q01, and every failing test name is kept
+  in `docs/esctest/0.1.1-results.txt` so the next run is a diff. The
+  largest single cause is one absence: OSC 4/5 indexed palette set and
+  query are not implemented.
+- **Nightly CI (2026-09-08)** — a lane for the checks a pull request
+  cannot carry: the core suite under thread and address sanitizers, and
+  a twenty-million-iteration fuzz run on a rotating seed. Both are clean;
+  the sanitizer lane found a test that had been asserting a property it
+  never established, and it is fixed. Pull-request checks gain job
+  timeouts, `contents: read`, and the `.xcresult` bundle and fuzz corpus
+  uploaded on failure.
+- **Real-workflow harness (2026-09-08)** — 12 passed, 1 skipped, 0
+  failed against zsh, fish, tmux, Neovim, vim, less, fzf, mouse
+  reporting and 20k lines of sustained output, each driven on a real PTY
+  and replayed through the core. `corta-dump --serve` answers a client's
+  terminal queries from that same core, which is what lets fish — which
+  waits for Primary DA before it prints a prompt — run under it at all.
+- **Same-machine comparison (2026-09-08)** — 19.1 MB through the tty:
+  Corta 0.204 s, Ghostty 0.164 s, Terminal.app 0.305 s, with Corta the
+  smallest resident set of the three at idle. Input latency and IME are
+  not in that comparison; they need the fixed benchmark environment held
+  by hand and are on the maintainer's list in
+  `docs/V0.1.1-MANUAL-VERIFICATION.md`.
+
+### Fixed
+
+- The terminal answered XTVERSION with `Corta(0.1.0)` regardless of the
+  version it was built as. `CortaVersion.string` and
+  `MARKETING_VERSION` are now pinned against each other by a test.
+- **DECID (`ESC Z`)** went unanswered. A query that is silent leaves a
+  client waiting for a reply that never arrives; it now answers exactly
+  what `CSI c` answers.
+- **DECALN (`ESC # 8`)** was not implemented — every escape sequence
+  carrying an intermediate byte was discarded. It fills the screen with
+  `E`, resets the margins and homes the cursor, which is how a program
+  asks for a completely known screen.
+
 ---
 
 ## Release checklist
@@ -342,8 +496,12 @@ For the maintainer, cutting any release:
 
 1. Move the relevant `[Unreleased]` entries under a new `## [x.y.z]`
    heading with the date, and leave `[Unreleased]` empty above it.
-2. Update `MARKETING_VERSION` in `Corta.xcodeproj/project.pbxproj` to
-   match.
+2. Update **both** hand-written version numbers to match:
+   `MARKETING_VERSION` in `Corta.xcodeproj/project.pbxproj` (all six
+   build configurations) and `CortaVersion.string` in
+   `CortaTerminal/Sources/CortaTerminal/Version.swift`, which is what
+   XTVERSION answers a program with. `VersionAgreementTests` fails if
+   only one of them moves.
 3. Re-record the tracking table in `docs/ROADMAP.md` if any number moved.
 4. Commit as `chore: release x.y.z`, then tag `vx.y.z` and push the tag.
    The release workflow builds from the tag and opens a **draft** release
@@ -353,5 +511,6 @@ For the maintainer, cutting any release:
    push that file — that is what makes the update visible to every
    already-installed Corta.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/noah-qin/Corta/releases/tag/v0.1.1
 [0.1.0]: https://github.com/noah-qin/Corta/releases/tag/v0.1.0

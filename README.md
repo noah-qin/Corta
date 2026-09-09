@@ -67,16 +67,24 @@ things Corta deliberately does **not** do.
 
 ## Status
 
-**Version 0.1.0. Milestone 7 closed; M6 has one open step.** M1 through
-M5 are done, M7 closed the places where Corta was still guessing — fonts,
-command boundaries, and a window nobody could reopen. Corta renders `vim`,
-`tmux` and `htop` correctly, and is used daily by its author.
+**Version 0.1.1. M1 through M10 are done.** Corta renders `vim`, `tmux`
+and `htop` correctly, and is used daily by its author. M7 closed the
+places where Corta was still guessing — fonts, command boundaries, and a
+window nobody could reopen; M8 and M9 are the render pipeline and its
+measurements; M10 is Kitty graphics, verified against `kitten icat`.
+0.1.1 is a quality release on top of that: hostile-input bounds on the
+graphics and clipboard paths, PTY writes and search off the main thread,
+and the interaction defects an audit of the native behaviour turned up.
 
-Notarised direct distribution (M6.16) is the sole open step.
+Conformance, measured against esctest2 on 2026-09-08: 112 passed, 335
+known bugs, 121 failed of 568 — 78.7% xterm-compatibility. The
+classification is in [`docs/V0.1.1-QUALITY-PLAN.md`](docs/V0.1.1-QUALITY-PLAN.md);
+the failing test names are in
+[`docs/esctest/0.1.1-results.txt`](docs/esctest/0.1.1-results.txt).
 [`docs/ROADMAP.md`](docs/ROADMAP.md) is the tracking record.
 
-Measured after M7 — the method is in
-[`docs/PERFORMANCE.md`](docs/PERFORMANCE.md):
+Measured after M7, except the conformance row, which is the 0.1.1 run —
+the method is in [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md):
 
 | Metric | Target | Measured | |
 | :--- | :--- | :--- | :--- |
@@ -85,7 +93,7 @@ Measured after M7 — the method is in
 | Memory, 100k × 120 lines | ~200 MB | **185.0 MB** | ✅ |
 | Core feed throughput | > 100 MB/s | **130.0 MiB/s** (5-run mean) | ✓ |
 | Keypress → pixel | < 1 frame + input | **45.5 ms avg** | ⚠️ above target |
-| `esctest` xterm conformance | — | **77.6%** — 127 of 568 failing | |
+| `esctest` xterm conformance | — | **78.7%** — 121 of 568 failing | |
 
 The number that misses its target is printed here rather than omitted.
 Numbers that have not been measured are left blank rather than estimated.
@@ -121,13 +129,27 @@ Numbers that have not been measured are left blank rather than estimated.
   and closing something that still has a job running asks first.
 - A command palette (⇧⌘P) over every command, which is also the list the
   menus and the keybindings are generated from.
+- Zoom Pane (⇧⌘⏎) to fill the window with one pane and put the split
+  back; Reopen Closed Pane (⇧⌘T), which restores the arrangement and
+  never claims to restore the process; Export Text… (⇧⌘S).
+- Clear Screen (⌘K), Clear History and Reset Terminal as three separate
+  commands, with a table saying what each one discards.
+- Search with a Match Case toggle and an optional regular-expression
+  mode, budgeted so a pattern that would never finish is refused rather
+  than run; and a pill saying how far back a scrolled viewport is.
 - Check for Updates… over a signed feed (Sparkle) — a manual check, or a
   daily background one you can turn off in `~/.config/corta/config`.
 
 **The shell**
 - OSC 133 shell integration: a status mark beside each prompt showing
-  which commands failed, ⌘↑/⌘↓ to jump between them, and a long-task
+  which commands failed, ⌘↑/⌘↓ to jump between them, ⇧⌘↑/⇧⌘↓ to jump
+  between the *failed* ones, Copy Last Command Output, and a long-task
   notification that fires on the real boundary rather than a guess.
+- Named shell, directory and environment presets under Shell ▸ New Pane
+  with Preset; hold ⌥ to open one in its own window.
+- ⌘-click a `path:line:column` reference in program output to open the
+  file, optionally through your own `open-file-command`. Local only: a
+  path reported by a remote host over OSC 7 is never opened.
 - OSC 52 clipboard *write* — how `tmux` and a remote `ssh` reach this
   Mac's clipboard. Off by default; the read direction does not exist.
 
