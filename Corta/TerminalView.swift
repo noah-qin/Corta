@@ -163,6 +163,11 @@ final class TerminalView: NSView, CALayerDelegate {
     /// rasterised per scale and has to be rebuilt.
     var onBackingScaleChange: ((CGFloat) -> Void)?
 
+    /// The drawable changed size, so what was presented no longer matches the
+    /// layer it is being shown in. The damage diff cannot see this — the grid
+    /// is identical — so the frame has to be forced from here.
+    var onDrawableSizeChange: (() -> Void)?
+
     /// The pane's controller, found by walking the responder chain (the view
     /// → its controller → the split controller). With splits the pane is no
     /// longer the window's content view controller, so `contentViewController`
@@ -619,8 +624,18 @@ final class TerminalView: NSView, CALayerDelegate {
 
     private func updateDrawableSize() {
         let scale = window?.backingScaleFactor ?? 1
+        let size = CGSize(width: bounds.width * scale, height: bounds.height * scale)
+        guard metalLayer.contentsScale != scale || metalLayer.drawableSize != size else { return }
         metalLayer.contentsScale = scale
-        metalLayer.drawableSize = CGSize(width: bounds.width * scale, height: bounds.height * scale)
+        metalLayer.drawableSize = size
+        // A resized drawable with no new frame in it is a stale frame
+        // stretched to fit: `CAMetalLayer` scales its contents by default, so
+        // through a fullscreen or zoom animation the text visibly grows and
+        // shrinks with the window and only returns to its real size when the
+        // animation ends and something else happens to ask for a frame. The
+        // grid is unchanged throughout, so the damage diff has nothing to
+        // report and no frame is drawn; this is what asks for one.
+        onDrawableSizeChange?()
     }
 
 }
