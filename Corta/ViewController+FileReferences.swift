@@ -129,7 +129,7 @@ extension ViewController {
     static func openFileArguments(
         template: String, path: String, line: Int, column: Int?
     ) -> [String] {
-        template.split(separator: " ").map { part in
+        template.split(whereSeparator: \.isWhitespace).map { part in
             String(part)
                 .replacingOccurrences(of: "{file}", with: path)
                 .replacingOccurrences(of: "{line}", with: String(line))

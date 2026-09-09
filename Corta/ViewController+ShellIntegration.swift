@@ -112,10 +112,22 @@ extension ViewController: NSMenuItemValidation {
     /// there would copy something the user cannot see (U14).
     ///
     /// Static and pure so the row arithmetic is testable without a pane.
-    static func commandOutput(in grid: Grid, scrollOffset: Int) -> String? {
+    /// The rows the command in view wrote, without materialising their text.
+    ///
+    /// `validateMenuItem` needs to know only *whether* there is anything to
+    /// copy, and AppKit asks it every time the menu is opened or a key
+    /// equivalent is matched. Building the string to answer that walked and
+    /// joined the whole output on the main thread each time.
+    static func commandOutputRows(in grid: Grid, scrollOffset: Int) -> Range<Int>? {
         let viewportTop = grid.scrollback.totalPushed - scrollOffset
         let bound = scrollOffset > 0 ? viewportTop + grid.rows : Int.max
-        guard let rows = grid.commandOutputRows(before: bound) else { return nil }
+        return grid.commandOutputRows(before: bound)
+    }
+
+    static func commandOutput(in grid: Grid, scrollOffset: Int) -> String? {
+        guard let rows = commandOutputRows(in: grid, scrollOffset: scrollOffset) else {
+            return nil
+        }
         // Absolute rows to the document rows selection speaks in.
         let base = grid.scrollback.totalPushed
         let range = SelectionRange(
@@ -152,7 +164,8 @@ extension ViewController: NSMenuItemValidation {
             return hasShellIntegration && hasFailedCommands
         case #selector(copyLastCommandOutput(_:)):
             guard isOperable else { return false }
-            return Self.commandOutput(in: session.snapshot(), scrollOffset: scrollOffset) != nil
+            return Self.commandOutputRows(in: session.snapshot(), scrollOffset: scrollOffset)
+                != nil
         case #selector(clearScreen(_:)), #selector(clearHistory(_:)),
             #selector(resetTerminal(_:)):
             return validateTerminalStateItem(menuItem)
