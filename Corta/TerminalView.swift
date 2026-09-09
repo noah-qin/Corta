@@ -313,7 +313,25 @@ final class TerminalView: NSView, CALayerDelegate {
             "bounds": NSNull(), "position": NSNull(), "contents": NSNull(),
             "contentsScale": NSNull(), "cornerRadius": NSNull(),
         ]
-        metalLayer.contentsGravity = .topLeft
+        // Set through AppKit, not on the layer: for a layer-hosting view
+        // AppKit *owns* `contentsGravity` and derives it from
+        // `layerContentsPlacement`, overwriting anything set directly —
+        // measured, not assumed (asking for `.topLeft` here leaves the layer
+        // reporting `bottomLeft`, which is the same corner once the view's
+        // flippedness is accounted for). Setting the CALayer property alone
+        // therefore did nothing, which is why the first two attempts at this
+        // did not work.
+        //
+        // The default placement is `.scaleAxesIndependently`: "stretch what
+        // you are holding to whatever size you have just been given". That
+        // is what made the text grow for the length of a window zoom — the
+        // last frame, a whole screen of text, scaled up to the new bounds
+        // until a new frame was presented. `.topLeft` pins it at its true
+        // size in the corner terminal text starts from instead.
+        layerContentsPlacement = .topLeft
+        // The view draws nothing itself — the drawable is the content — so
+        // AppKit has no reason to ask it to redraw mid-resize.
+        layerContentsRedrawPolicy = .onSetNeedsDisplay
         registerForFileDrags()
     }
 
