@@ -22,10 +22,26 @@ import Testing
         let recorded = Mutex<[[UInt8]]>([])
         session.writerSink = { chunk in recorded.withLock { $0.append(chunk) } }
 
-        // Feed exactly one primary-DA query (ESC [ c), then end of file.
+        // Feed exactly one primary-DA query (ESC [ c), then end of file —
+        // but not before the first user write has been recorded. Without
+        // that gate the reader races the test's own `write`, and which of
+        // the two is enqueued first is a coin toss rather than the property
+        // under test: this suite asserts that bytes *leave* in the order
+        // they were enqueued, not that the test won the race to enqueue
+        // first. Thread sanitizer changes the timing enough to lose that
+        // race reliably, which is how the gap was found.
         let queryDelivered = Mutex(false)
+        let mayDeliverQuery = Mutex(false)
         session.readerSource = ReaderSource(
             read: { buffer in
+                // Waits rather than returning 0: a zero-length read is end
+                // of file to the reader, which would stop it before the gate
+                // ever opened. Bounded so a mistake here fails rather than
+                // hangs.
+                let deadline = ContinuousClock.now + .seconds(10)
+                while !mayDeliverQuery.withLock({ $0 }), ContinuousClock.now < deadline {
+                    Thread.sleep(forTimeInterval: 0.002)
+                }
                 let already = queryDelivered.withLock { delivered -> Bool in
                     let was = delivered
                     delivered = true
@@ -42,6 +58,12 @@ import Testing
 
         let userBefore: [UInt8] = [0x41]  // "A"
         session.write(userBefore)
+        let firstDrained = awaitRecording(recorded, count: 1)
+        #expect(firstDrained, "expected the first user write to drain")
+
+        // Only now let the query through, so the reply is enqueued strictly
+        // after the first user write and strictly before the second.
+        mayDeliverQuery.withLock { $0 = true }
 
         // The reply is enqueued once the reader has fed the query; waiting
         // for it in the recorded stream is what orders the second user write

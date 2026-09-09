@@ -28,10 +28,16 @@ on:
 permissions:
   contents: write
 
+env:
+  # The shipping artifact is the one place the toolchain matters most; see
+  # the same pin in `ci.yml`.
+  XCODE_PIN: "26.6.0"
+
 jobs:
   release:
     name: Build and draft a release
     runs-on: macos-26
+    timeout-minutes: 90
 
     steps:
       - uses: actions/checkout@v7
@@ -39,10 +45,16 @@ jobs:
           ref: ${{ github.event.inputs.tag || github.ref }}
           fetch-depth: 0
 
-      - name: Select the newest installed Xcode
+      - name: Select the pinned Xcode
         run: |
-          latest=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
-          sudo xcode-select -s "$latest"
+          pinned="/Applications/Xcode_${XCODE_PIN}.app"
+          if [ ! -d "$pinned" ]; then
+            echo "::error::$pinned is not on this runner image."
+            echo "Installed: $(ls -d /Applications/Xcode*.app | tr '\n' ' ')"
+            echo "A release builds on the pinned toolchain or not at all."
+            exit 1
+          fi
+          sudo xcode-select -s "$pinned"
           xcodebuild -version
 
       - name: Work out the version
@@ -85,6 +97,20 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             DEVELOPMENT_TEAM="" \
             -quiet
+
+      # Kept whether or not the tests passed. A draft release is reviewed by
+      # a person before it is published, and "the tests passed" is a claim
+      # that review should be able to check rather than take on faith — the
+      # bundle is the evidence. On a failure it is the only record of what
+      # went wrong, since the run stops here.
+      - name: Keep the test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcresult-release-${{ steps.version.outputs.tag }}
+          path: test-results.xcresult
+          if-no-files-found: warn
+          retention-days: 90
 
       # -quiet above hides the individual #expect failure message (which
       # menu items collided, here) — only the test name survives to the
@@ -263,3 +289,15 @@ jobs:
             --notes-file release-notes.md \
             "${{ steps.package.outputs.zip }}" \
             "${{ steps.package.outputs.zip }}.sha256"
+
+      # Always, including when an earlier step failed: a signing keychain
+      # left on the runner outlives the job that needed it. The hosted
+      # runner is destroyed either way, which is why this is hygiene rather
+      # than a fix, but a workflow that only cleans up on success teaches
+      # the wrong habit to whatever runs it next.
+      - name: Remove the signing keychain
+        if: always() && steps.signing.outputs.available == 'true'
+        run: |
+          security list-keychains -d user -s login.keychain-db || true
+          security delete-keychain build.keychain || true
+          rm -f /tmp/certificate.p12 /tmp/notary.p8 /tmp/ExportOptions.plist || true

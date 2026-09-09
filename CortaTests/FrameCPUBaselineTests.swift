@@ -17,7 +17,7 @@ import Testing
 /// is written to a file so it survives outside the ephemeral test log.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
-@Suite(.serialized) struct FrameCPUBaselineTests {
+@Suite(.serialized, .metalSerialized) struct FrameCPUBaselineTests {
     @Test func measureFrameCPUTime() throws {
         guard let device = MTLCreateSystemDefaultDevice() else {
             Issue.record("No Metal device available in this environment")
@@ -42,11 +42,8 @@ import Testing
 
         let width = Int(renderer.metrics.cellWidth * CGFloat(columns))
         let height = Int(renderer.metrics.cellHeight * CGFloat(rows))
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: QuadRenderer.pixelFormat, width: width, height: height, mipmapped: false)
-        descriptor.usage = [.renderTarget, .shaderRead]
-        descriptor.storageMode = .managed
-        let texture = device.makeTexture(descriptor: descriptor)!
+        let texture = MetalRenderTarget.make(
+            device: device, width: width, height: height)
 
         let iterations = 60
         var durations: [Double] = []

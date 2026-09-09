@@ -10,14 +10,26 @@ import Testing
 /// `.serialized` note on `TerminalSessionTests`.
 @Suite("PTY", .serialized)
 struct PTYTests {
-    @Test("spawns /bin/echo and reads its output back")
-    func spawnsEchoAndReadsOutput() throws {
-        let pty = try PTY.spawn(executable: "/bin/echo", arguments: ["hello"])
+    /// The child waits for a line before exiting rather than writing and
+    /// leaving immediately. On Darwin the primary reports `EIO` once the last
+    /// replica reference is gone, and output still sitting in the tty's queue
+    /// goes with it — so a child that exits before the reader is scheduled
+    /// can take its own output with it. That is what failed this test on CI
+    /// (run 33943227267 on `main`: `output` came back empty), and no amount
+    /// of waiting fixes it, because the bytes are already discarded. Holding
+    /// the child open until the read has happened tests what this is for —
+    /// that output written to a pty is read back exactly — without racing the
+    /// kernel to do it.
+    @Test("spawns a child and reads its output back")
+    func spawnsChildAndReadsOutput() throws {
+        let pty = try PTYFixture.shell("echo hello; read -r line")
         defer { pty.close() }
 
         let output = pty.readOutput(containing: "hello")
         // A terminal in its default mode translates NL to CR NL on output.
-        #expect(output == "hello\r\n")
+        #expect(output.hasPrefix("hello\r\n"))
+        try pty.write(text: "\n")
+        _ = pty.readOutput()
         #expect(pty.waitForExit() == .exited(code: 0))
     }
 

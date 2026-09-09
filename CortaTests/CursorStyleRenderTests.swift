@@ -11,7 +11,7 @@ import Testing
 /// steady.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
-@Suite(.serialized) struct CursorStyleRenderTests {
+@Suite(.serialized, .metalSerialized) struct CursorStyleRenderTests {
     private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (
         r: UInt8, g: UInt8, b: UInt8, a: UInt8
     ) {
@@ -47,11 +47,8 @@ import Testing
 
         let width = Int(renderer.metrics.cellWidth * 10)
         let height = Int(renderer.metrics.cellHeight * 4)
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: QuadRenderer.pixelFormat, width: width, height: height, mipmapped: false)
-        descriptor.usage = [.renderTarget, .shaderRead]
-        descriptor.storageMode = .managed
-        let texture = device.makeTexture(descriptor: descriptor)!
+        let texture = MetalRenderTarget.make(
+            device: device, width: width, height: height)
 
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = texture

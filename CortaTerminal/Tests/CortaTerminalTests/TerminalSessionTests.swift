@@ -16,7 +16,8 @@ import Testing
 // before an assertion. Every wait polls the grid for the expected content;
 // the only deadlines are 30-second ceilings that stop a wedged child from
 // hanging the run — generous enough that reaching one means something is
-// genuinely wrong, not that the machine was busy (CI is loaded too).
+// genuinely wrong, not that the machine was busy (CI is loaded too). Under
+// a sanitizer even that is not generous enough; see `testTimeout`.
 @Suite(.serialized) struct TerminalSessionTests {
     @Test func readsChildOutputIntoTheGrid() throws {
         let session = try TerminalSession(executable: "/bin/echo", arguments: ["hello"])
@@ -63,7 +64,7 @@ import Testing
         defer { session.stop() }
         session.start()
 
-        let exit = session.pty.waitForExit(timeout: .seconds(30))
+        let exit = session.pty.waitForExit(timeout: testTimeout(30))
         #expect(exit != nil, "cat of a 100 MB file should finish well within 30s if the reader never stalls it")
     }
 
@@ -85,7 +86,7 @@ import Testing
             "precondition: the child should be flooding before ^C is sent; grid held:\n\(flooded)")
         session.write([0x03])
 
-        let exit = session.pty.waitForExit(timeout: .seconds(30))
+        let exit = session.pty.waitForExit(timeout: testTimeout(30))
         #expect(exit != nil, "^C should terminate a flooding child well within 30s")
     }
 
@@ -197,7 +198,7 @@ import Testing
     /// ceiling expires — see the suite header. Returns the last dump either
     /// way, so a failing expectation can show what the grid actually held.
     private func waitForGrid(
-        _ session: TerminalSession, timeout: Duration = .seconds(30),
+        _ session: TerminalSession, timeout: Duration = testTimeout(30),
         until condition: (String) -> Bool
     ) -> String {
         let deadline = ContinuousClock.now + timeout

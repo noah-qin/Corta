@@ -13,7 +13,7 @@ import Testing
 /// into the atlas's RGBA texture and draw through the color pipeline.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
-@Suite(.serialized) struct ColorEmojiRenderTests {
+@Suite(.serialized, .metalSerialized) struct ColorEmojiRenderTests {
     private static func makeDevice() -> MTLDevice? { MTLCreateSystemDefaultDevice() }
 
     private static func synchronize(_ texture: MTLTexture, queue: MTLCommandQueue) {
@@ -33,11 +33,8 @@ import Testing
     ) -> MTLTexture {
         let width = Int(renderer.metrics.cellWidth) * grid.columns
         let height = Int(renderer.metrics.cellHeight) * grid.rows
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: QuadRenderer.pixelFormat, width: width, height: height, mipmapped: false)
-        descriptor.usage = [.renderTarget, .shaderRead]
-        descriptor.storageMode = .managed
-        let texture = device.makeTexture(descriptor: descriptor)!
+        let texture = MetalRenderTarget.make(
+            device: device, width: width, height: height)
 
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = texture

@@ -11,7 +11,7 @@ import Testing
 /// shaped as one run, and no glyph ever inks a cell that is not its own.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
-@Suite(.serialized) struct WideGlyphRenderTests {
+@Suite(.serialized, .metalSerialized) struct WideGlyphRenderTests {
     private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> UInt8 {
         var bytes = [UInt8](repeating: 0, count: 4)
         texture.getBytes(&bytes, bytesPerRow: 4, from: MTLRegionMake2D(x, y, 1, 1), mipmapLevel: 0)
@@ -34,11 +34,8 @@ import Testing
     ) -> MTLTexture {
         let width = Int(renderer.metrics.cellWidth) * grid.columns
         let height = Int(renderer.metrics.cellHeight) * grid.rows
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: QuadRenderer.pixelFormat, width: width, height: height, mipmapped: false)
-        descriptor.usage = [.renderTarget, .shaderRead]
-        descriptor.storageMode = .managed
-        let texture = device.makeTexture(descriptor: descriptor)!
+        let texture = MetalRenderTarget.make(
+            device: device, width: width, height: height)
 
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = texture
@@ -225,11 +222,8 @@ import Testing
         // Three cells wide: the pair's box plus one neighbour.
         let width = Int(cellWidth) * 3
         let height = Int(cellHeight)
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: QuadRenderer.pixelFormat, width: width, height: height, mipmapped: false)
-        descriptor.usage = [.renderTarget, .shaderRead]
-        descriptor.storageMode = .managed
-        let texture = device.makeTexture(descriptor: descriptor)!
+        let texture = MetalRenderTarget.make(
+            device: device, width: width, height: height)
 
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = texture

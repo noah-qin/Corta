@@ -11,7 +11,7 @@ import Testing
 ///
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded by
 /// design — see that type's comment.
-@Suite(.serialized) struct ShellIntegrationRenderTests {
+@Suite(.serialized, .metalSerialized) struct ShellIntegrationRenderTests {
     private struct Fixture {
         let renderer: TerminalRenderer
         let queue: MTLCommandQueue
@@ -50,12 +50,8 @@ import Testing
     private static func draw(
         _ fixture: Fixture, grid: Grid, hoveredLink: TerminalSelection? = nil
     ) -> MTLTexture {
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: QuadRenderer.pixelFormat, width: fixture.width, height: fixture.height,
-            mipmapped: false)
-        descriptor.usage = [.renderTarget, .shaderRead]
-        descriptor.storageMode = .managed
-        let texture = fixture.renderer.quadRenderer.device.makeTexture(descriptor: descriptor)!
+        let texture = MetalRenderTarget.make(
+            device: fixture.renderer.quadRenderer.device, width: fixture.width, height: fixture.height)
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = texture
         pass.colorAttachments[0].loadAction = .clear
