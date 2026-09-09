@@ -221,7 +221,10 @@ scheme, and never whether the thing is a file at all.
 
 A preset is a named way to open a terminal: a shell, a directory and a few
 environment variables. Shell ▸ New Pane with Preset lists them, in the order
-the file defines them; the item is disabled when there are none.
+the file defines them, and hold ⌥ to open one in a window of its own. With
+no presets defined the row is *hidden* rather than greyed out: a submenu's
+parent item carries no action, so AppKit enables it unconditionally and a
+disabled-looking row would still open an empty menu.
 
 ```
 preset.api.shell = /bin/bash

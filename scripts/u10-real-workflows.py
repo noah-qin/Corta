@@ -205,7 +205,11 @@ class Dump:
         command += ["--scrollback", str(scrollback if scrollback is not None else 1000)]
         result = subprocess.run(command, input=capture, capture_output=True, timeout=60)
         if result.returncode != 0:
-            raise Failure(f"corta-dump exited {result.returncode}: {result.stderr.decode()}")
+            # `errors="replace"`: corta-dump is fed hostile bytes by design,
+            # and a stderr line that is not valid UTF-8 must not turn a clean
+            # FAIL with diagnostics into a harness crash with none.
+            detail = result.stderr.decode("utf-8", errors="replace")
+            raise Failure(f"corta-dump exited {result.returncode}: {detail}")
         self.text = result.stdout.decode("utf-8", errors="replace")
         self.report = {}
         if "--- report ---" in self.text:
@@ -509,14 +513,27 @@ def sustained_log(ctx):
 @scenario("ssh to localhost")
 @needs("ssh")
 def ssh_localhost(ctx):
+    # `UserKnownHostsFile=/dev/null` matters more than it looks:
+    # `StrictHostKeyChecking=no` alone still *appends* localhost's key to the
+    # user's `~/.ssh/known_hosts`, which is a change to the machine that
+    # outlives the test run — the one thing this project's rules say a test
+    # may never do. Sending it to /dev/null keeps the check to a check.
+    # `BatchMode` and the timeouts keep it from stopping on a prompt: this
+    # scenario asks whether sshd is there, and a harness that hangs waiting
+    # for a password has stopped asking that.
+    options = [
+        "-o", "BatchMode=yes",
+        "-o", "ConnectTimeout=3",
+        "-o", "StrictHostKeyChecking=no",
+        "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "LogLevel=ERROR",
+    ]
     probe = subprocess.run(
-        ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=3",
-         "-o", "StrictHostKeyChecking=no", "localhost", "true"],
-        capture_output=True, timeout=15)
+        ["ssh"] + options + ["localhost", "true"], capture_output=True, timeout=15)
     if probe.returncode != 0:
-        detail = probe.stderr.decode().strip().splitlines()
+        detail = probe.stderr.decode("utf-8", errors="replace").strip().splitlines()
         raise Skip("sshd unavailable: " + (detail[0][:80] if detail else "no detail"))
-    session = PtySession(["ssh", "-o", "StrictHostKeyChecking=no", "localhost", "echo U10SSHOK"])
+    session = PtySession(["ssh"] + options + ["localhost", "echo U10SSHOK"])
     session.finish(timeout=15)
     Dump(ctx.dump, session.all_bytes()).require("U10SSHOK")
 
