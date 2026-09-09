@@ -883,10 +883,15 @@ alternate-screen additions, `TerminalRenderBackendTests`,
 **Typometer, post-M9, default configuration** (the same "Run A" as
 M8.18, since default is the configuration M9 actually ships): 45.4 ms
 min, 99.4 ms max, 70.1 ms average, 13.9 ms SD — `PERFORMANCE.md` §5.4.
-**This is not a clean before/after against M6.12's 45.5 ms baseline**, and
-0.1.1 did not close it — the re-measurement is item 5c of
-[V0.1.1-MANUAL-VERIFICATION.md](V0.1.1-MANUAL-VERIFICATION.md), where it is
-written up with the environment table it has to be held to.
+**This is not a clean before/after against M6.12's 45.5 ms baseline.** The
+re-measurement was taken on **2026-09-09**: the default configuration,
+Typometer at M6.12's settings, §5.2's table held and recorded in full —
+**57.8 ms average, 45.3 ms min, 78.9 ms max, 5.6 ms SD** over 200 samples
+(`PERFORMANCE.md` §5). That does not make 70.1 ms comparable retroactively;
+it means the configuration now has a figure with an environment attached.
+Against 45.5 ms it is 12.3 ms worse, and even that comparison is soft:
+M6.12 recorded its Typometer settings and not its test program, and no run
+has ever recorded the machine beyond "MacBook Air, Apple silicon".
 §5.2's fixed-benchmark-environment table was not fully held for this
 run — in particular, other background load on the machine was not
 controlled the way M6.12's was — so a 70.1 ms average next to a 45.5 ms
@@ -1009,7 +1014,7 @@ Trends matter more than absolute values.
 | Frame CPU (ms)            | 1.67   | 1.72 | 2.32 | 2.26 | 2.40 | 2.32 | — |
 | Idle CPU (%)              | ~4     | ~0   | ~0   | ~0   | ~0   | 0.0 | — |
 | Memory @ 100k lines (MB)  | 265.7  | 265.7 | 265.7 | 184.6 | 184.6 | 185.0 | — |
-| Keypress → pixel (ms)     | —      | —    | —    | —    | —    | 45.5 avg / 24.8 min / 56.4 max / 6.8 SD | not re-measured |
+| Keypress → pixel (ms)     | —      | —    | —    | —    | —    | 45.5 avg / 24.8 min / 56.4 max / 6.8 SD | 57.8 avg / 45.3 min / 78.9 max / 5.6 SD |
 | `esctest` pass rate (%)   | —      | 8.8 (50/568) | 8.8 (50/568) | 8.8 (50/568, M3 carry) | 8.8 (M3 carry) | 18.7 (106/568) | 19.7 (112/568) |
 | `esctest` xterm-compat (%)| —      | 67.6 | 67.6 | 67.6 | 67.6 | 77.6 | 78.7 |
 | Core LOC                  | 2,547  | 3,972 | 4,247 | 4,908 | 4,959 | 5,884 | — |
