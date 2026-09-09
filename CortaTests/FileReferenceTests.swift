@@ -164,7 +164,6 @@ struct OpenFileCommandTests {
         let templates = [
             "/usr/bin/xed {file}",
             "/usr/bin/xed\t--line\t{line}\t{file}",
-            "/usr/bin/xed\n{file}",
             "  /usr/bin/xed   {file}  ",
         ]
         for template in templates {
@@ -180,6 +179,21 @@ struct OpenFileCommandTests {
         // A relative first word is refused however it is spaced, and the
         // config file keeps the default rather than storing it.
         #expect(!Configuration.isUsableOpenFileCommand("\txed {file}"))
+        // A line break inside the template is refused outright, whatever
+        // else is right about it: `serialized()` interpolates the value into
+        // `open-file-command = …` and the file is parsed a line at a time,
+        // so storing one would write a second line that reads as a stray
+        // key. The settings field takes a paste, so this is reachable.
+        #expect(!Configuration.isUsableOpenFileCommand("/usr/bin/xed\n{file}"))
+        #expect(!Configuration.isUsableOpenFileCommand("/usr/bin/xed\r\n{file}"))
+        // And because it can never be stored, what `serialized()` writes for
+        // this key is always one line, which is what the file's parser can
+        // read back.
+        let stored = Configuration.parse("open-file-command = /usr/bin/xed {file}").0
+        let hasNewline = stored.openFileCommand.contains { $0.isNewline }
+        #expect(!hasNewline)
+        let reparsed = Configuration.parse(stored.serialized()).0
+        #expect(reparsed.openFileCommand == stored.openFileCommand)
         let (parsed, _) = Configuration.parse("open-file-command = xed {file}")
         #expect(parsed.openFileCommand.isEmpty)
     }
