@@ -99,8 +99,14 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// allowed — an editor that takes the path last is a real shape — but
     /// one that names an unknown placeholder is not, because the placeholder
     /// would be passed through as a literal argument.
+    ///
+    /// Split on *any* whitespace, which is what `openFileArguments` does when
+    /// it launches the thing. Splitting on the space alone let a tab or a
+    /// newline inside the template pass this check and then fail at
+    /// `Process.run` — a value the file says is configured and the app will
+    /// never execute, which is precisely what refusing it here is for.
     static func isUsableOpenFileCommand(_ template: String) -> Bool {
-        let parts = template.split(separator: " ").map(String.init)
+        let parts = template.split(whereSeparator: \.isWhitespace).map(String.init)
         guard let executable = parts.first else { return true }
         guard executable.hasPrefix("/") else { return false }
         let known = ["{file}", "{line}", "{column}"]

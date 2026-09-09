@@ -80,10 +80,18 @@ final class ScrollPositionIndicator: NSView {
 
     /// Grouped digits, because "12,340 lines back" is a number a person reads
     /// and "12340" is one they count.
-    static func formatted(_ lines: Int) -> String {
+    ///
+    /// The formatter is built once. This is called on every scroll tick while
+    /// the pill is visible, and `NumberFormatter()` is not a cheap object to
+    /// build — it reads the current locale each time.
+    private static let lineCountFormatter: NumberFormatter = {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
-        return formatter.string(from: NSNumber(value: lines)) ?? String(lines)
+        return formatter
+    }()
+
+    static func formatted(_ lines: Int) -> String {
+        lineCountFormatter.string(from: NSNumber(value: lines)) ?? String(lines)
     }
 
     private func applyColors() {

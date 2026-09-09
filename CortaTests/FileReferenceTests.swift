@@ -154,6 +154,36 @@ struct OpenFileCommandTests {
         #expect(reparsed.openFileCommand == parsed.openFileCommand)
     }
 
+    /// Review finding. The validator split on the space alone while the
+    /// launcher runs the first *whitespace*-separated word. The invariant
+    /// that matters is that the two agree: whatever the validator judged is
+    /// what gets executed, so a template the config file accepts is one the
+    /// app can actually run.
+    @Test("the words the validator judges are the words the launcher runs")
+    func validatorAndLauncherSplitAlike() {
+        let templates = [
+            "/usr/bin/xed {file}",
+            "/usr/bin/xed\t--line\t{line}\t{file}",
+            "/usr/bin/xed\n{file}",
+            "  /usr/bin/xed   {file}  ",
+        ]
+        for template in templates {
+            let judged = Configuration.isUsableOpenFileCommand(template)
+            let arguments = ViewController.openFileArguments(
+                template: template, path: "/tmp/x", line: 3, column: nil)
+            // Accepted means the first word the launcher will exec is the
+            // absolute path the validator approved.
+            #expect(judged, "\(template.debugDescription) should be usable")
+            #expect(arguments.first == "/usr/bin/xed", "\(template.debugDescription)")
+            #expect(arguments.last == "/tmp/x", "\(template.debugDescription)")
+        }
+        // A relative first word is refused however it is spaced, and the
+        // config file keeps the default rather than storing it.
+        #expect(!Configuration.isUsableOpenFileCommand("\txed {file}"))
+        let (parsed, _) = Configuration.parse("open-file-command = xed {file}")
+        #expect(parsed.openFileCommand.isEmpty)
+    }
+
     /// The URL scheme allowlist is not widened by any of this: a `file://`
     /// string in output is still plain text, and still cannot be detected as
     /// a link at all.

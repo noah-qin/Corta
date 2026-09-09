@@ -98,8 +98,12 @@ extension Grid {
         let prompts = promptRows
         // The prompt that *ends* the command — the first one at or after the
         // command whose output is wanted.
-        guard let endIndex = prompts.lastIndex(where: { $0 <= absoluteRow }) ?? prompts.indices.last,
-            endIndex > 0
+        // No fallback to the newest prompt. A bound above every prompt means
+        // there is no completed command at or before it, and answering with
+        // the *last* command's output instead would copy something the user
+        // is not looking at — the scrolled-viewport case this parameter
+        // exists for is exactly where that would happen.
+        guard let endIndex = prompts.lastIndex(where: { $0 <= absoluteRow }), endIndex > 0
         else { return nil }
         let end = prompts[endIndex]
         let promptRow = prompts[endIndex - 1]

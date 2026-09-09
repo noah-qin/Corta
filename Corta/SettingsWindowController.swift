@@ -970,7 +970,8 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
             // Reported through the same channel a clamped number uses, for
             // the same reason — silently keeping the old value looks exactly
             // like the app ignoring what was typed.
-            let template = openFileCommandField.stringValue.trimmingCharacters(in: .whitespaces)
+            let template = openFileCommandField.stringValue
+                .trimmingCharacters(in: .whitespacesAndNewlines)
             if Configuration.isUsableOpenFileCommand(template) {
                 configuration.openFileCommand = template
             } else {
