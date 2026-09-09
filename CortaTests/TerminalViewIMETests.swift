@@ -213,6 +213,36 @@ struct TerminalViewIMETests {
         #expect(overlay.frame.width >= cell.width)
     }
 
+    /// Found by looking at a light-appearance window: the preedit was drawn
+    /// in near-white on a light background and could not be read. The overlay
+    /// held its own copy of "the colour the renderer uses", which stopped
+    /// being true once the palette started following the theme and the system
+    /// appearance.
+    @Test func preeditTakesItsColourFromTheLivePalette() {
+        let view = Self.makeView()
+        view.cursorRectProvider = { CGRect(x: 0, y: 0, width: 8, height: 17) }
+        let saved = TerminalColorPalette.activeVariant
+        defer { TerminalColorPalette.apply(saved) }
+
+        func drawnColour(underForeground foreground: SIMD4<Float>) -> NSColor? {
+            var variant = saved
+            variant.foreground = foreground
+            TerminalColorPalette.apply(variant)
+            view.setMarkedText(
+                "ni", selectedRange: NSRange(location: 2, length: 0),
+                replacementRange: NSRange(location: NSNotFound, length: 0))
+            guard let overlay = view.subviews.compactMap({ $0 as? MarkedTextOverlayView }).first,
+                let drawn = overlay.markedText
+            else { return nil }
+            return drawn.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
+        }
+
+        let onDark = try? #require(drawnColour(underForeground: SIMD4<Float>(0.95, 0.95, 0.95, 1)))
+        let onLight = try? #require(drawnColour(underForeground: SIMD4<Float>(0.1, 0.1, 0.1, 1)))
+        #expect(onDark?.usingColorSpace(.sRGB)?.redComponent ?? 0 > 0.9)
+        #expect(onLight?.usingColorSpace(.sRGB)?.redComponent ?? 1 < 0.2)
+    }
+
     @Test func preeditOverlayKeepsTheIMEUnderlineStyling() {
         let view = Self.makeView()
         view.cursorRectProvider = { CGRect(x: 0, y: 0, width: 8, height: 17) }

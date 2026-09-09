@@ -176,9 +176,23 @@ final class MarkedTextOverlayView: NSView {
     var font = NSFont.monospacedSystemFont(
         ofSize: ViewController.defaultFontSize, weight: .medium)
 
-    /// Same light grey the renderer resolves `.default` foreground to
-    /// (`TerminalColorPalette.defaultForeground`).
-    private let textColor = NSColor(white: 0.96, alpha: 1)
+    /// What the renderer would draw ordinary text in, read live.
+    ///
+    /// This used to be a stored `NSColor(white: 0.96)` with a comment saying
+    /// it was the same light grey the renderer resolves `.default` foreground
+    /// to. That stopped being true the moment the palette started following
+    /// the theme and the system appearance (M6.2, M6.13): in a light
+    /// appearance the terminal draws dark text on a light background and the
+    /// preedit kept drawing near-white, which is invisible. Found by looking
+    /// at it, not by a test — the same way the overlay's stale copy of the
+    /// cell metrics was (U02). A second copy of a value that has an owner is
+    /// a bug waiting for the owner to change.
+    private var textColor: NSColor {
+        let color = TerminalColorPalette.defaultForeground
+        return NSColor(
+            srgbRed: CGFloat(color.x), green: CGFloat(color.y), blue: CGFloat(color.z),
+            alpha: CGFloat(color.w))
+    }
 
     override var isFlipped: Bool { true }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
