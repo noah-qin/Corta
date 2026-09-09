@@ -27,8 +27,11 @@ enum MetalRenderTarget {
     /// the numbers in the message — and the run continues on a 1x1 stand-in.
     /// Handing the numbers straight to Metal instead ends the process.
     static func make(device: MTLDevice, width: Int, height: Int) -> MTLTexture {
-        var safeWidth = width
-        var safeHeight = height
+        // A 1x1 stand-in, not a clamp. Clamping an absurd request down to
+        // the maximum would still allocate a 16384-wide texture to satisfy a
+        // test that has already been told it asked for the wrong thing — and
+        // on a device that refuses that allocation it would end the process,
+        // which is the failure mode this type exists to remove.
         if !isValid(width) || !isValid(height) {
             Issue.record(
                 """
@@ -36,21 +39,35 @@ enum MetalRenderTarget {
                 between 1 and \(maximumDimension). Continuing on a 1x1 target \
                 so the rest of the run still reports.
                 """)
-            safeWidth = min(max(width, 1), maximumDimension)
-            safeHeight = min(max(height, 1), maximumDimension)
+            return standIn(device: device)
         }
+        guard let texture = texture(device: device, width: width, height: height) else {
+            // Valid but unallocatable — a size past what this particular
+            // device will give out. Reported the same way and continued the
+            // same way, since the run has more to say than this one texture.
+            Issue.record("the device refused a \(width)x\(height) render target")
+            return standIn(device: device)
+        }
+        return texture
+    }
+
+    private static func standIn(device: MTLDevice) -> MTLTexture {
+        guard let texture = texture(device: device, width: 1, height: 1) else {
+            // A device that cannot allocate one pixel cannot render anything,
+            // which is the same deliberate assertion `GlyphAtlas` makes when
+            // even its minimum atlas fails.
+            preconditionFailure("Metal device refused a 1x1 render target")
+        }
+        return texture
+    }
+
+    private static func texture(device: MTLDevice, width: Int, height: Int) -> MTLTexture? {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: QuadRenderer.pixelFormat, width: safeWidth, height: safeHeight,
+            pixelFormat: QuadRenderer.pixelFormat, width: width, height: height,
             mipmapped: false)
         descriptor.usage = [.renderTarget, .shaderRead]
         descriptor.storageMode = .managed
-        guard let texture = device.makeTexture(descriptor: descriptor) else {
-            // A device that cannot allocate the target cannot render
-            // anything, which is the same deliberate assertion `GlyphAtlas`
-            // makes when even its minimum atlas fails to allocate.
-            preconditionFailure("Metal device refused a \(safeWidth)x\(safeHeight) render target")
-        }
-        return texture
+        return device.makeTexture(descriptor: descriptor)
     }
 
     private static func isValid(_ dimension: Int) -> Bool {
@@ -71,8 +88,10 @@ enum MetalRenderTarget {
         for (width, height) in [(0, 10), (10, 0), (-4, 10), (MetalRenderTarget.maximumDimension + 1, 10)] {
             withKnownIssue("the size is reported, and the run continues") {
                 let texture = MetalRenderTarget.make(device: device, width: width, height: height)
-                #expect(texture.width > 0)
-                #expect(texture.height > 0)
+                // A stand-in, not a clamp: an absurd request must not turn
+                // into an enormous allocation.
+                #expect(texture.width == 1)
+                #expect(texture.height == 1)
             }
         }
     }
