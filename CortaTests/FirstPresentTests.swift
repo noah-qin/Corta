@@ -144,7 +144,18 @@ struct FirstPresentTests {
                 actions[key] is NSNull,
                 "\(key) must not animate on the terminal canvas")
         }
-        #expect(layer.contentsGravity == .topLeft)
+        // `layerContentsPlacement`, not `contentsGravity`: AppKit owns the
+        // layer's gravity for a layer-hosting view and derives it from this,
+        // overwriting a direct assignment. Its default,
+        // `.scaleAxesIndependently`, is what stretched the last frame over
+        // the whole of a window zoom.
+        #expect(view.layerContentsPlacement == .topLeft)
+        #expect(view.layerContentsRedrawPolicy == .onSetNeedsDisplay)
+        // Whatever corner AppKit resolves that to, it must not be the one
+        // that scales.
+        #expect(layer.contentsGravity != .resize)
+        #expect(layer.contentsGravity != .resizeAspect)
+        #expect(layer.contentsGravity != .resizeAspectFill)
     }
 
     /// Found by resizing a window and watching the text scale with it.
