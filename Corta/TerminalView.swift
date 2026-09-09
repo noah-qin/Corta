@@ -304,11 +304,11 @@ final class TerminalView: NSView, CALayerDelegate {
         // bounds are still mid-animation.
         //
         // `NSNull` on each geometric key removes the implicit animation, so
-        // the bounds take their new value at once. `contentsGravity` covers
-        // the remaining gap: between the bounds changing and the next frame
-        // being presented the old contents are pinned to the top-left at
-        // their true size — the corner terminal text starts from — rather
-        // than being scaled to fill.
+        // the bounds take their new value at once. What the layer does with
+        // the frame it is still holding in the gap before the next one is
+        // presented is decided by `layerContentsPlacement` below, which
+        // AppKit owns for a layer-hosting view — not by anything set on the
+        // layer here.
         metalLayer.actions = [
             "bounds": NSNull(), "position": NSNull(), "contents": NSNull(),
             "contentsScale": NSNull(), "cornerRadius": NSNull(),

@@ -1020,10 +1020,13 @@ Trends matter more than absolute values.
 | Core LOC                  | 2,547  | 3,972 | 4,247 | 4,908 | 4,959 | 5,884 | — |
 
 A blank in the 0.1.1 column is a number that was not re-measured in this
-release, not a number that stayed the same. Keypress → pixel is called
-out rather than blanked because it is owed twice over: the M9 figure
-below, and a same-conditions run against M6.12's 45.5 ms. Both are item
-5 of [V0.1.1-MANUAL-VERIFICATION.md](V0.1.1-MANUAL-VERIFICATION.md).
+release, not a number that stayed the same. Keypress → pixel *was*
+re-measured, on 2026-09-09, and the figure serves two purposes at once:
+it is the same-conditions run M6.12's 45.5 ms was waiting for, and it is
+the re-measurement M9 owed for the default configuration. It is 12.3 ms
+above M6.12, and `PERFORMANCE.md` §5 records why that comparison is
+softer than it looks — M6.12 never recorded its test program, and no run
+has recorded the machine beyond "MacBook Air, Apple silicon".
 
 0.1.1 also measured what M6 could not: **19.1 MB driven through the tty
 in 0.204 s, against Ghostty's 0.164 s and Terminal.app's 0.305 s on the

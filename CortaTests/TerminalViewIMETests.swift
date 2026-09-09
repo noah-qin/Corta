@@ -263,7 +263,7 @@ struct TerminalViewIMETests {
     /// held its own copy of "the colour the renderer uses", which stopped
     /// being true once the palette started following the theme and the system
     /// appearance.
-    @Test func preeditTakesItsColourFromTheLivePalette() {
+    @Test func preeditTakesItsColourFromTheLivePalette() throws {
         let view = Self.makeView()
         view.cursorRectProvider = { CGRect(x: 0, y: 0, width: 8, height: 17) }
         let saved = TerminalColorPalette.activeVariant
@@ -282,10 +282,14 @@ struct TerminalViewIMETests {
             return drawn.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
         }
 
-        let onDark = try? #require(drawnColour(underForeground: SIMD4<Float>(0.95, 0.95, 0.95, 1)))
-        let onLight = try? #require(drawnColour(underForeground: SIMD4<Float>(0.1, 0.1, 0.1, 1)))
-        #expect(onDark?.usingColorSpace(.sRGB)?.redComponent ?? 0 > 0.9)
-        #expect(onLight?.usingColorSpace(.sRGB)?.redComponent ?? 1 < 0.2)
+        let onDark = try #require(
+            drawnColour(underForeground: SIMD4<Float>(0.95, 0.95, 0.95, 1))?
+                .usingColorSpace(.sRGB))
+        let onLight = try #require(
+            drawnColour(underForeground: SIMD4<Float>(0.1, 0.1, 0.1, 1))?
+                .usingColorSpace(.sRGB))
+        #expect(onDark.redComponent > 0.9)
+        #expect(onLight.redComponent < 0.2)
     }
 
     @Test func preeditOverlayKeepsTheIMEUnderlineStyling() {

@@ -10,12 +10,22 @@ what to edit.
 
 ## [Unreleased]
 
-## [0.1.1] - 2026-09-08
+## [0.1.1] - 2026-09-09
 
 The quality release. Nothing here changes what Corta is; all of it is
 work on what was already there — the places it could be made to
 misbehave, the places it was slower than it had to be, and the places it
 was guessing at what the user meant.
+
+**Upgrading.** No configuration change is required and no config key
+changed meaning. Everything below is additive or a fix; a `~/.config/corta/config`
+written for 0.1.0 keeps working unchanged.
+
+Two things worth knowing before you read the list. `option-as-meta`
+existed in 0.1.0 and **did not work** — if you tried it and gave up, try
+it again. And the terminal answered `XTVERSION` with `Corta(0.1.0)`
+regardless of the build; it now answers with the version it actually is,
+which matters to anything doing capability detection.
 
 ### Added
 
@@ -99,6 +109,97 @@ was guessing at what the user meant.
   and ⌘F opened the Find bar after Find was rebound.
 - **U09 (2026-09-08)** — A pane that failed to start was silent to a screen
   reader and left nothing focused for the keyboard.
+
+**Found by the Stage 4 audits.**
+
+- The terminal answered `XTVERSION` with `Corta(0.1.0)` whatever version it
+  was built as, because that string is written by hand in two places and
+  only one of them had moved. A test pins `CortaVersion.string` to the
+  bundle's version now, so they cannot drift apart silently again.
+- **DECID (`ESC Z`)** went unanswered. A query that is silent leaves a
+  client waiting for a reply that never arrives; it answers exactly what
+  `CSI c` answers.
+- **DECALN (`ESC # 8`)** was not implemented at all — every escape sequence
+  carrying an intermediate byte was discarded with the charset designators.
+  It fills the screen with `E`, resets the margins and homes the cursor,
+  which is how a program asks for a completely known screen.
+
+**Found by using the app, in the manual verification pass (2026-09-09).**
+Four defects that no test in this repository would have caught, listed in
+the order they were met:
+
+- **Option as Meta had never worked.** With `option-as-meta = true`, ⌥F
+  typed `ƒ` instead of sending `ESC f`. The encoder handled the setting
+  from the day it shipped and the key event never reached it: an ⌥-only
+  press carries neither ⌘ nor ⌃, so it went to the input context first,
+  macOS composed the layout's alternate character, and it came back as
+  text. On a US layout that is most letters — the setting was inert for
+  exactly the keys people enable it for. ⌥ now bypasses the input method
+  when, and only when, ⌥ is Meta; with the setting off it still reaches
+  the input method, which dead keys and international layouts depend on.
+- **Marked text was unreadable in a light appearance.** The IME preedit
+  overlay drew in a fixed near-white, from a stored copy of "the colour
+  the renderer uses" that stopped being true when the palette started
+  following the theme and the system appearance. It reads the live
+  palette now.
+- **Text grew and shrank through a window zoom.** For a layer-hosting
+  view AppKit owns the layer's `contentsGravity` and derives it from
+  `layerContentsPlacement`, whose default is "stretch what you are
+  holding to whatever size you have just been given" — so the last
+  presented frame was scaled up for the length of the animation. The
+  placement is set through AppKit now, and the canvas no longer animates
+  its own geometry.
+- **`commandOutputRows(before:)` could answer with the wrong command.**
+  Scrolled above the first prompt, "copy the command in view" copied the
+  *newest* command's output, because the lookup fell back to the last
+  prompt when the bound was above every prompt.
+
+### Verification
+
+- **Keypress → pixel (2026-09-09)** — Typometer 1.0.1 at M6.12's settings
+  against the Release build: **57.8 ms average, 45.3 ms min, 78.9 ms max,
+  5.6 ms SD** over 200 samples, with `PERFORMANCE.md` §5.2's environment
+  table held and recorded in full for the first time — machine and chip,
+  OS, build, panel and refresh rate, scale, font, window, power source, and
+  the test program (`cat > /dev/null`). That is 12.3 ms above M6.12's
+  45.5 ms, and §5 records why the comparison is softer than it looks:
+  M6.12 recorded its Typometer settings and not its test program, and no
+  run has recorded the machine beyond "MacBook Air, Apple silicon". The
+  same run is the re-measurement M9 has owed since it landed.
+- **Manual verification (2026-09-09)** — the six checks in
+  `docs/V0.1.1-MANUAL-VERIFICATION.md`, run by the maintainer. VoiceOver
+  reads the grid with correct row and column, and its cursor box covers a
+  wide character whole. The IME candidate window follows the preedit across
+  font-size changes, both panes of a split, and fullscreen. A German layout
+  composes dead keys and its option characters with `option-as-meta` off,
+  and sends Meta with it on. `copy-on-select` keeps its default. Composing
+  Chinese is indistinguishable from Terminal.app and Ghostty. What was not
+  judged is recorded as not judged.
+- **esctest (2026-09-08)** — 112 passed, 335 known bugs, 121 failed of
+  568, against M6's 106 / 335 / 127. xterm-compatibility is 78.7%, up
+  from 77.6%. The failures are classified by real application impact in
+  `docs/V0.1.1-QUALITY-PLAN.md` Q01, and every failing test name is kept
+  in `docs/esctest/0.1.1-results.txt` so the next run is a diff. The
+  largest single cause is one absence: OSC 4/5 indexed palette set and
+  query are not implemented.
+- **Nightly CI (2026-09-08)** — a lane for the checks a pull request
+  cannot carry: the core suite under thread and address sanitizers, and
+  a twenty-million-iteration fuzz run on a rotating seed. Both are clean;
+  the sanitizer lane found a test that had been asserting a property it
+  never established, and it is fixed. Pull-request checks gain job
+  timeouts, `contents: read`, and the `.xcresult` bundle and fuzz corpus
+  uploaded on failure.
+- **Real-workflow harness (2026-09-08)** — 12 passed, 1 skipped, 0
+  failed against zsh, fish, tmux, Neovim, vim, less, fzf, mouse
+  reporting and 20k lines of sustained output, each driven on a real PTY
+  and replayed through the core. `corta-dump --serve` answers a client's
+  terminal queries from that same core, which is what lets fish — which
+  waits for Primary DA before it prints a prompt — run under it at all.
+- **Same-machine comparison (2026-09-08)** — 19.1 MB through the tty:
+  Corta 0.204 s, Ghostty 0.164 s, Terminal.app 0.305 s, with Corta the
+  smallest resident set of the three at idle. Input latency was measured
+  separately (above); IME across terminals has no measurement and was
+  compared by eye.
 
 ### Changed
 
@@ -445,48 +546,6 @@ M1–M10.
   rewrite (M9) landed and is covered by its own unit tests, but a
   same-conditions Typometer re-measurement against the 45.5 ms baseline
   is still open.
-
-### Verification
-
-- **esctest (2026-09-08)** — 112 passed, 335 known bugs, 121 failed of
-  568, against M6's 106 / 335 / 127. xterm-compatibility is 78.7%, up
-  from 77.6%. The failures are classified by real application impact in
-  `docs/V0.1.1-QUALITY-PLAN.md` Q01, and every failing test name is kept
-  in `docs/esctest/0.1.1-results.txt` so the next run is a diff. The
-  largest single cause is one absence: OSC 4/5 indexed palette set and
-  query are not implemented.
-- **Nightly CI (2026-09-08)** — a lane for the checks a pull request
-  cannot carry: the core suite under thread and address sanitizers, and
-  a twenty-million-iteration fuzz run on a rotating seed. Both are clean;
-  the sanitizer lane found a test that had been asserting a property it
-  never established, and it is fixed. Pull-request checks gain job
-  timeouts, `contents: read`, and the `.xcresult` bundle and fuzz corpus
-  uploaded on failure.
-- **Real-workflow harness (2026-09-08)** — 12 passed, 1 skipped, 0
-  failed against zsh, fish, tmux, Neovim, vim, less, fzf, mouse
-  reporting and 20k lines of sustained output, each driven on a real PTY
-  and replayed through the core. `corta-dump --serve` answers a client's
-  terminal queries from that same core, which is what lets fish — which
-  waits for Primary DA before it prints a prompt — run under it at all.
-- **Same-machine comparison (2026-09-08)** — 19.1 MB through the tty:
-  Corta 0.204 s, Ghostty 0.164 s, Terminal.app 0.305 s, with Corta the
-  smallest resident set of the three at idle. Input latency and IME are
-  not in that comparison; they need the fixed benchmark environment held
-  by hand and are on the maintainer's list in
-  `docs/V0.1.1-MANUAL-VERIFICATION.md`.
-
-### Fixed
-
-- The terminal answered XTVERSION with `Corta(0.1.0)` regardless of the
-  version it was built as. `CortaVersion.string` and
-  `MARKETING_VERSION` are now pinned against each other by a test.
-- **DECID (`ESC Z`)** went unanswered. A query that is silent leaves a
-  client waiting for a reply that never arrives; it now answers exactly
-  what `CSI c` answers.
-- **DECALN (`ESC # 8`)** was not implemented — every escape sequence
-  carrying an intermediate byte was discarded. It fills the screen with
-  `E`, resets the margins and homes the cursor, which is how a program
-  asks for a completely known screen.
 
 ---
 

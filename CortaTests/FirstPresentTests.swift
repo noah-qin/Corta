@@ -168,6 +168,11 @@ struct FirstPresentTests {
     /// to report; the request has to come from the size change itself.
     @Test func aResizedDrawableAsksForAFrame() {
         let view = TerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        // Lay out once first, so the drawable already has its initial size.
+        // Without this the test passes on the 0 → initial transition alone,
+        // and the bug is about resizing a layer that is *already* holding a
+        // frame.
+        view.layoutSubtreeIfNeeded()
         var requests = 0
         view.onDrawableSizeChange = { requests += 1 }
 

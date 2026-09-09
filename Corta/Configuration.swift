@@ -106,6 +106,13 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// `Process.run` — a value the file says is configured and the app will
     /// never execute, which is precisely what refusing it here is for.
     static func isUsableOpenFileCommand(_ template: String) -> Bool {
+        // A line break inside the template is refused rather than tolerated.
+        // `serialized()` interpolates this value straight into
+        // `open-file-command = …`, and the config file is read a line at a
+        // time, so storing one would write a second line the parser reads as
+        // a stray key — a value that corrupts the file it is written to.
+        // Trimming the ends is not enough: the settings field takes a paste.
+        guard !template.contains(where: \.isNewline) else { return false }
         let parts = template.split(whereSeparator: \.isWhitespace).map(String.init)
         guard let executable = parts.first else { return true }
         guard executable.hasPrefix("/") else { return false }
