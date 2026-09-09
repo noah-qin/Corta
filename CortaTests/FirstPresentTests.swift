@@ -123,6 +123,32 @@ struct FirstPresentTests {
     /// before and after a bounds change — the guard stays armed throughout
     /// and the drawable tracks the latest bounds, with no window and no
     /// run-loop turn involved.
+    /// Found by resizing a window and watching the text scale with it.
+    ///
+    /// `CAMetalLayer` stretches the frame it is holding when its bounds
+    /// change, so a resize with no new frame drawn into it shows the previous
+    /// frame at the wrong size — through a fullscreen animation the glyphs
+    /// visibly grow and shrink and only come back when something else asks
+    /// for a frame. The grid has not changed, so the damage diff has nothing
+    /// to report; the request has to come from the size change itself.
+    @Test func aResizedDrawableAsksForAFrame() {
+        let view = TerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        var requests = 0
+        view.onDrawableSizeChange = { requests += 1 }
+
+        view.setBoundsSize(NSSize(width: 400, height: 300))
+        view.layoutSubtreeIfNeeded()
+        #expect(requests >= 1, "a changed drawable size must ask for a frame")
+
+        // And only when it actually changed: layout runs far more often than
+        // the size changes, and forcing a frame each time would defeat the
+        // damage tracking the render loop is built on.
+        let afterResize = requests
+        view.layoutSubtreeIfNeeded()
+        view.layoutSubtreeIfNeeded()
+        #expect(requests == afterResize, "an unchanged size must not force a frame")
+    }
+
     @Test func drawNowSurvivesResizeBeforeFirstFrame() throws {
         let view = TerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
         view.drawNow()

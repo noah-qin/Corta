@@ -630,6 +630,9 @@ class ViewController: NSViewController {
         view.onBackingScaleChange = { [weak self] scale in
             self?.rebuildAtlas(forBackingScale: scale)
         }
+        view.onDrawableSizeChange = { [weak self] in
+            self?.invalidateDisplay()
+        }
         view.onPaste = { [weak self] in
             self?.pasteFromClipboard()
         }
