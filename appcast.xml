@@ -23,6 +23,14 @@
         <description>Corta release updates.</description>
         <language>en</language>
         <item>
+            <title>0.1.1</title>
+            <pubDate>Thu, 10 Sep 2026 08:10:27 +0800</pubDate>
+            <sparkle:version>2</sparkle:version>
+            <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/noah-qin/Corta/releases/download/v0.1.1/Corta-0.1.1.zip" length="6507124" type="application/octet-stream" sparkle:edSignature="/mk1CaXQGQ0j0uCOJxl0yXmQRWmJbzcpqiZqg6jtq9cC1rV1NIBRfYPZNjhBgJ0VdqE6oT8nAP7+llYqMITlDg=="/>
+        </item>
+        <item>
             <title>0.1.0</title>
             <pubDate>Sat, 05 Sep 2026 11:36:23 +0800</pubDate>
             <sparkle:version>1</sparkle:version>
