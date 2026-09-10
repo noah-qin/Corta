@@ -1,5 +1,18 @@
 # Corta
 
+## Next-development scope
+
+The active v1 plan lives in the ordered `B01`–`B16` GitHub roadmap issues.
+Work one issue as a coherent batch: inspect its dependencies, implement related
+changes, run proportional automated and app-level verification, and report each
+unchecked or human-only result honestly. Built-in AI is excluded; existing AI
+CLI compatibility is terminal correctness. The Claude Code slash-command Tab
+completion failure belongs to B02 and must remain explicitly tracked. Intelligent
+navigation and SSH/SFTP supersede conflicting historical auxiliary-workflow
+restrictions in this file and DESIGN.md. A roadmap issue is planned work, not a
+shipped capability, and never relaxes correctness, resource limits or explicit
+execution boundaries.
+
 A native macOS terminal emulator in pure Swift. Metal rendering, Core
 Text shaping, AppKit shell, a hand-written VT parser.
 

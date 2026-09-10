@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: v1 roadmap
+    url: https://github.com/noah-qin/Corta/milestone/1
+    about: Follow or contribute to the ordered B01-B16 implementation batches.
   - name: Question, idea or general discussion
     url: https://github.com/noah-qin/Corta/discussions
     about: Anything that is not a reproducible bug or a concrete feature request belongs in Discussions.

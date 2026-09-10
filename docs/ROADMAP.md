@@ -1,5 +1,18 @@
 # Corta — Roadmap
 
+## Active v1 roadmap
+
+Future work is tracked in the ordered
+[B01–B16 roadmap issues](https://github.com/noah-qin/Corta/milestone/1).
+Each issue records its scope, dependencies, acceptance criteria and current
+status. Start with B01's reproducible baseline and B02's keyboard/IME work,
+including the reported Claude Code slash-command Tab completion failure.
+Built-in AI is out of scope; compatibility with existing AI command-line tools
+is terminal correctness. The historical milestones below remain implementation
+history rather than the dependency order for new work.
+
+## Historical milestone roadmap
+
 An ordered, checkable execution plan. `DESIGN.md` §5 gives the
 milestones; this document gives the steps inside them.
 

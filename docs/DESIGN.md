@@ -1,5 +1,15 @@
 # Corta — Design
 
+> **Next-development scope (2026-09-10).** The active
+> [B01–B16 GitHub roadmap](https://github.com/noah-qin/Corta/milestone/1)
+> includes intelligent navigation, SSH/SFTP, modern macOS/Swift UI work and a
+> real Metal 4 backend. Built-in AI remains excluded; compatibility with
+> existing AI command-line tools is in scope. This supersedes conflicting
+> auxiliary-workflow restrictions below. Native macOS, the Swift terminal
+> core, correctness and explicit resource/security boundaries remain. Roadmap
+> entries describe planned work, not shipped capabilities; the milestones and
+> pre-M1 status below are historical design context.
+
 A native macOS terminal emulator written in pure Swift. Optimised for
 performance, deliberately small in scope.
 
