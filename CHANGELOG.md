@@ -566,14 +566,18 @@ For the maintainer, cutting any release:
 
 1. Move the relevant `[Unreleased]` entries under a new `## [x.y.z]`
    heading with the date, and leave `[Unreleased]` empty above it.
-2. Update **all three** hand-written version numbers to match, in
+2. Update the three hand-written version numbers, in
    `Corta.xcodeproj/project.pbxproj` (all six build configurations) and
-   the core:
-   - `MARKETING_VERSION` — what the bundle and the About panel show.
+   the core. **Two of them carry the release's semantic version and must
+   read exactly the same; the third is a build counter and only has to go
+   up:**
+   - `MARKETING_VERSION` — the semantic version, e.g. `0.1.1`. What the
+     bundle and the About panel show.
    - `CortaVersion.string` in `CortaTerminal/Sources/CortaTerminal/Version.swift`
-     — what XTVERSION answers a program with.
-   - **`CURRENT_PROJECT_VERSION`** — the build number, and the one
-     Sparkle actually compares. Two releases sharing a build number means
+     — the same string again, and what XTVERSION answers a program with.
+   - **`CURRENT_PROJECT_VERSION`** — *not* the semantic version. A plain
+     integer that increments once per release (0.1.0 shipped 1, 0.1.1
+     ships 2), and the one Sparkle actually compares. Two releases sharing a build number means
      the second is invisible to everyone running the first, and
      `generate_appcast` overwrites the earlier feed entry rather than
      adding one. 0.1.1 hit this: it was built, signed, notarised and

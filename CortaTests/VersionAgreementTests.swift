@@ -36,7 +36,8 @@ struct VersionAgreementTests {
     @Test("the build number is one Sparkle can compare against 0.1.0's")
     func buildNumberMovedPast0_1_0() throws {
         let build = try #require(
-            Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String)
+            Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String,
+            "the test host has no CFBundleVersion")
         let number = try #require(Int(build), "CFBundleVersion must be an integer: \(build)")
         // 0.1.0 shipped build 1. Anything at or below it is invisible to a
         // user running 0.1.0.
