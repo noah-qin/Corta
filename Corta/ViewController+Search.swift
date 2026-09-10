@@ -54,6 +54,23 @@ extension ViewController {
         return true
     }
 
+    /// Esc closes the bar from anywhere *in this pane's own window* — see
+    /// `searchKeyMonitor`'s comment for why a delegate method is not enough.
+    /// `addLocalMonitorForEvents` fires app-wide, not per-window, so without
+    /// the window check here an Esc typed into any other window (a second
+    /// split pane's search bar, a second Corta window) closed every open bar
+    /// at once and swallowed the key from all of them (B02) — a pane's
+    /// monitor must yield to the window that actually owns the key event.
+    /// Returns the event unmodified to let it continue to other monitors and
+    /// the responder chain when it isn't this pane's to consume.
+    func handleGlobalSearchEscape(_ event: NSEvent) -> NSEvent? {
+        guard event.keyCode == 53 /* kVK_Escape */, event.window === view.window else {
+            return event
+        }
+        closeSearchBar()
+        return nil
+    }
+
     /// The Find menu's items land here, tagged in the storyboard: 1 show,
     /// 2 next, 3 previous, 7 use-selection-for-find. Find and Replace and
     /// friends are ignored — a terminal has nothing to replace.
@@ -261,11 +278,7 @@ extension ViewController {
         searchBarContainer = container
         searchField = field
         searchKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            // Esc closes the bar from anywhere in the app — see the
-            // property's comment for why a delegate method is not enough.
-            guard event.keyCode == 53 /* kVK_Escape */ else { return event }
-            self?.closeSearchBar()
-            return nil
+            self?.handleGlobalSearchEscape(event) ?? event
         }
         view.window?.makeFirstResponder(field)
     }

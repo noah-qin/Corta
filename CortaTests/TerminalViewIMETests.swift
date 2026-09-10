@@ -240,6 +240,20 @@ struct TerminalViewIMETests {
         #expect(bytes == [0x0D, 0x7F, 0x1B] + Array("\u{1B}[A\u{1B}[B\u{1B}[D\u{1B}[C".utf8))
     }
 
+    /// B02: a candidate window (shell completion, an IME) can resolve Tab or
+    /// Shift-Tab as a command instead of calling `insertText`. Before this,
+    /// `doCommand(by:)` had no case for either selector and the keystroke was
+    /// silently dropped — this is the exact seam the reported Claude Code
+    /// slash-command Tab-completion failure went through.
+    @Test func doCommandForwardsTabAndBacktab() {
+        let view = Self.makeView()
+        var bytes: [UInt8] = []
+        view.onKeyBytes = { bytes += $0 }
+        view.doCommand(by: #selector(NSResponder.insertTab(_:)))
+        view.doCommand(by: #selector(NSResponder.insertBacktab(_:)))
+        #expect(bytes == [0x09] + Array("\u{1B}[Z".utf8))
+    }
+
     // MARK: - M3.3 preedit overlay
 
     @Test func preeditOverlayAppearsAtTheCursorCell() {

@@ -152,6 +152,15 @@ extension TerminalView: NSTextInputClient {
         case #selector(moveDown(_:)): bytes = Array("\u{1B}[B".utf8)
         case #selector(moveRight(_:)): bytes = Array("\u{1B}[C".utf8)
         case #selector(moveLeft(_:)): bytes = Array("\u{1B}[D".utf8)
+        // B02: a candidate window (a shell completion menu, an IME) can
+        // resolve Tab/Shift-Tab as a command instead of `insertText`, and
+        // without these cases it was silently dropped here — never reaching
+        // `bytes(for:)`'s own Tab encoding at all. `doCommand` never sees a
+        // modifier beyond Shift (⌘/⌃ never reach the input context, per
+        // `routesEventThroughIME`), so this always matches the unmodified
+        // Shift-Tab case in `TerminalView+Keyboard.swift`.
+        case #selector(insertTab(_:)): bytes = [0x09]
+        case #selector(insertBacktab(_:)): bytes = Array("\u{1B}[Z".utf8)
         default: bytes = nil
         }
         guard let bytes else { return }

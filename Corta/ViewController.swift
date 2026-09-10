@@ -221,7 +221,9 @@ class ViewController: NSViewController {
     /// Local key monitor for Esc while the bar is open: the field editor
     /// turns Esc into `cancelOperation:`, which NSSearchField can swallow
     /// without ever calling the delegate — a monitor sees the key before
-    /// any of that. Removed when the bar closes.
+    /// any of that. Scoped to this pane's own window by
+    /// `handleGlobalSearchEscape(_:)`, since the monitor itself fires
+    /// app-wide. Removed when the bar closes.
     var searchKeyMonitor: Any?
 
     /// The drag is over — the child should see the final size now, not after
