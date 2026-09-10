@@ -28,6 +28,17 @@ class ViewController: NSViewController {
     var terminalView: TerminalView!
     var terminalRenderer: TerminalRenderer!
     var session: TerminalSession!
+    /// B03: bumped every time `setUpPane()` installs a new `session`, and
+    /// captured by that session's `onOutput`/`onChildExit` closures at
+    /// install time. Those closures fire from the reader thread and hop to
+    /// the main actor to touch `self`; the generation they captured is
+    /// compared against this property's *current* value once there, so a
+    /// callback from a session `setUpPane()` has since replaced (a retry
+    /// after failure reusing this same, still-alive `ViewController`) is a
+    /// no-op instead of mutating state that belongs to a different session.
+    /// `[weak self]` alone only tells the callback the controller is still
+    /// alive, not that it is still the right session's controller.
+    private var sessionGeneration = 0
     private var commandQueue: MTLCommandQueue!
     /// Kept so `ViewController+Commands` can rebuild the renderer (with a new
     /// font size) without going through `MTLCreateSystemDefaultDevice` again.
@@ -439,6 +450,8 @@ class ViewController: NSViewController {
             return
         }
         session = started.session
+        sessionGeneration += 1
+        let generation = sessionGeneration
         // OSC 11 must answer with what is actually on screen (M6.6) — a
         // program that queries the background before choosing its own
         // colours needs the live theme's variant, not the type's default.
@@ -579,7 +592,17 @@ class ViewController: NSViewController {
         }
         // Fires on the reader thread after every parse batch.
         session.onOutput = { [weak self] in
-            self?.noteOutput()
+            self?.noteOutput(generation: generation)
+        }
+        // Fires once, from the reader thread, after the child has exited and
+        // the reader loop has stopped (B03) — previously never installed, so
+        // a child that exited on its own (`exit`, a crash, `kill`) produced
+        // no UI reaction at all, indistinguishable from a pane the user is
+        // still looking at a live shell in.
+        session.onChildExit = { [weak self] childExit in
+            Task(priority: .userInitiated) { @MainActor in
+                self?.noteChildExit(childExit, generation: generation)
+            }
         }
         // Configure-before-start (E02): callbacks must be installed before
         // the reader thread begins draining the PTY, so this stays last.
@@ -884,7 +907,9 @@ class ViewController: NSViewController {
 
     /// Called from the reader thread after each parse batch: record that the
     /// grid may have changed and wake the (possibly parked) display link.
-    nonisolated private func noteOutput() {
+    /// `generation` is `sessionGeneration` at the moment the calling
+    /// session's `onOutput` was installed — see `sessionGeneration`'s doc.
+    nonisolated private func noteOutput(generation: Int) {
         // A parse batch has landed on the grid. Emitted from the reader
         // thread, so it is a point rather than an interval — the interval it
         // would close began in `keyDown` on another thread
@@ -900,9 +925,24 @@ class ViewController: NSViewController {
         // bookkeeping — the default task priority gives it no such claim.
         Task(priority: .userInitiated) { @MainActor [weak self] in
             InputLatencySignposts.end(.wake, wake)
-            self?.terminalView?.setNeedsRedraw()
-            self?.taskNotifier.noteOutput()
+            guard let self, self.sessionGeneration == generation else { return }
+            self.terminalView?.setNeedsRedraw()
+            self.taskNotifier.noteOutput()
         }
+    }
+
+    /// B03: reacts to a child that exited on its own — as opposed to the
+    /// user closing the pane, which already went through `teardown()` and
+    /// set `didTeardown` before `session.stop()` ever made the reader loop
+    /// observe an exit. That ordering is exactly what tells the two apart:
+    /// a teardown-initiated stop must never surface a toast for a pane that
+    /// is already gone, and a generation check alone would not catch it
+    /// (`didTeardown` does not bump `sessionGeneration` — there is no new
+    /// session installed to bump it for).
+    @MainActor
+    private func noteChildExit(_: ChildExit, generation: Int) {
+        guard !didTeardown, sessionGeneration == generation else { return }
+        terminalView?.showToast(L10n.text("toast.shellExited"), kind: .warning)
     }
 
     /// Marks the display dirty and wakes the display link — for local changes

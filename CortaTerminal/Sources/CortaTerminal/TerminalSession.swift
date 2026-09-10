@@ -494,6 +494,23 @@ public final class TerminalSession: @unchecked Sendable {
         }
     }
 
+    /// What became of one `write(_:)` call (B03). Silent drops used to be
+    /// indistinguishable from a queued chunk that simply had not drained
+    /// yet — a caller like a large paste could not tell "still coming",
+    /// "the child is not reading and this was dropped", or "the session is
+    /// gone" apart, so it had nothing to react to.
+    public enum WriteOutcome: Sendable, Equatable {
+        /// Pushed onto the writer queue; will reach the child in FIFO order
+        /// unless `stop()` runs first.
+        case accepted
+        /// Dropped: the backlog was already at `maxPendingWriteBytes`,
+        /// meaning the child is not reading. Buffering further would grow
+        /// without bound for input nobody will ever act on.
+        case backpressured
+        /// Dropped: the session has already `stop()`ped.
+        case stopped
+    }
+
     /// Queues bytes for the child. Never routes attacker-controlled PTY
     /// output back into this call (`SECURITY.md` §6) — it is for keyboard
     /// input only.
@@ -508,26 +525,39 @@ public final class TerminalSession: @unchecked Sendable {
     /// input is dropped rather than buffered without bound — the alternative
     /// is the whole UI freezing on a wedged child. `stop()` cancels anything
     /// still pending.
-    public func write(_ bytes: [UInt8]) {
+    ///
+    /// The return value is the queueing decision only — `.accepted` means
+    /// this chunk joined the FIFO, not that it has reached the child yet.
+    /// Most callers (keyboard input, protocol replies) have no useful
+    /// response to a drop and may ignore it; a caller that can chunk its own
+    /// input (a paste) uses it to stop feeding a child that has already
+    /// stopped reading rather than queuing chunks that can only be dropped.
+    @discardableResult
+    public func write(_ bytes: [UInt8]) -> WriteOutcome {
         enqueueWrite(bytes)
     }
 
     /// FIFO enqueue shared by keyboard input and the parser's query replies;
     /// taking one path through one queue is what keeps the two ordered with
     /// respect to each other.
-    private func enqueueWrite(_ bytes: [UInt8]) {
-        guard !bytes.isEmpty else { return }
-        guard !stopped.withLock({ $0 }) else { return }
-        let shouldSchedule = pendingWrites.withLock { pending -> Bool in
-            guard pending.bytes <= Self.maxPendingWriteBytes else { return false }
+    @discardableResult
+    private func enqueueWrite(_ bytes: [UInt8]) -> WriteOutcome {
+        guard !bytes.isEmpty else { return .accepted }
+        guard !stopped.withLock({ $0 }) else { return .stopped }
+        var shouldSchedule = false
+        let outcome = pendingWrites.withLock { pending -> WriteOutcome in
+            guard pending.bytes <= Self.maxPendingWriteBytes else { return .backpressured }
             pending.push(bytes)
-            guard !pending.isDraining else { return false }
-            pending.isDraining = true
-            return true
+            if !pending.isDraining {
+                pending.isDraining = true
+                shouldSchedule = true
+            }
+            return .accepted
         }
         if shouldSchedule {
             writerQueue.async { [self] in drainPendingWrites() }
         }
+        return outcome
     }
 
     /// Runs on `writerQueue` only. Drains until the queue is empty or the
