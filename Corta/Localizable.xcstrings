@@ -11655,7 +11655,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "붙여넣기가 중단되었습니다 — 쁘이 입력을 읽지 않고 있습니다."
+            "value": "붙여넣기가 중단되었습니다 — 쉘이 입력을 읽지 않고 있습니다."
           }
         },
         "de": {
@@ -11714,7 +11714,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "쁘이 종료되었습니다."
+            "value": "쉘이 종료되었습니다."
           }
         },
         "de": {

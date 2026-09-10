@@ -26,13 +26,21 @@ extension ViewController {
         // whole write, so a keystroke typed mid-paste would wait behind all
         // of it rather than behind one chunk.
         for chunk in Paste.chunked(payload) {
-            let outcome = session.write(chunk)
-            guard outcome == .accepted else {
-                // The child has stopped reading (or the session is gone);
-                // the remaining chunks could only be dropped too, so stop
-                // feeding them rather than churn the queue for nothing, and
-                // say why the paste came up short.
+            switch session.write(chunk) {
+            case .accepted:
+                continue
+            case .backpressured:
+                // The child has stopped reading; the remaining chunks could
+                // only be dropped too, so stop feeding them rather than
+                // churn the queue for nothing, and say why the paste came up
+                // short.
                 terminalView?.showToast(L10n.text("toast.pasteStopped"), kind: .warning)
+                return
+            case .stopped:
+                // The session is already gone (the pane is tearing down) —
+                // nothing is reading this toast either, and "the shell isn't
+                // reading input" would be a misleading thing to say about a
+                // session that no longer exists at all.
                 return
             }
         }

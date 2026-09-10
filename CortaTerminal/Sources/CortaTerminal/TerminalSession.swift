@@ -503,9 +503,12 @@ public final class TerminalSession: @unchecked Sendable {
         /// Pushed onto the writer queue; will reach the child in FIFO order
         /// unless `stop()` runs first.
         case accepted
-        /// Dropped: the backlog was already at `maxPendingWriteBytes`,
-        /// meaning the child is not reading. Buffering further would grow
-        /// without bound for input nobody will ever act on.
+        /// Dropped: the backlog was already over `maxPendingWriteBytes`
+        /// before this chunk (the check runs before the push, so the chunk
+        /// that first crosses the cap is still accepted — see
+        /// `maxPendingWriteBytes`), meaning the child is not reading.
+        /// Buffering further would grow without bound for input nobody will
+        /// ever act on.
         case backpressured
         /// Dropped: the session has already `stop()`ped.
         case stopped
