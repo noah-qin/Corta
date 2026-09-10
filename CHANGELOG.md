@@ -25,6 +25,18 @@ what to edit.
   tests, so a pixel-mismatch failure carries the rendered PNG instead of
   only the failed comparison.
 
+### Fixed
+
+- **B02 — Tab dropped by a candidate UI (e.g. Claude Code's slash-command
+  menu).** `doCommand(by:)` had no case for `insertTab(_:)` /
+  `insertBacktab(_:)`, so a Tab press a candidate window resolved as a
+  command rather than committed text was silently dropped instead of
+  reaching the child as `0x09` / `CSI Z`.
+- **B02 — search-bar Escape leaked across windows.** The Esc key monitor
+  installed while the search bar is open fired for every window in the app,
+  so Escape in one pane could close a search bar open in a different pane
+  or window. Scoped to the window the event actually belongs to.
+
 ## [0.1.1] - 2026-09-09
 
 The quality release. Nothing here changes what Corta is; all of it is

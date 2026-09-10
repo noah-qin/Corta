@@ -326,9 +326,19 @@ Ordered by how badly they are usually underestimated.
    - Routing: an event carrying ⌘ or ⌃ bypasses the IME entirely; every
      other event is offered to `inputContext.handleEvent(_:)` first and
      falls through to direct byte translation only when unconsumed. The
-     input context consumes more than text keys — Return, Delete, Escape
-     and the arrows come back through `doCommand(by:)`, and forwarding
-     those there is load-bearing: without it they are silently eaten.
+     input context consumes more than text keys — Return, Delete, Escape,
+     the arrows, Tab and Shift-Tab come back through `doCommand(by:)`, and
+     forwarding those there is load-bearing: without it they are silently
+     eaten. Tab is the sharp case (B02): plain, unmodified Tab and
+     Shift-Tab carry neither ⌘ nor ⌃, so they are always offered to the
+     input context first, and any candidate UI — a shell completion menu,
+     an IME — that resolves the keystroke as a command rather than
+     `insertText` sends it to `doCommand(by:)` as `insertTab(_:)` /
+     `insertBacktab(_:)`. Those two cases forward `0x09` and the same
+     `CSI Z` backtab sequence `TerminalView+Keyboard.swift` already sends
+     for the direct (non-IME) path, and deliberately do not participate in
+     the kitty-protocol disambiguate re-encoding — Tab, Enter and
+     Backspace stay legacy there regardless of which path delivered them.
    - Committed text arrives via `insertText(_:replacementRange:)` and is
      written to the PTY there. Marked text is app-layer only — never the
      grid, never the PTY — drawn by `MarkedTextOverlayView` over the cells

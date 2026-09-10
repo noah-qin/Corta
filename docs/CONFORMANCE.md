@@ -123,6 +123,33 @@ be **fixed-format and never echo attacker-controlled text** — see
 | ⌘-click to open a URL                            | P1   | Scheme allowlist required — `SECURITY.md` §2.4      |
 | Kitty keyboard protocol                          | P2   | Scheduled, M6.9                                        |
 
+**B02 — Tab through a candidate UI.** The reported regression was Claude
+Code's slash-command Tab-completion not accepting the highlighted candidate
+inside Corta. Tracing `NSEvent -> inputContext.handleEvent -> doCommand(by:)`
+found the gap directly: `doCommand(by:)` (`TerminalView+IME.swift`) had no
+case for `insertTab(_:)` / `insertBacktab(_:)`, so a Tab press any candidate
+window resolved as a command — rather than committing it as text — was
+silently dropped before reaching the PTY. Fixed by forwarding both selectors
+(`0x09` and the same `CSI Z` backtab `TerminalView+Keyboard.swift` already
+sends for the direct path); see `DESIGN.md` §7.1 and
+`TerminalViewIMETests.doCommandForwardsTabAndBacktab`. A second scope bug
+turned up in the same area: the search bar's Escape key monitor
+(`NSEvent.addLocalMonitorForEvents`, `ViewController+Search.swift`) fired for
+every window in the app, so Escape in one pane could close another pane's
+search bar; scoped to the event's own window
+(`handleGlobalSearchEscape(_:)`), covered by
+`SearchDebounceTests.escapeOnlyClosesTheSearchBarInItsOwnWindow`.
+
+What the code-level fix does **not** cover, and what remains manual/human-only
+(no automated harness can drive a real candidate window or IME —
+`DESIGN.md` §7.1's verification caveat): a live confirmation that Claude Code
+itself, running inside a built Corta, now accepts Tab on its slash-command
+menu; a side-by-side comparison against a reference terminal (Terminal.app /
+iTerm2) under an English input source, a CJK input source with no marked
+text, and active CJK composition; and whether the originally reported failure
+was purely this code gap or also involved Claude Code's own configuration.
+That evidence is not yet collected — reported here rather than claimed.
+
 ### 2.2 Rendering
 
 | Capability                                       | Tier | Notes                                              |
