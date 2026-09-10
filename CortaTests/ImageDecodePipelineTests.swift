@@ -161,8 +161,8 @@ struct ImageDecodePipelineTests {
 
         renderer.update(
             table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-            scrollbackTotalPushed: scrollbackCount, cellWidth: updateArgs.cellWidth,
-            cellHeight: updateArgs.cellHeight)
+            scrollbackTotalPushed: terminal.grid.scrollback.totalPushed,
+            cellWidth: updateArgs.cellWidth, cellHeight: updateArgs.cellHeight)
         #expect(decodeCount.value == 0, "a provably offscreen placement must not decode")
         #expect(renderer.textureCount == 0)
 
@@ -170,8 +170,8 @@ struct ImageDecodePipelineTests {
         // decode happens then.
         renderer.update(
             table: Self.table(of: terminal), rows: updateArgs.rows, offset: scrollbackCount,
-            scrollbackTotalPushed: scrollbackCount, cellWidth: updateArgs.cellWidth,
-            cellHeight: updateArgs.cellHeight)
+            scrollbackTotalPushed: terminal.grid.scrollback.totalPushed,
+            cellWidth: updateArgs.cellWidth, cellHeight: updateArgs.cellHeight)
         #expect(decodeCount.value == 1)
         #expect(renderer.textureCount == 1)
     }

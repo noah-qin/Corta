@@ -995,7 +995,7 @@ class ViewController: NSViewController {
         // reset `Grid+Reflow.swift` documents). A row-only change is exactly
         // the ordinary-growth case the `baseScrollbackTotal` shift already
         // handles correctly, so it is deliberately left alone here.
-        if size.columns != lastRequestedSize?.columns {
+        if lastRequestedSize.map({ $0.columns != size.columns }) ?? false {
             selection = nil
             scrollOffset = 0
         }
