@@ -12,6 +12,21 @@ what to edit.
 
 ### Added
 
+- **B03 — session lifecycle and input backpressure made explicit.**
+  `TerminalSession.write` now returns a `WriteOutcome`
+  (`.accepted`/`.backpressured`/`.stopped`) instead of silently dropping a
+  chunk the child was not reading for; a paste is split into bounded
+  chunks (`Paste.chunked`) rather than enqueued as one arbitrarily large
+  write, so a keystroke typed mid-paste waits behind one chunk instead of
+  the whole paste, and a paste that hits backpressure stops instead of
+  queuing chunks that can only be dropped. `TerminalSession.onChildExit`
+  — built since M2 but never installed by the app — is now wired: a child
+  that exits on its own (`exit`, a crash, `kill`) shows a toast, and a
+  `sessionGeneration` counter on `ViewController`, carried through every
+  reader-thread callback's `@MainActor` hop, keeps a stale session's
+  callback from touching a pane that has since started a different one
+  (`docs/DESIGN.md` §7, "Ownership and synchronization audit," has the
+  full map).
 - **B01 — the v1 validation and performance baseline.** User-visible
   targets for input, sustained output, scrolling, startup, memory, energy,
   compatibility and recovery (`docs/PERFORMANCE.md` §1.1); the exact

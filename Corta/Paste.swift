@@ -40,4 +40,33 @@ nonisolated enum Paste {
         guard bracketedPasteEnabled else { return payload }
         return bracketStart + payload + bracketEnd
     }
+
+    /// B03: how large a piece of an already-wrapped paste one
+    /// `TerminalSession.write` call carries. Splitting the write, not the
+    /// bytes sent — the child sees the identical, unbroken byte stream
+    /// either way, since separate writes to the same pty concatenate on the
+    /// read side. What chunking buys is bounded latency for input typed
+    /// mid-paste: it shares `TerminalSession`'s one FIFO queue with keyboard
+    /// bytes, so a keystroke enqueued between two chunks is only ever
+    /// behind one chunk's `write(2)`, not the whole paste. 64 KiB matches
+    /// the reader's own read granularity (`TerminalSession.readChunkSize`).
+    static let defaultChunkSize = 64 * 1024
+
+    /// Splits `bytes` into pieces of at most `maxChunkSize`, preserving
+    /// order. An empty input yields no chunks (nothing to enqueue); a
+    /// non-positive `maxChunkSize` yields one chunk holding everything
+    /// rather than looping forever.
+    static func chunked(_ bytes: [UInt8], maxChunkSize: Int = defaultChunkSize) -> [[UInt8]] {
+        guard !bytes.isEmpty else { return [] }
+        guard maxChunkSize > 0 else { return [bytes] }
+        var chunks: [[UInt8]] = []
+        chunks.reserveCapacity((bytes.count + maxChunkSize - 1) / maxChunkSize)
+        var offset = 0
+        while offset < bytes.count {
+            let end = min(offset + maxChunkSize, bytes.count)
+            chunks.append(Array(bytes[offset..<end]))
+            offset = end
+        }
+        return chunks
+    }
 }

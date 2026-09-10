@@ -47,4 +47,40 @@ struct PasteTests {
     @Test func unbracketedPasteIsJustTheText() {
         #expect(Paste.bytes(for: "ls", bracketedPasteEnabled: false) == Array("ls".utf8))
     }
+
+    // MARK: - Chunking (B03)
+
+    @Test func emptyInputYieldsNoChunks() {
+        #expect(Paste.chunked([]).isEmpty)
+    }
+
+    @Test func inputUnderTheLimitIsOneChunk() {
+        let bytes = Array("hello".utf8)
+        #expect(Paste.chunked(bytes, maxChunkSize: 64) == [bytes])
+    }
+
+    @Test func inputIsSplitAtExactChunkBoundaries() {
+        let bytes = Array(0..<9).map { UInt8($0) }
+        let chunks = Paste.chunked(bytes, maxChunkSize: 3)
+        #expect(chunks == [[0, 1, 2], [3, 4, 5], [6, 7, 8]])
+    }
+
+    @Test func aRemainderBecomesAShorterFinalChunk() {
+        let bytes = Array(0..<8).map { UInt8($0) }
+        let chunks = Paste.chunked(bytes, maxChunkSize: 3)
+        #expect(chunks == [[0, 1, 2], [3, 4, 5], [6, 7]])
+    }
+
+    @Test func chunksConcatenateBackToTheOriginalBytes() {
+        let bytes = (0..<500).map { UInt8($0 % 256) }
+        let chunks = Paste.chunked(bytes, maxChunkSize: 37)
+        #expect(chunks.flatMap { $0 } == bytes)
+        #expect(chunks.allSatisfy { !$0.isEmpty && $0.count <= 37 })
+    }
+
+    @Test func nonPositiveChunkSizeStillTerminates() {
+        let bytes = Array("abc".utf8)
+        #expect(Paste.chunked(bytes, maxChunkSize: 0) == [bytes])
+        #expect(Paste.chunked(bytes, maxChunkSize: -1) == [bytes])
+    }
 }

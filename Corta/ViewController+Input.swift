@@ -19,7 +19,31 @@ extension ViewController {
             alert.addButton(withTitle: L10n.text("common.cancel"))
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
-        session.write(Paste.bytes(for: sanitized, bracketedPasteEnabled: bracketedPasteEnabled()))
+        let payload = Paste.bytes(for: sanitized, bracketedPasteEnabled: bracketedPasteEnabled())
+        // B03: bounded chunks, not one arbitrarily large enqueue — a
+        // multi-megabyte paste sent as a single `write` would occupy the
+        // one FIFO the writer queue shares with keyboard input for the
+        // whole write, so a keystroke typed mid-paste would wait behind all
+        // of it rather than behind one chunk.
+        for chunk in Paste.chunked(payload) {
+            switch session.write(chunk) {
+            case .accepted:
+                continue
+            case .backpressured:
+                // The child has stopped reading; the remaining chunks could
+                // only be dropped too, so stop feeding them rather than
+                // churn the queue for nothing, and say why the paste came up
+                // short.
+                terminalView?.showToast(L10n.text("toast.pasteStopped"), kind: .warning)
+                return
+            case .stopped:
+                // The session is already gone (the pane is tearing down) —
+                // nothing is reading this toast either, and "the shell isn't
+                // reading input" would be a misleading thing to say about a
+                // session that no longer exists at all.
+                return
+            }
+        }
     }
 
     /// The Edit menu's Paste lands on `TerminalView.paste(_:)`; the context

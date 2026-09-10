@@ -200,6 +200,45 @@ import Testing
             "the seventh chunk arrives with a 6 MB backlog and must be dropped; drained markers: \(markers)")
     }
 
+    /// B03: the queueing decision itself must be observable, not just its
+    /// eventual effect on what the child receives — a caller that can react
+    /// (a paste chunking itself) needs to know a chunk was dropped without
+    /// waiting to see whether it was ever echoed back.
+    @Test func writeReportsAcceptedBackpressuredAndStopped() throws {
+        let session = try TerminalSession(executable: "/bin/cat")
+
+        let gateOpen = Mutex(false)
+        let sinkEntered = Mutex(false)
+        session.writerSink = { chunk in
+            sinkEntered.withLock { $0 = true }
+            while !gateOpen.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.001) }
+            _ = chunk
+        }
+        session.start()
+
+        let megabyte = 1024 * 1024
+        let first = [UInt8](repeating: 0, count: megabyte)
+        #expect(session.write(first) == .accepted)
+        #expect(
+            awaitCondition { sinkEntered.withLock { $0 } },
+            "precondition: the drain should be parked inside the gated sink")
+
+        // Five more megabyte chunks are each accepted while the backlog is
+        // still at-or-under the 4 MB cap when the check runs (the first
+        // chunk is already out of the queue, in the sink) — same accounting
+        // as `backlogBeyondTheCapIsDropped`, which this mirrors from the
+        // return-value side. The backlog now sits at 5 MB, already past the
+        // cap, so the sixth is the one dropped.
+        for _ in 0..<5 {
+            #expect(session.write([UInt8](repeating: 1, count: megabyte)) == .accepted)
+        }
+        #expect(session.write([UInt8](repeating: 2, count: megabyte)) == .backpressured)
+
+        gateOpen.withLock { $0 = true }
+        session.stop()
+        #expect(session.write([1]) == .stopped)
+    }
+
     /// End to end, with the real pty as the sink: queued writes reach the
     /// child in FIFO order.
     @Test func queuedWritesReachTheChildInOrder() throws {
