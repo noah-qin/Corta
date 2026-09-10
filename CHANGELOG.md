@@ -110,6 +110,17 @@ which matters to anything doing capability detection.
 - **U09 (2026-09-08)** — A pane that failed to start was silent to a screen
   reader and left nothing focused for the keyboard.
 
+**Found while publishing.**
+
+- **An update for 0.1.0 users would never have arrived.** Sparkle compares
+  `CFBundleVersion` — the build number — and `CURRENT_PROJECT_VERSION` had
+  been 1 since 0.1.0 and was still 1 here, so 0.1.1 looked to every
+  installed copy like the version it was already running.
+  `generate_appcast` showed it plainly: it overwrote 0.1.0's feed entry
+  instead of adding one. The build number is 2 now, a test refuses a build
+  number a 0.1.0 install could not be offered, and the release checklist
+  names all three version numbers instead of two.
+
 **Found by the Stage 4 audits.**
 
 - The terminal answered `XTVERSION` with `Corta(0.1.0)` whatever version it
@@ -555,12 +566,26 @@ For the maintainer, cutting any release:
 
 1. Move the relevant `[Unreleased]` entries under a new `## [x.y.z]`
    heading with the date, and leave `[Unreleased]` empty above it.
-2. Update **both** hand-written version numbers to match:
-   `MARKETING_VERSION` in `Corta.xcodeproj/project.pbxproj` (all six
-   build configurations) and `CortaVersion.string` in
-   `CortaTerminal/Sources/CortaTerminal/Version.swift`, which is what
-   XTVERSION answers a program with. `VersionAgreementTests` fails if
-   only one of them moves.
+2. Update the three hand-written version numbers, in
+   `Corta.xcodeproj/project.pbxproj` (all six build configurations) and
+   the core. **Two of them carry the release's semantic version and must
+   read exactly the same; the third is a build counter and only has to go
+   up:**
+   - `MARKETING_VERSION` — the semantic version, e.g. `0.1.1`. What the
+     bundle and the About panel show.
+   - `CortaVersion.string` in `CortaTerminal/Sources/CortaTerminal/Version.swift`
+     — the same string again, and what XTVERSION answers a program with.
+   - **`CURRENT_PROJECT_VERSION`** — *not* the semantic version. A plain
+     integer that increments once per release (0.1.0 shipped 1, 0.1.1
+     ships 2), and the one Sparkle actually compares. Two releases sharing a build number means
+     the second is invisible to everyone running the first, and
+     `generate_appcast` overwrites the earlier feed entry rather than
+     adding one. 0.1.1 hit this: it was built, signed, notarised and
+     published carrying build 1, exactly like 0.1.0, and the mistake only
+     surfaced at step 5 when the feed came out with one item in it.
+   `VersionAgreementTests` fails if the marketing version and the core
+   constant disagree, or if the build number is one a 0.1.0 install could
+   not be offered.
 3. Re-record the tracking table in `docs/ROADMAP.md` if any number moved.
 4. Commit as `chore: release x.y.z`, then tag `vx.y.z` and push the tag.
    The release workflow builds from the tag and opens a **draft** release
