@@ -433,12 +433,12 @@ alone:
    baked characters, so composition never opens for them.
 8. **Sleep/wake** — the machine actually sleeping and waking with Corta
    running. Manual only, deliberately not scripted:
-   `measure-app-baseline.sh`'s own comment is explicit that sleep/wake and
+   `scripts/measure-app-baseline.sh`'s own comment is explicit that sleep/wake and
    low-power mode change machine-wide state other processes depend on, and
    need a dedicated session on an idle machine, not a CI-style script.
 9. **Restoration** — force-quit or crash Corta with a multi-pane layout and
    scrollback, relaunch, confirm the arrangement and content return (U07).
-   Partly scriptable: `measure-app-baseline.sh`'s `SessionRestore`
+   Partly scriptable: `scripts/measure-app-baseline.sh`'s `SessionRestore`
    config-flip pattern drives this without touching global machine state
    (it flips `restore-windows` in the config file, writes a `state.json`,
    launches, then restores the original config on every exit path) — but it

@@ -43,10 +43,10 @@ rather than filled in with a guess.
 | Sustained output | A flood (`yes`, a build log, a training run) does not fall behind or drop frames below §1's frame budget | `corta-bench`'s parse-throughput and write-backpressure benchmarks; `scripts/measure-app-baseline.sh` phase B flood |
 | Scrolling      | Scrolling a long buffer tracks the pointer/trackpad with no visible stutter | `scripts/measure-render-metrics.sh` (`CORTA_RENDER_METRICS` ring buffer); no dedicated automated scroll benchmark exists yet — a real gap, not an oversight |
 | Startup        | A warm launch reaches an interactive window fast enough that switching to Corta does not feel like waiting for an app to open | `scripts/measure-app-baseline.sh` phase A (5 warm launches + 1 cold-ish) |
-| Memory         | §1's scrollback figure holds, and closing panes/windows returns memory rather than leaking it | `corta-bench`'s scrollback-footprint and peak-RSS benchmarks; `measure-app-baseline.sh`'s post-close recovery phase |
+| Memory         | §1's scrollback figure holds, and closing panes/windows returns memory rather than leaking it | `corta-bench`'s scrollback-footprint and peak-RSS benchmarks; `scripts/measure-app-baseline.sh`'s post-close recovery phase |
 | Energy         | An idle pane draws no more power than idle CPU (§1) implies; a flooding pane does not keep the GPU busier than the frames it is actually producing require | No dedicated energy harness exists — Activity Monitor / `powermetrics` spot-checks only, manual and not repeatable. Stated as an open gap rather than a met target |
 | Compatibility  | The real-program and esctest pass rates `CONFORMANCE.md` already tracks | `CONFORMANCE.md` §4.2 (esctest), §4.4.2 (real-program table), §4.6 (manual scenario pass) — cross-referenced here rather than duplicated |
-| Recovery       | A crashed or force-quit Corta restores its window/split/scrollback state on next launch without asking the user to rebuild it by hand | `measure-app-baseline.sh`'s SessionRestore-driven multi-pane phases; U07's crash-marker mechanism (`CHANGELOG.md`) |
+| Recovery       | A crashed or force-quit Corta restores its window/split/scrollback state on next launch without asking the user to rebuild it by hand | `scripts/measure-app-baseline.sh`'s SessionRestore-driven multi-pane phases; U07's crash-marker mechanism (`CHANGELOG.md`) |
 
 Startup, memory and energy inherit their machine dependency from §5.2 below —
 a number recorded here is only comparable to another run that held the same
@@ -261,7 +261,7 @@ but avg/min/max/SD only) sits `CORTA_RENDER_METRICS=1`
 `drawableWait` and `gpu` from a live, on-screen app, without Instruments.
 Its limit is the opposite of Typometer's: it needs a person at the keyboard
 typing and scrolling for the ring to fill with real frames (the
-`measure-app-baseline.sh` finding that synthetic System Events keystrokes
+`scripts/measure-app-baseline.sh` finding that synthetic System Events keystrokes
 never reach `TerminalView` applies here too — a scripted flood through the
 PTY slave fills `drawableWait`/`gpu`, but `cpuFrame` specifically wants real
 keyDown-triggered frames), so running it and reading its output is recorded
@@ -290,8 +290,12 @@ samples is the second-largest value in the set, which is one scheduling
 hiccup away from being noise; `corta-bench` takes 2,000.
 
 **A fresh headless sample (B01, 2026-09-10, this machine — see §5.2's
-toolchain table above).** `swift build --package-path CortaTerminal
--c release --product corta-bench && CortaTerminal/.build/release/corta-bench`:
+toolchain table below).**
+
+```sh
+swift build --package-path CortaTerminal -c release --product corta-bench
+CortaTerminal/.build/release/corta-bench
+```
 
 | Benchmark | p50 | p95 | p99 | max | n |
 | --- | --- | --- | --- | --- | --- |
@@ -308,7 +312,7 @@ benchmarks not tabulated above, is reproducible with the command above; it
 is headless and scripted, so — unlike the Typometer numbers below — this
 much of §5.2's table is trivially held exactly by running it again. This is
 core-side only; it says nothing about the AppKit/render stages §5.3 and
-§5.4 cover, which is exactly the boundary `measure-app-baseline.sh` and
+§5.4 cover, which is exactly the boundary `scripts/measure-app-baseline.sh` and
 `CORTA_RENDER_METRICS` exist to close.
 
 ### 5.2 The fixed benchmark environment
