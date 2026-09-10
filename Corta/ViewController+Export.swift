@@ -36,40 +36,44 @@ extension ViewController {
         let range = selection.map { selectionRange(for: $0, in: grid) }
 
         largeTextTask?.cancel()
-        let textTask = Task.detached(priority: .userInitiated) {
-            Self.exportableText(grid: grid, selection: range)
-        }
-        largeTextTask = Task { _ = await textTask.value }
+        largeTextTask = Task { [weak self] in
+            // `async let`, not a separately-created `Task.detached`: only a
+            // *structured* child's cancellation is propagated automatically
+            // when `largeTextTask` itself is cancelled (superseded by a
+            // second export, or `teardown()`) — see `copy(_:)`'s identical
+            // reasoning, which caught the same mistake here first.
+            async let built = Self.exportableText(grid: grid, selection: range)
 
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.plainText]
-        panel.nameFieldStringValue = Self.exportFilename(hasSelection: hasSelection)
-        panel.canCreateDirectories = true
-        panel.isExtensionHidden = false
-        panel.message = L10n.text(
-            hasSelection ? "export.message.selection" : "export.message.history")
-        panel.beginSheetModal(for: window) { [weak self] response in
-            guard response == .OK, let url = panel.url else {
-                textTask.cancel()
+            let panel = NSSavePanel()
+            panel.allowedContentTypes = [.plainText]
+            panel.nameFieldStringValue = Self.exportFilename(hasSelection: hasSelection)
+            panel.canCreateDirectories = true
+            panel.isExtensionHidden = false
+            panel.message = L10n.text(
+                hasSelection ? "export.message.selection" : "export.message.history")
+            let url: URL? = await withCheckedContinuation { continuation in
+                panel.beginSheetModal(for: window) { response in
+                    continuation.resume(returning: response == .OK ? panel.url : nil)
+                }
+            }
+            guard !Task.isCancelled, let url else { return }
+
+            let text = await built
+            guard !Task.isCancelled else { return }
+            guard !text.isEmpty else {
+                self?.terminalView?.showToast(L10n.text("toast.nothingToExport"), kind: .warning)
                 return
             }
-            Task { [weak self] in
-                let text = await textTask.value
-                guard !text.isEmpty else {
-                    self?.terminalView?.showToast(L10n.text("toast.nothingToExport"), kind: .warning)
-                    return
-                }
-                do {
-                    try Self.write(text, to: url)
-                    self?.terminalView?.showToast(L10n.text("toast.exported"))
-                } catch {
-                    // The panel already granted access, so a failure here is
-                    // a full disk or a read-only volume — worth an alert
-                    // rather than a toast, because the file the user asked
-                    // for does not exist and nothing else would say so.
-                    let alert = NSAlert(error: error)
-                    await alert.beginSheetModal(for: window)
-                }
+            do {
+                try Self.write(text, to: url)
+                self?.terminalView?.showToast(L10n.text("toast.exported"))
+            } catch {
+                // The panel already granted access, so a failure here is a
+                // full disk or a read-only volume — worth an alert rather
+                // than a toast, because the file the user asked for does not
+                // exist and nothing else would say so.
+                let alert = NSAlert(error: error)
+                await alert.beginSheetModal(for: window)
             }
         }
     }

@@ -52,9 +52,15 @@ extension ViewController {
         let range = selectionRange(for: selection, in: grid)
         largeTextTask?.cancel()
         largeTextTask = Task { [weak self] in
-            let text = await Task.detached(priority: .userInitiated) {
-                Selection.text(of: range, in: grid)
-            }.value
+            // `async let`, not a separately-created `Task.detached`: only a
+            // *structured* child's cancellation is propagated automatically
+            // when `largeTextTask` itself is cancelled (superseded by a
+            // second copy, or `teardown()`) — an unstructured child task
+            // stored nowhere would keep running regardless of what happens
+            // to this one, which is exactly what Copilot's review caught in
+            // an earlier version of this change.
+            async let built = Selection.text(of: range, in: grid)
+            let text = await built
             guard !Task.isCancelled, !text.isEmpty else { return }
             let pasteboard = NSPasteboard.general
             pasteboard.clearContents()
