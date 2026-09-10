@@ -500,8 +500,10 @@ public final class TerminalSession: @unchecked Sendable {
     /// "the child is not reading and this was dropped", or "the session is
     /// gone" apart, so it had nothing to react to.
     public enum WriteOutcome: Sendable, Equatable {
-        /// Pushed onto the writer queue; will reach the child in FIFO order
-        /// unless `stop()` runs first.
+        /// Not dropped: pushed onto the writer queue and will reach the
+        /// child in FIFO order unless `stop()` runs first, or — for an
+        /// empty `bytes` — nothing to queue at all, an unconditional no-op
+        /// rather than a decision that could ever go the other way.
         case accepted
         /// Dropped: the backlog was already over `maxPendingWriteBytes`
         /// before this chunk (the check runs before the push, so the chunk
