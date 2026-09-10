@@ -40,20 +40,32 @@ extension ViewController {
     /// ⌘C and the Edit menu's Copy land here through the responder chain
     /// (`TerminalView` does not implement `copy:`). Copies the selection;
     /// with none there is nothing to do — ⌘C never reaches the PTY.
+    ///
+    /// B05: `Selection.text` is O(the selection), which for ⌘A over a large
+    /// scrollback is the whole document — the same cost class
+    /// `exportText(_:)` moved off the interaction path, so copy does too,
+    /// sharing its `largeTextTask` handle (cancels a copy superseded by a
+    /// second one, or by `teardown()`).
     @objc func copy(_ sender: Any?) {
         guard let selection, session != nil else { return }
         let grid = session.snapshot()
-        let text = Selection.text(of: selectionRange(for: selection, in: grid), in: grid)
-        guard !text.isEmpty else { return }
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
-        // Confirmation *after* the write, and only when there was something
-        // to write: an empty selection returns above, and a toast for a copy
-        // that did not happen is worse than no toast. This is what makes
-        // copy-on-select safe to have on by default (M7.10) — the clipboard
-        // no longer changes silently.
-        terminalView?.showToast(L10n.text("toast.copied"))
+        let range = selectionRange(for: selection, in: grid)
+        largeTextTask?.cancel()
+        largeTextTask = Task { [weak self] in
+            let text = await Task.detached(priority: .userInitiated) {
+                Selection.text(of: range, in: grid)
+            }.value
+            guard !Task.isCancelled, !text.isEmpty else { return }
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(text, forType: .string)
+            // Confirmation *after* the write, and only when there was
+            // something to write: an empty selection is a no-op above, and
+            // a toast for a copy that did not happen is worse than no
+            // toast. This is what makes copy-on-select safe to have on by
+            // default (M7.10) — the clipboard no longer changes silently.
+            self?.terminalView?.showToast(L10n.text("toast.copied"))
+        }
     }
 
     /// ⌘A: the whole document — scrollback plus screen.

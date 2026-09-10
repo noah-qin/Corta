@@ -61,10 +61,23 @@ extension ViewController {
     /// split pane's search bar, a second Corta window) closed every open bar
     /// at once and swallowed the key from all of them (B02) — a pane's
     /// monitor must yield to the window that actually owns the key event.
+    ///
+    /// The window check alone is not enough once a *split* puts two panes,
+    /// each with its own open bar, in the same window (B05): both panes'
+    /// monitors would see `event.window === view.window` and both would
+    /// close, only one of which the key was actually meant for. The field
+    /// editor is the window's first responder while a search field is being
+    /// edited, and its `delegate` is forwarded to the `NSSearchField` it is
+    /// editing on behalf of (`showSearchBar`'s `field.delegate = self`
+    /// applies to the search field, but the editing session's `NSText`
+    /// reports the field itself as its delegate) — so comparing that against
+    /// *this* pane's `searchField` is what tells the two panes apart.
     /// Returns the event unmodified to let it continue to other monitors and
     /// the responder chain when it isn't this pane's to consume.
     func handleGlobalSearchEscape(_ event: NSEvent) -> NSEvent? {
-        guard event.keyCode == 53 /* kVK_Escape */, event.window === view.window else {
+        guard event.keyCode == 53 /* kVK_Escape */, event.window === view.window,
+            (event.window?.firstResponder as? NSText)?.delegate === searchField
+        else {
             return event
         }
         closeSearchBar()
@@ -95,6 +108,11 @@ extension ViewController {
             return
         }
         scrollOffsetBeforeSearch = scrollOffset
+        totalPushedBeforeSearch = session?.snapshot().scrollback.totalPushed
+        // B05: seeded from the global default, then local to this pane —
+        // see `searchCaseSensitive`'s doc comment.
+        searchCaseSensitive = ConfigurationStore.shared.configuration.searchCaseSensitive
+        searchRegex = ConfigurationStore.shared.configuration.searchRegex
 
         // Symbols, not text, and all at one weight and point size so the
         // three of them read as a set rather than as three separate
@@ -306,10 +324,18 @@ extension ViewController {
         // the cancellation check from being applied.
         searchTask?.cancel()
         searchTask = nil
+        searchNeedsRefresh = false
         searchRefreshGeneration &+= 1
         if let beforeSearch = scrollOffsetBeforeSearch {
-            scrollOffset = beforeSearch
+            // B05: shift by the growth since capture, exactly like a
+            // selection's `baseScrollbackTotal` — restoring the raw offset
+            // alone would land on different text if output arrived while
+            // the bar was open (`totalPushedBeforeSearch`'s doc comment).
+            let scrollback = session?.snapshot().scrollback
+            let growth = max(0, (scrollback?.totalPushed ?? 0) - (totalPushedBeforeSearch ?? 0))
+            scrollOffset = min(scrollback?.count ?? beforeSearch, max(0, beforeSearch + growth))
             scrollOffsetBeforeSearch = nil
+            totalPushedBeforeSearch = nil
         }
         invalidateDisplay()
         view.window?.makeFirstResponder(terminalView)
@@ -349,12 +375,17 @@ extension ViewController {
             invalidateDisplay()
             return
         }
-        let caseSensitive = ConfigurationStore.shared.configuration.searchCaseSensitive
-        let regex = ConfigurationStore.shared.configuration.searchRegex
+        // B05: this pane's own local copy, not the live global default —
+        // see `searchCaseSensitive`'s doc comment.
+        let caseSensitive = searchCaseSensitive
+        let regex = searchRegex
         // Snapshotted on the main thread, but a Grid is copy-on-write — a
         // handful of retains, not a copy.
         let grid = session.snapshot()
         let totalPushed = grid.scrollback.totalPushed
+        // A fresh, explicitly-requested sweep supersedes any pending
+        // output-driven follow-up — it already reads the current grid.
+        searchNeedsRefresh = false
         searchTask = Task.detached(priority: .userInitiated) { [weak self] in
             // Debounce: a keystroke burst becomes one sweep, started once
             // the burst pauses. A cancelled sleep throws — a superseded
@@ -382,21 +413,31 @@ extension ViewController {
     /// off the main thread for the sweep itself.
     ///
     /// At most one sweep is ever in flight: an output batch that arrives
-    /// while the previous recompute is still running is dropped, not
-    /// queued — the in-flight snapshot is at most a frame old, and the
-    /// next output frame starts a fresh sweep as soon as this one lands.
-    /// During an output flood that keeps refresh at the sweep rate, not
-    /// the frame rate.
+    /// while the previous recompute is still running does not start a
+    /// second one — but it is not dropped either (B05). It sets
+    /// `searchNeedsRefresh`, which `applySearchResults` checks once the
+    /// in-flight sweep lands; without that, output arriving after the last
+    /// sweep that actually ran left the results stale with nothing left to
+    /// nudge them, since the render loop stops calling this at all once the
+    /// grid stops changing.
     func scheduleBackgroundSearchRefresh() {
-        guard searchBar != nil, let searchField, let session, searchTask == nil else { return }
+        guard searchBar != nil, let searchField, let session else { return }
+        guard searchTask == nil else {
+            searchNeedsRefresh = true
+            return
+        }
         searchRefreshGeneration &+= 1
         let generation = searchRefreshGeneration
         let query = searchField.stringValue
         let grid = session.snapshot()
         let totalPushed = grid.scrollback.totalPushed
-        let caseSensitive = ConfigurationStore.shared.configuration.searchCaseSensitive
-        let regex = ConfigurationStore.shared.configuration.searchRegex
+        // B05: this pane's own local copy — see `searchCaseSensitive`'s doc
+        // comment.
+        let caseSensitive = searchCaseSensitive
+        let regex = searchRegex
+        let gate = searchSweepGate
         searchTask = Task.detached(priority: .utility) { [weak self] in
+            gate?()
             let outcome = Self.sweep(
                 query, in: grid, caseSensitive: caseSensitive, regex: regex)
             await MainActor.run {
@@ -496,6 +537,13 @@ extension ViewController {
         }
         updateSearchCountLabel()
         invalidateDisplay()
+        // B05: output that arrived while this sweep was running is caught
+        // up on now, rather than staying stale until something unrelated
+        // (a keystroke, a scroll) happened to trigger the next sweep.
+        if searchNeedsRefresh {
+            searchNeedsRefresh = false
+            scheduleBackgroundSearchRefresh()
+        }
     }
 
     /// The match nearest a remembered absolute row. Nearest rather than
@@ -605,12 +653,13 @@ extension ViewController {
         }
     }
 
-    /// U12 — flips `search-case-sensitive` in the config file, which is the
-    /// only settings store (`CONFIGURATION.md`), and re-runs the query.
+    /// U12 — flips this pane's local case-sensitivity (B05) and persists it
+    /// to the config file as the new default for bars opened after this
+    /// one; an already-open bar in another pane keeps its own local value
+    /// and button state until *it* is next opened fresh.
     @objc private func toggleSearchCase(_ sender: Any?) {
-        _ = ConfigurationStore.shared.update {
-            $0.searchCaseSensitive.toggle()
-        }
+        searchCaseSensitive.toggle()
+        _ = ConfigurationStore.shared.update { $0.searchCaseSensitive = self.searchCaseSensitive }
         if let button = sender as? NSButton { updateCaseButton(button) }
         // The match list changes, so the place is re-found rather than kept:
         // a case-sensitive sweep may not contain the match the user was on.
@@ -618,16 +667,18 @@ extension ViewController {
         updateSearchResults(scrollsToMatch: true)
     }
 
-    /// U16 — flips `search-regex` and re-runs the query.
+    /// U16 — flips this pane's local regex mode (B05) and persists it as
+    /// the new default; see `toggleSearchCase`.
     @objc private func toggleSearchRegex(_ sender: Any?) {
-        _ = ConfigurationStore.shared.update { $0.searchRegex.toggle() }
+        searchRegex.toggle()
+        _ = ConfigurationStore.shared.update { $0.searchRegex = self.searchRegex }
         if let button = sender as? NSButton { updateRegexButton(button) }
         currentSearchMatchAnchor = nil
         updateSearchResults(scrollsToMatch: true)
     }
 
     private func updateRegexButton(_ button: NSButton) {
-        let on = ConfigurationStore.shared.configuration.searchRegex
+        let on = searchRegex
         button.contentTintColor = on ? .controlAccentColor : SystemAccessibility.secondaryLabelColor
         button.setAccessibilityValue(on ? 1 : 0)
         button.toolTip = L10n.text("search.regex")
@@ -636,7 +687,7 @@ extension ViewController {
     /// State on a borderless icon button has to be legible without colour —
     /// the tint says it at a glance, the accessibility value says it at all.
     private func updateCaseButton(_ button: NSButton) {
-        let on = ConfigurationStore.shared.configuration.searchCaseSensitive
+        let on = searchCaseSensitive
         button.contentTintColor = on ? .controlAccentColor : SystemAccessibility.secondaryLabelColor
         button.setAccessibilityValue(on ? 1 : 0)
         button.toolTip = L10n.text("search.caseSensitive")

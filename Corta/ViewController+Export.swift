@@ -17,17 +17,29 @@ import UniformTypeIdentifiers
 /// Copy already follows one level down, and it means the command needs no
 /// second name and no submenu: what you have selected is what you get.
 extension ViewController {
+    /// B05: building the text is O(scrollback) — the same cost class
+    /// `PERFORMANCE.md` §5.2 measures a full-document search sweep at
+    /// hundreds of ms for a 100k-line history — so it runs off the main
+    /// thread rather than stalling the panel's own appearance and every
+    /// other interaction behind it. It starts immediately, in parallel with
+    /// the save panel the user is about to spend a few seconds navigating,
+    /// so the common case pays the cost concurrently rather than serially;
+    /// only the write and the resulting toast wait for the panel's answer.
+    /// `largeTextTask` cancels a superseded export (a second ⌘⇧S before the
+    /// first panel closed) and is cancelled itself from `teardown()`, so a
+    /// closed pane's build does not keep running for a write that can never
+    /// land.
     @objc func exportText(_ sender: Any?) {
-        guard isOperable, let window = view.window else { return }
+        guard isOperable, let window = view.window, session != nil else { return }
         let grid = session.snapshot()
         let hasSelection = selection != nil
-        let text = Self.exportableText(grid: grid, selection: selection.map {
-            selectionRange(for: $0, in: grid)
-        })
-        guard !text.isEmpty else {
-            terminalView?.showToast(L10n.text("toast.nothingToExport"), kind: .warning)
-            return
+        let range = selection.map { selectionRange(for: $0, in: grid) }
+
+        largeTextTask?.cancel()
+        let textTask = Task.detached(priority: .userInitiated) {
+            Self.exportableText(grid: grid, selection: range)
         }
+        largeTextTask = Task { _ = await textTask.value }
 
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.plainText]
@@ -37,17 +49,27 @@ extension ViewController {
         panel.message = L10n.text(
             hasSelection ? "export.message.selection" : "export.message.history")
         panel.beginSheetModal(for: window) { [weak self] response in
-            guard response == .OK, let url = panel.url else { return }
-            do {
-                try Self.write(text, to: url)
-                self?.terminalView?.showToast(L10n.text("toast.exported"))
-            } catch {
-                // The panel already granted access, so a failure here is a
-                // full disk or a read-only volume — worth an alert rather
-                // than a toast, because the file the user asked for does not
-                // exist and nothing else would say so.
-                let alert = NSAlert(error: error)
-                alert.beginSheetModal(for: window)
+            guard response == .OK, let url = panel.url else {
+                textTask.cancel()
+                return
+            }
+            Task { [weak self] in
+                let text = await textTask.value
+                guard !text.isEmpty else {
+                    self?.terminalView?.showToast(L10n.text("toast.nothingToExport"), kind: .warning)
+                    return
+                }
+                do {
+                    try Self.write(text, to: url)
+                    self?.terminalView?.showToast(L10n.text("toast.exported"))
+                } catch {
+                    // The panel already granted access, so a failure here is
+                    // a full disk or a read-only volume — worth an alert
+                    // rather than a toast, because the file the user asked
+                    // for does not exist and nothing else would say so.
+                    let alert = NSAlert(error: error)
+                    await alert.beginSheetModal(for: window)
+                }
             }
         }
     }
@@ -69,7 +91,7 @@ extension ViewController {
     /// Static and pure so the range arithmetic is testable without a window
     /// or a save panel — the part that can be wrong is which rows are chosen,
     /// not that `NSSavePanel` works.
-    static func exportableText(grid: Grid, selection: SelectionRange?) -> String {
+    nonisolated static func exportableText(grid: Grid, selection: SelectionRange?) -> String {
         if let selection { return Selection.text(of: selection, in: grid) }
         // The whole document, the same range ⌘A builds: the scrollback
         // counts backwards from the live screen, so its first row is

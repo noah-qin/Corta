@@ -224,11 +224,51 @@ class ViewController: NSViewController {
     /// The scroll position from before the search bar opened, restored on
     /// Esc.
     var scrollOffsetBeforeSearch: Int?
+    /// `Scrollback.totalPushed` when `scrollOffsetBeforeSearch` was
+    /// captured (B05). Output arriving while the bar is open grows
+    /// `totalPushed`, so restoring the raw offset alone would land the
+    /// viewport on different text than what was actually on screen before
+    /// search opened — the same class of drift `docs/DESIGN.md` §2.7
+    /// documents for a selection's `baseScrollbackTotal`, applied here to
+    /// the pre-search anchor instead.
+    var totalPushedBeforeSearch: Int?
     /// Bumped by every `scheduleBackgroundSearchRefresh` call (M9); a
     /// background sweep applies its result only if this still matches what
     /// it captured when it started, so a superseded or late-arriving one is
     /// silently discarded instead of clobbering a newer result.
     var searchRefreshGeneration = 0
+    /// B05: set when `scheduleBackgroundSearchRefresh` is called while a
+    /// sweep is already in flight, rather than silently dropping the output
+    /// that triggered the call. Consumed in `applySearchResults` once the
+    /// in-flight sweep lands, which starts the follow-up sweep that output
+    /// asked for — without this, output arriving at the tail of a burst
+    /// (after which nothing else re-triggers a sweep, since the render loop
+    /// pauses once the grid stops changing) left the search results stale
+    /// until something unrelated nudged them.
+    var searchNeedsRefresh = false
+    /// Test hook: run at the start of `scheduleBackgroundSearchRefresh`'s
+    /// detached task, before the sweep, so a test can hold one sweep open
+    /// deterministically and observe the "already in flight" branch rather
+    /// than racing a real one. `nil` in production. Assign before calling
+    /// `scheduleBackgroundSearchRefresh`.
+    var searchSweepGate: (@Sendable () -> Void)?
+    /// B05: the in-flight large copy/export text build, if any — building a
+    /// potentially whole-scrollback string is O(scrollback), so it runs off
+    /// the interaction path (`ViewController+Export.swift`, `copy(_:)`).
+    /// Cancelling a superseded build (a second export before the first
+    /// panel closed) or the pane's own is what this handle is for; it does
+    /// not otherwise carry a value.
+    var largeTextTask: Task<Void, Never>?
+    /// B05: local to this pane once the bar is open — seeded from the
+    /// global default when it opens, toggled independently of any other
+    /// currently-open bar, and pushed back to `ConfigurationStore` only as
+    /// the new default for bars opened after this one. Reading
+    /// `ConfigurationStore` live on every sweep (the pre-B05 behaviour)
+    /// meant toggling case-sensitivity in one pane silently changed what a
+    /// second, already-open pane's *next* sweep would match, without that
+    /// pane's own button ever updating to say so.
+    var searchCaseSensitive = false
+    var searchRegex = false
     /// Local key monitor for Esc while the bar is open: the field editor
     /// turns Esc into `cancelOperation:`, which NSSearchField can swallow
     /// without ever calling the delegate — a monitor sees the key before
@@ -754,7 +794,8 @@ class ViewController: NSViewController {
     /// an orphan, holding its PTY and its thread.
     ///
     /// The steps: the search bar (its Esc key monitor; a sweep in flight
-    /// is cancelled by `closeSearchBar`), the
+    /// is cancelled by `closeSearchBar`), an in-flight large copy/export
+    /// text build (B05), the
     /// task notifier's idle timer, this pane's notification observers, and
     /// the session itself (SIGHUP to the child's process group, PTY
     /// closed, reader thread exits).
@@ -762,6 +803,8 @@ class ViewController: NSViewController {
         guard !didTeardown else { return }
         didTeardown = true
         closeSearchBar()
+        largeTextTask?.cancel()
+        largeTextTask = nil
         taskNotifier.cancel()
         NotificationCenter.default.removeObserver(self)
         session?.stop()

@@ -42,6 +42,32 @@ what to edit.
 
 ### Fixed
 
+- **B05 — search case-sensitivity and regex mode leaked across panes.**
+  Both were read live from `ConfigurationStore` on every sweep; toggling
+  either in one pane silently changed what a second, already-open pane's
+  next sweep matched, without that pane's button ever updating. Each pane
+  now keeps its own local copy, seeded from the config default when its
+  bar opens.
+- **B05 — Esc could close the wrong pane's search bar in a split.** B02
+  scoped the Esc handler to the event's window, but two panes in one
+  split share a window; Esc now also checks that this pane's search field
+  is the one actually being edited.
+- **B05 — output at the tail of a burst could leave search results
+  stale.** `scheduleBackgroundSearchRefresh` dropped an output-triggered
+  refresh outright whenever a sweep was already running, on the
+  assumption more output would trigger another one — true only while
+  output kept arriving. A dropped request is now remembered and run once
+  the in-flight sweep lands.
+- **B05 — closing search after output arrived could restore the wrong
+  scroll position.** The pre-search offset was restored verbatim; output
+  that arrived while the bar was open shifts what that raw number points
+  at, the same drift `docs/DESIGN.md` §2.7 documents for a selection. The
+  restore now shifts by the scrollback growth since the bar opened.
+- **B05 — large copy/export could stall input.** `⌘C`/`⌘A` and `⇧⌘S`
+  built their text — up to the whole scrollback — synchronously on the
+  interaction path; export built it before the save panel even appeared.
+  Both now build off the main thread, export's build running in parallel
+  with the save panel rather than blocking its appearance.
 - **B04 — selection highlight and copied text could disagree once the
   scrollback ring saturated.** `TerminalRenderer.selectionQuads` and
   `KittyImageRenderer` shifted a selection/image placement's document row by
