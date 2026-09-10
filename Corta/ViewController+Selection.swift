@@ -51,26 +51,30 @@ extension ViewController {
         let grid = session.snapshot()
         let range = selectionRange(for: selection, in: grid)
         largeTextTask?.cancel()
-        largeTextTask = Task { [weak self] in
-            // `async let`, not a separately-created `Task.detached`: only a
-            // *structured* child's cancellation is propagated automatically
-            // when `largeTextTask` itself is cancelled (superseded by a
-            // second copy, or `teardown()`) — an unstructured child task
-            // stored nowhere would keep running regardless of what happens
-            // to this one, which is exactly what Copilot's review caught in
-            // an earlier version of this change.
-            async let built = Selection.text(of: range, in: grid)
-            let text = await built
+        // `Task.detached`, not a plain `Task {}`: this method runs on
+        // `@MainActor`, and a plain `Task {}` created from an actor-isolated
+        // context inherits that actor's isolation for its body — relying on
+        // a *nonisolated callee* to implicitly escape it again is exactly
+        // the subtle inference Copilot's review flagged as unreliable here,
+        // even though it happens to hold today. `.detached` makes "this
+        // build runs off the main actor" true by construction rather than
+        // by inference, at the cost of an explicit `MainActor.run` hop for
+        // the pasteboard write, which is AppKit-affine.
+        largeTextTask = Task.detached(priority: .userInitiated) { [weak self] in
+            let text = Selection.text(of: range, in: grid)
             guard !Task.isCancelled, !text.isEmpty else { return }
-            let pasteboard = NSPasteboard.general
-            pasteboard.clearContents()
-            pasteboard.setString(text, forType: .string)
-            // Confirmation *after* the write, and only when there was
-            // something to write: an empty selection is a no-op above, and
-            // a toast for a copy that did not happen is worse than no
-            // toast. This is what makes copy-on-select safe to have on by
-            // default (M7.10) — the clipboard no longer changes silently.
-            self?.terminalView?.showToast(L10n.text("toast.copied"))
+            await MainActor.run {
+                let pasteboard = NSPasteboard.general
+                pasteboard.clearContents()
+                pasteboard.setString(text, forType: .string)
+                // Confirmation *after* the write, and only when there was
+                // something to write: an empty selection is a no-op above,
+                // and a toast for a copy that did not happen is worse than
+                // no toast. This is what makes copy-on-select safe to have
+                // on by default (M7.10) — the clipboard no longer changes
+                // silently.
+                self?.terminalView?.showToast(L10n.text("toast.copied"))
+            }
         }
     }
 

@@ -36,24 +36,27 @@ extension ViewController {
         let range = selection.map { selectionRange(for: $0, in: grid) }
 
         largeTextTask?.cancel()
-        largeTextTask = Task { [weak self] in
-            // `async let`, not a separately-created `Task.detached`: only a
-            // *structured* child's cancellation is propagated automatically
-            // when `largeTextTask` itself is cancelled (superseded by a
-            // second export, or `teardown()`) — see `copy(_:)`'s identical
-            // reasoning, which caught the same mistake here first.
+        // `Task.detached`, not a plain `Task {}` — see `copy(_:)`'s identical
+        // reasoning: this method is `@MainActor`, and relying on a
+        // nonisolated callee to implicitly escape an inherited actor is the
+        // fragile inference Copilot's review flagged. Every AppKit call
+        // below (`NSSavePanel`, `NSAlert`) is explicitly hopped back to
+        // `MainActor` rather than assumed to still be there.
+        largeTextTask = Task.detached(priority: .userInitiated) { [weak self] in
             async let built = Self.exportableText(grid: grid, selection: range)
 
-            let panel = NSSavePanel()
-            panel.allowedContentTypes = [.plainText]
-            panel.nameFieldStringValue = Self.exportFilename(hasSelection: hasSelection)
-            panel.canCreateDirectories = true
-            panel.isExtensionHidden = false
-            panel.message = L10n.text(
-                hasSelection ? "export.message.selection" : "export.message.history")
             let url: URL? = await withCheckedContinuation { continuation in
-                panel.beginSheetModal(for: window) { response in
-                    continuation.resume(returning: response == .OK ? panel.url : nil)
+                Task { @MainActor in
+                    let panel = NSSavePanel()
+                    panel.allowedContentTypes = [.plainText]
+                    panel.nameFieldStringValue = Self.exportFilename(hasSelection: hasSelection)
+                    panel.canCreateDirectories = true
+                    panel.isExtensionHidden = false
+                    panel.message = L10n.text(
+                        hasSelection ? "export.message.selection" : "export.message.history")
+                    panel.beginSheetModal(for: window) { response in
+                        continuation.resume(returning: response == .OK ? panel.url : nil)
+                    }
                 }
             }
             guard !Task.isCancelled, let url else { return }
@@ -61,19 +64,25 @@ extension ViewController {
             let text = await built
             guard !Task.isCancelled else { return }
             guard !text.isEmpty else {
-                self?.terminalView?.showToast(L10n.text("toast.nothingToExport"), kind: .warning)
+                await MainActor.run {
+                    self?.terminalView?.showToast(L10n.text("toast.nothingToExport"), kind: .warning)
+                }
                 return
             }
             do {
                 try Self.write(text, to: url)
-                self?.terminalView?.showToast(L10n.text("toast.exported"))
+                await MainActor.run {
+                    self?.terminalView?.showToast(L10n.text("toast.exported"))
+                }
             } catch {
                 // The panel already granted access, so a failure here is a
                 // full disk or a read-only volume — worth an alert rather
                 // than a toast, because the file the user asked for does not
                 // exist and nothing else would say so.
-                let alert = NSAlert(error: error)
-                await alert.beginSheetModal(for: window)
+                await MainActor.run {
+                    let alert = NSAlert(error: error)
+                    alert.beginSheetModal(for: window)
+                }
             }
         }
     }
@@ -85,7 +94,7 @@ extension ViewController {
     /// UTF-8, and a trailing newline when the text does not already end in
     /// one: the file is going to be read by `grep`, `less` and a diff, and
     /// every one of them treats a file without a final newline as malformed.
-    static func write(_ text: String, to url: URL) throws {
+    nonisolated static func write(_ text: String, to url: URL) throws {
         let payload = text.hasSuffix("\n") ? text : text + "\n"
         try Data(payload.utf8).write(to: url, options: .atomic)
     }
