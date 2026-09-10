@@ -233,6 +233,7 @@ index.
 | [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) | Every config-file key: settings, themes, keybindings |
 | [`docs/DESIGN.md`](docs/DESIGN.md) | Goals, locked decisions, architecture, milestones, non-goals |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | The ordered implementation plan and the tracking record |
+| [`docs/NEXT-GENERATION-PLAN.zh-CN.md`](docs/NEXT-GENERATION-PLAN.zh-CN.md) | Accepted next-generation plan: 100 improvements, rationale, scope and acceptance criteria (Chinese; planned, not shipped) |
 | [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) | Feature priorities, the daily-driver checklist, test strategy |
 | [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | Targets, hot-path rules, benchmarks |
 | [`docs/SECURITY.md`](docs/SECURITY.md) | Threat model, escape-sequence injection, resource caps |

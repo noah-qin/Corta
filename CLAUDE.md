@@ -1,5 +1,16 @@
 # Corta
 
+## Next-development planning scope
+
+The maintainer accepted [the next-generation plan](docs/NEXT-GENERATION-PLAN.zh-CN.md)
+on 2026-09-10. For future work, its optional AI, intelligent navigation and
+SSH/SFTP scope supersedes conflicting historical “no AI” and auxiliary-workflow
+restrictions in this file and DESIGN.md. The 100 numbered items retain evidence
+status and acceptance criteria. This is planning only: do not claim these
+features are implemented or relax terminal correctness, resource limits, or
+explicit execution boundaries. Follow the staged plan for new work rather than
+treating the completed historical milestone order as its dependency graph.
+
 A native macOS terminal emulator in pure Swift. Metal rendering, Core
 Text shaping, AppKit shell, a hand-written VT parser.
 

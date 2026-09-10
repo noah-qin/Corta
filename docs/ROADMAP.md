@@ -1,5 +1,19 @@
 # Corta — Roadmap
 
+## Next-generation planning
+
+The accepted [100-item next-generation plan](NEXT-GENERATION-PLAN.zh-CN.md)
+covers reliability, native macOS evolution, AI, navigation, SSH/SFTP,
+performance, maintainability and open-source documentation. It records
+meaning, implementation scope, evidence status and acceptance criteria for
+every item. Nothing is marked implemented by the planning change.
+
+Use its staged delivery model for new work; the historical top-to-bottom
+milestone ordering below applies to those milestones, not to all 100 items.
+Existing verification evidence and explicitly unresolved items remain valid.
+
+## Historical milestone roadmap
+
 An ordered, checkable execution plan. `DESIGN.md` §5 gives the
 milestones; this document gives the steps inside them.
 

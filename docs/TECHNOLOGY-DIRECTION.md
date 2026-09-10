@@ -1,5 +1,11 @@
 # Technology direction — modern native macOS first
 
+The accepted [next-generation plan](NEXT-GENERATION-PLAN.zh-CN.md), recorded
+2026-09-10, expands future product work to optional AI assistance, intelligent
+navigation and SSH/SFTP. Its 100 stable item numbers include implementation
+scope and acceptance criteria. The current release's capabilities and minimum
+deployment target are unchanged by this planning document.
+
 Maintainer preference recorded 2026-09-05: actively adopt the newest macOS,
 Swift, Xcode and Metal capabilities. Prefer a modern implementation over
 retaining an older implementation merely because it already works. This is
@@ -32,8 +38,10 @@ automatically faster or that an experiment is already shipped.
    owner. A mature public API remains appropriate if no newer API fits the
    terminal's requirements.
 8. Preserve the native macOS focus, Swift core, security boundaries and
-   terminal correctness. New platform integration does not imply adding cloud,
-   AI, a multiplexer or arbitrary remote command execution.
+   terminal correctness. The next-generation plan explicitly accepts optional
+   AI and remote workflows outside the terminal core. Each needs concrete
+   capability, resource and authorization boundaries; this does not implicitly
+   add cloud sync, a built-in multiplexer or arbitrary remote command execution.
 
 ## Active modernization work
 
