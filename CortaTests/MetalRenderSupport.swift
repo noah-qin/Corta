@@ -1,6 +1,9 @@
+import CoreGraphics
 import Foundation
+import ImageIO
 import Metal
 import Testing
+import UniformTypeIdentifiers
 
 @testable import Corta
 
@@ -72,6 +75,50 @@ enum MetalRenderTarget {
 
     private static func isValid(_ dimension: Int) -> Bool {
         dimension > 0 && dimension <= maximumDimension
+    }
+
+    /// Attaches a PNG snapshot of `texture` to the current test's failure
+    /// report (B01). A pixel-coverage assertion that fails says *that* a
+    /// pixel was wrong, never what actually got drawn — reproducing one
+    /// meant re-running the test under a debugger to inspect the texture by
+    /// hand. Silent on success: an attachment on every passing run would
+    /// bury the failures it exists to make visible.
+    ///
+    /// `texture` must already be readable on the CPU (synchronized, if
+    /// `.managed`) — the same precondition every caller already meets
+    /// before reading pixels for its own assertion.
+    static func attachPNG(_ texture: MTLTexture, named name: String) {
+        guard let data = pngData(of: texture) else { return }
+        Attachment.record([UInt8](data), named: name)
+    }
+
+    private static func pngData(of texture: MTLTexture) -> Data? {
+        let width = texture.width, height = texture.height
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        texture.getBytes(
+            &pixels, bytesPerRow: width * 4, from: MTLRegionMake2D(0, 0, width, height),
+            mipmapLevel: 0)
+        guard let provider = CGDataProvider(data: Data(pixels) as CFData) else { return nil }
+        // The render targets here are BGRA in memory; spelling that out in
+        // the bitmap info is what keeps the channels from coming out
+        // swapped in the PNG.
+        guard
+            let cgImage = CGImage(
+                width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
+                bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGBitmapInfo(
+                    rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue
+                        | CGBitmapInfo.byteOrder32Little.rawValue),
+                provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)
+        else { return nil }
+        let mutableData = NSMutableData()
+        guard
+            let destination = CGImageDestinationCreateWithData(
+                mutableData, UTType.png.identifier as CFString, 1, nil)
+        else { return nil }
+        CGImageDestinationAddImage(destination, cgImage, nil)
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        return mutableData as Data
     }
 }
 
