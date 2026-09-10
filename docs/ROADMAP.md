@@ -1,16 +1,15 @@
 # Corta — Roadmap
 
-## Next-generation planning
+## Active v1 roadmap
 
-The accepted [100-item next-generation plan](NEXT-GENERATION-PLAN.zh-CN.md)
-covers reliability, native macOS evolution, AI, navigation, SSH/SFTP,
-performance, maintainability and open-source documentation. It records
-meaning, implementation scope, evidence status and acceptance criteria for
-every item. Nothing is marked implemented by the planning change.
-
-Use its staged delivery model for new work; the historical top-to-bottom
-milestone ordering below applies to those milestones, not to all 100 items.
-Existing verification evidence and explicitly unresolved items remain valid.
+Future work is tracked in the ordered
+[B01–B16 roadmap issues](https://github.com/noah-qin/Corta/milestone/1).
+Each issue records its scope, dependencies, acceptance criteria and current
+status. Start with B01's reproducible baseline and B02's keyboard/IME work,
+including the reported Claude Code slash-command Tab completion failure.
+Built-in AI is out of scope; compatibility with existing AI command-line tools
+is terminal correctness. The historical milestones below remain implementation
+history rather than the dependency order for new work.
 
 ## Historical milestone roadmap
 

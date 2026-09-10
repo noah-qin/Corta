@@ -1,15 +1,17 @@
 # Corta
 
-## Next-development planning scope
+## Next-development scope
 
-The maintainer accepted [the next-generation plan](docs/NEXT-GENERATION-PLAN.zh-CN.md)
-on 2026-09-10. For future work, its optional AI, intelligent navigation and
-SSH/SFTP scope supersedes conflicting historical “no AI” and auxiliary-workflow
-restrictions in this file and DESIGN.md. The 100 numbered items retain evidence
-status and acceptance criteria. This is planning only: do not claim these
-features are implemented or relax terminal correctness, resource limits, or
-explicit execution boundaries. Follow the staged plan for new work rather than
-treating the completed historical milestone order as its dependency graph.
+The active v1 plan lives in the ordered `B01`–`B16` GitHub roadmap issues.
+Work one issue as a coherent batch: inspect its dependencies, implement related
+changes, run proportional automated and app-level verification, and report each
+unchecked or human-only result honestly. Built-in AI is excluded; existing AI
+CLI compatibility is terminal correctness. The Claude Code slash-command Tab
+completion failure belongs to B02 and must remain explicitly tracked. Intelligent
+navigation and SSH/SFTP supersede conflicting historical auxiliary-workflow
+restrictions in this file and DESIGN.md. A roadmap issue is planned work, not a
+shipped capability, and never relaxes correctness, resource limits or explicit
+execution boundaries.
 
 A native macOS terminal emulator in pure Swift. Metal rendering, Core
 Text shaping, AppKit shell, a hand-written VT parser.

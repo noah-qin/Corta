@@ -19,6 +19,10 @@ first-class CJK input, and a terminal core with zero third-party dependencies.
 [![Contributors](https://img.shields.io/github/contributors/noah-qin/Corta?style=flat-square)](https://github.com/noah-qin/Corta/graphs/contributors)
 [![Sponsors](https://img.shields.io/github/sponsors/noah-qin?style=flat-square)](https://github.com/sponsors/noah-qin)
 
+[**Download Corta 0.1.1**](https://github.com/noah-qin/Corta/releases/latest) ·
+[Roadmap](https://github.com/noah-qin/Corta/milestone/1) ·
+[Report a bug](https://github.com/noah-qin/Corta/issues/new?template=bug_report.yml)
+
 <br>
 
 *Small but resilient. Close to the system. Every character in its place.*
@@ -92,7 +96,7 @@ the method is in [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md):
 | Idle CPU | ~0% | **0.0%** | ✅ |
 | Memory, 100k × 120 lines | ~200 MB | **185.0 MB** | ✅ |
 | Core feed throughput | > 100 MB/s | **130.0 MiB/s** (5-run mean) | ✓ |
-| Keypress → pixel | < 1 frame + input | **45.5 ms avg** | ⚠️ above target |
+| Keypress → pixel | < 1 frame + input | **57.8 ms avg** (200 samples) | ⚠️ above target |
 | `esctest` xterm conformance | — | **78.7%** — 121 of 568 failing | |
 
 The number that misses its target is printed here rather than omitted.
@@ -192,7 +196,15 @@ and an exact long-task notification.
 
 </details>
 
-## Building
+## Install
+
+Corta 0.1.1 requires **macOS 26.0 or later**. Download the signed and
+notarised `Corta-0.1.1.zip` and its SHA-256 file from the
+[latest GitHub release](https://github.com/noah-qin/Corta/releases/latest),
+unzip it, and move `Corta.app` to `/Applications`. Existing installations can
+also use **Corta → Check for Updates…**.
+
+### Build from source
 
 Corta needs **macOS 26.0 or later** and **Xcode 26** (Swift 6). The one
 dependency step is Xcode resolving Sparkle over the network on first
@@ -220,8 +232,20 @@ CortaTerminal/.build/release/corta-fuzz --fuzz 500000 --seed 1 \
   CortaTerminal/Tests/Fuzz/corpus
 ```
 
-There is no notarised build yet, so building it yourself is currently the
-only way to run it.
+
+## Roadmap
+
+The active v1 roadmap is tracked as sixteen ordered GitHub issues, `B01`
+through `B16`. The sequence starts with reproducible quality and performance
+baselines, then keyboard/IME correctness (including Claude Code slash-command
+Tab completion), terminal interaction, shell workflows, native macOS/Swift
+work, a real Metal 4 backend, remote workflows, and release readiness.
+
+[Browse the v1 roadmap issues](https://github.com/noah-qin/Corta/milestone/1).
+Each issue owns its scope, dependencies, acceptance criteria and progress; the
+repository documentation continues to hold durable architecture, security and
+test decisions. Built-in AI is not planned. Compatibility with AI command-line
+tools is part of terminal correctness.
 
 ## Documentation
 
@@ -232,8 +256,7 @@ index.
 | :--- | :--- |
 | [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) | Every config-file key: settings, themes, keybindings |
 | [`docs/DESIGN.md`](docs/DESIGN.md) | Goals, locked decisions, architecture, milestones, non-goals |
-| [`docs/ROADMAP.md`](docs/ROADMAP.md) | The ordered implementation plan and the tracking record |
-| [`docs/NEXT-GENERATION-PLAN.zh-CN.md`](docs/NEXT-GENERATION-PLAN.zh-CN.md) | Accepted next-generation plan: 100 improvements, rationale, scope and acceptance criteria (Chinese; planned, not shipped) |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Active roadmap entry point and completed milestone history |
 | [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) | Feature priorities, the daily-driver checklist, test strategy |
 | [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | Targets, hot-path rules, benchmarks |
 | [`docs/SECURITY.md`](docs/SECURITY.md) | Threat model, escape-sequence injection, resource caps |
@@ -246,6 +269,11 @@ Issues and pull requests are welcome. Read
 [`CONTRIBUTING.md`](CONTRIBUTING.md) first — it covers the commit convention
 (Conventional Commits, English) and the working rules. Two of those catch
 newcomers out, and both were learned the expensive way:
+
+Roadmap issues are deliberately grouped into reviewable batches. Comment on an
+issue before starting substantial work so parallel attempts do not collide.
+Reproductions, terminal compatibility results, native-language review and
+VoiceOver verification are useful contributions even without a code change.
 
 > **App-layer changes are verified by launching the app.** Offscreen render
 > tests cannot see view-hierarchy, orientation, startup-ordering or gesture
