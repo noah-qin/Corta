@@ -92,4 +92,47 @@ struct SearchDebounceTests {
         #expect(pane.searchTask == nil)
         #expect(pane.searchMatches.isEmpty)
     }
+
+    /// B02: `NSEvent.addLocalMonitorForEvents` fires app-wide, so without a
+    /// window check an Esc meant for one pane's search bar closed every open
+    /// bar in the app. Two panes, two windows, two open bars — an Esc tagged
+    /// to window A must close only A's bar and must not be swallowed for B.
+    @Test func escapeOnlyClosesTheSearchBarInItsOwnWindow() throws {
+        func makeWindowedPane() -> ViewController {
+            let pane = makePane()
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+                styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+            window.contentViewController = pane
+            return pane
+        }
+
+        let paneA = makeWindowedPane()
+        let paneB = makeWindowedPane()
+        defer {
+            paneA.teardown()
+            paneB.teardown()
+        }
+        paneA.showSearchBar()
+        paneB.showSearchBar()
+        #expect(paneA.searchBar != nil)
+        #expect(paneB.searchBar != nil)
+
+        let escapeForA = NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+            windowNumber: try #require(paneA.view.window).windowNumber, context: nil,
+            characters: "\u{1B}", charactersIgnoringModifiers: "\u{1B}", isARepeat: false,
+            keyCode: 53)!
+
+        let unhandledByA = paneA.handleGlobalSearchEscape(escapeForA)
+        #expect(unhandledByA == nil)
+        #expect(paneA.searchBar == nil)
+        #expect(paneB.searchBar != nil)
+
+        // B's monitor must see the same event and let it pass through
+        // unmodified — it belongs to a different window.
+        let unhandledByB = paneB.handleGlobalSearchEscape(escapeForA)
+        #expect(unhandledByB === escapeForA)
+        #expect(paneB.searchBar != nil)
+    }
 }
