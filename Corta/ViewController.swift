@@ -984,6 +984,21 @@ class ViewController: NSViewController {
         let size = TerminalSize(
             rows: rows, columns: columns, pixelWidth: pixels.width, pixelHeight: pixels.height)
         guard size != lastRequestedSize else { return }
+        // B04 / DESIGN.md §2.7: only a column change reflows — `Grid.resize`
+        // rebuilds `Scrollback` from scratch when columns change (never for
+        // a row-only change, which just pushes/pops whole lines) — and
+        // reflow rewrites every document row wholesale. A selection or
+        // scroll offset recorded against the old layout no longer
+        // identifies the same text once that lands, so invalidate rather
+        // than let them silently point at the wrong rows (or, for
+        // `scrollOffset`, at content shifted by the `Scrollback.totalPushed`
+        // reset `Grid+Reflow.swift` documents). A row-only change is exactly
+        // the ordinary-growth case the `baseScrollbackTotal` shift already
+        // handles correctly, so it is deliberately left alone here.
+        if size.columns != lastRequestedSize?.columns {
+            selection = nil
+            scrollOffset = 0
+        }
         lastRequestedSize = size
         // Always coalesced to the trailing edge of a resize stream: window
         // drags, divider drags and the zoom animation all fire per-frame

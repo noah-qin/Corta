@@ -172,7 +172,7 @@ nonisolated final class KittyImageRenderer {
     /// and schedules background decodes for placements that are new or newly
     /// visible.
     func update(
-        table: ImagePlacementTable, rows: Int, offset: Int, scrollbackCount: Int,
+        table: ImagePlacementTable, rows: Int, offset: Int, scrollbackTotalPushed: Int,
         cellWidth: Float, cellHeight: Float
     ) {
         let placements = table.orderedPlacements()
@@ -217,7 +217,7 @@ nonisolated final class KittyImageRenderer {
             }
             guard Self.isPotentiallyVisible(
                 placement, data: data, rows: rows, offset: offset,
-                scrollbackCount: scrollbackCount, cellHeight: cellHeight)
+                scrollbackTotalPushed: scrollbackTotalPushed, cellHeight: cellHeight)
             else { continue }
             inFlight[id] = generation
             toSchedule.append((id, generation, data))
@@ -240,7 +240,7 @@ nonisolated final class KittyImageRenderer {
     /// only avoids paying decodes for offscreen images.
     private static func isPotentiallyVisible(
         _ placement: KittyGraphics.Placement, data: KittyGraphics.ImageData,
-        rows: Int, offset: Int, scrollbackCount: Int, cellHeight: Float
+        rows: Int, offset: Int, scrollbackTotalPushed: Int, cellHeight: Float
     ) -> Bool {
         let placementRows: Int?
         if let rows = placement.rows {
@@ -251,7 +251,8 @@ nonisolated final class KittyImageRenderer {
             placementRows = nil
         }
         guard let placementRows else { return true }
-        let growth = max(0, scrollbackCount - placement.baseScrollbackTotal)
+        // `totalPushed`, not `.count` (B04) — see `TerminalRenderer.selectionQuads`.
+        let growth = max(0, scrollbackTotalPushed - placement.baseScrollbackTotal)
         let viewportRow = placement.row - growth + offset
         return viewportRow + placementRows > 0 && viewportRow < rows
     }
@@ -335,7 +336,7 @@ nonisolated final class KittyImageRenderer {
 
     /// Draws every live placement in `table` that is visible somewhere in
     /// `rect`, in z-index then transmission order — the same layering rule
-    /// every reference client documents. `offset`/`scrollbackCount` place a
+    /// every reference client documents. `offset`/`scrollbackTotalPushed` place a
     /// placement's document row in the viewport exactly like
     /// `TerminalRenderer.selectionQuads` does for a selection.
     ///
@@ -344,7 +345,7 @@ nonisolated final class KittyImageRenderer {
     /// frame.
     func draw(
         table: ImagePlacementTable, cellWidth: Float, cellHeight: Float, rows: Int,
-        offset: Int, scrollbackCount: Int, rect: CGRect, drawableSize: CGSize,
+        offset: Int, scrollbackTotalPushed: Int, rect: CGRect, drawableSize: CGSize,
         quadRenderer: any TerminalRenderBackend, renderPassDescriptor: MTLRenderPassDescriptor,
         commandBuffer: MTLCommandBuffer
     ) {
@@ -354,7 +355,8 @@ nonisolated final class KittyImageRenderer {
         for placement in placements {
             guard let texture = texture(for: placement.imageID) else { continue }
 
-            let growth = max(0, scrollbackCount - placement.baseScrollbackTotal)
+            // `totalPushed`, not `.count` (B04) — see `TerminalRenderer.selectionQuads`.
+            let growth = max(0, scrollbackTotalPushed - placement.baseScrollbackTotal)
             let viewportRow = placement.row - growth + offset
             let columns = placement.columns ?? max(1, Int((Float(texture.width) / cellWidth).rounded(.up)))
             let placementRows =

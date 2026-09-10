@@ -166,6 +166,54 @@ import Testing
             Self.pixel(of: after, x: row1.x, y: row1.y).b == 0,
             "a stale highlight would still sit on the old row")
     }
+
+    /// B04: once the scrollback ring has saturated, `scrollback.count` stops
+    /// growing while eviction keeps shifting what each stored document row
+    /// means — the shift `selectionQuads` applies must use
+    /// `Scrollback.totalPushed` (monotonic) rather than `.count`
+    /// (saturating), or the highlight lands on the wrong line once the ring
+    /// is full. A limit of 2 makes it full after two evictions with only a
+    /// handful of feeds.
+    @Test func selectionTracksItsLineAfterTheRingSaturates() throws {
+        guard let fixture = try Self.fixture() else {
+            Issue.record("No Metal device available in this environment")
+            return
+        }
+        var terminal = Terminal(rows: 4, columns: 10, scrollbackLimit: 2)
+        terminal.feed(Array("ab\r\n".utf8))  // row 0
+        terminal.feed(Array("cd\r\n".utf8))  // row 1 — the line under test
+
+        // Blank columns of "cd", recorded while it is still a live row.
+        let selection = TerminalSelection(
+            start: GridPosition(row: 1, column: 4),
+            end: GridPosition(row: 1, column: 8),
+            baseScrollbackTotal: 0)
+
+        // Four more lines: "ab" scrolls into the ring first (totalPushed 1,
+        // count 1), then "cd" (totalPushed 2, count 2 — the ring is now
+        // full), then "ef" evicts "ab" (totalPushed 3, count still 2) —
+        // this is the push where `.count` and `.totalPushed` first diverge.
+        // "cd" itself is the oldest surviving line, not yet evicted.
+        terminal.feed(Array("ef\r\n".utf8))
+        terminal.feed(Array("gh\r\n".utf8))
+        terminal.feed(Array("ij\r\n".utf8))
+        terminal.feed(Array("kl\r\n".utf8))
+        let grid = terminal.grid
+        #expect(grid.scrollback.totalPushed == 3)
+        #expect(grid.scrollback.count == 2, "the ring should be saturated at its limit of 2")
+
+        // Scrolled fully into history, viewport row 0 is the oldest
+        // surviving scrollback line — "cd" — and row 1 is "ef".
+        let scrolled = Self.draw(fixture, grid: grid, scrollOffset: grid.scrollback.count, selection: selection)
+        let cdRow = Self.cellCenter(fixture, column: 6, row: 0)
+        let efRow = Self.cellCenter(fixture, column: 6, row: 1)
+        #expect(
+            Self.pixel(of: scrolled, x: cdRow.x, y: cdRow.y).b > 0,
+            "the highlight must follow \"cd\" onto the row it actually ended up on")
+        #expect(
+            Self.pixel(of: scrolled, x: efRow.x, y: efRow.y).b == 0,
+            "a `.count`-based shift would place the highlight one row off, on \"ef\" instead")
+    }
 }
 
 /// M3.7, hit-testing: a view point maps to a document position through the

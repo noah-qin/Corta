@@ -118,8 +118,17 @@ extension ViewController {
         NSEvent.startPeriodicEvents(afterDelay: 0.2, withPeriod: 1.0 / 30.0)
         defer { NSEvent.stopPeriodicEvents() }
         while true {
+            // B04: the pane can close mid-drag (its own close button, the
+            // window closing, the tab closing) — `teardown()` removes
+            // `terminalView` from the view hierarchy but this loop's local
+            // `window` reference stays alive and would otherwise keep
+            // blocking on events for a window this pane's view is no longer
+            // part of. Bail out rather than keep touching a torn-down
+            // pane's `session`/`terminalRenderer` for the rest of the drag.
+            guard terminalView.window != nil else { return }
             guard let next = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp, .periodic])
             else { continue }
+            guard terminalView.window != nil else { return }
             grid = session.snapshot()
             if next.type == .periodic {
                 dragAutoScrollTick(in: terminalView, grid: grid, anchor: anchor, unit: unit)

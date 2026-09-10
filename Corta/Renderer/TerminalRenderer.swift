@@ -68,7 +68,7 @@ nonisolated final class TerminalRenderer {
     /// the color pipeline directly rather than through any atlas UV.
     let kittyImageRenderer: KittyImageRenderer
     /// `grid.imagePlacements` as of the last `updateInstances` — cached the
-    /// same way `cachedOffset`/`cachedScrollbackCount` are, so `draw` (which
+    /// same way `cachedOffset`/`cachedScrollbackTotalPushed` are, so `draw` (which
     /// deliberately takes no `Grid` — see its doc comment) still has
     /// something current to hand `kittyImageRenderer`.
     private var cachedImagePlacements = ImagePlacementTable()
@@ -109,7 +109,12 @@ nonisolated final class TerminalRenderer {
     /// What the cache was built against; a mismatch forces a full rebuild.
     private var cachedColumns = 0
     private var cachedOffset = -1
-    private var cachedScrollbackCount = -1
+    /// `Scrollback.totalPushed`, not `.count` (B04): `.count` saturates at
+    /// the ring's limit, so once the ring is full every push evicts a row
+    /// while `.count` reports no change — a `.count`-based comparison would
+    /// then think nothing scrolled and skip a rebuild the shifted rows
+    /// actually need, leaving stale quads on screen.
+    private var cachedScrollbackTotalPushed = -1
     /// `Grid.linesGeneration` when the cache was last built. A mismatch means
     /// the live screen's `ScreenLines` was wholesale-replaced since (an
     /// alternate-screen swap, a column resize) — see `ScreenLines.generation`
@@ -234,7 +239,7 @@ nonisolated final class TerminalRenderer {
             || cachedOffset != offset
             // Scrolled into history, the viewport is a window over a ring
             // buffer that output keeps shifting — every row moves.
-            || (offset > 0 && cachedScrollbackCount != grid.scrollback.count)
+            || (offset > 0 && cachedScrollbackTotalPushed != grid.scrollback.totalPushed)
             // The live screen's `ScreenLines` was swapped wholesale (alt
             // screen, a column resize) — its rows' revisions restart at
             // small numbers independently of this cache's, so a coincidental
@@ -262,7 +267,7 @@ nonisolated final class TerminalRenderer {
             || cursorVisible != cachedCursorVisible
             // Output that scrolled lines into history shifts the selection's
             // viewport rows without the selection itself changing.
-            || (selection != nil && cachedScrollbackCount != grid.scrollback.count)
+            || (selection != nil && cachedScrollbackTotalPushed != grid.scrollback.totalPushed)
             || cachedSearchMatches != searchMatches
             || cachedCurrentSearchMatchIndex != currentSearchMatchIndex
             || !Self.selectionsEqual(cachedHoveredLink, hoveredLink)
@@ -276,7 +281,7 @@ nonisolated final class TerminalRenderer {
 
         cachedColumns = grid.columns
         cachedOffset = offset
-        cachedScrollbackCount = grid.scrollback.count
+        cachedScrollbackTotalPushed = grid.scrollback.totalPushed
         if offset == 0 {
             cachedLinesGeneration = grid.linesGeneration
             cachedLinesRotated = grid.linesRotated
@@ -292,7 +297,7 @@ nonisolated final class TerminalRenderer {
         }
         kittyImageRenderer.update(
             table: grid.imagePlacements, rows: grid.rows, offset: offset,
-            scrollbackCount: grid.scrollback.count,
+            scrollbackTotalPushed: grid.scrollback.totalPushed,
             cellWidth: Float(metrics.cellWidth), cellHeight: Float(metrics.cellHeight))
         cachedImagePlacements = grid.imagePlacements
         cachedCursor = grid.cursor
@@ -376,7 +381,7 @@ nonisolated final class TerminalRenderer {
             kittyImageRenderer.draw(
                 table: cachedImagePlacements, cellWidth: Float(metrics.cellWidth),
                 cellHeight: Float(metrics.cellHeight), rows: cachedLines.count, offset: cachedOffset,
-                scrollbackCount: cachedScrollbackCount, rect: rect, drawableSize: drawableSize,
+                scrollbackTotalPushed: cachedScrollbackTotalPushed, rect: rect, drawableSize: drawableSize,
                 quadRenderer: quadRenderer, renderPassDescriptor: renderPassDescriptor,
                 commandBuffer: commandBuffer)
         }
@@ -916,7 +921,14 @@ nonisolated final class TerminalRenderer {
         color: SIMD4<Float>
     ) -> [QuadInstance] {
         guard selection.start.row <= selection.end.row else { return [] }
-        let growth = max(0, grid.scrollback.count - selection.baseScrollbackTotal)
+        // `totalPushed`, not `.count` (M6.10, `TerminalSelection`'s own doc
+        // comment above): once the ring has saturated, `.count` stops
+        // growing while eviction keeps shifting what document row -1 means,
+        // so a `.count`-based shift here drew the highlight over the wrong
+        // text as soon as the ring filled, while the copy path (which
+        // already used `totalPushed`) copied the right text — the highlight
+        // and what `⌘C` produced would silently disagree (B04).
+        let growth = max(0, grid.scrollback.totalPushed - selection.baseScrollbackTotal)
         let firstRow = selection.start.row - growth + offset
         let lastRow = selection.end.row - growth + offset
         guard lastRow >= 0, firstRow < grid.rows else { return [] }

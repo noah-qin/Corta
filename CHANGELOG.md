@@ -42,6 +42,27 @@ what to edit.
 
 ### Fixed
 
+- **B04 — selection highlight and copied text could disagree once the
+  scrollback ring saturated.** `TerminalRenderer.selectionQuads` and
+  `KittyImageRenderer` shifted a selection/image placement's document row by
+  `scrollback.count`, which saturates at the ring's limit; `⌘C` already used
+  the monotonic `scrollback.totalPushed`, so once the ring was full the two
+  drifted apart — the highlighted line and the text actually copied were no
+  longer the same line. Both now use `totalPushed`, including the render
+  cache's own damage-invalidation key, which had the identical bug (a
+  `.count`-based comparison stops noticing scrollback changed once the ring
+  is full, so a stale frame could stay on screen).
+- **B04 — a column-resize reflow left a stale selection and scroll
+  position.** `Grid.resize` rebuilds `Scrollback` from scratch on a column
+  change, but nothing cleared `ViewController.selection`/`scrollOffset`
+  across that, so both could keep pointing at rows a reflow had already
+  rewritten. Both now clear when the column count actually changes (a
+  row-only resize is ordinary scrollback growth and needs no clearing).
+- **B04 — a selection drag left running past its pane closing.** The
+  drag-tracking loop's blocking `window.nextEvent(matching:)` kept touching
+  the pane's `session`/`terminalRenderer` for the rest of the gesture if the
+  pane (or its window or tab) closed mid-drag. It now exits as soon as the
+  terminal view is no longer part of a window.
 - **B02 — Tab dropped by a candidate UI (e.g. Claude Code's slash-command
   menu).** `doCommand(by:)` had no case for `insertTab(_:)` /
   `insertBacktab(_:)`, so a Tab press a candidate window resolved as a
