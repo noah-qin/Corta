@@ -68,7 +68,7 @@ struct ImageDecodePipelineTests {
         // frame-path lookup finds nothing yet — without decoding anything.
         renderer.update(
             table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-            scrollbackCount: 0, cellWidth: updateArgs.cellWidth, cellHeight: updateArgs.cellHeight)
+            scrollbackTotalPushed: 0, cellWidth: updateArgs.cellWidth, cellHeight: updateArgs.cellHeight)
         #expect(work.count == 1)
         #expect(decodeCount.value == 0)
         #expect(renderer.texture(for: id) == nil)
@@ -83,7 +83,7 @@ struct ImageDecodePipelineTests {
         // Later frames are pure cache hits: no reschedule, no re-decode.
         renderer.update(
             table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-            scrollbackCount: 0, cellWidth: updateArgs.cellWidth, cellHeight: updateArgs.cellHeight)
+            scrollbackTotalPushed: 0, cellWidth: updateArgs.cellWidth, cellHeight: updateArgs.cellHeight)
         #expect(work.count == 1)
         #expect(renderer.texture(for: id) != nil)
         #expect(decodeCount.value == 1)
@@ -103,7 +103,7 @@ struct ImageDecodePipelineTests {
         Self.placeRGBA(&terminal, id: 1, byte: 0xFF)
         renderer.update(
             table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-            scrollbackCount: 0, cellWidth: updateArgs.cellWidth, cellHeight: updateArgs.cellHeight)
+            scrollbackTotalPushed: 0, cellWidth: updateArgs.cellWidth, cellHeight: updateArgs.cellHeight)
         let first = try #require(renderer.texture(for: id))
         #expect(decodeCount.value == 1)
 
@@ -112,7 +112,7 @@ struct ImageDecodePipelineTests {
         Self.placeRGBA(&terminal, id: 1, byte: 0x7F)
         renderer.update(
             table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-            scrollbackCount: 0, cellWidth: updateArgs.cellWidth, cellHeight: updateArgs.cellHeight)
+            scrollbackTotalPushed: 0, cellWidth: updateArgs.cellWidth, cellHeight: updateArgs.cellHeight)
         let second = try #require(renderer.texture(for: id))
         #expect(decodeCount.value == 2)
         #expect(first !== second)
@@ -129,7 +129,7 @@ struct ImageDecodePipelineTests {
         Self.placeRGBA(&terminal, id: 1, byte: 0xFF)
         renderer.update(
             table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-            scrollbackCount: 0, cellWidth: updateArgs.cellWidth, cellHeight: updateArgs.cellHeight)
+            scrollbackTotalPushed: 0, cellWidth: updateArgs.cellWidth, cellHeight: updateArgs.cellHeight)
         #expect(renderer.textureCount == 1)
         #expect(renderer.cachedTextureBytes == 16)
 
@@ -139,7 +139,7 @@ struct ImageDecodePipelineTests {
         terminal.feed(Array("\u{1B}_Ga=d,d=i,i=1\u{1B}\\".utf8))
         renderer.update(
             table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-            scrollbackCount: 0, cellWidth: updateArgs.cellWidth, cellHeight: updateArgs.cellHeight)
+            scrollbackTotalPushed: 0, cellWidth: updateArgs.cellWidth, cellHeight: updateArgs.cellHeight)
         #expect(renderer.textureCount == 0)
         #expect(renderer.cachedTextureBytes == 0)
     }
@@ -161,8 +161,8 @@ struct ImageDecodePipelineTests {
 
         renderer.update(
             table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-            scrollbackCount: scrollbackCount, cellWidth: updateArgs.cellWidth,
-            cellHeight: updateArgs.cellHeight)
+            scrollbackTotalPushed: terminal.grid.scrollback.totalPushed,
+            cellWidth: updateArgs.cellWidth, cellHeight: updateArgs.cellHeight)
         #expect(decodeCount.value == 0, "a provably offscreen placement must not decode")
         #expect(renderer.textureCount == 0)
 
@@ -170,8 +170,8 @@ struct ImageDecodePipelineTests {
         // decode happens then.
         renderer.update(
             table: Self.table(of: terminal), rows: updateArgs.rows, offset: scrollbackCount,
-            scrollbackCount: scrollbackCount, cellWidth: updateArgs.cellWidth,
-            cellHeight: updateArgs.cellHeight)
+            scrollbackTotalPushed: terminal.grid.scrollback.totalPushed,
+            cellWidth: updateArgs.cellWidth, cellHeight: updateArgs.cellHeight)
         #expect(decodeCount.value == 1)
         #expect(renderer.textureCount == 1)
     }
@@ -191,7 +191,7 @@ struct ImageDecodePipelineTests {
         for _ in 0..<3 {
             renderer.update(
                 table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-                scrollbackCount: 0, cellWidth: updateArgs.cellWidth,
+                scrollbackTotalPushed: 0, cellWidth: updateArgs.cellWidth,
                 cellHeight: updateArgs.cellHeight)
         }
         #expect(decodeCount.value == 1, "a failed image must not retry the decode every frame")
@@ -202,7 +202,7 @@ struct ImageDecodePipelineTests {
         Self.placeRGBA(&terminal, id: 1, byte: 0xFF)
         renderer.update(
             table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-            scrollbackCount: 0, cellWidth: updateArgs.cellWidth, cellHeight: updateArgs.cellHeight)
+            scrollbackTotalPushed: 0, cellWidth: updateArgs.cellWidth, cellHeight: updateArgs.cellHeight)
         #expect(decodeCount.value == 2)
         #expect(renderer.textureCount == 1)
     }
@@ -220,12 +220,12 @@ struct ImageDecodePipelineTests {
         Self.placeRGBA(&terminal, id: 1, byte: 0xFF)
         renderer.update(
             table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-            scrollbackCount: 0, cellWidth: updateArgs.cellWidth, cellHeight: updateArgs.cellHeight)
+            scrollbackTotalPushed: 0, cellWidth: updateArgs.cellWidth, cellHeight: updateArgs.cellHeight)
         #expect(notified.value == 1)
         // A steady frame with nothing new does not notify again.
         renderer.update(
             table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-            scrollbackCount: 0, cellWidth: updateArgs.cellWidth, cellHeight: updateArgs.cellHeight)
+            scrollbackTotalPushed: 0, cellWidth: updateArgs.cellWidth, cellHeight: updateArgs.cellHeight)
         #expect(notified.value == 1)
     }
 }

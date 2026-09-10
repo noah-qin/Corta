@@ -118,8 +118,21 @@ extension ViewController {
         NSEvent.startPeriodicEvents(afterDelay: 0.2, withPeriod: 1.0 / 30.0)
         defer { NSEvent.stopPeriodicEvents() }
         while true {
+            // B04: the pane can close mid-drag (its own close button, the
+            // window closing, the tab closing) — `teardown()` removes
+            // `terminalView` from the view hierarchy but this loop's local
+            // `window` reference stays alive and would otherwise keep
+            // blocking on events for a window this pane's view is no longer
+            // part of. Identity, not just non-nil: a native-tab detach can
+            // reparent the view to a *different* window mid-drag, and
+            // `window` here would then be the wrong one to keep polling —
+            // still open, still delivering events, just not this pane's
+            // anymore. Bail out rather than keep touching a torn-down (or
+            // reparented) pane's `session`/`terminalRenderer`.
+            guard terminalView.window === window else { return }
             guard let next = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp, .periodic])
             else { continue }
+            guard terminalView.window === window else { return }
             grid = session.snapshot()
             if next.type == .periodic {
                 dragAutoScrollTick(in: terminalView, grid: grid, anchor: anchor, unit: unit)

@@ -140,6 +140,48 @@ rewrites document rows wholesale and must invalidate or re-anchor any
 live selection, and search matches must be reported in the same document
 coordinates so a match can be selected verbatim.
 
+**B04 found the render path violating its own invariant.**
+`TerminalRenderer.selectionQuads` and `KittyImageRenderer`'s visibility/draw
+math were shifting by `scrollback.count`, not `totalPushed` — exactly the
+mistake this section warns against, three paragraphs up, in the type this
+code itself belongs to. Once a ring saturated, the on-screen highlight (and
+image placement) drifted onto the wrong row while `⌘C` — which already used
+`totalPushed` — copied the right text; the two silently disagreed. Fixed by
+using `totalPushed` throughout (`cachedScrollbackTotalPushed` replaces
+`cachedScrollbackCount` as the render cache's own invalidation key, which had
+the same bug: a `.count`-based comparison stops noticing scrollback changed
+once the ring is full). Regression: `SelectionRendererTests
+.selectionTracksItsLineAfterTheRingSaturates`.
+
+Reflow's half of the invariant — "must invalidate or re-anchor any live
+selection" — was not implemented at all before B04: a column change (the
+only kind that reflows, `Grid.resize`) rebuilds `Scrollback` from scratch,
+resetting `totalPushed`, but nothing cleared `ViewController.selection` or
+`scrollOffset` across that. `resizeSessionToFitView` now clears both when the
+new size's column count differs from the last requested one (a row-only
+resize is ordinary scrollback growth, already handled correctly by the
+`baseScrollbackTotal` shift, and is deliberately left alone). This path is
+gated by window-visibility lifecycle state (`SplitViewController
+.sizeSettled`) that the offscreen test target never exercises — verified
+instead by launching the app and resizing a window narrower, per
+`CONFORMANCE.md` §4.4.
+
+**Still open, deliberately not attempted in B04**, because each is a
+substantially larger, riskier piece than the bugs above: re-anchoring
+`ViewController.scrollOffset` itself to a stable logical position while
+scrolled up and output keeps arriving (today it is a raw distance-from-
+bottom count that silently drifts as `totalPushed` grows — see the comment
+on `TerminalRenderer.updateInstances`); the bottom-return behavior that
+would depend on that anchoring; unifying the document/absolute/viewport
+conversions duplicated across the render, `ViewController+ShellIntegration`
+and `ViewController+Search` paths into one shared mapping, rather than fixing
+the one concrete divergence found; and a discoverable override separating
+terminal text selection from application mouse reporting — blocked on there
+being no `?1002`/`?1003` motion-tracking-mode support to override *to* in the
+first place (every drag today unconditionally becomes a local selection,
+which already makes selection achievable in a reporting-enabled TUI, but
+means Corta cannot forward a drag as reports at all).
+
 ---
 
 ## 3. Architecture
