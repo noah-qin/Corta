@@ -28,6 +28,30 @@ is a bug regardless of what it improves.
 Numbers are recorded at M1 and re-measured at every milestone. "It feels
 fast" is not a measurement.
 
+### 1.1 User-visible targets (B01)
+
+§1's table states engineering targets (frame budget, parser throughput) — the
+numbers a change is checked against. This table states what those numbers are
+*for*: the categories a person actually notices, each with a target stated in
+terms a user would recognize and the harness that is supposed to hold it
+accountable. Where no repeatable number exists yet, that is stated plainly
+rather than filled in with a guess.
+
+| Category      | Target                                              | Held accountable by |
+| -------------- | ---------------------------------------------------- | -------------------- |
+| Input          | Keypress → pixel feels immediate; §1's latency target | Typometer (§5.1–§5.3), `corta-bench`'s `benchmarkKeypressLatency` |
+| Sustained output | A flood (`yes`, a build log, a training run) does not fall behind or drop frames below §1's frame budget | `corta-bench`'s parse-throughput and write-backpressure benchmarks; `scripts/measure-app-baseline.sh` phase B flood |
+| Scrolling      | Scrolling a long buffer tracks the pointer/trackpad with no visible stutter | `scripts/measure-render-metrics.sh` (`CORTA_RENDER_METRICS` ring buffer); no dedicated automated scroll benchmark exists yet — a real gap, not an oversight |
+| Startup        | A warm launch reaches an interactive window fast enough that switching to Corta does not feel like waiting for an app to open | `scripts/measure-app-baseline.sh` phase A (5 warm launches + 1 cold-ish) |
+| Memory         | §1's scrollback figure holds, and closing panes/windows returns memory rather than leaking it | `corta-bench`'s scrollback-footprint and peak-RSS benchmarks; `scripts/measure-app-baseline.sh`'s post-close recovery phase |
+| Energy         | An idle pane draws no more power than idle CPU (§1) implies; a flooding pane does not keep the GPU busier than the frames it is actually producing require | No dedicated energy harness exists — Activity Monitor / `powermetrics` spot-checks only, manual and not repeatable. Stated as an open gap rather than a met target |
+| Compatibility  | The real-program and esctest pass rates `CONFORMANCE.md` already tracks | `CONFORMANCE.md` §4.2 (esctest), §4.4.2 (real-program table), §4.6 (manual scenario pass) — cross-referenced here rather than duplicated |
+| Recovery       | A crashed or force-quit Corta restores its window/split/scrollback state on next launch without asking the user to rebuild it by hand | `scripts/measure-app-baseline.sh`'s SessionRestore-driven multi-pane phases; U07's crash-marker mechanism (`CHANGELOG.md`) |
+
+Startup, memory and energy inherit their machine dependency from §5.2 below —
+a number recorded here is only comparable to another run that held the same
+fixed environment.
+
 ---
 
 ## 2. The Two Decisions That Matter
@@ -229,6 +253,20 @@ objects to, and it is a limit of the tool rather than a choice: the
 percentiles need the raw samples exported and summarised. `corta-bench`
 reports all four for the parts of the path it can see.
 
+**The percentile-shaped alternative for the render stage (B01).** Between
+`corta-bench` (headless, core-only) and a full Typometer run (end-to-end,
+but avg/min/max/SD only) sits `CORTA_RENDER_METRICS=1`
+(`RenderMetrics.swift`'s 600-sample ring buffer, streamed by
+`scripts/measure-render-metrics.sh`): it dumps real p50/p99 for `cpuFrame`,
+`drawableWait` and `gpu` from a live, on-screen app, without Instruments.
+Its limit is the opposite of Typometer's: it needs a person at the keyboard
+typing and scrolling for the ring to fill with real frames (the
+`scripts/measure-app-baseline.sh` finding that synthetic System Events keystrokes
+never reach `TerminalView` applies here too — a scripted flood through the
+PTY slave fills `drawableWait`/`gpu`, but `cpuFrame` specifically wants real
+keyDown-triggered frames), so running it and reading its output is recorded
+here as the next step, not as something this pass produced a number for.
+
 **Establish the baseline at M1.** Without a baseline, "performance is the
 first priority" is a slogan rather than a constraint.
 
@@ -251,6 +289,32 @@ The sample count has to support the percentile it claims. The p99 of 200
 samples is the second-largest value in the set, which is one scheduling
 hiccup away from being noise; `corta-bench` takes 2,000.
 
+**A fresh headless sample (B01, 2026-09-10, this machine — see §5.2's
+toolchain table below).**
+
+```sh
+swift build --package-path CortaTerminal -c release --product corta-bench
+CortaTerminal/.build/release/corta-bench
+```
+
+| Benchmark | p50 | p95 | p99 | max | n |
+| --- | --- | --- | --- | --- | --- |
+| keypress → grid latency | 0.009 ms | 0.012 ms | 0.013 ms | 0.020 ms | 2,000 |
+| keypress → grid latency, flooding neighbour | 0.009 ms | 0.012 ms | 0.015 ms | 0.046 ms | 2,000 |
+| snapshot latency under flood | 0.000 ms | 0.000 ms | 0.000 ms | 0.032 ms | 2,000 |
+| search response, 100k-line scrollback (warm) | 385.1 ms | 410.6 ms | 442.6 ms | 442.6 ms | 50 |
+
+Parser-only throughput 628.3 MiB/s, parser+grid 141.1 MiB/s, core feed
+130.0 MiB/s — all above §1's 100 MB/s target. Scrollback at 100k lines:
+185.0 MB resident, inside §1's ~200 MB target. Full raw output, including
+the resize-delivery, spawn-decomposition and multi-pane-fixed-cost
+benchmarks not tabulated above, is reproducible with the command above; it
+is headless and scripted, so — unlike the Typometer numbers below — this
+much of §5.2's table is trivially held exactly by running it again. This is
+core-side only; it says nothing about the AppKit/render stages §5.3 and
+§5.4 cover, which is exactly the boundary `scripts/measure-app-baseline.sh` and
+`CORTA_RENDER_METRICS` exist to close.
+
 ### 5.2 The fixed benchmark environment
 
 Numbers recorded in this document or in `ROADMAP.md` are only comparable
@@ -272,6 +336,22 @@ Two runs that differ in any row of that table are two different
 measurements. In particular a Debug build is not a slow Release build:
 the parse path's bounds checks and non-inlined generics change its shape,
 not only its speed.
+
+**Toolchain (B01).** Compiler, SDK, language mode and deployment target are
+four different things — conflating them makes a "same environment" claim
+unfalsifiable. Recorded on the machine this run was measured on
+(2026-09-10):
+
+| Variable            | Value                                                    |
+| -------------------- | --------------------------------------------------------- |
+| Xcode                | 26.6, build 17F113 (stable channel; `xcodebuild -version`) |
+| Swift compiler       | 6.3.3 (swiftlang-6.3.3.1.3, clang-2100.1.1.101; `swift --version`) |
+| Swift language mode  | Swift 6, per the Xcode project's `SWIFT_VERSION` and `CortaTerminal/Package.swift`'s `swift-tools-version: 6.2` |
+| macOS (build machine) | 26.6.2, build 25G83 (`sw_vers`) — the OS actually running the benchmark, not a promise every contributor matches it |
+| Deployment target    | `MACOSX_DEPLOYMENT_TARGET = 26.0` (`Corta.xcodeproj/project.pbxproj`) — the oldest OS the shipped binary claims to run on, independent of the two rows above |
+
+A run quoted without this table is a run from before B01 that predates the
+distinction — not a claim that it used a different toolchain.
 
 ### 5.3 Attributing latency: `os_signpost`
 

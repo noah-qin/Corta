@@ -10,6 +10,21 @@ what to edit.
 
 ## [Unreleased]
 
+### Added
+
+- **B01 — the v1 validation and performance baseline.** User-visible
+  targets for input, sustained output, scrolling, startup, memory, energy,
+  compatibility and recovery (`docs/PERFORMANCE.md` §1.1); the exact
+  toolchain (Xcode, Swift compiler and language mode, macOS, deployment
+  target) recorded distinctly rather than conflated (§5.2); a fresh
+  headless `corta-bench` p50/p95/p99 sample under that toolchain (§5.1); the
+  real-workflow test matrix extended with CJK input, sleep/wake,
+  restoration and an AI CLI application row, each marked automated,
+  partly-automated or manual/"not judged" (`docs/CONFORMANCE.md` §4.6); and
+  Swift Testing `Attachment` output for the offscreen render-correctness
+  tests, so a pixel-mismatch failure carries the rendered PNG instead of
+  only the failed comparison.
+
 ### Fixed
 
 - **B02 — Tab dropped by a candidate UI (e.g. Claude Code's slash-command

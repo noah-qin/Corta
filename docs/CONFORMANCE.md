@@ -444,6 +444,47 @@ Run at every milestone, because these are the actual workload:
 5. A Python REPL, paste a multi-line function
 6. `git log --graph --color` through a pager
 
+**B01 additions — the real-workflow matrix.** The issue asked for zsh, fish,
+ssh, tmux, Neovim, fzf, CJK input, long output, sleep/wake, restoration and
+AI CLI applications. zsh/tmux/Neovim/ssh/long-output are items 1–4 above;
+fzf and fish are covered by `scripts/u10-real-workflows.py`'s scenario table
+(it spawns real zsh/fish/tmux/nvim/fzf/ssh processes on real PTYs and
+replays their output through the core — see the script's own docstring for
+exactly what it can and cannot prove). The remainder, added here rather than
+to the scriptable harness because none of them are drivable through a PTY
+alone:
+
+7. **CJK input** — an actual input source composing (not just CJK *text*,
+   which item 2 already covers) through a live candidate window. Manual only
+   — `DESIGN.md` §7.1's verification caveat: synthetic key events carry
+   baked characters, so composition never opens for them.
+8. **Sleep/wake** — the machine actually sleeping and waking with Corta
+   running. Manual only, deliberately not scripted:
+   `scripts/measure-app-baseline.sh`'s own comment is explicit that sleep/wake and
+   low-power mode change machine-wide state other processes depend on, and
+   need a dedicated session on an idle machine, not a CI-style script.
+9. **Restoration** — force-quit or crash Corta with a multi-pane layout and
+   scrollback, relaunch, confirm the arrangement and content return (U07).
+   Partly scriptable: `scripts/measure-app-baseline.sh`'s `SessionRestore`
+   config-flip pattern drives this without touching global machine state
+   (it flips `restore-windows` in the config file, writes a `state.json`,
+   launches, then restores the original config on every exit path) — but it
+   drives the *mechanism*, and a human still has to judge whether what came
+   back looks right.
+10. **An AI CLI application** — Claude Code (or a similar TUI-driven AI CLI)
+    run as the child, covering ordinary interactive use including
+    tab-completion and its own keyboard handling. Manual only, and the
+    origin of B02's reported regression — see that issue's entry under §2.1
+    above; cross-referenced rather than duplicated here.
+
+Items 7, 8 and 10 above have no automated substitute and are recorded with
+an explicit **not judged** state when a pass has not actually run one
+(precedent: `V0.1.1-MANUAL-VERIFICATION.md`'s VoiceOver read-through, marked
+"not judged" rather than silently skipped when the tester could not follow
+spoken English closely enough to have an opinion). "Not judged" means
+exactly that — no automated check stands in for it, and no claim of success
+is made in its place.
+
 **2026-09-02 — M2 closeout pass (items 1 and 3).** tmux, htop and
 Neovim were not installed, so tmux 3.5a and htop 3.4.1 were built
 from source into a user-writable prefix (`/tmp/corta-tools`). Neovim

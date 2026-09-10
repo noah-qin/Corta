@@ -67,6 +67,9 @@ import Testing
 
         // The cursor block is a translucent grey over black — brighter than
         // the untouched background, which stays pure black.
+        if atCursor.r <= elsewhere.r {
+            MetalRenderTarget.attachPNG(texture, named: "cursor-block-render.png")
+        }
         #expect(atCursor.r > elsewhere.r)
     }
 
@@ -111,6 +114,9 @@ import Testing
 
         let inside = Self.pixel(of: texture, x: insideX, y: insideY)
         let outside = Self.pixel(of: texture, x: outsideX, y: insideY)
+        if inside.b <= outside.b {
+            MetalRenderTarget.attachPNG(texture, named: "selection-highlight-render.png")
+        }
         #expect(inside.b > outside.b, "expected the selection tint inside the range")
     }
 
@@ -169,6 +175,10 @@ import Testing
         scrolledTexture.getBytes(
             &scrolledBytes, bytesPerRow: width * 4, from: MTLRegionMake2D(0, 0, width, height),
             mipmapLevel: 0)
+        if liveBytes == scrolledBytes {
+            MetalRenderTarget.attachPNG(liveTexture, named: "scroll-offset-live-render.png")
+            MetalRenderTarget.attachPNG(scrolledTexture, named: "scroll-offset-scrolled-render.png")
+        }
         #expect(liveBytes != scrolledBytes)
     }
 

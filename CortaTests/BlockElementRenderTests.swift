@@ -16,30 +16,53 @@ import Testing
     /// the requested one — measured, U+2588 inked 88% of its cell and an
     /// orange (255,140,0) averaged out to (203,111,0), which reads as pink.
     @Test func fullBlockInksItsWholeCellAtTheRequestedColour() throws {
-        let (inked, total, mean) = try Self.render("\u{2588}")
+        let (inked, total, mean, texture) = try Self.render("\u{2588}")
+        if inked != total || mean != SIMD3<Int>(255, 140, 0), let texture {
+            MetalRenderTarget.attachPNG(texture, named: "full-block-render.png")
+        }
         #expect(inked == total)
         #expect(mean == SIMD3<Int>(255, 140, 0))
     }
 
     /// Halves have to tile: whatever rounding costs the top, the bottom gets.
     @Test func theTwoHalvesTileExactly() throws {
-        let (upper, total, _) = try Self.render("\u{2580}")
-        let (lower, _, _) = try Self.render("\u{2584}")
+        let (upper, total, _, upperTexture) = try Self.render("\u{2580}")
+        let (lower, _, _, lowerTexture) = try Self.render("\u{2584}")
+        if upper + lower != total {
+            if let upperTexture {
+                MetalRenderTarget.attachPNG(upperTexture, named: "upper-half-block-render.png")
+            }
+            if let lowerTexture {
+                MetalRenderTarget.attachPNG(lowerTexture, named: "lower-half-block-render.png")
+            }
+        }
         #expect(upper + lower == total)
     }
 
     /// Left and right halves likewise.
     @Test func theLeftAndRightHalvesTileExactly() throws {
-        let (left, total, _) = try Self.render("\u{258C}")
-        let (right, _, _) = try Self.render("\u{2590}")
+        let (left, total, _, leftTexture) = try Self.render("\u{258C}")
+        let (right, _, _, rightTexture) = try Self.render("\u{2590}")
+        if left + right != total {
+            if let leftTexture {
+                MetalRenderTarget.attachPNG(leftTexture, named: "left-half-block-render.png")
+            }
+            if let rightTexture {
+                MetalRenderTarget.attachPNG(rightTexture, named: "right-half-block-render.png")
+            }
+        }
         #expect(left + right == total)
     }
 
     /// Renders one cell holding `character` in (255,140,0) and reports how
-    /// many pixels have ink, the cell's pixel count, and its average colour.
-    private static func render(_ character: String) throws -> (Int, Int, SIMD3<Int>) {
+    /// many pixels have ink, the cell's pixel count, its average colour, and
+    /// the texture itself — nil only when there is no GPU to render or
+    /// attach with — so a failing test can attach it (B01).
+    private static func render(
+        _ character: String
+    ) throws -> (inked: Int, total: Int, mean: SIMD3<Int>, texture: MTLTexture?) {
         guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue()
-        else { return (1, 1, SIMD3<Int>(255, 140, 0)) }  // no GPU: nothing to assert against
+        else { return (1, 1, SIMD3<Int>(255, 140, 0), nil) }  // no GPU: nothing to assert against
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
         let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
 
@@ -82,6 +105,6 @@ import Testing
             if red + green + blue > 30 { inked += 1 }
         }
         let count = w * h
-        return (inked, count, sum / SIMD3<Int>(repeating: count))
+        return (inked, count, sum / SIMD3<Int>(repeating: count), texture)
     }
 }
