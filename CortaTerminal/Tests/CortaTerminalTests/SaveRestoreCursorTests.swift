@@ -87,4 +87,17 @@ struct SaveRestoreCursorTests {
         terminal.feed(Array("\u{1B}[u".utf8))  // SCORC, not a kitty query
         #expect(terminal.keyboardEnhancements == flagsBeforeBareU)
     }
+
+    /// The kitty keyboard protocol's own key-report form — `CSI
+    /// code;modifiers u`, unmarked but parameterized — must not be
+    /// misread as SCORC: it carries no private marker, so only the
+    /// parameter count tells it apart from a bare `CSI u`.
+    @Test("a parameterized CSI u (a kitty key report) does not restore the cursor")
+    func parameterizedCSIuIsNotSCORC() {
+        var terminal = Terminal(rows: 4, columns: 10)
+        terminal.feed(Array("\u{1B}[2;6H\u{1B}[s".utf8))  // move to (row 2, col 6), save
+        terminal.feed(Array("\u{1B}[1;1H".utf8))  // move home
+        terminal.feed(Array("\u{1B}[97;5u".utf8))  // an echoed kitty key report, not SCORC
+        #expect(terminal.grid.cursor == Cursor(row: 0, column: 0))
+    }
 }

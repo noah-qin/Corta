@@ -74,11 +74,32 @@ struct IndexedPaletteTests {
             == "\u{1B}]4;1;rgb:0000/0000/0000\u{1B}\\")
     }
 
-    @Test("a malformed pair does not stop later pairs in the same sequence")
+    @Test("a malformed spec does not stop later pairs in the same sequence")
     func malformedPairIsSkipped() {
         #expect(
             response(to: "\u{1B}]4;1;notacolor;2;#020202\u{1B}\\\u{1B}]4;2;?\u{1B}\\")
                 == "\u{1B}]4;2;rgb:0202/0202/0202\u{1B}\\")
+    }
+
+    @Test("a malformed or out-of-range index does not stop later pairs either")
+    func malformedIndexIsSkipped() {
+        #expect(
+            response(to: "\u{1B}]4;256;#ffffff;2;#020202\u{1B}\\\u{1B}]4;2;?\u{1B}\\")
+                == "\u{1B}]4;2;rgb:0202/0202/0202\u{1B}\\")
+        #expect(
+            response(to: "\u{1B}]4;notanumber;#ffffff;2;#020202\u{1B}\\\u{1B}]4;2;?\u{1B}\\")
+                == "\u{1B}]4;2;rgb:0202/0202/0202\u{1B}\\")
+    }
+
+    @Test("RIS keeps the app-seeded palette defaults but clears overrides")
+    func risKeepsDefaultsClearsOverrides() {
+        var terminal = Terminal()
+        var palette = terminal.indexedPalette
+        palette.setOverride(1, to: (10, 20, 30))
+        terminal.indexedPalette = palette
+        terminal.reset()
+        #expect(terminal.indexedPalette.overrides.isEmpty)
+        #expect(terminal.indexedPalette.color(at: 1) as (UInt8, UInt8, UInt8) == (0, 0, 0))
     }
 
     @Test("no OSC 4 or 104 produces unsolicited output")

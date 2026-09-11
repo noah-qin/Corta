@@ -223,17 +223,26 @@ extension Performer {
     mutating func handleIndexedColor(_ payload: ArraySlice<UInt8>) {
         var start = payload.startIndex
         while start < payload.endIndex {
+            // No `;` left at all means no `spec` for whatever token remains,
+            // malformed or not — nothing left to apply, so this is the one
+            // case that actually ends the scan rather than just skipping a
+            // pair.
             guard let firstSeparator = payload[start...].firstIndex(of: 0x3B) else { return }
-            guard let index = Self.parseByte(payload[start..<firstSeparator]) else { return }
             let specStart = payload.index(after: firstSeparator)
             let specEnd = payload[specStart...].firstIndex(of: 0x3B) ?? payload.endIndex
+            defer {
+                start = specEnd < payload.endIndex ? payload.index(after: specEnd) : payload.endIndex
+            }
+            // A malformed or out-of-range index (e.g. `256`) skips only this
+            // pair — xterm's own tolerance for multi-pair OSC 4/104, and
+            // what the doc comment above already promises.
+            guard let index = Self.parseByte(payload[start..<firstSeparator]) else { continue }
             let spec = payload[specStart..<specEnd]
             if spec.count == 1, spec.first == 0x3F {
                 reportIndexedColor(index)
             } else if let color = Self.parseColorSpecification(spec) {
                 state.indexedPalette.setOverride(index, to: color)
             }
-            start = specEnd < payload.endIndex ? payload.index(after: specEnd) : payload.endIndex
         }
     }
 

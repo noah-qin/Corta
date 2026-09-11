@@ -47,18 +47,22 @@ extension Performer {
             grid.tabForward(parameters.value(0, default: 1))
         case 0x5A:  // CBT — backward horizontal tabulation
             grid.tabBackward(parameters.value(0, default: 1))
-        // SCOSC / SCORC (ANSI.SYS; B06) — `CSI s` / `CSI u`, no private
-        // marker and no intermediate. xterm treats these as aliases for
+        // SCOSC / SCORC (ANSI.SYS; B06) — bare `CSI s` / `CSI u`, no private
+        // marker, no intermediate, and — checked here — no parameters.
+        // xterm treats the unmarked, unparameterized form as an alias for
         // DECSC/DECRC (`ESC 7`/`ESC 8`) unless DECLRMM (left/right margin
         // mode) is set — Corta has no margin mode to disambiguate against,
         // so the alias is unconditional, matching xterm's fallback
-        // behaviour. `CSI ? u`/`CSI > u`/`CSI < u`/`CSI = u` are the kitty
-        // keyboard protocol and carry a private marker, so they are handled
-        // in `csiDispatch`'s marker branch and never reach here — bare
-        // `CSI u` is unambiguous.
-        case 0x73:  // SCOSC
+        // behaviour. `CSI ? u`/`CSI > u`/`CSI < u`/`CSI = u` (a private
+        // marker) are the kitty keyboard protocol's query/push/pop forms
+        // and are handled in `csiDispatch`'s marker branch before reaching
+        // here, but the protocol's key-report form — `CSI code;modifiers u`,
+        // unmarked but parameterized — reaches this switch on `final`
+        // alone. Requiring zero parameters keeps a received key report
+        // (e.g. `CSI 97;5u`) from being misread as a cursor restore.
+        case 0x73 where parameters.count == 0:  // SCOSC
             grid.saveCursor()
-        case 0x75:  // SCORC
+        case 0x75 where parameters.count == 0:  // SCORC
             grid.restoreCursor()
         default:
             return false

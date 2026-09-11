@@ -10,7 +10,13 @@
 /// theme). `overrides` is the sparse set of indices OSC 4 has actually
 /// changed; OSC 104 clears one, several, or (with no arguments) all of them.
 public struct IndexedPalette: Sendable, Equatable {
-    public var defaults: [(red: UInt8, green: UInt8, blue: UInt8)]
+    // `private(set)`: the 256-entry invariant below is only checked in
+    // `init`, and `color(at:)` indexes this array with every `UInt8` — a
+    // freely mutable public property would let a caller shrink it and turn
+    // the next OSC 4 query into an out-of-bounds trap. Replacing the whole
+    // palette (as RIS and the app's theme reseed both do) goes through
+    // `init` again and is checked the same way.
+    public private(set) var defaults: [(red: UInt8, green: UInt8, blue: UInt8)]
     public internal(set) var overrides: [UInt8: (red: UInt8, green: UInt8, blue: UInt8)] = [:]
 
     public init(defaults: [(red: UInt8, green: UInt8, blue: UInt8)] = IndexedPalette.xtermDefaults()) {
