@@ -224,11 +224,73 @@ class ViewController: NSViewController {
     /// The scroll position from before the search bar opened, restored on
     /// Esc.
     var scrollOffsetBeforeSearch: Int?
+    /// `Scrollback.totalPushed` when `scrollOffsetBeforeSearch` was
+    /// captured (B05). Output arriving while the bar is open grows
+    /// `totalPushed`, so restoring the raw offset alone would land the
+    /// viewport on different text than what was actually on screen before
+    /// search opened — the same class of drift `docs/DESIGN.md` §2.7
+    /// documents for a selection's `baseScrollbackTotal`, applied here to
+    /// the pre-search anchor instead.
+    var totalPushedBeforeSearch: Int?
     /// Bumped by every `scheduleBackgroundSearchRefresh` call (M9); a
     /// background sweep applies its result only if this still matches what
     /// it captured when it started, so a superseded or late-arriving one is
     /// silently discarded instead of clobbering a newer result.
     var searchRefreshGeneration = 0
+    /// B05: set when `scheduleBackgroundSearchRefresh` is called while a
+    /// sweep is already in flight, rather than silently dropping the output
+    /// that triggered the call. Consumed in `applySearchResults` once the
+    /// in-flight sweep lands, which starts the follow-up sweep that output
+    /// asked for — without this, output arriving at the tail of a burst
+    /// (after which nothing else re-triggers a sweep, since the render loop
+    /// pauses once the grid stops changing) left the search results stale
+    /// until something unrelated nudged them.
+    var searchNeedsRefresh = false
+    /// Test hook: run at the start of `scheduleBackgroundSearchRefresh`'s
+    /// detached task, before the sweep, so a test can hold one sweep open
+    /// deterministically and observe the "already in flight" branch rather
+    /// than racing a real one. `nil` in production. Assign before calling
+    /// `scheduleBackgroundSearchRefresh`.
+    var searchSweepGate: (@Sendable () -> Void)?
+    /// B05: the in-flight large copy/export text build, if any — building a
+    /// potentially whole-scrollback string is O(scrollback), so it runs off
+    /// the interaction path (`ViewController+Export.swift`, `copy(_:)`).
+    /// Cancelling a superseded build (a second export before the first
+    /// panel closed) or the pane's own is what this handle is for; it does
+    /// not otherwise carry a value. Cleared back to `nil` on completion,
+    /// guarded by `largeTextTaskGeneration` so a superseded build finishing
+    /// late can never clear the *new* build's handle out from under it.
+    /// `Selection.text`/`exportableText` poll no cancellation flag
+    /// internally (unlike `Search.find`), so cancelling this only stops the
+    /// result from being applied — the build itself, if already running,
+    /// still runs to completion off the main thread.
+    var largeTextTask: Task<Void, Never>?
+    /// Bumped every time `largeTextTask` is replaced; see its doc comment.
+    var largeTextTaskGeneration = 0
+    /// Test hook: the pasteboard `copy(_:)` writes to; `nil` (production
+    /// default) uses `.general`, the real system clipboard. Tests assign
+    /// `NSPasteboard.withUniqueName()` instead, so exercising copy never
+    /// touches — and cannot be raced by, or clobber — the developer's own
+    /// clipboard contents.
+    var pasteboardForTesting: NSPasteboard?
+    /// Test hook: run at the start of `copy(_:)`'s detached build, before
+    /// `Selection.text`, matching `searchSweepGate`'s purpose — `nil` in
+    /// production. `Task.detached` gives no scheduling barrier, so without
+    /// this a test asserting "the build hasn't landed yet" immediately
+    /// after `copy(_:)` returns can pass or fail depending on how fast the
+    /// scheduler happens to run it for a given grid, rather than on
+    /// whether the implementation is actually asynchronous.
+    var largeTextBuildGateForTesting: (@Sendable () -> Void)?
+    /// B05: local to this pane once the bar is open — seeded from the
+    /// global default when it opens, toggled independently of any other
+    /// currently-open bar, and pushed back to `ConfigurationStore` only as
+    /// the new default for bars opened after this one. Reading
+    /// `ConfigurationStore` live on every sweep (the pre-B05 behaviour)
+    /// meant toggling case-sensitivity in one pane silently changed what a
+    /// second, already-open pane's *next* sweep would match, without that
+    /// pane's own button ever updating to say so.
+    var searchCaseSensitive = false
+    var searchRegex = false
     /// Local key monitor for Esc while the bar is open: the field editor
     /// turns Esc into `cancelOperation:`, which NSSearchField can swallow
     /// without ever calling the delegate — a monitor sees the key before
@@ -744,8 +806,12 @@ class ViewController: NSViewController {
 
     /// Guards `teardown`: a pane can be reached by two close paths at once
     /// (its own `closePane` and its window's close), and none of the steps
-    /// may run twice.
-    private var didTeardown = false
+    /// may run twice. Not `private`: `ViewController+Export.swift` and
+    /// `ViewController+Selection.swift` check it (B05) before a large
+    /// copy/export build's completion touches a pane that has since been
+    /// torn down — the generation guard alone catches a *newer* build
+    /// superseding it, not a teardown that never installs one.
+    var didTeardown = false
 
     /// Explicit, idempotent teardown — the single place every close path
     /// (pane, tab, window, quit) funnels through. It cannot wait for
@@ -754,7 +820,8 @@ class ViewController: NSViewController {
     /// an orphan, holding its PTY and its thread.
     ///
     /// The steps: the search bar (its Esc key monitor; a sweep in flight
-    /// is cancelled by `closeSearchBar`), the
+    /// is cancelled by `closeSearchBar`), an in-flight large copy/export
+    /// text build (B05), the
     /// task notifier's idle timer, this pane's notification observers, and
     /// the session itself (SIGHUP to the child's process group, PTY
     /// closed, reader thread exits).
@@ -762,6 +829,8 @@ class ViewController: NSViewController {
         guard !didTeardown else { return }
         didTeardown = true
         closeSearchBar()
+        largeTextTask?.cancel()
+        largeTextTask = nil
         taskNotifier.cancel()
         NotificationCenter.default.removeObserver(self)
         session?.stop()

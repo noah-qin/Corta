@@ -40,20 +40,74 @@ extension ViewController {
     /// ⌘C and the Edit menu's Copy land here through the responder chain
     /// (`TerminalView` does not implement `copy:`). Copies the selection;
     /// with none there is nothing to do — ⌘C never reaches the PTY.
+    ///
+    /// B05: `Selection.text` is O(the selection), which for ⌘A over a large
+    /// scrollback is the whole document — the same cost class
+    /// `exportText(_:)` moved off the interaction path, so copy does too,
+    /// sharing its `largeTextTask` handle (cancels a copy superseded by a
+    /// second one, or by `teardown()`).
     @objc func copy(_ sender: Any?) {
         guard let selection, session != nil else { return }
         let grid = session.snapshot()
-        let text = Selection.text(of: selectionRange(for: selection, in: grid), in: grid)
-        guard !text.isEmpty else { return }
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
-        // Confirmation *after* the write, and only when there was something
-        // to write: an empty selection returns above, and a toast for a copy
-        // that did not happen is worse than no toast. This is what makes
-        // copy-on-select safe to have on by default (M7.10) — the clipboard
-        // no longer changes silently.
-        terminalView?.showToast(L10n.text("toast.copied"))
+        let range = selectionRange(for: selection, in: grid)
+        let pasteboard = pasteboardForTesting ?? .general
+        // `largeTextTaskGeneration` is per-pane, but the pasteboard is a
+        // single resource shared by every pane and every other app — a
+        // slow copy in this pane finishing after a second, faster copy in
+        // *another* pane (or an OSC 52 write, or another app entirely)
+        // would otherwise clobber whatever wrote after it, since nothing
+        // about this pane's own state changed to trip the generation
+        // guard. `changeCount` is `NSPasteboard`'s own answer to "did
+        // anyone write here since I looked" — checked again right before
+        // the write below, the standard pattern for not stomping a
+        // pasteboard write that is not this call's to overwrite.
+        let changeCountAtStart = pasteboard.changeCount
+        largeTextTask?.cancel()
+        largeTextTaskGeneration &+= 1
+        let generation = largeTextTaskGeneration
+        // `Task.detached`, not a plain `Task {}`: this method runs on
+        // `@MainActor`, and a plain `Task {}` created from an actor-isolated
+        // context inherits that actor's isolation for its body — relying on
+        // a *nonisolated callee* to implicitly escape it again is exactly
+        // the subtle inference Copilot's review flagged as unreliable here,
+        // even though it happens to hold today. `.detached` makes "this
+        // build runs off the main actor" true by construction rather than
+        // by inference, at the cost of an explicit `MainActor.run` hop for
+        // the pasteboard write, which is AppKit-affine.
+        let gate = largeTextBuildGateForTesting
+        largeTextTask = Task.detached(priority: .userInitiated) { [weak self] in
+            gate?()
+            let text = Selection.text(of: range, in: grid)
+            await MainActor.run {
+                // Only this call's own generation may clear the handle —
+                // a superseded copy finishing late (its cancellation only
+                // ever stops the *result* from applying, never the build
+                // itself, which has already run to completion by now) must
+                // not clear the handle a newer copy has since installed.
+                guard let self, !self.didTeardown, self.largeTextTaskGeneration == generation else { return }
+                self.largeTextTask = nil
+                guard !Task.isCancelled, !text.isEmpty else { return }
+                let pasteboard = self.pasteboardForTesting ?? .general
+                guard pasteboard.changeCount == changeCountAtStart else {
+                    // Someone else — another pane, another app, the child
+                    // via OSC 52 — wrote to the shared pasteboard while
+                    // this build was running. Their write is newer than
+                    // this one's source selection; overwriting it with
+                    // stale text would be a worse surprise than this copy
+                    // silently not landing.
+                    return
+                }
+                pasteboard.clearContents()
+                pasteboard.setString(text, forType: .string)
+                // Confirmation *after* the write, and only when there was
+                // something to write: an empty selection is a no-op above,
+                // and a toast for a copy that did not happen is worse than
+                // no toast. This is what makes copy-on-select safe to have
+                // on by default (M7.10) — the clipboard no longer changes
+                // silently.
+                self.terminalView?.showToast(L10n.text("toast.copied"))
+            }
+        }
     }
 
     /// ⌘A: the whole document — scrollback plus screen.
