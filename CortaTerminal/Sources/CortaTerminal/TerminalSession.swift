@@ -755,6 +755,11 @@ public final class TerminalSession: @unchecked Sendable {
         state.withLock { $0.terminal.hasShellIntegration }
     }
 
+    /// B08 — see `Terminal.promptEndPosition`.
+    public var promptEndPosition: (row: Int, column: Int)? {
+        state.withLock { $0.terminal.promptEndPosition }
+    }
+
     /// B07 — this session's bounded command history. A snapshot like
     /// `snapshot()`'s grid: the lock is held only to copy it.
     public var commandRecords: CommandRecordStore {

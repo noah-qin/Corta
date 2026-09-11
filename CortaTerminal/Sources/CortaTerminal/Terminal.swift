@@ -154,6 +154,16 @@ public struct Terminal: Sendable {
     /// between the exact command boundaries and its own heuristic.
     public var hasShellIntegration: Bool { performer.state.promptRow != nil }
 
+    /// B08 — the absolute row of the current prompt and the column its text
+    /// ended at, when both are known for *this* prompt (see
+    /// `PerformerState.promptEndColumn`'s doc comment for why `B` on a
+    /// different row than `A` leaves this `nil`).
+    public var promptEndPosition: (row: Int, column: Int)? {
+        guard let row = performer.state.promptRow, let column = performer.state.promptEndColumn
+        else { return nil }
+        return (row, column)
+    }
+
     /// B07 — the bounded, id-keyed command history behind `hasShellIntegration`
     /// and the row-based marks above. See `CommandRecord`'s doc comment.
     public var commandRecords: CommandRecordStore { performer.state.commandRecords }
