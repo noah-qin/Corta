@@ -20,6 +20,18 @@ public struct IndexedPalette: Sendable, Equatable {
     public private(set) var defaults: [(red: UInt8, green: UInt8, blue: UInt8)]
     public internal(set) var overrides: [UInt8: (red: UInt8, green: UInt8, blue: UInt8)] = [:]
 
+    /// Bumped by every `overrides` mutation (never by `updateDefaults`,
+    /// which is a theme reseed the render path already invalidates on its
+    /// own — `ViewController.appearanceChanged`). The render cache
+    /// (`TerminalRenderer.updateInstances`) compares this once a frame,
+    /// the same shape `GlyphAtlas.generation`/`ScreenLines.generation`
+    /// already use, because `overrides` changing is invisible to the
+    /// per-cell content revision a damage check otherwise relies on: an
+    /// `OSC 4` override changes what index 1 *resolves to*, not what any
+    /// `Cell` stores, so nothing about the grid's own revision tracking
+    /// would ever notice on its own (B06).
+    public private(set) var overridesGeneration: UInt64 = 0
+
     public init(defaults: [(red: UInt8, green: UInt8, blue: UInt8)] = IndexedPalette.xtermDefaults()) {
         precondition(defaults.count == 256, "IndexedPalette.defaults must name all 256 indices")
         self.defaults = defaults
@@ -33,6 +45,7 @@ public struct IndexedPalette: Sendable, Equatable {
 
     mutating func setOverride(_ index: UInt8, to color: (red: UInt8, green: UInt8, blue: UInt8)) {
         overrides[index] = color
+        overridesGeneration &+= 1
     }
 
     /// Replaces `defaults` in place, keeping `overrides` untouched — for a
@@ -51,11 +64,15 @@ public struct IndexedPalette: Sendable, Equatable {
 
     /// OSC 104 with no arguments — every index reverts to its default.
     mutating func resetAllOverrides() {
+        guard !overrides.isEmpty else { return }
         overrides.removeAll()
+        overridesGeneration &+= 1
     }
 
     mutating func resetOverride(_ index: UInt8) {
+        guard overrides[index] != nil else { return }
         overrides[index] = nil
+        overridesGeneration &+= 1
     }
 
     /// xterm's fixed values for indices 16–255: the 6×6×6 colour cube, then

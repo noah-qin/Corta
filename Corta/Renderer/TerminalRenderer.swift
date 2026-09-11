@@ -120,6 +120,15 @@ nonisolated final class TerminalRenderer {
     /// alternate-screen swap, a column resize) — see `ScreenLines.generation`
     /// for why row revisions alone cannot be trusted to catch that.
     private var cachedLinesGeneration: UInt64?
+    /// `IndexedPalette.overridesGeneration` when the cache was last built. A
+    /// mismatch means an OSC 4 set/reset landed since — invisible to every
+    /// other invalidation check above, since it changes what an index
+    /// *resolves to*, not any `Cell`'s own stored value (B06). This session's
+    /// `overrides` themselves, read fresh every `updateInstances` call
+    /// rather than cached, are what `appendRowInstances` actually resolves
+    /// against.
+    private var cachedIndexedOverridesGeneration: UInt64 = 0
+    private var indexedOverrides: IndexedColorOverrides?
     /// `Grid.linesRotated` when the live-screen cache was last fully in
     /// sync. The difference from the current value is exactly how many rows
     /// a whole-screen scroll has shifted since, which `rebuildDamagedRows`
@@ -229,8 +238,16 @@ nonisolated final class TerminalRenderer {
     func updateInstances(
         grid: Grid, scrollOffset: Int, cursorVisible: Bool, selection: TerminalSelection?,
         searchMatches: [TerminalSelection] = [], currentSearchMatchIndex: Int? = nil,
-        hoveredLink: TerminalSelection? = nil
+        hoveredLink: TerminalSelection? = nil,
+        indexedOverrides: IndexedColorOverrides = [:], indexedOverridesGeneration: UInt64 = 0
     ) -> Bool {
+        // `nil`, not an always-passed empty dictionary: passing `nil` per row
+        // costs nothing (no object to retain), where an empty `Dictionary`
+        // still costs a retain/release pair on every `resolveForeground`/
+        // `resolveBackground` call each cell makes (B06 render-path
+        // integration; measured ~5% on `FrameCPUBaselineTests` before this
+        // was caught).
+        self.indexedOverrides = indexedOverrides.isEmpty ? nil : indexedOverrides
         let offset = min(max(0, scrollOffset), grid.scrollback.count)
         let fullRebuild =
             needsFullRebuild
@@ -245,6 +262,9 @@ nonisolated final class TerminalRenderer {
             // small numbers independently of this cache's, so a coincidental
             // match cannot be trusted (`ScreenLines.generation`).
             || (offset == 0 && cachedLinesGeneration != grid.linesGeneration)
+            // An OSC 4 set/reset landed since the cache was built (B06) —
+            // see `cachedIndexedOverridesGeneration`'s own doc comment.
+            || cachedIndexedOverridesGeneration != indexedOverridesGeneration
 
         var changed = fullRebuild
         // An atlas eviction mid-build invalidates every UV handed out so far
@@ -282,6 +302,7 @@ nonisolated final class TerminalRenderer {
         cachedColumns = grid.columns
         cachedOffset = offset
         cachedScrollbackTotalPushed = grid.scrollback.totalPushed
+        cachedIndexedOverridesGeneration = indexedOverridesGeneration
         if offset == 0 {
             cachedLinesGeneration = grid.linesGeneration
             cachedLinesRotated = grid.linesRotated
@@ -333,13 +354,16 @@ nonisolated final class TerminalRenderer {
         searchMatches: [TerminalSelection] = [],
         currentSearchMatchIndex: Int? = nil,
         hoveredLink: TerminalSelection? = nil,
+        indexedOverrides: IndexedColorOverrides = [:],
+        indexedOverridesGeneration: UInt64 = 0,
         renderPassDescriptor: MTLRenderPassDescriptor,
         commandBuffer: MTLCommandBuffer
     ) {
         updateInstances(
             grid: grid, scrollOffset: scrollOffset, cursorVisible: cursorVisible,
             selection: selection, searchMatches: searchMatches,
-            currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink)
+            currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink,
+            indexedOverrides: indexedOverrides, indexedOverridesGeneration: indexedOverridesGeneration)
         draw(rect: rect, drawableSize: drawableSize, renderPassDescriptor: renderPassDescriptor,
             commandBuffer: commandBuffer)
     }
@@ -670,8 +694,8 @@ nonisolated final class TerminalRenderer {
             // resolver they go through, so a plain reversed cell — a
             // `less` search hit is one — came out identical to an
             // unreversed one, with no visible highlight at all.
-            let resolvedFg = palette.resolveForeground(cell.foreground)
-            let resolvedBg = palette.resolveBackground(cell.background)
+            let resolvedFg = palette.resolveForeground(cell.foreground, indexedOverrides: indexedOverrides)
+            let resolvedBg = palette.resolveBackground(cell.background, indexedOverrides: indexedOverrides)
             var fg = reversed ? resolvedBg : resolvedFg
             let bg = reversed ? resolvedFg : resolvedBg
             // SGR 2 (dim). Parsed since M1 and drawn nowhere until now, so

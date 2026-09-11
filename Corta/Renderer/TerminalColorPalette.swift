@@ -64,29 +64,54 @@ nonisolated enum TerminalColorPalette {
     }
 }
 
+/// A session's OSC 4 overrides on top of the numeric cube/ramp — the raw
+/// dictionary rather than a whole `IndexedPalette`, since the palette's own
+/// `defaults` duplicate exactly what `Theme.Variant.resolve` already
+/// computes inline below; passing only what changes keeps the default path
+/// (no overrides set, by far the common case) byte-identical to before
+/// B06's render-path integration (`docs/DESIGN.md` §7).
+public typealias IndexedColorOverrides = [UInt8: (red: UInt8, green: UInt8, blue: UInt8)]
+
 nonisolated extension Theme.Variant {
     /// Resolution against one variant. On the variant rather than on
     /// `TerminalColorPalette` so the render loop can hold it in a local: the
     /// static accessors go through a global and retain the ANSI array on
     /// every cell, and there are tens of thousands of cells per frame.
+    ///
+    /// `indexedOverrides` is an *optional* dictionary, not a defaulted empty
+    /// one: passing `nil` costs nothing (no object to retain), while an
+    /// always-passed empty `Dictionary` still costs a retain/release pair
+    /// per call — measured at ~5% on `FrameCPUBaselineTests` before this was
+    /// caught and fixed. `TerminalRenderer.appendRowInstances` passes `nil`
+    /// outright when the session has no overrides, once per row rather than
+    /// re-deriving it per cell.
     @inline(__always)
-    func resolveForeground(_ color: Color) -> SIMD4<Float> {
-        color.isDefault ? foreground : resolve(color)
+    func resolveForeground(
+        _ color: Color, indexedOverrides: IndexedColorOverrides? = nil
+    ) -> SIMD4<Float> {
+        color.isDefault ? foreground : resolve(color, indexedOverrides: indexedOverrides)
     }
 
     @inline(__always)
-    func resolveBackground(_ color: Color) -> SIMD4<Float> {
-        color.isDefault ? background : resolve(color)
+    func resolveBackground(
+        _ color: Color, indexedOverrides: IndexedColorOverrides? = nil
+    ) -> SIMD4<Float> {
+        color.isDefault ? background : resolve(color, indexedOverrides: indexedOverrides)
     }
 
     @inline(__always)
-    func resolve(_ color: Color) -> SIMD4<Float> {
+    func resolve(_ color: Color, indexedOverrides: IndexedColorOverrides? = nil) -> SIMD4<Float> {
         if let components = color.components {
             return SIMD4<Float>(
                 Float(components.red) / 255, Float(components.green) / 255,
                 Float(components.blue) / 255, 1)
         }
         guard let index = color.index else { return foreground }
+        if let overrides = indexedOverrides, let overridden = overrides[index] {
+            return SIMD4<Float>(
+                Float(overridden.red) / 255, Float(overridden.green) / 255,
+                Float(overridden.blue) / 255, 1)
+        }
         if index < 16 { return ansi[Int(index)] }
         // The 6x6x6 cube and the 24-step ramp are xterm's, defined
         // numerically and the same under every theme.

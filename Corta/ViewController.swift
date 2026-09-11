@@ -997,11 +997,14 @@ class ViewController: NSViewController {
             }
         }
         let mappedSearchMatches = searchMatches.map { TerminalSelection($0, grid: grid) }
+        let indexedPalette = session.indexedPalette
         let damaged = terminalRenderer.updateInstances(
             grid: grid, scrollOffset: scrollOffset,
             cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
             searchMatches: mappedSearchMatches,
-            currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink)
+            currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink,
+            indexedOverrides: indexedPalette.overrides,
+            indexedOverridesGeneration: indexedPalette.overridesGeneration)
         pendingFrameContext = FrameContext(
             grid: grid, scrollOffset: scrollOffset,
             cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
