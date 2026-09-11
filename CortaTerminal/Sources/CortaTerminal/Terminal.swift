@@ -113,6 +113,15 @@ public struct Terminal: Sendable {
         set { performer.state.indexedPalette = newValue }
     }
 
+    /// The five special colours OSC 5 reports and sets, and OSC 105 resets
+    /// (B06). Query/set state only, like `indexedPalette` — see
+    /// `SpecialColors`'s own doc comment for why there is no themed
+    /// default to seed here.
+    public var specialColors: SpecialColors {
+        get { performer.state.specialColors }
+        set { performer.state.specialColors = newValue }
+    }
+
     /// The kitty keyboard protocol flags in force (M6.9). The app encodes
     /// key presses according to these.
     public var keyboardEnhancements: KeyboardEnhancementFlags {

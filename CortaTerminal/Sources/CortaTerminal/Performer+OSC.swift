@@ -11,12 +11,17 @@ extension Performer {
         guard let separator = bytes.firstIndex(of: 0x3B) else {
             // No `;`-separated payload at all. Every code but one needs
             // one to do anything and is unchanged by leaving it alone here;
-            // OSC 104 with no arguments — "reset the whole indexed
-            // palette" (B06) — is the one real use of a bare code, and it
-            // is the most common real-world form of the reset (xterm
-            // itself sends `OSC 104 ST` with nothing after it).
-            if let code = Self.parseOSCCode(bytes), code == 104 {
-                resetIndexedColors(bytes[bytes.endIndex...])
+            // OSC 104/105 with no arguments — "reset the whole indexed
+            // palette / every special colour" (B06) — is the one real use
+            // of a bare code, and it is the most common real-world form of
+            // the reset (xterm itself sends `OSC 104 ST` with nothing
+            // after it).
+            if let code = Self.parseOSCCode(bytes) {
+                if code == 104 {
+                    resetIndexedColors(bytes[bytes.endIndex...])
+                } else if code == 105 {
+                    resetSpecialColors(bytes[bytes.endIndex...])
+                }
             }
             return
         }
@@ -39,14 +44,21 @@ extension Performer {
             setHyperlink(payload)
         case 4:
             // The indexed palette (B06) — set/query, one or more `c ; spec`
-            // pairs. OSC 5 (xterm's "special colours") is deliberately not
-            // implemented: unlike OSC 4, its exact index semantics are not
-            // independently documented anywhere Corta can verify against
-            // without the esctest suite itself, and guessing wrong is worse
-            // than not answering.
+            // pairs.
             handleIndexedColor(payload)
         case 104:
             resetIndexedColors(payload)
+        case 5:
+            // The special colours (B06) — same wire shape as OSC 4, over
+            // `SpecialColors`' five fixed slots instead of a 256-entry
+            // palette. xterm ctlseqs documents the exact Pc values
+            // (0=bold, 1=underline, 2=blink, 3=reverse, 4=italic), unlike
+            // the exotic OSC 10/11/12 colour-space specs this file already
+            // refuses for being unverifiable — this one is independently
+            // documented, so it is implemented rather than guessed.
+            handleSpecialColor(payload)
+        case 105:
+            resetSpecialColors(payload)
         case 10, 11, 12:
             // The dynamic colours (M6.6). A payload of exactly `?` is the
             // query form; anything else is a colour specification to set.

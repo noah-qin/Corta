@@ -1,7 +1,7 @@
 /// The 256-entry indexed palette OSC 4 reports and sets, and OSC 104
 /// resets — the per-session overrides on top of a themed default (B06).
-/// OSC 5 ("special colours") is a separate, unimplemented interface; this
-/// type does not carry it despite the similar name.
+/// OSC 5 ("special colours") is a separate interface with its own type,
+/// `SpecialColors`; this type does not carry it despite the similar name.
 ///
 /// `defaults` is seeded by the app the same way `DynamicColors` is: ANSI
 /// 0–15 from the active theme, 16–255 from xterm's fixed 6×6×6 colour cube

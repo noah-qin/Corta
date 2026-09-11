@@ -88,6 +88,10 @@ public struct PerformerState: Sendable {
     /// see `IndexedPalette`'s own doc comment.
     public internal(set) var indexedPalette = IndexedPalette()
 
+    /// The five special colours OSC 5 reports and sets, and OSC 105 resets
+    /// (B06) — see `SpecialColors`'s own doc comment.
+    public internal(set) var specialColors = SpecialColors()
+
     /// OSC 133 shell integration (M7.2). The absolute row of the most
     /// recent prompt, so the exit status can be written back onto it however
     /// far the output has scrolled since.
