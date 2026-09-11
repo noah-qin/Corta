@@ -103,6 +103,16 @@ public struct Terminal: Sendable {
         set { performer.state.dynamicColors = newValue }
     }
 
+    /// The 256-entry indexed palette OSC 4 reports and sets, and OSC 104
+    /// resets (B06). The app seeds `defaults` from its theme (mirrors
+    /// `dynamicColors`), but this is query/set state only — no render path
+    /// reads it yet, unlike `dynamicColors`. See `TerminalSession
+    /// .indexedPalette`'s doc comment and `docs/DESIGN.md` §7.
+    public var indexedPalette: IndexedPalette {
+        get { performer.state.indexedPalette }
+        set { performer.state.indexedPalette = newValue }
+    }
+
     /// The kitty keyboard protocol flags in force (M6.9). The app encodes
     /// key presses according to these.
     public var keyboardEnhancements: KeyboardEnhancementFlags {

@@ -647,6 +647,30 @@ public final class TerminalSession: @unchecked Sendable {
         set { state.withLock { $0.terminal.dynamicColors = newValue } }
     }
 
+    /// The 256-entry indexed palette OSC 4 reports and sets, and OSC 104
+    /// resets (B06). The app seeds `defaults` from its theme at startup and
+    /// on every theme change, the same way `dynamicColors` is seeded — but
+    /// unlike `dynamicColors`, this is query/set state only: `TerminalColorPalette`
+    /// still resolves an indexed colour from the active `Theme.Variant`
+    /// directly, so an OSC 4 override changes what a query answers without
+    /// (yet) changing what is painted. See `docs/DESIGN.md` §7.
+    public var indexedPalette: IndexedPalette {
+        get { state.withLock { $0.terminal.indexedPalette } }
+        set { state.withLock { $0.terminal.indexedPalette = newValue } }
+    }
+
+    /// Reseeds `indexedPalette.defaults` for a live theme switch (M6.13)
+    /// without discarding overrides — under one lock acquisition, not a
+    /// read of `indexedPalette` followed by a write of it back. The reader
+    /// thread applies OSC 4 under this same lock (`feed`, below); a
+    /// get-then-set from outside it would race that write and could drop
+    /// an override the child set between the get and the set.
+    public func updateIndexedPaletteDefaults(
+        to newDefaults: [(red: UInt8, green: UInt8, blue: UInt8)]
+    ) {
+        state.withLock { $0.terminal.indexedPalette.updateDefaults(to: newDefaults) }
+    }
+
     /// The kitty keyboard protocol flags in force (`CSI > flags u`, M6.9).
     public var keyboardEnhancements: KeyboardEnhancementFlags {
         state.withLock { $0.terminal.keyboardEnhancements }

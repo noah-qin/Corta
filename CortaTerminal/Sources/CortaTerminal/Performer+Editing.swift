@@ -77,13 +77,18 @@ extension Performer {
     }
 
     private mutating func resetToInitialState() {
-        // Dynamic colours originate in the active app theme, not in terminal
-        // mode state; RIS resets modes, screens, title, tab stops and cursor
-        // while keeping those resource values truthful for later queries.
+        // Dynamic colours and the indexed palette's defaults (B06) both
+        // originate in the active app theme, not in terminal mode state;
+        // RIS resets modes, screens, title, tab stops and cursor while
+        // keeping those resource values truthful for later queries. The
+        // palette's *overrides* are terminal state like any other mode, so
+        // they reset along with everything else — only `defaults` survives.
         let colors = state.dynamicColors
+        let paletteDefaults = state.indexedPalette.defaults
         grid.resetToInitialState()
         state = PerformerState()
         state.dynamicColors = colors
+        state.indexedPalette = IndexedPalette(defaults: paletteDefaults)
     }
 
     /// CSI sequences carrying an intermediate byte. Only DECSCUSR is

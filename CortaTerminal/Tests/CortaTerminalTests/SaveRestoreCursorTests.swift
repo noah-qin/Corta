@@ -59,4 +59,45 @@ struct SaveRestoreCursorTests {
         #expect(grid.pendingWrap)
         #expect(grid.cursor == Cursor(row: 0, column: 3))
     }
+
+    // MARK: - SCOSC / SCORC (B06)
+
+    /// `CSI s` / `CSI u` (ANSI.SYS SCOSC/SCORC), wired as aliases for
+    /// DECSC/DECRC since Corta has no DECLRMM margin mode to disambiguate
+    /// against — the same fallback xterm uses. Fed through `Terminal`, not
+    /// `Grid` directly, since what is under test is the wire form reaching
+    /// `Grid.saveCursor()`/`restoreCursor()` at all.
+    @Test("CSI s / CSI u alias DECSC/DECRC")
+    func csiSaveRestoreAliasesDECSC() {
+        var terminal = Terminal(rows: 4, columns: 10)
+        terminal.feed(Array("\u{1B}[2;6H\u{1B}[s".utf8))  // move to (row 2, col 6), save
+        terminal.feed(Array("\u{1B}[1;1H\u{1B}[u".utf8))  // move home, then restore
+        #expect(terminal.grid.cursor == Cursor(row: 1, column: 5))
+    }
+
+    /// Bare `CSI u` (no private marker) must not be confused with the kitty
+    /// keyboard protocol's `CSI ? u` / `CSI = u` / `CSI < u` / `CSI > u`,
+    /// which all carry a marker and are a completely different sequence
+    /// family that happens to share the final byte.
+    @Test("bare CSI u does not disturb the kitty keyboard protocol stack")
+    func bareCSIuDoesNotTouchKittyProtocol() {
+        var terminal = Terminal(rows: 4, columns: 10)
+        terminal.feed(Array("\u{1B}[=5u".utf8))  // set kitty flags
+        let flagsBeforeBareU = terminal.keyboardEnhancements
+        terminal.feed(Array("\u{1B}[u".utf8))  // SCORC, not a kitty query
+        #expect(terminal.keyboardEnhancements == flagsBeforeBareU)
+    }
+
+    /// The kitty keyboard protocol's own key-report form — `CSI
+    /// code;modifiers u`, unmarked but parameterized — must not be
+    /// misread as SCORC: it carries no private marker, so only the
+    /// parameter count tells it apart from a bare `CSI u`.
+    @Test("a parameterized CSI u (a kitty key report) does not restore the cursor")
+    func parameterizedCSIuIsNotSCORC() {
+        var terminal = Terminal(rows: 4, columns: 10)
+        terminal.feed(Array("\u{1B}[2;6H\u{1B}[s".utf8))  // move to (row 2, col 6), save
+        terminal.feed(Array("\u{1B}[1;1H".utf8))  // move home
+        terminal.feed(Array("\u{1B}[97;5u".utf8))  // an echoed kitty key report, not SCORC
+        #expect(terminal.grid.cursor == Cursor(row: 0, column: 0))
+    }
 }

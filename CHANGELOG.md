@@ -40,8 +40,26 @@ what to edit.
   tests, so a pixel-mismatch failure carries the rendered PNG instead of
   only the failed comparison.
 
+- **B06 — indexed palette query, set and reset (OSC 4/104).** A program
+  naming a colour by number (`\e]4;137;?\e\\`) got silence, and setting or
+  resetting one (`\e]4;1;#ff0000\e\\`, `\e]104\e\\`) was a no-op. Added
+  `IndexedPalette` — a 256-entry `defaults` array plus a sparse
+  `overrides` dictionary, the same shape `DynamicColors` already uses —
+  wired through `PerformerState`/`Terminal`/`TerminalSession`, with
+  `defaults` seeded from the active theme's ANSI colours (0–15) and
+  xterm's fixed 6×6×6 cube and greyscale ramp (16–255) so a query answers
+  with what is actually drawn, matching how OSC 10/11/12 already work
+  (`docs/DESIGN.md` §7). Render-path integration (making an override
+  actually repaint) and OSC 5 are explicitly out of scope for this change
+  — see the same `DESIGN.md` entry for why.
+
 ### Fixed
 
+- **B06 — `CSI s` / `CSI u` cursor save/restore did nothing.** Corta has
+  no DECLRMM, so — matching xterm without left/right margins — these are
+  now unconditional aliases for `DECSC`/`DECRC` (`ESC 7`/`ESC 8`). The
+  kitty keyboard protocol's own `CSI u` forms are intercepted earlier in
+  dispatch and are unaffected.
 - **B05 — search case-sensitivity and regex mode leaked across panes.**
   Both were read live from `ConfigurationStore` on every sweep; toggling
   either in one pane silently changed what a second, already-open pane's
