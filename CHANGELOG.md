@@ -12,6 +12,22 @@ what to edit.
 
 ### Added
 
+- **B07 — shell integration and command-level debugging (first slice).**
+  Commands are now identified, not just marked: `CommandRecord` (bounded,
+  id-keyed, built from the same `OSC 133` marks the grid already reads)
+  distinguishes the command the viewport is scrolled to from the one that
+  most recently finished, records each command's exit status, timing and
+  working directory (`OSC 7`), and lets a still-running command's output
+  be copied as a timestamped snapshot (**Snapshot Running Command's
+  Output**, new menu item) rather than waiting for it to finish. Settings
+  ▸ Terminal ▸ Shell Integration installs, diagnoses and removes a zsh
+  integration script — reversibly, inside one marked block in `~/.zshrc`,
+  flagging a likely conflict with another terminal's own integration by
+  name rather than refusing to install (`docs/CONFIGURATION.md` §2, "Shell
+  integration"). Deferred to a later pass: fish/bash integration, and a
+  unified command-inspector surface tying navigation, output ops and
+  notifications together visually rather than through the existing
+  per-feature menu items.
 - **B03 — session lifecycle and input backpressure made explicit.**
   `TerminalSession.write` now returns a `WriteOutcome`
   (`.accepted`/`.backpressured`/`.stopped`) instead of silently dropping a

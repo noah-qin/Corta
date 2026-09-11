@@ -76,6 +76,43 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 | `link-activation` | `command`, `click` | `command` | `command` opens a link on ⌘-click. `click` opens it on a plain click and underlines the link under the pointer; dragging across a URL still selects it. |
 | `allow-clipboard-write` | boolean | `false` | Whether OSC 52 may put text on the system clipboard — the only route from inside `tmux` or an `ssh` session. Off by default because *any* output could use it. The **read** direction does not exist under any setting (`SECURITY.md` §6). |
 
+#### Shell integration (B07)
+
+Not a config-file key — a file on disk, `~/.zshrc`, that only Settings ▸
+Terminal ▸ Shell Integration touches, and only inside one marked block:
+
+```
+# >>> Corta shell integration >>>
+…
+# <<< Corta shell integration <<<
+```
+
+**Install** appends the block (creating `~/.zshrc` first if it does not
+exist); **Remove** deletes exactly that block and nothing else a user wrote
+around or inside it. Installing is reversible for the same reason: nothing
+outside those two lines is Corta's to change, so removing them undoes the
+whole thing. Installing twice changes nothing the second time, and the
+script itself guards its own hooks with `CORTA_SHELL_INTEGRATION_ACTIVE` in
+case something else sources it again.
+
+The row reports one of three states, read fresh from `~/.zshrc` every time
+Settings opens — the file, not a cached flag, is the ground truth, the same
+rule the config file itself follows (§1):
+
+| State | Meaning |
+| --- | --- |
+| Not installed | No Corta block. Offers **Install**. |
+| Installed | The block is present. Offers **Remove**. |
+| Possible conflict | No Corta block, but the file already sources another terminal's own integration (iTerm2, Starship, VS Code or WezTerm's are recognised by name). Offers **Install Anyway** — installing alongside another integration is not refused, only flagged, since only the user knows whether that is what they want. |
+
+Only zsh ships today; fish and bash are evaluated separately (the B07
+roadmap issue). The installed script emits `OSC 133 ; A/B/C/D` from zsh's
+`preexec`/`precmd` hooks and `OSC 7` for the working directory — the same
+two sequences `Performer+ShellIntegration.swift` and this document's
+command-jump entries already describe. Nothing is installed automatically;
+a user who never opens this row keeps the keystroke-and-idle heuristic
+`TaskNotifier` falls back to, same as before B07.
+
 ### Notifications
 
 | Key | Values | Default | Notes |
@@ -323,6 +360,7 @@ the key against both rows, which is how you spot it.
 | `previous-failed-command` | Previous Failed Command | `shift+cmd+up` |
 | `next-failed-command` | Next Failed Command | `shift+cmd+down` |
 | `copy-last-command-output` | Copy Last Command Output | *(none)* |
+| `snapshot-running-command-output` | Snapshot Running Command's Output | *(none)* |
 | `export-text` | Export Text… | `shift+cmd+s` |
 | `clear-screen` | Clear Screen | `cmd+k` |
 | `clear-history` | Clear History | *(none)* |
@@ -332,14 +370,23 @@ the key against both rows, which is how you spot it.
 | `settings` | Settings… | `cmd+,` |
 | `command-palette` | Command Palette… | `cmd+shift+p` |
 
-`previous-command`, `next-command`, the two failed-command jumps and
-`copy-last-command-output` all need shell integration (OSC 133) to have
-anything to work with; without it their menu items are disabled rather than
-silent. `copy-last-command-output` takes the rows between the last command's
-prompt and the next one — which is right for a one-line prompt with the
-command typed on it, and takes one row too much for a two-line prompt or a
-command continued across lines, because Corta marks `OSC 133 ; A` but not
-`OSC 133 ; C`.
+`previous-command`, `next-command`, the two failed-command jumps,
+`copy-last-command-output` and `snapshot-running-command-output` all need
+shell integration (OSC 133) to have anything to work with; without it their
+menu items are disabled rather than silent. `copy-last-command-output` takes
+the rows between the last command's prompt and the next one — which is right
+for a one-line prompt with the command typed on it, and takes one row too
+much for a two-line prompt or a command continued across lines, because Corta
+marks `OSC 133 ; A` but not `OSC 133 ; C`.
+
+`snapshot-running-command-output` is `copy-last-command-output`'s answer for
+a command that has not finished yet: `copy-last-command-output` needs the
+`OSC 133 ; D` mark that only arrives at the end, so it finds nothing while
+something is still building. This instead copies everything the running
+command has printed so far, with a header naming when the snapshot was taken
+— because what a build has printed at minute three is still worth reading,
+and waiting for it to finish to read it would be Corta making the user wait
+on itself.
 
 `reopen-closed-pane` puts a closed pane back where it was — same split, same
 side, same divider, same working directory. It restores the *arrangement*,

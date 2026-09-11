@@ -193,4 +193,90 @@ import Testing
         // Row -1 is above everything the fixture wrote.
         #expect(grid.commandOutputRows(before: -1) == nil)
     }
+
+    // MARK: - Command records (B07)
+
+    @Test("a completed command gets a stable id and every field")
+    func completedCommandRecordIsPopulated() {
+        var terminal = self.terminal()
+        terminal.feed(Array("\u{1B}]7;file:///tmp\u{1B}\\".utf8))
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\$ ls\r\n\u{1B}]133;C\u{1B}\\out\r\n".utf8))
+        terminal.feed(Array("\u{1B}]133;D;0\u{1B}\\".utf8))
+        let records = terminal.commandRecords.records
+        #expect(records.count == 1)
+        let record = try! #require(records.first)
+        #expect(record.id == 0)
+        #expect(record.exitStatus == 0)
+        #expect(!record.isRunning)
+        #expect(!record.didFail)
+        #expect(record.workingDirectory == "/tmp")
+        #expect(record.outputStartRow != nil)
+    }
+
+    @Test("a running command has no exit status and counts as running")
+    func runningCommandHasNoExitStatusYet() {
+        var terminal = self.terminal()
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\$ sleep 5\r\n\u{1B}]133;C\u{1B}\\".utf8))
+        let record = try! #require(terminal.commandRecords.last)
+        #expect(record.isRunning)
+        #expect(record.exitStatus == nil)
+    }
+
+    @Test("a failed command's record says so")
+    func failedCommandRecordDidFail() {
+        var terminal = self.terminal()
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\\u{1B}]133;C\u{1B}\\\u{1B}]133;D;1\u{1B}\\".utf8))
+        let record = try! #require(terminal.commandRecords.last)
+        #expect(record.didFail)
+    }
+
+    /// Each `A` starts a new record, keyed by a ever-increasing id rather
+    /// than reused across commands — the identity B07 exists to add.
+    @Test("each command gets its own, incrementing id")
+    func idsIncrementAcrossCommands() {
+        var terminal = self.terminal()
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\\u{1B}]133;C\u{1B}\\\u{1B}]133;D;0\u{1B}\\".utf8))
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\\u{1B}]133;C\u{1B}\\\u{1B}]133;D;0\u{1B}\\".utf8))
+        let records = terminal.commandRecords.records
+        #expect(records.map(\.id) == [0, 1])
+    }
+
+    /// `lastCompleted` is not `last`: a still-running command must not be
+    /// mistaken for "the command that just finished" — the exact confusion
+    /// U14's "copy last command's output" existed to avoid.
+    @Test("the latest completed command is not the one still running")
+    func lastCompletedSkipsARunningCommand() {
+        var store = CommandRecordStore()
+        store.begin(promptRow: 0, workingDirectory: nil, at: Date())
+        store.finish(exitStatus: 0, endRow: 1, at: Date())
+        store.begin(promptRow: 2, workingDirectory: nil, at: Date())
+        #expect(store.last?.id == 1)
+        #expect(store.lastCompleted?.id == 0)
+    }
+
+    @Test("record(before:) finds the command whose prompt is at or before a row")
+    func recordBeforeFindsTheRightCommand() {
+        var store = CommandRecordStore()
+        store.begin(promptRow: 0, workingDirectory: nil, at: Date())
+        store.finish(exitStatus: 0, endRow: 5, at: Date())
+        store.begin(promptRow: 10, workingDirectory: nil, at: Date())
+        store.finish(exitStatus: 1, endRow: 15, at: Date())
+        #expect(store.record(before: 3)?.promptRow == 0)
+        #expect(store.record(before: 10)?.promptRow == 10)
+        #expect(store.record(before: 20)?.promptRow == 10)
+        #expect(store.record(before: -1) == nil)
+    }
+
+    /// The bound exists for the same reason scrollback is bounded: a
+    /// session left running for days must not grow this without limit.
+    @Test("the record store is bounded and drops the oldest first")
+    func recordStoreIsBounded() {
+        var store = CommandRecordStore()
+        for row in 0..<(CommandRecordStore.capacity + 10) {
+            store.begin(promptRow: row, workingDirectory: nil, at: Date())
+        }
+        #expect(store.records.count == CommandRecordStore.capacity)
+        #expect(store.records.first?.id == 10)
+        #expect(store.records.last?.id == CommandRecordStore.capacity + 9)
+    }
 }

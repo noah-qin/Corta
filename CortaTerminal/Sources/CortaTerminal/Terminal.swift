@@ -154,6 +154,10 @@ public struct Terminal: Sendable {
     /// between the exact command boundaries and its own heuristic.
     public var hasShellIntegration: Bool { performer.state.promptRow != nil }
 
+    /// B07 — the bounded, id-keyed command history behind `hasShellIntegration`
+    /// and the row-based marks above. See `CommandRecord`'s doc comment.
+    public var commandRecords: CommandRecordStore { performer.state.commandRecords }
+
     /// Consumes the exit status of a command that just finished (OSC 133 D).
     /// Drained, like `takeBell`: a notification fires once per command, and a
     /// value left in place would fire on every frame after it.

@@ -755,6 +755,12 @@ public final class TerminalSession: @unchecked Sendable {
         state.withLock { $0.terminal.hasShellIntegration }
     }
 
+    /// B07 — this session's bounded command history. A snapshot like
+    /// `snapshot()`'s grid: the lock is held only to copy it.
+    public var commandRecords: CommandRecordStore {
+        state.withLock { $0.terminal.commandRecords }
+    }
+
     /// Consumes the exit status of a command that just finished (OSC 133 D).
     public func takeFinishedCommand() -> Int? {
         state.withLock { $0.terminal.takeFinishedCommand() }
