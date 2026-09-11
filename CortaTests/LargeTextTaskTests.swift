@@ -93,6 +93,51 @@ struct LargeTextTaskTests {
             "expected the handle to clear once the copy completed")
     }
 
+    /// B05 review follow-up: `largeTextTaskGeneration` is per-pane, but the
+    /// pasteboard is one resource shared by every pane, every other app,
+    /// and the child (OSC 52) — a slow copy finishing after something else
+    /// has written more recently must not clobber it.
+    @Test func copyDoesNotOverwriteAPasteboardWrittenToWhileItWasBuilding() async throws {
+        let pane = makePane()
+        defer { pane.teardown() }
+        let session = try #require(pane.session)
+        session.write(Array("echo COPYTASKMARKER\n".utf8))
+        #expect(await waitUpTo(10) { self.gridContains(pane, "COPYTASKMARKER") })
+
+        let grid = session.snapshot()
+        pane.selection = TerminalSelection(
+            start: GridPosition(row: -grid.scrollback.count, column: 0),
+            end: GridPosition(row: grid.rows - 1, column: grid.columns - 1),
+            baseScrollbackTotal: grid.scrollback.totalPushed)
+
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        pane.pasteboardForTesting = pasteboard
+
+        let buildEntered = Mutex(false)
+        let releaseBuild = Mutex(false)
+        pane.largeTextBuildGateForTesting = {
+            buildEntered.withLock { $0 = true }
+            while !releaseBuild.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.002) }
+        }
+
+        pane.copy(nil)
+        #expect(await waitUpTo(5) { buildEntered.withLock { $0 } })
+
+        // Someone else writes to the same pasteboard while the build is
+        // parked — a second pane's own copy, in the shape this test can
+        // actually produce without a second full pane.
+        let newerContent = "newer-\(UUID().uuidString)"
+        pasteboard.clearContents()
+        pasteboard.setString(newerContent, forType: .string)
+
+        releaseBuild.withLock { $0 = true }
+        #expect(await waitUpTo(5) { pane.largeTextTask == nil })
+
+        // The stale build must not have overwritten the newer write.
+        #expect(pasteboard.string(forType: .string) == newerContent)
+    }
+
     @Test func teardownCancelsAnInFlightLargeTextTask() async throws {
         let pane = makePane()
         let started = Mutex(false)

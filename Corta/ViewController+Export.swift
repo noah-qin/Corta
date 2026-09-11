@@ -99,6 +99,20 @@ extension ViewController {
                         }
                     }
                 } onCancel: {
+                    // Known, accepted narrow race: `onCancel` can run
+                    // before the presentation `Task` above has reached
+                    // `panelBox.panel = panel` — both the guard and that
+                    // assignment happen without an `await` between them,
+                    // but they are still two separate MainActor hops, and
+                    // nothing serializes which one this runs relative to.
+                    // In that exact window `panelBox.panel` reads `nil`
+                    // and there is nothing to dismiss yet; the presentation
+                    // continues (its own generation/`didTeardown` guard
+                    // already passed) and shows a panel this cancellation
+                    // cannot then retract. Closing that gap needs an
+                    // atomic handoff between the two, which is more
+                    // machinery than a window measured in a handful of
+                    // synchronous instructions has earned here.
                     Task { @MainActor in
                         guard let panel = panelBox.panel else { return }
                         window.endSheet(panel, returnCode: .cancel)

@@ -50,6 +50,18 @@ extension ViewController {
         guard let selection, session != nil else { return }
         let grid = session.snapshot()
         let range = selectionRange(for: selection, in: grid)
+        let pasteboard = pasteboardForTesting ?? .general
+        // `largeTextTaskGeneration` is per-pane, but the pasteboard is a
+        // single resource shared by every pane and every other app — a
+        // slow copy in this pane finishing after a second, faster copy in
+        // *another* pane (or an OSC 52 write, or another app entirely)
+        // would otherwise clobber whatever wrote after it, since nothing
+        // about this pane's own state changed to trip the generation
+        // guard. `changeCount` is `NSPasteboard`'s own answer to "did
+        // anyone write here since I looked" — checked again right before
+        // the write below, the standard pattern for not stomping a
+        // pasteboard write that is not this call's to overwrite.
+        let changeCountAtStart = pasteboard.changeCount
         largeTextTask?.cancel()
         largeTextTaskGeneration &+= 1
         let generation = largeTextTaskGeneration
@@ -76,6 +88,15 @@ extension ViewController {
                 self.largeTextTask = nil
                 guard !Task.isCancelled, !text.isEmpty else { return }
                 let pasteboard = self.pasteboardForTesting ?? .general
+                guard pasteboard.changeCount == changeCountAtStart else {
+                    // Someone else — another pane, another app, the child
+                    // via OSC 52 — wrote to the shared pasteboard while
+                    // this build was running. Their write is newer than
+                    // this one's source selection; overwriting it with
+                    // stale text would be a worse surprise than this copy
+                    // silently not landing.
+                    return
+                }
                 pasteboard.clearContents()
                 pasteboard.setString(text, forType: .string)
                 // Confirmation *after* the write, and only when there was
