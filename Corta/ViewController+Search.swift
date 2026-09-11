@@ -365,8 +365,9 @@ extension ViewController {
                 // arrived while the bar was open
                 // (`totalPushedBeforeSearch`'s doc comment).
                 let scrollback = session?.snapshot().scrollback
-                let growth = max(0, (scrollback?.totalPushed ?? 0) - (totalPushedBeforeSearch ?? 0))
-                scrollOffset = min(scrollback?.count ?? beforeSearch, max(0, beforeSearch + growth))
+                let reanchored = ScrollbackCoordinates.reanchoredOffset(
+                    beforeSearch, from: totalPushedBeforeSearch ?? 0, to: scrollback?.totalPushed ?? 0)
+                scrollOffset = min(scrollback?.count ?? beforeSearch, reanchored)
             }
             scrollOffsetBeforeSearch = nil
             totalPushedBeforeSearch = nil
@@ -599,7 +600,8 @@ extension ViewController {
         var best = 0
         var bestDistance = Int.max
         for (index, match) in matches.enumerated() {
-            let distance = abs((totalPushed + match.start.row) - anchor)
+            let distance = abs(
+                ScrollbackCoordinates.absoluteRow(match.start.row, totalPushed: totalPushed) - anchor)
             if distance < bestDistance {
                 bestDistance = distance
                 best = index
@@ -613,7 +615,8 @@ extension ViewController {
             currentSearchMatchAnchor = nil
             return
         }
-        currentSearchMatchAnchor = totalPushed + searchMatches[index].start.row
+        currentSearchMatchAnchor = ScrollbackCoordinates.absoluteRow(
+            searchMatches[index].start.row, totalPushed: totalPushed)
     }
 
     func showNextMatch() {

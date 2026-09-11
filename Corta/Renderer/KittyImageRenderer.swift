@@ -252,8 +252,9 @@ nonisolated final class KittyImageRenderer {
         }
         guard let placementRows else { return true }
         // `totalPushed`, not `.count` (B04) — see `TerminalRenderer.selectionQuads`.
-        let growth = max(0, scrollbackTotalPushed - placement.baseScrollbackTotal)
-        let viewportRow = placement.row - growth + offset
+        let viewportRow =
+            ScrollbackCoordinates.reanchoredRow(
+                placement.row, from: placement.baseScrollbackTotal, to: scrollbackTotalPushed) + offset
         return viewportRow + placementRows > 0 && viewportRow < rows
     }
 
@@ -356,8 +357,9 @@ nonisolated final class KittyImageRenderer {
             guard let texture = texture(for: placement.imageID) else { continue }
 
             // `totalPushed`, not `.count` (B04) — see `TerminalRenderer.selectionQuads`.
-            let growth = max(0, scrollbackTotalPushed - placement.baseScrollbackTotal)
-            let viewportRow = placement.row - growth + offset
+            let viewportRow =
+                ScrollbackCoordinates.reanchoredRow(
+                    placement.row, from: placement.baseScrollbackTotal, to: scrollbackTotalPushed) + offset
             let columns = placement.columns ?? max(1, Int((Float(texture.width) / cellWidth).rounded(.up)))
             let placementRows =
                 placement.rows ?? max(1, Int((Float(texture.height) / cellHeight).rounded(.up)))
