@@ -218,4 +218,79 @@ struct ScrollIndicatorIntegrationTests {
         pane.scroll(.toBottom)
         #expect(!pane.sawOutputWhileScrolled)
     }
+
+    /// **The defect this closes (B04).** `scrollOffset` is "lines above the
+    /// live bottom" — so if it stayed numerically fixed while the child kept
+    /// printing, the *document position* it pointed at would silently drift
+    /// forward: a person mid-read on some history would find the text under
+    /// their eyes replaced by later lines, one output batch at a time,
+    /// without ever having scrolled. `prepareFrame` now shifts `scrollOffset`
+    /// by the same growth in `scrollbackTotalPushed` on every output batch
+    /// while scrolled away, keeping it pointed at the same absolute row.
+    @Test func scrolledOffsetStaysAnchoredAsOutputArrives() throws {
+        let pane = makePane()
+        defer { pane.teardown() }
+        try #require(pane.isOperable)
+        try #require(fill(pane, atLeast: 60), "the child produced no scrollback")
+        let session = try #require(pane.session)
+
+        pane.terminalView?.scrollWheel(with: Self.wheel(lines: 12))
+        let offsetBefore = try #require(pane.scrollOffset > 0 ? pane.scrollOffset : nil)
+        let totalBefore = session.scrollbackTotalPushed
+
+        session.write(Array("printf 'more %s\\n' $(seq 1 20)\n".utf8))
+        let deadline = Date().addingTimeInterval(15)
+        while session.scrollbackTotalPushed <= totalBefore, Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
+        }
+        let totalAfter = session.scrollbackTotalPushed
+        try #require(totalAfter > totalBefore, "the child produced no further output")
+
+        // Stands in for a vsync tick: nothing here is attached to a live
+        // display link, so `prepareFrame` (where the shift happens) needs a
+        // direct call the way `FrameScheduler` would otherwise make it.
+        _ = pane.terminalView?.shouldRenderFrame?()
+
+        #expect(pane.scrollOffset == offsetBefore + (totalAfter - totalBefore))
+    }
+
+    /// **The defect this closes (B04).** Typing while scrolled away from the
+    /// bottom went to the child exactly as it should — but the viewport
+    /// stayed put, so what the user typed landed on a live screen they
+    /// could not see, behind whatever history they had scrolled to. Every
+    /// comparable terminal returns to the bottom on a keystroke; Corta did
+    /// not.
+    @Test func typingWhileScrolledReturnsToTheBottom() throws {
+        let pane = makePane()
+        defer { pane.teardown() }
+        try #require(pane.isOperable)
+        try #require(fill(pane, atLeast: 60), "the child produced no scrollback")
+
+        pane.terminalView?.scrollWheel(with: Self.wheel(lines: 12))
+        try #require(pane.scrollOffset > 0)
+
+        pane.terminalView?.onKeyBytes?(Array("a".utf8))
+        #expect(pane.scrollOffset == 0)
+    }
+
+    /// The same defect, exercised at the shared helper both the key and
+    /// paste paths call — proven once here rather than through the real
+    /// system pasteboard, which the project's tests otherwise avoid
+    /// touching.
+    @Test func returnToBottomOnInputOnlyActsWhenScrolled() throws {
+        let pane = makePane()
+        defer { pane.teardown() }
+        try #require(pane.isOperable)
+        try #require(fill(pane, atLeast: 60), "the child produced no scrollback")
+
+        // Already at the bottom: a no-op, not an assertion failure waiting
+        // to happen if this ever grew a side effect beyond `scrollOffset`.
+        pane.returnToBottomOnInput()
+        #expect(pane.scrollOffset == 0)
+
+        pane.terminalView?.scrollWheel(with: Self.wheel(lines: 12))
+        try #require(pane.scrollOffset > 0)
+        pane.returnToBottomOnInput()
+        #expect(pane.scrollOffset == 0)
+    }
 }

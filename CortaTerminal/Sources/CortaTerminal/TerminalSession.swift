@@ -596,6 +596,22 @@ public final class TerminalSession: @unchecked Sendable {
         }
     }
 
+    /// `Scrollback.totalPushed` — a monotonic growth counter, read without a
+    /// full `snapshot()`. Cheap enough for the app to call every time the
+    /// viewport's scroll offset changes and every output batch, to keep a
+    /// scrolled-away offset anchored to the same document position rather
+    /// than drifting forward as new output lands (B04).
+    public var scrollbackTotalPushed: Int {
+        state.withLock { $0.terminal.grid.scrollback.totalPushed }
+    }
+
+    /// `Scrollback.count` — the number of rows currently buffered, which
+    /// saturates at the ring's limit unlike `scrollbackTotalPushed` above.
+    /// Read without a full `snapshot()` for the same reason.
+    public var scrollbackCount: Int {
+        state.withLock { $0.terminal.grid.scrollback.count }
+    }
+
     /// Whether the child has enabled bracketed paste (`?2004`, M2.6).
     public var isBracketedPasteEnabled: Bool {
         state.withLock { $0.terminal.isBracketedPasteEnabled }
