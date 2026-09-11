@@ -27,10 +27,14 @@ extension ViewController {
     /// panel entirely again (present a save dialog, only to say "nothing to
     /// export," is worse than a moment's wait first), and there is no build
     /// left running unobserved once the panel is up for the user to answer.
-    /// `largeTextTask` cancels a superseded export (a second ⌘⇧S before the
-    /// first panel closed) and is cancelled itself from `teardown()`, so a
-    /// closed pane's build does not keep running for a write that can never
-    /// land.
+    /// `largeTextTask` is cancelled by a superseded export (a second ⌘⇧S
+    /// before the first panel closed) and by `teardown()` — but, like
+    /// `copy(_:)`, only ever to stop a *result* from being applied.
+    /// `exportableText`/`Selection.text` poll no cancellation flag
+    /// internally, so a row walk already in progress when cancellation
+    /// arrives runs to completion regardless; what stops there is the
+    /// panel that would follow it, and the write/toast/alert that would
+    /// follow that.
     @objc func exportText(_ sender: Any?) {
         guard isOperable, let window = view.window, session != nil else { return }
         let grid = session.snapshot()

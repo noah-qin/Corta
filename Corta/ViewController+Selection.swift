@@ -62,7 +62,9 @@ extension ViewController {
         // build runs off the main actor" true by construction rather than
         // by inference, at the cost of an explicit `MainActor.run` hop for
         // the pasteboard write, which is AppKit-affine.
+        let gate = largeTextBuildGateForTesting
         largeTextTask = Task.detached(priority: .userInitiated) { [weak self] in
+            gate?()
             let text = Selection.text(of: range, in: grid)
             await MainActor.run {
                 // Only this call's own generation may clear the handle —

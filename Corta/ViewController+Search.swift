@@ -65,23 +65,42 @@ extension ViewController {
     /// The window check alone is not enough once a *split* puts two panes,
     /// each with its own open bar, in the same window (B05): both panes'
     /// monitors would see `event.window === view.window` and both would
-    /// close, only one of which the key was actually meant for. The field
-    /// editor is the window's first responder while a search field is being
-    /// edited, and its `delegate` is forwarded to the `NSSearchField` it is
-    /// editing on behalf of (`showSearchBar`'s `field.delegate = self`
-    /// applies to the search field, but the editing session's `NSText`
-    /// reports the field itself as its delegate) — so comparing that against
-    /// *this* pane's `searchField` is what tells the two panes apart.
+    /// close, only one of which the key was actually meant for.
+    /// `isSearchBarResponderActive` tells them apart.
     /// Returns the event unmodified to let it continue to other monitors and
     /// the responder chain when it isn't this pane's to consume.
     func handleGlobalSearchEscape(_ event: NSEvent) -> NSEvent? {
         guard event.keyCode == 53 /* kVK_Escape */, event.window === view.window,
-            (event.window?.firstResponder as? NSText)?.delegate === searchField
+            isSearchBarResponderActive
         else {
             return event
         }
         closeSearchBar()
         return nil
+    }
+
+    /// Whether the window's current first responder belongs to *this*
+    /// pane's search bar — the split-pane half of `handleGlobalSearchEscape`'s
+    /// ownership check (the window check is the other half).
+    ///
+    /// Two shapes, because a search bar's first responder takes two shapes:
+    /// the shared field editor while the query field is being typed into
+    /// (its `delegate` is forwarded to the `NSSearchField` it edits on
+    /// behalf of — `showSearchBar`'s `field.delegate = self` applies to the
+    /// field, but the editing session's `NSText` reports the field itself as
+    /// its delegate — so comparing that against *this* pane's `searchField`
+    /// is what a field-editor responder needs), or one of the bar's own
+    /// controls (the case/regex/prev/next/close buttons) when Full Keyboard
+    /// Access has tabbed focus there instead — an ordinary view in this
+    /// pane's `searchBar` hierarchy, checked by ancestry rather than
+    /// identity since there is no single control to name in advance.
+    private var isSearchBarResponderActive: Bool {
+        guard let responder = view.window?.firstResponder else { return false }
+        if let text = responder as? NSText, text.delegate === searchField { return true }
+        if let responderView = responder as? NSView, let searchBar {
+            return responderView.isDescendant(of: searchBar)
+        }
+        return false
     }
 
     /// The Find menu's items land here, tagged in the storyboard: 1 show,

@@ -273,6 +273,14 @@ class ViewController: NSViewController {
     /// touches — and cannot be raced by, or clobber — the developer's own
     /// clipboard contents.
     var pasteboardForTesting: NSPasteboard?
+    /// Test hook: run at the start of `copy(_:)`'s detached build, before
+    /// `Selection.text`, matching `searchSweepGate`'s purpose — `nil` in
+    /// production. `Task.detached` gives no scheduling barrier, so without
+    /// this a test asserting "the build hasn't landed yet" immediately
+    /// after `copy(_:)` returns can pass or fail depending on how fast the
+    /// scheduler happens to run it for a given grid, rather than on
+    /// whether the implementation is actually asynchronous.
+    var largeTextBuildGateForTesting: (@Sendable () -> Void)?
     /// B05: local to this pane once the bar is open — seeded from the
     /// global default when it opens, toggled independently of any other
     /// currently-open bar, and pushed back to `ConfigurationStore` only as

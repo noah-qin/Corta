@@ -62,11 +62,24 @@ struct LargeTextTaskTests {
         pasteboard.clearContents()
         pasteboard.setString(markerBefore, forType: .string)
 
+        // `Task.detached` gives no scheduling barrier — for a grid this
+        // small, asserting "hasn't landed yet" immediately after `copy(_:)`
+        // returns would pass or fail depending on how fast the scheduler
+        // happens to run it, not on whether the build is actually
+        // asynchronous. The gate makes that deterministic.
+        let buildEntered = Mutex(false)
+        let releaseBuild = Mutex(false)
+        pane.largeTextBuildGateForTesting = {
+            buildEntered.withLock { $0 = true }
+            while !releaseBuild.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.002) }
+        }
+
         pane.copy(nil)
-        // Returns before the pasteboard write: the build is asynchronous,
-        // so immediately after the call the old sentinel is still there.
-        #expect(pasteboard.string(forType: .string) == markerBefore)
+        #expect(await waitUpTo(5) { buildEntered.withLock { $0 } })
+        #expect(pasteboard.string(forType: .string) == markerBefore, "the build is parked before touching the pasteboard")
         #expect(pane.largeTextTask != nil)
+
+        releaseBuild.withLock { $0 = true }
 
         #expect(
             await waitUpTo(5) {
