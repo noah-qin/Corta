@@ -198,6 +198,35 @@ struct LocalizationCoverageTests {
         #expect(mismatched.isEmpty, "format specifiers differ: \(mismatched.sorted())")
     }
 
+    /// B10 — `CONTRIBUTING.md`'s "Localization" section: `needs_review`
+    /// means untouched by a native speaker, `translated` is the claim that
+    /// one has actually read it in context. `en` is the source language, not
+    /// a translation of anything, so it is exempt rather than required to
+    /// carry either.
+    @Test("every non-English string carries a recognised review state")
+    func everyTranslationCarriesARecognisedState() throws {
+        let data = try Data(contentsOf: Self.catalogURL)
+        let catalog = try #require(
+            try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let strings = try #require(catalog["strings"] as? [String: Any])
+        let recognised: Set<String> = ["translated", "needs_review"]
+
+        var invalid: [String] = []
+        for (key, value) in strings {
+            let entry = value as? [String: Any] ?? [:]
+            let localizations = entry["localizations"] as? [String: Any] ?? [:]
+            for language in Self.shippedLanguages where language != "en" {
+                guard
+                    let state =
+                        ((localizations[language] as? [String: Any])?["stringUnit"]
+                            as? [String: Any])?["state"] as? String
+                else { continue }
+                if !recognised.contains(state) { invalid.append("\(key) [\(language)]: \(state)") }
+            }
+        }
+        #expect(invalid.isEmpty, "unrecognised review state: \(invalid.sorted())")
+    }
+
     @Test("every shipped language is a real localization, not just a folder")
     func shippedLanguagesResolve() throws {
         let languages = Bundle.main.localizations.filter { $0 != "Base" }
