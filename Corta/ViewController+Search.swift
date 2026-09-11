@@ -395,6 +395,11 @@ extension ViewController {
             searchMatches = []
             searchMatchesTruncated = false
             currentSearchMatchIndex = nil
+            // A pending output-triggered refresh (`searchNeedsRefresh`) is
+            // moot once there is no query to refresh — left set, the next
+            // output would run a pointless empty-query sweep and then
+            // schedule a further one from `applySearchResults`.
+            searchNeedsRefresh = false
             updateSearchCountLabel()
             invalidateDisplay()
             return
@@ -683,7 +688,14 @@ extension ViewController {
     /// and button state until *it* is next opened fresh.
     @objc private func toggleSearchCase(_ sender: Any?) {
         searchCaseSensitive.toggle()
-        _ = ConfigurationStore.shared.update { $0.searchCaseSensitive = self.searchCaseSensitive }
+        if !ConfigurationStore.shared.update({ $0.searchCaseSensitive = self.searchCaseSensitive }) {
+            // `update` rolls its own copy back on a failed write (a
+            // read-only or full config path) — this pane's local flag
+            // must match that truth too, or the active bar would keep
+            // showing a mode no persisted default, and no later bar,
+            // agrees with.
+            searchCaseSensitive = ConfigurationStore.shared.configuration.searchCaseSensitive
+        }
         if let button = sender as? NSButton { updateCaseButton(button) }
         // The match list changes, so the place is re-found rather than kept:
         // a case-sensitive sweep may not contain the match the user was on.
@@ -695,7 +707,10 @@ extension ViewController {
     /// the new default; see `toggleSearchCase`.
     @objc private func toggleSearchRegex(_ sender: Any?) {
         searchRegex.toggle()
-        _ = ConfigurationStore.shared.update { $0.searchRegex = self.searchRegex }
+        if !ConfigurationStore.shared.update({ $0.searchRegex = self.searchRegex }) {
+            // See `toggleSearchCase`'s identical reasoning.
+            searchRegex = ConfigurationStore.shared.configuration.searchRegex
+        }
         if let button = sender as? NSButton { updateRegexButton(button) }
         currentSearchMatchAnchor = nil
         updateSearchResults(scrollsToMatch: true)
