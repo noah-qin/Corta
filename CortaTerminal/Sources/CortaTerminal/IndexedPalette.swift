@@ -12,12 +12,11 @@
 /// theme). `overrides` is the sparse set of indices OSC 4 has actually
 /// changed; OSC 104 clears one, several, or (with no arguments) all of them.
 public struct IndexedPalette: Sendable, Equatable {
-    // `private(set)`: the 256-entry invariant below is only checked in
-    // `init`, and `color(at:)` indexes this array with every `UInt8` — a
-    // freely mutable public property would let a caller shrink it and turn
-    // the next OSC 4 query into an out-of-bounds trap. Replacing the whole
-    // palette (as RIS and the app's theme reseed both do) goes through
-    // `init` again and is checked the same way.
+    // `private(set)`: the 256-entry invariant is checked wherever `defaults`
+    // can change — `init` and `updateDefaults` both `precondition` it — and
+    // `color(at:)` indexes this array with every `UInt8`, so a freely
+    // mutable public property would let a caller shrink it from outside
+    // either check and turn the next OSC 4 query into an out-of-bounds trap.
     public private(set) var defaults: [(red: UInt8, green: UInt8, blue: UInt8)]
     public internal(set) var overrides: [UInt8: (red: UInt8, green: UInt8, blue: UInt8)] = [:]
 
@@ -64,9 +63,9 @@ public struct IndexedPalette: Sendable, Equatable {
     /// the app overwrites them immediately with its theme's ANSI colours
     /// (`Theme.Variant.indexedPaletteDefaults`), the same split
     /// `TerminalColorPalette.swift`'s `resolve(_:)` makes on the render
-    /// side. Internal rather than private: `Theme.Variant
-    /// .indexedPaletteDefaults` starts from this array and only replaces
-    /// the first sixteen entries.
+    /// side. `public`, not `private` or `internal`: `Theme.Variant
+    /// .indexedPaletteDefaults`, in the separate `Corta` app target, starts
+    /// from this array and only replaces the first sixteen entries.
     public static func xtermDefaults() -> [(red: UInt8, green: UInt8, blue: UInt8)] {
         var values: [(red: UInt8, green: UInt8, blue: UInt8)] = Array(
             repeating: (0, 0, 0), count: 256)

@@ -276,17 +276,19 @@ extension Performer {
     }
 
     /// A decimal palette index, 0–255. `nil` for anything out of range or
-    /// not purely digits — including a value that would overflow `Int`
-    /// before the range check ever ran, which is why this accumulates with
-    /// an early-out rather than parsing the whole span through `Int(_:)`
-    /// first.
+    /// not purely digits, including an arbitrarily long run of digits — the
+    /// bound is checked *before* each multiply-and-add, not after, so
+    /// `value` itself never exceeds 255 and a payload with hundreds of
+    /// digits (the parser allows up to `Parser.maxStringLength` bytes)
+    /// cannot walk `value` past what fits before the check catches it.
     private static func parseByte(_ bytes: ArraySlice<UInt8>) -> UInt8? {
         guard !bytes.isEmpty else { return nil }
         var value = 0
         for byte in bytes {
             guard byte >= 0x30, byte <= 0x39 else { return nil }
-            value = value * 10 + Int(byte - 0x30)
-            guard value <= 255 else { return nil }
+            let digit = Int(byte - 0x30)
+            guard value <= (255 - digit) / 10 else { return nil }
+            value = value * 10 + digit
         }
         return UInt8(value)
     }

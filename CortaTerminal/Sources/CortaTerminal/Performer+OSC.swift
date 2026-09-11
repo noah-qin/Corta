@@ -63,15 +63,19 @@ extension Performer {
     }
 
     /// A decimal OSC code, capped the way the wire format is: at most three
-    /// digits. `nil` for anything else, including an empty span — the
-    /// caller decides what "no code at all" means for it.
+    /// digits. `nil` for anything else, including an empty span or an
+    /// arbitrarily long run of digits — the bound is checked *before* each
+    /// multiply-and-add, not after, so `code` never exceeds 999 regardless
+    /// of how many digits a hostile payload supplies. The caller decides
+    /// what "no code at all" means for an empty span.
     private static func parseOSCCode(_ bytes: ArraySlice<UInt8>) -> Int? {
         guard !bytes.isEmpty else { return nil }
         var code = 0
         for byte in bytes {
             guard byte >= 0x30, byte <= 0x39 else { return nil }
-            code = code * 10 + Int(byte - 0x30)
-            guard code <= 999 else { return nil }
+            let digit = Int(byte - 0x30)
+            guard code <= (999 - digit) / 10 else { return nil }
+            code = code * 10 + digit
         }
         return code
     }

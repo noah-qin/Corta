@@ -74,6 +74,18 @@ struct IndexedPaletteTests {
             == "\u{1B}]4;1;rgb:0000/0000/0000\u{1B}\\")
     }
 
+    @Test("an index with far more digits than fit does not crash the reader")
+    func oversizedDecimalIndexDoesNotTrap() {
+        // Comfortably under `Parser.maxStringLength` (4096) so the whole
+        // OSC 4 reaches `handleIndexedColor` rather than being discarded
+        // wholesale as an overlong string — what's under test here is the
+        // digit-accumulation guard inside `parseByte`, not that discard.
+        let hugeIndex = String(repeating: "9", count: 2000)
+        #expect(
+            response(to: "\u{1B}]4;\(hugeIndex);#ffffff;2;#020202\u{1B}\\\u{1B}]4;2;?\u{1B}\\")
+                == "\u{1B}]4;2;rgb:0202/0202/0202\u{1B}\\")
+    }
+
     @Test("a malformed spec does not stop later pairs in the same sequence")
     func malformedPairIsSkipped() {
         #expect(

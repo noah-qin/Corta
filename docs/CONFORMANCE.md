@@ -281,6 +281,16 @@ rather than a re-reading. The largest single cause is one absence: OSC
 4/5 indexed palette set and query are not implemented, which accounts
 for 45 of the 121.
 
+**This snapshot predates B06** (`docs/DESIGN.md` §7), which implements
+OSC 4/104 (though not OSC 5, and not the renderer integration that would
+let it move esctest's `ChangeColor`/`ResetColor` cases — see the row
+above and `DESIGN.md` §7 for exactly what's still missing) and fixes
+`SCORC`/`DECRC`, the other open item this section named. B06 could not
+re-run esctest in its sandbox, so the 45-failure attribution and the
+112/335/121 counts above remain the last real numbers; they are not
+current evidence that either fix is absent, only that neither has been
+scored yet.
+
 **M6 result: 106 passed, 335 known bugs, 127 failed of 568.** Against the
 M2 record (50 / 334 / 184) that is 57 failures fixed and none
 introduced — the failing-test list is a strict subset. The closeout pass
