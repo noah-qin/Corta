@@ -665,11 +665,11 @@ public final class TerminalSession: @unchecked Sendable {
 
     /// The 256-entry indexed palette OSC 4 reports and sets, and OSC 104
     /// resets (B06). The app seeds `defaults` from its theme at startup and
-    /// on every theme change, the same way `dynamicColors` is seeded — but
-    /// unlike `dynamicColors`, this is query/set state only: `TerminalColorPalette`
-    /// still resolves an indexed colour from the active `Theme.Variant`
-    /// directly, so an OSC 4 override changes what a query answers without
-    /// (yet) changing what is painted. See `docs/DESIGN.md` §7.
+    /// on every theme change, the same way `dynamicColors` is seeded.
+    /// `TerminalColorPalette`/`TerminalRenderer.appendRowInstances`
+    /// (`Theme.Variant.resolve(_:indexedOverrides:)`) consult `overrides`
+    /// directly, so an OSC 4 override changes what is painted, not only
+    /// what a query answers. See `docs/DESIGN.md` §7.
     public var indexedPalette: IndexedPalette {
         get { state.withLock { $0.terminal.indexedPalette } }
         set { state.withLock { $0.terminal.indexedPalette = newValue } }

@@ -602,16 +602,47 @@ Ordered by how badly they are usually underestimated.
    ordinary SGR-attribute rendering applies, not a placeholder colour),
    with the query form answering black for an unset slot rather than
    silence, matching OSC 4's own precedent for "always some numeric
-   answer." **Render-path integration** — making an OSC 4 override
-   actually repaint indices 16–255 differently — was also cut here:
-   `TerminalRenderer`/`TerminalColorPalette` sit on the hot path this
-   file's own rule (`CLAUDE.md`, "measure the frame-CPU baseline") gates
-   behind a Typometer/`corta-bench` measurement this session had no way to
-   take safely, and every OSC 4/104 behaviour that *is* verifiable —
-   set, query, multi-pair parsing, reset-one/-several/-all, and the
-   default-colour formula itself — was checked directly against the core
-   package via `corta-dump --serve`, independent of whether a renderer
-   ever reads the result.
+   answer." Its own render-path integration — a special colour actually
+   changing how bold/underline/blink/reverse/italic text paints — was
+   not attempted in that pass and remains open.
+
+   **OSC 4's render-path integration — done in a follow-up pass, measured
+   before and after.** `Theme.Variant.resolve(_:indexedOverrides:)` now checks a
+   session's OSC 4 overrides before falling through to the existing
+   ansi/cube/ramp arithmetic; `TerminalRenderer` carries the overrides and
+   an `overridesGeneration` counter (`IndexedPalette`'s own new field,
+   the identical shape `GlyphAtlas.generation`/`ScreenLines.generation`
+   already use) so a set/reset invalidates the render cache even for a
+   cell whose *content* never changed — an OSC 4 override is invisible to
+   the ordinary per-cell revision check, since it changes what an index
+   resolves to, not what any `Cell` stores. Verified with offscreen
+   pixel-sampled tests (`IndexedPaletteRenderTests.swift`), including the
+   specific case that proves the cache invalidation actually matters: a
+   cell painted before the override, then repainted with no content
+   change in between.
+
+   `CLAUDE.md`'s own rule ("measure the frame-CPU baseline after touching
+   the render loop") was followed with `CortaTests/FrameCPUBaselineTests`
+   — the same headless, scriptable tool the M6 render-loop regression
+   this rule itself documents was found and fixed with, not the
+   Typometer/live-signpost route the first attempt at this pass assumed
+   was the only option (that route needs a real, focused GUI session;
+   this one does not). The first implementation *did* measure a real,
+   reproducible regression — about 5%, ~0.1 ms, isolated by A/B runs
+   against 11 samples per side after system-load noise alone had first
+   produced a misleading 21% swing between two same-code runs. The cause:
+   `indexedOverrides` was an always-passed, defaulted-to-empty
+   `Dictionary` parameter, and passing a `Dictionary` — even an empty one
+   — costs a retain/release pair Swift cannot elide across the call
+   boundary, paid twice a cell (foreground and background) across ~4800
+   cells a frame. Switched the parameter to `IndexedColorOverrides?`
+   (`nil` when a session has no overrides, computed once a frame rather
+   than re-checked per cell) — passing `nil` retains nothing — which
+   closed the gap back into noise (~1.6 ms both sides, matched runs
+   immediately before and after the fix). The regression-and-fix, not
+   just the final number, is the artifact worth keeping: it is a second,
+   independent instance of the exact failure mode this file's frame-CPU
+   rule was written to catch.
 
    `BS`/`CUB` also did not reverse-wrap — a program editing at a wrap
    boundary (`readline`'s own line editing among them) that expected

@@ -143,6 +143,36 @@ struct IndexedPaletteTests {
         #expect(palette.color(at: 2) as (UInt8, UInt8, UInt8) == (99, 98, 97))
     }
 
+    @Test("overridesGeneration bumps on every overrides mutation, and only those")
+    func overridesGenerationBumpsOnMutation() {
+        var palette = IndexedPalette()
+        let initial = palette.overridesGeneration
+        palette.setOverride(1, to: (10, 20, 30))
+        let afterSet = palette.overridesGeneration
+        #expect(afterSet != initial)
+        palette.resetOverride(1)
+        let afterReset = palette.overridesGeneration
+        #expect(afterReset != afterSet)
+        palette.setOverride(2, to: (1, 2, 3))
+        let afterSecondSet = palette.overridesGeneration
+        palette.resetAllOverrides()
+        let afterResetAll = palette.overridesGeneration
+        #expect(afterResetAll != afterSecondSet)
+        // A no-op reset (nothing to clear, nothing set) does not bump —
+        // the render cache would otherwise force a needless full rebuild
+        // on every frame after an idle reset.
+        let beforeNoOp = palette.overridesGeneration
+        palette.resetOverride(5)
+        palette.resetAllOverrides()
+        #expect(palette.overridesGeneration == beforeNoOp)
+        // updateDefaults (a theme reseed) never bumps this counter — the
+        // render path already invalidates its cache for a theme change a
+        // different way (`ViewController.appearanceChanged`'s `invalidate()`).
+        let beforeDefaults = palette.overridesGeneration
+        palette.updateDefaults(to: IndexedPalette.xtermDefaults())
+        #expect(palette.overridesGeneration == beforeDefaults)
+    }
+
     @Test("the core-level palette getter/setter round-trips overrides")
     func terminalIndexedPaletteProperty() {
         var terminal = Terminal()

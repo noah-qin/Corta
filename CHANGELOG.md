@@ -54,6 +54,20 @@ what to edit.
   viewport/selection/search coordinate mapping, and a discoverable
   selection/mouse-reporting override blocked on `?1002`/`?1003` support).
 
+- **B06 — an OSC 4 indexed-palette override now repaints, not just
+  answers a query.** `TerminalRenderer` consults a session's overrides
+  when resolving an indexed colour, with a new `IndexedPalette
+  .overridesGeneration` counter invalidating its cache the same way an
+  atlas or line-generation change already does — necessary because an
+  override changes what an index resolves to without changing any
+  `Cell`'s own stored content, which the ordinary per-row damage check
+  would otherwise never notice. Measured against `docs/PERFORMANCE.md`'s
+  own frame-CPU rule before and after: the first implementation measured
+  a real ~5% regression (an always-passed, defaulted-to-empty
+  `Dictionary` parameter costs a retain/release pair per cell even when
+  empty), fixed by making the parameter an optional the common case
+  passes as `nil` instead — `docs/DESIGN.md` §7 has the full account.
+
 - **B06 — special colours query, set and reset (OSC 5/105).** The
   behavioural-decision blocker B06's original pass named for OSC 5 was
   the lack of an independently verifiable specification, not esctest
