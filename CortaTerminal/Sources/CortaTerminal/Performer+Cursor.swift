@@ -47,6 +47,19 @@ extension Performer {
             grid.tabForward(parameters.value(0, default: 1))
         case 0x5A:  // CBT — backward horizontal tabulation
             grid.tabBackward(parameters.value(0, default: 1))
+        // SCOSC / SCORC (ANSI.SYS; B06) — `CSI s` / `CSI u`, no private
+        // marker and no intermediate. xterm treats these as aliases for
+        // DECSC/DECRC (`ESC 7`/`ESC 8`) unless DECLRMM (left/right margin
+        // mode) is set — Corta has no margin mode to disambiguate against,
+        // so the alias is unconditional, matching xterm's fallback
+        // behaviour. `CSI ? u`/`CSI > u`/`CSI < u`/`CSI = u` are the kitty
+        // keyboard protocol and carry a private marker, so they are handled
+        // in `csiDispatch`'s marker branch and never reach here — bare
+        // `CSI u` is unambiguous.
+        case 0x73:  // SCOSC
+            grid.saveCursor()
+        case 0x75:  // SCORC
+            grid.restoreCursor()
         default:
             return false
         }
