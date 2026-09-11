@@ -12,6 +12,19 @@ what to edit.
 
 ### Added
 
+- **B10 — mark every non-English string `needs_review` (first slice).**
+  `Localizable.xcstrings` conflated "has a translation" with "a native
+  speaker has read it in context" — every one of the 222 keys across 8
+  shipped non-English locales carried the same `translated` state
+  regardless of review, which is exactly the gap B10 names ("keep
+  unreviewed languages marked as such"). All 1,776 non-English
+  localizations now carry Xcode's own `needs_review` state instead — a
+  purely editorial marker with no runtime effect, so nothing changes for
+  a user today. `CONTRIBUTING.md` gets a "Localization" section
+  explaining the convention, and `LocalizationCoverageTests` gets a
+  regression test that every non-English string carries a recognised
+  state. What this does *not* do — actually review any of the eight
+  languages — needs native speakers this PR does not have.
 - **B09 — decouple temporary font zoom from the saved default (first
   slice, fixes a real bug).** ⌘+/⌘−/pinch used to write the zoomed size
   straight into `Configuration.fontSize` — the *global* default — so
