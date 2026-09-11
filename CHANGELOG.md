@@ -76,6 +76,17 @@ what to edit.
   blocking on drag and auto-scroll events for a window the user was no
   longer looking at. The loop now ends the same way the pane-closed case
   already does, leaving whatever was selected up to that point standing.
+- **B06 — `BS`/`CUB` did not reverse-wrap at a wrap boundary.** Backspacing
+  or moving the cursor left off column 0 always stopped there, even when
+  the row above had auto-wrapped into the current one — line editing at a
+  wrap boundary (`readline`'s among them) could not walk back across it.
+  Added `?45` (reverse-wraparound mode — not DECBKM, which is the
+  separate `?67` backarrow-key mode; off by default, matching xterm):
+  while set, `BS`/`CUB` continue onto the row above's last column when
+  that row's own `wrapped` flag says the two are one logical line, never
+  across a hard newline. The mode also now survives an alternate-screen
+  round trip (`?1049`), the same way `cursorStyle` already does — it is
+  terminal-wide state, not part of either screen's own content.
 - **B06 — `CSI s` / `CSI u` cursor save/restore did nothing.** Corta has
   no DECLRMM, so — matching xterm without left/right margins — these are
   now unconditional aliases for `DECSC`/`DECRC` (`ESC 7`/`ESC 8`). The

@@ -100,6 +100,15 @@ public struct Grid: Sendable {
     /// happened. `readline`'s and `ed`'s insert paths both use it.
     public var insertMode: Bool = false
 
+    /// DECRST/DECSET `?45` — reverse-wraparound mode (B06). While set, `BS`
+    /// and `CUB` that would move left of column 0 continue onto the end of
+    /// the row above, but only when that row's own `wrapped` flag says the
+    /// two are one logical line — undoing exactly the auto-wrap DECAWM
+    /// caused, never crossing a hard newline. Off by default, matching
+    /// xterm: most programs manage line-editing at a wrap boundary
+    /// themselves and do not expect `BS` to cross rows on its own.
+    public var reverseWraparoundEnabled: Bool = false
+
     public internal(set) var pendingWrap: Bool
 
     /// DECSC's slot — cursor, pen and wrap state (VT510 §DECSC).
@@ -482,8 +491,30 @@ public struct Grid: Sendable {
         moveCursor(row: min(ceiling, cursor.row + max(0, count)), column: cursor.column)
     }
 
+    /// CUB. Ordinarily clamps at column 0; with `reverseWraparoundEnabled`
+    /// (`?45`), running out of columns on a row whose *predecessor* wrapped
+    /// into it continues the move onto the end of that row instead of
+    /// stopping, one row at a time until `count` is spent or a row that was
+    /// not auto-wrapped is reached.
     public mutating func moveCursorLeft(_ count: Int = 1) {
-        moveCursor(row: cursor.row, column: cursor.column - max(0, count))
+        guard reverseWraparoundEnabled else {
+            moveCursor(row: cursor.row, column: cursor.column - max(0, count))
+            return
+        }
+        var remaining = max(0, count)
+        while remaining > 0 {
+            if cursor.column > 0 {
+                cursor.column -= 1
+                remaining -= 1
+            } else if cursor.row > 0, lines[cursor.row - 1].wrapped {
+                cursor.row -= 1
+                cursor.column = columns - 1
+                remaining -= 1
+            } else {
+                break
+            }
+        }
+        pendingWrap = false
     }
 
     public mutating func moveCursorRight(_ count: Int = 1) {
@@ -504,15 +535,23 @@ public struct Grid: Sendable {
         pendingWrap = false
     }
 
-    /// BS — one column left, stopping at the left margin. A backspace out of
-    /// the armed wrap state disarms it rather than moving, which is what
-    /// keeps `printf 'x%80s' ; printf '\b'` from stepping off the row.
+    /// BS — one column left, stopping at the left margin unless
+    /// `reverseWraparoundEnabled` (`?45`) and the row above auto-wrapped
+    /// into this one, in which case it continues onto that row's last
+    /// column instead of stopping (B06). A backspace out of the armed wrap
+    /// state disarms it rather than moving, which is what keeps
+    /// `printf 'x%80s' ; printf '\b'` from stepping off the row.
     public mutating func backspace() {
         if pendingWrap {
             pendingWrap = false
             return
         }
-        if cursor.column > 0 { cursor.column -= 1 }
+        if cursor.column > 0 {
+            cursor.column -= 1
+        } else if reverseWraparoundEnabled, cursor.row > 0, lines[cursor.row - 1].wrapped {
+            cursor.row -= 1
+            cursor.column = columns - 1
+        }
     }
 
     /// HT — the next tab stop. Stops are every eight columns; DECST8C and a
@@ -1077,6 +1116,13 @@ public struct Grid: Sendable {
         suspendedMain = nil
         var main = suspended.grid
         main.cursorStyle = cursorStyle  // the style is global, not per screen
+        // Ditto reverse-wraparound (B06): a private mode set by the
+        // program is terminal-wide state, not part of either screen's own
+        // content, and `self = main` below would otherwise silently
+        // restore whatever `?45` was set to before the alternate screen
+        // was entered, discarding a `?45` the child set while it was
+        // active.
+        main.reverseWraparoundEnabled = reverseWraparoundEnabled
         if main.rows != rows || main.columns != columns {
             main.resize(rows: rows, columns: columns)
         }

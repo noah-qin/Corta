@@ -60,6 +60,7 @@ extension Performer {
         case 1006: return state.sgrMouseEncodingEnabled ? 1 : 2
         case 2026: return state.synchronizedOutputEnabled ? 1 : 2
         case 1004: return state.focusReportingEnabled ? 1 : 2
+        case 45: return grid.reverseWraparoundEnabled ? 1 : 2
         // `?7` (autowrap) and `?25` (cursor visibility) are permanently on:
         // the grid always wraps at the right margin and always has a cursor
         // the app may choose to draw. 3 says so — "set, and cannot be
