@@ -38,14 +38,16 @@ extension ViewController: NSMenuItemValidation {
             NSSound.beep()
             return
         }
-        let viewportTop = grid.scrollback.totalPushed - scrollOffset
+        let viewportTop = ScrollbackCoordinates.viewportTopRow(
+            totalPushed: grid.scrollback.totalPushed, scrollOffset: scrollOffset)
         let target =
             backwards
             ? prompts.last { $0 < viewportTop }
             : prompts.first { $0 > viewportTop }
         guard let target else { return }
         scrollOffset = min(
-            max(0, grid.scrollback.totalPushed - target), grid.scrollback.count)
+            max(0, ScrollbackCoordinates.offset(forRow: target, totalPushed: grid.scrollback.totalPushed)),
+            grid.scrollback.count)
         invalidateDisplay()
     }
 
@@ -119,7 +121,8 @@ extension ViewController: NSMenuItemValidation {
     /// equivalent is matched. Building the string to answer that walked and
     /// joined the whole output on the main thread each time.
     static func commandOutputRows(in grid: Grid, scrollOffset: Int) -> Range<Int>? {
-        let viewportTop = grid.scrollback.totalPushed - scrollOffset
+        let viewportTop = ScrollbackCoordinates.viewportTopRow(
+            totalPushed: grid.scrollback.totalPushed, scrollOffset: scrollOffset)
         let bound = scrollOffset > 0 ? viewportTop + grid.rows : Int.max
         return grid.commandOutputRows(before: bound)
     }
@@ -131,8 +134,11 @@ extension ViewController: NSMenuItemValidation {
         // Absolute rows to the document rows selection speaks in.
         let base = grid.scrollback.totalPushed
         let range = SelectionRange(
-            anchor: SelectionPoint(row: rows.lowerBound - base, column: 0),
-            head: SelectionPoint(row: rows.upperBound - 1 - base, column: grid.columns - 1))
+            anchor: SelectionPoint(
+                row: ScrollbackCoordinates.relativeRow(rows.lowerBound, totalPushed: base), column: 0),
+            head: SelectionPoint(
+                row: ScrollbackCoordinates.relativeRow(rows.upperBound - 1, totalPushed: base),
+                column: grid.columns - 1))
         let text = Selection.text(of: range, in: grid)
         return text.isEmpty ? nil : text
     }

@@ -928,9 +928,14 @@ nonisolated final class TerminalRenderer {
         // text as soon as the ring filled, while the copy path (which
         // already used `totalPushed`) copied the right text — the highlight
         // and what `⌘C` produced would silently disagree (B04).
-        let growth = max(0, grid.scrollback.totalPushed - selection.baseScrollbackTotal)
-        let firstRow = selection.start.row - growth + offset
-        let lastRow = selection.end.row - growth + offset
+        let firstRow =
+            ScrollbackCoordinates.reanchoredRow(
+                selection.start.row, from: selection.baseScrollbackTotal,
+                to: grid.scrollback.totalPushed) + offset
+        let lastRow =
+            ScrollbackCoordinates.reanchoredRow(
+                selection.end.row, from: selection.baseScrollbackTotal,
+                to: grid.scrollback.totalPushed) + offset
         guard lastRow >= 0, firstRow < grid.rows else { return [] }
         var quads: [QuadInstance] = []
         for row in max(0, firstRow)...min(grid.rows - 1, lastRow) {

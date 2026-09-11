@@ -60,7 +60,10 @@ public struct SelectionRange: Equatable, Sendable {
 
     /// Re-anchors after output pushed `growth` lines from the screen into
     /// the scrollback: the line that was live row `r` is now scrollback, and
-    /// every document row counts one further from the screen boundary.
+    /// every document row counts one further from the screen boundary. The
+    /// batched cousin of `ScrollbackCoordinates.reanchoredRow`, applied to
+    /// both ends of a range at once — pass it the same
+    /// `max(0, newTotal - oldTotal)` that function computes internally.
     public func shifted(byScrollbackGrowth growth: Int) -> SelectionRange {
         SelectionRange(
             start: SelectionPoint(row: start.row - growth, column: start.column),

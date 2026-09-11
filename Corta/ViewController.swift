@@ -990,9 +990,9 @@ class ViewController: NSViewController {
             // counter a second time and could observe still more growth
             // that happened in between) so next frame's shift starts from
             // precisely what this one accounted for.
-            let growth = grid.scrollback.totalPushed - anchor
-            if growth > 0 {
-                scrollOffset += growth
+            if grid.scrollback.totalPushed > anchor {
+                scrollOffset = ScrollbackCoordinates.reanchoredOffset(
+                    scrollOffset, from: anchor, to: grid.scrollback.totalPushed)
                 scrollAnchorTotalPushed = grid.scrollback.totalPushed
             }
         }
