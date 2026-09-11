@@ -267,6 +267,12 @@ class ViewController: NSViewController {
     var largeTextTask: Task<Void, Never>?
     /// Bumped every time `largeTextTask` is replaced; see its doc comment.
     var largeTextTaskGeneration = 0
+    /// Test hook: the pasteboard `copy(_:)` writes to; `nil` (production
+    /// default) uses `.general`, the real system clipboard. Tests assign
+    /// `NSPasteboard.withUniqueName()` instead, so exercising copy never
+    /// touches — and cannot be raced by, or clobber — the developer's own
+    /// clipboard contents.
+    var pasteboardForTesting: NSPasteboard?
     /// B05: local to this pane once the bar is open — seeded from the
     /// global default when it opens, toggled independently of any other
     /// currently-open bar, and pushed back to `ConfigurationStore` only as

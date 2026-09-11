@@ -49,24 +49,14 @@ struct LargeTextTaskTests {
             end: GridPosition(row: grid.rows - 1, column: grid.columns - 1),
             baseScrollbackTotal: grid.scrollback.totalPushed)
 
-        // `copy(_:)` writes to the real system clipboard (`NSPasteboard
-        // .general`, not injectable) — the developer's own clipboard
-        // contents are saved here and restored on exit, rather than left
-        // clobbered by the test's sentinel.
-        let pasteboard = NSPasteboard.general
-        let savedItems: [NSPasteboardItem] = (pasteboard.pasteboardItems ?? []).map { item in
-            let copy = NSPasteboardItem()
-            for type in item.types {
-                if let data = item.data(forType: type) {
-                    copy.setData(data, forType: type)
-                }
-            }
-            return copy
-        }
-        defer {
-            pasteboard.clearContents()
-            if !savedItems.isEmpty { pasteboard.writeObjects(savedItems) }
-        }
+        // A private pasteboard, not `.general` (the real system clipboard):
+        // `pasteboardForTesting` (B05 review follow-up) is exactly the seam
+        // `NativeIntegrationTests` already uses `.withUniqueName()` for, so
+        // this never touches — and can never be raced by, or clobber — the
+        // developer's own clipboard contents.
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        pane.pasteboardForTesting = pasteboard
 
         let markerBefore = "sentinel-\(UUID().uuidString)"
         pasteboard.clearContents()

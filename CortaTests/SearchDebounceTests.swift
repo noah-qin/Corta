@@ -292,7 +292,11 @@ struct SearchDebounceTests {
 
         // A second output batch arrives while the first sweep is still
         // running — this call must set `searchNeedsRefresh`, not drop it.
-        pane.session.write(Array("echo MARKER2\n".utf8))
+        // Assembled by the shell (`$((1+1))`), not typed literally: the
+        // terminal's own echo of the command *as typed* would otherwise
+        // make "MARKER2" appear on screen from the input line alone, before
+        // the output this test is actually waiting for ever printed.
+        pane.session.write(Array("echo MARKER$((1+1))\n".utf8))
         #expect(await waitUpTo(10) { self.gridContains(pane, "MARKER2") })
         pane.scheduleBackgroundSearchRefresh()
         #expect(pane.searchNeedsRefresh, "the output that arrived mid-sweep must not be dropped")

@@ -20,11 +20,13 @@ extension ViewController {
     /// B05: building the text is O(scrollback) — the same cost class
     /// `PERFORMANCE.md` §5.2 measures a full-document search sweep at
     /// hundreds of ms for a 100k-line history — so it runs off the main
-    /// thread rather than stalling the panel's own appearance and every
-    /// other interaction behind it. It starts immediately, in parallel with
-    /// the save panel the user is about to spend a few seconds navigating,
-    /// so the common case pays the cost concurrently rather than serially;
-    /// only the write and the resulting toast wait for the panel's answer.
+    /// thread rather than stalling the interaction path. The build runs
+    /// *before* the save panel appears — trading the earlier "overlap the
+    /// build with panel navigation time" version's speed for two things
+    /// that version broke: an empty document or selection now skips the
+    /// panel entirely again (present a save dialog, only to say "nothing to
+    /// export," is worse than a moment's wait first), and there is no build
+    /// left running unobserved once the panel is up for the user to answer.
     /// `largeTextTask` cancels a superseded export (a second ⌘⇧S before the
     /// first panel closed) and is cancelled itself from `teardown()`, so a
     /// closed pane's build does not keep running for a write that can never
@@ -45,45 +47,7 @@ extension ViewController {
         // below (`NSSavePanel`, `NSAlert`) is explicitly hopped back to
         // `MainActor` rather than assumed to still be there.
         largeTextTask = Task.detached(priority: .userInitiated) { [weak self] in
-            // `async let`'s structured-concurrency guarantee cuts both ways:
-            // cancelling this task (a superseded export, or `teardown()`)
-            // stops `built`'s result from ever being applied below, but if
-            // the scope returns early (no `url`) before `await built`, the
-            // implicit await built into leaving an `async let` scope still
-            // waits for the build to finish first — Swift never leaves an
-            // orphaned structured child behind. That wait is invisible to
-            // the user (this whole task is already off the main actor), but
-            // it does mean "cancelled" only ever means "the result is
-            // discarded," never "the build stopped early" — the same
-            // limit `largeTextTask`'s own doc comment now states plainly.
-            async let built = Self.exportableText(grid: grid, selection: range)
-
-            let url: URL? = await withCheckedContinuation { continuation in
-                Task { @MainActor in
-                    // Unstructured, so cancelling the outer `largeTextTask`
-                    // does not cancel this presentation task by itself — a
-                    // pane torn down (or a superseded export) between that
-                    // cancellation and this hop running would otherwise
-                    // still show a save panel for a pane that is already
-                    // gone. Checked here, not just at the final apply.
-                    guard let self, !self.didTeardown,
-                        self.largeTextTaskGeneration == generation
-                    else {
-                        continuation.resume(returning: nil)
-                        return
-                    }
-                    let panel = NSSavePanel()
-                    panel.allowedContentTypes = [.plainText]
-                    panel.nameFieldStringValue = Self.exportFilename(hasSelection: hasSelection)
-                    panel.canCreateDirectories = true
-                    panel.isExtensionHidden = false
-                    panel.message = L10n.text(
-                        hasSelection ? "export.message.selection" : "export.message.history")
-                    panel.beginSheetModal(for: window) { response in
-                        continuation.resume(returning: response == .OK ? panel.url : nil)
-                    }
-                }
-            }
+            let text = Self.exportableText(grid: grid, selection: range)
 
             enum Outcome {
                 case cancelledOrDismissed
@@ -94,13 +58,51 @@ extension ViewController {
             let outcome: Outcome
             if Task.isCancelled {
                 outcome = .cancelledOrDismissed
-            } else if let url {
-                let text = await built
+            } else if text.isEmpty {
+                outcome = .empty
+            } else {
+                // A live handle to the presented panel, so cancellation —
+                // teardown, or a superseded export — can dismiss it and
+                // resume the continuation immediately instead of leaving
+                // this task (and the build it already finished) suspended
+                // until whenever the user happens to answer the sheet.
+                // `withCheckedContinuation` itself has no cancellation
+                // awareness; `withTaskCancellationHandler` is what supplies
+                // it, wrapping the same continuation.
+                let panelBox = PresentedPanelBox()
+                let url: URL? = await withTaskCancellationHandler {
+                    await withCheckedContinuation { continuation in
+                        Task { @MainActor in
+                            guard let self, !self.didTeardown,
+                                self.largeTextTaskGeneration == generation
+                            else {
+                                continuation.resume(returning: nil)
+                                return
+                            }
+                            let panel = NSSavePanel()
+                            panel.allowedContentTypes = [.plainText]
+                            panel.nameFieldStringValue = Self.exportFilename(
+                                hasSelection: hasSelection)
+                            panel.canCreateDirectories = true
+                            panel.isExtensionHidden = false
+                            panel.message = L10n.text(
+                                hasSelection
+                                    ? "export.message.selection" : "export.message.history")
+                            panelBox.panel = panel
+                            panel.beginSheetModal(for: window) { response in
+                                continuation.resume(returning: response == .OK ? panel.url : nil)
+                            }
+                        }
+                    }
+                } onCancel: {
+                    Task { @MainActor in
+                        guard let panel = panelBox.panel else { return }
+                        window.endSheet(panel, returnCode: .cancel)
+                    }
+                }
                 if Task.isCancelled {
                     outcome = .cancelledOrDismissed
-                } else if text.isEmpty {
-                    outcome = .empty
-                } else {
+                } else if let url {
                     do {
                         try Self.write(text, to: url)
                         outcome = .wrote
@@ -112,9 +114,9 @@ extension ViewController {
                         // would say so.
                         outcome = .failed(error)
                     }
+                } else {
+                    outcome = .cancelledOrDismissed
                 }
-            } else {
-                outcome = .cancelledOrDismissed
             }
 
             // One exit point: clears the handle (generation-guarded, same
@@ -176,4 +178,14 @@ extension ViewController {
         let kind = hasSelection ? "Selection" : "History"
         return "Corta \(kind) \(formatter.string(from: date)).txt"
     }
+}
+
+/// A mutable box for the `NSSavePanel` `exportText(_:)` is currently
+/// presenting, so `withTaskCancellationHandler`'s `onCancel` — which can run
+/// on any thread, concurrently with the operation still setting the box —
+/// has something to dismiss. `@unchecked Sendable`: every read and write is
+/// on the main actor (the panel itself is MainActor-affine), `onCancel` only
+/// ever reads it from inside its own `Task { @MainActor in }` hop.
+private final class PresentedPanelBox: @unchecked Sendable {
+    var panel: NSSavePanel?
 }

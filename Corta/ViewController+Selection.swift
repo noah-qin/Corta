@@ -73,7 +73,7 @@ extension ViewController {
                 guard let self, !self.didTeardown, self.largeTextTaskGeneration == generation else { return }
                 self.largeTextTask = nil
                 guard !Task.isCancelled, !text.isEmpty else { return }
-                let pasteboard = NSPasteboard.general
+                let pasteboard = self.pasteboardForTesting ?? .general
                 pasteboard.clearContents()
                 pasteboard.setString(text, forType: .string)
                 // Confirmation *after* the write, and only when there was
