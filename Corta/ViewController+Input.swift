@@ -19,6 +19,7 @@ extension ViewController {
             alert.addButton(withTitle: L10n.text("common.cancel"))
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
+        returnToBottomOnInput()
         let payload = Paste.bytes(for: sanitized, bracketedPasteEnabled: bracketedPasteEnabled())
         // B03: bounded chunks, not one arbitrarily large enqueue — a
         // multi-megabyte paste sent as a single `write` would occupy the

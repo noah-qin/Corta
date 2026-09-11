@@ -82,6 +82,12 @@ extension ViewController {
             alert.addButton(withTitle: L10n.text("common.cancel"))
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
+        // B04: a dropped file and a Services-menu paste are both a paste in
+        // every way that matters here — `pasteFromClipboard` already
+        // returns to the bottom for the ⌘V path, and this one write path
+        // backs both, so it needs the same call rather than a second copy
+        // of it.
+        returnToBottomOnInput()
         session.write(
             Paste.bytes(for: sanitized, bracketedPasteEnabled: session.isBracketedPasteEnabled))
     }

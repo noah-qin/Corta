@@ -40,6 +40,20 @@ what to edit.
   tests, so a pixel-mismatch failure carries the rendered PNG instead of
   only the failed comparison.
 
+- **B04 — the scrolled-away viewport now stays anchored to what it was
+  showing.** `scrollOffset` was a raw distance from the live bottom, so it
+  silently pointed at different text every time output arrived while the
+  user was scrolled up — the same number of lines above a bottom that had
+  just moved. `scrollAnchorTotalPushed` shifts it by the scrollback's growth
+  on every output batch instead, keeping the document position fixed.
+  Typing and pasting while scrolled away now return the viewport to the
+  bottom (`ViewController.returnToBottomOnInput`), matching every comparable
+  terminal — the anchor above is deliberately *not* applied to those, since
+  input is the user's own request to talk to the live screen. `docs/DESIGN.md`
+  §7 has the full account, including what is still open (a unified
+  viewport/selection/search coordinate mapping, and a discoverable
+  selection/mouse-reporting override blocked on `?1002`/`?1003` support).
+
 - **B06 — indexed palette query, set and reset (OSC 4/104).** A program
   naming a colour by number (`\e]4;137;?\e\\`) got silence, and setting or
   resetting one (`\e]4;1;#ff0000\e\\`, `\e]104\e\\`) was a no-op. Added
@@ -55,6 +69,13 @@ what to edit.
 
 ### Fixed
 
+- **B04 — a selection drag kept running after the window lost focus.**
+  `handleSelectionMouseDown`'s blocking local event loop already exited if
+  the pane closed mid-drag, but not if the window simply lost key status
+  (Cmd-Tab, a new window from a global shortcut, Mission Control) — it kept
+  blocking on drag and auto-scroll events for a window the user was no
+  longer looking at. The loop now ends the same way the pane-closed case
+  already does, leaving whatever was selected up to that point standing.
 - **B06 — `CSI s` / `CSI u` cursor save/restore did nothing.** Corta has
   no DECLRMM, so — matching xterm without left/right margins — these are
   now unconditional aliases for `DECSC`/`DECRC` (`ESC 7`/`ESC 8`). The

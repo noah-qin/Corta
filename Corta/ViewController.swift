@@ -78,10 +78,30 @@ class ViewController: NSViewController {
             guard scrollOffset != oldValue else { return }
             // Back at the bottom means there is nothing below to be told
             // about; the "new output" state starts again from here (U12).
-            if scrollOffset == 0 { sawOutputWhileScrolled = false }
+            if scrollOffset == 0 {
+                sawOutputWhileScrolled = false
+                scrollAnchorTotalPushed = nil
+            } else {
+                // Recorded on every change, including the anchor shift
+                // `prepareFrame` itself makes below — so after that shift
+                // this always reads the *post*-shift total, and the next
+                // batch's growth is measured from there, not from
+                // wherever scrolling started (B04).
+                scrollAnchorTotalPushed = session?.scrollbackTotalPushed
+            }
             updateScrollPositionIndicator()
         }
     }
+
+    /// `scrollbackTotalPushed` as of the last time `scrollOffset` changed,
+    /// while off the bottom — `nil` at the bottom, where there is nothing to
+    /// anchor. `prepareFrame` uses the gap between this and the current
+    /// total to keep the *document position* the viewport shows fixed while
+    /// scrolled away, rather than the row count "N lines above the bottom,"
+    /// which drifts forward as the live bottom moves (B04). The same
+    /// `totalPushed`-delta pattern `scrollOffsetBeforeSearch` and
+    /// `Selection.baseScrollbackTotal` already use elsewhere.
+    var scrollAnchorTotalPushed: Int?
 
     /// U12 — the pill in the corner while the viewport is off the bottom.
     var scrollPositionIndicator: ScrollPositionIndicator?
@@ -684,6 +704,7 @@ class ViewController: NSViewController {
             // A Return is the one moment a terminal without shell
             // integration knows the user asked for something (M6.3).
             if bytes.contains(0x0D) { taskNotifier.noteCommandSubmitted(in: view.window) }
+            returnToBottomOnInput()
             session.write(bytes)
         }
         view.onScroll = { [weak self] gesture in
@@ -950,6 +971,31 @@ class ViewController: NSViewController {
         needsRedraw = false
         wasSynchronizedOutputActive = false
         let grid = session.snapshot()
+        if hasOutput, scrollOffset > 0, let anchor = scrollAnchorTotalPushed {
+            // Keep the viewport pointed at the same document position while
+            // scrolled away from the bottom: without this, "N lines above
+            // the bottom" silently means something further along every time
+            // the live bottom moves, and text the user is mid-read on slides
+            // out from under them a line at a time (B04). Ring eviction
+            // (ordinary growth past `scrollbackLimit`) clamps the same way
+            // any other over-large offset does, in the renderer.
+            //
+            // Shifted from this frame's own `grid` snapshot, not a separate
+            // `scrollbackTotalPushed` read taken earlier — the reader
+            // thread can push more rows in the gap between two lock
+            // acquisitions, which would shift by less than this frame's
+            // `grid` actually grew and render one batch behind. The anchor
+            // is then pinned to that exact same total (bypassing
+            // `scrollOffset`'s `didSet`, which would otherwise re-read the
+            // counter a second time and could observe still more growth
+            // that happened in between) so next frame's shift starts from
+            // precisely what this one accounted for.
+            let growth = grid.scrollback.totalPushed - anchor
+            if growth > 0 {
+                scrollOffset += growth
+                scrollAnchorTotalPushed = grid.scrollback.totalPushed
+            }
+        }
         let mappedSearchMatches = searchMatches.map { TerminalSelection($0, grid: grid) }
         let damaged = terminalRenderer.updateInstances(
             grid: grid, scrollOffset: scrollOffset,
