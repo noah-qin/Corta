@@ -36,6 +36,8 @@ extension ViewController {
         let range = selection.map { selectionRange(for: $0, in: grid) }
 
         largeTextTask?.cancel()
+        largeTextTaskGeneration &+= 1
+        let generation = largeTextTaskGeneration
         // `Task.detached`, not a plain `Task {}` — see `copy(_:)`'s identical
         // reasoning: this method is `@MainActor`, and relying on a
         // nonisolated callee to implicitly escape an inherited actor is the
@@ -43,6 +45,17 @@ extension ViewController {
         // below (`NSSavePanel`, `NSAlert`) is explicitly hopped back to
         // `MainActor` rather than assumed to still be there.
         largeTextTask = Task.detached(priority: .userInitiated) { [weak self] in
+            // `async let`'s structured-concurrency guarantee cuts both ways:
+            // cancelling this task (a superseded export, or `teardown()`)
+            // stops `built`'s result from ever being applied below, but if
+            // the scope returns early (no `url`) before `await built`, the
+            // implicit await built into leaving an `async let` scope still
+            // waits for the build to finish first — Swift never leaves an
+            // orphaned structured child behind. That wait is invisible to
+            // the user (this whole task is already off the main actor), but
+            // it does mean "cancelled" only ever means "the result is
+            // discarded," never "the build stopped early" — the same
+            // limit `largeTextTask`'s own doc comment now states plainly.
             async let built = Self.exportableText(grid: grid, selection: range)
 
             let url: URL? = await withCheckedContinuation { continuation in
@@ -59,27 +72,54 @@ extension ViewController {
                     }
                 }
             }
-            guard !Task.isCancelled, let url else { return }
 
-            let text = await built
-            guard !Task.isCancelled else { return }
-            guard !text.isEmpty else {
-                await MainActor.run {
-                    self?.terminalView?.showToast(L10n.text("toast.nothingToExport"), kind: .warning)
-                }
-                return
+            enum Outcome {
+                case cancelledOrDismissed
+                case empty
+                case wrote
+                case failed(Error)
             }
-            do {
-                try Self.write(text, to: url)
-                await MainActor.run {
-                    self?.terminalView?.showToast(L10n.text("toast.exported"))
+            let outcome: Outcome
+            if Task.isCancelled {
+                outcome = .cancelledOrDismissed
+            } else if let url {
+                let text = await built
+                if Task.isCancelled {
+                    outcome = .cancelledOrDismissed
+                } else if text.isEmpty {
+                    outcome = .empty
+                } else {
+                    do {
+                        try Self.write(text, to: url)
+                        outcome = .wrote
+                    } catch {
+                        // The panel already granted access, so a failure
+                        // here is a full disk or a read-only volume — worth
+                        // an alert rather than a toast, because the file the
+                        // user asked for does not exist and nothing else
+                        // would say so.
+                        outcome = .failed(error)
+                    }
                 }
-            } catch {
-                // The panel already granted access, so a failure here is a
-                // full disk or a read-only volume — worth an alert rather
-                // than a toast, because the file the user asked for does not
-                // exist and nothing else would say so.
-                await MainActor.run {
+            } else {
+                outcome = .cancelledOrDismissed
+            }
+
+            // One exit point: clears the handle (generation-guarded, same
+            // reasoning as `copy(_:)`) and applies the outcome together,
+            // rather than an early `return` per case that each had to
+            // remember to clear it too.
+            await MainActor.run {
+                guard let self, self.largeTextTaskGeneration == generation else { return }
+                self.largeTextTask = nil
+                switch outcome {
+                case .cancelledOrDismissed:
+                    break
+                case .empty:
+                    self.terminalView?.showToast(L10n.text("toast.nothingToExport"), kind: .warning)
+                case .wrote:
+                    self.terminalView?.showToast(L10n.text("toast.exported"))
+                case .failed(let error):
                     let alert = NSAlert(error: error)
                     alert.beginSheetModal(for: window)
                 }

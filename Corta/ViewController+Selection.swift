@@ -51,6 +51,8 @@ extension ViewController {
         let grid = session.snapshot()
         let range = selectionRange(for: selection, in: grid)
         largeTextTask?.cancel()
+        largeTextTaskGeneration &+= 1
+        let generation = largeTextTaskGeneration
         // `Task.detached`, not a plain `Task {}`: this method runs on
         // `@MainActor`, and a plain `Task {}` created from an actor-isolated
         // context inherits that actor's isolation for its body — relying on
@@ -62,8 +64,15 @@ extension ViewController {
         // the pasteboard write, which is AppKit-affine.
         largeTextTask = Task.detached(priority: .userInitiated) { [weak self] in
             let text = Selection.text(of: range, in: grid)
-            guard !Task.isCancelled, !text.isEmpty else { return }
             await MainActor.run {
+                // Only this call's own generation may clear the handle —
+                // a superseded copy finishing late (its cancellation only
+                // ever stops the *result* from applying, never the build
+                // itself, which has already run to completion by now) must
+                // not clear the handle a newer copy has since installed.
+                guard let self, self.largeTextTaskGeneration == generation else { return }
+                self.largeTextTask = nil
+                guard !Task.isCancelled, !text.isEmpty else { return }
                 let pasteboard = NSPasteboard.general
                 pasteboard.clearContents()
                 pasteboard.setString(text, forType: .string)
@@ -73,7 +82,7 @@ extension ViewController {
                 // no toast. This is what makes copy-on-select safe to have
                 // on by default (M7.10) — the clipboard no longer changes
                 // silently.
-                self?.terminalView?.showToast(L10n.text("toast.copied"))
+                self.terminalView?.showToast(L10n.text("toast.copied"))
             }
         }
     }

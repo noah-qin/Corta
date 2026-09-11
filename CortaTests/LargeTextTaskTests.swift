@@ -64,6 +64,12 @@ struct LargeTextTaskTests {
             await waitUpTo(5) {
                 pasteboard.string(forType: .string)?.contains("COPYTASKMARKER") == true
             })
+        // B05 review follow-up: the handle must not outlive the build it
+        // names, or `largeTextTask != nil` stops meaning "a build is
+        // running."
+        #expect(
+            await waitUpTo(5) { pane.largeTextTask == nil },
+            "expected the handle to clear once the copy completed")
     }
 
     @Test func teardownCancelsAnInFlightLargeTextTask() async throws {

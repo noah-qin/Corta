@@ -257,8 +257,16 @@ class ViewController: NSViewController {
     /// the interaction path (`ViewController+Export.swift`, `copy(_:)`).
     /// Cancelling a superseded build (a second export before the first
     /// panel closed) or the pane's own is what this handle is for; it does
-    /// not otherwise carry a value.
+    /// not otherwise carry a value. Cleared back to `nil` on completion,
+    /// guarded by `largeTextTaskGeneration` so a superseded build finishing
+    /// late can never clear the *new* build's handle out from under it.
+    /// `Selection.text`/`exportableText` poll no cancellation flag
+    /// internally (unlike `Search.find`), so cancelling this only stops the
+    /// result from being applied — the build itself, if already running,
+    /// still runs to completion off the main thread.
     var largeTextTask: Task<Void, Never>?
+    /// Bumped every time `largeTextTask` is replaced; see its doc comment.
+    var largeTextTaskGeneration = 0
     /// B05: local to this pane once the bar is open — seeded from the
     /// global default when it opens, toggled independently of any other
     /// currently-open bar, and pushed back to `ConfigurationStore` only as
