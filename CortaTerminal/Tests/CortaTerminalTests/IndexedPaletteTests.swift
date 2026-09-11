@@ -94,12 +94,17 @@ struct IndexedPaletteTests {
     @Test("RIS keeps the app-seeded palette defaults but clears overrides")
     func risKeepsDefaultsClearsOverrides() {
         var terminal = Terminal()
-        var palette = terminal.indexedPalette
+        var seededDefaults = IndexedPalette.xtermDefaults()
+        // A non-black value at index 1: the xterm defaults ship it black, so
+        // asserting black after reset would pass even if the whole palette
+        // (not just the override) were discarded and rebuilt from scratch.
+        seededDefaults[1] = (200, 100, 50)
+        var palette = IndexedPalette(defaults: seededDefaults)
         palette.setOverride(1, to: (10, 20, 30))
         terminal.indexedPalette = palette
         terminal.reset()
         #expect(terminal.indexedPalette.overrides.isEmpty)
-        #expect(terminal.indexedPalette.color(at: 1) as (UInt8, UInt8, UInt8) == (0, 0, 0))
+        #expect(terminal.indexedPalette.color(at: 1) as (UInt8, UInt8, UInt8) == (200, 100, 50))
     }
 
     @Test("no OSC 4 or 104 produces unsolicited output")
@@ -114,12 +119,16 @@ struct IndexedPaletteTests {
         var palette = IndexedPalette()
         palette.setOverride(1, to: (10, 20, 30))
         var newDefaults = IndexedPalette.xtermDefaults()
-        newDefaults[1] = (99, 98, 97)
+        // Index 2 is left untouched by the override above, so changing its
+        // default here is what actually exercises the reseed — changing
+        // index 1's instead would pass even if `updateDefaults` were a
+        // no-op, since the override already shadows it.
+        newDefaults[2] = (99, 98, 97)
         palette.updateDefaults(to: newDefaults)
         // The override survives the reseed...
         #expect(palette.color(at: 1) as (UInt8, UInt8, UInt8) == (10, 20, 30))
         // ...but an untouched index picks up the new default.
-        #expect(palette.color(at: 2) as (UInt8, UInt8, UInt8) == newDefaults[2])
+        #expect(palette.color(at: 2) as (UInt8, UInt8, UInt8) == (99, 98, 97))
     }
 
     @Test("the core-level palette getter/setter round-trips overrides")
