@@ -365,4 +365,31 @@ struct SearchDebounceTests {
             pane.scrollOffset >= 1 + growth && pane.scrollOffset <= 1 + growth + 4,
             "expected the restore to shift by roughly the growth since capture (\(growth)), not replay the raw 1 — got \(pane.scrollOffset)")
     }
+
+    /// B05 review follow-up: zero is not a document position that drifts
+    /// with output — it *is* "follow the live bottom." A user who opened
+    /// search already at the bottom must still be at the bottom on close,
+    /// not scrolled up into history by however much arrived while the bar
+    /// was open (the growth-shift `closingSearchRestoresThePreSearchLine
+    /// NotJustTheRawOffset` proves for a *nonzero* pre-search offset would,
+    /// applied uniformly, do exactly that to zero).
+    @Test func closingSearchAtTheBottomStaysAtTheBottomDespiteOutputWhileOpen() async throws {
+        let pane = try await makePaneWithMarker()
+        defer { pane.teardown() }
+        #expect(pane.scrollOffset == 0, "precondition: at the bottom before search opens")
+
+        pane.showSearchBar()
+        #expect(pane.scrollOffsetBeforeSearch == 0)
+
+        pane.session.write(Array("yes filler | head -n 2000\n".utf8))
+        #expect(
+            await waitUpTo(10) {
+                pane.session.snapshot().scrollback.totalPushed > 0
+            },
+            "precondition: the scrollback actually grew while the bar was open")
+
+        pane.closeSearchBar()
+
+        #expect(pane.scrollOffset == 0, "expected to stay at the bottom, not shift into history")
+    }
 }

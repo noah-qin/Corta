@@ -351,13 +351,23 @@ extension ViewController {
         searchNeedsRefresh = false
         searchRefreshGeneration &+= 1
         if let beforeSearch = scrollOffsetBeforeSearch {
-            // B05: shift by the growth since capture, exactly like a
-            // selection's `baseScrollbackTotal` — restoring the raw offset
-            // alone would land on different text if output arrived while
-            // the bar was open (`totalPushedBeforeSearch`'s doc comment).
-            let scrollback = session?.snapshot().scrollback
-            let growth = max(0, (scrollback?.totalPushed ?? 0) - (totalPushedBeforeSearch ?? 0))
-            scrollOffset = min(scrollback?.count ?? beforeSearch, max(0, beforeSearch + growth))
+            if beforeSearch == 0 {
+                // Zero is not a document position that drifts with output —
+                // it *is* "follow the live bottom." A user who opened
+                // search already at the bottom expects to still be at the
+                // bottom on close, not scrolled up into history by however
+                // much arrived while the bar was open.
+                scrollOffset = 0
+            } else {
+                // B05: shift by the growth since capture, exactly like a
+                // selection's `baseScrollbackTotal` — restoring the raw
+                // offset alone would land on different text if output
+                // arrived while the bar was open
+                // (`totalPushedBeforeSearch`'s doc comment).
+                let scrollback = session?.snapshot().scrollback
+                let growth = max(0, (scrollback?.totalPushed ?? 0) - (totalPushedBeforeSearch ?? 0))
+                scrollOffset = min(scrollback?.count ?? beforeSearch, max(0, beforeSearch + growth))
+            }
             scrollOffsetBeforeSearch = nil
             totalPushedBeforeSearch = nil
         }
