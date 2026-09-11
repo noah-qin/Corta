@@ -166,21 +166,53 @@ gated by window-visibility lifecycle state (`SplitViewController
 instead by launching the app and resizing a window narrower, per
 `CONFORMANCE.md` §4.4.
 
-**Still open, deliberately not attempted in B04**, because each is a
-substantially larger, riskier piece than the bugs above: re-anchoring
-`ViewController.scrollOffset` itself to a stable logical position while
-scrolled up and output keeps arriving (today it is a raw distance-from-
-bottom count that silently drifts as `totalPushed` grows — see the comment
-on `TerminalRenderer.updateInstances`); the bottom-return behavior that
-would depend on that anchoring; unifying the document/absolute/viewport
-conversions duplicated across the render, `ViewController+ShellIntegration`
-and `ViewController+Search` paths into one shared mapping, rather than fixing
-the one concrete divergence found; and a discoverable override separating
-terminal text selection from application mouse reporting — blocked on there
-being no `?1002`/`?1003` motion-tracking-mode support to override *to* in the
-first place (every drag today unconditionally becomes a local selection,
-which already makes selection achievable in a reporting-enabled TUI, but
-means Corta cannot forward a drag as reports at all).
+**Re-anchoring `scrollOffset` and the bottom-return behavior, closed in a
+follow-up pass.** `scrollOffset` was a raw distance-from-bottom count that
+silently drifted as `totalPushed` grew — the same-numbered offset pointed at
+whatever was now that many lines above the live bottom, not at the text a
+person had actually scrolled to. `scrollAnchorTotalPushed` (`ViewController
+.swift`) records `scrollbackTotalPushed` on every `scrollOffset` change while
+off the bottom; `prepareFrame` shifts the offset by the growth in that total
+on every output batch, keeping the *document position* fixed instead of the
+row count. Ring eviction still clamps the same way any other over-large
+offset does, in the renderer — a stable position can't survive its own rows
+being evicted, only stop drifting while they exist. With that anchor in
+place, ordinary typing and paste (`ViewController.returnToBottomOnInput`,
+called from `onKeyBytes` and `pasteFromClipboard`) now return the viewport to
+the bottom, matching every comparable terminal — input is the user's own
+request to talk to the live screen, unlike output arriving while they read,
+which the anchor now deliberately leaves alone. Regression:
+`ScrollIndicatorIntegrationTests.scrolledOffsetStaysAnchoredAsOutputArrives`,
+`.typingWhileScrolledReturnsToTheBottom`,
+`.returnToBottomOnInputOnlyActsWhenScrolled`.
+
+**A drag now ends if the window loses key status mid-gesture** (Cmd-Tab to
+another app, a global shortcut opening a new window, Mission Control) rather
+than `nextEvent(matching:)` continuing to block on drag/periodic events for a
+window the user is no longer looking at — the same early-return shape the
+pane-closed-mid-drag case already used. This closes the "focus-loss
+cancellation" half of B04's blocking-mouse-tracking item; the loop itself is
+otherwise unchanged, and — like the rest of `handleSelectionMouseDown` — is
+gated on a real window's blocking local event loop that the offscreen test
+target cannot drive, so this is verified by reasoning parity with the
+already-tested pane-close guard rather than by an automated regression case.
+
+**Still open, deliberately not attempted**, because each is a substantially
+larger, riskier piece than the fixes above: unifying the document/absolute/
+viewport conversions duplicated across the render, `ViewController
++ShellIntegration`, `ViewController+Search` and now the scroll-anchor paths
+into one shared mapping, rather than fixing each concrete divergence found as
+it turned up (four call sites now share the identical `totalPushed`-delta
+shape, which is the functional requirement; consolidating them into one
+helper afterward is a pure refactor with real risk to already-tested code and
+no behavior change, not something this pass's fixes depend on); and a
+discoverable override separating terminal text selection from application
+mouse reporting — blocked on there being no `?1002`/`?1003` motion-tracking-
+mode support to override *to* in the first place (every drag today
+unconditionally becomes a local selection, which already makes selection
+achievable in a reporting-enabled TUI, but means Corta cannot forward a drag
+as reports at all — implementing motion-tracking mouse modes is a new
+protocol capability, not a bug fix, and belongs in its own pass).
 
 ---
 
