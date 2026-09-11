@@ -508,15 +508,25 @@ Ordered by how badly they are usually underestimated.
    selection's `baseScrollbackTotal` already uses.
 
    Large copy (⌘C/⌘A) and export (⇧⌘S) built their text — `Selection.text`,
-   O(the range, which for the whole document is O(scrollback)) — 
-   synchronously on the interaction path; export additionally built it
-   *before* the save panel even appeared. Both now build off the main
-   actor on a shared, cancellable `largeTextTask` handle (cancels a
-   superseded build, or the pane's own on `teardown()`); export's build
-   starts in parallel with the save panel rather than blocking its
-   appearance. `Data.write(options: .atomic)` already made the file write
-   itself atomic (`ViewController+Export.swift`, tested by
-   `ExportWriteTests`) — that half of the issue needed no change.
+   O(the range, which for the whole document is O(scrollback)) —
+   synchronously on the *main actor*, which is the interaction path in this
+   app (§2.2). Both now run that build on `Task.detached`, a compiler-level
+   guarantee of leaving the main actor rather than an inference — a plain
+   `Task {}` created from `@MainActor` code inherits that isolation for its
+   body, so relying on a nonisolated callee to implicitly escape it again
+   would be exactly the fragile assumption this fix replaces. A shared
+   `largeTextTask` handle, generation-guarded together with `didTeardown`,
+   keeps a superseded build's completion — or the pane's own, from
+   `teardown()` — from touching state that no longer belongs to it.
+   `Task.cancel()` here only ever discards a build's result, though: neither
+   `Selection.text` nor `exportableText` polls cancellation internally (M9's
+   `Search.find` does), so an in-flight row walk runs to completion off the
+   main actor regardless of whether it is later applied — see
+   `ViewController.swift`'s own doc comment on `largeTextTask` for the exact
+   line this was found and fixed to state accurately, after an earlier draft
+   of this paragraph overclaimed it. `Data.write(options: .atomic)` already
+   made the file write itself atomic (`ViewController+Export.swift`, tested
+   by `ExportWriteTests`) — that half of the issue needed no change.
 
 ---
 

@@ -65,9 +65,11 @@ what to edit.
   restore now shifts by the scrollback growth since the bar opened.
 - **B05 — large copy/export could stall input.** `⌘C`/`⌘A` and `⇧⌘S`
   built their text — up to the whole scrollback — synchronously on the
-  interaction path; export built it before the save panel even appeared.
-  Both now build off the main thread, export's build running in parallel
-  with the save panel rather than blocking its appearance.
+  main actor, which is the interaction path in this app. Both now build
+  on a detached task, with an empty document or selection still skipping
+  the save panel entirely, and export's save panel itself now cancellable
+  (dismissed and its wait released) if the pane closes or a second export
+  supersedes it while the panel is open.
 - **B04 — selection highlight and copied text could disagree once the
   scrollback ring saturated.** `TerminalRenderer.selectionQuads` and
   `KittyImageRenderer` shifted a selection/image placement's document row by

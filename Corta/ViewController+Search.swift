@@ -107,8 +107,13 @@ extension ViewController {
             view.window?.makeFirstResponder(searchField)
             return
         }
-        scrollOffsetBeforeSearch = scrollOffset
+        // `totalPushed` first: `session.snapshot()` can briefly wait on the
+        // reader thread's own lock, and output landing in that gap must not
+        // be excluded from the anchor either read captures — capturing
+        // `scrollOffset` (pure main-thread state, no such wait) second
+        // keeps the pair at least as fresh as the snapshot, never staler.
         totalPushedBeforeSearch = session?.snapshot().scrollback.totalPushed
+        scrollOffsetBeforeSearch = scrollOffset
         // B05: seeded from the global default, then local to this pane —
         // see `searchCaseSensitive`'s doc comment.
         searchCaseSensitive = ConfigurationStore.shared.configuration.searchCaseSensitive
