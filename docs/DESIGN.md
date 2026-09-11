@@ -613,10 +613,11 @@ Ordered by how badly they are usually underestimated.
    stick at column 0. The quality-plan record that first found this
    named the blocker as needing "a behavioural decision" about which
    reverse-wrap semantics to implement; xterm's own answer, `?45`
-   (DECBKM, reverse-wraparound mode, off by default) is the one every
-   other terminal a comparison would be made against also implements, so
-   it is the one Corta implements too rather than inventing a bespoke
-   variant. Added `Grid.reverseWraparoundEnabled` (mirrors `insertMode`'s
+   (reverse-wraparound mode, off by default — not DECBKM, which is the
+   separate `?67` backarrow-key mode) is the one every other terminal a
+   comparison would be made against also implements, so it is the one
+   Corta implements too rather than inventing a bespoke variant. Added
+   `Grid.reverseWraparoundEnabled` (mirrors `insertMode`'s
    pattern: a Grid-owned flag a private-mode DECSET/DECRST toggles, with
    a DECRQM case reporting it), and taught `moveCursorLeft`/`backspace`
    to continue onto the row above's last column when the mode is on and
@@ -625,6 +626,15 @@ Ordered by how badly they are usually underestimated.
    DECAWM's own auto-wrap actually happened (§2.1). `CUB`'s repeat count
    can cross more than one wrapped row in a single call; `BS` is always
    one step, matching its existing pending-wrap-disarm behaviour.
+
+   `exitAlternateScreen` restores the parked main screen wholesale
+   (`self = main`), the same mechanism `cursorStyle` already has to be
+   explicitly carried across for the identical reason: a private mode a
+   program set is terminal-wide state, not part of either screen's own
+   content, so the parked copy's stale value would otherwise silently
+   win. `reverseWraparoundEnabled` is now carried across the same way
+   `cursorStyle` already was — a real gap a review round caught, not
+   something reasoned out in advance.
 
 ---
 

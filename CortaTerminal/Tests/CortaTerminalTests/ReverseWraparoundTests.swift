@@ -2,7 +2,8 @@ import Testing
 
 @testable import CortaTerminal
 
-/// `?45` — DECBKM, reverse-wraparound mode (B06). While set, `BS`/`CUB`
+/// `?45` — reverse-wraparound mode (not DECBKM, which is the separate `?67`
+/// backarrow-key mode) (B06). While set, `BS`/`CUB`
 /// running out of columns on a row that auto-wrapped from the one above
 /// continue onto that row's last column instead of stopping at column 0.
 @Suite("Reverse wraparound (?45)")
@@ -56,6 +57,25 @@ struct ReverseWraparoundTests {
         // 1 to reach column 9 on row 0, 3 more within that row.
         grid.moveCursorLeft(4)
         #expect(grid.cursor == Cursor(row: 0, column: 6))
+    }
+
+    /// Two consecutive wrapped rows (a 21-column write into a 10-column
+    /// grid: row 0 and row 1 both fill and wrap, row 2 gets the remainder),
+    /// so a single `CUB` call has to cross more than one row boundary in
+    /// its own loop, not just one.
+    @Test("enabled: CUB crosses two wrapped rows in a single call")
+    func enabledCubCrossesTwoWrappedRows() {
+        var grid = Grid(rows: 4, columns: 10)
+        for scalar in String(repeating: "a", count: 21).unicodeScalars {
+            grid.write(scalar.value)
+        }
+        #expect(grid.cursor == Cursor(row: 2, column: 1))
+        grid.reverseWraparoundEnabled = true
+        // 1 to column 0 of row 2, 1 to cross onto row 1's last column, 9
+        // more to cross row 1 entirely (columns 9…0), 1 to cross onto row
+        // 0's last column: 12 in total.
+        grid.moveCursorLeft(12)
+        #expect(grid.cursor == Cursor(row: 0, column: 9))
     }
 
     @Test("enabled: a hard newline blocks the wrap — no auto-wrap, no crossing")

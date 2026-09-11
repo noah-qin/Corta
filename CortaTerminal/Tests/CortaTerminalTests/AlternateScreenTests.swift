@@ -43,6 +43,39 @@ struct AlternateScreenTests {
         #expect(grid.line(1).isEmpty)
     }
 
+    /// A private mode set by the program is terminal-wide state, not part
+    /// of either screen's own content — `exitAlternateScreen` restores the
+    /// parked main screen wholesale, and without carrying the mode across
+    /// explicitly (the same way `cursorStyle` already is) a `?45` a full-
+    /// screen child set would be silently discarded on exit (B06).
+    @Test("reverse-wraparound mode survives an alternate-screen round trip")
+    func reverseWraparoundSurvivesAlternateScreen() {
+        var grid = Grid(rows: 3, columns: 8)
+        grid.reverseWraparoundEnabled = true
+
+        grid.enterAlternateScreen()
+        #expect(grid.reverseWraparoundEnabled)
+
+        grid.exitAlternateScreen()
+        #expect(grid.reverseWraparoundEnabled)
+    }
+
+    /// The mode can also change *while* the alternate screen is active —
+    /// e.g. `tmux` or `less` setting it for their own full-screen UI — and
+    /// that value, not whatever the main screen had before entering, is
+    /// what must survive the exit.
+    @Test("a mode change made while the alternate screen is active survives exiting it")
+    func modeChangedDuringAlternateScreenSurvivesExit() {
+        var grid = Grid(rows: 3, columns: 8)
+        #expect(!grid.reverseWraparoundEnabled)
+
+        grid.enterAlternateScreen()
+        grid.reverseWraparoundEnabled = true
+        grid.exitAlternateScreen()
+
+        #expect(grid.reverseWraparoundEnabled)
+    }
+
     /// An alternate screen has no history (roadmap M2.3): lines scrolled
     /// while it is live are discarded, not pushed to the main scrollback.
     @Test("the alternate screen has no scrollback")

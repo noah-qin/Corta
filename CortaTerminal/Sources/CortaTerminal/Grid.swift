@@ -1116,6 +1116,13 @@ public struct Grid: Sendable {
         suspendedMain = nil
         var main = suspended.grid
         main.cursorStyle = cursorStyle  // the style is global, not per screen
+        // Ditto reverse-wraparound (B06): a private mode set by the
+        // program is terminal-wide state, not part of either screen's own
+        // content, and `self = main` below would otherwise silently
+        // restore whatever `?45` was set to before the alternate screen
+        // was entered, discarding a `?45` the child set while it was
+        // active.
+        main.reverseWraparoundEnabled = reverseWraparoundEnabled
         if main.rows != rows || main.columns != columns {
             main.resize(rows: rows, columns: columns)
         }

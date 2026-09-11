@@ -38,7 +38,7 @@ measured. Priorities:
 | **OSC 7** — report working directory                    | P1   | Prerequisite for new tabs and splits inheriting the cwd |
 | **OSC 4 / 104** — indexed palette query, set, reset (B06) | P1 | 256-entry palette, seeded from the theme (0–15) and xterm's cube/greyscale (16–255); `docs/DESIGN.md` §7 |
 | **CSI s / u (SCOSC/SCORC)** — cursor save/restore alias (B06) | P1 | Corta has no DECLRMM, so these are unconditional aliases for DECSC/DECRC, matching xterm without left/right margins |
-| **`?45` — reverse-wraparound mode (DECBKM)** (B06) | P2 | `BS`/`CUB` cross onto the row above when it auto-wrapped into this one; off by default, matching xterm |
+| **`?45` — reverse-wraparound mode** (B06) | P2 | `BS`/`CUB` cross onto the row above when it auto-wrapped into this one; off by default, matching xterm. Not DECBKM, which is the separate `?67` backarrow-key mode |
 | Bracketed paste (`?2004`)                               | P0   | A safety feature, not a convenience — see `SECURITY.md` §2.3 |
 | Mouse reporting (SGR, `?1006`)                          | P1   | Mouse inside tmux and vim                               |
 | Focus reporting (`?1004`)                               | P2   | Neovim autoread, tmux focus events; scheduled, M6.7                |

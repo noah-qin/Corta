@@ -19,7 +19,7 @@ extension Performer {
                 state.synchronizedOutputEnabled = enabled
             case 1004:  // focus reporting (M6.7)
                 state.focusReportingEnabled = enabled
-            case 45:  // DECBKM — reverse-wraparound mode (B06)
+            case 45:  // reverse-wraparound mode — not DECBKM, which is ?67 (B06)
                 grid.reverseWraparoundEnabled = enabled
             default:
                 break
