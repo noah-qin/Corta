@@ -58,7 +58,10 @@ nonisolated extension Theme.Variant {
     /// `IndexedPalette.xtermDefaults()`, xterm's fixed, non-themed 6×6×6
     /// cube and greyscale ramp — the identical formula
     /// `TerminalColorPalette.swift`'s `resolve(_:)` uses to render them, so
-    /// a query answers exactly what is drawn.
+    /// a query for an *untouched* index answers what is drawn. An index
+    /// OSC 4 has since overridden is query/set state only — the renderer
+    /// does not (yet) consult it, so the query and the painted colour can
+    /// disagree there; `docs/DESIGN.md` §7 has the reason.
     var indexedPaletteDefaults: IndexedPalette {
         func byte(_ component: Float) -> UInt8 { UInt8((component * 255).rounded()) }
         func triple(_ color: SIMD4<Float>) -> (red: UInt8, green: UInt8, blue: UInt8) {

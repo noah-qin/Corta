@@ -105,7 +105,9 @@ public struct Terminal: Sendable {
 
     /// The 256-entry indexed palette OSC 4 reports and sets, and OSC 104
     /// resets (B06). The app seeds `defaults` from its theme (mirrors
-    /// `dynamicColors`) and reads the whole thing back to render.
+    /// `dynamicColors`), but this is query/set state only — no render path
+    /// reads it yet, unlike `dynamicColors`. See `TerminalSession
+    /// .indexedPalette`'s doc comment and `docs/DESIGN.md` §7.
     public var indexedPalette: IndexedPalette {
         get { performer.state.indexedPalette }
         set { performer.state.indexedPalette = newValue }

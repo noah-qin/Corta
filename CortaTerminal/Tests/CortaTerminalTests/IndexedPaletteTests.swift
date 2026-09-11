@@ -109,6 +109,19 @@ struct IndexedPaletteTests {
         #expect(terminal.takeOutput().isEmpty)
     }
 
+    @Test("updateDefaults reseeds untouched indices without discarding overrides")
+    func updateDefaultsPreservesOverrides() {
+        var palette = IndexedPalette()
+        palette.setOverride(1, to: (10, 20, 30))
+        var newDefaults = IndexedPalette.xtermDefaults()
+        newDefaults[1] = (99, 98, 97)
+        palette.updateDefaults(to: newDefaults)
+        // The override survives the reseed...
+        #expect(palette.color(at: 1) as (UInt8, UInt8, UInt8) == (10, 20, 30))
+        // ...but an untouched index picks up the new default.
+        #expect(palette.color(at: 2) as (UInt8, UInt8, UInt8) == newDefaults[2])
+    }
+
     @Test("the core-level palette getter/setter round-trips overrides")
     func terminalIndexedPaletteProperty() {
         var terminal = Terminal()

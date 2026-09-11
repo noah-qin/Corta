@@ -1,5 +1,7 @@
-/// The 256-entry indexed palette OSC 4/5 address, and the per-session
-/// overrides they set (B06).
+/// The 256-entry indexed palette OSC 4 reports and sets, and OSC 104
+/// resets — the per-session overrides on top of a themed default (B06).
+/// OSC 5 ("special colours") is a separate, unimplemented interface; this
+/// type does not carry it despite the similar name.
 ///
 /// `defaults` is seeded by the app the same way `DynamicColors` is: ANSI
 /// 0–15 from the active theme, 16–255 from xterm's fixed 6×6×6 colour cube
@@ -32,6 +34,20 @@ public struct IndexedPalette: Sendable, Equatable {
 
     mutating func setOverride(_ index: UInt8, to color: (red: UInt8, green: UInt8, blue: UInt8)) {
         overrides[index] = color
+    }
+
+    /// Replaces `defaults` in place, keeping `overrides` untouched — for a
+    /// live theme switch (M6.13), which reseeds what an *unoverridden*
+    /// index answers without discarding OSC 4 state a program already set,
+    /// the same way `dynamicColors` reseeding never touches OSC 52 state.
+    /// Assigning a whole new `IndexedPalette` (RIS, initial session setup)
+    /// is the "start over" case this is not: `resetAllOverrides` is what
+    /// terminal state itself provides for that.
+    public mutating func updateDefaults(
+        to newDefaults: [(red: UInt8, green: UInt8, blue: UInt8)]
+    ) {
+        precondition(newDefaults.count == 256, "IndexedPalette.defaults must name all 256 indices")
+        defaults = newDefaults
     }
 
     /// OSC 104 with no arguments — every index reverts to its default.
