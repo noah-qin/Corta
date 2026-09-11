@@ -396,9 +396,10 @@ extension ViewController {
             searchMatchesTruncated = false
             currentSearchMatchIndex = nil
             // A pending output-triggered refresh (`searchNeedsRefresh`) is
-            // moot once there is no query to refresh — left set, the next
-            // output would run a pointless empty-query sweep and then
-            // schedule a further one from `applySearchResults`.
+            // moot once there is no query to refresh — cleared here too, or
+            // the next output would run a pointless empty-query sweep and
+            // `applySearchResults` would then schedule a further one from
+            // that.
             searchNeedsRefresh = false
             updateSearchCountLabel()
             invalidateDisplay()
