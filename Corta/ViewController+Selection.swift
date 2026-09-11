@@ -10,6 +10,20 @@ extension ViewController {
         session?.isSgrMouseEncodingEnabled ?? false
     }
 
+    /// Typing or pasting while scrolled away from the bottom returns the
+    /// viewport there (B04) — the input is about to affect the child's live
+    /// screen, which is not the screen currently showing. This is
+    /// deliberately not wired into ordinary output arriving while scrolled:
+    /// that case is the opposite one, where the fix is *not* to move the
+    /// viewport (`scrollAnchorTotalPushed`, above) — a person reading
+    /// history did not ask for the output racing past below to interrupt
+    /// them, but pressing a key is the user's own request to talk to the
+    /// live screen.
+    func returnToBottomOnInput() {
+        guard scrollOffset > 0 else { return }
+        scroll(.toBottom)
+    }
+
     func scroll(_ gesture: ScrollGesture) {
 
         let historyDepth = session.snapshot().scrollback.count
@@ -184,6 +198,16 @@ extension ViewController {
             // anymore. Bail out rather than keep touching a torn-down (or
             // reparented) pane's `session`/`terminalRenderer`.
             guard terminalView.window === window else { return }
+            // B04: the window can lose key status mid-drag — Cmd-Tab to
+            // another app, a global shortcut opening a new window, Mission
+            // Control — without the pane closing or the drag's mouse-up
+            // ever arriving. `nextEvent(matching:)` would otherwise keep
+            // blocking on drag/periodic events for a window the user is no
+            // longer looking at, silently extending the selection (and
+            // running auto-scroll) in the background. Ending the gesture
+            // here leaves whatever was selected up to this point standing,
+            // the same as any other early return in this loop.
+            guard window.isKeyWindow else { return }
             guard let next = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp, .periodic])
             else { continue }
             guard terminalView.window === window else { return }
