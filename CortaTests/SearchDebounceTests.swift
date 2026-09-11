@@ -225,6 +225,43 @@ struct SearchDebounceTests {
             "case-insensitive B must find strictly more than case-sensitive A for the same text")
     }
 
+    /// B05: `searchRegex` is a separate local flag from `searchCaseSensitive`
+    /// with its own toggle and sweep branch (`Self.sweep`) — isolating one
+    /// says nothing about the other, so it needs its own proof.
+    @Test func regexModeIsIsolatedPerPane() async throws {
+        let paneA = makePane()
+        let paneB = makePane()
+        defer {
+            paneA.teardown()
+            paneB.teardown()
+        }
+        for pane in [paneA, paneB] {
+            let session = try #require(pane.session)
+            session.write(Array("printf 'abc123 abc456\\n'\n".utf8))
+            #expect(await waitUpTo(10) { self.gridContains(pane, "abc123 abc456") })
+        }
+
+        paneA.showSearchBar()
+        paneB.showSearchBar()
+        paneA.searchRegex = true
+        paneB.searchRegex = false
+
+        // A pattern that matches as a regex but appears nowhere as a
+        // literal substring: A must find the digit runs, B must find
+        // nothing, for the identical query string.
+        try #require(paneA.searchField).stringValue = "[0-9]+"
+        paneA.updateSearchResults(scrollsToMatch: true)
+        try #require(paneB.searchField).stringValue = "[0-9]+"
+        paneB.updateSearchResults(scrollsToMatch: true)
+
+        #expect(await waitUpTo(5) { paneA.searchTask == nil })
+        #expect(await waitUpTo(5) { paneB.searchTask == nil })
+        #expect(paneA.searchMatches.count > 0, "regex-on A must match the digit runs")
+        #expect(
+            paneB.searchMatches.isEmpty,
+            "literal-mode B must not match \"[0-9]+\" as a substring — if it shared A's regex flag it would")
+    }
+
     /// B05: output arriving while a sweep is already running used to be
     /// silently dropped — `scheduleBackgroundSearchRefresh` was a no-op
     /// whenever `searchTask != nil`, and nothing re-triggered a sweep once

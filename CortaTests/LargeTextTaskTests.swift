@@ -49,7 +49,25 @@ struct LargeTextTaskTests {
             end: GridPosition(row: grid.rows - 1, column: grid.columns - 1),
             baseScrollbackTotal: grid.scrollback.totalPushed)
 
+        // `copy(_:)` writes to the real system clipboard (`NSPasteboard
+        // .general`, not injectable) — the developer's own clipboard
+        // contents are saved here and restored on exit, rather than left
+        // clobbered by the test's sentinel.
         let pasteboard = NSPasteboard.general
+        let savedItems: [NSPasteboardItem] = (pasteboard.pasteboardItems ?? []).map { item in
+            let copy = NSPasteboardItem()
+            for type in item.types {
+                if let data = item.data(forType: type) {
+                    copy.setData(data, forType: type)
+                }
+            }
+            return copy
+        }
+        defer {
+            pasteboard.clearContents()
+            if !savedItems.isEmpty { pasteboard.writeObjects(savedItems) }
+        }
+
         let markerBefore = "sentinel-\(UUID().uuidString)"
         pasteboard.clearContents()
         pasteboard.setString(markerBefore, forType: .string)

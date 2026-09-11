@@ -60,6 +60,18 @@ extension ViewController {
 
             let url: URL? = await withCheckedContinuation { continuation in
                 Task { @MainActor in
+                    // Unstructured, so cancelling the outer `largeTextTask`
+                    // does not cancel this presentation task by itself — a
+                    // pane torn down (or a superseded export) between that
+                    // cancellation and this hop running would otherwise
+                    // still show a save panel for a pane that is already
+                    // gone. Checked here, not just at the final apply.
+                    guard let self, !self.didTeardown,
+                        self.largeTextTaskGeneration == generation
+                    else {
+                        continuation.resume(returning: nil)
+                        return
+                    }
                     let panel = NSSavePanel()
                     panel.allowedContentTypes = [.plainText]
                     panel.nameFieldStringValue = Self.exportFilename(hasSelection: hasSelection)
