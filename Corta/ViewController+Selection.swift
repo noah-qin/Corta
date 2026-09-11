@@ -70,7 +70,7 @@ extension ViewController {
                 // ever stops the *result* from applying, never the build
                 // itself, which has already run to completion by now) must
                 // not clear the handle a newer copy has since installed.
-                guard let self, self.largeTextTaskGeneration == generation else { return }
+                guard let self, !self.didTeardown, self.largeTextTaskGeneration == generation else { return }
                 self.largeTextTask = nil
                 guard !Task.isCancelled, !text.isEmpty else { return }
                 let pasteboard = NSPasteboard.general

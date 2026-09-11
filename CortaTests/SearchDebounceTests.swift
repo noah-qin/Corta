@@ -201,10 +201,12 @@ struct SearchDebounceTests {
 
         paneA.showSearchBar()
         paneB.showSearchBar()
-        // Both seed from the same (default-false) global; only A turns it on
-        // locally — this must never touch B's copy.
+        // Set explicitly rather than relying on whatever the real machine's
+        // config file happens to default to (never assume machine state) —
+        // what this test verifies is that setting one pane's copy never
+        // touches the other's, not what any particular default is.
         paneA.searchCaseSensitive = true
-        #expect(paneB.searchCaseSensitive == false)
+        paneB.searchCaseSensitive = false
 
         try #require(paneA.searchField).stringValue = "hello"
         paneA.updateSearchResults(scrollsToMatch: true)

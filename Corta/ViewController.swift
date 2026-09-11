@@ -792,8 +792,12 @@ class ViewController: NSViewController {
 
     /// Guards `teardown`: a pane can be reached by two close paths at once
     /// (its own `closePane` and its window's close), and none of the steps
-    /// may run twice.
-    private var didTeardown = false
+    /// may run twice. Not `private`: `ViewController+Export.swift` and
+    /// `ViewController+Selection.swift` check it (B05) before a large
+    /// copy/export build's completion touches a pane that has since been
+    /// torn down — the generation guard alone catches a *newer* build
+    /// superseding it, not a teardown that never installs one.
+    var didTeardown = false
 
     /// Explicit, idempotent teardown — the single place every close path
     /// (pane, tab, window, quit) funnels through. It cannot wait for

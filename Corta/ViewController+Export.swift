@@ -110,7 +110,7 @@ extension ViewController {
             // rather than an early `return` per case that each had to
             // remember to clear it too.
             await MainActor.run {
-                guard let self, self.largeTextTaskGeneration == generation else { return }
+                guard let self, !self.didTeardown, self.largeTextTaskGeneration == generation else { return }
                 self.largeTextTask = nil
                 switch outcome {
                 case .cancelledOrDismissed:
