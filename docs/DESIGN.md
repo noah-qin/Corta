@@ -560,7 +560,7 @@ Ordered by how badly they are usually underestimated.
    made the file write itself atomic (`ViewController+Export.swift`, tested
    by `ExportWriteTests`) — that half of the issue needed no change.
 
-8. **Two conformance gaps closed, two more scoped and declined (B06).**
+8. **Three conformance gaps closed, two more scoped and declined (B06).**
    `CSI s` / `CSI u` (SCOSC/SCORC) were not dispatched at all — a program
    that saved and restored the cursor with the CSI form rather than
    DECSC/DECRC (`ESC 7`/`ESC 8`) got nothing back. Corta has no DECLRMM
@@ -606,6 +606,25 @@ Ordered by how badly they are usually underestimated.
    default-colour formula itself — was checked directly against the core
    package via `corta-dump --serve`, independent of whether a renderer
    ever reads the result.
+
+   `BS`/`CUB` also did not reverse-wrap — a program editing at a wrap
+   boundary (`readline`'s own line editing among them) that expected
+   backspace to walk back onto the previous row instead saw the cursor
+   stick at column 0. The quality-plan record that first found this
+   named the blocker as needing "a behavioural decision" about which
+   reverse-wrap semantics to implement; xterm's own answer, `?45`
+   (DECBKM, reverse-wraparound mode, off by default) is the one every
+   other terminal a comparison would be made against also implements, so
+   it is the one Corta implements too rather than inventing a bespoke
+   variant. Added `Grid.reverseWraparoundEnabled` (mirrors `insertMode`'s
+   pattern: a Grid-owned flag a private-mode DECSET/DECRST toggles, with
+   a DECRQM case reporting it), and taught `moveCursorLeft`/`backspace`
+   to continue onto the row above's last column when the mode is on and
+   that row's own `wrapped` flag says the two rows are one logical line
+   — never across a hard newline, since `wrapped` is set only where
+   DECAWM's own auto-wrap actually happened (§2.1). `CUB`'s repeat count
+   can cross more than one wrapped row in a single call; `BS` is always
+   one step, matching its existing pending-wrap-disarm behaviour.
 
 ---
 
