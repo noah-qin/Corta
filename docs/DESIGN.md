@@ -528,6 +528,53 @@ Ordered by how badly they are usually underestimated.
    made the file write itself atomic (`ViewController+Export.swift`, tested
    by `ExportWriteTests`) — that half of the issue needed no change.
 
+8. **Two conformance gaps closed, two more scoped and declined (B06).**
+   `CSI s` / `CSI u` (SCOSC/SCORC) were not dispatched at all — a program
+   that saved and restored the cursor with the CSI form rather than
+   DECSC/DECRC (`ESC 7`/`ESC 8`) got nothing back. Corta has no DECLRMM
+   (left/right margins), so xterm's own behaviour without that mode is to
+   treat both forms as unconditional aliases; fixed by routing `0x73`/
+   `0x75` in `Performer+Cursor.performCursorControl` to the existing
+   `grid.saveCursor()`/`restoreCursor()`. The kitty keyboard protocol's
+   marker-based `CSI u` forms are intercepted earlier in `csiDispatch` and
+   never reach this switch, so the alias cannot shadow them —
+   `SaveRestoreCursorTests.bareCSIuDoesNotTouchKittyProtocol` asserts that
+   directly rather than by inspection.
+
+   OSC 4 (indexed-palette set/query) and OSC 104 (reset) were entirely
+   unimplemented — a program picking colour 137 by number, or resetting
+   its overrides on exit, got silence for the query and a no-op for the
+   set. Added `IndexedPalette` (mirrors `DynamicColors`'s shape: `defaults`
+   seeded once, a sparse `overrides` dictionary OSC 4 writes into and OSC
+   104 clears), wired through `PerformerState`/`Terminal`/
+   `TerminalSession` the same way `dynamicColors` already was, and seeded
+   `defaults` from `Theme.Variant.indexedPaletteDefaults` — ANSI 0–15 from
+   the active theme (so index 1 answers with *this* theme's red, not a
+   generic one), 16–255 from xterm's fixed 6×6×6 cube and 24-step
+   greyscale ramp, matching `TerminalColorPalette.swift`'s independent
+   render-side copy of the same formula. `oscDispatch` gained a
+   `parseOSCCode` helper because OSC 104 is the one code with a real
+   no-semicolon form (`OSC 104 ST`, which is what xterm itself sends) —
+   every other code needs a payload and was already unreachable without
+   one.
+
+   Deliberately not attempted: **OSC 5** ("special colours" — bold,
+   underline, blink, reverse, italic default colours), because unlike OSC
+   4 its exact index semantics are not independently documented anywhere
+   verifiable without the esctest suite itself, and this sandbox cannot
+   run esctest (`docs/CONFORMANCE.md` §4.2 needs a live GUI process and
+   network access to fetch it) — guessing the mapping wrong would be
+   worse than not answering. **Render-path integration** — making an OSC
+   4 override actually repaint indices 16–255 differently — was also cut:
+   `TerminalRenderer`/`TerminalColorPalette` sit on the hot path this
+   file's own rule (`CLAUDE.md`, "measure the frame-CPU baseline") gates
+   behind a Typometer/`corta-bench` measurement this session had no way to
+   take safely, and every OSC 4/104 behaviour that *is* verifiable —
+   set, query, multi-pair parsing, reset-one/-several/-all, and the
+   default-colour formula itself — was checked directly against the core
+   package via `corta-dump --serve`, independent of whether a renderer
+   ever reads the result.
+
 ---
 
 ## 8. What "Done" Looks Like
