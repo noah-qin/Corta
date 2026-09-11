@@ -204,6 +204,84 @@ extension Performer {
         return (channels[0], channels[1], channels[2])
     }
 
+    // MARK: - OSC 4 / 104 — the indexed palette (B06)
+
+    /// OSC 4 — `OSC 4 ; c ; spec ; c ; spec ; … ST`. Every `c ; spec` pair is
+    /// independent: `spec` of exactly `?` queries index `c`'s current
+    /// colour (answered `OSC 4 ; c ; rgb:RRRR/GGGG/BBBB ST`, doubled to 16
+    /// bits per channel exactly like OSC 10/11/12's query — see
+    /// `reportDynamicColor`), anything else sets it through the same
+    /// colour-spec parser and policy `setDynamicColor` uses. A malformed
+    /// pair is skipped, not treated as ending the sequence, so one bad
+    /// index in a long OSC 4 does not swallow the indices after it — this
+    /// mirrors xterm's own tolerance for multi-pair OSC 4/104.
+    ///
+    /// The query reply is the terminal's own numeric palette state, nothing
+    /// the stream supplied (`SECURITY.md` §2.1–§2.2), the identical
+    /// reasoning `reportDynamicColor`'s doc comment already gives for
+    /// OSC 10/11/12.
+    mutating func handleIndexedColor(_ payload: ArraySlice<UInt8>) {
+        var start = payload.startIndex
+        while start < payload.endIndex {
+            guard let firstSeparator = payload[start...].firstIndex(of: 0x3B) else { return }
+            guard let index = Self.parseByte(payload[start..<firstSeparator]) else { return }
+            let specStart = payload.index(after: firstSeparator)
+            let specEnd = payload[specStart...].firstIndex(of: 0x3B) ?? payload.endIndex
+            let spec = payload[specStart..<specEnd]
+            if spec.count == 1, spec.first == 0x3F {
+                reportIndexedColor(index)
+            } else if let color = Self.parseColorSpecification(spec) {
+                state.indexedPalette.setOverride(index, to: color)
+            }
+            start = specEnd < payload.endIndex ? payload.index(after: specEnd) : payload.endIndex
+        }
+    }
+
+    /// OSC 104 — `OSC 104 ST` resets every override; `OSC 104 ; c ; c ; … ST`
+    /// resets only the named indices. Never answers anything — a reset is a
+    /// command, not a query.
+    mutating func resetIndexedColors(_ payload: ArraySlice<UInt8>) {
+        guard !payload.isEmpty else {
+            state.indexedPalette.resetAllOverrides()
+            return
+        }
+        var start = payload.startIndex
+        while start < payload.endIndex {
+            let end = payload[start...].firstIndex(of: 0x3B) ?? payload.endIndex
+            if let index = Self.parseByte(payload[start..<end]) {
+                state.indexedPalette.resetOverride(index)
+            }
+            start = end < payload.endIndex ? payload.index(after: end) : payload.endIndex
+        }
+    }
+
+    private mutating func reportIndexedColor(_ index: UInt8) {
+        let color = state.indexedPalette.color(at: index)
+        func channel(_ value: UInt8) -> String {
+            let hex = String(value, radix: 16)
+            let byte = hex.count == 1 ? "0" + hex : hex
+            return byte + byte
+        }
+        let body = "rgb:\(channel(color.red))/\(channel(color.green))/\(channel(color.blue))"
+        state.outputBuffer.append(contentsOf: Array("\u{1B}]4;\(index);\(body)\u{1B}\\".utf8))
+    }
+
+    /// A decimal palette index, 0–255. `nil` for anything out of range or
+    /// not purely digits — including a value that would overflow `Int`
+    /// before the range check ever ran, which is why this accumulates with
+    /// an early-out rather than parsing the whole span through `Int(_:)`
+    /// first.
+    private static func parseByte(_ bytes: ArraySlice<UInt8>) -> UInt8? {
+        guard !bytes.isEmpty else { return nil }
+        var value = 0
+        for byte in bytes {
+            guard byte >= 0x30, byte <= 0x39 else { return nil }
+            value = value * 10 + Int(byte - 0x30)
+            guard value <= 255 else { return nil }
+        }
+        return UInt8(value)
+    }
+
     /// Scales an n-hex-digit channel down to 8 bits the way xterm does:
     /// by the ratio of the two full-scale values, so `f` and `ffff` both
     /// become 255.

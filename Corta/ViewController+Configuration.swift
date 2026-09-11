@@ -54,6 +54,9 @@ extension ViewController {
         session?.dynamicColors =
             AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)
             .dynamicColors
+        session?.indexedPalette =
+            AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)
+            .indexedPaletteDefaults
         // Every cell's colours are resolved into the instance buffer when its
         // row is built, so a theme change invalidates the whole buffer — the
         // clear colour alone is read fresh each frame. Forcing a frame

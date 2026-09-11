@@ -83,6 +83,11 @@ public struct PerformerState: Sendable {
     /// updated by the set forms.
     public internal(set) var dynamicColors = DynamicColors()
 
+    /// The 256-entry indexed palette OSC 4 reports and sets, and OSC 104
+    /// resets (B06). Seeded by the app the same way `dynamicColors` is —
+    /// see `IndexedPalette`'s own doc comment.
+    public internal(set) var indexedPalette = IndexedPalette()
+
     /// OSC 133 shell integration (M7.2). The absolute row of the most
     /// recent prompt, so the exit status can be written back onto it however
     /// far the output has scrolled since.

@@ -647,6 +647,15 @@ public final class TerminalSession: @unchecked Sendable {
         set { state.withLock { $0.terminal.dynamicColors = newValue } }
     }
 
+    /// The 256-entry indexed palette OSC 4 reports and sets, and OSC 104
+    /// resets (B06). The app seeds `defaults` from its theme at startup and
+    /// on every theme change, the same way `dynamicColors` is seeded, and
+    /// reads the whole thing back to render.
+    public var indexedPalette: IndexedPalette {
+        get { state.withLock { $0.terminal.indexedPalette } }
+        set { state.withLock { $0.terminal.indexedPalette = newValue } }
+    }
+
     /// The kitty keyboard protocol flags in force (`CSI > flags u`, M6.9).
     public var keyboardEnhancements: KeyboardEnhancementFlags {
         state.withLock { $0.terminal.keyboardEnhancements }

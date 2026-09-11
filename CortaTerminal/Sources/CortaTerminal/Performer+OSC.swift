@@ -8,14 +8,20 @@ import Foundation
 /// string is discarded by the parser and never reaches this point.
 extension Performer {
     public mutating func oscDispatch(_ bytes: ArraySlice<UInt8>) {
-        guard let separator = bytes.firstIndex(of: 0x3B) else { return }  // ';'
-
-        var code = 0
-        for byte in bytes[..<separator] {
-            guard byte >= 0x30, byte <= 0x39 else { return }
-            code = code * 10 + Int(byte - 0x30)
-            guard code <= 999 else { return }
+        guard let separator = bytes.firstIndex(of: 0x3B) else {
+            // No `;`-separated payload at all. Every code but one needs
+            // one to do anything and is unchanged by leaving it alone here;
+            // OSC 104 with no arguments — "reset the whole indexed
+            // palette" (B06) — is the one real use of a bare code, and it
+            // is the most common real-world form of the reset (xterm
+            // itself sends `OSC 104 ST` with nothing after it).
+            if let code = Self.parseOSCCode(bytes), code == 104 {
+                resetIndexedColors(bytes[bytes.endIndex...])
+            }
+            return
         }
+
+        guard let code = Self.parseOSCCode(bytes[..<separator]) else { return }
         let payload = bytes[bytes.index(after: separator)...]
 
         switch code {
@@ -31,6 +37,16 @@ extension Performer {
             shellIntegration(payload)
         case 8:
             setHyperlink(payload)
+        case 4:
+            // The indexed palette (B06) — set/query, one or more `c ; spec`
+            // pairs. OSC 5 (xterm's "special colours") is deliberately not
+            // implemented: unlike OSC 4, its exact index semantics are not
+            // independently documented anywhere Corta can verify against
+            // without the esctest suite itself, and guessing wrong is worse
+            // than not answering.
+            handleIndexedColor(payload)
+        case 104:
+            resetIndexedColors(payload)
         case 10, 11, 12:
             // The dynamic colours (M6.6). A payload of exactly `?` is the
             // query form; anything else is a colour specification to set.
@@ -44,6 +60,20 @@ extension Performer {
         default:
             break
         }
+    }
+
+    /// A decimal OSC code, capped the way the wire format is: at most three
+    /// digits. `nil` for anything else, including an empty span — the
+    /// caller decides what "no code at all" means for it.
+    private static func parseOSCCode(_ bytes: ArraySlice<UInt8>) -> Int? {
+        guard !bytes.isEmpty else { return nil }
+        var code = 0
+        for byte in bytes {
+            guard byte >= 0x30, byte <= 0x39 else { return nil }
+            code = code * 10 + Int(byte - 0x30)
+            guard code <= 999 else { return nil }
+        }
+        return code
     }
 
     /// OSC 8 — `OSC 8 ; params ; URI ST` (M6.8).

@@ -520,6 +520,9 @@ class ViewController: NSViewController {
         session.dynamicColors =
             AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)
             .dynamicColors
+        session.indexedPalette =
+            AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)
+            .indexedPaletteDefaults
         pendingSessionNotice = started.notice
         lastRequestedSize = initialSize
 
