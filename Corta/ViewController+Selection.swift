@@ -211,6 +211,13 @@ extension ViewController {
             guard let next = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp, .periodic])
             else { continue }
             guard terminalView.window === window else { return }
+            // Rechecked here, not only before the blocking call above: focus
+            // can be lost *while* `nextEvent` was waiting, and the event
+            // that wakes it — a queued drag, or the mouse-up itself — would
+            // otherwise still be processed below, finalizing (and
+            // potentially copy-on-select-ing) a selection gesture for a
+            // window the user is no longer looking at.
+            guard window.isKeyWindow else { return }
             grid = session.snapshot()
             if next.type == .periodic {
                 dragAutoScrollTick(in: terminalView, grid: grid, anchor: anchor, unit: unit)

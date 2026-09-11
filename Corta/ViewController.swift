@@ -933,25 +933,12 @@ class ViewController: NSViewController {
         // instead (M9). `scheduleBackgroundSearchRefresh` hands the
         // recompute to a detached task and applies the result once it
         // lands, whenever that is — this frame does not wait on it.
-        if hasOutput, scrollOffset > 0 {
-            // Keep the viewport pointed at the same document position while
-            // scrolled away from the bottom: without this, "N lines above
-            // the bottom" silently means something further along every time
-            // the live bottom moves, and text the user is mid-read on slides
-            // out from under them a line at a time (B04). Ring eviction
-            // (ordinary growth past `scrollbackLimit`) clamps the same way
-            // any other over-large offset does, in the renderer.
-            if let anchor = scrollAnchorTotalPushed {
-                let growth = session.scrollbackTotalPushed - anchor
-                if growth > 0 { scrollOffset += growth }
-            }
-            if !sawOutputWhileScrolled {
-                // U12 — the pane is showing history and the child has
-                // printed. Nothing else on screen says so: there is no
-                // scroll bar, and the live screen is not visible.
-                sawOutputWhileScrolled = true
-                updateScrollPositionIndicator()
-            }
+        if hasOutput, scrollOffset > 0, !sawOutputWhileScrolled {
+            // U12 — the pane is showing history and the child has printed.
+            // Nothing else on screen says so: there is no scroll bar, and the
+            // live screen is not visible.
+            sawOutputWhileScrolled = true
+            updateScrollPositionIndicator()
         }
         if hasOutput, searchBar != nil {
             scheduleBackgroundSearchRefresh()
@@ -984,6 +971,31 @@ class ViewController: NSViewController {
         needsRedraw = false
         wasSynchronizedOutputActive = false
         let grid = session.snapshot()
+        if hasOutput, scrollOffset > 0, let anchor = scrollAnchorTotalPushed {
+            // Keep the viewport pointed at the same document position while
+            // scrolled away from the bottom: without this, "N lines above
+            // the bottom" silently means something further along every time
+            // the live bottom moves, and text the user is mid-read on slides
+            // out from under them a line at a time (B04). Ring eviction
+            // (ordinary growth past `scrollbackLimit`) clamps the same way
+            // any other over-large offset does, in the renderer.
+            //
+            // Shifted from this frame's own `grid` snapshot, not a separate
+            // `scrollbackTotalPushed` read taken earlier — the reader
+            // thread can push more rows in the gap between two lock
+            // acquisitions, which would shift by less than this frame's
+            // `grid` actually grew and render one batch behind. The anchor
+            // is then pinned to that exact same total (bypassing
+            // `scrollOffset`'s `didSet`, which would otherwise re-read the
+            // counter a second time and could observe still more growth
+            // that happened in between) so next frame's shift starts from
+            // precisely what this one accounted for.
+            let growth = grid.scrollback.totalPushed - anchor
+            if growth > 0 {
+                scrollOffset += growth
+                scrollAnchorTotalPushed = grid.scrollback.totalPushed
+            }
+        }
         let mappedSearchMatches = searchMatches.map { TerminalSelection($0, grid: grid) }
         let damaged = terminalRenderer.updateInstances(
             grid: grid, scrollOffset: scrollOffset,
