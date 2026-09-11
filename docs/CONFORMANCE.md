@@ -37,6 +37,7 @@ measured. Priorities:
 | OSC 0 / 2 — set window and tab title                    | P1   | Set only. Query is **never** implemented, see `SECURITY.md` §2.2 |
 | **OSC 7** — report working directory                    | P1   | Prerequisite for new tabs and splits inheriting the cwd |
 | **OSC 4 / 104** — indexed palette query, set, reset (B06) | P1 | 256-entry palette, seeded from the theme (0–15) and xterm's cube/greyscale (16–255); `docs/DESIGN.md` §7 |
+| **OSC 5 / 105** — special colours query, set, reset (B06) | P2 | Five fixed slots (bold/underline/blink/reverse/italic), no themed default — see `SpecialColors`; `docs/DESIGN.md` §7 |
 | **CSI s / u (SCOSC/SCORC)** — cursor save/restore alias (B06) | P1 | Corta has no DECLRMM, so these are unconditional aliases for DECSC/DECRC, matching xterm without left/right margins |
 | **`?45` — reverse-wraparound mode** (B06) | P2 | `BS`/`CUB` cross onto the row above when it auto-wrapped into this one; off by default, matching xterm. Not DECBKM, which is the separate `?67` backarrow-key mode |
 | Bracketed paste (`?2004`)                               | P0   | A safety feature, not a convenience — see `SECURITY.md` §2.3 |
@@ -283,14 +284,15 @@ rather than a re-reading. The largest single cause is one absence: OSC
 for 45 of the 121.
 
 **This snapshot predates B06** (`docs/DESIGN.md` §7), which implements
-OSC 4/104 (though not OSC 5, and not the renderer integration that would
-let it move esctest's `ChangeColor`/`ResetColor` cases — see the row
-above and `DESIGN.md` §7 for exactly what's still missing) and fixes
-`SCORC`/`DECRC`, the other open item this section named. B06 could not
+OSC 4/104 and OSC 5/105 (though not the renderer integration that would
+let either move esctest's `ChangeColor`/`ChangeSpecialColor`/`ResetColor`/
+`ResetSpecialColor` cases — see the rows above and `DESIGN.md` §7 for
+exactly what's still missing) and fixes `SCORC`/`DECRC` and `BS`/`CUB`
+reverse-wrap, the other open items this section named. B06 could not
 re-run esctest in its sandbox, so the 45-failure attribution and the
 112/335/121 counts above remain the last real numbers; they are not
-current evidence that either fix is absent, only that neither has been
-scored yet.
+current evidence that any of these fixes are absent, only that none has
+been scored yet.
 
 **M6 result: 106 passed, 335 known bugs, 127 failed of 568.** Against the
 M2 record (50 / 334 / 184) that is 57 failures fixed and none

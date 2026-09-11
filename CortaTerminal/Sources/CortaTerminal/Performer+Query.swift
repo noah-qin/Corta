@@ -276,6 +276,77 @@ extension Performer {
         state.outputBuffer.append(contentsOf: Array("\u{1B}]4;\(index);\(body)\u{1B}\\".utf8))
     }
 
+    // MARK: - OSC 5 / 105 — the special colours (B06)
+
+    /// OSC 5 — `OSC 5 ; c ; spec ; c ; spec ; … ST`, the same wire shape as
+    /// OSC 4 (`handleIndexedColor`) but addressing `SpecialColors`'
+    /// five fixed slots (0–4) instead of a 256-entry palette, and with a
+    /// black fallback for the query form's reply when a slot was never
+    /// set — there being no themed default to answer instead, see
+    /// `SpecialColors`'s own doc comment, and OSC 4/10/11/12 already
+    /// establish that a query always gets *some* numeric answer here
+    /// rather than the silence a probing client would otherwise wait on.
+    mutating func handleSpecialColor(_ payload: ArraySlice<UInt8>) {
+        var start = payload.startIndex
+        while start < payload.endIndex {
+            guard let firstSeparator = payload[start...].firstIndex(of: 0x3B) else { return }
+            let specStart = payload.index(after: firstSeparator)
+            let specEnd = payload[specStart...].firstIndex(of: 0x3B) ?? payload.endIndex
+            defer {
+                start = specEnd < payload.endIndex ? payload.index(after: specEnd) : payload.endIndex
+            }
+            guard let slot = Self.parseSpecialColorSlot(payload[start..<firstSeparator]) else {
+                continue
+            }
+            let spec = payload[specStart..<specEnd]
+            if spec.count == 1, spec.first == 0x3F {
+                reportSpecialColor(slot)
+            } else if let color = Self.parseColorSpecification(spec) {
+                state.specialColors.setOverride(slot, to: color)
+            }
+        }
+    }
+
+    /// OSC 105 — `OSC 105 ST` resets every special colour;
+    /// `OSC 105 ; c ; c ; … ST` resets only the named slots.
+    mutating func resetSpecialColors(_ payload: ArraySlice<UInt8>) {
+        guard !payload.isEmpty else {
+            state.specialColors.resetAllOverrides()
+            return
+        }
+        var start = payload.startIndex
+        while start < payload.endIndex {
+            let end = payload[start...].firstIndex(of: 0x3B) ?? payload.endIndex
+            if let slot = Self.parseSpecialColorSlot(payload[start..<end]) {
+                state.specialColors.resetOverride(slot)
+            }
+            start = end < payload.endIndex ? payload.index(after: end) : payload.endIndex
+        }
+    }
+
+    private mutating func reportSpecialColor(_ slot: SpecialColors.Slot) {
+        let color = state.specialColors.color(at: slot) ?? (0, 0, 0)
+        func channel(_ value: UInt8) -> String {
+            let hex = String(value, radix: 16)
+            let byte = hex.count == 1 ? "0" + hex : hex
+            return byte + byte
+        }
+        let body = "rgb:\(channel(color.red))/\(channel(color.green))/\(channel(color.blue))"
+        state.outputBuffer.append(
+            contentsOf: Array("\u{1B}]5;\(slot.rawValue);\(body)\u{1B}\\".utf8))
+    }
+
+    /// A decimal `Pc` in OSC 5/105's 0–4 range. `nil` for anything else,
+    /// including an out-of-range value — `parseByte` already guards
+    /// digit-accumulation overflow the same way, so this only adds the
+    /// narrower bound and the `Slot` conversion.
+    private static func parseSpecialColorSlot(_ bytes: ArraySlice<UInt8>) -> SpecialColors.Slot? {
+        guard let byte = parseByte(bytes), let slot = SpecialColors.Slot(rawValue: byte) else {
+            return nil
+        }
+        return slot
+    }
+
     /// A decimal palette index, 0–255. `nil` for anything out of range or
     /// not purely digits, including an arbitrarily long run of digits — the
     /// bound is checked *before* each multiply-and-add, not after, so

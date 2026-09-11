@@ -687,6 +687,13 @@ public final class TerminalSession: @unchecked Sendable {
         state.withLock { $0.terminal.indexedPalette.updateDefaults(to: newDefaults) }
     }
 
+    /// The five special colours OSC 5 reports and sets, and OSC 105 resets
+    /// (B06) — see `SpecialColors`'s own doc comment.
+    public var specialColors: SpecialColors {
+        get { state.withLock { $0.terminal.specialColors } }
+        set { state.withLock { $0.terminal.specialColors = newValue } }
+    }
+
     /// The kitty keyboard protocol flags in force (`CSI > flags u`, M6.9).
     public var keyboardEnhancements: KeyboardEnhancementFlags {
         state.withLock { $0.terminal.keyboardEnhancements }

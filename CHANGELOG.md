@@ -54,6 +54,17 @@ what to edit.
   viewport/selection/search coordinate mapping, and a discoverable
   selection/mouse-reporting override blocked on `?1002`/`?1003` support).
 
+- **B06 — special colours query, set and reset (OSC 5/105).** The
+  behavioural-decision blocker B06's original pass named for OSC 5 was
+  the lack of an independently verifiable specification, not esctest
+  itself — xterm's own `ctlseqs.txt` documents the five fixed slots
+  (`Pc` 0–4: bold, underline, blink, reverse, italic) and the OSC 105
+  reset pairing precisely. Added `SpecialColors`: unlike `IndexedPalette`
+  there is no themed default to seed (an unset slot means Corta's
+  ordinary SGR-attribute rendering applies), and the query form answers
+  black for an unset slot rather than silence, matching OSC 4's own
+  precedent.
+
 - **B06 — indexed palette query, set and reset (OSC 4/104).** A program
   naming a colour by number (`\e]4;137;?\e\\`) got silence, and setting or
   resetting one (`\e]4;1;#ff0000\e\\`, `\e]104\e\\`) was a no-op. Added
