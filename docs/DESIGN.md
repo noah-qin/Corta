@@ -590,14 +590,20 @@ Ordered by how badly they are usually underestimated.
    every other code needs a payload and was already unreachable without
    one.
 
-   Deliberately not attempted: **OSC 5** ("special colours" — bold,
-   underline, blink, reverse, italic default colours), because unlike OSC
-   4 its exact index semantics are not independently documented anywhere
-   verifiable without the esctest suite itself, and this sandbox cannot
-   run esctest (`docs/CONFORMANCE.md` §4.2 needs a live GUI process and
-   network access to fetch it) — guessing the mapping wrong would be
-   worse than not answering. **Render-path integration** — making an OSC
-   4 override actually repaint indices 16–255 differently — was also cut:
+   **OSC 5** ("special colours" — bold, underline, blink, reverse, italic
+   default colours) was implemented in a follow-up pass, once the exact
+   semantics were pinned down from xterm's own `ctlseqs.txt` (the
+   `Pc` values — 0 bold, 1 underline, 2 blink, 3 reverse, 4 italic — and
+   the OSC 105 reset pairing) rather than guessed: an *independently
+   documented* specification is what B06's original pass lacked access
+   to, not esctest specifically, and the two turned out not to be the
+   same requirement. Added `SpecialColors` — five fixed slots, no themed
+   default to seed (unlike `IndexedPalette`, an unset slot means Corta's
+   ordinary SGR-attribute rendering applies, not a placeholder colour),
+   with the query form answering black for an unset slot rather than
+   silence, matching OSC 4's own precedent for "always some numeric
+   answer." **Render-path integration** — making an OSC 4 override
+   actually repaint indices 16–255 differently — was also cut here:
    `TerminalRenderer`/`TerminalColorPalette` sit on the hot path this
    file's own rule (`CLAUDE.md`, "measure the frame-CPU baseline") gates
    behind a Typometer/`corta-bench` measurement this session had no way to
