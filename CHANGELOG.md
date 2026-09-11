@@ -12,6 +12,23 @@ what to edit.
 
 ### Added
 
+- **B08 — smart directory and contextual command navigation (first
+  slice).** `DirectoryHistory` ranks directories a completed command
+  actually ran in (frecency — visit count that halves every three days —
+  with favorites sorted first and fuzzy filtering over the list),
+  persisted separately from the config file and clearable from Settings ▸
+  General ▸ History (`directory-history` key gates whether it is kept at
+  all). `DirectoryHistory.projectRoot(for:)` finds the nearest `.git`
+  ancestor. `ViewController.changeDirectory(to:)` writes an app-initiated
+  `cd` only when `canChangeDirectorySafely` holds — shell integration
+  active, nothing currently running, and the cursor still exactly where
+  the prompt finished drawing — so a chosen directory never lands on a
+  busy shell, a TUI, or a populated prompt. `CommandRecordStore.records
+  (inDirectory:since:until:exitStatus:)` searches command history by the
+  same dimensions. Deferred to a later pass: the picker UI itself (Finder/
+  drag-drop/output-path actions, a directory-switcher panel) — this slice
+  is the ranking and safety engine underneath it, exercised by tests
+  rather than a new visible surface yet.
 - **B07 — shell integration and command-level debugging (first slice).**
   Commands are now identified, not just marked: `CommandRecord` (bounded,
   id-keyed, built from the same `OSC 133` marks the grid already reads)

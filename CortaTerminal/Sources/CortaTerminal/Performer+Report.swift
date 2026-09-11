@@ -97,6 +97,15 @@ public struct PerformerState: Sendable {
     /// far the output has scrolled since.
     public internal(set) var promptRow: Int?
 
+    /// B08 — the cursor column where the prompt text ended (`OSC 133 ; B`),
+    /// on `promptRow`. Answers "has anything been typed since the prompt
+    /// finished drawing": immediately after `B` the cursor sits here; if it
+    /// still does, the prompt is empty. Used to gate an app-initiated
+    /// directory change — see `ViewController.canChangeDirectorySafely`
+    /// — so a chosen directory is never `cd`'d into whatever the user was
+    /// halfway through typing.
+    public internal(set) var promptEndColumn: Int?
+
     /// Where the running command's output began (`OSC 133 ; C`), as an
     /// absolute row (U14). `nil` until a command reports one.
     public internal(set) var outputStartRow: Int?

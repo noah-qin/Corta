@@ -279,4 +279,94 @@ import Testing
         #expect(store.records.first?.id == 10)
         #expect(store.records.last?.id == CommandRecordStore.capacity + 9)
     }
+
+    // MARK: - Prompt end position (B08)
+
+    @Test("the prompt end column is where the cursor sits right after B")
+    func promptEndColumnIsRecordedAtB() {
+        var terminal = self.terminal()
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\$ \u{1B}]133;B\u{1B}\\".utf8))
+        let position = try! #require(terminal.promptEndPosition)
+        #expect(position.row == 0)
+        #expect(position.column == 2)  // "$ " is two columns wide
+    }
+
+    @Test("typing after B does not move the recorded prompt end column")
+    func typingDoesNotMoveThePromptEndColumn() {
+        var terminal = self.terminal()
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\$ \u{1B}]133;B\u{1B}\\".utf8))
+        terminal.feed(Array("ls -la".utf8))
+        let position = try! #require(terminal.promptEndPosition)
+        #expect(position.column == 2)
+    }
+
+    @Test("a new prompt clears the previous one's end column until its own B arrives")
+    func aNewPromptClearsTheStaleEndColumn() {
+        var terminal = self.terminal()
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\$ \u{1B}]133;B\u{1B}\\".utf8))
+        terminal.feed(Array("ls\r\n\u{1B}]133;C\u{1B}\\out\r\n\u{1B}]133;D;0\u{1B}\\".utf8))
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\".utf8))
+        #expect(terminal.promptEndPosition == nil)
+        terminal.feed(Array("$ \u{1B}]133;B\u{1B}\\".utf8))
+        #expect(terminal.promptEndPosition?.column == 2)
+    }
+
+    @Test("B on a different row than A leaves the end column unset")
+    func multiLinePromptLeavesEndColumnUnset() {
+        var terminal = self.terminal()
+        // A two-line prompt: A on row 0, output continues to row 1 before B.
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\prompt line one\r\n$ \u{1B}]133;B\u{1B}\\".utf8))
+        #expect(terminal.promptEndPosition == nil)
+    }
+
+    @Test("with no shell integration at all, there is no prompt end position")
+    func noIntegrationMeansNoPromptEndPosition() {
+        let terminal = self.terminal()
+        #expect(terminal.promptEndPosition == nil)
+    }
+
+    // MARK: - Command record search (B08)
+
+    @Test("records can be filtered by directory, most recent first")
+    func recordsFilterByDirectory() {
+        var store = CommandRecordStore()
+        store.begin(promptRow: 0, workingDirectory: "/a", at: Date())
+        store.finish(exitStatus: 0, endRow: 1, at: Date())
+        store.begin(promptRow: 2, workingDirectory: "/b", at: Date())
+        store.finish(exitStatus: 0, endRow: 3, at: Date())
+        store.begin(promptRow: 4, workingDirectory: "/a", at: Date())
+        store.finish(exitStatus: 1, endRow: 5, at: Date())
+        let inA = store.records(inDirectory: "/a")
+        #expect(inA.map(\.promptRow) == [4, 0])
+    }
+
+    @Test("records can be filtered by exit status")
+    func recordsFilterByExitStatus() {
+        var store = CommandRecordStore()
+        store.begin(promptRow: 0, workingDirectory: nil, at: Date())
+        store.finish(exitStatus: 0, endRow: 1, at: Date())
+        store.begin(promptRow: 2, workingDirectory: nil, at: Date())
+        store.finish(exitStatus: 1, endRow: 3, at: Date())
+        #expect(store.records(exitStatus: 1).map(\.promptRow) == [2])
+    }
+
+    @Test("records can be filtered by a time range")
+    func recordsFilterByTimeRange() {
+        var store = CommandRecordStore()
+        let base = Date()
+        store.begin(promptRow: 0, workingDirectory: nil, at: base.addingTimeInterval(-100))
+        store.finish(exitStatus: 0, endRow: 1, at: base.addingTimeInterval(-100))
+        store.begin(promptRow: 2, workingDirectory: nil, at: base)
+        store.finish(exitStatus: 0, endRow: 3, at: base)
+        #expect(store.records(since: base.addingTimeInterval(-1)).map(\.promptRow) == [2])
+        #expect(store.records(until: base.addingTimeInterval(-1)).map(\.promptRow) == [0])
+    }
+
+    @Test("no filters returns every record, most recent first")
+    func noFiltersReturnsEverything() {
+        var store = CommandRecordStore()
+        store.begin(promptRow: 0, workingDirectory: nil, at: Date())
+        store.begin(promptRow: 1, workingDirectory: nil, at: Date())
+        #expect(store.records().map(\.promptRow) == [1, 0])
+    }
 }

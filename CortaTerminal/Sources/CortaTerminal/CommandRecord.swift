@@ -96,4 +96,25 @@ public struct CommandRecordStore: Sendable, Equatable {
     public var lastCompleted: CommandRecord? {
         records.last { !$0.isRunning }
     }
+
+    /// B08 — records filtered by directory, time range and/or exit status,
+    /// most recent first. Every filter is independent and optional; passing
+    /// none returns every record. `host` is not a filter here: nothing in
+    /// this store carries one yet — `workingDirectory` is already
+    /// local-only by construction (`Performer+OSC.swift`'s
+    /// `setWorkingDirectory`) — and a real one waits for B13's SSH context.
+    public func records(
+        inDirectory directory: String? = nil,
+        since: Date? = nil,
+        until: Date? = nil,
+        exitStatus: Int? = nil
+    ) -> [CommandRecord] {
+        records.reversed().filter { record in
+            if let directory, record.workingDirectory != directory { return false }
+            if let since, record.startedAt < since { return false }
+            if let until, record.startedAt > until { return false }
+            if let exitStatus, record.exitStatus != exitStatus { return false }
+            return true
+        }
+    }
 }
