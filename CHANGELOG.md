@@ -12,6 +12,24 @@ what to edit.
 
 ### Added
 
+- **B09 — decouple temporary font zoom from the saved default (first
+  slice, fixes a real bug).** ⌘+/⌘−/pinch used to write the zoomed size
+  straight into `Configuration.fontSize` — the *global* default — so
+  zooming one window changed every other open window's size (and what a
+  brand-new window opened at) the moment any of them next re-read the
+  config file, which a theme change, a settings-page edit or an
+  `$EDITOR` save all trigger. `isFontSizeZoomed` makes the zoom
+  per-window and `configurationChanged` skips a zoomed pane's size line
+  instead of overwriting it; ⌘0 ends the zoom by reading the *current*
+  config value rather than a hardcoded constant, so a default changed
+  in Settings while a window was zoomed is what ⌘0 lands on. A zoom no
+  longer survives a relaunch — that trade only existed to make the old,
+  incorrect behavior tolerable. Known gap: a pane split off a zoomed
+  window opens at the plain default rather than matching its zoomed
+  siblings.
+
+### Added
+
 - **B08 — smart directory and contextual command navigation (first
   slice).** `DirectoryHistory` ranks directories a completed command
   actually ran in (frecency — visit count that halves every three days —

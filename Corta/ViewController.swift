@@ -47,6 +47,10 @@ class ViewController: NSViewController {
     /// The atlas is rasterised for one size, so a change rebuilds the
     /// renderer — see `setFontSize`.
     var fontSize: CGFloat = ViewController.defaultFontSize
+    /// B09 — whether `fontSize` is a temporary zoom (⌘+/⌘−/pinch) rather
+    /// than the config file's `font-size`. While true, `configurationChanged`
+    /// leaves this pane's size alone; `resetFontSize` is what clears it.
+    var isFontSizeZoomed = false
     /// The font family in use, from the settings page (M6.1). The sentinel
     /// `Configuration.systemFontFamily` means System Monospaced. Kept so a
     /// config change can tell a family swap from a size change — they need

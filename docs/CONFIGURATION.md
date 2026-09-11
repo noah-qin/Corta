@@ -51,7 +51,7 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 | `theme` | a theme name | `corta` | Built in: `corta`, plus `solarized` and `mono`, which still resolve but are not offered in the UI (§4). A theme defined in this file wins over a built-in of the same name. |
 | `appearance` | `auto`, `light`, `dark` | `auto` | Which of the theme's two variants is live. `auto` follows macOS and switches while running. |
 | `font-family` | a family name, or `system` | `system` | `system` means `NSFont.monospacedSystemFont`. A named family is verified before use: every ASCII printable must advance identically across the regular, bold, italic and bold-italic faces, and the faces must be outlines. A family that fails falls back to the system font. |
-| `font-size` | 8–64 | `12` | Points. ⌘+ / ⌘− / pinch write back here, so a zoom survives a relaunch. |
+| `font-size` | 8–64 | `12` | Points, applied to every **new** window and pane. ⌘+ / ⌘− / pinch (B09) are a *temporary*, per-window zoom that never writes here — zooming one window does not change this key, another open window, or what the next new window opens at; ⌘0 ends the zoom and returns to whatever this key currently says. A zoom does not survive quitting and relaunching Corta. |
 
 ### Window
 
