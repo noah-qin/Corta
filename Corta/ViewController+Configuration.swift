@@ -54,10 +54,12 @@ extension ViewController {
         session?.dynamicColors =
             AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)
             .dynamicColors
-        // `updateDefaults`, not a whole-value replace: an index a program
-        // has already OSC 4'd is terminal state, not theme state, and a
-        // live theme swap must not silently revert it.
-        session?.indexedPalette.updateDefaults(
+        // `updateIndexedPaletteDefaults`, not a get-then-set of
+        // `indexedPalette`: an index a program has already OSC 4'd is
+        // terminal state, not theme state, and a live theme swap must not
+        // silently revert it — nor race the reader thread applying an OSC 4
+        // between a separate get and set.
+        session?.updateIndexedPaletteDefaults(
             to: AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)
                 .indexedPaletteDefaults.defaults)
         // Every cell's colours are resolved into the instance buffer when its

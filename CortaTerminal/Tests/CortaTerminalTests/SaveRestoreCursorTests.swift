@@ -76,7 +76,7 @@ struct SaveRestoreCursorTests {
     }
 
     /// Bare `CSI u` (no private marker) must not be confused with the kitty
-    /// keyboard protocol's `CSI ? u` / `CSI = u` / `CSI &lt; u` / `CSI &gt; u`,
+    /// keyboard protocol's `CSI ? u` / `CSI = u` / `CSI < u` / `CSI > u`,
     /// which all carry a marker and are a completely different sequence
     /// family that happens to share the final byte.
     @Test("bare CSI u does not disturb the kitty keyboard protocol stack")
