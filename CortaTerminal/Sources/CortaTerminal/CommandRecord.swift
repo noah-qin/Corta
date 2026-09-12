@@ -18,7 +18,8 @@ public struct CommandRecord: Sendable, Equatable, Identifiable {
     public var promptRow: Int
     /// Where this command's output began (`OSC 133 ; C`), when the shell
     /// reported one. `nil` for a shell whose integration emits only `A` and
-    /// `D` — `Grid.commandOutputRows(before:)` has the same fallback.
+    /// `D` — `ViewController.commandOutputText(grid:record:)` falls back to
+    /// one row past the prompt in that case.
     public var outputStartRow: Int?
     /// The row the next prompt reached (`OSC 133 ; D`'s cursor position) —
     /// where this command's output stops. `nil` while the command is still

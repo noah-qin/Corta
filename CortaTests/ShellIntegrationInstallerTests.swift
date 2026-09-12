@@ -11,7 +11,9 @@ struct ShellIntegrationInstallerTests {
     private let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent("corta-shell-integration-tests-\(UUID().uuidString)")
     private var file: URL { directory.appendingPathComponent(".zshrc") }
-    private var installer: ShellIntegrationInstaller { ShellIntegrationInstaller(rcFileURL: file) }
+    private var installer: ShellIntegrationInstaller {
+        ShellIntegrationInstaller(shell: .zsh, rcFileURL: file)
+    }
 
     private func removeDirectory() {
         try? FileManager.default.removeItem(at: directory)
@@ -94,5 +96,29 @@ struct ShellIntegrationInstallerTests {
         try writeFile("source ~/.iterm2_shell_integration.zsh\n")
         #expect(installer.install())
         #expect(installer.status() == .installed)
+    }
+
+    @Test("bash and fish install, diagnose and uninstall exactly like zsh", arguments: [
+        ShellKind.bash, ShellKind.fish,
+    ])
+    func otherShellsRoundTrip(_ shell: ShellKind) throws {
+        defer { removeDirectory() }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let rcFile = directory.appendingPathComponent(shell.rawValue + "rc")
+        let otherInstaller = ShellIntegrationInstaller(shell: shell, rcFileURL: rcFile)
+        #expect(otherInstaller.status() == .notInstalled)
+        #expect(otherInstaller.install())
+        #expect(otherInstaller.status() == .installed)
+        let text = try String(contentsOf: rcFile, encoding: .utf8)
+        #expect(text.contains(shell.script))
+        #expect(otherInstaller.uninstall())
+        #expect(otherInstaller.status() == .notInstalled)
+    }
+
+    @Test("each shell's script is distinct and non-empty")
+    func scriptsAreDistinct() {
+        let scripts = ShellKind.allCases.map(\.script)
+        #expect(Set(scripts).count == ShellKind.allCases.count)
+        #expect(scripts.allSatisfy { !$0.isEmpty })
     }
 }

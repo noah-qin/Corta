@@ -176,10 +176,10 @@ import Testing
         #expect(terminal.grid.logicalLine(containing: 0).text.hasPrefix("ok"))
     }
 
-    /// Review finding. `commandOutputRows(before:)` used to fall back to the
-    /// newest prompt when the bound was above every prompt — so scrolling
-    /// above the first prompt and asking for "the command in view" answered
-    /// with the *last* command's output, which is not in view at all.
+    /// Review finding. `CommandRecordStore.record(before:)` must not fall
+    /// back to the newest command when the bound is above every prompt — so
+    /// scrolling above the first prompt and asking for "the command in view"
+    /// answers with the *last* command's output, which is not in view at all.
     @Test("a bound above every prompt has no command, rather than the last one")
     func aBoundBeforeTheFirstPromptFindsNothing() {
         var terminal = Terminal(rows: 6, columns: 20)
@@ -188,10 +188,10 @@ import Testing
         terminal.feed(Array("\u{1B}]133;A\u{7}$ one\r\n\u{1B}]133;C\u{7}out1\r\n".utf8))
         terminal.feed(Array("\u{1B}]133;D;0\u{7}\u{1B}]133;A\u{7}$ two\r\n".utf8))
         terminal.feed(Array("\u{1B}]133;C\u{7}out2\r\n\u{1B}]133;D;0\u{7}".utf8))
-        let grid = terminal.grid
-        #expect(grid.lastCommandOutputRows != nil, "the fixture must have a command")
+        let records = terminal.commandRecords
+        #expect(records.lastCompleted != nil, "the fixture must have a command")
         // Row -1 is above everything the fixture wrote.
-        #expect(grid.commandOutputRows(before: -1) == nil)
+        #expect(records.record(before: -1) == nil)
     }
 
     // MARK: - Command records (B07)

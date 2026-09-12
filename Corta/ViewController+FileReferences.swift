@@ -120,6 +120,41 @@ extension ViewController {
         }
     }
 
+    /// B07 — the file reference `openFileReferenceInCommand(_:)` opens: the
+    /// last one on the last logical line of `record`'s output that has one,
+    /// walking backwards. Closest to the end is closest to where a build
+    /// tool actually prints "here is the problem," after whatever preamble
+    /// came first — a compiler's summary line, a stack trace's innermost
+    /// frame, a test runner's failure detail.
+    ///
+    /// Bounded the same way `FileReferenceDetection.reference(at:in:)`
+    /// already is for a single line (P08's "not an unbounded regex pass"
+    /// rule) — here bounded in *rows scanned* instead, since this walks many
+    /// lines rather than hit-testing one: a multi-thousand-line build log
+    /// with no reference at all must not turn opening this menu item into a
+    /// linear scan of the whole thing on the main thread.
+    func fileReferenceInCommand(_ record: CommandRecord?) -> ResolvedFileReference? {
+        guard let record, isOperable else { return nil }
+        let start = record.outputStartRow ?? record.promptRow + 1
+        let grid = session.snapshot()
+        let base = grid.scrollback.totalPushed
+        let end = record.endRow ?? grid.absoluteRow(ofScreenRow: grid.cursor.row)
+        let startDoc = start - base
+        var row = end - base - 1
+        var rowsScanned = 0
+        while row >= startDoc, rowsScanned < Self.maxCommandOutputRowsScanned {
+            let line = grid.logicalLine(containing: row)
+            rowsScanned += row - line.firstRow + 1
+            if let reference = FileReferenceDetection.references(in: line).last {
+                return Self.resolve(reference, directory: session.workingDirectory)
+            }
+            row = line.firstRow - 1
+        }
+        return nil
+    }
+
+    private static let maxCommandOutputRowsScanned = 2000
+
     /// Substitutes `{file}`, `{line}` and `{column}` into the configured
     /// command, one argument at a time.
     ///
