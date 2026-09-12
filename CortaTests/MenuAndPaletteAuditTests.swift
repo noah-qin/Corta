@@ -198,6 +198,56 @@ struct LocalizationCoverageTests {
         #expect(mismatched.isEmpty, "format specifiers differ: \(mismatched.sorted())")
     }
 
+    /// B10 — mechanical, not linguistic: this cannot judge whether a
+    /// translation reads naturally (`CONTRIBUTING.md`'s "Localization"
+    /// section reserves that for a native speaker flipping the state to
+    /// `translated`), only whether one was ever supplied at all. A
+    /// non-English value byte-identical to its English source, once
+    /// stripped of format specifiers a template legitimately shares across
+    /// every language ("%@, %@, %@" has nothing to translate), is a string
+    /// nobody has touched rather than a coincidence — Latin-script proper
+    /// nouns and acronyms are the false-positive case, so the bar is two
+    /// separate words of three-plus letters left after stripping, not any
+    /// overlap at all.
+    @Test("no translation is an untouched copy of its English source")
+    func noTranslationIsAnUntranslatedCopy() throws {
+        let data = try Data(contentsOf: Self.catalogURL)
+        let catalog = try #require(
+            try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let strings = try #require(catalog["strings"] as? [String: Any])
+        let specifier = try NSRegularExpression(
+            pattern: "%(?:\\d+\\$)?(?:@|lld|ld|d|s)")
+        let word = try NSRegularExpression(pattern: "[A-Za-z]{3,}")
+
+        func stripped(_ text: String) -> String {
+            let range = NSRange(text.startIndex..., in: text)
+            return specifier.stringByReplacingMatches(
+                in: text, range: range, withTemplate: "")
+        }
+        func wordCount(_ text: String) -> Int {
+            let range = NSRange(text.startIndex..., in: text)
+            return word.numberOfMatches(in: text, range: range)
+        }
+
+        var untranslated: [String] = []
+        for (key, value) in strings {
+            let entry = value as? [String: Any] ?? [:]
+            let localizations = entry["localizations"] as? [String: Any] ?? [:]
+            func text(_ language: String) -> String? {
+                ((localizations[language] as? [String: Any])?["stringUnit"]
+                    as? [String: Any])?["value"] as? String
+            }
+            guard let source = text("en") else { continue }
+            let sourceCore = stripped(source)
+            guard wordCount(sourceCore) >= 2 else { continue }
+            for language in Self.shippedLanguages where language != "en" {
+                guard let translated = text(language), translated == source else { continue }
+                untranslated.append("\(key) [\(language)]")
+            }
+        }
+        #expect(untranslated.isEmpty, "reads as untranslated English: \(untranslated.sorted())")
+    }
+
     /// B10 — `CONTRIBUTING.md`'s "Localization" section: `needs_review`
     /// means untouched by a native speaker, `translated` is the claim that
     /// one has actually read it in context. `en` is the source language, not
