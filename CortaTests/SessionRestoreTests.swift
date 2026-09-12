@@ -31,6 +31,44 @@ struct SessionRestoreTests {
         #expect(layout.droppingMissingDirectories() == layout)
     }
 
+    // MARK: - Preset identity and focus (B09)
+
+    @Test("presetName and isFocused round-trip through validation and directory-dropping")
+    func presetAndFocusSurviveRepair() {
+        let layout = PaneLayout.pane(
+            directory: "/tmp", presetName: "work", isFocused: true)
+        let repaired = layout.validated().droppingMissingDirectories()
+        #expect(repaired.firstPresetName == "work")
+        guard case .pane(_, let presetName, let isFocused) = repaired else {
+            Issue.record("expected a pane")
+            return
+        }
+        #expect(presetName == "work")
+        #expect(isFocused)
+    }
+
+    @Test("a dropped directory keeps its preset name and focus flag")
+    func droppingDirectoryPreservesPresetAndFocus() {
+        let layout = PaneLayout.pane(
+            directory: "/no/such/directory", presetName: "work", isFocused: true)
+        guard case .pane(let directory, let presetName, let isFocused) =
+            layout.droppingMissingDirectories()
+        else {
+            Issue.record("expected a pane")
+            return
+        }
+        #expect(directory == nil)
+        #expect(presetName == "work")
+        #expect(isFocused)
+    }
+
+    @Test("old JSON with no presetName or isFocused decodes with honest defaults")
+    func oldPaneJSONDecodesWithDefaults() throws {
+        let json = Data(#"{"pane": {"directory": "/tmp"}}"#.utf8)
+        let layout = try JSONDecoder().decode(PaneLayout.self, from: json)
+        #expect(layout == .pane(directory: "/tmp", presetName: nil, isFocused: false))
+    }
+
     @Test("filtering recurses through splits and keeps their shape")
     func splitsAreFiltered() {
         let layout = PaneLayout.split(
@@ -200,6 +238,83 @@ struct RestoreValidationTests {
         #expect(SessionRestore.load() == [state])
         SessionRestore.clear()
         #expect(SessionRestore.load().isEmpty)
+    }
+
+    // MARK: - Versioning (B09)
+
+    @Test("a freshly constructed state carries the current version")
+    func newStateCarriesCurrentVersion() {
+        let state = WindowState(
+            frame: WindowState.Frame(NSRect(x: 0, y: 0, width: 900, height: 560)),
+            layout: .pane(directory: nil))
+        #expect(state.version == WindowState.currentVersion)
+    }
+
+    @Test("state saved with no version field reads as version 0")
+    func missingVersionFieldReadsAsZero() throws {
+        let json = Data(
+            #"""
+            {"frame": {"x": 0, "y": 0, "width": 900, "height": 560},
+             "layout": {"pane": {"directory": null}}}
+            """#.utf8)
+        let state = try JSONDecoder().decode(WindowState.self, from: json)
+        #expect(state.version == 0)
+    }
+
+    @Test("a window saved by a future, unrecognized version is skipped on load")
+    func futureVersionIsSkippedNotCrashed() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("corta-restore-\(UUID().uuidString)")
+        let saved = SessionRestore.directory
+        SessionRestore.directory = directory
+        defer {
+            SessionRestore.directory = saved
+            try? FileManager.default.removeItem(at: directory)
+        }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let json = Data(
+            #"""
+            [{"version": 999, "frame": {"x": 0, "y": 0, "width": 900, "height": 560},
+              "layout": {"pane": {"directory": null}}, "isSelectedTab": true}]
+            """#.utf8)
+        try json.write(to: SessionRestore.fileURL)
+        #expect(SessionRestore.load().isEmpty)
+    }
+
+    // MARK: - Tab group (B09)
+
+    @Test("tab group fields round-trip through the state file")
+    func tabGroupFieldsRoundTrip() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("corta-restore-\(UUID().uuidString)")
+        let saved = SessionRestore.directory
+        SessionRestore.directory = directory
+        defer {
+            SessionRestore.directory = saved
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let state = WindowState(
+            frame: WindowState.Frame(NSRect(x: 0, y: 0, width: 900, height: 560)),
+            layout: .pane(directory: nil), tabGroupID: "group-1", tabIndex: 1,
+            isSelectedTab: false)
+        SessionRestore.save([state])
+        let loaded = try #require(SessionRestore.load().first)
+        #expect(loaded.tabGroupID == "group-1")
+        #expect(loaded.tabIndex == 1)
+        #expect(!loaded.isSelectedTab)
+    }
+
+    @Test("state saved before tab grouping existed defaults to selected, ungrouped")
+    func missingTabFieldsDefaultToSelectedUngrouped() throws {
+        let json = Data(
+            #"""
+            {"frame": {"x": 0, "y": 0, "width": 900, "height": 560},
+             "layout": {"pane": {"directory": null}}}
+            """#.utf8)
+        let state = try JSONDecoder().decode(WindowState.self, from: json)
+        #expect(state.tabGroupID == nil)
+        #expect(state.tabIndex == nil)
+        #expect(state.isSelectedTab)
     }
 }
 

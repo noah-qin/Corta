@@ -168,4 +168,39 @@ struct DirectoryHistoryStoreTests {
         let store = DirectoryHistoryStore(fileURL: file)
         #expect(store.history.entries.isEmpty)
     }
+
+    // MARK: - Versioning (B09)
+
+    @Test("a pre-B09 file with no version wrapper still loads")
+    func bareArrayFileStillLoads() throws {
+        defer { removeDirectory() }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let entry = DirectoryHistory.Entry(
+            path: "/tmp", visitCount: 3, lastVisit: Date(), isFavorite: false)
+        try JSONEncoder().encode([entry]).write(to: file)
+        let store = DirectoryHistoryStore(fileURL: file)
+        #expect(store.history.entries["/tmp"]?.visitCount == 3)
+    }
+
+    @Test("a file saved by a future, unrecognized version loads as empty")
+    func futureVersionLoadsEmpty() throws {
+        defer { removeDirectory() }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let json = Data(#"{"version": 999, "entries": []}"#.utf8)
+        try json.write(to: file)
+        let store = DirectoryHistoryStore(fileURL: file)
+        #expect(store.history.entries.isEmpty)
+    }
+
+    @Test("saving writes the current version, and it round-trips")
+    func savingWritesCurrentVersion() throws {
+        defer { removeDirectory() }
+        let store = DirectoryHistoryStore(fileURL: file)
+        store.record("/tmp")
+        let raw = try Data(contentsOf: file)
+        let object = try JSONSerialization.jsonObject(with: raw) as? [String: Any]
+        #expect(object?["version"] as? Int == 1)
+        let reloaded = DirectoryHistoryStore(fileURL: file)
+        #expect(reloaded.history.entries["/tmp"]?.visitCount == 1)
+    }
 }

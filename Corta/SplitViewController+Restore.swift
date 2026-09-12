@@ -24,16 +24,36 @@ extension SplitViewController {
         // of it, so the split it came from has one subview and would read as
         // a plain pane. The layout recorded on the way in is what the
         // arrangement still is.
+        let (tabGroupID, tabIndex, isSelectedTab) = tabState()
         if let zoomed = layoutBeforeZoom {
-            return WindowState(frame: WindowState.Frame(frame), layout: zoomed)
+            return WindowState(
+                frame: WindowState.Frame(frame), layout: zoomed, tabGroupID: tabGroupID,
+                tabIndex: tabIndex, isSelectedTab: isSelectedTab)
         }
         guard let root = layoutRoot else { return nil }
-        return WindowState(frame: WindowState.Frame(frame), layout: layout(of: root))
+        return WindowState(
+            frame: WindowState.Frame(frame), layout: layout(of: root), tabGroupID: tabGroupID,
+            tabIndex: tabIndex, isSelectedTab: isSelectedTab)
+    }
+
+    /// B09 — this window's place in its native tab group, if any. `nil`
+    /// group/index for a window that was never tabbed; AppKit groups tabbed
+    /// windows only by having the same `tabbingIdentifier` and does not
+    /// number them itself, so the index is this window's position in
+    /// `tabbedWindows` order at save time.
+    private func tabState() -> (groupID: String?, index: Int?, isSelected: Bool) {
+        guard let window = view.window, let tabbed = window.tabbedWindows, tabbed.count > 1
+        else { return (nil, nil, true) }
+        let index = tabbed.firstIndex(of: window)
+        return (window.tabbingIdentifier, index, window.tabGroup?.selectedWindow === window)
     }
 
     private func layout(of subtree: NSView) -> PaneLayout {
         guard let split = subtree as? NSSplitView, split.subviews.count == 2 else {
-            return .pane(directory: pane(forView: subtree)?.session?.workingDirectory)
+            let pane = pane(forView: subtree)
+            return .pane(
+                directory: pane?.session?.workingDirectory, presetName: pane?.preset?.name,
+                isFocused: pane === focusedPane)
         }
         let axis = split.isVertical ? split.bounds.width : split.bounds.height
         let first = split.subviews[0].frame
@@ -62,7 +82,8 @@ extension SplitViewController {
     /// to halve and a divider fraction needs an axis to be a fraction of.
     func restore(layout: PaneLayout) {
         guard let root = focusedPane else { return }
-        rebuild(layout, at: root)
+        var focusTarget: ViewController?
+        rebuild(layout, at: root, focusTarget: &focusTarget)
         view.layoutSubtreeIfNeeded()
         applyDividerPositions(layout, subtree: view.subviews.first)
         view.layoutSubtreeIfNeeded()
@@ -70,20 +91,37 @@ extension SplitViewController {
             pane.resizeSessionToFitView()
             pane.endLiveResize()
         }
-        // The first pane keeps focus, as it would after a fresh launch —
-        // `splitFocusedPane` moves focus to each new pane as it goes.
-        view.window?.makeFirstResponder(root.terminalView)
+        // B09 — whichever pane's saved node was `isFocused`, or the first
+        // pane as before (`splitFocusedPane` moves focus to each new pane as
+        // it goes, so without a match this is where it already landed) for
+        // data saved before that field existed.
+        view.window?.makeFirstResponder((focusTarget ?? root).terminalView)
     }
 
-    private func rebuild(_ node: PaneLayout, at pane: ViewController) {
-        guard case .split(let vertical, _, let first, let second) = node else { return }
-        focusedPane = pane
-        splitFocusedPane(
-            orientation: vertical ? .columns : .rows,
-            workingDirectory: second.firstDirectory)
-        guard let created = focusedPane, created !== pane else { return }
-        rebuild(first, at: pane)
-        rebuild(second, at: created)
+    /// A preset resolved by name against the *current* config file — never
+    /// the one that was active when the window was saved, which may not
+    /// even exist anymore. A name that no longer resolves (renamed or
+    /// deleted since) degrades to directory-only exactly as if the pane had
+    /// never been launched from a preset at all (B09).
+    private func resolvedPreset(named name: String?) -> Preset? {
+        guard let name else { return nil }
+        return ConfigurationStore.shared.configuration.presets.first { $0.name == name }
+    }
+
+    private func rebuild(_ node: PaneLayout, at pane: ViewController, focusTarget: inout ViewController?) {
+        switch node {
+        case .pane(_, _, let isFocused):
+            if isFocused { focusTarget = pane }
+        case .split(let vertical, _, let first, let second):
+            focusedPane = pane
+            splitFocusedPane(
+                orientation: vertical ? .columns : .rows,
+                workingDirectory: second.firstDirectory,
+                preset: resolvedPreset(named: second.firstPresetName))
+            guard let created = focusedPane, created !== pane else { return }
+            rebuild(first, at: pane, focusTarget: &focusTarget)
+            rebuild(second, at: created, focusTarget: &focusTarget)
+        }
     }
 
     /// Second pass: the dividers, once every split exists and the tree has

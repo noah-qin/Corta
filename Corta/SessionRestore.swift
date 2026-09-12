@@ -8,9 +8,41 @@ import AppKit
 /// What is worth restoring is the *arrangement*: how many windows, how they
 /// were split, how the dividers sat, and which directory each pane was in —
 /// which is the part a person actually rebuilds by hand after a restart.
-nonisolated struct WindowState: Codable, Equatable, Sendable {
+nonisolated struct WindowState: Equatable, Sendable {
+    /// B09 — bumped whenever the shape of a saved `WindowState` changes in a
+    /// way `decodeIfPresent` alone can't paper over. Absent entirely in data
+    /// saved before this existed, which is exactly what makes `0` the right
+    /// default for it: nothing else about that data needs migrating yet,
+    /// only new fields defaulting sensibly (`decode(from:)` below).
+    static let currentVersion = 1
+
+    var version: Int
     var frame: Frame
     var layout: PaneLayout
+    /// B09 — `NSWindow.tabbingIdentifier` at save time, so windows that were
+    /// tabbed together can be regrouped on restore instead of each coming
+    /// back as its own standalone window. `nil` for a window that was never
+    /// tabbed, or for data saved before this existed.
+    var tabGroupID: String?
+    /// This window's position within its tab group at save time, oldest
+    /// first — `nil` alongside `tabGroupID`.
+    var tabIndex: Int?
+    /// Whether this was the frontmost tab in its group. Defaults `true` on
+    /// decode: a window saved before this existed, or one that was never
+    /// tabbed, is its own only tab and was trivially the selected one.
+    var isSelectedTab: Bool
+
+    init(
+        frame: Frame, layout: PaneLayout, tabGroupID: String? = nil, tabIndex: Int? = nil,
+        isSelectedTab: Bool = true
+    ) {
+        self.version = Self.currentVersion
+        self.frame = frame
+        self.layout = layout
+        self.tabGroupID = tabGroupID
+        self.tabIndex = tabIndex
+        self.isSelectedTab = isSelectedTab
+    }
 
     struct Frame: Codable, Equatable, Sendable {
         var x: Double
@@ -80,6 +112,32 @@ nonisolated struct WindowState: Codable, Equatable, Sendable {
     }
 }
 
+nonisolated extension WindowState: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case version, frame, layout, tabGroupID, tabIndex, isSelectedTab
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 0
+        frame = try container.decode(Frame.self, forKey: .frame)
+        layout = try container.decode(PaneLayout.self, forKey: .layout)
+        tabGroupID = try container.decodeIfPresent(String.self, forKey: .tabGroupID)
+        tabIndex = try container.decodeIfPresent(Int.self, forKey: .tabIndex)
+        isSelectedTab = try container.decodeIfPresent(Bool.self, forKey: .isSelectedTab) ?? true
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(Self.currentVersion, forKey: .version)
+        try container.encode(frame, forKey: .frame)
+        try container.encode(layout, forKey: .layout)
+        try container.encodeIfPresent(tabGroupID, forKey: .tabGroupID)
+        try container.encodeIfPresent(tabIndex, forKey: .tabIndex)
+        try container.encode(isSelectedTab, forKey: .isSelectedTab)
+    }
+}
+
 extension NSRect {
     /// Zero for a null rectangle, which is what `intersection` returns when
     /// there is no overlap at all — and what makes "the screen it overlaps
@@ -91,11 +149,13 @@ extension NSRect {
 
 /// The split tree, as a value. Mirrors `SplitTree`'s shape: a leaf is a pane,
 /// a node is exactly two children and a divider.
-nonisolated indirect enum PaneLayout: Codable, Equatable, Sendable {
-    /// A pane, and the working directory it last reported through OSC 7.
+nonisolated indirect enum PaneLayout: Equatable, Sendable {
+    /// A pane, the working directory it last reported through OSC 7, the
+    /// preset it was launched from (B09; `nil` for an ordinary pane or data
+    /// saved before this existed), and whether it held focus at save time.
     /// Reports naming a remote host are dropped by the parser before they
     /// can be saved here, so a directory is always a local path.
-    case pane(directory: String?)
+    case pane(directory: String?, presetName: String? = nil, isFocused: Bool = false)
     /// - Parameter position: the divider as a *fraction* of the node's axis,
     ///   not points. A restored window may open on a different display, or at
     ///   a size the user changed since; a fraction keeps the proportions the
@@ -106,8 +166,18 @@ nonisolated indirect enum PaneLayout: Codable, Equatable, Sendable {
     /// has to be, since that pane is created before the layout is applied.
     var firstDirectory: String? {
         switch self {
-        case .pane(let directory): return directory
+        case .pane(let directory, _, _): return directory
         case .split(_, _, let first, _): return first.firstDirectory
+        }
+    }
+
+    /// The first pane's preset name, mirroring `firstDirectory` exactly —
+    /// `SplitViewController.viewDidLoad()` needs it at the same moment and
+    /// for the same reason it needs the directory (B09).
+    var firstPresetName: String? {
+        switch self {
+        case .pane(_, let presetName, _): return presetName
+        case .split(_, _, let first, _): return first.firstPresetName
         }
     }
 
@@ -160,12 +230,12 @@ nonisolated indirect enum PaneLayout: Codable, Equatable, Sendable {
     /// unmounted.
     func droppingMissingDirectories(fileManager: FileManager = .default) -> PaneLayout {
         switch self {
-        case .pane(let directory):
+        case .pane(let directory, let presetName, let isFocused):
             if let directory {
                 var isDirectory = ObjCBool(false)
                 guard fileManager.fileExists(atPath: directory, isDirectory: &isDirectory),
                     isDirectory.boolValue
-                else { return .pane(directory: nil) }
+                else { return .pane(directory: nil, presetName: presetName, isFocused: isFocused) }
             }
             return self
         case .split(let vertical, let position, let first, let second):
@@ -173,6 +243,58 @@ nonisolated indirect enum PaneLayout: Codable, Equatable, Sendable {
                 vertical: vertical, position: position,
                 first: first.droppingMissingDirectories(fileManager: fileManager),
                 second: second.droppingMissingDirectories(fileManager: fileManager))
+        }
+    }
+}
+
+nonisolated extension PaneLayout: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case pane, split
+    }
+
+    /// Mirrors exactly what Swift's automatic enum-with-associated-values
+    /// synthesis produced before this needed a hand-written implementation
+    /// — `{"pane": {"directory": ...}}` / `{"split": {...}}` — so state
+    /// saved by an older Corta still decodes; `presetName`/`isFocused`
+    /// simply weren't keys in that JSON yet.
+    private struct PanePayload: Codable {
+        var directory: String?
+        var presetName: String?
+        var isFocused: Bool?
+    }
+
+    private struct SplitPayload: Codable {
+        var vertical: Bool
+        var position: Double
+        var first: PaneLayout
+        var second: PaneLayout
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let pane = try container.decodeIfPresent(PanePayload.self, forKey: .pane) {
+            self = .pane(
+                directory: pane.directory, presetName: pane.presetName,
+                isFocused: pane.isFocused ?? false)
+        } else {
+            let split = try container.decode(SplitPayload.self, forKey: .split)
+            self = .split(
+                vertical: split.vertical, position: split.position, first: split.first,
+                second: split.second)
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .pane(let directory, let presetName, let isFocused):
+            try container.encode(
+                PanePayload(directory: directory, presetName: presetName, isFocused: isFocused),
+                forKey: .pane)
+        case .split(let vertical, let position, let first, let second):
+            try container.encode(
+                SplitPayload(vertical: vertical, position: position, first: first, second: second),
+                forKey: .split)
         }
     }
 }
@@ -207,10 +329,15 @@ enum SessionRestore {
         guard let data = try? Data(contentsOf: fileURL),
             let states = try? JSONDecoder().decode([WindowState].self, from: data)
         else { return [] }
-        return states.map {
+        // B09 — a window saved by a *newer* Corta, in a version this build
+        // does not understand, is skipped rather than guessed at: the same
+        // "degrade, don't vanish" rule applied per-window instead of to the
+        // whole file, now that there is a version to check.
+        return states.filter { $0.version <= WindowState.currentVersion }.map {
             WindowState(
                 frame: $0.frame,
-                layout: $0.layout.validated().droppingMissingDirectories())
+                layout: $0.layout.validated().droppingMissingDirectories(),
+                tabGroupID: $0.tabGroupID, tabIndex: $0.tabIndex, isSelectedTab: $0.isSelectedTab)
         }
     }
 

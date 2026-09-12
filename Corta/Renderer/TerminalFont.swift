@@ -56,6 +56,32 @@ nonisolated enum TerminalFont {
         return NSFont(descriptor: descriptor, size: size)
     }
 
+    /// B09 — why a requested family did or didn't resolve, for the settings
+    /// page to say something more specific than `primary(ofSize:family:)`'s
+    /// silent fallback. Not a change to that function or its signature —
+    /// this is a separate, pure query the render hot path never calls.
+    enum FontResolution: Equatable {
+        /// No `family`, or it resolved and passed the grid check.
+        case resolved
+        /// AppKit knows no font family by this name at all.
+        case missing(requested: String)
+        /// The family exists but `MonospacedFontCatalog` won't vouch for
+        /// it — a real face that does not advance evenly, so laying it out
+        /// on the grid would misalign every cell after the first uneven one.
+        case invalidForGrid(requested: String)
+    }
+
+    static func resolution(forFamily family: String?) -> FontResolution {
+        guard let family, family != Configuration.systemFontFamily else { return .resolved }
+        guard namedFamily(family, size: 12) != nil || NSFont(name: family, size: 12) != nil else {
+            return .missing(requested: family)
+        }
+        guard MonospacedFontCatalog.isUsable(family: family) else {
+            return .invalidForGrid(requested: family)
+        }
+        return .resolved
+    }
+
     /// One styled variant of `font` — what the atlas rasterises bold, italic
     /// and bold-italic cells with, alongside whether the bold half had to be
     /// faked.

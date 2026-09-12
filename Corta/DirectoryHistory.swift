@@ -193,15 +193,37 @@ final class DirectoryHistoryStore {
         try? FileManager.default.removeItem(at: fileURL)
     }
 
+    /// B09 — the on-disk shape, versioned so a future incompatible change
+    /// can be given real migration code instead of the file just vanishing.
+    private struct Persisted: Codable {
+        static let currentVersion = 1
+        var version: Int
+        var entries: [DirectoryHistory.Entry]
+    }
+
     private func load() {
-        guard let data = try? Data(contentsOf: fileURL),
-            let entries = try? JSONDecoder().decode([DirectoryHistory.Entry].self, from: data)
+        guard let data = try? Data(contentsOf: fileURL) else { return }
+        if let persisted = try? JSONDecoder().decode(Persisted.self, from: data) {
+            // A future version this build does not understand degrades to
+            // "nothing to load," the same rule `SessionRestore` applies per
+            // window — not a guess at a format that might have changed
+            // underneath these fields.
+            guard persisted.version <= Persisted.currentVersion else { return }
+            history = DirectoryHistory(entries: persisted.entries)
+            return
+        }
+        // Pre-B09 files are a bare array with no wrapper at all — read once
+        // more under the old shape rather than treating every existing
+        // history as gone the moment this key gets added.
+        guard let entries = try? JSONDecoder().decode([DirectoryHistory.Entry].self, from: data)
         else { return }
         history = DirectoryHistory(entries: entries)
     }
 
     private func save() {
-        guard let data = try? JSONEncoder().encode(Array(history.entries.values)) else { return }
+        let persisted = Persisted(
+            version: Persisted.currentVersion, entries: Array(history.entries.values))
+        guard let data = try? JSONEncoder().encode(persisted) else { return }
         try? FileManager.default.createDirectory(
             at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? data.write(to: fileURL, options: .atomic)

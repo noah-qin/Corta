@@ -63,9 +63,17 @@ final class SplitViewController: NSViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        // B09 — the root pane's own preset, resolved by name against the
+        // *current* config file: a restored window that was launched from a
+        // preset gets its shell/env back too, not just its directory, and a
+        // preset renamed or deleted since degrades to directory-only exactly
+        // like an ordinary pane rather than failing.
+        let restoredPreset = pendingRestore?.layout.firstPresetName.flatMap { name in
+            ConfigurationStore.shared.configuration.presets.first { $0.name == name }
+        }
         let pane = makePane(
             workingDirectory: pendingRestore?.layout.firstDirectory, initialGridSize: nil,
-            preset: pendingPreset)
+            preset: pendingPreset ?? restoredPreset)
         focusedPane = pane
         tree = SplitTree(root: pane.view)
         installRoot()
