@@ -108,6 +108,34 @@ Before writing a commit, work through this checklist:
 - [ ] No tool or session identifiers anywhere in the message (rule 6).
 - [ ] Never rewrite published history without explicit instruction.
 
+## Localization
+
+Every user-facing string lives in `Corta/Localizable.xcstrings` (a String
+Catalog — English is `sourceLanguage`; the app currently ships zh-Hans,
+zh-Hant, ja, ko, de, fr, es and pt-BR alongside it). Two things about a
+translation's state are worth knowing before touching this file:
+
+- **`"state": "needs_review"`** on a non-English localization means what
+  Xcode's own String Catalog editor takes it to mean: this text has not
+  been checked by a native speaker in context, whatever produced it
+  (currently: an AI assistant, for every non-English string in the file
+  as of B10 — `docs/ROADMAP.md`'s B10 entry). It is not a placeholder and
+  not broken; it ships and reads correctly to Corta at runtime exactly
+  like `"translated"` — the state is an editorial marker, not a build
+  gate. Adding a string keeps this pattern: write the English value,
+  translate the rest as best available, mark the non-English entries
+  `needs_review`.
+- **`"state": "translated"`** on a non-English localization is a claim
+  that a native speaker has actually read it in Corta, in context — the
+  same bar `CLAUDE.md` sets for offering a theme or a font: "passing a
+  mechanical check is not the same claim." Flipping a string to
+  `translated` is the review; there is no separate log to update.
+
+A language with no native-speaker reviewer available stays
+`needs_review` indefinitely rather than being guessed into
+`translated` — an unreviewed language marked honestly is more useful
+than one that looks done and is not.
+
 ## Branches
 
 - `main` is always buildable.
