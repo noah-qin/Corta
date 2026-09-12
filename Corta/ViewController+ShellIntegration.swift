@@ -150,6 +150,77 @@ extension ViewController: NSMenuItemValidation {
         session?.hasShellIntegration == true
     }
 
+    // MARK: - Command identity (B07)
+
+    /// The command the viewport is looking at — see `commandOutput(in
+    /// scrollOffset:)`'s doc comment for the same "nearest prompt at or
+    /// before the top of the viewport" rule, expressed here as an identity
+    /// rather than a row range.
+    var viewportCommand: CommandRecord? {
+        guard isOperable else { return nil }
+        let grid = session.snapshot()
+        let viewportTop = ScrollbackCoordinates.viewportTopRow(
+            totalPushed: grid.scrollback.totalPushed, scrollOffset: scrollOffset)
+        let bound = scrollOffset > 0 ? viewportTop + grid.rows : Int.max
+        return session.commandRecords.record(before: bound)
+    }
+
+    /// The most recently *completed* command, regardless of where the
+    /// viewport is scrolled — distinct from `viewportCommand` on purpose
+    /// (B07): scrolled up to read an old failure, "copy the last command's
+    /// output" from a menu with no row context should still mean the one
+    /// that just finished, not the one currently in view.
+    var latestCompletedCommand: CommandRecord? {
+        guard isOperable else { return nil }
+        return session.commandRecords.lastCompleted
+    }
+
+    /// B07 — takes a marked, timestamped snapshot of a still-running
+    /// command's output so far. `copyLastCommandOutput` only ever finds a
+    /// *completed* command (`commandOutputRows` requires a following
+    /// prompt); this is the answer for "it's still building, but I want
+    /// what it's printed so far" — a build log at minute three is still
+    /// worth reading, and waiting for `OSC 133 ; D` to read it would be a
+    /// terminal that makes the user wait on itself.
+    @objc func snapshotRunningCommandOutput(_ sender: Any?) {
+        guard isOperable else { return }
+        let grid = session.snapshot()
+        guard let record = session.commandRecords.last, record.isRunning else {
+            terminalView?.showToast(L10n.text("toast.noCommandRunning"), kind: .warning)
+            return
+        }
+        let startRow = record.outputStartRow ?? record.promptRow + 1
+        let endRow = grid.absoluteRow(ofScreenRow: grid.cursor.row)
+        guard startRow < endRow else {
+            terminalView?.showToast(L10n.text("toast.noCommandOutput"), kind: .warning)
+            return
+        }
+        let base = grid.scrollback.totalPushed
+        let range = SelectionRange(
+            anchor: SelectionPoint(
+                row: ScrollbackCoordinates.relativeRow(startRow, totalPushed: base), column: 0),
+            head: SelectionPoint(
+                row: ScrollbackCoordinates.relativeRow(endRow - 1, totalPushed: base),
+                column: grid.columns - 1))
+        let text = Selection.text(of: range, in: grid)
+        guard !text.isEmpty else {
+            terminalView?.showToast(L10n.text("toast.noCommandOutput"), kind: .warning)
+            return
+        }
+        let stamped = "\(L10n.format("snapshot.header", Self.snapshotTimestampFormatter.string(from: Date())))\n\(text)"
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(stamped, forType: .string)
+        terminalView?.showToast(L10n.text("toast.snapshotCopied"))
+    }
+
+    private static let snapshotTimestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .medium
+        return formatter
+    }()
+
     // MARK: - Menu validation
 
     /// Greys out the items that depend on shell integration, or on a
@@ -172,6 +243,9 @@ extension ViewController: NSMenuItemValidation {
             guard isOperable else { return false }
             return Self.commandOutputRows(in: session.snapshot(), scrollOffset: scrollOffset)
                 != nil
+        case #selector(snapshotRunningCommandOutput(_:)):
+            guard isOperable else { return false }
+            return session.commandRecords.last?.isRunning == true
         case #selector(clearScreen(_:)), #selector(clearHistory(_:)),
             #selector(resetTerminal(_:)):
             return validateTerminalStateItem(menuItem)

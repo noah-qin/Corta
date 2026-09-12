@@ -1,3 +1,5 @@
+import Foundation
+
 /// OSC 133 — shell integration (M7.2).
 ///
 /// A terminal without this cannot see command boundaries. It sees keystrokes
@@ -33,6 +35,11 @@ extension Performer {
             state.promptRow = row
             state.commandExitStatus = nil
             grid.setMark(.prompt, atAbsoluteRow: row)
+            // B07 — a new command record starts here, keyed by id rather
+            // than this row, which is the only thing that survives the row
+            // scrolling into history and the id it names moving with it.
+            state.commandRecords.begin(
+                promptRow: row, workingDirectory: state.workingDirectory, at: Date())
         case 0x42:  // 'B' — command line starts
             break
         case 0x43:  // 'C' — the command is running, and its output starts here
@@ -44,6 +51,7 @@ extension Performer {
             // that guess take a row of what the user typed.
             let outputRow = grid.absoluteRow(ofScreenRow: grid.cursor.row)
             state.outputStartRow = outputRow
+            state.commandRecords.markOutputStart(outputRow)
             // Never over a prompt mark: a command that printed nothing leaves
             // the next prompt on this very row, and the prompt is the one
             // that matters for jumping.
@@ -58,6 +66,8 @@ extension Performer {
             if let row = state.promptRow {
                 grid.setMark(status == 0 ? .promptSucceeded : .promptFailed, atAbsoluteRow: row)
             }
+            let endRow = grid.absoluteRow(ofScreenRow: grid.cursor.row)
+            state.commandRecords.finish(exitStatus: status, endRow: endRow, at: Date())
         default:
             break
         }

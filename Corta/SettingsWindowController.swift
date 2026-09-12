@@ -127,6 +127,11 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
     /// setting that lies. Icon and words, with a button to the one place the
     /// decision can be reversed.
     private let notificationPermissionNotice = SettingsStatusView()
+    /// B07 — install state for the zsh integration: not installed, installed,
+    /// or possibly conflicting with another terminal's own. Reuses the same
+    /// icon-word-button shape as `notificationPermissionNotice`: this is the
+    /// same kind of report, state plus the one action that changes it.
+    private let shellIntegrationStatusView = SettingsStatusView()
 
     /// The panes, built on first visit and kept. A control on a tab that is
     /// not showing is still populated from the store, so switching tabs never
@@ -442,6 +447,9 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
                 row(
                     L10n.text("settings.label.openFileCommand"), openFileCommandField,
                     help: L10n.text("settings.help.openFileCommand")),
+                row(
+                    L10n.text("settings.label.shellIntegration"), shellIntegrationStatusView,
+                    help: L10n.text("settings.help.shellIntegration")),
             ]
         case .general:
             let windowHeader = sectionHeader(L10n.text("settings.section.window"))
@@ -861,6 +869,7 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         applyThresholdState(enabled: configuration.notifyOnLongTask)
         pathLabel.stringValue = ConfigurationStore.fileURL.path
         applyNotificationPermission()
+        applyShellIntegrationStatus()
         applySystemAccessibilityPreferences()
     }
 
@@ -901,6 +910,50 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
             notificationPermissionRow.isHidden = !show
             if currentTab == .general { resizeToFitPane(animated: false) }
         }
+    }
+
+    /// B07 — reflects `ShellIntegrationInstaller`'s three states as an icon,
+    /// a sentence and the one action that changes it. Read from disk on
+    /// every populate rather than cached: unlike every other row on this
+    /// page, the ground truth here is `~/.zshrc`, which the user can edit
+    /// outside Corta at any time — the same reason `ConfigurationStore`
+    /// re-reads its own file instead of trusting memory.
+    private func applyShellIntegrationStatus() {
+        switch ShellIntegrationInstaller.shared.status() {
+        case .notInstalled:
+            shellIntegrationStatusView.show(
+                .adjusted(L10n.text("settings.status.shellIntegrationNotInstalled")),
+                retry: { [weak self] in self?.installShellIntegration() },
+                actionTitle: L10n.text("settings.action.install"))
+        case .conflicting(let name):
+            shellIntegrationStatusView.show(
+                .failed(L10n.format("settings.status.shellIntegrationConflict", name)),
+                retry: { [weak self] in self?.installShellIntegration() },
+                actionTitle: L10n.text("settings.action.installAnyway"))
+        case .installed:
+            shellIntegrationStatusView.show(
+                .adjusted(L10n.text("settings.status.shellIntegrationInstalled")),
+                retry: { [weak self] in self?.removeShellIntegration() },
+                actionTitle: L10n.text("settings.action.remove"))
+        }
+    }
+
+    private func installShellIntegration() {
+        guard ShellIntegrationInstaller.shared.install() else {
+            shellIntegrationStatusView.show(
+                .failed(L10n.text("settings.status.shellIntegrationWriteFailed")))
+            return
+        }
+        applyShellIntegrationStatus()
+    }
+
+    private func removeShellIntegration() {
+        guard ShellIntegrationInstaller.shared.uninstall() else {
+            shellIntegrationStatusView.show(
+                .failed(L10n.text("settings.status.shellIntegrationWriteFailed")))
+            return
+        }
+        applyShellIntegrationStatus()
     }
 
     /// Colours that have to follow Increase Contrast. Applied on every

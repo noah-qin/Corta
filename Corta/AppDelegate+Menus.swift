@@ -342,7 +342,7 @@ extension AppDelegate {
         shell.addItem(.separator())
         for command in [
             TerminalCommand.previousCommand, .nextCommand, .previousFailedCommand,
-            .nextFailedCommand, .copyLastCommandOutput,
+            .nextFailedCommand, .copyLastCommandOutput, .snapshotRunningCommandOutput,
         ] {
             shell.addItem(item(for: command))
         }

@@ -115,6 +115,11 @@ public struct PerformerState: Sendable {
     /// drained.
     public internal(set) var commandExitStatus: Int?
 
+    /// B07 — the bounded history of commands this session's shell has
+    /// reported, each identified by a stable id rather than a row. See
+    /// `CommandRecord`'s own doc comment for why a row is not enough.
+    public internal(set) var commandRecords = CommandRecordStore()
+
     /// OSC 52 (M7.11). Text the child asked to put on the system clipboard,
     /// drained by the app. Never the other direction: the read form of OSC 52
     /// hands clipboard contents to the child, which is a data-exfiltration
