@@ -137,6 +137,15 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// other route to the local clipboard. The *read* half stays unavailable
     /// under every setting (`SECURITY.md` §6).
     var allowClipboardWrite: Bool = false
+    /// B08 — whether Corta remembers visited directories (`OSC 7`) to rank
+    /// for the directory switcher. On by default: unlike clipboard write,
+    /// nothing here reaches outside the app, and the data is app-managed
+    /// history, not a setting — `DirectoryHistory` persists it to its own
+    /// file, not this one, the same split `ConfigurationStore` draws
+    /// between preference and state. This key only gates whether it is
+    /// kept at all; clearing what is already kept is a Settings action, not
+    /// a config-file key.
+    var directoryHistory: Bool = true
     /// M7.4 — reopen the windows, splits and working directories from the
     /// last run.
     var restoreWindows: Bool = true
@@ -311,6 +320,9 @@ nonisolated struct Configuration: Equatable, Sendable {
         case "allow-clipboard-write":
             guard let parsed = Self.parseBool(value) else { return false }
             allowClipboardWrite = parsed
+        case "directory-history":
+            guard let parsed = Self.parseBool(value) else { return false }
+            directoryHistory = parsed
         case "restore-windows":
             guard let parsed = Self.parseBool(value) else { return false }
             restoreWindows = parsed
@@ -501,6 +513,7 @@ nonisolated struct Configuration: Equatable, Sendable {
             "search-regex = \(searchRegex)",
             "open-file-command = \(openFileCommand)",
             "allow-clipboard-write = \(allowClipboardWrite)",
+            "directory-history = \(directoryHistory)",
             "restore-windows = \(restoreWindows)",
             "confirm-close = \(confirmClose)",
             "update-auto-check = \(updateAutoCheck)",

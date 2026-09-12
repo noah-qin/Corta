@@ -957,6 +957,12 @@ class ViewController: NSViewController {
             if session.hasShellIntegration {
                 taskNotifier.noteCommandRunning(
                     session.isCommandRunning, exitStatus: finished, in: view.window)
+                // B08 — a directory is worth ranking once a command has
+                // actually run there, not on every OSC 7 report a `cd` with
+                // no command after it would also produce.
+                if finished != nil, let directory = session.currentDirectory {
+                    DirectoryHistoryStore.shared.record(directory)
+                }
             }
         }
         if session.isSynchronizedOutputEnabled {

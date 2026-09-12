@@ -109,6 +109,12 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
     private let restoreWindowsSwitch = NSSwitch()
     private let confirmCloseSwitch = NSSwitch()
     private let notifySwitch = NSSwitch()
+    private let directoryHistorySwitch = NSSwitch()
+    /// B08 — reports how many directories are remembered, with a Clear
+    /// button. Reuses `SettingsStatusView` the same way
+    /// `shellIntegrationStatusView` does: a state and the one action that
+    /// changes it.
+    private let directoryHistoryStatusView = SettingsStatusView()
     private let thresholdField = NSTextField()
     private let thresholdLabel = NSTextField(labelWithString: L10n.text("settings.label.longerThan"))
     private let pathLabel = NSTextField(labelWithString: "")
@@ -455,6 +461,7 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
             let windowHeader = sectionHeader(L10n.text("settings.section.window"))
             let closingHeader = sectionHeader(L10n.text("settings.section.closing"))
             let notificationsHeader = sectionHeader(L10n.text("settings.section.notifications"))
+            let historyHeader = sectionHeader(L10n.text("settings.section.history"))
             rows = [
                 windowHeader,
                 row(
@@ -471,15 +478,20 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
                     help: L10n.text("settings.help.notifyOnLongTasks")),
                 permissionRow(),
                 makeThresholdFormRow(),
+                historyHeader,
+                row(
+                    L10n.text("settings.label.directoryHistory"), directoryHistorySwitch,
+                    help: L10n.text("settings.help.directoryHistory")),
+                row(L10n.text("settings.label.directoryHistoryClear"), directoryHistoryStatusView),
             ]
             let generalStack = stack(rows)
-            // Three unrelated concerns — what a new window looks like,
-            // whether closing asks first, whether a long task can notify —
-            // used to read as one flat list of five rows with no seams. The
-            // gap above a header is what actually separates the groups; the
-            // uniform `rowSpacing` elsewhere in the tab is deliberately
-            // tighter than this.
-            for header in [windowHeader, closingHeader, notificationsHeader] {
+            // Four unrelated concerns — what a new window looks like,
+            // whether closing asks first, whether a long task can notify,
+            // whether visited directories are remembered — used to read as
+            // one flat list with no seams. The gap above a header is what
+            // actually separates the groups; the uniform `rowSpacing`
+            // elsewhere in the tab is deliberately tighter than this.
+            for header in [windowHeader, closingHeader, notificationsHeader, historyHeader] {
                 generalStack.setCustomSpacing(Self.sectionSpacing, after: header)
             }
             panes[tab] = generalStack
@@ -805,7 +817,7 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
 
         for control in [
             optionAsMetaSwitch, copyOnSelectSwitch, clipboardWriteSwitch, restoreWindowsSwitch,
-            confirmCloseSwitch, notifySwitch,
+            confirmCloseSwitch, notifySwitch, directoryHistorySwitch,
         ] {
             control.target = self
             control.action = #selector(commit)
@@ -862,6 +874,8 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         copyOnSelectSwitch.state = configuration.copyOnSelect ? .on : .off
         linkActivationPopUp.selectItem(at: configuration.linkActivation == .click ? 1 : 0)
         clipboardWriteSwitch.state = configuration.allowClipboardWrite ? .on : .off
+        directoryHistorySwitch.state = configuration.directoryHistory ? .on : .off
+        applyDirectoryHistoryStatus()
         restoreWindowsSwitch.state = configuration.restoreWindows ? .on : .off
         confirmCloseSwitch.state = configuration.confirmClose ? .on : .off
         notifySwitch.state = configuration.notifyOnLongTask ? .on : .off
@@ -956,6 +970,23 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         applyShellIntegrationStatus()
     }
 
+    /// B08 — how many directories `DirectoryHistoryStore` currently
+    /// remembers, with a Clear action. Re-read on every populate, same
+    /// reason as `applyShellIntegrationStatus`: this is app-managed state,
+    /// not something this window owns a copy of.
+    private func applyDirectoryHistoryStatus() {
+        let count = DirectoryHistoryStore.shared.history.entries.count
+        directoryHistoryStatusView.show(
+            .adjusted(L10n.format("settings.status.directoryHistoryCount", count)),
+            retry: count > 0 ? { [weak self] in self?.clearDirectoryHistory() } : nil,
+            actionTitle: L10n.text("settings.action.clear"))
+    }
+
+    private func clearDirectoryHistory() {
+        DirectoryHistoryStore.shared.clear()
+        applyDirectoryHistoryStatus()
+    }
+
     /// Colours that have to follow Increase Contrast. Applied on every
     /// populate and whenever the system preference changes, so a switch
     /// flipped while this window is open is picked up without a relaunch.
@@ -1034,6 +1065,7 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
             configuration.linkActivation =
                 linkActivationPopUp.indexOfSelectedItem == 1 ? .click : .command
             configuration.allowClipboardWrite = clipboardWriteSwitch.state == .on
+            configuration.directoryHistory = directoryHistorySwitch.state == .on
             configuration.restoreWindows = restoreWindowsSwitch.state == .on
             configuration.confirmClose = confirmCloseSwitch.state == .on
             configuration.notifyOnLongTask = notifySwitch.state == .on

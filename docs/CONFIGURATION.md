@@ -128,6 +128,35 @@ the timer and 1.5 s of output silence ends it — which is why the feature
 is off by default. The notification carries the pane's title and the exit
 status, never the command text (`SECURITY.md` §5).
 
+### History (B08)
+
+| Key | Values | Default | Notes |
+| --- | --- | --- | --- |
+| `directory-history` | boolean | `true` | Whether Corta remembers directories a completed command actually ran in (`OSC 7`), to rank for the directory switcher. |
+
+Not the config file's own state: `directory-history` only gates whether
+`DirectoryHistoryStore` reads and writes its file (Application Support, not
+`~/.config/corta/config` — the same split `SessionRestore` draws between
+settings and app-managed state). Turning the key off stops it being read
+*or* written; **Clear** in Settings ▸ General ▸ History empties it (and
+deletes the file) regardless of the setting. Ranking is frecency — visit
+count that halves every three days — with favorites always sorted first;
+`DirectoryHistory.projectRoot(for:)` separately finds the nearest ancestor
+directory containing `.git`, for jumping to a project root rather than
+wherever inside it a command happened to run. A directory only ever enters
+this history already local — `OSC 7`'s own host check
+(`Performer+OSC.swift`) drops a remote report before `TerminalSession
+.currentDirectory` ever reports it, so nothing here can rank a path that
+belongs to a different machine.
+
+An app-initiated directory change (`ViewController.changeDirectory(to:)`)
+writes `cd '<path>'` to the child only when
+`ViewController.canChangeDirectorySafely` holds: shell integration is
+active, no command is currently running, and the cursor is still exactly
+where the prompt finished drawing — so a directory a person picked from
+history or a favorite never lands on a busy shell, a TUI holding the
+screen, or a prompt with something already typed into it.
+
 ### Updates
 
 | Key | Values | Default | Notes |

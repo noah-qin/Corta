@@ -34,6 +34,10 @@ extension Performer {
             let row = grid.absoluteRow(ofScreenRow: grid.cursor.row)
             state.promptRow = row
             state.commandExitStatus = nil
+            // B08 — stale until this prompt's own 'B' arrives; a directory
+            // change must not read the *previous* prompt's end column while
+            // this one is still being drawn.
+            state.promptEndColumn = nil
             grid.setMark(.prompt, atAbsoluteRow: row)
             // B07 — a new command record starts here, keyed by id rather
             // than this row, which is the only thing that survives the row
@@ -41,7 +45,14 @@ extension Performer {
             state.commandRecords.begin(
                 promptRow: row, workingDirectory: state.workingDirectory, at: Date())
         case 0x42:  // 'B' — command line starts
-            break
+            // B08 — the cursor sits exactly here until the user types
+            // something; still true only when 'B' landed on the same row as
+            // 'A' (a wrapped or multi-line prompt makes this an
+            // under-estimate, which is the safe direction — see
+            // `ViewController.canChangeDirectorySafely`).
+            if state.promptRow == grid.absoluteRow(ofScreenRow: grid.cursor.row) {
+                state.promptEndColumn = grid.cursor.column
+            }
         case 0x43:  // 'C' — the command is running, and its output starts here
             state.isCommandRunning = true
             // The row the shell reaches after echoing the command line, which
