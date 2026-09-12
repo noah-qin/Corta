@@ -39,15 +39,20 @@ extension ViewController {
     /// increments and minimum size derive from one cell geometry, so the
     /// panes share it (`SplitViewController.setFontSizeForAllPanes`).
     @objc func increaseFontSize(_ sender: Any?) {
-        setFontSizeForAllPanes(fontSize + 1)
+        zoomFontSizeForAllPanes(to: fontSize + 1)
     }
 
     @objc func decreaseFontSize(_ sender: Any?) {
-        setFontSizeForAllPanes(fontSize - 1)
+        zoomFontSizeForAllPanes(to: fontSize - 1)
     }
 
+    /// B09 — ends this window's zoom and returns to whatever the config
+    /// file currently says, not a hardcoded constant: a default changed in
+    /// Settings while this window was zoomed must be what ⌘0 lands on, the
+    /// same value a brand-new window would have opened at.
     @objc func resetFontSize(_ sender: Any?) {
-        setFontSizeForAllPanes(Self.defaultFontSize)
+        let configured = CGFloat(ConfigurationStore.shared.configuration.fontSize)
+        applyFontSizeForAllPanes(configured, isZoomed: false)
     }
 
     /// M6.14 — the trackpad magnification gesture, driving the same scale
@@ -63,7 +68,7 @@ extension ViewController {
             forMagnification: magnification,
             accumulator: &pinchAccumulator,
             startingAt: fontSize)
-        for size in sizes { setFontSizeForAllPanes(size) }
+        for size in sizes { zoomFontSizeForAllPanes(to: size) }
     }
 
     /// Pure step accumulator behind the AppKit gesture entry point. Keeping
@@ -102,34 +107,36 @@ extension ViewController {
         pinchAccumulator = 0
     }
 
-    private func setFontSizeForAllPanes(_ newSize: CGFloat) {
-        if let splitController {
-            splitController.setFontSizeForAllPanes(newSize)
-        } else {
-            setFontSize(newSize)
-        }
-        persistFontSize(newSize)
+    /// B09 — a temporary, per-window font size that never touches the
+    /// config file.
+    ///
+    /// This used to write every ⌘+/⌘−/pinch step straight into
+    /// `Configuration.fontSize` — the *global* default — on the reasoning
+    /// that a size living nowhere else would not survive a relaunch or a
+    /// theme change. It worked, and it also meant zooming one window
+    /// changed every other open window's size the moment any of them next
+    /// ran `configurationChanged` (picking a theme, editing the file in
+    /// `$EDITOR`, anything), and changed what a brand-new window opened at.
+    /// `isFontSizeZoomed` is the fix: `configurationChanged` skips the size
+    /// line while it is set (see that method), so a zoom rides out a config
+    /// change instead of being silently overwritten *or* silently leaking —
+    /// and `resetFontSize` is what ends it.
+    ///
+    /// Known gap: a pane split off a zoomed window is not zoomed itself —
+    /// it opens at the plain configured size. Visually inconsistent within
+    /// one window, but not the cross-window/saved-default leak this exists
+    /// to close, so left for a follow-up rather than growing this further.
+    private func zoomFontSizeForAllPanes(to newSize: CGFloat) {
+        applyFontSizeForAllPanes(newSize, isZoomed: true)
     }
 
-    /// Writes the new size to the config file, which is the only store there
-    /// is (`CLAUDE.md`: two stores drift, and the file has to win).
-    ///
-    /// Without this, ⌘+ / ⌘− / pinch changed a size that lived nowhere:
-    /// the file still said 12, and the *next* config change of any kind —
-    /// picking a theme, opening the settings page, saving the file in an
-    /// editor — ran `configurationChanged`, which re-applies `font-size` and
-    /// silently threw the zoom away. It also meant a zoom did not survive a
-    /// relaunch, and a new window opened at the old size while the one beside
-    /// it was zoomed.
-    ///
-    /// `ConfigurationStore.update` is a no-op when the value is unchanged, so
-    /// the write happens once per whole-point step and a pinch that ends
-    /// where it started writes nothing at all. `setFontSize` is likewise
-    /// guarded, so the change notification this posts costs every pane a
-    /// comparison and nothing more.
-    private func persistFontSize(_ newSize: CGFloat) {
-        let clamped = Double(min(64, max(8, newSize)))
-        ConfigurationStore.shared.update { $0.fontSize = clamped }
+    private func applyFontSizeForAllPanes(_ newSize: CGFloat, isZoomed: Bool) {
+        if let splitController {
+            splitController.setFontSizeForAllPanes(newSize, isZoomed: isZoomed)
+        } else {
+            setFontSize(newSize)
+            isFontSizeZoomed = isZoomed
+        }
     }
 
     /// A font change rebuilds the renderer: the glyph atlas is rasterised

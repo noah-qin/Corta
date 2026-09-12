@@ -42,7 +42,12 @@ extension ViewController {
                 width: metrics.cellWidth, height: metrics.cellHeight)
             resizeSessionToFitView()
         }
-        setFontSize(min(64, max(8, configuration.fontSize)))
+        // B09 — a zoomed window rides out a config change rather than being
+        // silently snapped back to the default; `resetFontSize` is the
+        // explicit way out of a zoom, not a side effect of picking a theme.
+        if !isFontSizeZoomed {
+            setFontSize(min(64, max(8, configuration.fontSize)))
+        }
         invalidateDisplay()
     }
 
