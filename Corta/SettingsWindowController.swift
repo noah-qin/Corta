@@ -95,6 +95,11 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
     private let themePopUp = NSPopUpButton()
     private let appearancePopUp = NSPopUpButton()
     private let fontFamilyLabel = NSTextField(labelWithString: "")
+    /// B09 — distinguishes a font that resolved from one that silently fell
+    /// back, and why, with a Retry that finally gives `MonospacedFontCatalog
+    /// .refresh()` a caller.
+    private let fontStatusView = SettingsStatusView()
+    private let fontPreviewView = FontPreviewView()
     private let fontSizeField = NSTextField()
     private let fontSizeStepper = NSStepper()
     private let scrollbackField = NSTextField()
@@ -434,7 +439,9 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
                 row(
                     L10n.text("settings.label.font"), fontFamilyLabel,
                     help: L10n.text("settings.help.font")),
+                row(L10n.text("settings.label.fontStatus"), fontStatusView),
                 row(L10n.text("settings.label.size"), makeFontSizeRow()),
+                row(L10n.text("settings.label.preview"), fontPreviewView),
             ]
         case .terminal:
             rows = [
@@ -863,6 +870,11 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         fontFamilyLabel.stringValue =
             configuration.fontFamily == Configuration.systemFontFamily
             ? L10n.text("settings.font.systemMonospaced") : configuration.fontFamily
+        applyFontStatus()
+        fontPreviewView.configure(
+            theme: Theme.named(configuration.theme, in: configuration) ?? .corta,
+            font: TerminalFont.primary(
+                ofSize: configuration.fontSize, family: configuration.fontFamily))
         fontSizeField.stringValue = String(Int(configuration.fontSize))
         fontSizeStepper.doubleValue = configuration.fontSize
         scrollbackField.stringValue = String(configuration.scrollbackLines)
@@ -924,6 +936,37 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
             notificationPermissionRow.isHidden = !show
             if currentTab == .general { resizeToFitPane(animated: false) }
         }
+    }
+
+    /// B09 — distinguishes a family AppKit knows nothing about from one that
+    /// exists but fails the grid's uniform-advance check, rather than
+    /// leaving both as an unexplained silent substitution. `.resolved` shows
+    /// nothing, matching `SettingsStatusView`'s "nothing to report" rule
+    /// everywhere else on this page.
+    private func applyFontStatus() {
+        let configuration = ConfigurationStore.shared.configuration
+        switch TerminalFont.resolution(forFamily: configuration.fontFamily) {
+        case .resolved:
+            fontStatusView.show(.none)
+        case .missing(let requested):
+            fontStatusView.show(
+                .failed(L10n.format("settings.status.fontMissing", requested)),
+                retry: { [weak self] in self?.retryFontResolution() },
+                actionTitle: L10n.text("settings.status.retry"))
+        case .invalidForGrid(let requested):
+            fontStatusView.show(
+                .failed(L10n.format("settings.status.fontInvalidForGrid", requested)),
+                retry: { [weak self] in self?.retryFontResolution() },
+                actionTitle: L10n.text("settings.status.retry"))
+        }
+    }
+
+    /// The first call site `MonospacedFontCatalog.refresh()` has ever had —
+    /// a font installed (or repaired) after this window opened is picked up
+    /// on request rather than only after a relaunch.
+    private func retryFontResolution() {
+        MonospacedFontCatalog.refresh()
+        applyFontStatus()
     }
 
     /// B07 — reflects `ShellIntegrationInstaller`'s three states as an icon,

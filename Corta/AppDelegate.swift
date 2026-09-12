@@ -274,22 +274,48 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // view; the view (and with it the pane's session) loads at
         // `showWindow`, after `pendingRestore` has been set.
         let preopened = windowControllers.first
-        var restored = 0
+        var restored: [(state: WindowState, controller: NSWindowController)] = []
         for state in states {
             guard let controller = instantiateWindowController(),
                 let split = controller.contentViewController as? SplitViewController
             else { continue }
             // Before the view loads: the root pane needs its working
-            // directory at spawn time.
+            // directory (and now, B09, its preset) at spawn time.
             split.pendingRestore = state
             controller.showWindow(nil)
             controller.window?.makeKeyAndOrderFront(nil)
-            restored += 1
+            restored.append((state, controller))
         }
         // Only if something replaced it — closing the sole window on a failed
         // restore would leave the app running with nothing on screen.
-        if restored > 0, let preopened, preopened.window?.isVisible == true {
+        if !restored.isEmpty, let preopened, preopened.window?.isVisible == true {
             preopened.window?.close()
+        }
+        regroupRestoredTabs(restored)
+    }
+
+    /// B09 — windows that were tabbed together come back that way, in the
+    /// order they were saved, with whichever was frontmost selected again —
+    /// instead of every restore turning previously-tabbed windows back into
+    /// standalone ones. Grouped by `tabGroupID`; a group of one (or a `nil`
+    /// ID) is left exactly as `restoreWindowsIfConfigured` already made it.
+    private func regroupRestoredTabs(
+        _ restored: [(state: WindowState, controller: NSWindowController)]
+    ) {
+        let byGroup = Dictionary(grouping: restored.filter { $0.state.tabGroupID != nil }) {
+            $0.state.tabGroupID!
+        }
+        for (_, members) in byGroup {
+            guard members.count > 1 else { continue }
+            let ordered = members.sorted { ($0.state.tabIndex ?? 0) < ($1.state.tabIndex ?? 0) }
+            guard let first = ordered.first?.controller.window else { continue }
+            for member in ordered.dropFirst() {
+                guard let window = member.controller.window else { continue }
+                first.addTabbedWindow(window, ordered: .above)
+            }
+            if let selected = ordered.first(where: { $0.state.isSelectedTab })?.controller.window {
+                selected.makeKeyAndOrderFront(nil)
+            }
         }
     }
 

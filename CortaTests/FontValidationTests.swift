@@ -62,6 +62,26 @@ import Testing
                 == CTFontCopyPostScriptName(system) as String)
     }
 
+    // MARK: - Resolution (B09)
+
+    @Test func resolutionIsResolvedForNilAndForTheSystemFamily() {
+        #expect(TerminalFont.resolution(forFamily: nil) == .resolved)
+        #expect(TerminalFont.resolution(forFamily: Configuration.systemFontFamily) == .resolved)
+    }
+
+    @Test func resolutionIsResolvedForAKnownGoodFamily() {
+        #expect(TerminalFont.resolution(forFamily: "Menlo") == .resolved)
+    }
+
+    @Test func resolutionDistinguishesMissingFromInvalidForGrid() {
+        #expect(
+            TerminalFont.resolution(forFamily: "No Such Family At All")
+                == .missing(requested: "No Such Family At All"))
+        #expect(
+            TerminalFont.resolution(forFamily: "Helvetica")
+                == .invalidForGrid(requested: "Helvetica"))
+    }
+
     // MARK: - Styles
 
     /// A family with real italics must use them; the four styles must be four

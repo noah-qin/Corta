@@ -3,12 +3,13 @@
 Every setting Corta has, in the one file that holds them:
 `~/.config/corta/config`.
 
-That file is the **single source of truth**. The Settings page (⌘,) edits
-it and reads the result back; there is no second store. An edit made in
-`$EDITOR` while Corta is running is picked up within a moment — the file
-and its directory are both watched, because most editors write a
-temporary file and rename it over the target rather than writing in
-place.
+That file is the **single source of truth for settings** — what this
+document covers. The Settings page (⌘,) edits it and reads the result
+back; there is no second *settings* store. An edit made in `$EDITOR` while
+Corta is running is picked up within a moment — the file and its directory
+are both watched, because most editors write a temporary file and rename
+it over the target rather than writing in place. (Two other files hold
+data that is not a setting at all — §8 explains the distinction.)
 
 The file is created with the current values the first time the Settings
 page is opened, so opening it once and then reading the file is the
@@ -482,3 +483,37 @@ search away.
 | `restore-windows` | The next launch. |
 | `update-auto-check` | Immediately — applied to the live Sparkle updater on every file change. |
 | `suggest-applications-folder` | The next launch. |
+
+## 8. Config file vs. app-owned state (B09)
+
+This file holds **settings**: values a person chose and might reasonably
+hand-edit, review in version control, or copy to another machine. Two more
+files, in `~/Library/Application Support/Corta/`, hold **state**: data
+Corta itself produces by being used, which nobody edits by hand and which
+would only look like noise in a diff.
+
+| Store | File | What it holds | Category |
+| --- | --- | --- | --- |
+| `Configuration` | `~/.config/corta/config` (this file) | Appearance, terminal behaviour, notifications, shell integration and history *toggles*, updates | **Global preference** — applies to every window and pane until changed again |
+| `Configuration.columns`/`.rows` | same file | The grid a *new* window opens with | **Window-launch default** — read once, at the moment a window is created; changing it does nothing to windows already open |
+| `Configuration.presets` | same file | Named shell/directory/environment combinations | **Pane-launch configuration** — read once, at the moment a pane spawns from that preset; never re-applied afterwards (`docs/CONFIGURATION.md` §4a) |
+| `SessionRestore` | `state.json` | Window frames and split arrangement, restored on the next launch | **Window/session state** — describes *this run's* windows, not a preference about future ones |
+| `DirectoryHistoryStore` | `directory-history.json` | Ranked recent/favourite directories | **Temporary interaction history** — a record of use, gated on/off by the `directory-history` *preference* but not itself a preference |
+
+Why three files rather than one: `Configuration` is line-oriented text
+specifically so a person can open it in `$EDITOR`, diff it, and understand
+every line; `state.json` and `directory-history.json` are JSON blobs a
+person never opens, rewritten wholesale on every change, with no comments
+or ordering worth preserving. Folding window arrangement or directory
+history into the hand-edited file would make every window move or `cd`
+churn the file a person is supposed to be able to read at a glance — the
+same reason `SessionRestore.swift`'s own header comment gives for keeping
+state in Application Support rather than the config directory.
+
+Both `state.json` and `directory-history.json` carry a `version` field
+(added in B09) so a future, incompatible change to either format can skip
+or migrate old data instead of the previous behaviour — silently discarding
+the *entire* file the moment it fails to decode. `Configuration` has never
+needed one: unknown keys are preserved verbatim (§1) and an unparsed line
+is simply skipped, so it already degrades one line at a time rather than as
+a whole file.

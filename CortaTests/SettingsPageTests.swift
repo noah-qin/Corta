@@ -96,10 +96,38 @@ struct SettingsPageTests {
 
     @Test("every shipped localization of the clipboard-write label fits the two-line row")
     func clipboardLabelFitsInEveryLocalization() throws {
-        // The column the label wraps in, and the two-line cap it wraps under:
-        // `SettingsWindowController.measuredLabelColumnWidth` clamps the label
-        // column at 240 pt and rows allow two lines. A translation that needs
-        // a third line in 240 pt would clip exactly like the reported defect.
+        try Self.assertFitsEveryLocalization(key: "settings.label.allowClipboardCopy")
+    }
+
+    /// B09 — the same check as `clipboardLabelFitsInEveryLocalization`,
+    /// generalized to every row label on the settings page rather than just
+    /// the one that was reported broken. New rows (like B09's own Font
+    /// Status and Preview) get the same guarantee for free the moment their
+    /// key is added to this list, instead of waiting for a second report.
+    @Test("every shipped localization of every settings row label fits its two-line row")
+    func everyRowLabelFitsInEveryLocalization() throws {
+        let keys = [
+            "settings.label.theme", "settings.label.lightOrDark", "settings.label.font",
+            "settings.label.fontStatus", "settings.label.size", "settings.label.preview",
+            "settings.label.scrollback", "settings.label.bell", "settings.label.optionAsMeta",
+            "settings.label.copyOnSelect", "settings.label.openLinksWith",
+            "settings.label.allowClipboardCopy", "settings.label.openFileCommand",
+            "settings.label.shellIntegration", "settings.label.newWindow",
+            "settings.label.restoreWindows", "settings.label.confirmClose",
+            "settings.label.notifyOnLongTasks", "settings.label.longerThan",
+            "settings.label.directoryHistory", "settings.label.directoryHistoryClear",
+        ]
+        for key in keys {
+            try Self.assertFitsEveryLocalization(key: key)
+        }
+    }
+
+    /// The column every label wraps in, and the two-line cap it wraps under:
+    /// `SettingsWindowController.measuredLabelColumnWidth` clamps the label
+    /// column at 240 pt and rows allow two lines. A translation that needs a
+    /// third line in 240 pt would clip exactly like the originally reported
+    /// defect (UI01).
+    private static func assertFitsEveryLocalization(key: String) throws {
         let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
         let lineHeight = NSTextField(labelWithString: "Ag").fittingSize.height
         for localization in Bundle.main.localizations {
@@ -107,10 +135,9 @@ struct SettingsPageTests {
                 let path = Bundle.main.path(forResource: localization, ofType: "lproj"),
                 let bundle = Bundle(path: path)
             else { continue }
-            let text = bundle.localizedString(
-                forKey: "settings.label.allowClipboardCopy", value: nil, table: "Localizable")
+            let text = bundle.localizedString(forKey: key, value: nil, table: "Localizable")
             // A bundle without the key answers with the key itself.
-            guard text != "settings.label.allowClipboardCopy" else { continue }
+            guard text != key else { continue }
             let needed = (text as NSString).boundingRect(
                 with: NSSize(width: 240, height: CGFloat.greatestFiniteMagnitude),
                 options: [.usesLineFragmentOrigin, .usesFontLeading],
@@ -118,7 +145,7 @@ struct SettingsPageTests {
             ).height
             #expect(
                 needed <= 2 * lineHeight + 1,
-                "\(localization) needs \(needed) pt (\(text)) — more than two lines")
+                "\(localization)'s \(key) needs \(needed) pt (\(text)) — more than two lines")
         }
     }
 
