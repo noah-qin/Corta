@@ -7,6 +7,7 @@
 
 import Cocoa
 import CortaTerminal
+import UserNotifications
 
 @main
 class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
@@ -191,6 +192,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             }
         }
         restoreWindowsIfConfigured()
+        // B07 — so a click on a `TaskNotifier` notification can jump back to
+        // the command it was about (`AppDelegate+Notifications.swift`).
+        UNUserNotificationCenter.current().delegate = self
     }
 
     // MARK: - Reopening (M7.3)

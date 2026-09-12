@@ -180,6 +180,8 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     case nextFailedCommand = "next-failed-command"
     case copyLastCommandOutput = "copy-last-command-output"
     case snapshotRunningCommandOutput = "snapshot-running-command-output"
+    case exportCommandOutput = "export-command-output"
+    case openFileReferenceInCommand = "open-file-reference-in-command"
     case exportText = "export-text"
     case clearScreen = "clear-screen"
     case clearHistory = "clear-history"
@@ -224,6 +226,9 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .copyLastCommandOutput: return L10n.text("command.copyLastCommandOutput")
         case .snapshotRunningCommandOutput:
             return L10n.text("command.snapshotRunningCommandOutput")
+        case .exportCommandOutput: return L10n.text("command.exportCommandOutput")
+        case .openFileReferenceInCommand:
+            return L10n.text("command.openFileReferenceInCommand")
         case .exportText: return L10n.text("command.exportText")
         case .clearScreen: return L10n.text("command.clearScreen")
         case .clearHistory: return L10n.text("command.clearHistory")
@@ -278,6 +283,9 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
             return #selector(ViewController.copyLastCommandOutput(_:))
         case .snapshotRunningCommandOutput:
             return #selector(ViewController.snapshotRunningCommandOutput(_:))
+        case .exportCommandOutput: return #selector(ViewController.exportCommandOutput(_:))
+        case .openFileReferenceInCommand:
+            return #selector(ViewController.openFileReferenceInCommand(_:))
         case .exportText: return #selector(ViewController.exportText(_:))
         case .clearScreen: return #selector(ViewController.clearScreen(_:))
         case .clearHistory: return #selector(ViewController.clearHistory(_:))
@@ -341,6 +349,8 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
             return Shortcut(Shortcut.parse("down")!.key, [.command, .shift])
         case .copyLastCommandOutput: return nil
         case .snapshotRunningCommandOutput: return nil
+        case .exportCommandOutput: return nil
+        case .openFileReferenceInCommand: return nil
         // ⇧⌘S, the save-as of an app that has no document to save.
         case .exportText: return Shortcut("s", [.command, .shift])
         case .clearScreen: return Shortcut("k", .command)
@@ -368,7 +378,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .increaseFontSize, .decreaseFontSize, .resetFontSize, .scrollPageUp,
             .scrollPageDown, .scrollToTop, .scrollToBottom, .previousCommand, .nextCommand,
             .previousFailedCommand, .nextFailedCommand, .copyLastCommandOutput,
-            .snapshotRunningCommandOutput:
+            .snapshotRunningCommandOutput, .exportCommandOutput, .openFileReferenceInCommand:
             return .view
         case .clearScreen, .clearHistory, .resetTerminal: return .terminal
         case .find, .copy, .paste, .selectAll, .exportText: return .edit
@@ -411,6 +421,8 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .nextFailedCommand: return 10
         case .copyLastCommandOutput: return 11
         case .snapshotRunningCommandOutput: return 12
+        case .exportCommandOutput: return 13
+        case .openFileReferenceInCommand: return 14
         case .copy: return 0
         case .paste: return 1
         case .selectAll: return 2

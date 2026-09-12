@@ -946,7 +946,10 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
                 actionTitle: L10n.text("settings.action.installAnyway"))
         case .installed:
             shellIntegrationStatusView.show(
-                .adjusted(L10n.text("settings.status.shellIntegrationInstalled")),
+                .adjusted(
+                    L10n.format(
+                        "settings.status.shellIntegrationInstalled",
+                        ShellIntegrationInstaller.shared.displayPath)),
                 retry: { [weak self] in self?.removeShellIntegration() },
                 actionTitle: L10n.text("settings.action.remove"))
         }
@@ -955,7 +958,10 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
     private func installShellIntegration() {
         guard ShellIntegrationInstaller.shared.install() else {
             shellIntegrationStatusView.show(
-                .failed(L10n.text("settings.status.shellIntegrationWriteFailed")))
+                .failed(
+                    L10n.format(
+                        "settings.status.shellIntegrationWriteFailed",
+                        ShellIntegrationInstaller.shared.displayPath)))
             return
         }
         applyShellIntegrationStatus()
@@ -964,7 +970,10 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
     private func removeShellIntegration() {
         guard ShellIntegrationInstaller.shared.uninstall() else {
             shellIntegrationStatusView.show(
-                .failed(L10n.text("settings.status.shellIntegrationWriteFailed")))
+                .failed(
+                    L10n.format(
+                        "settings.status.shellIntegrationWriteFailed",
+                        ShellIntegrationInstaller.shared.displayPath)))
             return
         }
         applyShellIntegrationStatus()

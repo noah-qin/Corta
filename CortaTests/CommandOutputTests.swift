@@ -54,7 +54,7 @@ struct CommandOutputTests {
             ("echo one", ["one"], 0),
             ("echo two", ["two", "and more"], 0),
         ])
-        let text = try #require(ViewController.commandOutput(in: terminal.grid, scrollOffset: 0))
+        let text = try #require(ViewController.commandOutput(in: terminal.grid, records: terminal.commandRecords, scrollOffset: 0))
         #expect(text.contains("two"))
         #expect(text.contains("and more"))
         // Not the command line itself, and not the earlier command's output.
@@ -72,7 +72,7 @@ struct CommandOutputTests {
             ("short", ["ignored"], 0),
             ("long", lines, 0),
         ])
-        let text = try #require(ViewController.commandOutput(in: terminal.grid, scrollOffset: 0))
+        let text = try #require(ViewController.commandOutput(in: terminal.grid, records: terminal.commandRecords, scrollOffset: 0))
         #expect(text.contains("line0"))
         #expect(text.contains("line79"))
         #expect(!text.contains("ignored"))
@@ -92,7 +92,7 @@ struct CommandOutputTests {
         terminal.feed(Array("\u{1B}]133;D;0\u{7}\u{1B}]133;A\u{7}$ ".utf8))
 
         let text = try #require(
-            ViewController.commandOutput(in: terminal.grid, scrollOffset: 0))
+            ViewController.commandOutput(in: terminal.grid, records: terminal.commandRecords, scrollOffset: 0))
         #expect(text.trimmingCharacters(in: .whitespacesAndNewlines) == "hi")
         #expect(!text.contains("echo hi"))
         #expect(!text.contains("~/src"))
@@ -106,7 +106,7 @@ struct CommandOutputTests {
         terminal.feed(Array("\u{1B}]133;A\u{7}$ echo hi\r\nhi\r\n".utf8))
         terminal.feed(Array("\u{1B}]133;D;0\u{7}\u{1B}]133;A\u{7}$ ".utf8))
         let text = try #require(
-            ViewController.commandOutput(in: terminal.grid, scrollOffset: 0))
+            ViewController.commandOutput(in: terminal.grid, records: terminal.commandRecords, scrollOffset: 0))
         #expect(text.contains("hi"))
     }
 
@@ -136,11 +136,11 @@ struct CommandOutputTests {
         terminal.feed(Array("\u{1B}]133;A\u{7}$ ".utf8))
         let grid = terminal.grid
 
-        let latest = try #require(ViewController.commandOutput(in: grid, scrollOffset: 0))
+        let latest = try #require(ViewController.commandOutput(in: grid, records: terminal.commandRecords, scrollOffset: 0))
         #expect(latest.contains("out5-0"))
 
         // Scrolled up far enough that an earlier command fills the viewport.
-        let scrolled = try #require(ViewController.commandOutput(in: grid, scrollOffset: 18))
+        let scrolled = try #require(ViewController.commandOutput(in: grid, records: terminal.commandRecords, scrollOffset: 18))
         #expect(!scrolled.contains("out5-0"))
         #expect(scrolled.contains("out"))
     }
@@ -153,11 +153,11 @@ struct CommandOutputTests {
         var bare = Terminal(rows: 24, columns: 40, scrollbackLimit: 100)
         bare.feed(Array("$ ls\r\nfile\r\n".utf8))
         #expect(bare.grid.promptRows.isEmpty)
-        #expect(ViewController.commandOutput(in: bare.grid, scrollOffset: 0) == nil)
+        #expect(ViewController.commandOutput(in: bare.grid, records: bare.commandRecords, scrollOffset: 0) == nil)
 
         var fresh = Terminal(rows: 24, columns: 40, scrollbackLimit: 100)
         fresh.feed(Array("\u{1B}]133;A\u{7}$ ".utf8))
-        #expect(ViewController.commandOutput(in: fresh.grid, scrollOffset: 0) == nil)
+        #expect(ViewController.commandOutput(in: fresh.grid, records: fresh.commandRecords, scrollOffset: 0) == nil)
     }
 
     /// A command that printed nothing has an empty range, not a range over
@@ -165,7 +165,7 @@ struct CommandOutputTests {
     @Test("a command that printed nothing yields no output")
     func silentCommand() {
         let terminal = Self.session(commands: [("true", [], 0)])
-        #expect(ViewController.commandOutput(in: terminal.grid, scrollOffset: 0) == nil)
+        #expect(ViewController.commandOutput(in: terminal.grid, records: terminal.commandRecords, scrollOffset: 0) == nil)
     }
 }
 

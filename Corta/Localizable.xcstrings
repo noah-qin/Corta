@@ -9914,6 +9914,124 @@
         }
       }
     },
+    "command.exportCommandOutput": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export Command Output…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "导出命令输出…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "匯出命令輸出…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "コマンドの出力を書き出す…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "명령 출력 내보내기…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Befehlsausgabe exportieren…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Exporter la sortie de la commande…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Exportar salida del comando…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Exportar saída do comando…"
+          }
+        }
+      }
+    },
+    "command.openFileReferenceInCommand": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open File Reference in Command Output"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "打开命令输出中的文件引用"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "開啟命令輸出中的檔案參照"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "コマンド出力内のファイル参照を開く"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "명령 출력의 파일 참조 열기"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Dateiverweis in Befehlsausgabe öffnen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ouvrir la référence de fichier dans la sortie de la commande"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Abrir referencia de archivo en la salida del comando"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Abrir referência de arquivo na saída do comando"
+          }
+        }
+      }
+    },
     "command.previousFailedCommand": {
       "extractionState": "manual",
       "localizations": {
@@ -10677,6 +10795,65 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Salvar o histórico e a tela visível."
+          }
+        }
+      }
+    },
+    "export.message.command": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save this command's output."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "保存此命令的输出。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "儲存此命令的輸出。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "このコマンドの出力を保存します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "이 명령의 출력을 저장합니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ausgabe dieses Befehls sichern."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Enregistrer la sortie de cette commande."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Guardar la salida de este comando."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Salvar a saída deste comando."
           }
         }
       }
@@ -12038,6 +12215,65 @@
         }
       }
     },
+    "toast.noFileReferenceInCommand": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No file reference found in this command's output"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "此命令的输出中未找到文件引用"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "此命令的輸出中未找到檔案參照"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "このコマンドの出力にファイル参照が見つかりません"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "이 명령의 출력에서 파일 참조를 찾을 수 없습니다"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Kein Dateiverweis in der Ausgabe dieses Befehls gefunden"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Aucune référence de fichier trouvée dans la sortie de cette commande"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se encontró ninguna referencia de archivo en la salida de este comando"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Nenhuma referência de arquivo encontrada na saída deste comando"
+          }
+        }
+      }
+    },
     "snapshot.header": {
       "extractionState": "manual",
       "localizations": {
@@ -12221,55 +12457,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lets Corta see where each command starts, ends and whether it failed. Installs into ~/.zshrc, reversibly."
+            "value": "Lets Corta see where each command starts, ends and whether it failed. Installs into your shell's startup file (zsh, bash or fish), reversibly."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "让 Corta 知道每条命令在哪里开始、结束及是否失败。以可逆的方式安装到 ~/.zshrc。"
+            "value": "让 Corta 知道每条命令在哪里开始、结束及是否失败。以可逆的方式安装到你所用 shell（zsh、bash 或 fish）的启动文件。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "讓 Corta 知道每個命令在哪裡開始、結束以及是否失敗。以可還原的方式安裝到 ~/.zshrc。"
+            "value": "讓 Corta 知道每個命令在哪裡開始、結束以及是否失敗。以可還原的方式安裝到你所用 shell（zsh、bash 或 fish）的啟動檔。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "各コマンドの開始位置、終了位置、失敗したかどうかを Corta が把握できるようになります。~/.zshrc に可逆的にインストールします。"
+            "value": "各コマンドの開始位置、終了位置、失敗したかどうかを Corta が把握できるようになります。使用しているシェル（zsh、bash、fish のいずれか）の起動ファイルに可逆的にインストールします。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "각 명령이 어디서 시작되고 끝났는지, 실패했는지를 Corta가 알 수 있게 합니다. ~/.zshrc에 되돌릴 수 있게 설치됩니다."
+            "value": "각 명령이 어디서 시작되고 끝났는지, 실패했는지를 Corta가 알 수 있게 합니다. 사용 중인 셸(zsh, bash 또는 fish)의 시작 파일에 되돌릴 수 있게 설치됩니다."
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Ermöglicht Corta zu erkennen, wo jeder Befehl beginnt, endet und ob er fehlgeschlagen ist. Wird reversibel in ~/.zshrc installiert."
+            "value": "Ermöglicht Corta zu erkennen, wo jeder Befehl beginnt, endet und ob er fehlgeschlagen ist. Wird reversibel in die Startdatei der verwendeten Shell (zsh, bash oder fish) installiert."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Permet à Corta de savoir où chaque commande commence, se termine et si elle a échoué. Installation réversible dans ~/.zshrc."
+            "value": "Permet à Corta de savoir où chaque commande commence, se termine et si elle a échoué. Installation réversible dans le fichier de démarrage du shell utilisé (zsh, bash ou fish)."
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Permite que Corta sepa dónde empieza y termina cada comando, y si falló. Se instala de forma reversible en ~/.zshrc."
+            "value": "Permite que Corta sepa dónde empieza y termina cada comando, y si falló. Se instala de forma reversible en el archivo de inicio del shell en uso (zsh, bash o fish)."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Permite que o Corta saiba onde cada comando começa, termina e se falhou. Instalado de forma reversível em ~/.zshrc."
+            "value": "Permite que o Corta saiba onde cada comando começa, termina e se falhou. Instalado de forma reversível no arquivo de inicialização do shell em uso (zsh, bash ou fish)."
           }
         }
       }
@@ -12339,55 +12575,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Installed in ~/.zshrc"
+            "value": "Installed in %@"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "已安装到 ~/.zshrc"
+            "value": "已安装到 %@"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "已安裝至 ~/.zshrc"
+            "value": "已安裝至 %@"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "~/.zshrc にインストール済み"
+            "value": "%@ にインストール済み"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "~/.zshrc에 설치됨"
+            "value": "%@에 설치됨"
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "In ~/.zshrc installiert"
+            "value": "In %@ installiert"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Installée dans ~/.zshrc"
+            "value": "Installée dans %@"
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Instalada en ~/.zshrc"
+            "value": "Instalada en %@"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Instalada em ~/.zshrc"
+            "value": "Instalada em %@"
           }
         }
       }
@@ -12457,55 +12693,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Couldn't update ~/.zshrc"
+            "value": "Couldn't update %@"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "无法更新 ~/.zshrc"
+            "value": "无法更新 %@"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "無法更新 ~/.zshrc"
+            "value": "無法更新 %@"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "~/.zshrc を更新できませんでした"
+            "value": "%@ を更新できませんでした"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "~/.zshrc를 업데이트하지 못했습니다"
+            "value": "%@를 업데이트하지 못했습니다"
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "~/.zshrc konnte nicht aktualisiert werden"
+            "value": "%@ konnte nicht aktualisiert werden"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Impossible de mettre à jour ~/.zshrc"
+            "value": "Impossible de mettre à jour %@"
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "No se pudo actualizar ~/.zshrc"
+            "value": "No se pudo actualizar %@"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Não foi possível atualizar o ~/.zshrc"
+            "value": "Não foi possível atualizar o %@"
           }
         }
       }

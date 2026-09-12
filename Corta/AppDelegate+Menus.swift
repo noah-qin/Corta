@@ -343,6 +343,7 @@ extension AppDelegate {
         for command in [
             TerminalCommand.previousCommand, .nextCommand, .previousFailedCommand,
             .nextFailedCommand, .copyLastCommandOutput, .snapshotRunningCommandOutput,
+            .exportCommandOutput, .openFileReferenceInCommand,
         ] {
             shell.addItem(item(for: command))
         }

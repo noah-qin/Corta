@@ -43,6 +43,10 @@ final class TaskNotifier {
     private var wasCommandRunning = false
     /// The exit status of the command that just finished, for the body text.
     private var lastExitStatus: Int?
+    /// The id of the command that just finished, so clicking the
+    /// notification can jump to it (B07) — `nil` on the heuristic path,
+    /// which has no `CommandRecord` to name.
+    private var lastCommandID: Int?
     /// The window to check for key status when the task ends, and the pane's
     /// title for the notification body.
     private weak var window: NSWindow?
@@ -110,7 +114,13 @@ final class TaskNotifier {
 
     /// The shell said a command started or stopped (OSC 133 C / D). Once
     /// this is called even once, the heuristic below stops running.
-    func noteCommandRunning(_ running: Bool, exitStatus: Int?, in window: NSWindow?) {
+    ///
+    /// - Parameter commandID: the `CommandRecord.id` that just finished, so
+    ///   a click on the resulting notification can jump straight back to it
+    ///   (B07). `nil` on a start edge, where there is nothing finished yet.
+    func noteCommandRunning(
+        _ running: Bool, exitStatus: Int?, commandID: Int?, in window: NSWindow?
+    ) {
         usesShellIntegration = true
         idleTimer?.invalidate()
         idleTimer = nil
@@ -124,6 +134,7 @@ final class TaskNotifier {
             requestAuthorizationOnce()
         } else if !running, wasCommandRunning {
             lastExitStatus = exitStatus
+            lastCommandID = commandID
             finishExactly()
         }
         wasCommandRunning = running
@@ -202,6 +213,14 @@ final class TaskNotifier {
         lastExitStatus = nil
         content.body = L10n.format("notification.body", outcome, Self.duration(elapsed))
         content.sound = nil
+        // B07 — carries just enough to find the pane and the command again:
+        // a window number and a `CommandRecord.id`, both meaningless outside
+        // this running app and neither of them the command's own text.
+        var userInfo: [String: Any] = [:]
+        if let windowNumber = window?.windowNumber { userInfo["windowNumber"] = windowNumber }
+        if let lastCommandID { userInfo["commandID"] = lastCommandID }
+        content.userInfo = userInfo
+        lastCommandID = nil
         UNUserNotificationCenter.current().add(
             UNNotificationRequest(
                 identifier: UUID().uuidString, content: content, trigger: nil))

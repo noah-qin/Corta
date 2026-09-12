@@ -40,7 +40,35 @@ extension ViewController {
         let grid = session.snapshot()
         let hasSelection = selection != nil
         let range = selection.map { selectionRange(for: $0, in: grid) }
+        performExport(
+            window: window, grid: grid, range: range,
+            messageKey: hasSelection ? "export.message.selection" : "export.message.history",
+            filename: Self.exportFilename(hasSelection: hasSelection))
+    }
 
+    /// B07 — the same export, scoped to `effectiveCommand`'s output rather
+    /// than the current selection: the identity-based counterpart to
+    /// `copyLastCommandOutput`, for a build log too long to want on the
+    /// clipboard but still worth attaching to a bug report.
+    @objc func exportCommandOutput(_ sender: Any?) {
+        guard isOperable, let window = view.window, session != nil else { return }
+        let grid = session.snapshot()
+        guard let range = Self.commandOutputRange(grid: grid, record: effectiveCommand) else {
+            terminalView?.showToast(L10n.text("toast.noCommandOutput"), kind: .warning)
+            return
+        }
+        performExport(
+            window: window, grid: grid, range: range, messageKey: "export.message.command",
+            filename: Self.exportFilename(kind: "Command Output"))
+    }
+
+    /// The save-panel/write flow both `exportText` and `exportCommandOutput`
+    /// share — see `exportText`'s doc comment above for why the build runs
+    /// off the main thread and why cancellation is generation-guarded rather
+    /// than relied on to always land before a result is applied.
+    private func performExport(
+        window: NSWindow, grid: Grid, range: SelectionRange?, messageKey: String, filename: String
+    ) {
         largeTextTask?.cancel()
         largeTextTaskGeneration &+= 1
         let generation = largeTextTaskGeneration
@@ -85,13 +113,10 @@ extension ViewController {
                             }
                             let panel = NSSavePanel()
                             panel.allowedContentTypes = [.plainText]
-                            panel.nameFieldStringValue = Self.exportFilename(
-                                hasSelection: hasSelection)
+                            panel.nameFieldStringValue = filename
                             panel.canCreateDirectories = true
                             panel.isExtensionHidden = false
-                            panel.message = L10n.text(
-                                hasSelection
-                                    ? "export.message.selection" : "export.message.history")
+                            panel.message = L10n.text(messageKey)
                             panelBox.panel = panel
                             panel.beginSheetModal(for: window) { response in
                                 continuation.resume(returning: response == .OK ? panel.url : nil)
@@ -190,10 +215,13 @@ extension ViewController {
     /// A name that says what the file is and when it was taken, so a folder
     /// of them is still readable a week later.
     static func exportFilename(hasSelection: Bool, date: Date = Date()) -> String {
+        exportFilename(kind: hasSelection ? "Selection" : "History", date: date)
+    }
+
+    static func exportFilename(kind: String, date: Date = Date()) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
-        let kind = hasSelection ? "Selection" : "History"
         return "Corta \(kind) \(formatter.string(from: date)).txt"
     }
 }

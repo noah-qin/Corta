@@ -1,6 +1,31 @@
 import Foundation
 
-/// B07 — installs, diagnoses and removes Corta's zsh shell integration.
+/// B07 — the shells Corta can install its integration snippet into.
+enum ShellKind: String, CaseIterable {
+    case zsh, bash, fish
+
+    /// Parsed from `$SHELL`'s last path component — the login shell the
+    /// user actually typed a password to get, not whatever spawned Corta.
+    /// An unrecognized or missing value falls back to `zsh`, matching the
+    /// only shell this ever supported before bash/fish existed.
+    static var loginShell: ShellKind {
+        let name = (ProcessInfo.processInfo.environment["SHELL"] as NSString?)?.lastPathComponent
+        return name.flatMap(ShellKind.init(rawValue:)) ?? .zsh
+    }
+
+    var defaultRCFileURL: URL {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        switch self {
+        case .zsh: return home.appendingPathComponent(".zshrc")
+        case .bash: return home.appendingPathComponent(".bashrc")
+        case .fish: return home.appendingPathComponent(".config/fish/config.fish")
+        }
+    }
+
+    var script: String { ShellIntegrationScript.script(for: self) }
+}
+
+/// B07 — installs, diagnoses and removes Corta's shell integration.
 ///
 /// Nothing in Corta requires this: a session without it falls back to
 /// `TaskNotifier`'s keystroke-and-idle heuristic and greys out the menu
@@ -29,15 +54,35 @@ enum ShellIntegrationStatus: Equatable {
 }
 
 struct ShellIntegrationInstaller {
+    /// Which shell's hooks and rc file this instance targets.
+    let shell: ShellKind
+
     /// The rc file this instance reads and writes — injected so a test can
-    /// point at a temporary file instead of the user's real `~/.zshrc`.
-    /// Never change the file a running Corta actually reads to test this
+    /// point at a temporary file instead of the user's real rc file. Never
+    /// change the file a running Corta actually reads to test this
     /// (`CLAUDE.md` — "Never change the machine to test").
     let rcFileURL: URL
 
-    static let shared = ShellIntegrationInstaller(
-        rcFileURL: FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".zshrc"))
+    init(shell: ShellKind, rcFileURL: URL) {
+        self.shell = shell
+        self.rcFileURL = rcFileURL
+    }
+
+    init(shell: ShellKind) {
+        self.init(shell: shell, rcFileURL: shell.defaultRCFileURL)
+    }
+
+    static let shared = ShellIntegrationInstaller(shell: .loginShell)
+
+    /// `rcFileURL` with the home directory abbreviated to `~`, for status
+    /// copy — `"~/.zshrc"`, not the full path a sandboxed-looking absolute
+    /// path would imply.
+    var displayPath: String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let path = rcFileURL.path
+        guard path.hasPrefix(home) else { return path }
+        return "~" + path.dropFirst(home.count)
+    }
 
     private static let beginMarker = "# >>> Corta shell integration >>>"
     private static let endMarker = "# <<< Corta shell integration <<<"
@@ -78,7 +123,7 @@ struct ShellIntegrationInstaller {
         var existing = (try? String(contentsOf: rcFileURL, encoding: .utf8)) ?? ""
         guard !existing.contains(Self.beginMarker) else { return true }
         if !existing.isEmpty, !existing.hasSuffix("\n") { existing += "\n" }
-        let block = "\n\(Self.beginMarker)\n\(ShellIntegrationScript.zsh)\n\(Self.endMarker)\n"
+        let block = "\n\(Self.beginMarker)\n\(shell.script)\n\(Self.endMarker)\n"
         return write(existing + block)
     }
 

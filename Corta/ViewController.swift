@@ -77,9 +77,18 @@ class ViewController: NSViewController {
     /// U16 — the preset this pane was opened from, applied once at spawn
     /// time. Set before the view loads, like `inheritedWorkingDirectory`.
     var preset: Preset?
+    /// B07 — the command jump navigation last landed on; `nil` once the
+    /// viewport has moved away from it (`scrollOffset`'s `didSet` below), so
+    /// `effectiveCommand` never targets a command that has scrolled out of
+    /// the picture. Set by `jumpToCommand` right after it sets `scrollOffset`
+    /// itself, which fires this same `didSet` and clears it first — the
+    /// jump's own selection is always the last word.
+    var selectedCommandID: Int?
+
     var scrollOffset = 0 {
         didSet {
             guard scrollOffset != oldValue else { return }
+            selectedCommandID = nil
             // Back at the bottom means there is nothing below to be told
             // about; the "new output" state starts again from here (U12).
             if scrollOffset == 0 {
@@ -960,7 +969,9 @@ class ViewController: NSViewController {
             let finished = session.takeFinishedCommand()
             if session.hasShellIntegration {
                 taskNotifier.noteCommandRunning(
-                    session.isCommandRunning, exitStatus: finished, in: view.window)
+                    session.isCommandRunning, exitStatus: finished,
+                    commandID: finished != nil ? session.commandRecords.lastCompleted?.id : nil,
+                    in: view.window)
                 // B08 — a directory is worth ranking once a command has
                 // actually run there, not on every OSC 7 report a `cd` with
                 // no command after it would also produce.
