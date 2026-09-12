@@ -67,6 +67,7 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 | Key | Values | Default | Notes |
 | --- | --- | --- | --- |
 | `scrollback-lines` | 0–1000000 | `10000` | Lines of history per session. **Applies to sessions opened afterwards**: a running child's history cannot be re-limited without discarding lines. |
+| `command-history-limit` | 0–10000 | `512` | How many completed/running commands a session's structured command history (jumping, copy/export by identity, Command History search) keeps at once — separate from `scrollback-lines`, which bounds visible text, not command records. **Applies to sessions opened afterwards**, same reason as `scrollback-lines`. |
 | `bell` | `visual`, `audible`, `muted` | `visual` | `visual` flashes the pane; `audible` is `NSSound.beep()`. |
 | `option-as-meta` | boolean | `false` | Whether ⌥ acts as Meta — an ESC prefix on the base character, the way a PC keyboard's Alt does — instead of composing the layout's alternate character. Off by default because on macOS ⌥ *is* text input: it types `é`, `ø`, `–`, and starts dead-key sequences, and an international layout needs that. Turn it on when a program wants `M-x` and `M-b`. Special keys are unaffected either way: ⌥ already reaches the child there as the xterm modifier parameter, and an IME still sees every event it would otherwise see. |
 | `open-file-command` | string | *(empty)* | The command run when a `path:line` reference in program output is ⌘-clicked. `{file}`, `{line}` and `{column}` are substituted, one argument at a time. The executable must be an **absolute path** and is run directly — never through a shell — so a path containing `;` or `$(…)` stays a path. Empty means the system default application for the file's type, which cannot be told a line number; the hover tooltip says so. |
@@ -477,6 +478,7 @@ search away.
 | `theme.*` | Immediately, if the live theme is the one you edited. |
 | `columns`, `rows` | The next window opened. |
 | `scrollback-lines` | Sessions started afterwards; a running shell keeps the history it has. |
+| `command-history-limit` | Sessions started afterwards, same reason as `scrollback-lines`. |
 | `restore-windows` | The next launch. |
 | `update-auto-check` | Immediately — applied to the live Sparkle updater on every file change. |
 | `suggest-applications-folder` | The next launch. |

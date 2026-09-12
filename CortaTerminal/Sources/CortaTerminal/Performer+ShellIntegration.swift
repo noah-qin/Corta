@@ -52,6 +52,11 @@ extension Performer {
             // `ViewController.canChangeDirectorySafely`).
             if state.promptRow == grid.absoluteRow(ofScreenRow: grid.cursor.row) {
                 state.promptEndColumn = grid.cursor.column
+                // B08 — the same column, kept on the record itself so a
+                // command still recorded once it has scrolled off the live
+                // prompt (`ViewController.commandLineText(grid:record:)`)
+                // can still say where its own text started.
+                state.commandRecords.markPromptEnd(column: grid.cursor.column)
             }
         case 0x43:  // 'C' — the command is running, and its output starts here
             state.isCommandRunning = true

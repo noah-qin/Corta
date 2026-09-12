@@ -35,15 +35,18 @@ struct MenuStructureTests {
     /// navigation families. The terminal-state commands (U11) are their own
     /// group because each one discards something, and grouping them with
     /// anything else would make that less obvious, not more.
-    @Test("Shell groups presets, create, move, clear, then resize")
+    @Test("Shell groups presets, create, move, directories, clear, then resize")
     func shellMenuGrouping() throws {
         let groups = try Self.shellGroups()
-        #expect(groups.count == 6, "presets, splits, focus, navigation, state, resize")
+        #expect(
+            groups.count == 7, "presets, splits, focus, navigation, directories, state, resize")
 
         let split = #selector(SplitViewController.splitRight(_:))
         let focusLeft = #selector(SplitViewController.moveFocusLeft(_:))
         let previousCommand = #selector(ViewController.jumpToPreviousCommand(_:))
         let copyOutput = #selector(ViewController.copyLastCommandOutput(_:))
+        let revealWorkingDirectory = #selector(ViewController.revealWorkingDirectoryInFinder(_:))
+        let changeToProjectRoot = #selector(ViewController.changeDirectoryToProjectRoot(_:))
         let clearScreen = #selector(ViewController.clearScreen(_:))
         let reset = #selector(ViewController.resetTerminal(_:))
         let zoom = #selector(SplitViewController.toggleZoomPane(_:))
@@ -62,14 +65,19 @@ struct MenuStructureTests {
         #expect(groups[3].first == previousCommand)
         #expect(groups[3].contains(copyOutput))
 
+        // B08 — directory navigation: reveal/copy (reads), then the two
+        // `cd` primitives, then the two new-pane variants.
+        #expect(groups[4].first == revealWorkingDirectory)
+        #expect(groups[4].contains(changeToProjectRoot))
+
         // U11 — the three state commands, in the order of how much each
         // discards.
-        #expect(groups[4].first == clearScreen)
-        #expect(groups[4].contains(reset))
+        #expect(groups[5].first == clearScreen)
+        #expect(groups[5].contains(reset))
 
         // Geometry last, zoom at its head (U13).
-        #expect(groups[5].first == zoom)
-        #expect(groups[5].last == equalize)
+        #expect(groups[6].first == zoom)
+        #expect(groups[6].last == equalize)
     }
 
     @Test("View has one Theme submenu holding appearance, then themes")

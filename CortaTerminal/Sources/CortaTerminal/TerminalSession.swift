@@ -234,7 +234,8 @@ public final class TerminalSession: @unchecked Sendable {
         environment: [String: String] = ChildEnvironment.default(),
         size: TerminalSize = TerminalSize(),
         workingDirectory: String? = nil,
-        scrollbackLimit: Int = Scrollback.defaultLimit
+        scrollbackLimit: Int = Scrollback.defaultLimit,
+        commandHistoryLimit: Int = CommandRecordStore.defaultCapacity
     ) throws(PTYError) {
         let pty = try PTY.spawn(
             executable: executable,
@@ -246,7 +247,8 @@ public final class TerminalSession: @unchecked Sendable {
         self.pty = pty
         self.state = Mutex(State(
             terminal: Terminal(
-                rows: Int(size.rows), columns: Int(size.columns), scrollbackLimit: scrollbackLimit
+                rows: Int(size.rows), columns: Int(size.columns), scrollbackLimit: scrollbackLimit,
+                commandHistoryLimit: commandHistoryLimit
             )
         ))
         // The reader is NOT started here: `onOutput`/`onChildExit` must be
@@ -764,6 +766,12 @@ public final class TerminalSession: @unchecked Sendable {
     /// `snapshot()`'s grid: the lock is held only to copy it.
     public var commandRecords: CommandRecordStore {
         state.withLock { $0.terminal.commandRecords }
+    }
+
+    /// B08 — empties the command history without touching scrollback or the
+    /// live screen; see `Terminal.clearCommandRecords()`.
+    public func clearCommandRecords() {
+        state.withLock { $0.terminal.clearCommandRecords() }
     }
 
     /// Consumes the exit status of a command that just finished (OSC 133 D).

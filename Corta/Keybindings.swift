@@ -182,6 +182,13 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     case snapshotRunningCommandOutput = "snapshot-running-command-output"
     case exportCommandOutput = "export-command-output"
     case openFileReferenceInCommand = "open-file-reference-in-command"
+    case revealWorkingDirectory = "reveal-working-directory"
+    case copyWorkingDirectoryPath = "copy-working-directory-path"
+    case changeDirectoryToParent = "change-directory-to-parent"
+    case changeDirectoryToProjectRoot = "change-directory-to-project-root"
+    case openParentDirectoryInNewPane = "open-parent-directory-in-new-pane"
+    case openProjectRootInNewPane = "open-project-root-in-new-pane"
+    case searchCommandHistory = "search-command-history"
     case exportText = "export-text"
     case clearScreen = "clear-screen"
     case clearHistory = "clear-history"
@@ -229,6 +236,16 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .exportCommandOutput: return L10n.text("command.exportCommandOutput")
         case .openFileReferenceInCommand:
             return L10n.text("command.openFileReferenceInCommand")
+        case .revealWorkingDirectory: return L10n.text("command.revealWorkingDirectory")
+        case .copyWorkingDirectoryPath: return L10n.text("command.copyWorkingDirectoryPath")
+        case .changeDirectoryToParent: return L10n.text("command.changeDirectoryToParent")
+        case .changeDirectoryToProjectRoot:
+            return L10n.text("command.changeDirectoryToProjectRoot")
+        case .openParentDirectoryInNewPane:
+            return L10n.text("command.openParentDirectoryInNewPane")
+        case .openProjectRootInNewPane:
+            return L10n.text("command.openProjectRootInNewPane")
+        case .searchCommandHistory: return L10n.text("command.searchCommandHistory")
         case .exportText: return L10n.text("command.exportText")
         case .clearScreen: return L10n.text("command.clearScreen")
         case .clearHistory: return L10n.text("command.clearHistory")
@@ -286,6 +303,19 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .exportCommandOutput: return #selector(ViewController.exportCommandOutput(_:))
         case .openFileReferenceInCommand:
             return #selector(ViewController.openFileReferenceInCommand(_:))
+        case .revealWorkingDirectory:
+            return #selector(ViewController.revealWorkingDirectoryInFinder(_:))
+        case .copyWorkingDirectoryPath:
+            return #selector(ViewController.copyWorkingDirectoryPath(_:))
+        case .changeDirectoryToParent:
+            return #selector(ViewController.changeDirectoryToParent(_:))
+        case .changeDirectoryToProjectRoot:
+            return #selector(ViewController.changeDirectoryToProjectRoot(_:))
+        case .openParentDirectoryInNewPane:
+            return #selector(ViewController.openParentDirectoryInNewPane(_:))
+        case .openProjectRootInNewPane:
+            return #selector(ViewController.openProjectRootInNewPane(_:))
+        case .searchCommandHistory: return #selector(ViewController.searchCommandHistory(_:))
         case .exportText: return #selector(ViewController.exportText(_:))
         case .clearScreen: return #selector(ViewController.clearScreen(_:))
         case .clearHistory: return #selector(ViewController.clearHistory(_:))
@@ -351,6 +381,13 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .snapshotRunningCommandOutput: return nil
         case .exportCommandOutput: return nil
         case .openFileReferenceInCommand: return nil
+        case .revealWorkingDirectory: return nil
+        case .copyWorkingDirectoryPath: return nil
+        case .changeDirectoryToParent: return nil
+        case .changeDirectoryToProjectRoot: return nil
+        case .openParentDirectoryInNewPane: return nil
+        case .openProjectRootInNewPane: return nil
+        case .searchCommandHistory: return nil
         // ⇧⌘S, the save-as of an app that has no document to save.
         case .exportText: return Shortcut("s", [.command, .shift])
         case .clearScreen: return Shortcut("k", .command)
@@ -378,7 +415,10 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .increaseFontSize, .decreaseFontSize, .resetFontSize, .scrollPageUp,
             .scrollPageDown, .scrollToTop, .scrollToBottom, .previousCommand, .nextCommand,
             .previousFailedCommand, .nextFailedCommand, .copyLastCommandOutput,
-            .snapshotRunningCommandOutput, .exportCommandOutput, .openFileReferenceInCommand:
+            .snapshotRunningCommandOutput, .exportCommandOutput, .openFileReferenceInCommand,
+            .revealWorkingDirectory, .copyWorkingDirectoryPath, .changeDirectoryToParent,
+            .changeDirectoryToProjectRoot, .openParentDirectoryInNewPane,
+            .openProjectRootInNewPane, .searchCommandHistory:
             return .view
         case .clearScreen, .clearHistory, .resetTerminal: return .terminal
         case .find, .copy, .paste, .selectAll, .exportText: return .edit
@@ -423,6 +463,13 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .snapshotRunningCommandOutput: return 12
         case .exportCommandOutput: return 13
         case .openFileReferenceInCommand: return 14
+        case .revealWorkingDirectory: return 15
+        case .copyWorkingDirectoryPath: return 16
+        case .changeDirectoryToParent: return 17
+        case .changeDirectoryToProjectRoot: return 18
+        case .openParentDirectoryInNewPane: return 19
+        case .openProjectRootInNewPane: return 20
+        case .searchCommandHistory: return 21
         case .copy: return 0
         case .paste: return 1
         case .selectAll: return 2

@@ -1,4 +1,5 @@
 import AppKit
+import CortaTerminal
 import Foundation
 
 /// M6.1 — everything the settings page can change, and the text format the
@@ -44,6 +45,11 @@ nonisolated struct Configuration: Equatable, Sendable {
     var theme: String = Theme.corta.name
     var appearance: Appearance = .auto
     var scrollbackLines: Int = 10_000
+    /// B08 — the bound on `CommandRecordStore`'s per-session history,
+    /// distinct from `scrollbackLines`: this caps structured command
+    /// records (for jumping, copying and the command-history search), not
+    /// visible text.
+    var commandHistoryLimit: Int = CommandRecordStore.defaultCapacity
     /// The grid a new window opens with (M7.14). In *cells*, not points: the
     /// window's pixel size is this grid times the font's cell metrics plus
     /// the pane insets, which is what keeps `columns × rows` meaning the same
@@ -283,6 +289,9 @@ nonisolated struct Configuration: Equatable, Sendable {
             // input needs a cap (`SECURITY.md` §3).
             guard let lines = Int(value) else { return false }
             scrollbackLines = min(1_000_000, max(0, lines))
+        case "command-history-limit":
+            guard let limit = Int(value) else { return false }
+            commandHistoryLimit = min(10_000, max(0, limit))
         case "bell":
             guard let mode = BellMode(rawValue: value) else { return false }
             bell = mode
@@ -505,6 +514,7 @@ nonisolated struct Configuration: Equatable, Sendable {
             "columns = \(columns)",
             "rows = \(rows)",
             "scrollback-lines = \(scrollbackLines)",
+            "command-history-limit = \(commandHistoryLimit)",
             "bell = \(bell.rawValue)",
             "copy-on-select = \(copyOnSelect)",
             "link-activation = \(linkActivation.rawValue)",

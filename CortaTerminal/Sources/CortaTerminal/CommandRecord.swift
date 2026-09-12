@@ -33,6 +33,14 @@ public struct CommandRecord: Sendable, Equatable, Identifiable {
     /// reports one (M2.8). Not re-read at command end: a command that itself
     /// changed directory should still be found under where it was launched.
     public var workingDirectory: String?
+    /// The column the cursor sat at when `OSC 133 ; B` landed on this same
+    /// row (M2.8's `promptEndColumn`, kept per-record here) — where the
+    /// command the user typed starts. `nil` for a multi-line prompt whose
+    /// `B` landed on a later row, or a shell that never reaches `B` at all;
+    /// either way `ViewController.commandLineText(grid:record:)` (B08) has
+    /// no honest place to start reading from and returns `nil` rather than
+    /// guessing where a prompt string ends.
+    public var promptEndColumn: Int?
 
     public var isRunning: Bool { endedAt == nil }
     public var didFail: Bool { exitStatus.map { $0 != 0 } ?? false }
@@ -43,17 +51,27 @@ public struct CommandRecord: Sendable, Equatable, Identifiable {
 /// everything else the performer owns, and this is small enough that the
 /// copy is not worth avoiding.
 public struct CommandRecordStore: Sendable, Equatable {
+    /// The bound a store gets when nothing more specific is asked for —
+    /// generous for jumping and inspecting *recent* commands, not an audit
+    /// log, and small enough that a linear walk over it costs nothing per
+    /// frame. `Configuration.commandHistoryLimit` (B08) overrides this the
+    /// same way `Configuration.scrollbackLines` already overrides
+    /// `Scrollback.defaultLimit`.
+    public static let defaultCapacity = 512
+
     /// Bounded for the reason scrollback is bounded: a session left running
     /// for days must not grow this without limit (`SECURITY.md`'s resource
-    /// caps). This exists to serve jumping and inspecting *recent* commands,
-    /// not an audit log, so 512 is generous for the job and small enough
-    /// that a linear walk over it costs nothing per frame.
-    public static let capacity = 512
+    /// caps). Per-instance rather than a fixed constant (B08) so a session
+    /// can be given a smaller or larger bound without CortaTerminal knowing
+    /// anything about where that number came from.
+    public let capacity: Int
 
     public internal(set) var records: [CommandRecord] = []
     private var nextID = 0
 
-    public init() {}
+    public init(capacity: Int = defaultCapacity) {
+        self.capacity = max(0, capacity)
+    }
 
     public var last: CommandRecord? { records.last }
 
@@ -61,17 +79,22 @@ public struct CommandRecordStore: Sendable, Equatable {
         let record = CommandRecord(
             id: nextID, promptRow: promptRow, outputStartRow: nil, endRow: nil,
             startedAt: date, endedAt: nil, exitStatus: nil,
-            workingDirectory: workingDirectory)
+            workingDirectory: workingDirectory, promptEndColumn: nil)
         nextID += 1
         records.append(record)
-        if records.count > Self.capacity {
-            records.removeFirst(records.count - Self.capacity)
+        if records.count > capacity {
+            records.removeFirst(records.count - capacity)
         }
     }
 
     mutating func markOutputStart(_ row: Int) {
         guard !records.isEmpty else { return }
         records[records.count - 1].outputStartRow = row
+    }
+
+    mutating func markPromptEnd(column: Int) {
+        guard !records.isEmpty else { return }
+        records[records.count - 1].promptEndColumn = column
     }
 
     mutating func finish(exitStatus: Int, endRow: Int, at date: Date) {
@@ -83,10 +106,9 @@ public struct CommandRecordStore: Sendable, Equatable {
     }
 
     /// The command whose output covers `absoluteRow` — the most recent one
-    /// whose prompt is at or before it. Mirrors
-    /// `Grid.commandOutputRows(before:)`'s "nearest at or before" rule
-    /// (U14) so the row-based and identity-based views of the same command
-    /// never disagree, whether it has finished or is still running.
+    /// whose prompt is at or before it, whether it has finished or is still
+    /// running. `ViewController.viewportCommand` (B07) is the one place that
+    /// additionally cares whether it finished.
     public func record(before absoluteRow: Int) -> CommandRecord? {
         records.last { $0.promptRow <= absoluteRow }
     }
