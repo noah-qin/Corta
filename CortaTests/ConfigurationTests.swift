@@ -22,6 +22,7 @@ struct ConfigurationTests {
         configuration.theme = "solarized"
         configuration.appearance = .dark
         configuration.scrollbackLines = 4242
+        configuration.commandHistoryLimit = 128
         configuration.bell = .muted
         configuration.notifyOnLongTask = true
         configuration.notificationThreshold = 90
@@ -66,6 +67,10 @@ struct ConfigurationTests {
         #expect(huge.fontSize == 64)
         let (negative, _) = Configuration.parse("scrollback-lines = -5")
         #expect(negative.scrollbackLines == 0)
+        let (hugeHistory, _) = Configuration.parse("command-history-limit = 999999")
+        #expect(hugeHistory.commandHistoryLimit == 10_000)
+        let (negativeHistory, _) = Configuration.parse("command-history-limit = -5")
+        #expect(negativeHistory.commandHistoryLimit == 0)
     }
 
     /// The name is kept verbatim and resolved when it is *used*, not when it

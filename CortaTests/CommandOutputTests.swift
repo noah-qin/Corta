@@ -167,6 +167,32 @@ struct CommandOutputTests {
         let terminal = Self.session(commands: [("true", [], 0)])
         #expect(ViewController.commandOutput(in: terminal.grid, records: terminal.commandRecords, scrollOffset: 0) == nil)
     }
+
+    // MARK: - Command line text recovery (B08)
+
+    /// `commandLineText` reads the literal command back from the grid using
+    /// `promptEndColumn` — the "Fill"/"Run" half of Command History search.
+    @Test("the command line is read back from between B and the output")
+    func commandLineTextIsRecoveredFromTheGrid() throws {
+        var terminal = Terminal(rows: 24, columns: 40, scrollbackLimit: 200)
+        terminal.feed(Array("\u{1B}]133;A\u{7}$ \u{1B}]133;B\u{7}echo hi\r\n".utf8))
+        terminal.feed(Array("\u{1B}]133;C\u{7}hi\r\n".utf8))
+        terminal.feed(Array("\u{1B}]133;D;0\u{7}\u{1B}]133;A\u{7}$ ".utf8))
+        let record = try #require(terminal.commandRecords.records.first)
+        let text = ViewController.commandLineText(grid: terminal.grid, record: record)
+        #expect(text == "echo hi")
+    }
+
+    /// No `B` mark on the prompt's own row means no honest starting column —
+    /// `commandLineText` refuses rather than guessing one.
+    @Test("no B mark on the prompt row means no recoverable command line")
+    func commandLineTextIsNilWithoutAPromptEndColumn() throws {
+        var terminal = Terminal(rows: 24, columns: 40, scrollbackLimit: 200)
+        terminal.feed(Array("\u{1B}]133;A\u{7}$ echo hi\r\nhi\r\n".utf8))
+        terminal.feed(Array("\u{1B}]133;D;0\u{7}\u{1B}]133;A\u{7}$ ".utf8))
+        let record = try #require(terminal.commandRecords.records.first)
+        #expect(ViewController.commandLineText(grid: terminal.grid, record: record) == nil)
+    }
 }
 
 /// The commands' place in the one table the menus, palette and config file

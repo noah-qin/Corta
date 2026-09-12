@@ -343,7 +343,17 @@ extension AppDelegate {
         for command in [
             TerminalCommand.previousCommand, .nextCommand, .previousFailedCommand,
             .nextFailedCommand, .copyLastCommandOutput, .snapshotRunningCommandOutput,
-            .exportCommandOutput, .openFileReferenceInCommand,
+            .exportCommandOutput, .openFileReferenceInCommand, .searchCommandHistory,
+        ] {
+            shell.addItem(item(for: command))
+        }
+        // B08 — directory navigation: reveal/copy first (reads only), then
+        // the two things a `cd` primitive with real callers looks like.
+        shell.addItem(.separator())
+        for command in [
+            TerminalCommand.revealWorkingDirectory, .copyWorkingDirectoryPath,
+            .changeDirectoryToParent, .changeDirectoryToProjectRoot,
+            .openParentDirectoryInNewPane, .openProjectRootInNewPane,
         ] {
             shell.addItem(item(for: command))
         }

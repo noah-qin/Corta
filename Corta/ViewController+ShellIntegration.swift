@@ -148,6 +148,13 @@ extension ViewController: NSMenuItemValidation {
         open(reference)
     }
 
+    /// B08 — opens `CommandHistoryController`, the search/find/fill/run
+    /// surface for this pane's command records.
+    @objc func searchCommandHistory(_ sender: Any?) {
+        guard isOperable else { return }
+        CommandHistoryController.shared.show(for: self)
+    }
+
     /// A completed command's output as text, using the same document-row
     /// arithmetic every identity-based action shares — the one place a
     /// `CommandRecord`'s rows become a `Selection` range.
@@ -185,6 +192,57 @@ extension ViewController: NSMenuItemValidation {
             head: SelectionPoint(
                 row: ScrollbackCoordinates.relativeRow(end - 1, totalPushed: base),
                 column: grid.columns - 1))
+    }
+
+    // MARK: - Command history: find/fill/run (B08)
+
+    /// The literal text of a historic command, read back from the grid
+    /// rather than stored anywhere — `CommandRecord` never captured it, only
+    /// row markers (B07's doc comment on why a row is not enough applies
+    /// here too: the text itself is even less worth duplicating). `nil`
+    /// covers every honest reason it cannot be recovered: no `B` mark ever
+    /// landed on the prompt's own row (`record.promptEndColumn`), or the row
+    /// has since scrolled out of the bounded scrollback — `CommandHistory
+    /// Controller` greys out Fill/Run rather than guessing either way.
+    func commandLineText(for record: CommandRecord?) -> String? {
+        Self.commandLineText(grid: session.snapshot(), record: record)
+    }
+
+    nonisolated static func commandLineText(grid: Grid, record: CommandRecord?) -> String? {
+        guard let record, let column = record.promptEndColumn else { return nil }
+        guard let end = record.outputStartRow ?? record.endRow, end > record.promptRow
+        else { return nil }
+        let base = grid.scrollback.totalPushed
+        let range = SelectionRange(
+            anchor: SelectionPoint(
+                row: ScrollbackCoordinates.relativeRow(record.promptRow, totalPushed: base),
+                column: column),
+            head: SelectionPoint(
+                row: ScrollbackCoordinates.relativeRow(end - 1, totalPushed: base),
+                column: grid.columns - 1))
+        let text = Selection.text(of: range, in: grid).trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
+    }
+
+    /// Writes `text` at the current prompt, only when `canChangeDirectorySafely`
+    /// holds — the same "pane exists, shell integration present, nothing
+    /// already typed" gate `changeDirectory(to:)` already enforces, reused
+    /// as-is: filling a historic command at a busy or dirty prompt is exactly
+    /// as unsafe as `cd`-ing one would be. Returns whether it wrote.
+    @discardableResult
+    func fillPrompt(with text: String) -> Bool {
+        guard canChangeDirectorySafely else { return false }
+        session.write(Array(text.utf8))
+        return true
+    }
+
+    /// `fillPrompt(with:)`, then Return — equivalent to the user pasting the
+    /// line and pressing Return themselves, not a new execution path.
+    @discardableResult
+    func fillAndRunPrompt(with text: String) -> Bool {
+        guard fillPrompt(with: text) else { return false }
+        session.write(Array("\r".utf8))
+        return true
     }
 
     /// The last *completed* command at or before the top of the viewport —
@@ -338,11 +396,24 @@ extension ViewController: NSMenuItemValidation {
         case #selector(openFileReferenceInCommand(_:)):
             guard isOperable else { return false }
             return fileReferenceInCommand(effectiveCommand) != nil
+        case #selector(searchCommandHistory(_:)):
+            return isOperable
         case #selector(clearScreen(_:)), #selector(clearHistory(_:)),
             #selector(resetTerminal(_:)):
             return validateTerminalStateItem(menuItem)
         case #selector(exportText(_:)):
             return isOperable
+        case #selector(revealWorkingDirectoryInFinder(_:)), #selector(copyWorkingDirectoryPath(_:)),
+            #selector(openParentDirectoryInNewPane(_:)):
+            return hasKnownWorkingDirectory
+        case #selector(changeDirectoryToParent(_:)):
+            return hasKnownWorkingDirectory && canChangeDirectorySafely
+        case #selector(changeDirectoryToProjectRoot(_:)):
+            return hasKnownWorkingDirectory && canChangeDirectorySafely
+                && session.workingDirectory.flatMap { DirectoryHistory.projectRoot(for: $0) } != nil
+        case #selector(openProjectRootInNewPane(_:)):
+            return hasKnownWorkingDirectory
+                && session.workingDirectory.flatMap { DirectoryHistory.projectRoot(for: $0) } != nil
         default:
             return true
         }

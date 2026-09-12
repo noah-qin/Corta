@@ -537,7 +537,8 @@ class ViewController: NSViewController {
         do {
             started = try Self.startSession(
                 size: initialSize, directory: inheritedWorkingDirectory,
-                scrollbackLimit: configuration.scrollbackLines, preset: preset)
+                scrollbackLimit: configuration.scrollbackLines,
+                commandHistoryLimit: configuration.commandHistoryLimit, preset: preset)
         } catch {
             presentFailure(
                 title: L10n.text("failure.title.session"),
@@ -1458,7 +1459,8 @@ class ViewController: NSViewController {
     ///   else — the project's rule is that a test never changes the machine
     ///   (U09).
     static func startSession(
-        size: TerminalSize, directory: String?, scrollbackLimit: Int, preset: Preset? = nil,
+        size: TerminalSize, directory: String?, scrollbackLimit: Int,
+        commandHistoryLimit: Int = CommandRecordStore.defaultCapacity, preset: Preset? = nil,
         configuredShell: String? = nil
     ) throws(PTYError) -> StartedSession {
         // U16 — a preset supplies the first rung's shell and directory; every
@@ -1506,7 +1508,7 @@ class ViewController: NSViewController {
                     // Per session: a running child's history cannot be
                     // re-limited without discarding lines, so a change
                     // applies to sessions opened after it.
-                    scrollbackLimit: scrollbackLimit)
+                    scrollbackLimit: scrollbackLimit, commandHistoryLimit: commandHistoryLimit)
                 return StartedSession(session: session, notice: attempt.notice)
             } catch {
                 lastError = error

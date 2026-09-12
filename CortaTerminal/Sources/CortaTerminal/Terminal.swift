@@ -12,11 +12,22 @@ public struct Terminal: Sendable {
     public init(
         rows: Int = 24,
         columns: Int = 80,
-        scrollbackLimit: Int = Scrollback.defaultLimit
+        scrollbackLimit: Int = Scrollback.defaultLimit,
+        commandHistoryLimit: Int = CommandRecordStore.defaultCapacity
     ) {
         self.performer = Performer(
             grid: Grid(rows: rows, columns: columns, scrollbackLimit: scrollbackLimit)
         )
+        self.performer.state.commandRecords = CommandRecordStore(capacity: commandHistoryLimit)
+    }
+
+    /// B08 — retention control distinct from `reset()`'s scrollback clear:
+    /// a session's structured command history can be emptied on its own,
+    /// the same way `DirectoryHistoryStore.clear()` is independent of
+    /// clearing the visible scrollback.
+    public mutating func clearCommandRecords() {
+        performer.state.commandRecords = CommandRecordStore(
+            capacity: performer.state.commandRecords.capacity)
     }
 
     public var grid: Grid {

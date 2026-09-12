@@ -272,12 +272,61 @@ import Testing
     @Test("the record store is bounded and drops the oldest first")
     func recordStoreIsBounded() {
         var store = CommandRecordStore()
-        for row in 0..<(CommandRecordStore.capacity + 10) {
+        for row in 0..<(CommandRecordStore.defaultCapacity + 10) {
             store.begin(promptRow: row, workingDirectory: nil, at: Date())
         }
-        #expect(store.records.count == CommandRecordStore.capacity)
+        #expect(store.records.count == CommandRecordStore.defaultCapacity)
         #expect(store.records.first?.id == 10)
-        #expect(store.records.last?.id == CommandRecordStore.capacity + 9)
+        #expect(store.records.last?.id == CommandRecordStore.defaultCapacity + 9)
+    }
+
+    @Test("a store's capacity is configurable per instance")
+    func recordStoreCapacityIsConfigurable() {
+        var store = CommandRecordStore(capacity: 3)
+        for row in 0..<5 {
+            store.begin(promptRow: row, workingDirectory: nil, at: Date())
+        }
+        #expect(store.records.count == 3)
+        #expect(store.records.map(\.id) == [2, 3, 4])
+    }
+
+    // MARK: - Command text recovery (B08)
+
+    /// `promptEndColumn` is what `ViewController.commandLineText(grid:
+    /// record:)` reads a historic command's own text back from — it has to
+    /// land on the record itself, not just the live `PerformerState`, or a
+    /// command already scrolled off the current prompt would have nowhere
+    /// honest to read its start column from.
+    @Test("the B mark's column is recorded on the command, not just the live state")
+    func promptEndColumnLandsOnTheRecord() {
+        var terminal = self.terminal()
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\$ \u{1B}]133;B\u{1B}\\ls\r\n".utf8))
+        let record = try! #require(terminal.commandRecords.last)
+        #expect(record.promptEndColumn == 2)
+    }
+
+    /// A multi-line prompt whose `B` lands on a later row leaves the record
+    /// honestly unable to say where the command starts, the same "under-
+    /// estimate is the safe direction" rule `state.promptEndColumn` already
+    /// follows.
+    @Test("a B mark on a different row leaves promptEndColumn unset")
+    func promptEndColumnUnsetForAWrappedPrompt() {
+        var terminal = self.terminal()
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\~/src\r\n\u{1B}]133;B\u{1B}\\$ ls\r\n".utf8))
+        let record = try! #require(terminal.commandRecords.last)
+        #expect(record.promptEndColumn == nil)
+    }
+
+    @Test("clearing command records empties the store without touching the grid")
+    func clearCommandRecordsEmptiesTheStore() {
+        var terminal = self.terminal()
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\$ ls\r\n\u{1B}]133;C\u{1B}\\out\r\n".utf8))
+        terminal.feed(Array("\u{1B}]133;D;0\u{1B}\\".utf8))
+        #expect(!terminal.commandRecords.records.isEmpty)
+        let textBefore = terminal.grid.logicalLine(containing: 0).text
+        terminal.clearCommandRecords()
+        #expect(terminal.commandRecords.records.isEmpty)
+        #expect(terminal.grid.logicalLine(containing: 0).text == textBefore)
     }
 
     // MARK: - Prompt end position (B08)
