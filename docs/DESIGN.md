@@ -197,6 +197,48 @@ gated on a real window's blocking local event loop that the offscreen test
 target cannot drive, so this is verified by reasoning parity with the
 already-tested pane-close guard rather than by an automated regression case.
 
+**B10's text-selection API spike: evaluated, not adopted.** B10 asks for
+`NSTextView`/TextKit to be prototyped against Corta's grid before any
+adoption decision, rather than assumed away. Checked against the same four
+things that make this section's invariants what they are:
+
+- **Grid coordinates.** `Selection.swift` indexes cells directly; TextKit
+  lays out an `NSAttributedString` with no native concept of a fixed
+  column grid. Getting TextKit to agree with the grid means either
+  mirroring every write into a parallel `NSTextStorage` (a second copy of
+  what the Metal renderer already owns, kept in sync by hand) or using
+  TextKit only as a selection/hit-test overlay over glyphs Corta still
+  places itself — the exact "two stores that can disagree" shape this
+  section's own B04 entry documents as a real bug, not a hypothetical one.
+- **Wide and combining text.** `NSAttributedString` understands grapheme
+  clusters well enough, but TextKit's layout measures glyph advances to
+  place them — a CJK character occupying *exactly* two monospace columns
+  regardless of the font's natural advance is Corta's rule, not a text
+  system's, and enforcing it means bypassing TextKit's automatic layout
+  for the one thing it exists to do.
+- **Wrapped history.** `wrapped` is a fact the VT emulation layer already
+  decided, from the columns the child process was actually given —
+  `NSLayoutManager`/`NSTextLayoutManager` decide wrapping themselves, from
+  content and container width. Two engines deciding the same thing
+  independently is a standing invitation for them to decide it differently.
+- **TUI mouse reporting.** Every drag today becomes local selection unless
+  reporting mode is on (§7's "Known Hard Parts" has the rest of that
+  story) — that dispatch has to run *before* whatever handles the drag.
+  Adopting `NSTextView` for its built-in marquee/drag gestures would still
+  require intercepting ahead of that built-in handling to preserve the
+  override, which gives up most of the actual reason to adopt it.
+
+What TextKit would genuinely buy: system-standard drag inertia and visuals,
+free right-click Services integration, and `NSTextFinder`'s Find Bar
+chrome. Accessibility — the other plausible win — is already achieved:
+`TerminalView+Accessibility.swift` implements the text-area protocol by
+hand, tested end to end (`AccessibilityMappingTests`,
+`TerminalViewAccessibilityTests`), so TextKit would not be closing a gap
+there, only relocating one already closed. Weighed against three separate
+constraints that each cost a shadow data structure or a fight with the
+engine's own defaults, for benefits narrower than they first look: **not
+adopted**. `Selection.swift` stays hand-rolled.
+
 **Still open, deliberately not attempted**, because each is a substantially
 larger, riskier piece than the fixes above: unifying the document/absolute/
 viewport conversions duplicated across the render, `ViewController

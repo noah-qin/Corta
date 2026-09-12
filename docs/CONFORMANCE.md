@@ -560,3 +560,48 @@ window in this milestone, and what was not:
   the M2-closeout build: **50 passed, 334 known bugs, 184 failed of
   568** — identical totals to the M2 record, and the list of failing
   tests is byte-identical to the M2 run's. No new failures, no fixes.
+
+**2026-09-12 — B10 pass (UI modernization and accessibility).** What got
+real code or a written decision, and what is recorded **not judged** rather
+than silently skipped:
+
+- **Verified by code and test.** The text-selection API spike (`DESIGN.md`
+  §2.7) is a decision, not an experiment left half-run: `NSTextView`/
+  TextKit was weighed against the grid, wide/combining text, wrapped
+  history and TUI mouse reporting, and not adopted, with the reasoning kept
+  next to the decision it explains. `TerminalView`'s `NSAccessibility`
+  overrides — never exercised by a test before this pass, only the
+  underlying `TerminalAccessibilitySnapshot` math was — now are
+  (`TerminalViewAccessibilityTests`): line navigation round-trips across
+  every line of a long-output fixture, a scrolled view reports history
+  rather than the live screen, selection and the no-provider-installed
+  degradation path all behave. The translation-consistency audit
+  (`LocalizationCoverageTests.noTranslationIsAnUntranslatedCopy`) found
+  nothing to fix — every non-English string differs from its English
+  source once legitimate shared placeholders are excluded.
+- **Not judged: listening to VoiceOver read long output.** The tree-health
+  audit above tests the *data* VoiceOver consumes, not the experience of
+  hearing it — that needs a person with working audio judgment running
+  VoiceOver live, which this pass did not have. Precedent:
+  `V0.1.1-MANUAL-VERIFICATION.md`'s identical "not judged" state for the
+  same reason.
+- **Not judged: native-speaker translation review.** The mechanical audit
+  above (format specifiers, untranslated copies) is not a substitute for
+  `CONTRIBUTING.md`'s "Localization" bar — a bilingual human reading each
+  string in context and flipping it to `translated`. All 258 keys across
+  8 non-English locales remain `needs_review`, honestly, until reviewers
+  are available.
+- **Not judged: multi-monitor, fullscreen and external-display resize.**
+  Only resize *debouncing* has automated coverage (`ResizeDebouncerTests`).
+  Moving a window between displays of different scale factors, entering
+  and leaving fullscreen, and attaching/detaching an external display all
+  need physical hardware this pass did not have access to.
+- Not attempted at all this pass, and not claimed otherwise: system
+  materials/"Liquid Glass" adoption for B08/B09's new surfaces
+  (`CommandHistoryController`, `FontPreviewView`, `SettingsStatusView`) was
+  audited and found not to fit — the three existing `NSGlassEffectView`
+  adoptions are all floating overlays on top of live terminal content
+  (the command palette, the search bar), and none of the three audited
+  surfaces are that; a plain, opaque, accessible background is the
+  correct choice already in place for a separate utility window like
+  Command History, the same way Settings itself has no glass.
