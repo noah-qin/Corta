@@ -205,16 +205,16 @@ import Testing
     @Test("an abbreviation finds the command it abbreviates")
     func paletteFuzzyMatching() {
         let split = try! #require(
-            CommandPaletteController.score("split pane right", query: "spr"))
-        let unrelated = CommandPaletteController.score("copy", query: "spr")
+            CommandPaletteModel.score("split pane right", query: "spr"))
+        let unrelated = CommandPaletteModel.score("copy", query: "spr")
         #expect(unrelated == nil)
         #expect(split > 0)
     }
 
     @Test("a shorter title wins a tie")
     func paletteRanksShorterTitlesFirst() {
-        let short = try! #require(CommandPaletteController.score("copy", query: "cop"))
-        let long = try! #require(CommandPaletteController.score("copy on select", query: "cop"))
+        let short = try! #require(CommandPaletteModel.score("copy", query: "cop"))
+        let long = try! #require(CommandPaletteModel.score("copy on select", query: "cop"))
         #expect(short > long)
     }
 
