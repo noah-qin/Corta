@@ -60,8 +60,11 @@ final class SFTPLoopbackConnection: @unchecked Sendable {
         condition.lock()
         defer { condition.unlock() }
         let deadline = Date().addingTimeInterval(Self.readDeadline)
-        while !state.isClosed {
+        while true {
             let side = fromClient ? state.serverToClient : state.clientToServer
+            // Buffered bytes are delivered even after close: a peer that
+            // wrote a reply and then died still said it. EOF is closed
+            // *and* drained.
             if !side.buffer.isEmpty {
                 let count = min(out.count, side.buffer.count)
                 side.buffer.withUnsafeBufferPointer { buffer in
@@ -75,14 +78,14 @@ final class SFTPLoopbackConnection: @unchecked Sendable {
                 }
                 return count
             }
+            if state.isClosed { return 0 }
             if !condition.wait(until: deadline) {
                 throw .ioFailed(code: ETIMEDOUT)
             }
         }
-        return 0
     }
 
-    fileprivate func close() {
+    func close() {
         condition.lock()
         state.isClosed = true
         condition.broadcast()
@@ -129,7 +132,16 @@ final class FakeRemoteFileSystem: @unchecked Sendable {
     private let state = Mutex(State())
 
     func createFile(_ path: String, data: [UInt8], modificationTime: UInt32 = 1_000) {
-        state.withLock { $0.files[path] = File(data: data, modificationTime: modificationTime) }
+        state.withLock { state in
+            state.files[path] = File(data: data, modificationTime: modificationTime)
+            // Ancestor directories exist implicitly, the way a real
+            // filesystem's would.
+            var ancestor = path
+            while let slash = ancestor.lastIndex(of: "/"), slash != ancestor.startIndex {
+                ancestor = String(ancestor[ancestor.startIndex..<slash])
+                state.directories.insert(ancestor)
+            }
+        }
     }
 
     func createDirectory(_ path: String) {
@@ -366,7 +378,9 @@ final class FakeSFTPServer: @unchecked Sendable {
             }
             let delay = replyDelay
             Thread.detachNewThread { [weak self] in
-                Thread.sleep(forTimeInterval: TimeInterval(delay.components.seconds) + 0.001)
+                let seconds = TimeInterval(delay.components.seconds)
+                    + TimeInterval(delay.components.attoseconds) / 1e18
+                Thread.sleep(forTimeInterval: seconds + 0.001)
                 guard let self else { return }
                 self.state.withLock { $0.outstandingReads -= 1 }
                 self.respondDefault(to: message)
