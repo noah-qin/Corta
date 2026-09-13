@@ -109,6 +109,11 @@ public struct Line: Equatable, Sendable {
     /// rows, so only the two run boundaries can leave a half outside the
     /// overwritten range; everything inside is replaced. This avoids the
     /// per-cell read/check/grow sequence used by scalar writes.
+    ///
+    /// The inner loop writes through `withUnsafeMutableBufferPointer` (B11):
+    /// `grow(to:)` above already fixes `cells`' length for the rest of this
+    /// call, so the per-element bounds/exclusivity check `ContiguousArray`'s
+    /// subscript would otherwise repeat on every byte is redundant here.
     mutating func overwriteASCII(_ bytes: ArraySlice<UInt8>, at column: Int, pen: Pen) {
         guard !bytes.isEmpty, column >= 0 else { return }
         let end = column + bytes.count
@@ -119,12 +124,15 @@ public struct Line: Equatable, Sendable {
             cells[end] = pen.eraseCell
         }
         grow(to: end)
-        var destination = column
-        var cell = pen.cell(0x20)
-        for byte in bytes {
-            cell.scalar = UInt32(byte)
-            cells[destination] = cell
-            destination += 1
+        let template = pen.cell(0x20)
+        cells.withUnsafeMutableBufferPointer { buffer in
+            var destination = column
+            var cell = template
+            for byte in bytes {
+                cell.scalar = UInt32(byte)
+                buffer[destination] = cell
+                destination += 1
+            }
         }
     }
 

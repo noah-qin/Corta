@@ -1,5 +1,6 @@
 import CoreGraphics
 import CoreText
+import Foundation
 import Metal
 import Testing
 
@@ -8,6 +9,51 @@ import Testing
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
 @Suite(.serialized, .metalSerialized) struct GlyphAtlasTests {
+
+    /// B12's cold-startup measurement (`docs/PERFORMANCE.md` §6): records
+    /// `GlyphAtlas.init`'s cost and the cost of the first screenful of
+    /// ordinary text afterward. A bounded eager ASCII prewarm (every
+    /// printable column × all four styles, at `init`) was built and measured
+    /// against this test and made things worse, not better — see the doc's
+    /// numbers — so it was not kept; this test is what caught that, and
+    /// stays as the harness for anyone re-evaluating a warm-up strategy
+    /// later. Not an assertion, same reasoning as `FrameCPUBaselineTests`:
+    /// the result is the point, written to a file so it survives outside
+    /// the ephemeral test log.
+    @Test func measureColdStartupAndFirstFrameCost() throws {
+        guard let device = Self.makeDevice() else {
+            Issue.record("No Metal device available in this environment")
+            return
+        }
+        let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
+
+        let initStart = DispatchTime.now()
+        let atlas = GlyphAtlas(device: device, font: font)
+        let initMs =
+            Double(DispatchTime.now().uptimeNanoseconds - initStart.uptimeNanoseconds) / 1_000_000
+
+        // Simulates the first screenful of ordinary text: every printable
+        // ASCII column in the plain style, the common case a cold launch or
+        // a live font change actually redraws first.
+        let firstFrameStart = DispatchTime.now()
+        for _ in 0..<120 {
+            for scalar in UInt32(0x20)...UInt32(0x7E) {
+                _ = atlas.glyph(forASCII: scalar, bold: false)
+            }
+        }
+        let firstFrameMs =
+            Double(DispatchTime.now().uptimeNanoseconds - firstFrameStart.uptimeNanoseconds)
+            / 1_000_000
+
+        let report =
+            "glyph atlas cold init: \(String(format: "%.3f", initMs)) ms\n"
+            + "first simulated frame (120 columns of printable ASCII, plain style): \(String(format: "%.3f", firstFrameMs)) ms\n"
+        let outputPath =
+            ProcessInfo.processInfo.environment["CORTA_ATLAS_BASELINE_OUTPUT"]
+            ?? "/tmp/corta-atlas-cold-startup-baseline.txt"
+        try? report.write(toFile: outputPath, atomically: true, encoding: .utf8)
+        #expect(initMs >= 0)  // always true; the measurement is the point
+    }
     private static func makeDevice() -> MTLDevice? { MTLCreateSystemDefaultDevice() }
 
     private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (

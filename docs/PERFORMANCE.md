@@ -547,3 +547,173 @@ Corta is slower on average than iTerm2 and noticeably slower than
 Ghostty on this machine. (Terminal.app is missing — Typometer would not
 measure it; figures above are Typometer's min/max/avg/SD, not the §5.1
 percentile distribution.)
+
+---
+
+## 6. B11 — CPU, locking and memory hot-path pass (2026-09-13)
+
+**Locking.** `TerminalSession` already carries exactly one hot-path lock
+(`state: Mutex<State>`, guarding the parser, grid and scrollback
+together) plus the `stateWaiters`/`yieldToStateWaiters` anti-starvation
+mechanism a prior pass added and `TerminalSessionLockWaitTests` already
+holds to a 100 ms per-wait / 30 s total ceiling under a `yes` flood. This
+pass re-ran that measurement rather than restructuring lock ownership:
+`corta-bench`'s snapshot-latency-under-flood benchmark reports p50/p95/p99
+all 0.000 ms and max 0.030–0.032 ms on this machine, level with the
+figure already on record in §5.1. No batch-budget or ownership change is
+justified by that number.
+
+**Copy-on-write / allocation cost.** `Scrollback` already packs rows into
+shared batch arenas (`Batch`, ≤256 rows each) rather than one
+`ContiguousArray` per row — a prior pass's fix for the growth-headroom
+waste `corta-bench`'s `diagnoseScrollbackFootprint` still reports
+(608 B/row slack, 57 MB at 100k lines, entirely in the *live-screen* ring
+`ScreenLines` uses, which cannot use the same batching since its rows are
+still being edited). `snapshot()` itself is an O(1) struct copy
+(`Grid`/`ScreenLines`/`Scrollback` are all value types over
+`ContiguousArray`); the actual deep-copy cost is deferred COW, paid one
+row at a time by whichever side next mutates it. Measured scrollback
+footprint at 100k×120-column lines: 185.0 MB, inside §1's ~200 MB target
+and unchanged from the last recorded figure — this pass made no change
+here; the existing batching already addresses what "immutable blocks"
+would otherwise be evaluating.
+
+**ASCII fast path.** Both existing fast paths (`Parser.parse([UInt8],
+performer:)`'s run scan; `Grid.writeASCII`/`Line.overwriteASCII`'s
+batched cell write) read/wrote through `Array`/`ContiguousArray`
+subscripting, which re-checks bounds and the exclusivity flag on every
+element even though each scan/write's range is already fixed before it
+starts. Both now go through `Span` (`Array.span`, Swift 6.2): the
+run-boundary scan in `Parser.swift` indexes `bytes.span` instead of
+`bytes`, and `Line.overwriteASCII`'s inner loop writes through
+`cells.withUnsafeMutableBufferPointer`. `Span` was chosen over a raw
+`UnsafeBufferPointer` for the parser scan specifically because it keeps
+the lifetime/exclusivity reasoning checked by the compiler against
+`bytes`' scope rather than resting on the caller's manual promise inside
+an `withUnsafeBufferPointer` closure — `Line.overwriteASCII` still needs
+the closure form because it *writes*, and `Span`'s mutable counterpart
+(`MutableSpan`) is not yet what `ContiguousArray` exposes on this
+toolchain.
+
+Measured, `-c release`, this machine, 5 runs each before/after (noise
+band shown as the full min–max spread rather than one sample, per §5.1's
+spirit — `corta-bench`'s own harness reports percentiles only for the
+latency benchmarks, not throughput):
+
+| Benchmark | Before | After |
+| --- | --- | --- |
+| Parser-only throughput | 643.6–650.5 MiB/s | 635.3–684.3 MiB/s |
+| Parser + grid throughput | 144.0–145.6 MiB/s | 144.9–154.1 MiB/s |
+| Core feed throughput | 129.7–130.9 MiB/s | 128.2–139.5 MiB/s |
+
+The grid-write side (`Line.overwriteASCII`) shows a consistent, real gain
+— parser+grid and core-feed throughput both moved up across every
+sample, never below the old range. The parser-only scan's gain is
+smaller and its range now overlaps the old one at the bottom end; kept
+anyway because it is never worse than the old code in any sample taken,
+and because `Span` is the safer construct at no measured cost, which is
+worth keeping on its own terms even where the throughput case is weak.
+All 541 `CortaTerminalTests`, the 18 golden-file cases and a 500,000-input
+`corta-fuzz` run against `Tests/Fuzz/corpus` (`--seed 1` and `--seed 2`)
+stayed green throughout — no correctness change, byte-identical golden
+output.
+
+**Span, borrowing and `@specialize` more broadly.** `Span` is now used at
+the two boundaries above; extending it further (e.g. `Grid.write`'s
+single-scalar path) found nothing to gain — that path has no
+array-range loop left to bounds-check-eliminate, it is one table lookup
+per call already behind `@inline(__always)`. `borrowing`/`consuming`
+parameters were not introduced: every hot-path type here is a small
+value (`Cell`, `UInt32`, `UInt8`) where a `borrowing` annotation changes
+nothing measurable, and the one place a large value crosses a call
+boundary (`Grid` itself, at `snapshot()`) is COW-cheap already, not a
+copy `borrowing` would avoid. `@_specialize` was evaluated and not added:
+`Parser.parse<P: ParserPerformer>` and `Performer` are both defined in
+`CortaTerminal`, and every production call site (`Terminal.feed`,
+`corta-bench`) calls it with the concrete `Performer` type from within
+the same module, so whole-module optimization (SwiftPM's release default)
+already specializes and devirtualizes it — an explicit `@_specialize`
+annotation exists to buy this across a module boundary that does not
+exist here, and adding one changed nothing in either binary size or the
+throughput numbers above (not tabulated: confirmed and reverted).
+
+**Not attempted.** Restructuring `state`'s single-lock ownership (e.g.
+splitting parser/grid from scrollback under separate locks) was
+considered and rejected: the measured wait times above show no
+contention problem to justify it, and `TerminalSession`'s own header
+comment already documents why a single lock plus the waiter-yield
+mechanism was chosen over finer-grained locking. Widening the ASCII
+fast path itself (SIMD-scanning the printable range, or admitting C0
+controls into a run instead of ending it) was not attempted this pass —
+`Span`'s subscript is not the vectorizing kind of win a real SIMD compare
+would be, and that is a larger, separate change with its own
+before/after case to make.
+
+---
+
+## 7. B12 — rendering diagnostics and a rejected prewarm (2026-09-13)
+
+**Metal/Instruments correlation labels.** `QuadRenderer`'s three render
+command encoders (solid/glyph/color-glyph) and `ViewController`'s
+per-pane command buffer now carry a `label` and, for the encoders, a
+`pushDebugGroup`/`popDebugGroup` pair (`Corta.solid`, `Corta.glyph`,
+`Corta.colorGlyph`, `Corta.frame.<pane>`). This is the B12 "platform
+diagnostics/state labels that correlate terminal scenarios with
+Instruments/Metal traces" scope item: a GPU frame capture or Metal
+System Trace can now attribute a command buffer to a pane and an encoder
+to which of the up-to-three passes it was. Purely additive — no draw
+call, pipeline state or blend changed; `CortaTests` (529 tests, offscreen
+only, no `CortaUITests`) stayed green.
+
+**Cold-startup / first-frame measurement.** Added
+`GlyphAtlasTests.measureColdStartupAndFirstFrameCost` (non-asserting,
+same pattern as `FrameCPUBaselineTests`): times `GlyphAtlas.init` and a
+simulated first screenful of ordinary text (120 columns × the printable
+ASCII range, one style) against it, writing both numbers to
+`CORTA_ATLAS_BASELINE_OUTPUT` (default `/tmp/corta-atlas-cold-startup-
+baseline.txt`). This is the B12 "measure Core Text lookup/rasterization/
+atlas alloc-eviction/cold startup" scope item.
+
+**A bounded eager ASCII prewarm was built against that measurement and
+rejected.** The idea (B12's "bounded prewarming instead of unlimited
+growth" bullet): populate the ASCII atlas page for all four styles
+(regular/bold/italic/bold-italic, 380 glyphs total) at `GlyphAtlas.init`
+and on every `reset(font:)`, so the first frame never pays per-glyph
+rasterization. Measured on this machine, `-c release`-equivalent
+(Debug scheme, offscreen `CortaTests`, no UI):
+
+| | Cold init | First simulated frame (1 style) |
+| --- | --- | --- |
+| Without prewarm | 0.29–0.79 ms | 3.28–3.53 ms |
+| With prewarm (4 styles) | 5.48 ms | 2.35 ms |
+
+Prewarming *does* make the first frame in the tested style faster (by
+about 1.1–1.2 ms — the cost of rasterizing that style's 95 glyphs, paid
+early instead of on demand), but a typical session uses one, maybe two
+of the four styles on its first screen, and the prewarm pays for all
+four regardless: cold init grew by roughly 4.7–5.2 ms to buy back at
+most ~1.2 ms, a net loss against the very "Startup" target
+(`PERFORMANCE.md` §1.1) it was meant to help, and pure waste for the two
+or three styles a given session's first screen never uses at all. Not
+kept. The measurement test stays as the harness for a narrower version
+of the idea later — prewarming only the one style a fresh pane actually
+starts in, say — which this pass did not attempt because that requires
+plumbing which style is "the default" through to `GlyphAtlas.init`,
+a larger change than this measurement pass's scope.
+
+**Everything else in B12's scope was not attempted this pass**, for the
+reason stated in `Metal4Backend.swift`'s own doc comment: replacing the
+forwarding backend with a real `MTL4CommandQueue`/`MTL4CommandAllocator`
+implementation risks silent GPU corruption or a driver-level hang on a
+wrong binding, not a compile error, and this pass had no way to visually
+verify a frame — no UI test, no Instruments capture against a running
+window. Cross-pane resource sharing (atlas/pipeline/font across split
+panes) was evaluated as a design (`B11/B12` research pass) and not
+attempted for the same reason: it changes per-pane object lifetime in
+`ViewController`/`SplitViewController`, which `CLAUDE.md`'s own working
+rules flag as needing a live-app check offscreen tests cannot substitute
+for. Display-link/drawable-depth comparison and redundant-render-pass
+removal were reviewed against the existing M8/M9 measurements and found
+already addressed (`§5.4`'s A/B, and `QuadRenderer.draw`'s one encoder
+per pass with no repeated state sets) — no further change is justified
+by anything measured here.

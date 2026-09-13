@@ -1317,6 +1317,10 @@ class ViewController: NSViewController {
         guard let session, let terminalRenderer, let commandQueue,
             let commandBuffer = commandQueue.makeCommandBuffer()
         else { return }
+        // A GPU-frame-capture/Instruments label, not behavior: lets a Metal
+        // System Trace correlate a captured command buffer back to the pane
+        // that submitted it (B12 platform-diagnostics scope item).
+        commandBuffer.label = "Corta.frame.\(ObjectIdentifier(self).hashValue)"
         guard let context = pendingFrameContext else {
             // Should not happen on any real call path — see the doc comment
             // above — but if it ever does, diff-and-draw the old way rather
