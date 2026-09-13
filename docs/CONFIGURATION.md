@@ -273,9 +273,10 @@ Two rules bound it, and neither is negotiable:
 - **Only files on this machine.** The path is resolved against the pane's
   working directory and must name a regular file that exists locally. A pane
   inside `ssh` has no local working directory — OSC 7 reports naming a remote
-  host are dropped by the parser — so nothing resolves there, absolute paths
-  included: an absolute path on another machine is no more this machine's
-  than a relative one.
+  host are recorded as the pane's remote context (they drive the title badge
+  and command-history host filter), never its local working directory — so
+  nothing resolves there, absolute paths included: an absolute path on
+  another machine is no more this machine's than a relative one.
 
 This does **not** widen the URL scheme allowlist (`SECURITY.md` §2.4). A
 `file://` string in output is still plain text and still cannot be detected as
@@ -316,6 +317,23 @@ whose shell has been uninstalled degrades down the same fallback ladder an
 ordinary pane uses, so it opens a working terminal rather than a failure
 panel — and the preset's `arguments` apply only to its own shell, since a
 fallback `/bin/sh` may not understand them.
+
+A preset is also the supported way to open a **remote** terminal:
+
+```
+preset.staging.shell = /usr/bin/ssh
+preset.staging.arguments = staging.example.com
+```
+
+The child is the system's own OpenSSH client, so everything its
+configuration does — `Host` blocks, `Include`, `Match`, `ProxyJump`, agent
+keys, `ControlMaster` connection sharing — applies exactly as it does in any
+other terminal; Corta parses none of it. `directory`, if set, remains a
+*local* working directory for the launcher. The pane's title carries a `⟂`
+badge with the remote host and directory once the remote shell reports them
+(OSC 7), and says so when it cannot know them. When the connection dies,
+Shell ▸ Reconnect to Host (`reconnect-remote`) starts a new connection to
+the same host — explicitly a new one, never a restore of the dead session.
 
 A preset is applied once, at spawn. A pane opened from one is an ordinary
 pane afterwards: there is nothing to leave and nothing to keep in sync. Presets
@@ -396,6 +414,7 @@ the key against both rows, which is how you spot it.
 | `clear-screen` | Clear Screen | `cmd+k` |
 | `clear-history` | Clear History | *(none)* |
 | `reset-terminal` | Reset Terminal | *(none)* |
+| `reconnect-remote` | Reconnect to Host | *(none)* |
 | `previous-command` | Previous Command | `cmd+up` |
 | `next-command` | Next Command | `cmd+down` |
 | `settings` | Settings… | `cmd+,` |
@@ -424,6 +443,16 @@ side, same divider, same working directory. It restores the *arrangement*,
 never the process: the child that was running is gone, and its scrollback with
 it. The record is one pane deep, because the position of anything older is
 described against a tree the first reopen has already changed.
+
+`reconnect-remote` appears only for a pane whose recorded spawn command was a
+remote launcher (`ssh`, `mosh`) and whose child has exited. It re-runs exactly
+that command — no fallback ladder, because landing in a silent local shell
+when you asked for the host back would look like success and be nothing of
+the kind. It is a **new connection**: the copy says so, and never suggests
+the dead remote shell or its scrollback came back. When the recorded command
+itself attaches to a remote multiplexer (`tmux attach`, `screen -r`), the
+copy says the command reattaches to whatever session exists on the host —
+the reattach is the remote program's doing, not Corta's.
 
 `export-text` writes the selection — or, with nothing selected, the whole
 scrollback and screen — to a text file. It is the same text ⌘C would put on

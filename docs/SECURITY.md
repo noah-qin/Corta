@@ -285,6 +285,20 @@ For quick reference during implementation and review:
   `currentWorkingDirectory` fallback. Session state saved before this filter
   can still carry a remote path with the host already lost, so restore drops
   any saved directory that does not exist as a local directory.
+- **S09 — 2026-09-13: remote OSC 7 reports are recorded, still isolated.**
+  B13 changed the disposition of a remote-host report from *dropped* to
+  *recorded as `RemoteContext`* — the pane's title badge, the command
+  history's host filter and (in B14) remote file operations all need to know
+  which host a pane is on. The isolation rule itself is unchanged and is the
+  security property: `Terminal.workingDirectory` remains local-only by
+  construction, so every consumer that existed before this change — the
+  spawn fallback ladder, split-pane inheritance, session restore, file
+  reference resolution — is unreachable by a remote path without a single
+  edit to those consumers. The recorded context is informational; nothing in
+  the core hands it to a local spawn, and the app tests stage that refusal
+  end to end. A remote host is also *attacker-influenced* text: it is
+  displayed, never parsed for credentials, paths to execute, or hosts to
+  connect to without the user's own command doing the connecting.
 - **S06 — 2026-09-06: OSC 52 clipboard payloads are sanitised, and stricter
   base64.** The write half of OSC 52 is text a *stream* chose, sight unseen —
   unlike a user drag-selection there is no "copy what I saw" contract — so the

@@ -12,6 +12,36 @@ what to edit.
 
 ### Added
 
+- **B13 — OpenSSH configuration and remote context (first slice).** A pane
+  now knows — and says — which machine it is talking to. OSC 7 reports
+  naming a remote host were previously dropped by the parser; they are now
+  recorded as a `RemoteContext` (host, directory, provenance) that drives a
+  `⟂ host · directory` badge in the pane's title and a host filter in
+  Command History, while `workingDirectory` stays local-only by
+  construction, so nothing remote can leak into local spawns, splits,
+  restore, or file-reference resolution. Foreground-process detection
+  (`ssh`/`mosh` in the foreground, or a pane spawned *as* `ssh` via a
+  preset) covers connections whose shell emits no OSC 7, with the badge
+  honestly reading "host unknown" or "remote?" for nested ssh/tmux states
+  rather than guessing from prompt text. Command records carry the host they
+  ran on. A dead remote connection offers Shell ▸ Reconnect to Host, which
+  re-runs exactly the recorded command as an explicitly *new* connection —
+  never a fallback to a local shell, never a claim that anything was
+  restored; when the command itself attaches to a remote multiplexer, the
+  copy says the reattach is the remote program's doing. Presets are the
+  documented way to open a remote terminal (`preset.<name>.shell =
+  /usr/bin/ssh`): the child is the system's own OpenSSH client, so `Host`
+  blocks, `Include`, `Match`, `ProxyJump`, agent keys and any
+  `ControlMaster` setup in `~/.ssh/config` all apply untouched — Corta
+  parses none of it. ControlMaster/ControlPersist were evaluated for a
+  Corta-side connection cache and declined: the user's own ssh config
+  already provides it, with ssh owning the master's lifetime. What this
+  does *not* do: parse or merge OpenSSH configuration, share connections
+  itself, or verify any of this against a real remote host — that matrix is
+  recorded as not judged.
+
+### Added
+
 - **B10 — mark every non-English string `needs_review` (first slice).**
   `Localizable.xcstrings` conflated "has a translation" with "a native
   speaker has read it in context" — every one of the 222 keys across 8
