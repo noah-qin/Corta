@@ -407,7 +407,10 @@ extension ViewController: NSMenuItemValidation {
             #selector(openParentDirectoryInNewPane(_:)):
             return hasKnownWorkingDirectory
         case #selector(changeDirectoryToParent(_:)):
-            return hasKnownWorkingDirectory && canChangeDirectorySafely
+            // B13 — `shellDirectory`, so a remote pane can walk its own
+            // remote directories; it is nil exactly when no honest answer
+            // exists (remote without a report, or behind a multiplexer).
+            return shellDirectory != nil && canChangeDirectorySafely
         case #selector(changeDirectoryToProjectRoot(_:)):
             return hasKnownWorkingDirectory && canChangeDirectorySafely
                 && session.workingDirectory.flatMap { DirectoryHistory.projectRoot(for: $0) } != nil

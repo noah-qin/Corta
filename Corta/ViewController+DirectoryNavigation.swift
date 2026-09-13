@@ -12,14 +12,14 @@ extension ViewController {
     ///
     /// - **Pane identity**: the pane still exists and has a live session
     ///   (`isOperable`) — a closed pane has nothing to write to.
-    /// - **Remote context**: implicit rather than checked here.
-    ///   `session.currentDirectory` only ever names a *local* path —
-    ///   `Performer+OSC.swift`'s `setWorkingDirectory` already drops an
-    ///   `OSC 7` report naming a remote host, and the kernel-side fallback
-    ///   (`PTY.currentWorkingDirectory`) cannot report one either — so
-    ///   nothing reachable from here can offer a directory whose `cd` would
-    ///   go to a host that never heard of it. (B13, not yet built, is where
-    ///   an SSH pane's *own* remote directories will need this revisited.)
+    /// - **Remote context** (B13): the `cd` goes to the pane's own shell,
+    ///   so a *remote* directory is safe to send when the pane is remote —
+    ///   the shell receiving it runs on the machine the path belongs to.
+    ///   What must never happen is a remote path reaching a *local* spawn
+    ///   (a split pane, a restored session), and that is structural rather
+    ///   than checked here: those readers consume `session.workingDirectory`,
+    ///   which `Performer+OSC.swift`'s `setWorkingDirectory` keeps
+    ///   local-only, while the remote report lives in `remoteContext`.
     /// - **Prompt state**: `hasShellIntegration` (no marks means no way to
     ///   know whether a command is running or a TUI holds the screen) and
     ///   `!isCommandRunning` — a busy shell, including a TUI (which never
@@ -40,14 +40,43 @@ extension ViewController {
         return grid.cursor.row == screenRow && grid.cursor.column == end.column
     }
 
+    /// B13 — the directory this pane's shell is actually sitting in,
+    /// whichever machine that shell runs on: the local report/fallback when
+    /// the pane is local, the pane's own reported remote directory when it
+    /// is remote (with the host attached, so a caller can say whose path it
+    /// is). `nil` when neither side knows — a remote launcher that has not
+    /// reported yet has no honest answer.
+    ///
+    /// Only ever fed to `changeDirectory(to:)`. Anything that spawns a
+    /// local process or touches Finder keeps reading `session
+    /// .workingDirectory`, which is local-or-nil by construction.
+    var shellDirectory: (path: String, host: String?)? {
+        switch paneRemoteState {
+        case .remote(let host, let directory, _):
+            return (directory, host)
+        case .local:
+            return session.workingDirectory.map { ($0, nil) }
+        case .remoteUnknown, .unknown:
+            // Remote with no report, or a multiplexer that may be attached
+            // anywhere: `session.workingDirectory` here is a *stale local*
+            // path from before the connection, and sending its `cd` to a
+            // shell that may be on another machine is the wrong-direction
+            // leak. No honest answer, so no offer.
+            return nil
+        }
+    }
+
     /// Writes `cd '<path>'` followed by Return, only when
     /// `canChangeDirectorySafely` holds — returns whether it did. Single-
     /// quoted, with any embedded `'` escaped as `'\''`, rather than passed
-    /// unquoted: `path` is app-constructed, from `OSC 7` by way of
-    /// `DirectoryHistory`, never stream-supplied text a child sent
-    /// (`SECURITY.md` §6's rule is about the latter), but the quoting still
-    /// has to survive a directory a user could genuinely have — a space, an
-    /// apostrophe, an emoji — without breaking out of the argument.
+    /// unquoted: `path` is app-constructed — from `OSC 7` by way of
+    /// `DirectoryHistory`, or (B13) from the pane's own remote report —
+    /// never stream-supplied text a child sent (`SECURITY.md` §6's rule is
+    /// about the latter), but the quoting still has to survive a directory
+    /// a user could genuinely have — a space, an apostrophe, an emoji —
+    /// without breaking out of the argument. A remote path is safe here for
+    /// the reason `shellDirectory` gives: the `cd` is delivered to the
+    /// pane's own shell, on the machine that path names.
     @discardableResult
     func changeDirectory(to path: String) -> Bool {
         guard canChangeDirectorySafely else { return false }

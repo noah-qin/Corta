@@ -47,10 +47,17 @@ extension ViewController {
     /// `cd ..`, through the same safety-gated primitive B08's PR #60 built
     /// (`ViewController+DirectoryNavigation.swift`) — no new gate, just a
     /// new source for the path.
+    ///
+    /// B13 — reads `shellDirectory`, not `session.workingDirectory`, so a
+    /// remote pane can walk its *own* remote directories too: the `cd` is
+    /// delivered to the pane's shell, which is the machine the path belongs
+    /// to. The spawn actions below stay on `session.workingDirectory`
+    /// (local-only by construction) for the mirror-image reason — a new
+    /// local pane must never be rooted at a path that lives on another
+    /// computer, and neither may `changeDirectoryToProjectRoot`, whose
+    /// `.git` search runs against *this* machine's filesystem.
     @objc func changeDirectoryToParent(_ sender: Any?) {
-        guard let directory = hasKnownWorkingDirectory ? session.workingDirectory : nil else {
-            return
-        }
+        guard let directory = shellDirectory?.path else { return }
         let parent = (directory as NSString).deletingLastPathComponent
         guard !parent.isEmpty, parent != directory else { return }
         changeDirectory(to: parent)
