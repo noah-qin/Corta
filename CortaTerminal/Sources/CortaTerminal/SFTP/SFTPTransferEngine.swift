@@ -361,11 +361,6 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         guard descriptor >= 0 else {
             throw SFTPError.localIOFailed(operation: "open", code: errno)
         }
-        // The partial records the source's mtime from its first byte, so a
-        // later resume validates against what this transfer *started* from.
-        if let mtime = sourceAttributes.modificationTime {
-            stampModificationTime(descriptor, seconds: mtime)
-        }
 
         let handle = try await session.open(path: remotePath, flags: .read)
         let abort = AbortFlag()
@@ -374,6 +369,7 @@ public final class SFTPTransferEngine: @unchecked Sendable {
                 try await self.pipeDownload(
                     session: session, handle: handle, descriptor: descriptor,
                     offset: offset, total: sourceAttributes.size,
+                    sourceModificationSeconds: sourceAttributes.modificationTime,
                     progress: progress, abort: abort)
             } onCancel: {
                 abort.set()
@@ -389,7 +385,10 @@ public final class SFTPTransferEngine: @unchecked Sendable {
                 bytesTransferred: receipt, resumedFromOffset: offset, attempts: 0)
         } catch {
             Darwin.close(descriptor)
-            try? await session.close(handle)
+            // Cleanup must survive the caller's cancellation: the server
+            // is owed the CLOSE regardless, so it runs in a fresh,
+            // uncancelled task.
+            _ = await Task { [session] in try? await session.close(handle) }.value
             cleanUpPartial(
                 partialPath, disposition: partialDisposition,
                 keepForResume: resolution == .resume)
@@ -407,6 +406,7 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         descriptor: Int32,
         offset: UInt64,
         total: UInt64?,
+        sourceModificationSeconds: UInt32?,
         progress: ProgressHandler?,
         abort: AbortFlag
     ) async throws(SFTPError) -> UInt64 {
@@ -445,6 +445,12 @@ public final class SFTPTransferEngine: @unchecked Sendable {
                 break
             }
             try writeAll(descriptor: descriptor, bytes: data, at: first.offset)
+            // The partial's mtime is the resume-validation record, but
+            // every pwrite bumps it — restamp after each block so an
+            // interruption at any point leaves a self-validating partial.
+            if let seconds = sourceModificationSeconds {
+                stampModificationTime(descriptor, seconds: seconds)
+            }
             moved += UInt64(data.count)
             completed = first.offset + UInt64(data.count)
             progress?(SFTPTransferProgress(completedBytes: completed, totalBytes: total))
@@ -527,7 +533,7 @@ public final class SFTPTransferEngine: @unchecked Sendable {
                 bytesTransferred: moved, resumedFromOffset: offset, attempts: 0)
         } catch {
             Darwin.close(descriptor)
-            try? await session.close(handle)
+            _ = await Task { [session] in try? await session.close(handle) }.value
             await cleanUpPartialAsync(
                 partialPath, disposition: partialDisposition,
                 keepForResume: resolution == .resume, session: session)
@@ -618,7 +624,11 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         switch policy {
         case .fail: resolution = .fail
         case .overwrite: resolution = .overwrite
-        case .resume: resolution = conflict.partialSize != nil ? .resume : .overwrite
+        // `.resume` keeps its meaning even with no partial present: the
+        // transfer starts at zero either way, but the resolution is what
+        // decides whether an interrupted run's partial is kept for a later
+        // resume — a caller who asked for resume wants that.
+        case .resume: resolution = .resume
         case .decide(let decide): resolution = decide(conflict)
         }
         if resolution == .fail, conflict.destinationExists {
@@ -659,7 +669,11 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         case .remove: keep = false
         case .automatic: keep = keepForResume
         }
-        if !keep { try? await session.remove(path: path) }
+        if !keep {
+            // Uncancelled, like the CLOSE above: a cancelled transfer's
+            // cleanup must still reach the server.
+            _ = await Task { [session] in try? await session.remove(path: path) }.value
+        }
     }
 
     // MARK: - Local filesystem helpers

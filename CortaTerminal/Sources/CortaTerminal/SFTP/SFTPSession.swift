@@ -461,20 +461,23 @@ public final class SFTPSession: @unchecked Sendable {
         guard capabilities?.supportsStatVFS == true else { return nil }
         var writer = SFTPWriter()
         writer.writeString(Array(path.utf8))
-        let reply: SFTPMessage
         do {
-            reply = try await extended(name: SFTPCodec.statVFSExtensionName, data: writer.bytes)
+            let reply = try await extended(name: SFTPCodec.statVFSExtensionName, data: writer.bytes)
+            guard case .extendedReply(let body) = reply.payload else {
+                throw unexpected(reply, wanted: "EXTENDED_REPLY")
+            }
+            guard let info = SFTPVolumeInfo(extendedReplyBody: body) else {
+                throw SFTPError.protocolViolation("malformed statvfs reply (\(body.count) bytes)")
+            }
+            return info
         } catch SFTPError.server(let status) where status.code == .operationUnsupported {
             // Advertised but refused: degrade all the same.
             return nil
+        } catch let error as SFTPError {
+            throw error
+        } catch {
+            throw SFTPError.protocolViolation("\(error)")
         }
-        guard case .extendedReply(let body) = reply.payload else {
-            throw unexpected(reply, wanted: "EXTENDED_REPLY")
-        }
-        guard let info = SFTPVolumeInfo(extendedReplyBody: body) else {
-            throw .protocolViolation("malformed statvfs reply (\(body.count) bytes)")
-        }
-        return info
     }
 
     // MARK: - Request plumbing
