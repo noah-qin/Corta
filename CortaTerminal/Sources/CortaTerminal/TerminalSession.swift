@@ -713,11 +713,19 @@ public final class TerminalSession: @unchecked Sendable {
     }
 
     /// The working directory reported via OSC 7 (M2.8). Reports that name a
-    /// remote host (`file://remote/path` from an `ssh` session) are dropped
-    /// at parse time — see `Performer.setWorkingDirectory` — so this is
-    /// always a local path, safe to spawn or restore from.
+    /// remote host (`file://remote/path` from an `ssh` session) are kept
+    /// apart in `remoteContext` — see `Performer.setWorkingDirectory` — so
+    /// this is always a local path, safe to spawn or restore from.
     public var workingDirectory: String? {
         state.withLock { $0.terminal.workingDirectory }
+    }
+
+    /// B13 — the remote host and directory this pane's shell most recently
+    /// reported, when the report names another machine. Informational only:
+    /// for showing the user which host a pane refers to, never for spawning
+    /// or restoring a local process (see `RemoteContext`'s doc comment).
+    public var remoteContext: RemoteContext? {
+        state.withLock { $0.terminal.remoteContext }
     }
 
     /// Whether a command other than the shell itself is running here — what
@@ -738,10 +746,11 @@ public final class TerminalSession: @unchecked Sendable {
     /// OSC 7 first: a shell that reports its directory is reporting the one
     /// it believes it is in, which is the right answer when a program has
     /// changed directory internally. A remote host's report never reaches
-    /// here — the parser drops it — so the fallback also covers panes whose
-    /// shell is on another machine. That fallback is the kernel's answer for
-    /// the foreground process group, because a stock macOS zsh sends no
-    /// OSC 7 to anything but Terminal.app (`PTY.currentWorkingDirectory`).
+    /// here — it lands in `remoteContext` instead — so the fallback also
+    /// covers panes whose shell is on another machine. That fallback is the
+    /// kernel's answer for the foreground process group, because a stock
+    /// macOS zsh sends no OSC 7 to anything but Terminal.app
+    /// (`PTY.currentWorkingDirectory`).
     public var currentDirectory: String? {
         state.withLock { $0.terminal.workingDirectory } ?? pty.currentWorkingDirectory
     }
