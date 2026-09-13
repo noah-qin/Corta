@@ -307,7 +307,7 @@ nonisolated final class QuadRenderer {
         draw(
             instances, ring: solidBufferRing, pipeline: solidPipeline, atlas: nil, rect: rect,
             drawableSize: drawableSize, renderPassDescriptor: renderPassDescriptor,
-            commandBuffer: commandBuffer)
+            commandBuffer: commandBuffer, label: "Corta.solid")
     }
 
     /// Draws `instances` sampled from `atlas` into `rect`.
@@ -322,7 +322,7 @@ nonisolated final class QuadRenderer {
         draw(
             instances, ring: glyphBufferRing, pipeline: glyphPipeline, atlas: atlas, rect: rect,
             drawableSize: drawableSize, renderPassDescriptor: renderPassDescriptor,
-            commandBuffer: commandBuffer)
+            commandBuffer: commandBuffer, label: "Corta.glyph")
     }
 
     /// Draws `instances` sampled from the *color* atlas into `rect`. Same
@@ -340,7 +340,7 @@ nonisolated final class QuadRenderer {
         draw(
             instances, ring: colorGlyphBufferRing, pipeline: colorGlyphPipeline, atlas: atlas,
             rect: rect, drawableSize: drawableSize, renderPassDescriptor: renderPassDescriptor,
-            commandBuffer: commandBuffer)
+            commandBuffer: commandBuffer, label: "Corta.colorGlyph")
     }
 
     private func draw(
@@ -351,7 +351,8 @@ nonisolated final class QuadRenderer {
         rect: CGRect,
         drawableSize: CGSize,
         renderPassDescriptor: MTLRenderPassDescriptor,
-        commandBuffer: MTLCommandBuffer
+        commandBuffer: MTLCommandBuffer,
+        label: String
     ) {
         // Even with zero instances, the encoder still has to run: a `.clear`
         // load action must happen so a frame that draws nothing (an all-
@@ -359,7 +360,15 @@ nonisolated final class QuadRenderer {
         // screen.
         guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)
         else { return }
-        defer { encoder.endEncoding() }
+        // Correlates an Instruments/Metal System Trace capture with which of
+        // the up-to-three passes a frame took (B12 platform-diagnostics
+        // scope item); purely a label, changes nothing about what draws.
+        encoder.label = label
+        encoder.pushDebugGroup(label)
+        defer {
+            encoder.popDebugGroup()
+            encoder.endEncoding()
+        }
         guard !instances.isEmpty else { return }
 
         // Clipping to `rect` via the scissor is what makes "renders into a
