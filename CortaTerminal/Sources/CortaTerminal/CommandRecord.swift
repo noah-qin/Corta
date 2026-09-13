@@ -32,7 +32,16 @@ public struct CommandRecord: Sendable, Equatable, Identifiable {
     /// `OSC 7`'s value at the moment the prompt started, when the shell
     /// reports one (M2.8). Not re-read at command end: a command that itself
     /// changed directory should still be found under where it was launched.
+    ///
+    /// Local-only by construction, like `PerformerState.workingDirectory`;
+    /// a command begun under a remote report carries `host` instead.
     public var workingDirectory: String?
+    /// B13 — the remote host this pane referred to when the command began
+    /// (`RemoteContext.host` at that moment). `nil` for a local command.
+    /// Informational only, like the context it came from: a value here
+    /// means `workingDirectory` describes a *local* directory the pane was
+    /// in before going remote, not one this command ran in.
+    public var host: String?
     /// The column the cursor sat at when `OSC 133 ; B` landed on this same
     /// row (M2.8's `promptEndColumn`, kept per-record here) — where the
     /// command the user typed starts. `nil` for a multi-line prompt whose
@@ -75,11 +84,13 @@ public struct CommandRecordStore: Sendable, Equatable {
 
     public var last: CommandRecord? { records.last }
 
-    mutating func begin(promptRow: Int, workingDirectory: String?, at date: Date) {
+    mutating func begin(
+        promptRow: Int, workingDirectory: String?, host: String? = nil, at date: Date
+    ) {
         let record = CommandRecord(
             id: nextID, promptRow: promptRow, outputStartRow: nil, endRow: nil,
             startedAt: date, endedAt: nil, exitStatus: nil,
-            workingDirectory: workingDirectory, promptEndColumn: nil)
+            workingDirectory: workingDirectory, host: host, promptEndColumn: nil)
         nextID += 1
         records.append(record)
         if records.count > capacity {
@@ -120,24 +131,34 @@ public struct CommandRecordStore: Sendable, Equatable {
         records.last { !$0.isRunning }
     }
 
-    /// B08 — records filtered by directory, time range and/or exit status,
-    /// most recent first. Every filter is independent and optional; passing
-    /// none returns every record. `host` is not a filter here: nothing in
-    /// this store carries one yet — `workingDirectory` is already
+    /// B08 — records filtered by directory, time range, exit status and/or
+    /// host, most recent first. Every filter is independent and optional;
+    /// passing none returns every record. The `host` filter (B13) matches
+    /// the remote host recorded on each command; `workingDirectory` stays
     /// local-only by construction (`Performer+OSC.swift`'s
-    /// `setWorkingDirectory`) — and a real one waits for B13's SSH context.
+    /// `setWorkingDirectory`), so the two never disagree about which side
+    /// of an `ssh` session a command ran on.
     public func records(
         inDirectory directory: String? = nil,
         since: Date? = nil,
         until: Date? = nil,
-        exitStatus: Int? = nil
+        exitStatus: Int? = nil,
+        host: String? = nil
     ) -> [CommandRecord] {
         records.reversed().filter { record in
             if let directory, record.workingDirectory != directory { return false }
             if let since, record.startedAt < since { return false }
             if let until, record.startedAt > until { return false }
             if let exitStatus, record.exitStatus != exitStatus { return false }
+            if let host, record.host != host { return false }
             return true
         }
+    }
+
+    /// B13 — the commands begun while the pane referred to `host`, most
+    /// recent first. The single-filter spelling of `records(host:)` for the
+    /// app, whose question is "what did this pane run on that machine?".
+    public func records(onHost host: String) -> [CommandRecord] {
+        records(host: host)
     }
 }
