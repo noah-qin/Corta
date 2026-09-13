@@ -18,14 +18,20 @@ import Foundation
 /// `TerminalSession.workingDirectory`, which are local-or-nil by
 /// construction, and a remote report never changes that.
 public struct RemoteContext: Sendable, Equatable {
-    /// Where the report came from. Today every report is `OSC 7`; the app
-    /// layer will add `.foregroundProcess` when it learns to recognise an
-    /// `ssh` (or `mosh`, …) process in the foreground and infer the host
-    /// from its arguments rather than from a sequence the remote shell
-    /// chose to send.
+    /// Where the report came from. `OSC 7` is the remote shell's own
+    /// statement and the only one that can name a host; `.foregroundProcess`
+    /// is the app layer recognising a remote launcher (`ssh`, `mosh`, …) in
+    /// the foreground — lower confidence, and it arrives with no host at
+    /// all, because a process name carries none and the launcher's argv is
+    /// deliberately not parsed for one (an alias, a `~/.ssh/config` name or
+    /// a jump-host chain would all read back wrong).
     public enum Provenance: Sendable, Equatable {
         /// The remote shell emitted `OSC 7 ; file://host/path` itself.
         case osc7
+        /// The app saw a remote launcher holding the pane's foreground
+        /// (`PTY.foregroundProcessName`), not a sequence the remote shell
+        /// chose to send.
+        case foregroundProcess
     }
 
     /// The host the report names, normalised the way `Performer.normalize
