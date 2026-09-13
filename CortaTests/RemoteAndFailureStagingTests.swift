@@ -41,7 +41,13 @@ struct RemoteWorkingDirectoryTests {
     /// computer.
     @Test("an OSC 7 report from a remote host is recorded, and isolated")
     func remoteReportsAreRecordedAndIsolated() {
-        for authority in ["build-box", "build-box.internal", "192.168.1.40", "user@host"] {
+        // `expectedHost` differs from `authority` for the userinfo form:
+        // `URL` reads `user@host` as user + host, and the host component is
+        // what a display should name.
+        for (authority, expectedHost) in [
+            ("build-box", "build-box"), ("build-box.internal", "build-box.internal"),
+            ("192.168.1.40", "192.168.1.40"), ("user@host", "host"),
+        ] {
             let terminal = Self.terminal(feeding: "\u{1B}]7;file://\(authority)/srv/app\u{7}")
             // Isolation: the local-spawn path still answers nil, which is
             // also what split-pane inheritance consumes.
@@ -52,7 +58,7 @@ struct RemoteWorkingDirectoryTests {
             // in the normalised form — lowercase, no trailing dot).
             let context = terminal.remoteContext
             #expect(
-                context?.host == authority,
+                context?.host == expectedHost,
                 "file://\(authority)/srv/app should be recorded as remote context")
             #expect(context?.directory == "/srv/app")
             #expect(context?.provenance == .osc7)
