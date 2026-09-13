@@ -101,6 +101,36 @@ struct PaneRemoteStateTests {
         let uncertain = PaneRemoteState.unknown.titleComponent
         #expect(uncertain == "⟂ \(L10n.text("remote.uncertain"))")
     }
+
+    /// The case the two process signals cannot see: a pane spawned *as*
+    /// `ssh` (an ssh preset). The launcher owns the terminal as the pane's
+    /// own child, so there is never a foreground job in front of a shell —
+    /// without the spawn record the pane would read `.local` for the whole
+    /// connection.
+    @Test("a pane spawned as ssh is remote even with no foreground job")
+    func spawnedLauncherIsRemote() {
+        #expect(
+            PaneRemoteState.resolve(
+                remoteContext: nil, hasForegroundJob: false, foregroundProcessName: nil,
+                childIsRemoteLauncher: true) == .remoteUnknown(provenance: .spawnedLauncher))
+        // The report still outranks the spawn record: it names the host.
+        #expect(
+            PaneRemoteState.resolve(
+                remoteContext: Self.report(), hasForegroundJob: false,
+                foregroundProcessName: nil, childIsRemoteLauncher: true)
+                == .remote(host: "build-box", directory: "/srv/app", provenance: .osc7))
+    }
+
+    @Test("a launcher is recognised from a full path, as a preset spells it")
+    func launcherPathsAreRecognised() {
+        #expect(PaneRemoteState.isRemoteLauncher(executable: "/usr/bin/ssh"))
+        #expect(PaneRemoteState.isRemoteLauncher(executable: "ssh"))
+        #expect(PaneRemoteState.isRemoteLauncher(executable: "/opt/homebrew/bin/mosh"))
+        #expect(!PaneRemoteState.isRemoteLauncher(executable: "/bin/zsh"))
+        // A lookalike: `sshd` is a daemon, not a connection this pane holds.
+        #expect(!PaneRemoteState.isRemoteLauncher(executable: "/usr/sbin/sshd"))
+    }
+
 }
 
 /// B13 — the isolation half, staged through real sessions: a remote OSC 7
@@ -268,4 +298,91 @@ struct CommandHistoryHostScopeTests {
         model.hostScope = .any
         #expect(model.rows.count == 2)
     }
+}
+
+/// B13 — an ssh preset as a first-class path, staged without a network:
+/// the "launcher" is a symlink to `/bin/sh` *named* `ssh` in a temporary
+/// directory, so the pane spawns exactly what an ssh preset spells (a
+/// system binary path plus arguments) while nothing about the machine
+/// changes. What is asserted is Corta's side of the seam: the spawn record
+/// drives the remote state, the dead connection offers Reconnect, and
+/// Reconnect re-runs the same command as a new session rather than falling
+/// back to a local shell.
+@MainActor
+@Suite(.serialized)
+struct SSHPresetPaneTests {
+    /// A symlink to `/bin/sh` under the name `ssh`, inside a throwaway
+    /// directory the caller removes (`launcher.deletingLastPathComponent()`).
+    /// Not a copy: a copied Apple platform binary is killed at exec (its
+    /// signature ties it to the system volume), while a symlink resolves
+    /// to the real vnode and runs. The pane spawns the path named `ssh`,
+    /// which is the only place the name matters — the spawn record, not
+    /// `proc_name`, drives the remote state.
+    private static func makeStagingLauncher() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("corta-ssh-preset-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let launcher = directory.appendingPathComponent("ssh")
+        try FileManager.default.createSymbolicLink(
+            at: launcher, withDestinationURL: URL(fileURLWithPath: "/bin/sh"))
+        return launcher
+    }
+
+    private static func makePane(launcher: URL, script: String) -> ViewController {
+        var preset = Preset(name: "ssh-staging")
+        preset.shell = launcher.path
+        preset.arguments = ["-c", script]
+        let pane = ViewController()
+        pane.preset = preset
+        _ = pane.view
+        return pane
+    }
+
+    private func waitUntilTrue(
+        timeout: Duration = .seconds(10), _ condition: () -> Bool
+    ) async -> Bool {
+        let deadline = ContinuousClock.now + timeout
+        while ContinuousClock.now < deadline {
+            if condition() { return true }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return condition()
+    }
+
+    /// The spawn is enough: before the far end reports anything the pane is
+    /// remote with the host unknown, and a remote `OSC 7` through the
+    /// connection upgrades that to host and directory — the two states a
+    /// real ssh preset walks through. The report is gated on a line of
+    /// input so both states are observed deterministically.
+    @Test func anSSHPresetPaneReadsRemoteFromSpawnToReport() async throws {
+        let launcher = try Self.makeStagingLauncher()
+        defer { try? FileManager.default.removeItem(at: launcher.deletingLastPathComponent()) }
+        let pane = Self.makePane(
+            launcher: launcher,
+            script: "read _; printf '\\033]7;file://build-box/srv/app\\007'; sleep 60")
+        defer { pane.teardown() }
+        let session = try #require(pane.session)
+
+        // The launcher owns the terminal as the pane's own child: no
+        // foreground job ever stands in front of it, and the spawn record
+        // is what says the pane is remote.
+        #expect(!session.hasForegroundJob)
+        #expect(session.remoteContext == nil)
+        #expect(pane.paneRemoteState == .remoteUnknown(provenance: .spawnedLauncher))
+
+        // The far end answers.
+        session.write(Array("\n".utf8))
+        #expect(await waitUntilTrue { session.remoteContext != nil })
+        #expect(
+            pane.paneRemoteState
+                == .remote(host: "build-box", directory: "/srv/app", provenance: .osc7))
+        // The title's copy of the state is cached on an interval; force the
+        // re-read rather than racing it.
+        pane.invalidateProcessFacts()
+        #expect(pane.composedWindowTitle.contains("⟂ build-box"))
+        // Nothing local changed its mind: the remote report never reaches
+        // the local-spawn value.
+        #expect(session.workingDirectory == nil)
+    }
+
 }

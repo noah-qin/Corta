@@ -77,6 +77,11 @@ class ViewController: NSViewController {
     /// U16 — the preset this pane was opened from, applied once at spawn
     /// time. Set before the view loads, like `inheritedWorkingDirectory`.
     var preset: Preset?
+    /// B13 — the command the current session was actually spawned with: the
+    /// ladder rung that succeeded, which after a fallback is `/bin/zsh`
+    /// rather than what was asked for. The remote-state composition reads it
+    /// because a pane whose child *is* `ssh` shows no foreground job.
+    private(set) var launchedCommand: (executable: String, arguments: [String])?
     /// B07 — the command jump navigation last landed on; `nil` once the
     /// viewport has moved away from it (`scrollOffset`'s `didSet` below), so
     /// `effectiveCommand` never targets a command that has scrolled out of
@@ -494,6 +499,7 @@ class ViewController: NSViewController {
     /// "your login shell moved" was a crash report. Now the recoverable ones
     /// degrade (`startSession`, `makeRenderer`) and the rest present
     /// `PaneFailureView`, whose Try Again runs this again.
+    ///
     private func setUpPane() {
         // The settings page's font and size (M6.1). Read here rather than
         // pushed in later: a pane created at any time — a split, a new tab —
@@ -547,6 +553,7 @@ class ViewController: NSViewController {
             return
         }
         session = started.session
+        launchedCommand = (started.executable, started.arguments)
         sessionGeneration += 1
         // The facts cache predates this session; a retried pane must not
         // show the dead one's process, directory or remote badge until the
@@ -1287,7 +1294,8 @@ class ViewController: NSViewController {
         cachedRemoteState = PaneRemoteState.resolve(
             remoteContext: session.remoteContext,
             hasForegroundJob: session.hasForegroundJob,
-            foregroundProcessName: session.foregroundProcessName)
+            foregroundProcessName: session.foregroundProcessName,
+            childIsRemoteLauncher: childIsLiveRemoteLauncher)
     }
 
     /// Forces the next title to re-read them — for the moments where waiting
@@ -1469,6 +1477,12 @@ class ViewController: NSViewController {
         /// something other than what was asked for instead of leaving the
         /// user to wonder why their prompt looks wrong.
         let notice: String?
+        /// The command that actually spawned — the rung of the ladder that
+        /// succeeded, not necessarily the one that was asked for. The pane
+        /// keeps it so "which machine is this?" can answer for a pane whose
+        /// child *is* `ssh` (`PaneRemoteState`).
+        let executable: String
+        let arguments: [String]
     }
 
     /// Starts the child, degrading rather than failing whenever only *part* of
@@ -1538,7 +1552,10 @@ class ViewController: NSViewController {
                     // re-limited without discarding lines, so a change
                     // applies to sessions opened after it.
                     scrollbackLimit: scrollbackLimit, commandHistoryLimit: commandHistoryLimit)
-                return StartedSession(session: session, notice: attempt.notice)
+                return StartedSession(
+                    session: session, notice: attempt.notice,
+                    executable: attempt.shell,
+                    arguments: attempt.shell == configured ? arguments : ["-l"])
             } catch {
                 lastError = error
             }
@@ -1564,6 +1581,7 @@ class ViewController: NSViewController {
     /// that can help. The terminal view is never built in this state, so
     /// `isOperable` is false and every geometry and render entry point
     /// short-circuits.
+    ///
     private func presentFailure(title: String, detail: String, canRetry: Bool) {
         failureView?.removeFromSuperview()
         let failure = PaneFailureView(title: title, detail: detail, canRetry: canRetry)

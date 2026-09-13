@@ -32,6 +32,12 @@ public struct RemoteContext: Sendable, Equatable {
         /// (`PTY.foregroundProcessName`), not a sequence the remote shell
         /// chose to send.
         case foregroundProcess
+        /// The app spawned the remote launcher itself, as the pane's own
+        /// child (an ssh preset). No `proc_name` is involved — the launcher
+        /// owns the terminal *as* the child, so the foreground-group check
+        /// never fires — and the answer is certain rather than recognised:
+        /// the app knows what it exec'd.
+        case spawnedLauncher
     }
 
     /// The host the report names, normalised the way `Performer.normalize

@@ -17,6 +17,23 @@ extension ViewController {
         return PaneRemoteState.resolve(
             remoteContext: session.remoteContext,
             hasForegroundJob: session.hasForegroundJob,
-            foregroundProcessName: session.foregroundProcessName)
+            foregroundProcessName: session.foregroundProcessName,
+            childIsRemoteLauncher: childIsLiveRemoteLauncher)
+    }
+
+    /// Whether the pane's own child is a live remote launcher — the case
+    /// the foreground-process signal cannot see, because the launcher owns
+    /// the terminal *as* the pane's child and no job ever stands in front
+    /// of it. What the pane exec'd (`launchedCommand`) is the certain
+    /// version of what `proc_name` can only recognise.
+    ///
+    /// `exitStatus` is the liveness check rather than the failure view's
+    /// state: an `ssh` that exited in a pane still showing its last output
+    /// is dead, and a recorded report from it is stale.
+    var childIsLiveRemoteLauncher: Bool {
+        guard let launchedCommand,
+            PaneRemoteState.isRemoteLauncher(executable: launchedCommand.executable)
+        else { return false }
+        return session != nil && session.pty.exitStatus == nil
     }
 }

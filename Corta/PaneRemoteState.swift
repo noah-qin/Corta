@@ -2,7 +2,7 @@ import CortaTerminal
 import Foundation
 
 /// B13 — which machine a pane's terminal is actually talking to, composed
-/// from the two independent signals that can answer it, kept as a plain
+/// from the independent signals that can answer it, kept as a plain
 /// value so the composition is testable without a pane, a pty or a window.
 ///
 /// - The remote shell's own `OSC 7` report (`TerminalSession.remoteContext`)
@@ -12,6 +12,10 @@ import Foundation
 ///   even when the far end reports nothing; a `tmux`/`screen` means the
 ///   pane *may* be — it could be attached to a session on another machine —
 ///   so the state is uncertain and says so rather than guessing.
+/// - The command the pane itself spawned is the app's own answer for the
+///   case the kernel's cannot see: a pane whose child *is* `ssh` (an ssh
+///   preset) has no foreground job to measure, so what was exec'd is what
+///   says the pane is remote.
 ///
 /// Two things are deliberately never done: reading the host out of the
 /// terminal's text (a prompt that merely *looks* like `user@host` is child
@@ -43,6 +47,14 @@ nonisolated enum PaneRemoteState: Equatable {
     /// way.
     private static let remoteLaunchers: Set<String> = ["ssh", "mosh", "mosh-client"]
 
+    /// Whether an executable a pane is about to spawn — a full path, as a
+    /// preset's `shell` is — is a remote launcher. Asked of the spawn
+    /// request itself rather than of `proc_name`: a pane spawned *as* `ssh`
+    /// never shows a foreground job, because the launcher *is* the child.
+    static func isRemoteLauncher(executable: String) -> Bool {
+        remoteLaunchers.contains((executable as NSString).lastPathComponent.lowercased())
+    }
+
     /// Executable names that hide what is behind them: the session a local
     /// `tmux`/`screen` is attached to may itself be running over `ssh`, and
     /// neither signal available here can say.
@@ -53,9 +65,30 @@ nonisolated enum PaneRemoteState: Equatable {
     /// rather than the name alone because the name is `nil` both for "the
     /// shell is at a prompt" (local) and for "the name could not be read"
     /// (uncertain) — two answers a display must not conflate.
+    ///
+    /// `childIsRemoteLauncher` covers the pane the foreground signals cannot
+    /// see: one spawned *as* the launcher (an ssh preset). The launcher owns
+    /// the terminal as the pane's own child, so `hasForegroundJob` is false
+    /// for the whole connection — the kernel question "is a job in front of
+    /// the shell?" has no shell to be in front of. What the pane exec'd is
+    /// recorded at spawn time, which is the certain version of what
+    /// `proc_name` can only recognise. The caller passes `true` only while
+    /// that child is alive: once it exits, a recorded report is as stale
+    /// here as it is behind a shell.
     static func resolve(
-        remoteContext: RemoteContext?, hasForegroundJob: Bool, foregroundProcessName: String?
+        remoteContext: RemoteContext?, hasForegroundJob: Bool, foregroundProcessName: String?,
+        childIsRemoteLauncher: Bool = false
     ) -> PaneRemoteState {
+        if childIsRemoteLauncher {
+            // The report still outranks the spawn: it is the remote shell
+            // speaking for itself, and it is the only source of a host.
+            if let remoteContext {
+                return .remote(
+                    host: remoteContext.host, directory: remoteContext.directory,
+                    provenance: remoteContext.provenance)
+            }
+            return .remoteUnknown(provenance: .spawnedLauncher)
+        }
         guard hasForegroundJob else { return .local }
         guard let name = foregroundProcessName?.lowercased() else { return .unknown }
         if remoteLaunchers.contains(name) {
