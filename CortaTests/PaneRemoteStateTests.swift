@@ -131,6 +131,23 @@ struct PaneRemoteStateTests {
         #expect(!PaneRemoteState.isRemoteLauncher(executable: "/usr/sbin/sshd"))
     }
 
+    /// The copy rule behind Reconnect: when the command line itself asks the
+    /// far end to reattach, the UI may say so — the reattach is the user's
+    /// own command doing it, not Corta restoring anything.
+    @Test("a reattaching command line is recognised for what it is")
+    func reattachDetection() {
+        #expect(ViewController.reattachesRemoteSession(["user@build-box", "tmux", "attach"]))
+        #expect(ViewController.reattachesRemoteSession(["user@build-box", "tmux", "a"]))
+        #expect(ViewController.reattachesRemoteSession(["user@build-box", "tmux", "attach-session", "-t", "main"]))
+        #expect(ViewController.reattachesRemoteSession(["user@build-box", "screen", "-x"]))
+        #expect(ViewController.reattachesRemoteSession(["user@build-box", "screen", "-rr"]))
+        // Quoted into one argument, as presets often spell it: same line.
+        #expect(ViewController.reattachesRemoteSession(["user@build-box", "tmux attach"]))
+        // A fresh session is not a reattach.
+        #expect(!ViewController.reattachesRemoteSession(["user@build-box"]))
+        #expect(!ViewController.reattachesRemoteSession(["user@build-box", "tmux", "new-session"]))
+        #expect(!ViewController.reattachesRemoteSession(["user@build-box", "screen"]))
+    }
 }
 
 /// B13 — the isolation half, staged through real sessions: a remote OSC 7
@@ -385,4 +402,75 @@ struct SSHPresetPaneTests {
         #expect(session.workingDirectory == nil)
     }
 
+    /// The dead-connection seam: the launcher exits, the pane goes local
+    /// again (a stale report must not dress it up), and Reconnect is what
+    /// is offered — a new session running the same command, whose remote
+    /// context starts empty until the new connection reports. The launcher
+    /// blocks on `read` so each liveness phase is observed while it lasts.
+    @Test func aDeadLauncherOffersReconnectAsANewConnection() async throws {
+        let launcher = try Self.makeStagingLauncher()
+        defer { try? FileManager.default.removeItem(at: launcher.deletingLastPathComponent()) }
+        let pane = Self.makePane(launcher: launcher, script: "read _")
+        defer { pane.teardown() }
+        let dead = try #require(pane.session)
+        #expect(await waitUntilTrue { pane.paneRemoteState == .remoteUnknown(provenance: .spawnedLauncher) })
+        #expect(!pane.canReconnectRemote, "a live connection has nothing to reconnect")
+
+        dead.write(Array("\n".utf8))
+        #expect(await waitUntilTrue { dead.pty.exitStatus != nil })
+        #expect(pane.paneRemoteState == .local, "the exited launcher owns nothing any more")
+        #expect(pane.canReconnectRemote)
+
+        pane.reconnectRemote(nil)
+        let respawned = try #require(pane.session)
+        #expect(respawned !== dead)
+        // The same command, byte for byte — not a paraphrase of it.
+        #expect(pane.launchedCommand?.executable == launcher.path)
+        #expect(pane.launchedCommand?.arguments == ["-c", "read _"])
+        // A fresh session carries nothing from the dead one: no host, no
+        // directory, and the badge is back to what the spawn alone can say.
+        #expect(respawned.remoteContext == nil)
+        #expect(
+            await waitUntilTrue {
+                pane.paneRemoteState == .remoteUnknown(provenance: .spawnedLauncher)
+            })
+    }
+
+    /// The honesty half: when the recorded command can no longer run, a
+    /// reconnect fails as itself — the fallback ladder would land the pane
+    /// in a local `/bin/zsh` while the user asked for the host back, which
+    /// is the one substitution Reconnect must never make silently.
+    @Test func aReconnectThatCannotRunFailsRatherThanFallingBack() async throws {
+        let launcher = try Self.makeStagingLauncher()
+        let pane = Self.makePane(launcher: launcher, script: "exit 0")
+        defer {
+            pane.teardown()
+            try? FileManager.default.removeItem(at: launcher.deletingLastPathComponent())
+        }
+        #expect(await waitUntilTrue { pane.session?.pty.exitStatus != nil })
+        #expect(pane.canReconnectRemote)
+
+        // The binary is gone now: the exact command cannot be re-run.
+        try FileManager.default.removeItem(at: launcher)
+        pane.reconnectRemote(nil)
+        #expect(
+            await waitUntilTrue { pane.failureView != nil },
+            "a failed reconnect shows the failure view instead of a silent local shell")
+        #expect(pane.canReconnectRemote, "the button stays on offer — the command is still remote")
+    }
+
+    /// The negative: a local shell never sees Reconnect, dead or alive —
+    /// Try Again already covers it, and two names for one respawn is how a
+    /// menu teaches a distinction that does not exist.
+    @Test func aLocalShellNeverOffersReconnect() async throws {
+        var preset = Preset(name: "local-staging")
+        preset.shell = "/bin/sh"
+        preset.arguments = ["-c", "exit 0"]
+        let pane = ViewController()
+        pane.preset = preset
+        _ = pane.view
+        defer { pane.teardown() }
+        #expect(await waitUntilTrue { pane.session?.pty.exitStatus != nil })
+        #expect(!pane.canReconnectRemote)
+    }
 }

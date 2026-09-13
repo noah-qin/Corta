@@ -401,6 +401,11 @@ extension ViewController: NSMenuItemValidation {
         case #selector(clearScreen(_:)), #selector(clearHistory(_:)),
             #selector(resetTerminal(_:)):
             return validateTerminalStateItem(menuItem)
+        case #selector(reconnectRemote(_:)):
+            // B13 — only a pane whose session *was* a remote launcher, and
+            // whose child is now gone, has anything to reconnect. For every
+            // other pane the item is greyed rather than live and silent.
+            return canReconnectRemote
         case #selector(exportText(_:)):
             return isOperable
         case #selector(revealWorkingDirectoryInFinder(_:)), #selector(copyWorkingDirectoryPath(_:)),

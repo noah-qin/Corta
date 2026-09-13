@@ -79,8 +79,9 @@ class ViewController: NSViewController {
     var preset: Preset?
     /// B13 — the command the current session was actually spawned with: the
     /// ladder rung that succeeded, which after a fallback is `/bin/zsh`
-    /// rather than what was asked for. The remote-state composition reads it
-    /// because a pane whose child *is* `ssh` shows no foreground job.
+    /// rather than what was asked for. Read by the remote-state composition
+    /// (a pane whose child *is* `ssh` shows no foreground job) and by
+    /// Reconnect, which re-runs exactly this.
     private(set) var launchedCommand: (executable: String, arguments: [String])?
     /// B07 — the command jump navigation last landed on; `nil` once the
     /// viewport has moved away from it (`scrollOffset`'s `didSet` below), so
@@ -500,7 +501,14 @@ class ViewController: NSViewController {
     /// degrade (`startSession`, `makeRenderer`) and the rest present
     /// `PaneFailureView`, whose Try Again runs this again.
     ///
-    private func setUpPane() {
+    /// `strictRespawn` is the reconnect path (B13): the recorded command is
+    /// re-run *exactly*, with no fallback ladder. Degrading is the right
+    /// answer to "open me a terminal" — a bad `$SHELL` still gets you a
+    /// shell — and the wrong answer to "reconnect to that host", where
+    /// quietly landing in a local `/bin/zsh` would turn a remote pane local
+    /// while claiming otherwise. Reconnect succeeds as the same command or
+    /// fails as itself.
+    private func setUpPane(strictRespawn: Bool = false) {
         // The settings page's font and size (M6.1). Read here rather than
         // pushed in later: a pane created at any time — a split, a new tab —
         // gets the current values by asking, and nothing has to remember to
@@ -542,14 +550,23 @@ class ViewController: NSViewController {
         }
         let started: StartedSession
         do {
-            started = try Self.startSession(
-                size: initialSize, directory: inheritedWorkingDirectory,
-                scrollbackLimit: configuration.scrollbackLines,
-                commandHistoryLimit: configuration.commandHistoryLimit, preset: preset)
+            if strictRespawn, let command = reconnectCommand {
+                started = StartedSession(
+                    session: try respawn(command, size: initialSize, configuration: configuration),
+                    notice: nil, executable: command.executable, arguments: command.arguments)
+            } else {
+                started = try Self.startSession(
+                    size: initialSize, directory: inheritedWorkingDirectory,
+                    scrollbackLimit: configuration.scrollbackLines,
+                    commandHistoryLimit: configuration.commandHistoryLimit, preset: preset)
+            }
         } catch {
             presentFailure(
                 title: L10n.text("failure.title.session"),
-                detail: Self.describe(error), canRetry: true)
+                detail: Self.describe(error), canRetry: true,
+                canReconnect: reconnectCommand.map {
+                    PaneRemoteState.isRemoteLauncher(executable: $0.executable)
+                } ?? false)
             return
         }
         session = started.session
@@ -1098,7 +1115,16 @@ class ViewController: NSViewController {
     @MainActor
     private func noteChildExit(_: ChildExit, generation: Int) {
         guard !didTeardown, sessionGeneration == generation else { return }
-        terminalView?.showToast(L10n.text("toast.shellExited"), kind: .warning)
+        // A dead remote launcher gets the honest version of the news: the
+        // *connection* ended, and the way back is a new one — Reconnect —
+        // not anything that would pretend the old session survived.
+        if let launchedCommand,
+            PaneRemoteState.isRemoteLauncher(executable: launchedCommand.executable)
+        {
+            terminalView?.showToast(L10n.text("toast.connectionEnded"), kind: .warning)
+        } else {
+            terminalView?.showToast(L10n.text("toast.shellExited"), kind: .warning)
+        }
     }
 
     /// Marks the display dirty and wakes the display link — for local changes
@@ -1480,7 +1506,8 @@ class ViewController: NSViewController {
         /// The command that actually spawned — the rung of the ladder that
         /// succeeded, not necessarily the one that was asked for. The pane
         /// keeps it so "which machine is this?" can answer for a pane whose
-        /// child *is* `ssh` (`PaneRemoteState`).
+        /// child *is* `ssh` (`PaneRemoteState`), and so Reconnect can re-run
+        /// exactly it rather than a paraphrase.
         let executable: String
         let arguments: [String]
     }
@@ -1563,6 +1590,31 @@ class ViewController: NSViewController {
         throw lastError
     }
 
+    /// The reconnect spawn (B13): the recorded command, exactly — no
+    /// fallback ladder, because a fallback here would silently turn a
+    /// remote pane into a local shell while the user asked for the host.
+    /// Succeeds as the same command, or fails as itself and lets the
+    /// failure view say so.
+    private func respawn(
+        _ command: (executable: String, arguments: [String]),
+        size: TerminalSize, configuration: Configuration
+    ) throws(PTYError) -> TerminalSession {
+        // The environment is rebuilt rather than remembered: what the first
+        // spawn inherited may be stale, and building it again is what the
+        // first spawn did (`SECURITY.md` §4.3 applies either way).
+        var environment = ChildEnvironment.default()
+        for (key, value) in preset?.environment ?? [:] { environment[key] = value }
+        // The working directory is a *local* cwd for the launcher process;
+        // the remote side lands wherever the connection and the far shell
+        // put it. A preset directory is honoured as it was at first spawn.
+        return try TerminalSession(
+            executable: command.executable, arguments: command.arguments,
+            environment: environment, size: size,
+            workingDirectory: preset?.directory ?? inheritedWorkingDirectory ?? NSHomeDirectory(),
+            scrollbackLimit: configuration.scrollbackLines,
+            commandHistoryLimit: configuration.commandHistoryLimit)
+    }
+
     /// One line a person can act on. `PTYError` writes its description for
     /// exactly this purpose; anything else falls back to Foundation's.
     ///
@@ -1582,10 +1634,18 @@ class ViewController: NSViewController {
     /// `isOperable` is false and every geometry and render entry point
     /// short-circuits.
     ///
-    private func presentFailure(title: String, detail: String, canRetry: Bool) {
+    /// `canReconnect` adds a third action when what failed was a remote
+    /// launcher's spawn (B13): Reconnect re-runs that exact command rather
+    /// than the fallback ladder, and the detail says plainly that it is a
+    /// new connection, not a restored one.
+    private func presentFailure(
+        title: String, detail: String, canRetry: Bool, canReconnect: Bool = false
+    ) {
         failureView?.removeFromSuperview()
-        let failure = PaneFailureView(title: title, detail: detail, canRetry: canRetry)
+        let failure = PaneFailureView(
+            title: title, detail: detail, canRetry: canRetry, canReconnect: canReconnect)
         failure.onRetry = { [weak self] in self?.retryAfterFailure() }
+        failure.onReconnect = { [weak self] in self?.reconnectRemote(nil) }
         failure.onOpenSettings = { SettingsWindowController.shared.show(nil) }
         failure.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(failure)
@@ -1612,13 +1672,24 @@ class ViewController: NSViewController {
     }
 
     private func retryAfterFailure() {
+        rebuildPane(strictRespawn: false)
+    }
+
+    /// The shared teardown-and-rebuild behind Try Again and Reconnect: the
+    /// failure view, the dead terminal view and the dim come down, and
+    /// `setUpPane` builds the pane again — through the fallback ladder for
+    /// a retry, or as the exact recorded command for a reconnect.
+    ///
+    /// Not `private`: the reconnect entry point lives in
+    /// `ViewController+RemoteContext.swift`, an extension.
+    func rebuildPane(strictRespawn: Bool) {
         failureView?.removeFromSuperview()
         failureView = nil
         terminalView?.removeFromSuperview()
         terminalView = nil
         focusDimView?.removeFromSuperview()
         focusDimView = nil
-        setUpPane()
+        setUpPane(strictRespawn: strictRespawn)
         guard isOperable, let terminalView else { return }
         // The window settled long before this retry, so the startup gate that
         // holds back transient layouts has nothing left to protect against —
@@ -1628,6 +1699,12 @@ class ViewController: NSViewController {
         view.window?.makeFirstResponder(terminalView)
         resizeSessionToFitView()
         invalidateDisplay()
+        if strictRespawn {
+            // Said out loud, every time: this is a new connection. The dead
+            // session's scrollback is gone with its process, and the copy
+            // must not let "reconnect" read as "restored".
+            terminalView.showToast(reconnectNotice)
+        }
     }
 
     override func viewDidAppear() {

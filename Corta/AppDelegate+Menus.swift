@@ -359,9 +359,12 @@ extension AppDelegate {
         }
         // U11 — the three state commands, together and in the order of how
         // much each throws away, so the menu itself is the explanation.
+        // B13 adds Reconnect at the end of the group: it throws away the
+        // most (the whole session and its connection) and is enabled only
+        // where that is the way back — a dead remote launcher.
         shell.addItem(.separator())
         for command in [
-            TerminalCommand.clearScreen, .clearHistory, .resetTerminal,
+            TerminalCommand.clearScreen, .clearHistory, .resetTerminal, .reconnectRemote,
         ] {
             shell.addItem(item(for: command))
         }
