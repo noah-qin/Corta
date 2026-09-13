@@ -36,6 +36,20 @@ struct CommandHistoryView: View {
             }
             .labelsHidden()
             .frame(width: 140)
+            // B13 — "which machine did it run on", alongside the existing
+            // where-did-it-run filters. The hosts on offer are the ones this
+            // pane's records actually name (`CommandHistoryModel.knownHosts`).
+            Picker("", selection: $model.hostScope) {
+                Text(L10n.text("commandHistory.hostAny"))
+                    .tag(CommandHistoryModel.HostScope.any)
+                Text(L10n.text("commandHistory.hostLocal"))
+                    .tag(CommandHistoryModel.HostScope.local)
+                ForEach(model.knownHosts, id: \.self) { host in
+                    Text(host).tag(CommandHistoryModel.HostScope.host(host))
+                }
+            }
+            .labelsHidden()
+            .frame(width: 140)
             Spacer()
             Button(L10n.text("commandHistory.clear")) { model.clearHistory() }
         }
