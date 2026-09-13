@@ -204,6 +204,7 @@ class ViewController: NSViewController {
     /// Backing store for `refreshProcessFactsIfStale`.
     private var cachedProcessName: String?
     private var cachedDirectory: String?
+    private var cachedRemoteState: PaneRemoteState = .local
     private var lastProcessFactsRefresh: CFTimeInterval = 0
     /// True for a moment after a resize, while the title carries the grid
     /// size (see `composedWindowTitle`).
@@ -547,6 +548,11 @@ class ViewController: NSViewController {
         }
         session = started.session
         sessionGeneration += 1
+        // The facts cache predates this session; a retried pane must not
+        // show the dead one's process, directory or remote badge until the
+        // refresh interval runs out.
+        invalidateProcessFacts()
+        cachedRemoteState = .local
         let generation = sessionGeneration
         // OSC 11 must answer with what is actually on screen (M6.6) — a
         // program that queries the background before choosing its own
@@ -1168,8 +1174,12 @@ class ViewController: NSViewController {
     /// of a title bar with four windows open.
     ///
     /// `<title or directory> — <process> — <columns>×<rows>`, with any part
-    /// that is unknown left out rather than filled with a placeholder. The
-    /// first part prefers the OSC 0/2 title, because a program that sets one
+    /// that is unknown left out rather than filled with a placeholder, and a
+    /// leading `⟂ …` badge when the pane refers to another machine (B13 —
+    /// `PaneRemoteState`): the badge goes first because it answers the
+    /// question the rest of the title cannot — *which computer* the title's
+    /// directory and process are on. The first part prefers the OSC 0/2
+    /// title, because a program that sets one
     /// (an editor, `claude`, a long build) is saying something more useful
     /// than its own name; a shell that sets none falls back to the working
     /// directory, abbreviated with `~`.
@@ -1182,6 +1192,9 @@ class ViewController: NSViewController {
         guard session != nil else { return "Corta" }
         refreshProcessFactsIfStale()
         var parts: [String] = []
+        if let badge = cachedRemoteState.titleComponent {
+            parts.append(badge)
+        }
         if let title = Self.sanitizedTitleComponent(session.windowTitle) {
             parts.append(title)
         } else if let directory = cachedDirectory {
@@ -1212,7 +1225,11 @@ class ViewController: NSViewController {
     ///
     /// The represented URL is only set for a directory that exists: the path
     /// arrives over OSC 7 from the child, and a proxy icon is something the
-    /// user can drag into another application.
+    /// user can drag into another application. A remote pane gets no icon at
+    /// all, by construction rather than by check: `cachedDirectory` reads
+    /// `session.currentDirectory`, which a remote `OSC 7` report never
+    /// reaches (it lands in `remoteContext` — B13), so there is no remote
+    /// path here to offer a drag of.
     func applyWindowTitle() {
         guard let window = view.window else { return }
         let title = composedWindowTitle
@@ -1248,21 +1265,29 @@ class ViewController: NSViewController {
 
     private static let transientSizeDuration: TimeInterval = 1.5
 
-    /// The process name and directory behind the title, and when they were
-    /// last read.
+    /// The process name, directory and remote state behind the title, and
+    /// when they were last read.
     ///
-    /// Both are syscalls — `tcgetpgrp`, `proc_name`, `proc_pidinfo` — and the
-    /// title is rebuilt on every output batch, which during a `yes` or a
-    /// build is thousands of batches a second. Refreshed on an interval
+    /// All three are syscalls — `tcgetpgrp`, `proc_name`, `proc_pidinfo` —
+    /// and the title is rebuilt on every output batch, which during a `yes`
+    /// or a build is thousands of batches a second. Refreshed on an interval
     /// instead: a directory that changed a quarter of a second ago is not
     /// worth three syscalls per frame, and the OSC 0/2 title (the part a
     /// program updates deliberately) is read fresh every time regardless.
+    /// The remote state (B13) rides the same cadence: `ssh` starting or
+    /// exiting announces itself with output — the far end's banner, the
+    /// local shell's returning prompt — so the badge follows within one
+    /// interval, with no timer of its own.
     private func refreshProcessFactsIfStale() {
         let now = CACurrentMediaTime()
         guard now - lastProcessFactsRefresh >= Self.processFactsInterval else { return }
         lastProcessFactsRefresh = now
         cachedProcessName = session.activeProcessName
         cachedDirectory = session.currentDirectory
+        cachedRemoteState = PaneRemoteState.resolve(
+            remoteContext: session.remoteContext,
+            hasForegroundJob: session.hasForegroundJob,
+            foregroundProcessName: session.foregroundProcessName)
     }
 
     /// Forces the next title to re-read them — for the moments where waiting
