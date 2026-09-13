@@ -98,6 +98,24 @@ public struct SFTPVolumeInfo: Equatable, Sendable {
     public var flags: UInt64
     public var nameMaximum: UInt64
 
+    public init(
+        blockSize: UInt64, fragmentSize: UInt64, blocks: UInt64, blocksFree: UInt64,
+        blocksAvailable: UInt64, files: UInt64, filesFree: UInt64, filesAvailable: UInt64,
+        filesystemID: UInt64, flags: UInt64, nameMaximum: UInt64
+    ) {
+        self.blockSize = blockSize
+        self.fragmentSize = fragmentSize
+        self.blocks = blocks
+        self.blocksFree = blocksFree
+        self.blocksAvailable = blocksAvailable
+        self.files = files
+        self.filesFree = filesFree
+        self.filesAvailable = filesAvailable
+        self.filesystemID = filesystemID
+        self.flags = flags
+        self.nameMaximum = nameMaximum
+    }
+
     /// Decodes an EXTENDED_REPLY body. `nil` for any shape but eleven
     /// words — a short reply is the server and the extension disagreeing,
     /// which is unanswerable rather than partially true.
@@ -181,7 +199,7 @@ public final class SFTPSession: @unchecked Sendable {
         /// was registered — the registration checks this first.
         var pendingCancelIDs: Set<UInt32> = []
         /// Senders suspended on the window, FIFO by token.
-        var windowWaiters: [(token: UInt64, continuation: CheckedContinuation<Void, Never>)] = []
+        var windowWaiters: [(token: UInt64, continuation: CheckedContinuation<Bool, Never>)] = []
         var nextWindowToken: UInt64 = 0
         /// The INIT handshake's continuation, while connect() is pending.
         var handshake: CheckedContinuation<Result<SFTPMessage, SFTPError>, Never>?
@@ -522,25 +540,32 @@ public final class SFTPSession: @unchecked Sendable {
             defer { state.nextWindowToken += 1 }
             return state.nextWindowToken
         }
-        await withTaskCancellationHandler {
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+        // The continuation's Bool says *how* it was resumed: true only
+        // when the window admitted this waiter. A cancellation handler
+        // resumes false, and only for a waiter still queued — admission
+        // removes the waiter from the queue first, under the lock, so a
+        // continuation is never resumed twice and an admitted slot is
+        // never stranded by a late cancellation.
+        let admitted = await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
                 let queued = state.withLock { state -> Bool in
                     guard state.closed == nil else { return false }
                     state.windowWaiters.append((token: token, continuation: continuation))
                     return true
                 }
-                if !queued { continuation.resume() }
+                if !queued { continuation.resume(returning: false) }
             }
         } onCancel: {
             state.withLock { state in
                 if let index = state.windowWaiters.firstIndex(where: { $0.token == token }) {
-                    state.windowWaiters.remove(at: index).continuation.resume()
+                    state.windowWaiters.remove(at: index).continuation.resume(returning: false)
                 }
             }
         }
-        // Woken — by admission, cancellation, or teardown.
-        if Task.isCancelled { throw .cancelled }
-        if let closed = state.withLock({ $0.closed }) { throw closed }
+        guard admitted else {
+            if let closed = state.withLock({ $0.closed }) { throw closed }
+            throw .cancelled
+        }
         return state.withLock { allocateRequestID(&$0) }
     }
 
@@ -584,10 +609,10 @@ public final class SFTPSession: @unchecked Sendable {
     }
 
     /// Admits the next FIFO waiter, if any. Called with the window count
-    /// already decremented.
+    /// already decremented; the admitted waiter holds the freed slot.
     private func releaseWindowSlot(_ state: inout State) {
         guard !state.windowWaiters.isEmpty else { return }
-        state.windowWaiters.removeFirst().continuation.resume()
+        state.windowWaiters.removeFirst().continuation.resume(returning: true)
     }
 
     private func recycleRequestID(_ requestID: UInt32, _ state: inout State) {
@@ -627,7 +652,7 @@ public final class SFTPSession: @unchecked Sendable {
         let drained = state.withLock { state -> (
             handshakes: [CheckedContinuation<Result<SFTPMessage, SFTPError>, Never>],
             requests: [CheckedContinuation<Result<SFTPMessage, SFTPError>, Never>],
-            waiters: [CheckedContinuation<Void, Never>],
+            waiters: [CheckedContinuation<Bool, Never>],
             alreadyClosed: Bool
         ) in
             if state.closed != nil {
@@ -646,7 +671,7 @@ public final class SFTPSession: @unchecked Sendable {
         if closingTransport { transport.close() }
         for handshake in drained.handshakes { handshake.resume(returning: .failure(error)) }
         for request in drained.requests { request.resume(returning: .failure(error)) }
-        for waiter in drained.waiters { waiter.resume() }
+        for waiter in drained.waiters { waiter.resume(returning: false) }
     }
 
     // MARK: - Reader loop
