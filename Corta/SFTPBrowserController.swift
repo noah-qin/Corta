@@ -69,6 +69,25 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
         model.pickDownloadDestination = { [weak self] entries in
             await self?.pickDownloadDestination(for: entries)
         }
+        // B14 remote editing — the Edit row action, run through the shared
+        // coordinator so browser- and pane-initiated edits of the same
+        // remote file land on the same managed copy.
+        model.onEditFile = { [weak model] entry in
+            guard let model, let host = model.host else { return }
+            let remotePath = SFTPBrowserModel.joinPath(model.currentPath, entry.name)
+            Task {
+                do {
+                    let opened = try await RemoteEditCoordinator.shared.open(
+                        host: host, remotePath: remotePath, line: 1, column: nil)
+                    if !opened {
+                        model.listingError = L10n.text("toast.badOpenFileCommand")
+                    }
+                } catch {
+                    let error = SFTPBrowserModel.sftpError(error)
+                    model.listingError = SFTPBrowserModel.errorMessage(error, host: host)
+                }
+            }
+        }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }

@@ -34,6 +34,11 @@ extension ViewController {
         if let reference = fileReferenceUnder(event, in: terminalView) {
             return open(reference)
         }
+        // B14 — in a remote pane the same shape names a file on the host the
+        // pane is talking to: open its managed local copy in the editor.
+        if let remote = remoteFileReferenceUnder(event, in: terminalView) {
+            return openRemote(remote)
+        }
         return false
     }
 
@@ -47,6 +52,9 @@ extension ViewController {
         if let link = linkUnder(event, in: terminalView) { return open(link) }
         if let reference = fileReferenceUnder(event, in: terminalView) {
             return open(reference)
+        }
+        if let remote = remoteFileReferenceUnder(event, in: terminalView) {
+            return openRemote(remote)
         }
         return false
     }
@@ -99,6 +107,20 @@ extension ViewController {
                 ? L10n.format("link.fileNoLine", target) : target
             if terminalView.toolTip != tip { terminalView.toolTip = tip }
             setHoveredLink(reference.range)
+        } else if armed, session != nil,
+            let remote = remoteFileReferenceUnder(event, in: terminalView)
+        {
+            // B14 — the remote case of the same rule: the tooltip names the
+            // real target (host and path) and says the editor opens a
+            // managed local copy, before any click can open it.
+            if !hoveringLink {
+                NSCursor.pointingHand.set()
+                hoveringLink = true
+            }
+            let tip = L10n.format(
+                "link.remoteFile", "\(remote.host):\(remote.remotePath):\(remote.line)")
+            if terminalView.toolTip != tip { terminalView.toolTip = tip }
+            setHoveredLink(remote.range)
         } else {
             resetLinkHover(terminalView)
         }

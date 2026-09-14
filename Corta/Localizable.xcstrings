@@ -19707,6 +19707,832 @@
           }
         }
       }
+    },
+    "sftp.action.edit": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "编辑"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "編輯"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "編集"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "편집"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Bearbeiten"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Modifier"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Editar"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Editar"
+          }
+        }
+      }
+    },
+    "link.remoteFile": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ — opens a managed local copy"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ — 打开一个受管理的本地副本"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ — 開啟受管理的本機副本"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ — 管理対象のローカルコピーを開きます"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ — 관리되는 로컬 복사본 열기"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ — öffnet eine verwaltete lokale Kopie"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ — ouvre une copie locale gérée"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ — abre una copia local gestionada"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ — abre uma cópia local gerenciada"
+          }
+        }
+      }
+    },
+    "remoteEdit.changed.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Upload Changes?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "上传更改？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "上傳更動？"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "変更をアップロードしますか?"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "변경 사항을 업로드하시겠습니까?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Änderungen hochladen?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Envoyer les modifications ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "¿Subir los cambios?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Enviar as alterações?"
+          }
+        }
+      }
+    },
+    "remoteEdit.changed.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The local copy of “%1$@” on %2$@ was edited. Upload the changes to the remote file?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%2$@ 上“%1$@”的本地副本已被编辑。要将更改上传到远程文件吗？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%2$@ 上「%1$@」的本機副本已被編輯。要將更動上傳到遠端檔案嗎？"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%2$@ の「%1$@」のローカルコピーが編集されました。変更をリモートファイルにアップロードしますか?"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%2$@의 “%1$@” 로컬 복사본이 편집되었습니다. 변경 사항을 원격 파일에 업로드하시겠습니까?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Die lokale Kopie von „%1$@“ auf %2$@ wurde bearbeitet. Die Änderungen in die entfernte Datei hochladen?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "La copie locale de « %1$@ » sur %2$@ a été modifiée. Envoyer les modifications vers le fichier distant ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Se editó la copia local de «%1$@» en %2$@. ¿Subir los cambios al archivo remoto?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "A cópia local de “%1$@” em %2$@ foi editada. Enviar as alterações para o arquivo remoto?"
+          }
+        }
+      }
+    },
+    "remoteEdit.upload": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Upload"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "上传"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "上傳"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "アップロード"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "업로드"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Hochladen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Envoyer"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Subir"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Enviar"
+          }
+        }
+      }
+    },
+    "remoteEdit.dismiss": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not Now"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "暂不上传"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "暫不上傳"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "アップロードしない"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "업로드 안 함"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Nicht hochladen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ne pas envoyer"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No subir"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Não enviar"
+          }
+        }
+      }
+    },
+    "remoteEdit.conflict.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remote File Changed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "远程文件已更改"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "遠端檔案已更動"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "リモートファイルが変更されました"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "원격 파일이 변경됨"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Entfernte Datei wurde geändert"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Le fichier distant a changé"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "El archivo remoto cambió"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O arquivo remoto mudou"
+          }
+        }
+      }
+    },
+    "remoteEdit.conflict.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%1$@” on %2$@ changed since it was downloaded.\n\nAt download: %3$@\nRemote now: %4$@\n\nUploading overwrites the remote file; re-downloading discards the local edits."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%2$@ 上的“%1$@”在下载后已被更改。\n\n下载时：%3$@\n远程现在：%4$@\n\n上传会覆盖远程文件；重新下载会丢弃本地编辑。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%2$@ 上的「%1$@」在下載後已被更動。\n\n下載時：%3$@\n遠端現在：%4$@\n\n上傳會覆蓋遠端檔案；重新下載會捨棄本機編輯。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%2$@ の「%1$@」はダウンロード後に変更されました。\n\nダウンロード時: %3$@\n現在のリモート: %4$@\n\nアップロードするとリモートファイルを上書きします。再ダウンロードするとローカルの編集は破棄されます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%2$@의 “%1$@”이(가) 다운로드된 후 변경되었습니다.\n\n다운로드 시점: %3$@\n현재 원격: %4$@\n\n업로드하면 원격 파일을 덮어쓰고, 다시 다운로드하면 로컬 편집 내용이 삭제됩니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "„%1$@“ auf %2$@ wurde seit dem Laden geändert.\n\nBeim Laden: %3$@\nEntfernt jetzt: %4$@\n\nHochladen ersetzt die entfernte Datei; erneutes Laden verwirft die lokalen Änderungen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "« %1$@ » sur %2$@ a changé depuis son téléchargement.\n\nAu téléchargement : %3$@\nDistant maintenant : %4$@\n\nL’envoi remplace le fichier distant ; un nouveau téléchargement abandonne les modifications locales."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "«%1$@» en %2$@ cambió desde que se descargó.\n\nAl descargar: %3$@\nRemoto ahora: %4$@\n\nSubir sobrescribe el archivo remoto; volver a descargar descarta las ediciones locales."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%1$@” em %2$@ mudou desde que foi baixado.\n\nNo download: %3$@\nRemoto agora: %4$@\n\nEnviar sobrescreve o arquivo remoto; baixar novamente descarta as edições locais."
+          }
+        }
+      }
+    },
+    "remoteEdit.conflict.deletedMessage": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%1$@” no longer exists on %2$@. At download it was: %3$@.\n\nUploading recreates it with the local copy's contents."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%1$@”在 %2$@ 上已不存在。下载时：%3$@。\n\n上传将以本地副本的内容重新创建它。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「%1$@」在 %2$@ 上已不存在。下載時：%3$@。\n\n上傳將以本機副本的內容重新建立它。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「%1$@」は %2$@ にもう存在しません。ダウンロード時: %3$@。\n\nアップロードするとローカルコピーの内容で再作成されます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%1$@”이(가) %2$@에 더 이상 없습니다. 다운로드 시점: %3$@.\n\n업로드하면 로컬 복사본 내용으로 다시 생성됩니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "„%1$@“ ist auf %2$@ nicht mehr vorhanden. Beim Laden: %3$@.\n\nHochladen erstellt sie mit dem Inhalt der lokalen Kopie neu."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "« %1$@ » n’existe plus sur %2$@. Au téléchargement : %3$@.\n\nL’envoi le recrée avec le contenu de la copie locale."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "«%1$@» ya no existe en %2$@. Al descargar era: %3$@.\n\nSubir lo recrea con el contenido de la copia local."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%1$@” não existe mais em %2$@. No download era: %3$@.\n\nEnviar o recria com o conteúdo da cópia local."
+          }
+        }
+      }
+    },
+    "remoteEdit.conflict.deleted": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "deleted"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已删除"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已刪除"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "削除されました"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "삭제됨"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "gelöscht"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "supprimé"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "eliminado"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "apagado"
+          }
+        }
+      }
+    },
+    "remoteEdit.conflict.uploadAnyway": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Upload Anyway"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "仍然上传"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "仍然上傳"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "それでもアップロード"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "그래도 업로드"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Trotzdem hochladen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Envoyer quand même"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Subir de todos modos"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Enviar mesmo assim"
+          }
+        }
+      }
+    },
+    "remoteEdit.conflict.redownload": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Re-download, Discarding Local Edits"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "重新下载（丢弃本地编辑）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "重新下載（捨棄本機編輯）"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "再ダウンロード（ローカルの編集を破棄）"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "다시 다운로드(로컬 편집 내용 삭제)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Erneut laden, lokale Änderungen verwerfen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Retélécharger en abandonnant les modifications locales"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Volver a descargar, descartando las ediciones locales"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Baixar novamente, descartando as edições locais"
+          }
+        }
+      }
+    },
+    "remoteEdit.conflict.saveCopy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save Local Copy Elsewhere…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "将本地副本另存到别处…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "將本機副本另存到其他位置…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ローカルコピーを別の場所に保存…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "로컬 복사본을 다른 위치에 저장…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Lokale Kopie anderweitig sichern …"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Enregistrer la copie locale ailleurs…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Guardar la copia local en otro lugar…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Salvar a cópia local em outro lugar…"
+          }
+        }
+      }
+    },
+    "remoteEdit.uploadFailed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uploading “%1$@” to %2$@ failed: %3$@\n\nThe remote file was not changed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "上传“%1$@”到 %2$@ 失败：%3$@\n\n远程文件未被更改。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "上傳「%1$@」到 %2$@ 失敗：%3$@\n\n遠端檔案未被更動。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「%1$@」の %2$@ へのアップロードに失敗しました: %3$@\n\nリモートファイルは変更されていません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%1$@”을(를) %2$@(으)로 업로드하지 못했습니다: %3$@\n\n원격 파일은 변경되지 않았습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "„%1$@“ konnte nicht zu %2$@ hochgeladen werden: %3$@\n\nDie entfernte Datei wurde nicht geändert."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "L’envoi de « %1$@ » vers %2$@ a échoué : %3$@\n\nLe fichier distant n’a pas été modifié."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se pudo subir «%1$@» a %2$@: %3$@\n\nEl archivo remoto no se modificó."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Falha ao enviar “%1$@” para %2$@: %3$@\n\nO arquivo remoto não foi alterado."
+          }
+        }
+      }
     }
   }
 }
