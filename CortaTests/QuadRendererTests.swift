@@ -155,11 +155,15 @@ import Testing
 
     // MARK: - M9: compiled-pipeline cache
 
-    /// `init` writes a `MTLBinaryArchive` to disk so a later launch can look
-    /// its three pipelines up instead of compiling them — this only checks
-    /// that the file lands where `binaryArchiveURL` says it should; the
-    /// compile-time saving itself is not something a unit test can observe
-    /// (Metal does not expose "was this pipeline looked up or compiled").
+    /// The first pipeline-set creation in a process writes a
+    /// `MTLBinaryArchive` to disk so a later launch can look its three
+    /// pipelines up instead of compiling them — this only checks that the
+    /// file lands where `binaryArchiveURL` says it should; the compile-time
+    /// saving itself is not something a unit test can observe (Metal does
+    /// not expose "was this pipeline looked up or compiled"). The cache
+    /// reset forces a cold creation: since B12 the write happens inside
+    /// `QuadPipelineCache.makeEntry`, which runs at most once per device per
+    /// process, and earlier tests have usually already warmed it.
     @Test func initWritesAPipelineCacheFile() throws {
         guard let device = MTLCreateSystemDefaultDevice() else {
             Issue.record("No Metal device available in this environment")
@@ -171,22 +175,24 @@ import Testing
         }
         try? FileManager.default.removeItem(at: url)
 
+        QuadPipelineCache.resetForTesting()
         _ = try QuadRenderer(device: device)
         #expect(FileManager.default.fileExists(atPath: url.path))
     }
 
-    /// A second `QuadRenderer` must construct successfully with the first
-    /// one's cache file already on disk. Running here, under `CortaTests`,
-    /// `loadOrCreateBinaryArchive.isRunningUnderXCTest` keeps this from
-    /// ever actually reading that file back — `-[_MTLDevice
-    /// recordBinaryArchiveUsage:]` segfaulted inside Metal's own framework
-    /// code doing exactly that under a hosted test launch (its doc comment
-    /// has the full account, including why a real launch is not the same
-    /// launch path and is not affected). What this test can still assert
-    /// from inside that same hosted launch: the file is written every
-    /// time regardless, and a second construction finding one already on
-    /// disk — from itself or an earlier run — must never be what breaks
-    /// construction.
+    /// A second renderer construction must succeed with the first one's
+    /// cache file already on disk — and must not re-run the archive path at
+    /// all: since B12 it is a `QuadPipelineCache` hit. Running here, under
+    /// `CortaTests`, `loadOrCreateBinaryArchive.isRunningUnderXCTest` keeps
+    /// the cold path from ever actually reading the file back —
+    /// `-[_MTLDevice recordBinaryArchiveUsage:]` segfaulted inside Metal's
+    /// own framework code doing exactly that under a hosted test launch
+    /// (its doc comment has the full account, including why a real launch
+    /// is not the same launch path and is not affected). What this test can
+    /// still assert from inside that same hosted launch: the file is
+    /// written on a cold creation regardless, and a second construction —
+    /// the warm-cache case every split pane hits — constructs fine with one
+    /// already on disk.
     @Test func aSecondRendererConstructsWithACacheFileAlreadyOnDisk() throws {
         guard let device = MTLCreateSystemDefaultDevice() else {
             Issue.record("No Metal device available in this environment")
@@ -198,6 +204,7 @@ import Testing
         }
         try? FileManager.default.removeItem(at: url)
 
+        QuadPipelineCache.resetForTesting()
         _ = try QuadRenderer(device: device)
         #expect(FileManager.default.fileExists(atPath: url.path))
         _ = try QuadRenderer(device: device)

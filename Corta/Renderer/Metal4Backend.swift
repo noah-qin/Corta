@@ -22,18 +22,18 @@ enum Metal4BackendError: Error {
 /// no `setVertexBytes`, so uniforms live in the ring buffers alongside the
 /// instances), committed to an `MTL4CommandQueue`, with drawable
 /// presentation via `signalDrawable` + `MTLDrawable.present`. The pipeline
-/// state objects are the classic `MTLRenderPipelineState`, compiled with
-/// `device.makeRenderPipelineState(descriptor:)` — that is not a gap:
-/// `MTL4RenderCommandEncoder.setRenderPipelineState` takes exactly that
+/// state objects are the classic `MTLRenderPipelineState` — that is not a
+/// gap: `MTL4RenderCommandEncoder.setRenderPipelineState` takes exactly that
 /// type, and MTL4's own compiler (`MTL4Compiler.newRenderPipelineState`)
-/// returns it too. `MTL4Compiler`/`MTL4Archive`-based compilation and
-/// binary-archive caching (`QuadRenderer`'s M9 cache is `MTL3`-API and
-/// stays QuadRenderer's) are the deliberate follow-up; construction here
-/// pays the same synchronous compile `QuadRenderer` pays on a cold cache.
-/// The blend state, pixel format, scissor math, viewport and draw
-/// parameters replicate `QuadRenderer.draw` exactly — the pixel-equivalence
-/// tests in `TerminalRenderBackendTests` enforce that the two stay in
-/// lockstep.
+/// returns it too. They come from `QuadPipelineCache` (B12), shared with
+/// `QuadRenderer`, so construction here costs a dictionary lookup once any
+/// pane has run, and the M9 `MTLBinaryArchive` warm-up (which lives in the
+/// cache's creation path) covers this backend too — an
+/// `MTL4Compiler`/`MTL4Archive`-specific cache is no longer a distinct
+/// follow-up of its own. The blend state, pixel format, scissor math,
+/// viewport and draw parameters replicate `QuadRenderer.draw` exactly — the
+/// pixel-equivalence tests in `TerminalRenderBackendTests` enforce that the
+/// two stay in lockstep.
 ///
 /// **Resource lifetime (the part MTL4 makes explicit).** Ring-slot reuse is
 /// gated on GPU completion: each commit signals `completionEvent` with the
@@ -270,56 +270,21 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         }
         self.completionEvent = event
 
-        // The pipelines mirror `QuadRenderer.init`'s descriptors exactly —
-        // same shaders, pixel format and blend state, so the two backends
-        // produce identical pixels for identical instances. No binary
-        // archive here: QuadRenderer's M9 cache is built on the MTL3 API
-        // and stays its own; an MTL4Archive/MTL4Compiler cache is the
-        // follow-up.
-        guard let library = device.makeDefaultLibrary() else {
-            throw QuadRendererError.libraryUnavailable
-        }
-        guard let vertexFunction = library.makeFunction(name: "quad_vertex"),
-            let solidFragment = library.makeFunction(name: "quad_fragment_solid"),
-            let glyphFragment = library.makeFunction(name: "quad_fragment_glyph"),
-            let colorGlyphFragment = library.makeFunction(name: "quad_fragment_color")
-        else {
-            throw QuadRendererError.functionUnavailable
-        }
-
-        func makePipeline(fragment: MTLFunction, premultipliedSource: Bool = false) throws -> MTLRenderPipelineState {
-            let descriptor = MTLRenderPipelineDescriptor()
-            descriptor.vertexFunction = vertexFunction
-            descriptor.fragmentFunction = fragment
-            let attachment = descriptor.colorAttachments[0]!
-            attachment.pixelFormat = QuadRenderer.pixelFormat
-            attachment.isBlendingEnabled = true
-            attachment.rgbBlendOperation = .add
-            attachment.alphaBlendOperation = .add
-            // `.one` for a premultiplied source (the color atlas): the
-            // sample's rgb is already alpha-scaled, so multiplying by
-            // sourceAlpha again would double-darken every translucent texel.
-            attachment.sourceRGBBlendFactor = premultipliedSource ? .one : .sourceAlpha
-            // `.one`, not `.sourceAlpha`: the drawable is composited by Core
-            // Animation as premultiplied alpha, so the alpha channel must
-            // accumulate as src.a + dst.a*(1-src.a).
-            attachment.sourceAlphaBlendFactor = .one
-            attachment.destinationRGBBlendFactor = .oneMinusSourceAlpha
-            attachment.destinationAlphaBlendFactor = .oneMinusSourceAlpha
-            return try device.makeRenderPipelineState(descriptor: descriptor)
-        }
-
-        self.solidPipeline = try makePipeline(fragment: solidFragment)
-        self.glyphPipeline = try makePipeline(fragment: glyphFragment)
-        self.colorGlyphPipeline = try makePipeline(fragment: colorGlyphFragment, premultipliedSource: true)
-
-        let samplerDescriptor = MTLSamplerDescriptor()
-        samplerDescriptor.minFilter = .linear
-        samplerDescriptor.magFilter = .linear
-        guard let sampler = device.makeSamplerState(descriptor: samplerDescriptor) else {
-            throw QuadRendererError.samplerUnavailable
-        }
-        self.sampler = sampler
+        // The pipelines and sampler are shared with `QuadRenderer` through
+        // `QuadPipelineCache` (B12) — same shaders, pixel format and blend
+        // state, so the two backends produce identical pixels for identical
+        // instances, and a pane pays the compile at most once per process
+        // whichever backend it gets. The M9 `MTLBinaryArchive` warm-up now
+        // also covers this backend: it lives in the cache's creation path
+        // (the pipelines are classic `MTLRenderPipelineState`s whichever
+        // submission API encodes them), so the "no binary archive here"
+        // gap this init used to document is closed by sharing rather than
+        // by an MTL4Archive/MTL4Compiler port.
+        let pipelines = try QuadPipelineCache.entry(for: device)
+        self.solidPipeline = pipelines.solidPipeline
+        self.glyphPipeline = pipelines.glyphPipeline
+        self.colorGlyphPipeline = pipelines.colorGlyphPipeline
+        self.sampler = pipelines.sampler
     }
 
     /// Waits for the last committed frame before anything this backend owns
