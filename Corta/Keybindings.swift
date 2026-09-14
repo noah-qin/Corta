@@ -194,6 +194,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     case clearHistory = "clear-history"
     case resetTerminal = "reset-terminal"
     case reconnectRemote = "reconnect-remote"
+    case browseRemoteFiles = "browse-remote-files"
     case settings
     case commandPalette = "command-palette"
 
@@ -252,6 +253,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .clearHistory: return L10n.text("command.clearHistory")
         case .resetTerminal: return L10n.text("command.resetTerminal")
         case .reconnectRemote: return L10n.text("command.reconnectRemote")
+        case .browseRemoteFiles: return L10n.text("command.browseRemoteFiles")
         case .settings: return L10n.text("command.settings")
         case .commandPalette: return L10n.text("command.commandPalette")
         }
@@ -323,6 +325,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .clearHistory: return #selector(ViewController.clearHistory(_:))
         case .resetTerminal: return #selector(ViewController.resetTerminal(_:))
         case .reconnectRemote: return #selector(ViewController.reconnectRemote(_:))
+        case .browseRemoteFiles: return #selector(ViewController.browseRemoteFiles(_:))
         case .settings: return #selector(AppDelegate.showSettings(_:))
         case .commandPalette: return #selector(AppDelegate.showCommandPalette(_:))
         }
@@ -401,6 +404,10 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         // default. And it is enabled only for a dead remote pane, where a
         // keypress is rarely how anyone gets there.
         case .reconnectRemote: return nil
+        // Unbound: it opens a window against a specific pane's host, which
+        // is a mouse's or a menu's gesture more than a keystroke's — and a
+        // key spent here is a key the child process can never have.
+        case .browseRemoteFiles: return nil
         case .settings: return Shortcut(",", .command)
         case .commandPalette: return Shortcut("p", [.command, .shift])
         }
@@ -428,7 +435,8 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
             .changeDirectoryToProjectRoot, .openParentDirectoryInNewPane,
             .openProjectRootInNewPane, .searchCommandHistory:
             return .view
-        case .clearScreen, .clearHistory, .resetTerminal, .reconnectRemote: return .terminal
+        case .clearScreen, .clearHistory, .resetTerminal, .reconnectRemote, .browseRemoteFiles:
+            return .terminal
         case .find, .copy, .paste, .selectAll, .exportText: return .edit
         case .settings, .commandPalette: return .app
         }
@@ -487,6 +495,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .clearHistory: return 1
         case .resetTerminal: return 2
         case .reconnectRemote: return 3
+        case .browseRemoteFiles: return 4
         case .settings: return 0
         case .commandPalette: return 1
         }
