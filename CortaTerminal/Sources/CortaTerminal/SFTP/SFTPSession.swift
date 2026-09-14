@@ -81,6 +81,18 @@ public struct SFTPServerCapabilities: Equatable, Sendable {
     /// destination and the transfer engine falls back to a documented
     /// non-atomic REMOVE+RENAME.
     public var supportsPosixRename: Bool
+
+    public init(
+        version: UInt32,
+        extensions: [String: [UInt8]],
+        supportsStatVFS: Bool,
+        supportsPosixRename: Bool
+    ) {
+        self.version = version
+        self.extensions = extensions
+        self.supportsStatVFS = supportsStatVFS
+        self.supportsPosixRename = supportsPosixRename
+    }
 }
 
 /// The answer to `statvfs@openssh.com` (OpenSSH's `sftp-server` man page):
