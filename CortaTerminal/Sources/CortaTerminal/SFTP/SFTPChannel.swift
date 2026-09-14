@@ -161,6 +161,23 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
     /// How the child ended, or `nil` while it is still running.
     public var exitStatus: ChildExit? { state.withLock { $0.exit } }
 
+    /// Waits — bounded — for the child to exit and be reaped, returning its
+    /// exit, or `nil` if it was still running when the wait ran out.
+    ///
+    /// Diagnostics only, never the frame path: after a failure has already
+    /// been delivered, the exit the process source has not quite finished
+    /// recording is what turns a bare `.connectionLost` into the
+    /// authentication/reachability classification `classify(exit:)` gives.
+    /// Polls the non-blocking reap, so a live child is never disturbed.
+    public func awaitExit(timeout: Duration = .seconds(2)) -> ChildExit? {
+        let deadline = ContinuousClock.now + timeout
+        while true {
+            if let exit = reap(blocking: false) { return exit }
+            if ContinuousClock.now >= deadline { return state.withLock { $0.exit } }
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+    }
+
     /// Spawns the channel. Throws only for local failures; remote-side
     /// failures surface later as EOF on reads plus `exitStatus`.
     public static func spawn(
