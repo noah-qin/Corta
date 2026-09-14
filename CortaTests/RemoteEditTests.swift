@@ -341,12 +341,19 @@ struct RemoteEditCoordinatorTests {
             }
         }
         fixture.coordinator.resolveConflict(conflict.id, choice: .redownload)
-        await waitUntil("re-downloaded") {
-            (try? String(contentsOf: fixture.localCopyURL, encoding: .utf8)) == "remote v2"
+        // Wait on the coordinator's *settled* state, not on the file's
+        // content: the fake writes the destination inside the download
+        // call, and the trailing bookkeeping (re-stamp, digest, pending
+        // removal) happens after later resumptions on the same actor.
+        // Waiting on the content observed the flow mid-flight, which is
+        // exactly what full-suite load exploited.
+        await waitUntil("re-downloaded and re-baselined") {
+            fixture.store.copies[fixture.copyID]?.remoteMTime == 5000
+                && fixture.coordinator.pendingUploads.isEmpty
         }
         #expect(fixture.coordinator.pendingConflicts.isEmpty)
-        #expect(fixture.coordinator.pendingUploads.isEmpty)
-        #expect(fixture.store.copies[fixture.copyID]?.remoteMTime == 5000)
+        #expect(
+            (try? String(contentsOf: fixture.localCopyURL, encoding: .utf8)) == "remote v2")
         // The local edits are gone, and the new content is the baseline:
         // checking the watch path now prompts nothing.
         fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
@@ -378,8 +385,14 @@ struct RemoteEditCoordinatorTests {
         // Upload anyway: the upload is sent despite the drift.
         var conflict = try await stageConflict("edit one")
         fixture.coordinator.resolveConflict(conflict.id, choice: .uploadAnyway)
-        await waitUntil("uploaded anyway") {
+        // The transfer call is recorded at the start of the fake's upload;
+        // the manifest re-stamp is the flow's last step. Waiting for the
+        // call alone lets the next stage's stamp reset lose the race
+        // against the trailing re-stamp (full-suite load), silently
+        // erasing the drift stage two needs to see.
+        await waitUntil("uploaded anyway and re-stamped") {
             fixture.fake.transferCalls.contains { $0.isUpload }
+                && fixture.store.copies[fixture.copyID]?.remoteMTime == 5000
         }
         #expect(fixture.fake.transferCalls.last?.policy == "overwrite")
 
