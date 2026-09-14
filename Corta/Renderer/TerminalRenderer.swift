@@ -189,10 +189,10 @@ nonisolated final class TerminalRenderer {
     init(device: MTLDevice, font: CTFont, scale: CGFloat, atlasPixelSize: Int = GlyphAtlas.atlasSize) throws {
         let atlasFont = CTFontCreateCopyWithAttributes(
             font, CTFontGetSize(font) * scale, nil, nil)
-        // `Metal4Backend` is opt-in and, today, a pass-through to
-        // `QuadRenderer` under the hood regardless — see its doc comment —
-        // so a failed `Metal4Backend(device:)` falls back to `QuadRenderer`
-        // directly rather than failing `TerminalRenderer.init` outright.
+        // `Metal4Backend` is opt-in (`CORTA_METAL4=1`) and submits through
+        // MTL4 for real — see its doc comment — so a failed
+        // `Metal4Backend(device:)` falls back to `QuadRenderer` directly
+        // rather than failing `TerminalRenderer.init` outright.
         if Metal4Backend.isOptedIn, Metal4Backend.isSupported(by: device),
             let metal4 = try? Metal4Backend(device: device)
         {
@@ -409,6 +409,40 @@ nonisolated final class TerminalRenderer {
                 quadRenderer: quadRenderer, renderPassDescriptor: renderPassDescriptor,
                 commandBuffer: commandBuffer)
         }
+    }
+
+    /// The Metal 4 counterpart to `draw(rect:drawableSize:renderPassDescriptor:commandBuffer:)`
+    /// (B12): the backend owns the command buffer, the render pass, the
+    /// commit and the drawable presentation (`Metal4FrameBackend`), so this
+    /// takes the render target, clear colour and drawable directly rather
+    /// than the Metal 3 pass/buffer pair. `ViewController.render(into:...)`
+    /// calls it when the selected backend is a Metal 4 one; the pass order —
+    /// background, glyphs, color glyphs, images — is deliberately identical
+    /// to the MTL3 path's.
+    func draw(
+        through backend: any Metal4FrameBackend,
+        rect: CGRect, drawableSize: CGSize, target: MTLTexture, clearColor: MTLClearColor,
+        drawable: (any MTLDrawable)?, label: String, onCompleted: (@Sendable () -> Void)?
+    ) {
+        backend.beginFrame(target: target, clearColor: clearColor, label: label)
+        backend.drawSolidQuads(cachedBackground, rect: rect, drawableSize: drawableSize)
+        backend.drawGlyphQuads(
+            cachedGlyphs, atlas: glyphAtlas.texture, rect: rect, drawableSize: drawableSize)
+        // Skipped outright when no cell produced a color glyph, exactly like
+        // the MTL3 path.
+        if !cachedColorGlyphs.isEmpty {
+            backend.drawColorQuads(
+                cachedColorGlyphs, atlas: glyphAtlas.colorTexture, rect: rect,
+                drawableSize: drawableSize)
+        }
+        if cachedImagePlacements.placementCount > 0 {
+            kittyImageRenderer.draw(
+                table: cachedImagePlacements, cellWidth: Float(metrics.cellWidth),
+                cellHeight: Float(metrics.cellHeight), rows: cachedLines.count, offset: cachedOffset,
+                scrollbackTotalPushed: cachedScrollbackTotalPushed, rect: rect,
+                drawableSize: drawableSize, metal4: backend)
+        }
+        backend.endFrame(presenting: drawable, onCompleted: onCompleted)
     }
 
     /// Full rebuild: every row's instances, straight into the cached arrays.

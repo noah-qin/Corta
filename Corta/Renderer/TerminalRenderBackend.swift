@@ -52,3 +52,44 @@ nonisolated protocol TerminalRenderBackend: AnyObject {
 }
 
 nonisolated extension QuadRenderer: TerminalRenderBackend {}
+
+/// The Metal 4 half of the backend seam (B12): full-frame command
+/// submission, owned end-to-end by the backend.
+///
+/// The base protocol's three `draw*Quads` methods are Metal-3-shaped: the
+/// caller owns the `MTLCommandBuffer` and `MTLRenderPassDescriptor` and
+/// hands them down per draw call. Metal 4 has no `MTLCommandBuffer` to hand
+/// over — an `MTL4CommandQueue` commits `MTL4CommandBuffer`s the backend
+/// itself began from an `MTL4CommandAllocator`, and drawable presentation
+/// is a queue operation (`signalDrawable`) followed by `MTLDrawable.present`
+/// — so a backend submitting through MTL4 conforms to this instead:
+/// `beginFrame` opens the command buffer and the render pass (and so owns
+/// the frame's clear), the draw calls encode into it in the same order the
+/// MTL3 path uses, and `endFrame` ends, commits, signals and presents.
+///
+/// `TerminalRenderer.draw(through:...)` drives the sequence;
+/// `ViewController.render(into:...)` selects it when the renderer's backend
+/// conforms, leaving the MTL3 path — which remains the default — untouched.
+nonisolated protocol Metal4FrameBackend: TerminalRenderBackend {
+    /// Opens a frame targeting `target`, clearing it to `clearColor` on
+    /// load — matching the clear pass the MTL3 path's first draw call runs,
+    /// so a frame that draws nothing still clears. `label` becomes the
+    /// command buffer's GPU-capture label (the MTL3 path's
+    /// `Corta.frame.<pane>`).
+    func beginFrame(target: MTLTexture, clearColor: MTLClearColor, label: String)
+
+    /// The `TerminalRenderBackend.draw*Quads` trio without the Metal 3
+    /// parameters: same instances, same rect/drawableSize semantics, encoded
+    /// into the open frame.
+    func drawSolidQuads(_ instances: [QuadInstance], rect: CGRect, drawableSize: CGSize)
+    func drawGlyphQuads(
+        _ instances: [QuadInstance], atlas: MTLTexture, rect: CGRect, drawableSize: CGSize)
+    func drawColorQuads(
+        _ instances: [QuadInstance], atlas: MTLTexture, rect: CGRect, drawableSize: CGSize)
+
+    /// Ends the frame's encoding, commits it, and presents `drawable` (nil
+    /// for offscreen renders, e.g. tests). `onCompleted` runs after the
+    /// GPU finishes the frame — the counterpart of the MTL3 path's
+    /// `addCompletedHandler`, feeding the same metrics.
+    func endFrame(presenting drawable: (any MTLDrawable)?, onCompleted: (@Sendable () -> Void)?)
+}
