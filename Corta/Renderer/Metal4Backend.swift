@@ -84,13 +84,17 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
 
     private let queue: any MTL4CommandQueue
     /// MTL4 command buffers are persistent, reusable objects (begin →
-    /// encode → end → commit, then begin again), unlike MTL3's
-    /// per-frame `MTLCommandBuffer`s — one for the life of the backend.
-    private let commandBuffer: any MTL4CommandBuffer
+    /// encode → end → commit, then begin again), unlike MTL3's per-frame
+    /// `MTLCommandBuffer`s — but re-beginning one while its previous commit
+    /// is still executing faults intermittently at the driver level
+    /// (`IOGPUMetalError`, observed on the very first frames of an app
+    /// launch), so there is one per in-flight frame slot, rotated with the
+    /// allocators: the frame-completion gate in `beginFrame` guarantees a
+    /// slot's command buffer is quiescent before it is begun again.
+    private var commandBuffers: [any MTL4CommandBuffer]
     /// One allocator per in-flight frame slot: an allocator may be
     /// `reset()` only once every command buffer encoded with it has
-    /// completed on the GPU, which the frame-completion gate in
-    /// `beginFrame` guarantees before the slot is reused.
+    /// completed on the GPU, which the same gate guarantees.
     private var allocators: [any MTL4CommandAllocator]
     /// Bindings for the one argument table every draw uses. Snapshot
     /// semantics ("Metal takes a snapshot of the resources in the argument
@@ -142,6 +146,7 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
     /// residency set — once the GPU has completed that frame.
     private var retiredBuffers: [(frame: UInt64, buffer: MTLBuffer)] = []
     private var retiredAllocators: [(frame: UInt64, allocator: any MTL4CommandAllocator)] = []
+    private var retiredCommandBuffers: [(frame: UInt64, commandBuffer: any MTL4CommandBuffer)] = []
 
     /// Instance storage for one pipeline kind. One buffer per frame slot;
     /// every draw call of the kind within a frame *appends* its instances
@@ -230,17 +235,19 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         let queueDescriptor = MTL4CommandQueueDescriptor()
         queueDescriptor.label = "Corta.metal4"
         self.queue = try device.makeMTL4CommandQueue(descriptor: queueDescriptor)
-        guard let commandBuffer: any MTL4CommandBuffer = device.makeCommandBuffer() else {
-            throw Metal4BackendError.commandBufferUnavailable
-        }
-        self.commandBuffer = commandBuffer
+        var commandBuffers: [any MTL4CommandBuffer] = []
         var allocators: [any MTL4CommandAllocator] = []
         for _ in 0..<Self.frameSlotCount {
+            guard let commandBuffer: any MTL4CommandBuffer = device.makeCommandBuffer() else {
+                throw Metal4BackendError.commandBufferUnavailable
+            }
+            commandBuffers.append(commandBuffer)
             guard let allocator: any MTL4CommandAllocator = device.makeCommandAllocator() else {
                 throw Metal4BackendError.commandAllocatorUnavailable
             }
             allocators.append(allocator)
         }
+        self.commandBuffers = commandBuffers
         self.allocators = allocators
 
         let tableDescriptor = MTL4ArgumentTableDescriptor()
@@ -360,7 +367,14 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         if forceFreshResources {
             let retired = allocators[currentSlot]
             retiredAllocators.append((frame: frameNumber, allocator: retired))
-            guard let fresh: any MTL4CommandAllocator = device.makeCommandAllocator() else {
+            // The slot's command buffer may equally still be executing —
+            // the wait that failed was precisely the guarantee that it is
+            // not — so it is retired and replaced along with the allocator.
+            retiredCommandBuffers.append(
+                (frame: frameNumber, commandBuffer: commandBuffers[currentSlot]))
+            guard let freshAllocator: any MTL4CommandAllocator = device.makeCommandAllocator(),
+                let freshCommandBuffer: any MTL4CommandBuffer = device.makeCommandBuffer()
+            else {
                 // Nothing to encode into: the frame is skipped, but
                 // `endFrame` still runs and still presents the drawable —
                 // an unpresented drawable is never recycled
@@ -368,10 +382,12 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
                 forceFreshResources = false
                 return
             }
-            allocators[currentSlot] = fresh
+            allocators[currentSlot] = freshAllocator
+            commandBuffers[currentSlot] = freshCommandBuffer
         }
         let allocator = allocators[currentSlot]
         allocator.reset()
+        let commandBuffer = commandBuffers[currentSlot]
 
         commandBuffer.label = label
         commandBuffer.beginCommandBuffer(allocator: allocator)
@@ -431,6 +447,7 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         }
         encoder?.endEncoding()
         encoder = nil
+        let commandBuffer = commandBuffers[currentSlot]
         commandBuffer.endCommandBuffer()
 
         // `waitForDrawable` before committing work that targets the
@@ -579,5 +596,6 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         if removedAny { residencySet.commit() }
         retiredBuffers = keptBuffers
         retiredAllocators.removeAll { $0.frame <= completed }
+        retiredCommandBuffers.removeAll { $0.frame <= completed }
     }
 }
