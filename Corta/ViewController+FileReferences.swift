@@ -70,18 +70,40 @@ extension ViewController {
     func fileReferenceUnder(_ event: NSEvent, in terminalView: TerminalView)
         -> ResolvedFileReference?
     {
+        guard let reference = detectedReferenceUnder(event, in: terminalView) else { return nil }
+        return Self.resolve(reference, directory: session.workingDirectory)
+    }
+
+    /// The raw detection half of `fileReferenceUnder`, before resolution —
+    /// shared with the remote path (`ViewController+RemoteEdit.swift`),
+    /// which resolves against the pane's remote directory instead.
+    func detectedReferenceUnder(_ event: NSEvent, in terminalView: TerminalView)
+        -> FileReferenceDetection.Reference?
+    {
         guard isOperable, let terminalRenderer else { return nil }
         let grid = session.snapshot()
         let point = Self.documentPosition(
             for: terminalView.convert(event.locationInWindow, from: nil),
             viewHeight: terminalView.bounds.height, metrics: terminalRenderer.pointMetrics,
             grid: grid, scrollOffset: scrollOffset, topInset: topInset)
-        guard let reference = FileReferenceDetection.reference(at: point, in: grid)
-        else { return nil }
-        return Self.resolve(reference, directory: session.workingDirectory)
+        return FileReferenceDetection.reference(at: point, in: grid)
     }
 
-    /// Opens the file, at the line if the configured command can take one.
+    @discardableResult
+    func open(_ reference: ResolvedFileReference) -> Bool {
+        let opened = Self.openFileAt(
+            url: reference.url, line: reference.line, column: reference.column)
+        if !opened {
+            terminalView?.showToast(L10n.text("toast.badOpenFileCommand"), kind: .warning)
+        }
+        return opened
+    }
+
+    /// Opens a local file in the editor, at the line if the configured
+    /// command can take one — static so both the local file-reference path
+    /// and the remote-edit coordinator (`RemoteEditCoordinator`, which
+    /// opens *managed local copies* of remote files) go through the exact
+    /// same `open-file-command` substitution.
     ///
     /// With no `open-file-command` configured this is `NSWorkspace.open`,
     /// which opens the user's default application for the type and cannot be
@@ -92,20 +114,18 @@ extension ViewController {
     /// shell would make its metacharacters mean something again after all the
     /// work `SECURITY.md` §2.3 does to stop exactly that.
     @discardableResult
-    func open(_ reference: ResolvedFileReference) -> Bool {
+    static func openFileAt(url: URL, line: Int, column: Int?) -> Bool {
         let template = ConfigurationStore.shared.configuration.openFileCommand
         guard !template.isEmpty else {
-            NSWorkspace.shared.open(reference.url)
+            NSWorkspace.shared.open(url)
             return true
         }
-        let arguments = Self.openFileArguments(
-            template: template, path: reference.url.path, line: reference.line,
-            column: reference.column)
+        let arguments = openFileArguments(
+            template: template, path: url.path, line: line, column: column)
         guard let executable = arguments.first, executable.hasPrefix("/") else {
             // An absolute path, like every other executable Corta launches
             // (`Spawn`): resolving a bare name would mean consulting a `PATH`
             // that the user's shell, not Corta, controls.
-            terminalView?.showToast(L10n.text("toast.badOpenFileCommand"), kind: .warning)
             return false
         }
         let process = Process()
@@ -115,7 +135,6 @@ extension ViewController {
             try process.run()
             return true
         } catch {
-            terminalView?.showToast(L10n.text("toast.badOpenFileCommand"), kind: .warning)
             return false
         }
     }
@@ -134,6 +153,16 @@ extension ViewController {
     /// with no reference at all must not turn opening this menu item into a
     /// linear scan of the whole thing on the main thread.
     func fileReferenceInCommand(_ record: CommandRecord?) -> ResolvedFileReference? {
+        guard let reference = detectedReferenceInCommand(record) else { return nil }
+        return Self.resolve(reference, directory: session.workingDirectory)
+    }
+
+    /// The raw detection half of `fileReferenceInCommand`, before
+    /// resolution — the remote path resolves the same reference against the
+    /// pane's remote directory instead (`ViewController+RemoteEdit.swift`).
+    func detectedReferenceInCommand(_ record: CommandRecord?)
+        -> FileReferenceDetection.Reference?
+    {
         guard let record, isOperable else { return nil }
         let start = record.outputStartRow ?? record.promptRow + 1
         let grid = session.snapshot()
@@ -146,7 +175,7 @@ extension ViewController {
             let line = grid.logicalLine(containing: row)
             rowsScanned += row - line.firstRow + 1
             if let reference = FileReferenceDetection.references(in: line).last {
-                return Self.resolve(reference, directory: session.workingDirectory)
+                return reference
             }
             row = line.firstRow - 1
         }
@@ -161,7 +190,10 @@ extension ViewController {
     /// Split *before* substitution, so a path containing a space becomes one
     /// argument rather than two — the split is of the template the user wrote,
     /// never of the value the child produced.
-    static func openFileArguments(
+    ///
+    /// Pure and `nonisolated` (B14): the remote-edit flow's tests drive it
+    /// off the main actor, and string substitution needs no queue.
+    nonisolated static func openFileArguments(
         template: String, path: String, line: Int, column: Int?
     ) -> [String] {
         template.split(whereSeparator: \.isWhitespace).map { part in

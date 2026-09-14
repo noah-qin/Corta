@@ -213,6 +213,8 @@ struct SFTPBrowserView: View {
                 model.requestDelete(model.selectedEntries)
             }
             .disabled(model.selectedEntries.isEmpty)
+            Button(L10n.text("sftp.action.edit")) { model.requestEdit() }
+                .disabled(!model.canEditSelection)
             Spacer()
             Button(L10n.text("sftp.action.upload")) { model.requestUpload() }
             Button(L10n.text("sftp.action.download")) { model.requestDownload() }

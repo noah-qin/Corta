@@ -238,6 +238,11 @@ final class SFTPBrowserModel {
     /// panel and starts nothing.
     var pickUploadFiles: (() async -> [URL])?
     var pickDownloadDestination: (([Entry]) async -> DownloadDestination?)?
+    /// B14 remote editing — opens a file row in the editor, on a managed
+    /// local copy (`RemoteEditCoordinator` owns download, watch and the
+    /// upload-back decision). Set by the controller; any error wording is
+    /// handed back for the listing's error line.
+    var onEditFile: ((Entry) -> Void)?
     /// Called with the window's title text whenever it should change.
     var onTitleChange: ((String) -> Void)?
     /// Called once the connection succeeded, with the host actually
@@ -621,6 +626,20 @@ final class SFTPBrowserModel {
     /// Whether Download has anything it can act on.
     var canDownloadSelection: Bool {
         selectedEntries.contains { $0.kind != .directory }
+    }
+
+    /// Edit acts on exactly one plain file. A symlink is excluded on
+    /// purpose: whether the copy should track the link or its target is a
+    /// question the UI has no answer for yet, so it does not pretend.
+    var canEditSelection: Bool {
+        selectedEntries.count == 1 && selectedEntries.first?.kind == .file
+    }
+
+    /// The Edit button. The coordinator call itself is the controller's
+    /// wiring (`onEditFile`); errors come back through `listingError`.
+    func requestEdit() {
+        guard canEditSelection, let entry = selectedEntries.first else { return }
+        onEditFile?(entry)
     }
 
     // MARK: - Transfers: queue
