@@ -49,6 +49,15 @@ enum Metal4BackendError: Error {
 /// allocates fresh buffers and a fresh allocator instead of overwriting
 /// memory the GPU may still be reading.
 ///
+/// Deallocation is the other half of that contract: address- and
+/// resource-ID-based bindings are not retained by the command buffer the
+/// way MTL3's object bindings are, so freeing the backend — its command
+/// buffer, allocators, ring buffers, residency set — while a committed
+/// frame is still executing is a driver-level `Invalid Resource` fault
+/// (caught by `metal4BackendDeallocatesWithFramesInFlight` during B12
+/// development). `deinit` therefore drains: it waits, bounded, for the
+/// last committed frame before anything it owns is released.
+///
 /// **Residency.** The ring buffers sit in an `MTLResidencySet` attached to
 /// the queue. Shared- and managed-storage resources are CPU-visible and
 /// always resident on macOS, so strictly nothing here needs the set — every
@@ -304,6 +313,20 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
             throw QuadRendererError.samplerUnavailable
         }
         self.sampler = sampler
+    }
+
+    /// Waits for the last committed frame before anything this backend owns
+    /// — the reusable command buffer, the allocators, the ring buffers, the
+    /// residency set — is released: MTL4's address-based bindings are not
+    /// retained by the command buffer the way MTL3's object bindings were,
+    /// so releasing them mid-execution is a driver-level `Invalid Resource`
+    /// fault. The wait is bounded: frames complete within a vsync or two in
+    /// any live render loop, and past a second the GPU is hung and no wait
+    /// would save the process anyway.
+    deinit {
+        if frameNumber > 0 {
+            _ = completionEvent.wait(untilSignaledValue: frameNumber, timeoutMS: 1000)
+        }
     }
 
     // MARK: - Metal4FrameBackend
