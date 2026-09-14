@@ -313,7 +313,7 @@ struct LocalizationCoverageTests {
         #expect(missing.isEmpty, "not in the built bundle: \(missing)")
     }
 
-    /// A sample of the 41, spread across the areas the release touched.
+    /// A sample, spread across the areas the release touched.
     private static let keysAddedByThisRelease = [
         "command.zoomPane", "command.clearScreen", "command.exportText",
         "command.copyLastCommandOutput", "command.resetTerminal", "menu.presets",
@@ -321,5 +321,6 @@ struct LocalizationCoverageTests {
         "settings.label.optionAsMeta", "settings.label.openFileCommand",
         "commandPalette.category.terminal", "scrollback.newOutput",
         "clear.history.title", "export.message.history",
+        "command.browseRemoteFiles", "sftp.conflict.title",
     ]
 }
