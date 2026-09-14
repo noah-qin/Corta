@@ -406,6 +406,11 @@ extension ViewController: NSMenuItemValidation {
             // whose child is now gone, has anything to reconnect. For every
             // other pane the item is greyed rather than live and silent.
             return canReconnectRemote
+        case #selector(browseRemoteFiles(_:)):
+            // B14 — a remote pane has a host to browse (or, when the host
+            // is genuinely unknown, a window that asks for it). A local or
+            // uncertain pane has neither, and the item is greyed.
+            return canBrowseRemoteFiles
         case #selector(exportText(_:)):
             return isOperable
         case #selector(revealWorkingDirectoryInFinder(_:)), #selector(copyWorkingDirectoryPath(_:)),
