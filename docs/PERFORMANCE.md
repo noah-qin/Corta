@@ -743,7 +743,10 @@ running the real app and fixed:
    storage included); the first live run faulted at launch with
    `kIOGPUCommandBufferCallbackErrorPageFault`. Every bound texture now
    enters the queue's residency set on first use and is retained until
-   the last frame that bound it has completed.
+   the last frame that bound it has completed — plus a 60-frame grace,
+   because with the GPU keeping up an exact "last frame completed" rule
+   evicted and re-added the atlas every single frame (two residency-set
+   commits per frame per texture) for a texture bound every frame.
 2. **Completion signalling** — a queue-signalled `MTLSharedEvent` never
    advanced against a live `CAMetalDisplayLink` drawable stream, so every
    `beginFrame` past the ring depth waited out its one-second timeout and

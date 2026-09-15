@@ -210,8 +210,22 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
     /// table fixes), and a texture freed while a frame that references it
     /// is in flight faults the same way — so entries here retain the
     /// texture, and `dropRetired` releases both the retention and the
-    /// residency only once the last binding frame has completed on the GPU.
+    /// residency only once the last binding frame has completed on the GPU
+    /// plus `textureRetentionFrames` more (see that constant for why not
+    /// immediately).
     private var boundTextures: [ObjectIdentifier: (texture: MTLTexture, lastFrame: UInt64)] = [:]
+    /// How many completed frames a bound texture stays resident past its
+    /// last binding frame. Zero would be correct but churns: with the GPU
+    /// keeping up, the atlas bound by frame *N* is already complete when
+    /// frame *N + 1* begins, so it would leave the residency set in
+    /// `dropRetired` and re-enter it in `makeResident` — two
+    /// `MTLResidencySet.commit()`s per frame, per texture, for a texture
+    /// that is bound every frame. The grace keeps the atlas (and a Kitty
+    /// placement's texture) resident across the frames that reuse it; a
+    /// texture the renderer has actually dropped is released once this
+    /// many further frames have completed — bounded by frames, so an idle
+    /// pane holds it no longer than its next second of drawing.
+    private static let textureRetentionFrames: UInt64 = 60
 
     /// Buffers/allocators replaced mid-life (a grown ring slot, the
     /// timeout path) whose last reader may still be in flight, tagged with
@@ -713,7 +727,9 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
                 keptBuffers.append(entry)
             }
         }
-        let expiredTextures = boundTextures.filter { $0.value.lastFrame <= completed }
+        let expiredTextures = boundTextures.filter {
+            $0.value.lastFrame + Self.textureRetentionFrames <= completed
+        }
         for (id, entry) in expiredTextures {
             residencySet.removeAllocation(entry.texture)
             boundTextures.removeValue(forKey: id)
