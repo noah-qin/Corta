@@ -102,7 +102,16 @@ public final class PTY: @unchecked Sendable {
         self.processIdentifier = processIdentifier
         self.replicaPath = replicaPath
         self.terminationHandler = terminationHandler
-        self.exitQueue = DispatchQueue(label: "com.corta.pty.child.\(processIdentifier)")
+        // `.userInitiated`, matching the callers of `waitForExit`: the
+        // teardown path blocks on `exited` (a `DispatchGroup`, which does
+        // not propagate its waiter's QoS to the queue that will `leave()`
+        // it), so a queue at the default class would leave a
+        // user-initiated thread waiting on a lower-priority one — the
+        // priority inversion Xcode's runtime diagnostics flag at
+        // `waitForExit`. The queue only ever reaps one child; nothing
+        // else competes for it.
+        self.exitQueue = DispatchQueue(
+            label: "com.corta.pty.child.\(processIdentifier)", qos: .userInitiated)
         // Child exit arrives through kqueue's `NOTE_EXIT` rather than a
         // `SIGCHLD` handler: signal dispositions are process-wide, and a
         // library that installs one fights whatever else the app does with

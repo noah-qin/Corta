@@ -23,9 +23,10 @@ struct FontPreviewSwiftUIView: View {
             Text("~/corta $ echo hello")
                 .font(Font(nsFont))
                 .foregroundStyle(Self.color(variant.foreground))
-            (
-                Text("ok  ").foregroundStyle(Self.color(variant.ansi[2]))
-                    + Text("failed").foregroundStyle(Self.color(variant.ansi[1]))
+            // Two colours in one line: `Text` interpolation composes styled
+            // runs (the `+` operator is deprecated on macOS 26).
+            Text(
+                "\(Text("ok  ").foregroundStyle(Self.color(variant.ansi[2])))\(Text("failed").foregroundStyle(Self.color(variant.ansi[1])))"
             )
             .font(Font(nsFont))
             Text("The quick brown fox jumps over the lazy dog.")
