@@ -50,10 +50,7 @@ final class RemoteEditStore {
     private(set) var copies: [String: RemoteCopy] = [:]
 
     static var defaultRootURL: URL {
-        let base =
-            FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
-            .first ?? FileManager.default.homeDirectoryForCurrentUser
-        return base.appendingPathComponent("Corta/RemoteEdit")
+        AppPaths.applicationSupportDirectory.appendingPathComponent("RemoteEdit", isDirectory: true)
     }
 
     init(rootURL: URL) {
