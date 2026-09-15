@@ -783,6 +783,22 @@ as measurement seams. The `preferredFrameLatency` follow-up named in
 numbers here are flood-only; typing-latency judgment needs Typometer —
 not judged.
 
+**Re-measured after the residency grace (2026-09-15, review pass).**
+Same shape of run — Release build, real window launched through
+LaunchServices, `CORTA_RENDER_METRICS=1`, a 40 s `yes` flood through a
+`SHELL=` script, one 600-frame dump per config — after bound textures
+stopped leaving and re-entering the residency set every frame:
+
+| config | cpuFrame p50 | cpuFrame p99 | gpu p50 | gpu p99 | commit faults |
+| --- | --- | --- | --- | --- | --- |
+| MTL3 default | 0.75 ms | 3.32 ms | 0.63 ms | 4.54 ms | — |
+| Metal 4 | 0.73 ms | 2.77 ms | 0.59 ms | 1.33 ms | 0 |
+
+Still within drift of each other; still no speedup claimed. The
+hosted-XCTest frame-CPU baseline (`FrameCPUBaselineTests`, 120×40, Debug)
+read 2.04–2.16 ms avg on this branch against 2.00–2.22 ms on `main` over
+three runs each — no regression from the branch's render-loop changes.
+
 **Cross-pane pipeline/sampler sharing — done.** `QuadPipelineCache`
 (per-device, immutable-after-creation) holds the three pipeline states
 and sampler both backends share; the M9 binary-archive warm-up moved into
