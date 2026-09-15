@@ -2,9 +2,10 @@ import AppKit
 import SwiftUI
 
 /// B08 — search command records by directory, project and exit status;
-/// separate find/fill/run actions. `host` stays out of scope, the same
-/// reason `CommandRecordStore.records(inDirectory:...)`'s own doc comment
-/// gives: nothing carries one yet, and a real one waits for B13's SSH work.
+/// separate find/fill/run actions. B13 added the host scope: a command
+/// begun while the pane referred to a remote host carries that host
+/// (`CommandRecord.host`), so the filter reads records rather than
+/// guessing which side of an `ssh` a command ran on.
 ///
 /// B10 — this project's first SwiftUI surface: the window and its chrome
 /// are still AppKit (an `NSWindowController` is still what `showWindow`/

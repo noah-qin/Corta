@@ -226,24 +226,32 @@ extension Performer {
     }
 
     /// OSC 7 — the payload is a `file://host/path` URL. Only `file` is
-    /// meaningful for a local working directory; anything else is ignored.
+    /// meaningful for a working directory; anything else is ignored.
     ///
-    /// The host part is checked, because a shell reached over `ssh` (or a
-    /// pane inside `tmux` on one) reports a directory on *that* host with
-    /// its hostname attached. The report feeds local spawns — new tabs,
-    /// splits, session restore — so a remote path kept here would be `chdir`'d
-    /// on this Mac, opening the new shell in a lookalike directory or an
-    /// unrelated one that happens to exist. Only a local host (empty,
-    /// `localhost`, or this machine's own names) is accepted; a remote
-    /// report is dropped, which leaves the app its kernel-side fallback
-    /// (`PTY.currentWorkingDirectory`).
+    /// The host part decides where the report lands. A local host (empty,
+    /// `localhost`, or this machine's own names) sets `state.working
+    /// Directory`, which feeds local spawns — new tabs, splits, session
+    /// restore — and clears any remote context: the pane is local again.
+    /// A remote host (a shell reached over `ssh`, or a pane inside `tmux`
+    /// on one) is recorded in `state.remoteContext` instead (B13): kept so
+    /// the app can show which host and directory the pane refers to, kept
+    /// *apart* because the path names a file on another computer and must
+    /// never be `chdir`'d on this Mac. A remote report also leaves any
+    /// directory already accepted in place — it does not displace it.
     private mutating func setWorkingDirectory(_ payload: ArraySlice<UInt8>) {
         let string = String(decoding: payload, as: UTF8.self)
         guard let url = URL(string: string), url.scheme == "file" else { return }
-        guard Self.isLocalHost(url.host(percentEncoded: false) ?? "") else { return }
+        let host = url.host(percentEncoded: false) ?? ""
         let path = url.path(percentEncoded: false)
         guard !path.isEmpty else { return }
-        state.workingDirectory = path
+        if Self.isLocalHost(host) {
+            state.workingDirectory = path
+            state.remoteContext = nil
+        } else {
+            state.remoteContext = RemoteContext(
+                host: Self.normalizeHostname(host), directory: path,
+                provenance: .osc7, reportedAt: Date())
+        }
     }
 
     /// Whether an OSC 7 host names this machine. Comparison is

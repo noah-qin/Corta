@@ -418,4 +418,47 @@ import Testing
         store.begin(promptRow: 1, workingDirectory: nil, at: Date())
         #expect(store.records().map(\.promptRow) == [1, 0])
     }
+
+    // MARK: - Remote context on command records (B13)
+
+    /// A command begun while the pane refers to a remote host records that
+    /// host on the command itself — the remote context can move on or be
+    /// cleared while the command is still running, and the record must not.
+    @Test("a command begun under a remote context records its host")
+    func remoteCommandRecordsItsHost() throws {
+        var terminal = self.terminal()
+        terminal.feed(Array("\u{1B}]7;file://build-box/srv/app\u{1B}\\".utf8))
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\$ make\r\n\u{1B}]133;C\u{1B}\\out\r\n".utf8))
+        terminal.feed(Array("\u{1B}]133;D;0\u{1B}\\".utf8))
+        let record = try #require(terminal.commandRecords.last)
+        #expect(record.host == "build-box")
+        // The remote path stays out of the local-only field, even though a
+        // remote OSC 7 was the last directory report the pane saw.
+        #expect(record.workingDirectory == nil)
+    }
+
+    @Test("a local command records no host")
+    func localCommandRecordsNoHost() throws {
+        var terminal = self.terminal()
+        terminal.feed(Array("\u{1B}]7;file:///tmp\u{1B}\\".utf8))
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\$ ls\r\n\u{1B}]133;C\u{1B}\\out\r\n".utf8))
+        terminal.feed(Array("\u{1B}]133;D;0\u{1B}\\".utf8))
+        let record = try #require(terminal.commandRecords.last)
+        #expect(record.host == nil)
+        #expect(record.workingDirectory == "/tmp")
+    }
+
+    @Test("records can be filtered by host")
+    func recordsFilterByHost() {
+        var store = CommandRecordStore()
+        store.begin(promptRow: 0, workingDirectory: nil, host: "build-box", at: Date())
+        store.finish(exitStatus: 0, endRow: 1, at: Date())
+        store.begin(promptRow: 2, workingDirectory: "/tmp", at: Date())
+        store.finish(exitStatus: 0, endRow: 3, at: Date())
+        store.begin(promptRow: 4, workingDirectory: nil, host: "build-box", at: Date())
+        store.finish(exitStatus: 1, endRow: 5, at: Date())
+        #expect(store.records(onHost: "build-box").map(\.promptRow) == [4, 0])
+        #expect(store.records(exitStatus: 1, host: "build-box").map(\.promptRow) == [4])
+        #expect(store.records(onHost: "elsewhere").isEmpty)
+    }
 }

@@ -20,6 +20,10 @@ final class PaneFailureView: NSView {
     /// The pane is being asked to build itself again — the shell was
     /// reinstalled, the volume was remounted.
     var onRetry: (() -> Void)?
+    /// B13 — the pane was reaching for a remote host when it failed.
+    /// Reconnect re-runs that exact command as a new connection; unlike
+    /// Try Again it never falls back to a local shell.
+    var onReconnect: (() -> Void)?
     /// Open the settings page, which is where `$SHELL`-adjacent choices and
     /// the config file live.
     var onOpenSettings: (() -> Void)?
@@ -37,7 +41,7 @@ final class PaneFailureView: NSView {
     /// What VoiceOver should hear when the panel replaces the terminal.
     var announcement: String { accessibilityLabel() ?? "" }
 
-    init(title: String, detail: String, canRetry: Bool) {
+    init(title: String, detail: String, canRetry: Bool, canReconnect: Bool = false) {
         super.init(frame: .zero)
         wantsLayer = true
         layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
@@ -57,7 +61,15 @@ final class PaneFailureView: NSView {
         titleLabel.alignment = .center
         titleLabel.maximumNumberOfLines = 3
 
-        let detailLabel = NSTextField(wrappingLabelWithString: detail)
+        // When Reconnect is on offer the detail carries one more sentence —
+        // what it *is*: a new connection to the same host, never the dead
+        // session brought back. Said here, next to the button, because the
+        // button's own label has no room to be honest.
+        let detailText =
+            canReconnect
+            ? "\(detail)\n\n\(L10n.text("failure.reconnectHint"))"
+            : detail
+        let detailLabel = NSTextField(wrappingLabelWithString: detailText)
         detailLabel.font = .systemFont(ofSize: 12)
         detailLabel.textColor = .secondaryLabelColor
         detailLabel.alignment = .center
@@ -71,6 +83,13 @@ final class PaneFailureView: NSView {
             retry.keyEquivalent = "\r"
             buttons.append(retry)
             primaryAction = retry
+        }
+        if canReconnect {
+            let reconnect = NSButton(
+                title: L10n.text("failure.button.reconnect"), target: self,
+                action: #selector(reconnectTapped))
+            buttons.append(reconnect)
+            if primaryAction == nil { primaryAction = reconnect }
         }
         let settings = NSButton(
             title: L10n.text("failure.button.settings"), target: self,
@@ -97,7 +116,7 @@ final class PaneFailureView: NSView {
         // One group with a spoken description, rather than four unrelated
         // elements VoiceOver reads in layout order.
         setAccessibilityRole(.group)
-        setAccessibilityLabel("\(title). \(detail)")
+        setAccessibilityLabel("\(title). \(detailText)")
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -108,5 +127,6 @@ final class PaneFailureView: NSView {
     }
 
     @objc private func retryTapped() { onRetry?() }
+    @objc private func reconnectTapped() { onReconnect?() }
     @objc private func settingsTapped() { onOpenSettings?() }
 }

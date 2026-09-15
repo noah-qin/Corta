@@ -19,6 +19,18 @@ import Foundation
 /// fonts, no per-preset keybindings. Those are window-wide or app-wide in
 /// Corta by design (`DESIGN.md` §6), and a preset that changed them would be
 /// a second settings store fighting the first.
+///
+/// **The ssh preset is a first-class case** (B13). `shell = /usr/bin/ssh`
+/// with `arguments = user@host` — the *system* OpenSSH, deliberately, so the
+/// user's agent, `~/.ssh/config`, `ControlMaster` settings and known-hosts
+/// all apply untouched — opens a pane whose child is the connection itself.
+/// Such a pane is recognised as remote from the spawn record
+/// (`PaneRemoteState`), upgraded to host and directory when the far shell
+/// reports `OSC 7`, and when the connection dies the pane offers Reconnect:
+/// the same command line, re-run as a *new* connection — never a claim that
+/// the dead session's state survived. The `directory` key still means a
+/// *local* working directory for the launcher process; the remote side's
+/// directory is the far shell's business.
 nonisolated struct Preset: Equatable, Sendable {
     /// The key it is written under, and the name shown in the menu.
     var name: String

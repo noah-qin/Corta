@@ -153,7 +153,17 @@ public struct Terminal: Sendable {
     public var windowTitle: String? { performer.state.windowTitle }
 
     /// The working directory reported by OSC 7 (M2.8).
+    ///
+    /// Local-only by construction: a report that names a remote host lands
+    /// in `remoteContext` instead and never reaches this, so the value is
+    /// always safe to hand to a local spawn.
     public var workingDirectory: String? { performer.state.workingDirectory }
+
+    /// B13 — the remote host and directory this pane most recently reported,
+    /// when an OSC 7 report names another machine. Informational only, for
+    /// showing the user which host the pane refers to; nothing that spawns a
+    /// local process may read it. A subsequent local OSC 7 report clears it.
+    public var remoteContext: RemoteContext? { performer.state.remoteContext }
 
     /// Whether the shell says a command is running (OSC 133, M7.2). `false`
     /// when the shell emits no shell-integration sequences at all, which is

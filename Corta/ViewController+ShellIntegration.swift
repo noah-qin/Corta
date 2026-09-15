@@ -401,13 +401,21 @@ extension ViewController: NSMenuItemValidation {
         case #selector(clearScreen(_:)), #selector(clearHistory(_:)),
             #selector(resetTerminal(_:)):
             return validateTerminalStateItem(menuItem)
+        case #selector(reconnectRemote(_:)):
+            // B13 — only a pane whose session *was* a remote launcher, and
+            // whose child is now gone, has anything to reconnect. For every
+            // other pane the item is greyed rather than live and silent.
+            return canReconnectRemote
         case #selector(exportText(_:)):
             return isOperable
         case #selector(revealWorkingDirectoryInFinder(_:)), #selector(copyWorkingDirectoryPath(_:)),
             #selector(openParentDirectoryInNewPane(_:)):
             return hasKnownWorkingDirectory
         case #selector(changeDirectoryToParent(_:)):
-            return hasKnownWorkingDirectory && canChangeDirectorySafely
+            // B13 — `shellDirectory`, so a remote pane can walk its own
+            // remote directories; it is nil exactly when no honest answer
+            // exists (remote without a report, or behind a multiplexer).
+            return shellDirectory != nil && canChangeDirectorySafely
         case #selector(changeDirectoryToProjectRoot(_:)):
             return hasKnownWorkingDirectory && canChangeDirectorySafely
                 && session.workingDirectory.flatMap { DirectoryHistory.projectRoot(for: $0) } != nil

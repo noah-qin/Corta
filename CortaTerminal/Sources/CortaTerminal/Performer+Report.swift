@@ -39,7 +39,17 @@ public struct PerformerState: Sendable {
 
     /// The working directory most recently reported by OSC 7 (M2.8), as a
     /// path. A hint for new tabs and splits (M5.5), nothing more.
+    ///
+    /// Local-only by construction: a report that names a remote host is
+    /// recorded in `remoteContext` instead and never lands here.
     public internal(set) var workingDirectory: String?
+
+    /// B13 — the remote host and directory this pane's shell most recently
+    /// reported, when the report names another machine. Informational only:
+    /// nothing that spawns a local process may read it (see `RemoteContext`'s
+    /// doc comment). A subsequent *local* OSC 7 report clears it — the pane's
+    /// context is local again, and a stale remote label would be a lie.
+    public internal(set) var remoteContext: RemoteContext?
 
     /// `?1004` — focus reporting (M6.7). While set, the app sends `CSI I` on
     /// focus and `CSI O` on blur, which is what Neovim's `autoread` and

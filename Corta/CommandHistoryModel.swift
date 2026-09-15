@@ -23,6 +23,14 @@ final class CommandHistoryModel {
         }
     }
 
+    /// B13 — scope records by the machine they ran on. `CommandRecord.host`
+    /// is set for a command begun while the pane referred to a remote host
+    /// (`Performer+ShellIntegration.swift`), so "this host" and "local" are
+    /// a real question the records can answer, not a guess from text.
+    enum HostScope: Hashable {
+        case any, local, host(String)
+    }
+
     /// One row's already-formatted display state — computed once per
     /// `rows` access rather than per SwiftUI body evaluation, since
     /// `canFillOrRun` reads the grid (`ViewController.commandLineText`) and
@@ -43,6 +51,7 @@ final class CommandHistoryModel {
     var directoryOnly = false
     var projectOnly = false
     var exitFilter: ExitFilter = .any
+    var hostScope: HostScope = .any
     /// Set by `CommandHistoryController`; called when an action (Find,
     /// successful Fill or Run) wants the window to close, same moment the
     /// AppKit version called `window?.close()` directly.
@@ -59,11 +68,27 @@ final class CommandHistoryModel {
         pane?.session == nil ? L10n.text("commandHistory.noPane") : nil
     }
 
+    /// The hosts this pane's records name, for the scope picker's list.
+    /// Sorted rather than in record order: the list is a chooser, and a
+    /// chooser that reshuffles as new commands land is unusable.
+    var knownHosts: [String] {
+        guard let session = pane?.session else { return [] }
+        return Set(session.commandRecords.records.compactMap(\.host)).sorted()
+    }
+
     var rows: [Row] {
         guard let pane, let session = pane.session else { return [] }
         let grid = session.snapshot()
         let directory = directoryOnly ? session.workingDirectory : nil
-        var records = session.commandRecords.records(inDirectory: directory)
+        let host: String? =
+            switch hostScope {
+            case .any, .local: nil
+            case .host(let name): name
+            }
+        var records = session.commandRecords.records(inDirectory: directory, host: host)
+        if case .local = hostScope {
+            records = records.filter { $0.host == nil }
+        }
         if projectOnly, let cwd = session.workingDirectory,
             let root = DirectoryHistory.projectRoot(for: cwd)
         {
@@ -92,13 +117,26 @@ final class CommandHistoryModel {
             symbolName = "checkmark.circle.fill"
             statusDescription = L10n.text("commandHistory.statusSucceeded")
         }
-        let directoryText = record.workingDirectory.map { ($0 as NSString).lastPathComponent }
-            ?? L10n.text("commandHistory.unknownDirectory")
+        // A remote command's column shows its host, not its
+        // `workingDirectory`: on a record with a host that field is the
+        // *local* directory the pane was in before going remote
+        // (`CommandRecord.host`'s doc), which would label the command with
+        // a place it never ran in.
+        let directoryText: String
+        let directoryTooltip: String?
+        if let host = record.host {
+            directoryText = "⟂ \(host)"
+            directoryTooltip = nil
+        } else {
+            directoryText = record.workingDirectory.map { ($0 as NSString).lastPathComponent }
+                ?? L10n.text("commandHistory.unknownDirectory")
+            directoryTooltip = record.workingDirectory
+        }
         let timestamp = timestampFormatter.string(from: record.startedAt)
         return Row(
             id: record.id, statusSymbolName: symbolName, statusDescription: statusDescription,
             timestamp: timestamp, directoryText: directoryText,
-            directoryTooltip: record.workingDirectory,
+            directoryTooltip: directoryTooltip,
             canFillOrRun: ViewController.commandLineText(grid: grid, record: record) != nil,
             accessibilityLabel: L10n.format(
                 "commandHistory.a11yRow", statusDescription, timestamp, directoryText))

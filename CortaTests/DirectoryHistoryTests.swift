@@ -204,3 +204,21 @@ struct DirectoryHistoryStoreTests {
         #expect(reloaded.history.entries["/tmp"]?.visitCount == 1)
     }
 }
+
+/// The one filter between a directory path — every one of which began as
+/// an `OSC 7` report, i.e. text a child sent — and the `cd` line
+/// `ViewController.changeDirectory(to:)` writes back to the shell.
+struct SendableDirectoryPathTests {
+    @Test func ordinaryPathsAreSendable() {
+        #expect(ViewController.isSendableDirectoryPath("/srv/app"))
+        #expect(ViewController.isSendableDirectoryPath("/Users/noah/My Project's dir — ✨"))
+    }
+
+    @Test func controlCharactersAreRefused() {
+        #expect(!ViewController.isSendableDirectoryPath("/srv/app\ninjected"))
+        #expect(!ViewController.isSendableDirectoryPath("/srv/app\r"))
+        #expect(!ViewController.isSendableDirectoryPath("/srv/\u{1B}]0;x\u{07}"))
+        #expect(!ViewController.isSendableDirectoryPath("/srv/\u{9B}"))
+        #expect(!ViewController.isSendableDirectoryPath(""))
+    }
+}

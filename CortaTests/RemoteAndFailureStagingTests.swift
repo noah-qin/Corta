@@ -35,15 +35,33 @@ struct RemoteWorkingDirectoryTests {
     }
 
     /// What the same shell reports **through `ssh`**: the remote machine's
-    /// hostname and the remote machine's path. Dropped, because that path
-    /// names a file on a different computer.
-    @Test("an OSC 7 report from a remote host is dropped")
-    func remoteReportsAreDropped() {
-        for authority in ["build-box", "build-box.internal", "192.168.1.40", "user@host"] {
+    /// hostname and the remote machine's path. Recorded as remote context so
+    /// the app can show which host the pane refers to — and kept apart from
+    /// the local-spawn state, because that path names a file on a different
+    /// computer.
+    @Test("an OSC 7 report from a remote host is recorded, and isolated")
+    func remoteReportsAreRecordedAndIsolated() {
+        // `expectedHost` differs from `authority` for the userinfo form:
+        // `URL` reads `user@host` as user + host, and the host component is
+        // what a display should name.
+        for (authority, expectedHost) in [
+            ("build-box", "build-box"), ("build-box.internal", "build-box.internal"),
+            ("192.168.1.40", "192.168.1.40"), ("user@host", "host"),
+        ] {
             let terminal = Self.terminal(feeding: "\u{1B}]7;file://\(authority)/srv/app\u{7}")
+            // Isolation: the local-spawn path still answers nil, which is
+            // also what split-pane inheritance consumes.
             #expect(
                 terminal.workingDirectory == nil,
-                "file://\(authority)/srv/app should be dropped")
+                "file://\(authority)/srv/app must stay out of local-spawn state")
+            // Recorded: host and path kept (these authorities are already
+            // in the normalised form — lowercase, no trailing dot).
+            let context = terminal.remoteContext
+            #expect(
+                context?.host == expectedHost,
+                "file://\(authority)/srv/app should be recorded as remote context")
+            #expect(context?.directory == "/srv/app")
+            #expect(context?.provenance == .osc7)
         }
     }
 
@@ -60,6 +78,10 @@ struct RemoteWorkingDirectoryTests {
         terminal.feed(Array("\u{1B}]7;file://build-box/srv/app\u{7}".utf8))
         terminal.feed(Array("src/main.rs:42:17: error: no method\r\n".utf8))
         #expect(terminal.workingDirectory == nil)
+        // The report is not dropped, though: the pane now knows which host
+        // and directory it refers to.
+        #expect(terminal.remoteContext?.host == "build-box")
+        #expect(terminal.remoteContext?.directory == "/srv/app")
 
         let line = terminal.grid.logicalLine(containing: 0)
         let reference = try #require(FileReferenceDetection.references(in: line).first)

@@ -153,8 +153,9 @@ nonisolated indirect enum PaneLayout: Equatable, Sendable {
     /// A pane, the working directory it last reported through OSC 7, the
     /// preset it was launched from (B09; `nil` for an ordinary pane or data
     /// saved before this existed), and whether it held focus at save time.
-    /// Reports naming a remote host are dropped by the parser before they
-    /// can be saved here, so a directory is always a local path.
+    /// Reports naming a remote host never reach here — the parser records
+    /// them as remote context (`RemoteContext`, B13) instead — so a
+    /// directory is always a local path.
     case pane(directory: String?, presetName: String? = nil, isFocused: Bool = false)
     /// - Parameter position: the divider as a *fraction* of the node's axis,
     ///   not points. A restored window may open on a different display, or at

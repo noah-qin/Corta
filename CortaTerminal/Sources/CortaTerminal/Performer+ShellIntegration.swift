@@ -43,7 +43,8 @@ extension Performer {
             // than this row, which is the only thing that survives the row
             // scrolling into history and the id it names moving with it.
             state.commandRecords.begin(
-                promptRow: row, workingDirectory: state.workingDirectory, at: Date())
+                promptRow: row, workingDirectory: state.workingDirectory,
+                host: state.remoteContext?.host, at: Date())
         case 0x42:  // 'B' — command line starts
             // B08 — the cursor sits exactly here until the user types
             // something; still true only when 'B' landed on the same row as

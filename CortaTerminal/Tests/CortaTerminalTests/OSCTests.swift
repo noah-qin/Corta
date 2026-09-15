@@ -57,17 +57,43 @@ struct OSCTests {
         #expect(try terminal("\\e]7;file://\(own)/tmp\\a").workingDirectory == "/tmp")
     }
 
-    @Test("OSC 7 from a remote host is ignored")
-    func remoteWorkingDirectoryIsIgnored() throws {
+    @Test("OSC 7 from a remote host is recorded as remote context, isolated from spawn paths")
+    func remoteWorkingDirectoryIsRecordedAsRemoteContext() throws {
         // A shell over ssh reports a directory on the remote host; the path
-        // must never seed a local spawn or a restored session.
-        #expect(try terminal("\\e]7;file://host/Users/noah/work\\a").workingDirectory == nil)
-        #expect(
-            try terminal("\\e]7;file://prod.example.com/var/www\\a").workingDirectory == nil)
+        // must never seed a local spawn or a restored session, but the report
+        // itself is kept so the app can show which host the pane refers to.
+        var remote = try terminal("\\e]7;file://host/Users/noah/work\\a")
+        #expect(remote.workingDirectory == nil)
+        #expect(remote.remoteContext?.host == "host")
+        #expect(remote.remoteContext?.directory == "/Users/noah/work")
+        #expect(remote.remoteContext?.provenance == .osc7)
+
+        remote = try terminal("\\e]7;file://PROD.example.com./var/www\\a")
+        #expect(remote.workingDirectory == nil)
+        // The host is normalised the way host matching normalises everything
+        // else; the path is preserved as reported, percent-decoded.
+        #expect(remote.remoteContext?.host == "prod.example.com")
+        #expect(remote.remoteContext?.directory == "/var/www")
+
+        // The latest remote report wins.
+        remote = try terminal(
+            "\\e]7;file://host/one\\a\\e]7;file://other-host/two\\a")
+        #expect(remote.remoteContext?.host == "other-host")
+        #expect(remote.remoteContext?.directory == "/two")
+
         // A remote report does not displace a directory already accepted.
-        #expect(
-            try terminal("\\e]7;file:///tmp\\a\\e]7;file://host/elsewhere\\a").workingDirectory
-                == "/tmp")
+        remote = try terminal("\\e]7;file:///tmp\\a\\e]7;file://host/elsewhere\\a")
+        #expect(remote.workingDirectory == "/tmp")
+        #expect(remote.remoteContext?.host == "host")
+        #expect(remote.remoteContext?.directory == "/elsewhere")
+    }
+
+    @Test("a local OSC 7 report clears a recorded remote context")
+    func localReportClearsRemoteContext() throws {
+        let terminal = try terminal(
+            "\\e]7;file://host/srv/app\\a\\e]7;file:///tmp\\a")
+        #expect(terminal.workingDirectory == "/tmp")
+        #expect(terminal.remoteContext == nil)
     }
 
     @Test("OSC 7 host matching is case-insensitive and ignores a trailing dot")

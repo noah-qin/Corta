@@ -33,11 +33,16 @@ struct ChildEnvironmentTests {
         let sanitized = ChildEnvironment.sanitized(inheriting: [
             "PATH": "/usr/bin",
             "HOME": "/Users/someone",
+            // B13 — an ssh preset that cannot reach the agent is a preset
+            // that asks for a password every time; both halves of the agent
+            // handshake must survive sanitisation.
             "SSH_AUTH_SOCK": "/tmp/socket",
+            "SSH_AGENT_PID": "4242",
         ])
         #expect(sanitized["PATH"] == "/usr/bin")
         #expect(sanitized["HOME"] == "/Users/someone")
         #expect(sanitized["SSH_AUTH_SOCK"] == "/tmp/socket")
+        #expect(sanitized["SSH_AGENT_PID"] == "4242")
     }
 
     @Test("the process environment is readable")

@@ -77,6 +77,12 @@ class ViewController: NSViewController {
     /// U16 — the preset this pane was opened from, applied once at spawn
     /// time. Set before the view loads, like `inheritedWorkingDirectory`.
     var preset: Preset?
+    /// B13 — the command the current session was actually spawned with: the
+    /// ladder rung that succeeded, which after a fallback is `/bin/zsh`
+    /// rather than what was asked for. Read by the remote-state composition
+    /// (a pane whose child *is* `ssh` shows no foreground job) and by
+    /// Reconnect, which re-runs exactly this.
+    private(set) var launchedCommand: (executable: String, arguments: [String])?
     /// B07 — the command jump navigation last landed on; `nil` once the
     /// viewport has moved away from it (`scrollOffset`'s `didSet` below), so
     /// `effectiveCommand` never targets a command that has scrolled out of
@@ -204,6 +210,12 @@ class ViewController: NSViewController {
     /// Backing store for `refreshProcessFactsIfStale`.
     private var cachedProcessName: String?
     private var cachedDirectory: String?
+    private var cachedRemoteState: PaneRemoteState = .local
+    /// B13 — masks a remote report the pane has since been seen local
+    /// behind (`PaneRemoteState.ReportTracker`). Shared by the cached and
+    /// the fresh reader so both supersede the same report; reset with the
+    /// session.
+    private var remoteReportTracker = PaneRemoteState.ReportTracker()
     private var lastProcessFactsRefresh: CFTimeInterval = 0
     /// True for a moment after a resize, while the title carries the grid
     /// size (see `composedWindowTitle`).
@@ -493,7 +505,15 @@ class ViewController: NSViewController {
     /// "your login shell moved" was a crash report. Now the recoverable ones
     /// degrade (`startSession`, `makeRenderer`) and the rest present
     /// `PaneFailureView`, whose Try Again runs this again.
-    private func setUpPane() {
+    ///
+    /// `strictRespawn` is the reconnect path (B13): the recorded command is
+    /// re-run *exactly*, with no fallback ladder. Degrading is the right
+    /// answer to "open me a terminal" — a bad `$SHELL` still gets you a
+    /// shell — and the wrong answer to "reconnect to that host", where
+    /// quietly landing in a local `/bin/zsh` would turn a remote pane local
+    /// while claiming otherwise. Reconnect succeeds as the same command or
+    /// fails as itself.
+    private func setUpPane(strictRespawn: Bool = false) {
         // The settings page's font and size (M6.1). Read here rather than
         // pushed in later: a pane created at any time — a split, a new tab —
         // gets the current values by asking, and nothing has to remember to
@@ -535,18 +555,34 @@ class ViewController: NSViewController {
         }
         let started: StartedSession
         do {
-            started = try Self.startSession(
-                size: initialSize, directory: inheritedWorkingDirectory,
-                scrollbackLimit: configuration.scrollbackLines,
-                commandHistoryLimit: configuration.commandHistoryLimit, preset: preset)
+            if strictRespawn, let command = reconnectCommand {
+                started = StartedSession(
+                    session: try respawn(command, size: initialSize, configuration: configuration),
+                    notice: nil, executable: command.executable, arguments: command.arguments)
+            } else {
+                started = try Self.startSession(
+                    size: initialSize, directory: inheritedWorkingDirectory,
+                    scrollbackLimit: configuration.scrollbackLines,
+                    commandHistoryLimit: configuration.commandHistoryLimit, preset: preset)
+            }
         } catch {
             presentFailure(
                 title: L10n.text("failure.title.session"),
-                detail: Self.describe(error), canRetry: true)
+                detail: Self.describe(error), canRetry: true,
+                canReconnect: reconnectCommand.map {
+                    PaneRemoteState.isRemoteLauncher(executable: $0.executable)
+                } ?? false)
             return
         }
         session = started.session
+        launchedCommand = (started.executable, started.arguments)
         sessionGeneration += 1
+        // The facts cache predates this session; a retried pane must not
+        // show the dead one's process, directory or remote badge until the
+        // refresh interval runs out.
+        invalidateProcessFacts()
+        cachedRemoteState = .local
+        remoteReportTracker = PaneRemoteState.ReportTracker()
         let generation = sessionGeneration
         // OSC 11 must answer with what is actually on screen (M6.6) — a
         // program that queries the background before choosing its own
@@ -1085,7 +1121,16 @@ class ViewController: NSViewController {
     @MainActor
     private func noteChildExit(_: ChildExit, generation: Int) {
         guard !didTeardown, sessionGeneration == generation else { return }
-        terminalView?.showToast(L10n.text("toast.shellExited"), kind: .warning)
+        // A dead remote launcher gets the honest version of the news: the
+        // *connection* ended, and the way back is a new one — Reconnect —
+        // not anything that would pretend the old session survived.
+        if let launchedCommand,
+            PaneRemoteState.isRemoteLauncher(executable: launchedCommand.executable)
+        {
+            terminalView?.showToast(L10n.text("toast.connectionEnded"), kind: .warning)
+        } else {
+            terminalView?.showToast(L10n.text("toast.shellExited"), kind: .warning)
+        }
     }
 
     /// Marks the display dirty and wakes the display link — for local changes
@@ -1168,8 +1213,12 @@ class ViewController: NSViewController {
     /// of a title bar with four windows open.
     ///
     /// `<title or directory> — <process> — <columns>×<rows>`, with any part
-    /// that is unknown left out rather than filled with a placeholder. The
-    /// first part prefers the OSC 0/2 title, because a program that sets one
+    /// that is unknown left out rather than filled with a placeholder, and a
+    /// leading `⟂ …` badge when the pane refers to another machine (B13 —
+    /// `PaneRemoteState`): the badge goes first because it answers the
+    /// question the rest of the title cannot — *which computer* the title's
+    /// directory and process are on. The first part prefers the OSC 0/2
+    /// title, because a program that sets one
     /// (an editor, `claude`, a long build) is saying something more useful
     /// than its own name; a shell that sets none falls back to the working
     /// directory, abbreviated with `~`.
@@ -1182,6 +1231,12 @@ class ViewController: NSViewController {
         guard session != nil else { return "Corta" }
         refreshProcessFactsIfStale()
         var parts: [String] = []
+        // The badge's host and directory are the remote shell's own OSC 7
+        // text, percent-decoded — as hostile as any other child-supplied
+        // component, and sanitised the same way.
+        if let badge = Self.sanitizedTitleComponent(cachedRemoteState.titleComponent) {
+            parts.append(badge)
+        }
         if let title = Self.sanitizedTitleComponent(session.windowTitle) {
             parts.append(title)
         } else if let directory = cachedDirectory {
@@ -1212,7 +1267,11 @@ class ViewController: NSViewController {
     ///
     /// The represented URL is only set for a directory that exists: the path
     /// arrives over OSC 7 from the child, and a proxy icon is something the
-    /// user can drag into another application.
+    /// user can drag into another application. A remote pane gets no icon at
+    /// all, by construction rather than by check: `cachedDirectory` reads
+    /// `session.currentDirectory`, which a remote `OSC 7` report never
+    /// reaches (it lands in `remoteContext` — B13), so there is no remote
+    /// path here to offer a drag of.
     func applyWindowTitle() {
         guard let window = view.window else { return }
         let title = composedWindowTitle
@@ -1248,21 +1307,39 @@ class ViewController: NSViewController {
 
     private static let transientSizeDuration: TimeInterval = 1.5
 
-    /// The process name and directory behind the title, and when they were
-    /// last read.
+    /// The process name, directory and remote state behind the title, and
+    /// when they were last read.
     ///
-    /// Both are syscalls — `tcgetpgrp`, `proc_name`, `proc_pidinfo` — and the
-    /// title is rebuilt on every output batch, which during a `yes` or a
-    /// build is thousands of batches a second. Refreshed on an interval
+    /// All three are syscalls — `tcgetpgrp`, `proc_name`, `proc_pidinfo` —
+    /// and the title is rebuilt on every output batch, which during a `yes`
+    /// or a build is thousands of batches a second. Refreshed on an interval
     /// instead: a directory that changed a quarter of a second ago is not
     /// worth three syscalls per frame, and the OSC 0/2 title (the part a
     /// program updates deliberately) is read fresh every time regardless.
+    /// The remote state (B13) rides the same cadence: `ssh` starting or
+    /// exiting announces itself with output — the far end's banner, the
+    /// local shell's returning prompt — so the badge follows within one
+    /// interval, with no timer of its own.
     private func refreshProcessFactsIfStale() {
         let now = CACurrentMediaTime()
         guard now - lastProcessFactsRefresh >= Self.processFactsInterval else { return }
         lastProcessFactsRefresh = now
         cachedProcessName = session.activeProcessName
         cachedDirectory = session.currentDirectory
+        cachedRemoteState = resolveRemoteState()
+    }
+
+    /// One fresh read of the pane's remote state — the syscalls, the
+    /// spawn record and the stale-report mask together. Both readers
+    /// (`refreshProcessFactsIfStale`, `paneRemoteState`) come through here
+    /// so a report one of them saw the pane local behind is superseded for
+    /// the other too.
+    func resolveRemoteState() -> PaneRemoteState {
+        remoteReportTracker.resolve(
+            remoteContext: session.remoteContext,
+            hasForegroundJob: session.hasForegroundJob,
+            foregroundProcessName: session.foregroundProcessName,
+            childIsRemoteLauncher: childIsLiveRemoteLauncher)
     }
 
     /// Forces the next title to re-read them — for the moments where waiting
@@ -1444,6 +1521,13 @@ class ViewController: NSViewController {
         /// something other than what was asked for instead of leaving the
         /// user to wonder why their prompt looks wrong.
         let notice: String?
+        /// The command that actually spawned — the rung of the ladder that
+        /// succeeded, not necessarily the one that was asked for. The pane
+        /// keeps it so "which machine is this?" can answer for a pane whose
+        /// child *is* `ssh` (`PaneRemoteState`), and so Reconnect can re-run
+        /// exactly it rather than a paraphrase.
+        let executable: String
+        let arguments: [String]
     }
 
     /// Starts the child, degrading rather than failing whenever only *part* of
@@ -1513,12 +1597,40 @@ class ViewController: NSViewController {
                     // re-limited without discarding lines, so a change
                     // applies to sessions opened after it.
                     scrollbackLimit: scrollbackLimit, commandHistoryLimit: commandHistoryLimit)
-                return StartedSession(session: session, notice: attempt.notice)
+                return StartedSession(
+                    session: session, notice: attempt.notice,
+                    executable: attempt.shell,
+                    arguments: attempt.shell == configured ? arguments : ["-l"])
             } catch {
                 lastError = error
             }
         }
         throw lastError
+    }
+
+    /// The reconnect spawn (B13): the recorded command, exactly — no
+    /// fallback ladder, because a fallback here would silently turn a
+    /// remote pane into a local shell while the user asked for the host.
+    /// Succeeds as the same command, or fails as itself and lets the
+    /// failure view say so.
+    private func respawn(
+        _ command: (executable: String, arguments: [String]),
+        size: TerminalSize, configuration: Configuration
+    ) throws(PTYError) -> TerminalSession {
+        // The environment is rebuilt rather than remembered: what the first
+        // spawn inherited may be stale, and building it again is what the
+        // first spawn did (`SECURITY.md` §4.3 applies either way).
+        var environment = ChildEnvironment.default()
+        for (key, value) in preset?.environment ?? [:] { environment[key] = value }
+        // The working directory is a *local* cwd for the launcher process;
+        // the remote side lands wherever the connection and the far shell
+        // put it. A preset directory is honoured as it was at first spawn.
+        return try TerminalSession(
+            executable: command.executable, arguments: command.arguments,
+            environment: environment, size: size,
+            workingDirectory: preset?.directory ?? inheritedWorkingDirectory ?? NSHomeDirectory(),
+            scrollbackLimit: configuration.scrollbackLines,
+            commandHistoryLimit: configuration.commandHistoryLimit)
     }
 
     /// One line a person can act on. `PTYError` writes its description for
@@ -1539,10 +1651,19 @@ class ViewController: NSViewController {
     /// that can help. The terminal view is never built in this state, so
     /// `isOperable` is false and every geometry and render entry point
     /// short-circuits.
-    private func presentFailure(title: String, detail: String, canRetry: Bool) {
+    ///
+    /// `canReconnect` adds a third action when what failed was a remote
+    /// launcher's spawn (B13): Reconnect re-runs that exact command rather
+    /// than the fallback ladder, and the detail says plainly that it is a
+    /// new connection, not a restored one.
+    private func presentFailure(
+        title: String, detail: String, canRetry: Bool, canReconnect: Bool = false
+    ) {
         failureView?.removeFromSuperview()
-        let failure = PaneFailureView(title: title, detail: detail, canRetry: canRetry)
+        let failure = PaneFailureView(
+            title: title, detail: detail, canRetry: canRetry, canReconnect: canReconnect)
         failure.onRetry = { [weak self] in self?.retryAfterFailure() }
+        failure.onReconnect = { [weak self] in self?.reconnectRemote(nil) }
         failure.onOpenSettings = { SettingsWindowController.shared.show(nil) }
         failure.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(failure)
@@ -1569,13 +1690,24 @@ class ViewController: NSViewController {
     }
 
     private func retryAfterFailure() {
+        rebuildPane(strictRespawn: false)
+    }
+
+    /// The shared teardown-and-rebuild behind Try Again and Reconnect: the
+    /// failure view, the dead terminal view and the dim come down, and
+    /// `setUpPane` builds the pane again — through the fallback ladder for
+    /// a retry, or as the exact recorded command for a reconnect.
+    ///
+    /// Not `private`: the reconnect entry point lives in
+    /// `ViewController+RemoteContext.swift`, an extension.
+    func rebuildPane(strictRespawn: Bool) {
         failureView?.removeFromSuperview()
         failureView = nil
         terminalView?.removeFromSuperview()
         terminalView = nil
         focusDimView?.removeFromSuperview()
         focusDimView = nil
-        setUpPane()
+        setUpPane(strictRespawn: strictRespawn)
         guard isOperable, let terminalView else { return }
         // The window settled long before this retry, so the startup gate that
         // holds back transient layouts has nothing left to protect against —
@@ -1585,6 +1717,12 @@ class ViewController: NSViewController {
         view.window?.makeFirstResponder(terminalView)
         resizeSessionToFitView()
         invalidateDisplay()
+        if strictRespawn {
+            // Said out loud, every time: this is a new connection. The dead
+            // session's scrollback is gone with its process, and the copy
+            // must not let "reconnect" read as "restored".
+            terminalView.showToast(reconnectNotice)
+        }
     }
 
     override func viewDidAppear() {
