@@ -19,7 +19,14 @@ what to edit.
   `ProxyJump` and all of `~/.ssh/config` stay with OpenSSH; Corta adds no
   SSH library. The codec treats the peer as hostile (bounded lengths,
   checked counts, truncation is a typed error, never a trap). Shell ▸
-  Browse Remote Files… opens a per-host browser window from a remote pane:
+  Browse Remote Files… opens a per-host browser window from a remote pane.
+  The host a pane names is the remote shell's own report — program output
+  — so the first connection to a host in each run is asked, with the name
+  prefilled, editable and its provenance stated, from the browser and from
+  a ⌘-clicked file reference alike; Corta never connects on the far end's
+  say-so. The channel has no terminal, so ssh cannot prompt on it: a
+  password, an agent-less passphrase or an unknown host key fails as its
+  own typed error that says to connect once in the terminal first. Then:
   directory listing, mkdir, rename, delete (confirming host, path and
   entry count), explicit upload/download with a transfers list (progress,
   per-transfer cancel, retry for transport-class failures only) and an

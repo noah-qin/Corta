@@ -59,6 +59,26 @@ struct SFTPChannelTests {
         }
     }
 
+    /// The channel has no terminal, so ssh can never ask "are you sure
+    /// you want to continue connecting?" — the failure is its own kind,
+    /// with its own remedy (connect once in the terminal), and must not
+    /// fall through to the unclassified bucket or be mistaken for a bad
+    /// password.
+    @Test("exit 255 on an unverifiable host key is its own failure")
+    func hostKeyUnverified() {
+        let cases = [
+            "Host key verification failed.\r\n",
+            "@@@ WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! @@@\nHost key verification failed.",
+        ]
+        for diagnostics in cases {
+            let error = SFTPTransportError.classify(exit: .exited(code: 255), diagnostics: diagnostics)
+            guard case .hostKeyUnverified = error else {
+                Issue.record("expected .hostKeyUnverified for \(diagnostics), got \(error)")
+                continue
+            }
+        }
+    }
+
     @Test("exit 255 without a known signature stays unclassified")
     func unclassifiedFailure() {
         let error = SFTPTransportError.classify(

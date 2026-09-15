@@ -456,9 +456,19 @@ copy says the command reattaches to whatever session exists on the host —
 the reattach is the remote program's doing, not Corta's.
 
 `browse-remote-files` opens the SFTP browser for the focused pane's host —
-enabled only for a pane known to be remote. The channel is the system's
-`ssh -s -- <host> sftp`, so authentication and `~/.ssh/config` belong to
-OpenSSH; there is nothing to configure here. Transfers are atomic (a
+enabled only for a pane known to be remote. The host name comes from the
+remote shell's own report, which is program output, so the first
+connection to a host in each run is a question: the browser opens with the
+name prefilled and editable (correct it to the alias you would pass to
+`ssh`), and connects only when you press Connect; a ⌘-clicked file
+reference in a remote pane asks the same question once. The channel is the
+system's `ssh -s -- <host> sftp`, so authentication and `~/.ssh/config`
+belong to OpenSSH; there is nothing to configure here — but the channel has
+**no terminal**, so ssh cannot prompt on it: a password, a key passphrase
+the agent does not hold, or a host key not yet in `known_hosts` fails with
+a message saying so rather than asking. Use a key held by `ssh-agent` or
+the keychain, and connect once in the terminal first for a new host.
+Transfers are atomic (a
 `.corta-part` partial renamed over the destination), resumable with both
 endpoints re-validated, and every overwrite is a decision you make in a
 sheet, not a default. A remote file's **Edit** action — or ⌘-clicking a
