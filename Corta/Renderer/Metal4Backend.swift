@@ -1,11 +1,40 @@
 import CoreGraphics
 import Foundation
 import Metal
+import OSLog
 
 enum Metal4BackendError: Error {
     case commandBufferUnavailable
     case commandAllocatorUnavailable
-    case sharedEventUnavailable
+}
+
+/// Where Metal 4 backend faults are reported. A faulted commit or a queue
+/// whose work never completes must be loud in the log — the silent
+/// failure mode is a window that renders nothing (`Metal4Backend`'s
+/// completion gate documents the degradation path).
+nonisolated enum Metal4Diagnostics {
+    static let log = OSLog(subsystem: "dev.noahqin.Corta", category: "render")
+
+    private static let lock = NSLock()
+    /// Bounded: a persistently faulting queue would otherwise log one
+    /// error per frame forever.
+    nonisolated(unsafe) private static var reportedFaults = 0
+
+    static func reportCommitFault(_ error: any Error) {
+        lock.lock()
+        let reported = reportedFaults
+        if reportedFaults < 8 { reportedFaults += 1 }
+        lock.unlock()
+        guard reported < 8 else { return }
+        os_log(.error, log: log, "Metal 4 commit faulted: %{public}@", String(describing: error))
+    }
+
+    static func reportDeadQueue(timeouts: Int) {
+        os_log(
+            .fault, log: log,
+            "Metal 4 GPU work has not completed across %d consecutive frames (commit fault or hung GPU); skipping frames instead of stalling the render loop",
+            timeouts)
+    }
 }
 
 /// A `TerminalRenderBackend` that submits through the Metal 4 command
@@ -36,10 +65,10 @@ enum Metal4BackendError: Error {
 /// two stay in lockstep.
 ///
 /// **Resource lifetime (the part MTL4 makes explicit).** Ring-slot reuse is
-/// gated on GPU completion: each commit signals `completionEvent` with the
-/// frame number, and `beginFrame` for frame *N* waits — non-blocking check
-/// first — for frame *N − frameSlotCount* before touching the allocator and
-/// ring slots that frame used. A frame's draws *append* to that frame's
+/// gated on GPU completion: each commit's feedback handler records the
+/// frame number into `completedFrame`, and `beginFrame` for frame *N* waits
+/// — non-blocking check first — for frame *N − frameSlotCount* before
+/// touching the allocator and ring slots that frame used. A frame's draws *append* to that frame's
 /// ring slot rather than rotating slots per draw call (Kitty image draws
 /// can exceed the slot count within one frame, which a per-call rotation
 /// would alias); a slot that outgrows its buffer mid-frame allocates a
@@ -106,7 +135,18 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
     /// Signalled with the frame number after each frame's commit;
     /// `beginFrame` consults it before reusing anything frame
     /// *N − frameSlotCount* wrote (see the type's doc comment).
-    private let completionEvent: MTLSharedEvent
+    ///
+    /// Implemented on commit-feedback handlers, not a queue-signalled
+    /// `MTLSharedEvent`: the feedback handler demonstrably fires for every
+    /// commit (it is also where commit faults arrive), while the
+    /// queue-level event was observed never to advance against a live
+    /// `CAMetalDisplayLink` drawable stream — every `beginFrame` past the
+    /// ring depth then waited out its full timeout and the window rendered
+    /// ~1 frame/second (B12 live-run debugging).
+    private let completionLock = NSCondition()
+    /// Highest frame number whose commit feedback has arrived. Guarded by
+    /// `completionLock`; written from the commit-feedback thread.
+    private var completedFrame: UInt64 = 0
 
     private let solidPipeline: MTLRenderPipelineState
     private let glyphPipeline: MTLRenderPipelineState
@@ -125,8 +165,8 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
     /// and of every `InstanceBufferRing` slot array.
     private static let frameSlotCount = 3
 
-    /// 1-based count of frames begun so far. Also the value
-    /// `completionEvent` is signalled with once a frame completes.
+    /// 1-based count of frames begun so far. Also the value a frame's
+    /// commit-feedback handler records into `completedFrame`.
     private var frameNumber: UInt64 = 0
     /// Ring slot the current frame writes — `(frameNumber - 1) %
     /// frameSlotCount`, computed in `beginFrame`.
@@ -135,6 +175,19 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
     /// must not overwrite anything a still-in-flight frame may be reading,
     /// so ring writes allocate fresh buffers instead (see the type comment).
     private var forceFreshResources = false
+
+    /// Consecutive `beginFrame` completion-wait timeouts. A queue whose
+    /// commits fault never delivers completion feedback, and the naive
+    /// behaviour then is a one-second stall plus fresh allocator, command
+    /// buffer and ring buffers on *every* frame — the "renders nothing at
+    /// 1 fps while leaking" failure observed live when the drawable path
+    /// faulted at launch (B12). Past `completionTimeoutLimit` the queue is
+    /// treated as dead: frames stop encoding entirely (`beginFrame`
+    /// returns encoder-less, `endFrame` still presents the drawable and
+    /// records the frame complete), which is cheap, bounded, and logged —
+    /// and recovers by itself if feedback ever does arrive again.
+    private var consecutiveCompletionTimeouts = 0
+    private static let completionTimeoutLimit = 3
 
     /// Per-frame state, valid between `beginFrame` and `endFrame`. The
     /// render thread is the only caller, as with `QuadRenderer`.
@@ -274,11 +327,6 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         self.residencySet = try device.makeResidencySet(descriptor: residencyDescriptor)
         queue.addResidencySet(residencySet)
 
-        guard let event = device.makeSharedEvent() else {
-            throw Metal4BackendError.sharedEventUnavailable
-        }
-        self.completionEvent = event
-
         // The pipelines and sampler are shared with `QuadRenderer` through
         // `QuadPipelineCache` (B12) — same shaders, pixel format and blend
         // state, so the two backends produce identical pixels for identical
@@ -306,7 +354,12 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
     /// would save the process anyway.
     deinit {
         if frameNumber > 0 {
-            _ = completionEvent.wait(untilSignaledValue: frameNumber, timeoutMS: 1000)
+            completionLock.lock()
+            let deadline = Date().addingTimeInterval(1)
+            while completedFrame < frameNumber && Date() < deadline {
+                completionLock.wait(until: deadline)
+            }
+            completionLock.unlock()
         }
     }
 
@@ -320,7 +373,9 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         frameNumber += 1
         currentSlot = Int((frameNumber - 1) % UInt64(Self.frameSlotCount))
 
-        let completed = completionEvent.signaledValue
+        completionLock.lock()
+        let completed = completedFrame
+        completionLock.unlock()
         dropRetired(through: completed)
 
         // The slot this frame reuses was last written by frame
@@ -328,14 +383,40 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         // before the allocator is reset or a ring slot is rewritten.
         if frameNumber > UInt64(Self.frameSlotCount) {
             let predecessor = frameNumber - UInt64(Self.frameSlotCount)
-            if completed < predecessor,
-                !completionEvent.wait(untilSignaledValue: predecessor, timeoutMS: 1000)
-            {
+            var caughtUp = completed >= predecessor
+            if !caughtUp {
+                completionLock.lock()
+                let deadline = Date().addingTimeInterval(1)
+                while completedFrame < predecessor && Date() < deadline {
+                    completionLock.wait(until: deadline)
+                }
+                caughtUp = completedFrame >= predecessor
+                completionLock.unlock()
+            }
+            if !caughtUp {
                 // A second behind is not a slow frame, it is a hung GPU.
                 // Allocate fresh resources for this frame rather than
                 // overwrite memory in-flight work may still read.
                 forceFreshResources = true
+                consecutiveCompletionTimeouts += 1
+                if consecutiveCompletionTimeouts == Self.completionTimeoutLimit {
+                    Metal4Diagnostics.reportDeadQueue(timeouts: consecutiveCompletionTimeouts)
+                }
+            } else {
+                consecutiveCompletionTimeouts = 0
             }
+        }
+
+        if consecutiveCompletionTimeouts >= Self.completionTimeoutLimit {
+            // The queue is dead (a faulting commit never signals the
+            // completion event): stop encoding — one second of stall and a
+            // full set of fresh resources per frame is the failure this
+            // caps. `endFrame` still presents the drawable and signals the
+            // event number, so the scheduler and later waits are undisturbed;
+            // if the event ever advances again the timeout counter resets
+            // above and encoding resumes.
+            forceFreshResources = false
+            return
         }
 
         if forceFreshResources {
@@ -408,18 +489,29 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
             rect: rect, drawableSize: drawableSize, label: "Corta.colorGlyph")
     }
 
-    func endFrame(presenting drawable: (any MTLDrawable)?, onCompleted: (@Sendable () -> Void)?) {
+    /// Records a frame's completion (feedback arrived or nothing was
+    /// committed) and wakes any `beginFrame` waiting on it.
+    private func noteFrameCompleted(_ frame: UInt64) {
+        completionLock.lock()
+        if frame > completedFrame { completedFrame = frame }
+        completionLock.signal()
+        completionLock.unlock()
+    }
+
+    func endFrame(
+        presenting drawable: (any MTLDrawable)?, onCompleted: (@Sendable ((any Error)?) -> Void)?
+    ) {
         forceFreshResources = false
         guard encoder != nil else {
             // `beginFrame` failed to open the frame (allocator creation
             // under the timeout path, or encoder creation failed): there is
             // nothing to commit, but a drawable must still be presented —
-            // see `FrameScheduler`'s replacement rule. The event is still
-            // signalled so a later frame's completion wait never blocks on
-            // a frame number nothing will ever commit.
-            queue.signalEvent(completionEvent, value: frameNumber)
+            // see `FrameScheduler`'s replacement rule. The frame is still
+            // recorded complete so a later frame's completion wait never
+            // blocks on a frame number nothing will ever commit.
+            noteFrameCompleted(frameNumber)
             drawable?.present()
-            onCompleted?()
+            onCompleted?(nil)
             return
         }
         encoder?.endEncoding()
@@ -434,14 +526,21 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         if let drawable {
             queue.waitForDrawable(drawable)
         }
-        if let onCompleted {
-            let options = MTL4CommitOptions()
-            options.addFeedbackHandler { _ in onCompleted() }
-            queue.commit([commandBuffer], options: options)
-        } else {
-            queue.commit([commandBuffer])
+        // The feedback handler is the completion gate (`completedFrame`) as
+        // well as the caller's metrics hook — always attached: it is the
+        // one commit-lifecycle callback MTL4 reliably delivers here.
+        let options = MTL4CommitOptions()
+        let frame = frameNumber
+        options.addFeedbackHandler { feedback in
+            // A faulted commit is loud, once per fault, bounded — the
+            // alternative is a window that silently renders nothing.
+            if let error = feedback.error {
+                Metal4Diagnostics.reportCommitFault(error)
+            }
+            self.noteFrameCompleted(frame)
+            onCompleted?(feedback.error)
         }
-        queue.signalEvent(completionEvent, value: frameNumber)
+        queue.commit([commandBuffer], options: options)
         if let drawable {
             // After committing everything that targets the drawable, before
             // presenting it — `MTL4CommandQueue.signalDrawable`'s contract.

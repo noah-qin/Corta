@@ -1475,9 +1475,9 @@ class ViewController: NSViewController {
             topInset: topInset)
         let gpu = InputLatencySignposts.begin(.gpu)
         let gpuStart = RenderMetrics.isEnabled ? DispatchTime.now() : nil
-        let onCompleted: (@Sendable () -> Void)? =
+        let onCompleted: (@Sendable ((any Error)?) -> Void)? =
             (gpu != nil || gpuStart != nil)
-            ? { @Sendable in
+            ? { @Sendable _ in
                 InputLatencySignposts.end(.gpu, gpu)
                 if let gpuStart {
                     let ms =

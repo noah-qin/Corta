@@ -90,6 +90,10 @@ nonisolated protocol Metal4FrameBackend: TerminalRenderBackend {
     /// Ends the frame's encoding, commits it, and presents `drawable` (nil
     /// for offscreen renders, e.g. tests). `onCompleted` runs after the
     /// GPU finishes the frame — the counterpart of the MTL3 path's
-    /// `addCompletedHandler`, feeding the same metrics.
-    func endFrame(presenting drawable: (any MTLDrawable)?, onCompleted: (@Sendable () -> Void)?)
+    /// `addCompletedHandler`, feeding the same metrics — and carries the
+    /// commit's error when one occurred: a faulted commit must surface,
+    /// not silently render nothing.
+    func endFrame(
+        presenting drawable: (any MTLDrawable)?,
+        onCompleted: (@Sendable ((any Error)?) -> Void)?)
 }

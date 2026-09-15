@@ -185,7 +185,7 @@ struct TerminalRenderBackendTests {
         backend.drawGlyphQuads(glyphInstances, atlas: coverage, rect: rect, drawableSize: drawableSize)
         backend.drawColorQuads(colorInstances, atlas: color, rect: rect, drawableSize: drawableSize)
         let completion = DispatchSemaphore(value: 0)
-        backend.endFrame(presenting: nil, onCompleted: { completion.signal() })
+        backend.endFrame(presenting: nil, onCompleted: { _ in completion.signal() })
         return completion.wait(timeout: .now() + 10) == .success
     }
 
@@ -282,7 +282,7 @@ struct TerminalRenderBackendTests {
         let actual = MetalRenderTarget.make(device: device, width: Self.width, height: Self.height)
         backend.beginFrame(target: actual, clearColor: Self.clearColor, label: "Corta.test")
         let completion = DispatchSemaphore(value: 0)
-        backend.endFrame(presenting: nil, onCompleted: { completion.signal() })
+        backend.endFrame(presenting: nil, onCompleted: { _ in completion.signal() })
         #expect(completion.wait(timeout: .now() + 10) == .success)
         Self.synchronize(actual, queue: queue)
 
@@ -311,7 +311,7 @@ struct TerminalRenderBackendTests {
                 [QuadInstance(origin: .zero, size: .init(64, 48), color: color)],
                 rect: Self.rect, drawableSize: Self.drawableSize)
             if index == colors.count - 1 {
-                backend.endFrame(presenting: nil, onCompleted: { completion.signal() })
+                backend.endFrame(presenting: nil, onCompleted: { _ in completion.signal() })
             } else {
                 backend.endFrame(presenting: nil, onCompleted: nil)
             }
@@ -344,7 +344,7 @@ struct TerminalRenderBackendTests {
                 backend.drawSolidQuads(
                     Self.solidInstances, rect: Self.rect, drawableSize: Self.drawableSize)
                 if index == 4 {
-                    backend.endFrame(presenting: nil, onCompleted: { completion.signal() })
+                    backend.endFrame(presenting: nil, onCompleted: { _ in completion.signal() })
                 } else {
                     backend.endFrame(presenting: nil, onCompleted: nil)
                 }

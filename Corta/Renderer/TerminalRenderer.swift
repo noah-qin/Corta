@@ -443,7 +443,8 @@ nonisolated final class TerminalRenderer {
     func draw(
         through backend: any Metal4FrameBackend,
         rect: CGRect, drawableSize: CGSize, target: MTLTexture, clearColor: MTLClearColor,
-        drawable: (any MTLDrawable)?, label: String, onCompleted: (@Sendable () -> Void)?
+        drawable: (any MTLDrawable)?, label: String,
+        onCompleted: (@Sendable ((any Error)?) -> Void)?
     ) {
         backend.beginFrame(target: target, clearColor: clearColor, label: label)
         backend.drawSolidQuads(cachedBackground, rect: rect, drawableSize: drawableSize)
