@@ -374,19 +374,32 @@ under `Corta/` is therefore verified by launching the app and checking:
 
 **Remote workflows (B13/B14) have a launched-app check of their own**,
 `CortaUITests/RemoteWorkflowUITests`, which is the shape every
-remote-path change is verified in: a throwaway `HOME` carries the config
-(a preset whose `shell` is a script named `ssh` standing in for the
-remote shell — banner, a remote `OSC 7`, then `/bin/sh -i`), and
-`CORTA_SFTP_SSH` points the SFTP channel at a script that `exec`s the
-real `/usr/libexec/sftp-server`. One test walks preset → `⟂` badge →
-Browse Remote Files… (asked first, host prefilled) → a listing answered
-by OpenSSH's own server → Edit → the managed copy edited on disk → the
-upload prompt → the remote file changed with no partial left → the fake
-shell exiting → Reconnect → the badge back. Nothing on the machine is
-changed and no network is used. What it cannot cover, and a human
-still judges against a real host: authentication and host keys (there
-is no `ssh` in the loop), and how the panes look — they are Metal
-surfaces the accessibility tree cannot read.
+remote-path change is verified in. `CORTA_STAGE_DIR` (`AppPaths`) moves
+the config file and Application Support under a throwaway directory —
+`$HOME` moves neither on macOS — `SHELL` names a script called `ssh`
+standing in for the remote shell (banner, a remote `OSC 7`, then
+`/bin/sh -i`), and `CORTA_SFTP_SSH` points the SFTP channel at a script
+that `exec`s the real `/usr/libexec/sftp-server`. The UI-test runner is
+sandboxed (it reads all of `/`, writes only its container, which the app
+cannot read), so the app builds the stage itself: the test's first
+launch types `stage-remote-ui.sh` into an ordinary terminal. The walk:
+`⟂` badge → keystrokes reach the pane → Browse Remote Files… (asked
+first, host prefilled, nothing spawned before Connect) → a listing
+answered by OpenSSH's own server → Edit → the "editor" rewrites the
+managed copy → the upload prompt → the remote file changed with no
+partial left → the fake shell exiting → badge gone → Reconnect → badge
+back, keyboard live → the stage removed through the same terminal.
+Nothing on the machine is changed and no network is used. Its first run
+found six defects the unit suites had passed over (a spawn that never
+returned, a write size the server rejected, a SIGPIPE that killed the
+app, a consent step that auto-connected, an untitled window, a badge
+that outlived its connection) — which is the argument for running it.
+What it cannot cover, and a human still judges against a real host:
+authentication and host keys (there is no `ssh` in the loop), and how
+the panes look — they are Metal surfaces the accessibility tree cannot
+read. `SFTPRealServerTests` in the core package drives the same server
+without the app. Run it with an English input source active: a CJK
+input method composes the typed command instead of delivering it.
 
 ### 4.4.2 Real-program verification (P0, M8.20)
 
