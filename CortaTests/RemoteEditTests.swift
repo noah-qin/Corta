@@ -228,6 +228,75 @@ struct RemoteEditCoordinatorTests {
         #expect(fixture.store.copies[fixture.copyID]?.openCount == 2)
     }
 
+    /// The first connection to a host is the user's decision, not the
+    /// far end's: the host came from the pane's OSC 7 report — child
+    /// output — so it is asked (host and path named) before any client is
+    /// made, a refusal is `.cancelled` with nothing spawned, and an
+    /// acceptance is remembered for the run (`RemoteHostConsent`).
+    @Test("a first connection to a reported host is asked, and the answer is remembered")
+    func firstConnectionIsAskedAndRemembered() async throws {
+        let root = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = RemoteEditStore(rootURL: root)
+        let fake = FakeSFTPClient()
+        let host = "consent-\(UUID().uuidString.prefix(8)).example"
+        fake.lstatResults["/srv/app/main.rs"] = SFTPAttributes(size: 100, modificationTime: 1000)
+        fake.onTransfer = { call, _ in
+            guard !call.isUpload else { return }
+            try "remote".write(toFile: call.localPath, atomically: true, encoding: .utf8)
+        }
+        final class Asked {
+            var questions: [(host: String, path: String)] = []
+            var answer = false
+        }
+        let asked = Asked()
+        var clientsMade = 0
+        let coordinator = RemoteEditCoordinator(
+            store: store,
+            makeClient: { _ in
+                clientsMade += 1
+                return fake
+            },
+            opener: { _, _, _ in true },
+            presenter: RemoteEditCoordinator.RemoteEditPresenter(
+                promptUpload: { _ in }, promptConflict: { _ in }, showError: { _ in },
+                confirmConnection: { host, path in
+                    asked.questions.append((host, path))
+                    return asked.answer
+                }))
+
+        // Declined: nothing is connected, nothing downloaded, and the
+        // caller hears "cancelled" — the user's answer, not a failure.
+        do {
+            _ = try await coordinator.open(
+                host: host, remotePath: "/srv/app/main.rs", line: 1, column: nil)
+            Issue.record("expected the declined connection to throw cancelled")
+        } catch let error as SFTPError {
+            guard case .cancelled = error else {
+                Issue.record("expected .cancelled, got \(error)")
+                return
+            }
+        }
+        #expect(asked.questions.count == 1)
+        #expect(asked.questions[0].host == host && asked.questions[0].path == "/srv/app/main.rs")
+        #expect(clientsMade == 0)
+        #expect(fake.transferCalls.isEmpty)
+        #expect(!RemoteHostConsent.isConfirmed(host))
+
+        // Accepted: connects, and the next open of the same host asks
+        // nothing more.
+        asked.answer = true
+        #expect(
+            try await coordinator.open(
+                host: host, remotePath: "/srv/app/main.rs", line: 1, column: nil))
+        #expect(asked.questions.count == 2)
+        #expect(clientsMade == 1)
+        #expect(RemoteHostConsent.isConfirmed(host))
+        _ = try await coordinator.open(
+            host: host, remotePath: "/srv/app/main.rs", line: 2, column: nil)
+        #expect(asked.questions.count == 2, "a confirmed host is not asked again")
+    }
+
     @Test("a missing remote file is the server's answer, surfaced typed")
     func openMissingRemoteFile() async throws {
         let fixture = try makeFixture()

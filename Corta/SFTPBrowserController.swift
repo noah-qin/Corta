@@ -31,9 +31,24 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
     static func show(for pane: ViewController) {
         switch pane.paneRemoteState {
         case .remote(let host, let directory, _):
-            let controller =
-                byHost[host] ?? SFTPBrowserController(host: host, startDirectory: directory)
-            byHost[host] = controller
+            if let open = byHost[host] {
+                open.present()
+                return
+            }
+            if RemoteHostConsent.isConfirmed(host) {
+                let controller = SFTPBrowserController(host: host, startDirectory: directory)
+                byHost[host] = controller
+                controller.present()
+                return
+            }
+            // The host is the remote shell's own report — child output,
+            // not something the user typed (`RemoteHostConsent`). The first
+            // connection to it is asked, with the name prefilled and
+            // editable and its provenance stated; the answer is remembered
+            // for the run.
+            let controller = SFTPBrowserController(
+                host: nil, startDirectory: directory, suggestedHost: host)
+            unconnected[ObjectIdentifier(controller)] = controller
             controller.present()
         case .remoteUnknown:
             // The host is genuinely not known, and the B13 rule stands:
@@ -47,8 +62,9 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    private init(host: String?, startDirectory: String?) {
-        model = SFTPBrowserModel(host: host, startDirectory: startDirectory)
+    private init(host: String?, startDirectory: String?, suggestedHost: String? = nil) {
+        model = SFTPBrowserModel(
+            host: host, startDirectory: startDirectory, suggestedHost: suggestedHost)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 640, height: 440),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
@@ -64,6 +80,9 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
             guard let self else { return }
             Self.unconnected.removeValue(forKey: ObjectIdentifier(self))
             Self.byHost[host] = self
+            // Connected means the user pressed Connect with this name in
+            // front of them (or the name was confirmed earlier this run).
+            RemoteHostConsent.confirm(host)
         }
         model.pickUploadFiles = { [weak self] in await self?.pickUploadFiles() ?? [] }
         model.pickDownloadDestination = { [weak self] entries in

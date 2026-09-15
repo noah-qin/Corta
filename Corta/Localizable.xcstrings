@@ -19006,55 +19006,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Authentication failed connecting to %1$@:\n%2$@"
+            "value": "Authentication failed connecting to %1$@:\n%2$@\n\nThe SFTP connection has no terminal, so ssh cannot ask for a password or a key passphrase here. Use a key held by ssh-agent or the keychain, or connect once in the terminal first."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "连接 %1$@ 时认证失败：\n%2$@"
+            "value": "连接 %1$@ 时认证失败：\n%2$@\n\nSFTP 连接没有终端，ssh 在这里无法询问密码或密钥口令。请使用 ssh-agent 或钥匙串持有的密钥，或先在终端里连接一次。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "連線 %1$@ 時認證失敗：\n%2$@"
+            "value": "連線 %1$@ 時驗證失敗：\n%2$@\n\nSFTP 連線沒有終端機，ssh 在這裡無法詢問密碼或金鑰密語。請使用 ssh-agent 或鑰匙圈持有的金鑰，或先在終端機裡連線一次。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%1$@ への接続で認証に失敗しました:\n%2$@"
+            "value": "%1$@ への接続で認証に失敗しました:\n%2$@\n\nSFTP 接続には端末がないため、ssh はここでパスワードや鍵のパスフレーズを尋ねられません。ssh-agent かキーチェーンが保持する鍵を使うか、先に端末で一度接続してください。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%1$@에 연결하는 중 인증에 실패했습니다:\n%2$@"
+            "value": "%1$@에 연결하는 중 인증에 실패했습니다:\n%2$@\n\nSFTP 연결에는 터미널이 없어 ssh가 여기서 암호나 키 암호 구문을 물을 수 없습니다. ssh-agent나 키체인이 보유한 키를 사용하거나, 먼저 터미널에서 한 번 연결하세요."
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Authentifizierung bei %1$@ fehlgeschlagen:\n%2$@"
+            "value": "Authentifizierung bei %1$@ fehlgeschlagen:\n%2$@\n\nDie SFTP-Verbindung hat kein Terminal, daher kann ssh hier weder nach einem Passwort noch nach einer Schlüssel-Passphrase fragen. Verwenden Sie einen Schlüssel aus ssh-agent oder dem Schlüsselbund, oder verbinden Sie sich zuerst einmal im Terminal."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Échec de l’authentification auprès de %1$@ :\n%2$@"
+            "value": "Échec de l'authentification auprès de %1$@ :\n%2$@\n\nLa connexion SFTP n'a pas de terminal : ssh ne peut donc demander ici ni mot de passe ni phrase secrète de clé. Utilisez une clé détenue par ssh-agent ou le trousseau, ou connectez-vous d'abord une fois dans le terminal."
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Falló la autenticación al conectar con %1$@:\n%2$@"
+            "value": "Falló la autenticación al conectar con %1$@:\n%2$@\n\nLa conexión SFTP no tiene terminal, así que ssh no puede pedir aquí una contraseña ni la frase de una clave. Usa una clave que tenga ssh-agent o el llavero, o conecta primero una vez en el terminal."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Falha na autenticação ao conectar a %1$@:\n%2$@"
+            "value": "Falha na autenticação ao conectar a %1$@:\n%2$@\n\nA conexão SFTP não tem terminal, então o ssh não pode pedir senha nem a frase-secreta de uma chave aqui. Use uma chave mantida pelo ssh-agent ou pelas chaves do sistema, ou conecte uma vez no terminal primeiro."
           }
         }
       }
@@ -20530,6 +20530,242 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Falha ao enviar “%1$@” para %2$@: %3$@\n\nO arquivo remoto não foi alterado."
+          }
+        }
+      }
+    },
+    "sftp.host.suggestedMessage": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This pane's shell reported that it is on “%@”. That name came from the remote shell's output, not from you — check it (or correct it to what you would pass to ssh), then connect:"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "此面板的 shell 报告它位于“%@”。这个名字来自远端 shell 的输出，而不是你输入的——请核对（或改成你会传给 ssh 的写法），然后连接："
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "此面板的 shell 回報它位於「%@」。這個名稱來自遠端 shell 的輸出，而不是你輸入的——請核對（或改成你會傳給 ssh 的寫法），然後連線："
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "このペインのシェルは「%@」上にあると報告しました。この名前はリモートシェルの出力から得たもので、あなたが入力したものではありません。確認（または ssh に渡す形に修正）してから接続してください:"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "이 패널의 셸이 “%@”에 있다고 보고했습니다. 이 이름은 사용자가 입력한 것이 아니라 원격 셸의 출력에서 온 것입니다. 확인하거나 ssh에 전달할 형식으로 수정한 뒤 연결하세요:"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Die Shell dieses Bereichs meldet, sie laufe auf „%@“. Dieser Name stammt aus der Ausgabe der entfernten Shell, nicht von Ihnen – prüfen Sie ihn (oder korrigieren Sie ihn zu dem, was Sie ssh übergeben würden) und verbinden Sie dann:"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Le shell de ce volet indique qu'il se trouve sur « %@ ». Ce nom provient de la sortie du shell distant, pas de vous : vérifiez-le (ou corrigez-le en ce que vous passeriez à ssh), puis connectez-vous :"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "El shell de este panel informa que está en «%@». Ese nombre proviene de la salida del shell remoto, no de ti: compruébalo (o corrígelo a lo que pasarías a ssh) y luego conecta:"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O shell deste painel informou que está em “%@”. Esse nome veio da saída do shell remoto, não de você — confira (ou corrija para o que você passaria ao ssh) e então conecte:"
+          }
+        }
+      }
+    },
+    "remoteEdit.connect.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to “%@” to fetch this file?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "连接到“%@”以获取此文件？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "連線到「%@」以取得此檔案？"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "このファイルを取得するために「%@」に接続しますか?"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "이 파일을 가져오기 위해 “%@”에 연결할까요?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Mit „%@“ verbinden, um diese Datei zu laden?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Se connecter à « %@ » pour récupérer ce fichier ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "¿Conectar con «%@» para obtener este archivo?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conectar a “%@” para obter este arquivo?"
+          }
+        }
+      }
+    },
+    "remoteEdit.connect.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corta would run the system ssh to download %1$@ from %2$@ into a managed local copy. The host name is what the remote shell reported, not something you typed; connect only if it is the host you expect."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta 将运行系统 ssh，把 %2$@ 上的 %1$@ 下载为受管本地副本。主机名来自远端 shell 的报告，不是你输入的；只有当它确实是你预期的主机时才连接。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta 將執行系統 ssh，把 %2$@ 上的 %1$@ 下載為受管的本機副本。主機名稱來自遠端 shell 的回報，並非你輸入的；只有在它確實是你預期的主機時才連線。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta はシステムの ssh を実行し、%2$@ 上の %1$@ を管理されたローカルコピーとしてダウンロードします。ホスト名はリモートシェルが報告したもので、あなたが入力したものではありません。想定どおりのホストである場合にのみ接続してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta가 시스템 ssh를 실행하여 %2$@의 %1$@을(를) 관리되는 로컬 사본으로 다운로드합니다. 호스트 이름은 원격 셸이 보고한 것이지 사용자가 입력한 것이 아닙니다. 예상한 호스트일 때만 연결하세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta würde das System-ssh ausführen, um %1$@ von %2$@ in eine verwaltete lokale Kopie zu laden. Der Hostname stammt aus der Meldung der entfernten Shell, nicht aus Ihrer Eingabe; verbinden Sie nur, wenn es der erwartete Host ist."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta lancerait le ssh du système pour télécharger %1$@ depuis %2$@ dans une copie locale gérée. Le nom d'hôte est celui rapporté par le shell distant, pas quelque chose que vous avez saisi ; ne vous connectez que s'il s'agit bien de l'hôte attendu."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta ejecutaría el ssh del sistema para descargar %1$@ desde %2$@ a una copia local gestionada. El nombre del host es el que informó el shell remoto, no algo que escribiste; conecta solo si es el host que esperas."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O Corta executaria o ssh do sistema para baixar %1$@ de %2$@ para uma cópia local gerenciada. O nome do host é o que o shell remoto informou, não algo que você digitou; conecte apenas se for o host esperado."
+          }
+        }
+      }
+    },
+    "sftp.error.hostKey": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The host key of %1$@ could not be verified:\n%2$@\n\nThe SFTP connection has no terminal, so ssh cannot ask you to accept a new or changed host key here. Connect once in the terminal to review and accept it, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法验证 %1$@ 的主机密钥：\n%2$@\n\nSFTP 连接没有终端，ssh 在这里无法请你接受新的或已变更的主机密钥。请先在终端里连接一次，审核并接受后再试。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "無法驗證 %1$@ 的主機金鑰：\n%2$@\n\nSFTP 連線沒有終端機，ssh 在這裡無法請你接受新的或已變更的主機金鑰。請先在終端機裡連線一次，審核並接受後再試。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ のホスト鍵を検証できませんでした:\n%2$@\n\nSFTP 接続には端末がないため、ssh はここで新しい、または変更されたホスト鍵の受け入れを尋ねられません。先に端末で一度接続して確認・受け入れてから、もう一度お試しください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@의 호스트 키를 확인할 수 없습니다:\n%2$@\n\nSFTP 연결에는 터미널이 없어 ssh가 여기서 새 호스트 키나 변경된 호스트 키의 수락을 물을 수 없습니다. 먼저 터미널에서 한 번 연결해 검토하고 수락한 뒤 다시 시도하세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Der Hostschlüssel von %1$@ konnte nicht überprüft werden:\n%2$@\n\nDie SFTP-Verbindung hat kein Terminal, daher kann ssh Sie hier nicht bitten, einen neuen oder geänderten Hostschlüssel zu akzeptieren. Verbinden Sie sich zuerst einmal im Terminal, prüfen und akzeptieren Sie ihn, und versuchen Sie es dann erneut."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "La clé d'hôte de %1$@ n'a pas pu être vérifiée :\n%2$@\n\nLa connexion SFTP n'a pas de terminal : ssh ne peut donc pas vous demander ici d'accepter une clé d'hôte nouvelle ou modifiée. Connectez-vous d'abord une fois dans le terminal pour la vérifier et l'accepter, puis réessayez."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se pudo verificar la clave de host de %1$@:\n%2$@\n\nLa conexión SFTP no tiene terminal, así que ssh no puede pedirte aquí que aceptes una clave de host nueva o cambiada. Conecta primero una vez en el terminal para revisarla y aceptarla, y vuelve a intentarlo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "A chave de host de %1$@ não pôde ser verificada:\n%2$@\n\nA conexão SFTP não tem terminal, então o ssh não pode pedir aqui que você aceite uma chave de host nova ou alterada. Conecte uma vez no terminal para revisá-la e aceitá-la, depois tente de novo."
           }
         }
       }

@@ -298,7 +298,14 @@ For quick reference during implementation and review:
   the core hands it to a local spawn, and the app tests stage that refusal
   end to end. A remote host is also *attacker-influenced* text: it is
   displayed, never parsed for credentials, paths to execute, or hosts to
-  connect to without the user's own command doing the connecting.
+  connect to without the user's own command doing the connecting. B14's
+  SFTP browser and remote editing are the one place Corta itself spawns
+  `ssh` toward a host a pane named, and the rule holds there by asking:
+  the first connection to a host in a run shows the name (prefilled,
+  editable, provenance stated) and connects only on the user's Connect —
+  `RemoteHostConsent`, in memory for the run, never persisted. Without
+  that step, any bytes the far end printed could have pointed the next
+  ⌘-click's download — and the agent's keys — at a host of their choosing.
 - **S06 — 2026-09-06: OSC 52 clipboard payloads are sanitised, and stricter
   base64.** The write half of OSC 52 is text a *stream* chose, sight unseen —
   unlike a user drag-selection there is no "copy what I saw" contract — so the

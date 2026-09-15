@@ -70,8 +70,13 @@ struct SFTPBrowserView: View {
 
     private var hostEntry: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(L10n.text("sftp.host.message"))
-                .fixedSize(horizontal: false, vertical: true)
+            // A reported host is a suggestion with its provenance stated;
+            // an unknown one is a blank to fill in.
+            Text(
+                model.suggestedHost.map { L10n.format("sftp.host.suggestedMessage", $0) }
+                    ?? L10n.text("sftp.host.message")
+            )
+            .fixedSize(horizontal: false, vertical: true)
             HStack {
                 TextField(L10n.text("sftp.host.field"), text: $model.hostField)
                     .textFieldStyle(.roundedBorder)

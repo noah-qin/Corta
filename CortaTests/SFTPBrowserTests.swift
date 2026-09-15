@@ -167,6 +167,47 @@ struct SFTPBrowserFormattingTests {
 
 @MainActor
 struct SFTPBrowserModelTests {
+    /// A host the pane *reported* is a suggestion: the window opens on the
+    /// host-entry step with the name prefilled, connects to nothing until
+    /// Connect is pressed, and then connects to whatever the field holds
+    /// — the user's word, corrected or not.
+    @Test("a suggested host is prefilled, not connected to, until the user says so")
+    func suggestedHostWaitsForTheUser() async {
+        let fake = FakeSFTPClient()
+        fake.listings["/srv/app"] = []
+        let model = SFTPBrowserModel(
+            host: nil, startDirectory: "/srv/app", suggestedHost: "reported-box"
+        ) { host in
+            fake.connectedHosts.append(host)
+            return fake
+        }
+        defer { model.disconnect() }
+        #expect(model.connectionState == .needsHost)
+        #expect(model.host == nil)
+        #expect(model.hostField == "reported-box")
+        #expect(model.suggestedHost == "reported-box")
+        #expect(fake.connectedHosts.isEmpty, "presenting the window spawns nothing")
+
+        // The user corrects the name to the alias ssh actually knows.
+        model.hostField = "box"
+        model.connect()
+        await waitUntil("connected") { model.connectionState == .connected }
+        #expect(fake.connectedHosts == ["box"])
+        #expect(model.host == "box")
+        #expect(model.currentPath == "/srv/app", "the reported directory is still the start")
+    }
+
+    /// A decided host never carries a suggestion: the suggestion is only
+    /// for the question, and there is none to ask.
+    @Test("a decided host ignores any suggestion")
+    func decidedHostHasNoSuggestion() {
+        let model = SFTPBrowserModel(
+            host: "box", startDirectory: nil, suggestedHost: "reported-box")
+        #expect(model.suggestedHost == nil)
+        #expect(model.hostField == "")
+        #expect(model.connectionState == .connecting)
+    }
+
     @Test("connecting lists the pane's directory, filtering the server's dot entries")
     func connectLists() async {
         let fake = FakeSFTPClient()
