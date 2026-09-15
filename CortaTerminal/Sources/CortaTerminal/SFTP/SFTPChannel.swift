@@ -208,26 +208,29 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
         guard executable.hasPrefix("/") else { throw .executablePathNotAbsolute }
 
         // stdin: child reads, we write. stdout/stderr: child writes, we
-        // read. Plus the exec-failure handshake pipe, mirroring
-        // `Spawn.child`: its write end is FD_CLOEXEC inside the child, so
-        // a failed execve of `executable` writes its errno back, and a
-        // successful one closes the pipe — EOF with no bytes.
+        // read. No exec-failure handshake pipe: `Spawn.child` has one
+        // because its child is the `corta-exec` trampoline, which does a
+        // *second* `execve` the parent cannot otherwise observe. Here the
+        // spawned image *is* the program, and `posix_spawn` on macOS
+        // reports a failed exec synchronously in its return value. A pipe
+        // handed to the child with `addinherit_np` would have its
+        // close-on-exec flag cleared — ssh would hold the write end for
+        // its whole life and the parent's read of it would block until
+        // ssh exited, which is a connection that never completes (found
+        // by the first run against a real `sftp-server`).
         var stdinPipe: [Int32] = [0, 0]
         var stdoutPipe: [Int32] = [0, 0]
         var stderrPipe: [Int32] = [0, 0]
-        var errorPipe: [Int32] = [0, 0]
-        guard pipe(&stdinPipe) == 0, pipe(&stdoutPipe) == 0,
-            pipe(&stderrPipe) == 0, pipe(&errorPipe) == 0
+        guard pipe(&stdinPipe) == 0, pipe(&stdoutPipe) == 0, pipe(&stderrPipe) == 0
         else {
             let code = errno
             for fd in [stdinPipe[0], stdinPipe[1], stdoutPipe[0], stdoutPipe[1],
-                stderrPipe[0], stderrPipe[1], errorPipe[0], errorPipe[1]]
+                stderrPipe[0], stderrPipe[1]]
             where fd > 0 {
                 Darwin.close(fd)
             }
             throw .spawnFailed(code: code)
         }
-        _ = fcntl(errorPipe[1], F_SETFD, FD_CLOEXEC)
 
         var fileActions: posix_spawn_file_actions_t?
         posix_spawn_file_actions_init(&fileActions)
@@ -235,7 +238,6 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
         posix_spawn_file_actions_adddup2(&fileActions, stdinPipe[0], 0)
         posix_spawn_file_actions_adddup2(&fileActions, stdoutPipe[1], 1)
         posix_spawn_file_actions_adddup2(&fileActions, stderrPipe[1], 2)
-        posix_spawn_file_actions_addinherit_np(&fileActions, errorPipe[1])
 
         var attributes: posix_spawnattr_t?
         posix_spawnattr_init(&attributes)
@@ -274,32 +276,13 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
         Darwin.close(stdinPipe[0])
         Darwin.close(stdoutPipe[1])
         Darwin.close(stderrPipe[1])
-        Darwin.close(errorPipe[1])
         guard spawnResult == 0 else {
+            // A missing or non-executable `executable` lands here, as the
+            // errno `posix_spawn` returns.
             Darwin.close(stdinPipe[1])
             Darwin.close(stdoutPipe[0])
             Darwin.close(stderrPipe[0])
-            Darwin.close(errorPipe[0])
             throw .spawnFailed(code: spawnResult)
-        }
-
-        // The exec-failure handshake: EOF means the child's FD_CLOEXEC
-        // write end closed because execve succeeded.
-        var reported: Int32 = 0
-        let handshakeRead = withUnsafeMutableBytes(of: &reported) { buffer in
-            Darwin.read(errorPipe[0], buffer.baseAddress!, MemoryLayout<Int32>.size)
-        }
-        Darwin.close(errorPipe[0])
-        if handshakeRead > 0 {
-            // The execve of ssh itself failed; the child wrote its errno
-            // and is about to _exit. Reap it so this path leaves no zombie.
-            kill(pid, SIGKILL)
-            var status: Int32 = 0
-            while waitpid(pid, &status, 0) < 0, errno == EINTR {}
-            Darwin.close(stdinPipe[1])
-            Darwin.close(stdoutPipe[0])
-            Darwin.close(stderrPipe[0])
-            throw .spawnFailed(code: reported)
         }
 
         let channel = SFTPSubprocessChannel(
@@ -314,6 +297,12 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
         self.host = host
         self.stdinWrite = stdinWrite
         self.stdoutRead = stdoutRead
+        // A write after the child has closed its stdin must come back as
+        // EPIPE (`write` turns it into `.closed`), never as SIGPIPE: nothing
+        // in the process ignores that signal, and its default action
+        // terminates the whole app — which is what the first upload against
+        // a real `sftp-server` did when the server dropped the connection.
+        _ = fcntl(stdinWrite, F_SETNOSIGPIPE, 1)
         self.exitQueue = DispatchQueue(label: "dev.corta.sftp.channel.\(pid)")
         self.exitSource = DispatchSource.makeProcessSource(
             identifier: pid, eventMask: .exit, queue: exitQueue)
@@ -382,11 +371,10 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
             }
             if count < 0, errno == EINTR { continue }
             // EPIPE means the child is gone with its stdin read end; that
-            // is the channel closing, not an arbitrary I/O error — and on
-            // Darwin the EPIPE arrives alongside SIGPIPE, which the app
-            // must already tolerate (it is a terminal emulator full of
-            // pipes); reporting it as `.closed` keeps one meaning for
-            // "the far end is gone".
+            // is the channel closing, not an arbitrary I/O error (the
+            // descriptor is `F_SETNOSIGPIPE`, so it is EPIPE and not a
+            // fatal signal); reporting it as `.closed` keeps one meaning
+            // for "the far end is gone".
             if count < 0, errno == EPIPE { throw .closed }
             throw .ioFailed(code: errno)
         }

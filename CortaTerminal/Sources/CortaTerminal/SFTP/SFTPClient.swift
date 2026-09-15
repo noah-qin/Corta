@@ -101,9 +101,19 @@ public final class SFTPConnection: SFTPClient, @unchecked Sendable {
 
     private let state = Mutex(State())
 
-    public init(host: String, sshExecutable: String = SFTPSubprocessChannel.defaultSSHPath) {
+    /// `arguments`, when given, replaces the `ssh -s -- <host> sftp` argv
+    /// outright — the seam that lets `/usr/libexec/sftp-server -d <dir>`
+    /// stand in for ssh in `SFTPRealServerTests`. Production passes
+    /// neither.
+    private let arguments: [String]?
+
+    public init(
+        host: String, sshExecutable: String = SFTPSubprocessChannel.defaultSSHPath,
+        arguments: [String]? = nil
+    ) {
         self.host = host
         self.sshExecutable = sshExecutable
+        self.arguments = arguments
     }
 
     public var capabilities: SFTPServerCapabilities? {
@@ -142,7 +152,8 @@ public final class SFTPConnection: SFTPClient, @unchecked Sendable {
     private func openSession() async throws(SFTPError) -> (SFTPSubprocessChannel, SFTPSession) {
         let channel: SFTPSubprocessChannel
         do {
-            channel = try SFTPSubprocessChannel.spawn(host: host, executable: sshExecutable)
+            channel = try SFTPSubprocessChannel.spawn(
+                host: host, executable: sshExecutable, arguments: arguments)
         } catch {
             throw .transport(error)
         }

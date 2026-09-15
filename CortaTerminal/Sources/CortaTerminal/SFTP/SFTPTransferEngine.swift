@@ -47,8 +47,13 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         /// so this is also bounded by the session's own window.
         public var pipelineDepth = 16
 
-        /// Bytes per READ/WRITE request. Matches OpenSSH's own cap.
-        public var blockSize = 256 * 1024
+        /// Bytes per READ/WRITE request. OpenSSH's *message* cap is
+        /// 256 KiB, header included, so a 256 KiB data block made every
+        /// WRITE a "bad message" that ended the session (found against the
+        /// real `sftp-server`); 32 KiB is what OpenSSH's own client sends,
+        /// and with `pipelineDepth` requests in flight it is not the
+        /// throughput bound.
+        public var blockSize = 32 * 1024
 
         /// Total attempts per transfer, the first included. Only
         /// transport-class failures consume attempts.
