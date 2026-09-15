@@ -67,21 +67,36 @@ extension ViewController {
     }
 
     /// Writes `cd '<path>'` followed by Return, only when
-    /// `canChangeDirectorySafely` holds — returns whether it did. Single-
-    /// quoted, with any embedded `'` escaped as `'\''`, rather than passed
-    /// unquoted: `path` is app-constructed — from `OSC 7` by way of
-    /// `DirectoryHistory`, or (B13) from the pane's own remote report —
-    /// never stream-supplied text a child sent (`SECURITY.md` §6's rule is
-    /// about the latter), but the quoting still has to survive a directory
-    /// a user could genuinely have — a space, an apostrophe, an emoji —
-    /// without breaking out of the argument. A remote path is safe here for
-    /// the reason `shellDirectory` gives: the `cd` is delivered to the
-    /// pane's own shell, on the machine that path names.
+    /// `canChangeDirectorySafely` holds — returns whether it did.
+    ///
+    /// Every `path` here began as an `OSC 7` report — the local shell's by
+    /// way of `DirectoryHistory`, or (B13) the pane's own remote report —
+    /// which is text a child sent, the thing `SECURITY.md` §6 says never
+    /// to write back to a child. It goes back anyway, under three
+    /// conditions that together are what make it the user's command
+    /// rather than the stream's: it is sent only on the user's own action
+    /// (a menu item, a history row) to the shell on the machine the path
+    /// names; it is single-quoted with `'` escaped as `'\''`, so a space,
+    /// an apostrophe or an emoji stay inside the one argument; and a path
+    /// carrying a control character is refused outright — a real directory
+    /// may hold a newline, but a `cd` line with one in it is the one shape
+    /// a shell other than the ones this quoting was checked against could
+    /// read as two commands, and no directory is worth that.
     @discardableResult
     func changeDirectory(to path: String) -> Bool {
-        guard canChangeDirectorySafely else { return false }
+        guard canChangeDirectorySafely, Self.isSendableDirectoryPath(path) else { return false }
         let escaped = path.replacingOccurrences(of: "'", with: "'\\''")
         session.write(Array("cd '\(escaped)'\r".utf8))
         return true
+    }
+
+    /// Whether a directory path may be written into a `cd` line at all:
+    /// nothing from the C0/C1 control ranges (a newline, a carriage return,
+    /// an escape) and nothing empty.
+    nonisolated static func isSendableDirectoryPath(_ path: String) -> Bool {
+        !path.isEmpty
+            && !path.unicodeScalars.contains { scalar in
+                scalar.value < 0x20 || (0x7F...0x9F).contains(scalar.value)
+            }
     }
 }
