@@ -292,7 +292,7 @@ final class SFTPBrowserModel {
         self.startDirectory = startDirectory
         self.suggestedHost = host == nil ? suggestedHost : nil
         if host == nil, let suggestedHost { hostField = suggestedHost }
-        self.makeClient = makeClient ?? { SFTPConnection(host: $0) }
+        self.makeClient = makeClient ?? { SFTPConnection.forApp(host: $0) }
         connectionState = host == nil ? .needsHost : .connecting
     }
 

@@ -120,7 +120,7 @@ final class RemoteEditCoordinator {
         presenter: RemoteEditPresenter? = nil
     ) {
         self.store = store
-        self.makeClient = makeClient ?? { SFTPConnection(host: $0) }
+        self.makeClient = makeClient ?? { SFTPConnection.forApp(host: $0) }
         self.opener = opener ?? ViewController.openFileAt(url:line:column:)
         self.presenter = presenter ?? RemoteEditPresenter(
             promptUpload: { _ in }, promptConflict: { _ in }, showError: { _ in })
