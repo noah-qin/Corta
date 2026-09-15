@@ -209,16 +209,18 @@ struct RemoteEditCoordinatorTests {
             host: "build-box", remotePath: "/srv/app/main.rs", line: 12, column: 3)
         #expect(opened)
         #expect(fixture.recorder.opened.count == 1)
-        #expect(fixture.recorder.opened[0].line == 12 && fixture.recorder.opened[0].column == 3)
-        #expect(fixture.recorder.opened[0].url.path.hasPrefix(fixture.root.path))
+        let first = try #require(fixture.recorder.opened.first)
+        #expect(first.line == 12 && first.column == 3)
+        #expect(first.url.path.hasPrefix(fixture.root.path))
 
         // The manifest learned the remote stamp at download.
         let copy = try #require(fixture.store.copies[fixture.copyID])
         #expect(copy.remoteSize == 100 && copy.remoteMTime == 1000)
         #expect(copy.openCount == 1)
         #expect(fixture.fake.transferCalls.count == 1)
-        #expect(fixture.fake.transferCalls[0].policy == "fail")
-        #expect(fixture.fake.transferCalls[0].disposition == .remove)
+        let call = try #require(fixture.fake.transferCalls.first)
+        #expect(call.policy == "fail")
+        #expect(call.disposition == .remove)
 
         // Second open: the copy is reused, not downloaded again.
         let again = try await fixture.coordinator.open(
@@ -278,7 +280,8 @@ struct RemoteEditCoordinatorTests {
         }
         #expect(declined == .cancelled, "expected .cancelled, got \(String(describing: declined))")
         #expect(asked.questions.count == 1)
-        #expect(asked.questions[0].host == host && asked.questions[0].path == "/srv/app/main.rs")
+        let question = try #require(asked.questions.first)
+        #expect(question.host == host && question.path == "/srv/app/main.rs")
         #expect(clientsMade == 0)
         #expect(fake.transferCalls.isEmpty)
         #expect(!RemoteHostConsent.isConfirmed(host))
@@ -332,7 +335,7 @@ struct RemoteEditCoordinatorTests {
         fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
         #expect(fixture.coordinator.pendingUploads.count == 1)
         #expect(fixture.recorder.uploads.count == 1)
-        #expect(fixture.recorder.uploads[0].remoteDisplay == "build-box:/srv/app/main.rs")
+        #expect(fixture.recorder.uploads.first?.remoteDisplay == "build-box:/srv/app/main.rs")
 
         // A second edit while the first awaits a decision does not stack prompts.
         try "remote v1, edited more".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)

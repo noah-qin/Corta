@@ -334,14 +334,14 @@ struct SFTPBrowserModelTests {
     }
 
     @Test("navigating into a directory lists it; up walks back")
-    func navigation() async {
+    func navigation() async throws {
         let fake = FakeSFTPClient()
         fake.listings["/srv/app"] = [makeEntry("sub", permissions: 0o040755)]
         fake.listings["/srv/app/sub"] = [makeEntry("deep.txt")]
         let model = await connectedModel(fake: fake)
         defer { model.disconnect() }
 
-        model.navigateInto(model.entries[0])
+        model.navigateInto(try #require(model.entries.first))
         await waitUntil("entered sub") { model.currentPath == "/srv/app/sub" }
         #expect(model.entries.map(\.name) == ["deep.txt"])
 
@@ -492,7 +492,7 @@ struct SFTPBrowserModelTests {
         // Overwrite maps to the engine's policy.
         model.requestDownload()
         await waitUntil("second conflict") { !model.conflictPrompts.isEmpty }
-        model.resolveConflict(model.conflictPrompts[0].id, choice: .overwrite)
+        model.resolveConflict(try #require(model.conflictPrompts.first).id, choice: .overwrite)
         await waitUntil("overwrite ran") { !fake.transferCalls.isEmpty }
         #expect(fake.transferCalls.last?.policy == "overwrite")
         #expect(fake.transferCalls.last?.localPath == existing.path)
@@ -500,7 +500,7 @@ struct SFTPBrowserModelTests {
         // Keep both: a renamed destination, still under .fail.
         model.requestDownload()
         await waitUntil("third conflict") { !model.conflictPrompts.isEmpty }
-        model.resolveConflict(model.conflictPrompts[0].id, choice: .keepBoth)
+        model.resolveConflict(try #require(model.conflictPrompts.first).id, choice: .keepBoth)
         await waitUntil("keep-both ran") { fake.transferCalls.count >= 2 }
         let kept = try #require(fake.transferCalls.last)
         #expect(kept.localPath == directory.appendingPathComponent("a 2.txt").path)
