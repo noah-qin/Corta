@@ -211,6 +211,11 @@ class ViewController: NSViewController {
     private var cachedProcessName: String?
     private var cachedDirectory: String?
     private var cachedRemoteState: PaneRemoteState = .local
+    /// B13 — masks a remote report the pane has since been seen local
+    /// behind (`PaneRemoteState.ReportTracker`). Shared by the cached and
+    /// the fresh reader so both supersede the same report; reset with the
+    /// session.
+    private var remoteReportTracker = PaneRemoteState.ReportTracker()
     private var lastProcessFactsRefresh: CFTimeInterval = 0
     /// True for a moment after a resize, while the title carries the grid
     /// size (see `composedWindowTitle`).
@@ -577,6 +582,7 @@ class ViewController: NSViewController {
         // refresh interval runs out.
         invalidateProcessFacts()
         cachedRemoteState = .local
+        remoteReportTracker = PaneRemoteState.ReportTracker()
         let generation = sessionGeneration
         // OSC 11 must answer with what is actually on screen (M6.6) — a
         // program that queries the background before choosing its own
@@ -1225,7 +1231,10 @@ class ViewController: NSViewController {
         guard session != nil else { return "Corta" }
         refreshProcessFactsIfStale()
         var parts: [String] = []
-        if let badge = cachedRemoteState.titleComponent {
+        // The badge's host and directory are the remote shell's own OSC 7
+        // text, percent-decoded — as hostile as any other child-supplied
+        // component, and sanitised the same way.
+        if let badge = Self.sanitizedTitleComponent(cachedRemoteState.titleComponent) {
             parts.append(badge)
         }
         if let title = Self.sanitizedTitleComponent(session.windowTitle) {
@@ -1317,7 +1326,16 @@ class ViewController: NSViewController {
         lastProcessFactsRefresh = now
         cachedProcessName = session.activeProcessName
         cachedDirectory = session.currentDirectory
-        cachedRemoteState = PaneRemoteState.resolve(
+        cachedRemoteState = resolveRemoteState()
+    }
+
+    /// One fresh read of the pane's remote state — the syscalls, the
+    /// spawn record and the stale-report mask together. Both readers
+    /// (`refreshProcessFactsIfStale`, `paneRemoteState`) come through here
+    /// so a report one of them saw the pane local behind is superseded for
+    /// the other too.
+    func resolveRemoteState() -> PaneRemoteState {
+        remoteReportTracker.resolve(
             remoteContext: session.remoteContext,
             hasForegroundJob: session.hasForegroundJob,
             foregroundProcessName: session.foregroundProcessName,

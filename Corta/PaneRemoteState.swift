@@ -105,6 +105,46 @@ nonisolated enum PaneRemoteState: Equatable {
         return .local
     }
 
+    /// The pane-lifetime half of `resolve` (B13): remembers a report the
+    /// pane has since been seen *local* behind, so it is never dressed up
+    /// as the next connection's.
+    ///
+    /// The parser clears a remote report only when a *local* `OSC 7`
+    /// arrives, and a stock shell — local or remote — sends none. So after
+    /// `ssh A` exits, A's report lingers; the local prompt hides it
+    /// (`resolve` says `.local` with no launcher in front), but the next
+    /// `ssh B` puts a launcher in the foreground again and, if B never
+    /// reports, `resolve` alone would answer `.remote(A)` — a stale host
+    /// shown as certain, and the host B14 would connect to. The tracker
+    /// closes that: once a report has been observed with the pane local,
+    /// that exact report (`RemoteContext` is `Equatable`, timestamp
+    /// included) is superseded and reads as *no* report until the far end
+    /// sends a new one. Reset with the session: a new child starts with
+    /// nothing to supersede.
+    struct ReportTracker: Equatable {
+        private(set) var supersededReport: RemoteContext?
+
+        init() {}
+
+        /// `PaneRemoteState.resolve` with the superseded report masked, and
+        /// the mask advanced whenever the fresh answer is local while a
+        /// report is still on record.
+        mutating func resolve(
+            remoteContext: RemoteContext?, hasForegroundJob: Bool,
+            foregroundProcessName: String?, childIsRemoteLauncher: Bool = false
+        ) -> PaneRemoteState {
+            let report = remoteContext == supersededReport ? nil : remoteContext
+            let state = PaneRemoteState.resolve(
+                remoteContext: report, hasForegroundJob: hasForegroundJob,
+                foregroundProcessName: foregroundProcessName,
+                childIsRemoteLauncher: childIsRemoteLauncher)
+            if case .local = state, let lingering = remoteContext {
+                supersededReport = lingering
+            }
+            return state
+        }
+    }
+
     /// The window-title badge, or `nil` when the pane is plainly local and
     /// the title has nothing to say. A sober marker and what is known —
     /// `⟂ build-box · app` — and an honest word when it is not

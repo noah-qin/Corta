@@ -23,7 +23,10 @@ what to edit.
   (`ssh`/`mosh` in the foreground, or a pane spawned *as* `ssh` via a
   preset) covers connections whose shell emits no OSC 7, with the badge
   honestly reading "host unknown" or "remote?" for nested ssh/tmux states
-  rather than guessing from prompt text. Command records carry the host they
+  rather than guessing from prompt text. A report the pane has since been
+  seen local behind (the connection that sent it exited) is retired rather
+  than reused: the next `ssh` reads "host unknown" until *its* far end
+  reports, never the previous host. Command records carry the host they
   ran on. A dead remote connection offers Shell ▸ Reconnect to Host, which
   re-runs exactly the recorded command as an explicitly *new* connection —
   never a fallback to a local shell, never a claim that anything was

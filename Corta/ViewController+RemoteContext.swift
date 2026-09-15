@@ -15,11 +15,7 @@ extension ViewController {
     /// each time and so never answers from a quarter-second-old fact.
     var paneRemoteState: PaneRemoteState {
         guard isOperable else { return .local }
-        return PaneRemoteState.resolve(
-            remoteContext: session.remoteContext,
-            hasForegroundJob: session.hasForegroundJob,
-            foregroundProcessName: session.foregroundProcessName,
-            childIsRemoteLauncher: childIsLiveRemoteLauncher)
+        return resolveRemoteState()
     }
 
     /// Whether the pane's own child is a live remote launcher — the case

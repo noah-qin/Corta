@@ -148,6 +148,61 @@ struct PaneRemoteStateTests {
         #expect(!ViewController.reattachesRemoteSession(["user@build-box", "tmux", "new-session"]))
         #expect(!ViewController.reattachesRemoteSession(["user@build-box", "screen"]))
     }
+
+    /// The stale-report seam: `ssh A` reported and exited, the pane sat at
+    /// its local prompt, and `ssh B` — which never reports — takes the
+    /// foreground. A's report must not become B's host; only a *new*
+    /// report may name one.
+    @Test("a report seen local behind is superseded, not reused for the next launcher")
+    func staleReportIsSuperseded() {
+        var tracker = PaneRemoteState.ReportTracker()
+        let a = Self.report(host: "host-a")
+
+        // Live connection to A: the report is A's own.
+        #expect(
+            tracker.resolve(remoteContext: a, hasForegroundJob: true, foregroundProcessName: "ssh")
+                == .remote(host: "host-a", directory: "/srv/app", provenance: .osc7))
+        // A exits; the local prompt has nothing left that could be emitting
+        // the report, and seeing it local retires it.
+        #expect(
+            tracker.resolve(remoteContext: a, hasForegroundJob: false, foregroundProcessName: nil)
+                == .local)
+        // `ssh B` with the far end silent: remote, host unknown — never A.
+        #expect(
+            tracker.resolve(remoteContext: a, hasForegroundJob: true, foregroundProcessName: "ssh")
+                == .remoteUnknown(provenance: .foregroundProcess))
+        // B finally reports: a new report (different host, later stamp)
+        // is not the superseded one and names the host again.
+        let b = Self.report(host: "host-b", directory: "/home/b")
+        #expect(
+            tracker.resolve(remoteContext: b, hasForegroundJob: true, foregroundProcessName: "ssh")
+                == .remote(host: "host-b", directory: "/home/b", provenance: .osc7))
+        // A brand-new report from A itself, re-sent by a new connection,
+        // is a different value (its timestamp) and counts as well.
+        let aAgain = Self.report(host: "host-a")
+        #expect(aAgain != a)
+        #expect(
+            tracker.resolve(
+                remoteContext: aAgain, hasForegroundJob: true, foregroundProcessName: "ssh")
+                == .remote(host: "host-a", directory: "/srv/app", provenance: .osc7))
+    }
+
+    /// A pane spawned *as* ssh keeps its report for the connection's life —
+    /// the tracker only retires a report it has seen the pane local behind,
+    /// and a spawned launcher is never local while it runs.
+    @Test("a spawned launcher's report is not retired while it is live")
+    func spawnedLauncherReportPersists() {
+        var tracker = PaneRemoteState.ReportTracker()
+        let a = Self.report()
+        for _ in 0..<3 {
+            #expect(
+                tracker.resolve(
+                    remoteContext: a, hasForegroundJob: false, foregroundProcessName: nil,
+                    childIsRemoteLauncher: true)
+                    == .remote(host: "build-box", directory: "/srv/app", provenance: .osc7))
+        }
+        #expect(tracker.supersededReport == nil)
+    }
 }
 
 /// B13 — the isolation half, staged through real sessions: a remote OSC 7
@@ -400,6 +455,25 @@ struct SSHPresetPaneTests {
         // Nothing local changed its mind: the remote report never reaches
         // the local-spawn value.
         #expect(session.workingDirectory == nil)
+    }
+
+    /// The badge is child-supplied text like every other title component:
+    /// a percent-encoded newline in the OSC 7 path decodes to a real one,
+    /// and must be stripped before it reaches the title bar.
+    @Test func theBadgeIsSanitisedLikeEveryOtherTitleComponent() async throws {
+        let launcher = try Self.makeStagingLauncher()
+        defer { try? FileManager.default.removeItem(at: launcher.deletingLastPathComponent()) }
+        let pane = Self.makePane(
+            launcher: launcher,
+            script: "printf '\\033]7;file://build-box/srv/app%%0Ainjected\\007'; sleep 60")
+        defer { pane.teardown() }
+        let session = try #require(pane.session)
+        #expect(await waitUntilTrue { session.remoteContext != nil })
+        #expect(session.remoteContext?.directory == "/srv/app\ninjected")
+        pane.invalidateProcessFacts()
+        let title = pane.composedWindowTitle
+        #expect(title.contains("⟂ build-box"))
+        #expect(!title.contains("\n"))
     }
 
     /// The dead-connection seam: the launcher exits, the pane goes local
