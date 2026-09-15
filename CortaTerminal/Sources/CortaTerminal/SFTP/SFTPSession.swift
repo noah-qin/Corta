@@ -185,10 +185,11 @@ public final class SFTPSession: @unchecked Sendable {
         /// unreplied frames.
         public var maxInFlightRequests = 32
 
-        /// The largest single READ request issued. Servers commonly cap
-        /// replies well under the frame limit (OpenSSH: 256 KB), and
-        /// asking for more just gets truncated.
-        public var maximumReadLength: UInt32 = 256 * 1024
+        /// The largest single READ request issued. OpenSSH caps a whole
+        /// message at 256 KiB and clamps a longer read; 64 KiB stays
+        /// clear of that with room for the header, and reads are
+        /// pipelined anyway.
+        public var maximumReadLength: UInt32 = 64 * 1024
 
         public init() {}
     }
