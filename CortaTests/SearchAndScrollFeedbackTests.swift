@@ -239,11 +239,24 @@ struct ScrollIndicatorIntegrationTests {
         let totalBefore = session.scrollbackTotalPushed
 
         session.write(Array("printf 'more %s\\n' $(seq 1 20)\n".utf8))
+        // Wait for the output to *settle*, not merely to start: the child
+        // keeps printing after the first batch lands, and sampling the
+        // total mid-stream made the expected shift smaller than the one
+        // `prepareFrame` correctly applied for everything that had arrived
+        // by then (a race a slow CI runner lost reliably).
         let deadline = Date().addingTimeInterval(15)
-        while session.scrollbackTotalPushed <= totalBefore, Date() < deadline {
+        var totalAfter = session.scrollbackTotalPushed
+        var settledSince = Date()
+        while Date() < deadline {
             RunLoop.current.run(until: Date().addingTimeInterval(0.02))
+            let now = session.scrollbackTotalPushed
+            if now != totalAfter {
+                totalAfter = now
+                settledSince = Date()
+            } else if totalAfter > totalBefore, Date().timeIntervalSince(settledSince) > 0.5 {
+                break
+            }
         }
-        let totalAfter = session.scrollbackTotalPushed
         try #require(totalAfter > totalBefore, "the child produced no further output")
 
         // Stands in for a vsync tick: nothing here is attached to a live
