@@ -1121,6 +1121,11 @@ class ViewController: NSViewController {
     @MainActor
     private func noteChildExit(_: ChildExit, generation: Int) {
         guard !didTeardown, sessionGeneration == generation else { return }
+        // The title is rebuilt on output, and a dead child produces none:
+        // without this, a remote launcher's `⟂ host` badge outlived the
+        // connection it described (seen live in `RemoteWorkflowUITests`).
+        invalidateProcessFacts()
+        applyWindowTitle()
         // A dead remote launcher gets the honest version of the news: the
         // *connection* ended, and the way back is a new one — Reconnect —
         // not anything that would pretend the old session survived.
