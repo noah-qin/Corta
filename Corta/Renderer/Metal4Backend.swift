@@ -88,14 +88,14 @@ nonisolated enum Metal4Diagnostics {
 /// last committed frame before anything it owns is released.
 ///
 /// **Residency.** The ring buffers sit in an `MTLResidencySet` attached to
-/// the queue. Shared- and managed-storage resources are CPU-visible and
-/// always resident on macOS, so strictly nothing here needs the set — every
-/// texture this backend binds (the glyph atlases, Kitty image textures) is
-/// `.managed`, and the drawable is Core Animation's, sequenced by
-/// `waitForDrawable`/`signalDrawable`. The set exists because MTL4 makes
-/// residency the caller's explicit responsibility for address-bound
-/// resources and the cost of being explicit is one set commit per buffer
-/// creation; the pixel-equivalence tests cover the texture path as proof.
+/// the queue — and so does every texture ever bound by resource ID
+/// (`boundTextures`): MTL4 neither retains nor implicitly keeps resident a
+/// texture bound by `gpuResourceID`, and one that is not resident faults at
+/// read time — `.managed` storage included; MTL3's automatic residency does
+/// not apply to argument-table bindings (the launch-time
+/// `kIOGPUCommandBufferCallbackErrorPageFault` of the first live run). The
+/// drawable is Core Animation's and is sequenced by
+/// `waitForDrawable`/`signalDrawable` instead.
 ///
 /// **Selection.** Still opt-in (`CORTA_METAL4=1`) and capability-gated
 /// (`supportsFamily(.metal4)`), selected by `TerminalRenderer.init`; a
@@ -201,6 +201,17 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
     private var lastScissor: MTLScissorRect?
     private var lastViewport: MTLViewport?
     private var lastPipeline: (any MTLRenderPipelineState)?
+
+    /// Textures ever bound by resource ID, with the last frame that bound
+    /// them. MTL4 does not retain or implicitly keep resident a texture
+    /// bound by `gpuResourceID` the way MTL3's object bindings did: a bound
+    /// texture that is not in the queue's residency set faults at read time
+    /// (the launch-time `kIOGPUCommandBufferCallbackErrorPageFault` this
+    /// table fixes), and a texture freed while a frame that references it
+    /// is in flight faults the same way — so entries here retain the
+    /// texture, and `dropRetired` releases both the retention and the
+    /// residency only once the last binding frame has completed on the GPU.
+    private var boundTextures: [ObjectIdentifier: (texture: MTLTexture, lastFrame: UInt64)] = [:]
 
     /// Buffers/allocators replaced mid-life (a grown ring slot, the
     /// timeout path) whose last reader may still be in flight, tagged with
@@ -636,6 +647,7 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         argumentTable.setAddress(addresses.0, index: 0)
         argumentTable.setAddress(addresses.1, index: 1)
         if let atlas {
+            makeResident(atlas)
             argumentTable.setTexture(atlas.gpuResourceID, index: 0)
             argumentTable.setSamplerState(sampler.gpuResourceID, index: 0)
         }
@@ -676,6 +688,17 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         encoder.popDebugGroup()
     }
 
+    /// Keeps a bound texture alive and in the residency set until every
+    /// frame that has bound it has completed — see `boundTextures`.
+    private func makeResident(_ texture: MTLTexture) {
+        let id = ObjectIdentifier(texture)
+        if boundTextures[id] == nil {
+            residencySet.addAllocation(texture)
+            residencySet.commit()
+        }
+        boundTextures[id] = (texture: texture, lastFrame: frameNumber)
+    }
+
     /// Releases retired buffers/allocators whose retiring frame the GPU has
     /// completed. Called from `beginFrame` with the last-known completed
     /// frame number.
@@ -689,6 +712,12 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
             } else {
                 keptBuffers.append(entry)
             }
+        }
+        let expiredTextures = boundTextures.filter { $0.value.lastFrame <= completed }
+        for (id, entry) in expiredTextures {
+            residencySet.removeAllocation(entry.texture)
+            boundTextures.removeValue(forKey: id)
+            removedAny = true
         }
         if removedAny { residencySet.commit() }
         retiredBuffers = keptBuffers
