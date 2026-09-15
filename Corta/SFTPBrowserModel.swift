@@ -448,11 +448,23 @@ final class SFTPBrowserModel {
         }
     }
 
+    /// Whether a name the server listed is one plain path component — the
+    /// only thing a `READDIR` entry is allowed to be. A hostile server can
+    /// send `../../.zshrc`, and a multi-file download would have appended
+    /// that to the chosen local folder and written outside it; such an
+    /// entry is dropped from the listing rather than shown, since nothing
+    /// honest is on the other end of it.
+    nonisolated static func isPlainEntryName(_ name: String) -> Bool {
+        !name.isEmpty && name != "." && name != ".." && !name.contains("/")
+            && !name.contains("\0")
+    }
+
     private func applyEntries(_ listing: [SFTPEntry]) {
         entries =
             listing
-            // `.` and `..` are the server's bookkeeping, not content.
-            .filter { $0.filenameUTF8 != "." && $0.filenameUTF8 != ".." }
+            // `.` and `..` are the server's bookkeeping, not content; a
+            // name that is not one component is not content either.
+            .filter { Self.isPlainEntryName($0.filenameUTF8) }
             .map { entry in
                 let attributes = entry.attributes
                 return Entry(
@@ -606,12 +618,17 @@ final class SFTPBrowserModel {
         Task {
             guard let destination = await pickDownloadDestination(chosen) else { return }
             for entry in chosen {
-                let local: URL =
-                    switch destination {
-                    case .file(let url): url
-                    case .directory(let directory):
-                        directory.appendingPathComponent(entry.name)
-                    }
+                let local: URL
+                switch destination {
+                case .file(let url):
+                    local = url
+                case .directory(let directory):
+                    // `applyEntries` already refused anything but a plain
+                    // component; asserted again at the one place the name
+                    // becomes a local path.
+                    guard Self.isPlainEntryName(entry.name) else { continue }
+                    local = directory.appendingPathComponent(entry.name)
+                }
                 enqueue(
                     Plan(
                         isUpload: false,
