@@ -207,9 +207,11 @@ struct SFTPBrowserModelTests {
         let model = await connectedModel(fake: fake)
         defer { model.disconnect() }
         await waitUntil("volume probed") { model.volumeStatus != .unknown }
-        #expect(
-            model.volumeStatus
-                == .available(free: 400 * 4096, total: 1000 * 4096))
+        // Spelled out: the inline literal arithmetic inside `#expect` is a
+        // type-check timeout on Xcode 27's compiler.
+        let expected: SFTPBrowserModel.VolumeStatus = .available(
+            free: UInt64(400 * 4096), total: UInt64(1000 * 4096))
+        #expect(model.volumeStatus == expected)
     }
 
     @Test("an authentication failure is named as one, with a way back")
