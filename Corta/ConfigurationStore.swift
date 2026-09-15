@@ -58,11 +58,9 @@ final class ConfigurationStore {
     let fileURL: URL
 
     /// `~/.config/corta/config` — the XDG-ish location a terminal user will
-    /// look in first, and one no sandbox container hides.
-    static var fileURL: URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".config/corta/config")
-    }
+    /// look in first, and one no sandbox container hides — unless a staged
+    /// launch moved it (`AppPaths`).
+    static var fileURL: URL { AppPaths.configFileURL }
 
     init(fileURL: URL) {
         self.fileURL = fileURL

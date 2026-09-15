@@ -161,10 +161,7 @@ final class DirectoryHistoryStore {
     let fileURL: URL
 
     static var defaultFileURL: URL {
-        let base =
-            FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
-            .first ?? FileManager.default.homeDirectoryForCurrentUser
-        return base.appendingPathComponent("Corta/directory-history.json")
+        AppPaths.applicationSupportDirectory.appendingPathComponent("directory-history.json")
     }
 
     init(fileURL: URL) {
