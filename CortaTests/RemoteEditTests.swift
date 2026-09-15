@@ -267,16 +267,16 @@ struct RemoteEditCoordinatorTests {
 
         // Declined: nothing is connected, nothing downloaded, and the
         // caller hears "cancelled" — the user's answer, not a failure.
+        // (Spelled with a captured result rather than a typed `catch`:
+        // the CI toolchain's SIL verifier crashed on that pattern.)
+        var declined: SFTPError?
         do {
             _ = try await coordinator.open(
                 host: host, remotePath: "/srv/app/main.rs", line: 1, column: nil)
-            Issue.record("expected the declined connection to throw cancelled")
-        } catch let error as SFTPError {
-            guard case .cancelled = error else {
-                Issue.record("expected .cancelled, got \(error)")
-                return
-            }
+        } catch {
+            declined = error
         }
+        #expect(declined == .cancelled, "expected .cancelled, got \(String(describing: declined))")
         #expect(asked.questions.count == 1)
         #expect(asked.questions[0].host == host && asked.questions[0].path == "/srv/app/main.rs")
         #expect(clientsMade == 0)
