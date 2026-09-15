@@ -12,6 +12,35 @@ what to edit.
 
 ### Added
 
+- **B12 — a real Metal 4 rendering backend, plus rendering evidence
+  (first slice).** The forwarding `Metal4Backend` stub is replaced by a
+  genuine MTL4 submission path — `MTL4CommandQueue`, persistent per-slot
+  command buffers and allocators, argument tables, an explicit residency
+  set, and `waitForDrawable`/`signalDrawable` drawable sequencing —
+  selected only with `CORTA_METAL4=1` on Metal-4-capable hardware, with
+  the MTL3 `QuadRenderer` unchanged as the default and fallback. Pixel
+  equivalence between the two backends is enforced by tests; two faults
+  only the live drawable path could produce (argument-table texture
+  residency, and completion signalling that never fired against a live
+  display link) were found by running the real app and fixed, with commit
+  faults now logged instead of silent. Compared under an identical
+  sustained-output workload the Metal 4 path is fault-free and its
+  frame-CPU edge is within run-to-run drift, so per the batch's own rule
+  no speedup is claimed — the implementation is the deliverable.
+  Cross-pane sharing landed for the parts that are safe: the three
+  pipeline states and sampler are per-device shared
+  (`QuadPipelineCache`), so panes after the first pay ~0 ms of shader
+  compile instead of ~10 ms each; atlas sharing was evaluated and
+  declined (it would couple every pane's damage tracking to the union of
+  all panes' glyph churn). Bounded partial GPU uploads were built,
+  measured (a 41× upload reduction bought ~15 µs p50 against the 4 ms
+  frame budget), and reverted — the numbers are in PERFORMANCE.md §8.
+  Provably-empty render passes and redundant MTL4 state sets are removed.
+  New measurement seams: `CORTA_FRAME_LATENCY` (preferredFrameLatency
+  experiments) and `scripts/measure-energy.sh` (idle/occluded/flood/
+  multi-window/image energy scenarios; powermetrics sampling itself needs
+  a sudo-capable session and was not run — recorded as not judged, along
+  with Typometer typing latency and thermal/low-power forcing).
 - **B14 — SFTP and remote editing (first slice).** Built on B13's remote
   context. The engine is a self-contained SFTPv3 wire-protocol client in
   the CortaTerminal package whose transport is the system's `ssh -s --
@@ -83,6 +112,7 @@ what to edit.
   does *not* do: parse or merge OpenSSH configuration, share connections
   itself, or verify any of this against a real remote host — that matrix is
   recorded as not judged.
+||||||| parent of 92fe2d2 (docs: close out the b12 metal 4 and rendering records)
 
 ### Added
 
