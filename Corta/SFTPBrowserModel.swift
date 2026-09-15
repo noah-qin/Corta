@@ -301,6 +301,14 @@ final class SFTPBrowserModel {
     /// `host:path` once connected — the connection never learns the user
     /// (ssh's config owns that), so none is shown rather than one
     /// invented.
+    /// The title for the window's first frame — `connect()` updates it on
+    /// every state change after that, but a window opened on the
+    /// host-entry step has had no state change yet and would otherwise sit
+    /// untitled.
+    func publishTitle() {
+        updateTitle()
+    }
+
     private func updateTitle() {
         let title: String
         switch connectionState {
@@ -327,6 +335,9 @@ final class SFTPBrowserModel {
     /// re-presenting an open window must not spawn a second session.
     func connect() {
         guard client == nil else { return }
+        // `hostField` is consent only when the user submits it — a
+        // presenter must not call this on a `.needsHost` model with a
+        // prefilled suggestion (`SFTPBrowserController.present`).
         let name: String
         if let host {
             name = host
