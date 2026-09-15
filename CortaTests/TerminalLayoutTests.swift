@@ -76,3 +76,30 @@ struct TerminalLayoutTests {
         #expect(edges.right)
     }
 }
+
+/// `ViewController.gridSize(fitting:)`'s conversion from a pixel-over-metric
+/// quotient to a `UInt16` cell count. A zero cell metric — a pane whose face
+/// could not be measured — turns the quotient infinite, and an unguarded
+/// `UInt16(.infinity)` trapped the whole test host once from `PaneZoomTests`;
+/// the clamp is what keeps a broken pane from taking the window down.
+struct GridCellCountTests {
+    @Test func ordinaryQuotientsTruncateToCells() {
+        #expect(ViewController.cellCount(80.9) == 80)
+        #expect(ViewController.cellCount(1) == 1)
+    }
+
+    @Test func belowOneCellReadsAsOne() {
+        #expect(ViewController.cellCount(0.2) == 1)
+        #expect(ViewController.cellCount(-40) == 1)
+    }
+
+    @Test func nonFiniteQuotientsNeverTrap() {
+        #expect(ViewController.cellCount(.infinity) == 1)
+        #expect(ViewController.cellCount(-.infinity) == 1)
+        #expect(ViewController.cellCount(.nan) == 1)
+    }
+
+    @Test func hugeQuotientsSaturateAtTheFieldWidth() {
+        #expect(ViewController.cellCount(1e9) == UInt16.max)
+    }
+}

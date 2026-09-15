@@ -467,8 +467,19 @@ class ViewController: NSViewController {
     func gridSize(fitting size: CGSize) -> TerminalSize {
         let metrics = cellMetrics
         return TerminalSize(
-            rows: UInt16(max(1, (size.height - verticalInsets) / metrics.cellHeight)),
-            columns: UInt16(max(1, (size.width - TerminalLayout.insetWidth) / metrics.cellWidth)))
+            rows: Self.cellCount((size.height - verticalInsets) / metrics.cellHeight),
+            columns: Self.cellCount((size.width - TerminalLayout.insetWidth) / metrics.cellWidth))
+    }
+
+    /// A cell count from a pixel-over-metric quotient, clamped into what a
+    /// `TerminalSize` field holds. A zero cell metric (a pane whose atlas
+    /// could not measure a face) makes the quotient infinite, and
+    /// `UInt16(.infinity)` is a trap — seen once as a full-suite crash in
+    /// `PaneZoomTests` — so the bounds are applied before the conversion,
+    /// and a non-finite quotient reads as the one-cell minimum.
+    nonisolated static func cellCount(_ quotient: CGFloat) -> UInt16 {
+        guard quotient.isFinite else { return 1 }
+        return UInt16(min(max(1, quotient), CGFloat(UInt16.max)))
     }
 
     /// The window size that fits the initial grid exactly. With
