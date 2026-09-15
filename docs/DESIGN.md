@@ -728,7 +728,7 @@ Ordered by how badly they are usually underestimated.
    typed error rather than a trap — the same discipline as the escape
    parser); a cancelled request's id is tombstoned until its late reply
    lands so it is never mistaken for a protocol violation; and destination
-   writes go to a `<name>.corta-part-<pid>` partial that is renamed over
+   writes go to a `<name>.corta-part` partial that is renamed over
    the target only on completion, so an interrupted transfer can never
    leave a silently-accepted partial file. Resume validates both endpoints
    — the partial's own mtime carries the source's mtime stamp, and any

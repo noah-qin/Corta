@@ -6,7 +6,7 @@ import Synchronization
 ///
 /// What the engine guarantees:
 ///
-/// - **Atomic destinations.** A download writes `name.corta-part-<pid>`
+/// - **Atomic destinations.** A download writes `name.corta-part`
 ///   next to the destination and `rename(2)`s it over the target only when
 ///   complete; an upload does the same with a remote temp file and RENAME
 ///   (`posix-rename@openssh.com` when the server advertises it, because
@@ -172,11 +172,13 @@ public final class SFTPTransferEngine: @unchecked Sendable {
 
     // MARK: - Partial naming
 
-    /// The partial file's suffix for this process. One suffix per process
-    /// is deliberate: two live transfers to the same destination would be
-    /// a conflict anyway, and a stale partial from a crashed run is
-    /// recognised by the same name on the next run.
-    public static let partialSuffix = ".corta-part-\(getpid())"
+    /// The partial file's suffix. One fixed name, not one per process: a
+    /// resume has to find the partial an *earlier* run left behind, and a
+    /// pid in the name meant nothing survived a relaunch — the old partial
+    /// was neither resumed nor cleaned up, on either side. Two live
+    /// transfers to the same destination would be a conflict anyway, so
+    /// the pid bought no isolation.
+    public static let partialSuffix = ".corta-part"
 
     /// The partial path for a destination, local or remote — the rule is
     /// the same on both sides.
