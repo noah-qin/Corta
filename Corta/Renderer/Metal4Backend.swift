@@ -139,6 +139,15 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
     /// Per-frame state, valid between `beginFrame` and `endFrame`. The
     /// render thread is the only caller, as with `QuadRenderer`.
     private var encoder: (any MTL4RenderCommandEncoder)?
+    /// What the open encoder was last told (B12 audit): one encoder serves
+    /// every draw of the frame and all draws share the pane's rect, so
+    /// re-setting identical scissor, viewport or pipeline state per draw is
+    /// a redundant state change. Reset in `beginFrame` — the MTL3 path has
+    /// no equivalent to dedupe because each of its draws opens a fresh
+    /// encoder and must set everything.
+    private var lastScissor: MTLScissorRect?
+    private var lastViewport: MTLViewport?
+    private var lastPipeline: (any MTLRenderPipelineState)?
 
     /// Buffers/allocators replaced mid-life (a grown ring slot, the
     /// timeout path) whose last reader may still be in flight, tagged with
@@ -369,6 +378,9 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         // took, same as the MTL3 path's per-encoder labels.
         encoder.label = label
         self.encoder = encoder
+        lastScissor = nil
+        lastViewport = nil
+        lastPipeline = nil
         solidRing.beginFrame()
         glyphRing.beginFrame()
         colorGlyphRing.beginFrame()
@@ -529,14 +541,35 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
             argumentTable.setSamplerState(sampler.gpuResourceID, index: 0)
         }
 
-        encoder.setRenderPipelineState(pipeline)
+        if lastPipeline !== pipeline {
+            encoder.setRenderPipelineState(pipeline)
+            lastPipeline = pipeline
+        }
         encoder.setArgumentTable(argumentTable, stages: [.vertex, .fragment])
-        encoder.setScissorRect(MTLScissorRect(x: x, y: y, width: width, height: height))
-        encoder.setViewport(
-            MTLViewport(
-                originX: 0, originY: 0,
-                width: Double(drawableSize.width), height: Double(drawableSize.height),
-                znear: 0, zfar: 1))
+        let scissor = MTLScissorRect(x: x, y: y, width: width, height: height)
+        let scissorIsCurrent =
+            lastScissor.map {
+                $0.x == scissor.x && $0.y == scissor.y
+                    && $0.width == scissor.width && $0.height == scissor.height
+            } ?? false
+        if !scissorIsCurrent {
+            encoder.setScissorRect(scissor)
+            lastScissor = scissor
+        }
+        let viewport = MTLViewport(
+            originX: 0, originY: 0,
+            width: Double(drawableSize.width), height: Double(drawableSize.height),
+            znear: 0, zfar: 1)
+        let viewportIsCurrent =
+            lastViewport.map {
+                $0.originX == viewport.originX && $0.originY == viewport.originY
+                    && $0.width == viewport.width && $0.height == viewport.height
+                    && $0.znear == viewport.znear && $0.zfar == viewport.zfar
+            } ?? false
+        if !viewportIsCurrent {
+            encoder.setViewport(viewport)
+            lastViewport = viewport
+        }
         encoder.pushDebugGroup(label)
         encoder.drawPrimitives(
             primitiveType: .triangleStrip, vertexStart: 0, vertexCount: 4,

@@ -286,10 +286,19 @@ nonisolated final class QuadRenderer {
         commandBuffer: MTLCommandBuffer,
         label: String
     ) {
-        // Even with zero instances, the encoder still has to run: a `.clear`
+        // Even with zero instances, a `.clear` pass still has to run: the
         // load action must happen so a frame that draws nothing (an all-
         // default-colour blank grid) doesn't leave the previous frame on
-        // screen.
+        // screen. A `.load` pass with zero instances is the opposite case —
+        // it draws nothing and preserves nothing — so skipping it outright
+        // is pixel-identical and saves the tile load/store round trip an
+        // empty render pass still costs (the glyph pass on a blank screen
+        // used to pay one every frame; B12 audit).
+        if instances.isEmpty,
+            renderPassDescriptor.colorAttachments[0].loadAction == .load
+        {
+            return
+        }
         guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)
         else { return }
         // Correlates an Instruments/Metal System Trace capture with which of
