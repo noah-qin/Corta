@@ -32,15 +32,22 @@ public enum SFTPCodec {
     /// over it rather than through a newer base version.
     public static let protocolVersion: UInt32 = 3
 
-    /// The hard limit on one frame. SFTP frames carry file data, so the
-    /// limit is generous — but a length prefix of 4 GB from a desynchronised
-    /// or hostile peer must not become an allocation request.
-    public static let maxFrameLength = 256 * 1024 * 1024
+    /// The hard limit on one frame — the largest allocation a peer's length
+    /// prefix can ever ask for. Sized to what a well-formed peer sends:
+    /// OpenSSH's own client and server cap a message at 256 KiB, and the
+    /// largest thing this client requests is a `maximumReadLength` data
+    /// block of that size plus its header. Four times that leaves room for
+    /// a generous server's `READDIR` batch; a length prefix beyond it is a
+    /// desynchronised or hostile peer, rejected before a byte is read
+    /// rather than honoured with a hundreds-of-megabytes buffer.
+    public static let maxFrameLength = 1024 * 1024
 
     /// The hard limit on one string field (path, handle, data block). A
     /// length prefix larger than this is rejected before a single payload
-    /// byte is read, so a corrupt length can never size an allocation.
-    public static let maxStringLength = 64 * 1024 * 1024
+    /// byte is read, so a corrupt length can never size an allocation. A
+    /// string also never exceeds the frame it sits in (the reader checks
+    /// the remaining bytes), so this is the same bound stated per field.
+    public static let maxStringLength = maxFrameLength
 
     /// Message type constants (`SSH_FXP_*`). A plain enum over `UInt8`
     /// constants, not an `enum: UInt8` with cases: decoding must be able to
