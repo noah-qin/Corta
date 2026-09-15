@@ -143,7 +143,11 @@ func waitUntil(
     condition: @MainActor () -> Bool,
     sourceLocation: SourceLocation = #_sourceLocation
 ) async {
-    let deadline = ContinuousClock.now + .seconds(5)
+    // Generous: a passing wait returns the moment the condition holds, and
+    // on a loaded CI VM the main actor can be away for well over five
+    // seconds — a timeout there failed a suite that was merely slow, and
+    // the index that followed it took the whole test host down.
+    let deadline = ContinuousClock.now + .seconds(30)
     while !condition() {
         if ContinuousClock.now > deadline {
             Issue.record("timed out waiting for \(description)", sourceLocation: sourceLocation)

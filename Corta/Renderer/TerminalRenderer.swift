@@ -189,10 +189,10 @@ nonisolated final class TerminalRenderer {
     init(device: MTLDevice, font: CTFont, scale: CGFloat, atlasPixelSize: Int = GlyphAtlas.atlasSize) throws {
         let atlasFont = CTFontCreateCopyWithAttributes(
             font, CTFontGetSize(font) * scale, nil, nil)
-        // `Metal4Backend` is opt-in and, today, a pass-through to
-        // `QuadRenderer` under the hood regardless — see its doc comment —
-        // so a failed `Metal4Backend(device:)` falls back to `QuadRenderer`
-        // directly rather than failing `TerminalRenderer.init` outright.
+        // `Metal4Backend` is opt-in (`CORTA_METAL4=1`) and submits through
+        // MTL4 for real — see its doc comment — so a failed
+        // `Metal4Backend(device:)` falls back to `QuadRenderer` directly
+        // rather than failing `TerminalRenderer.init` outright.
         if Metal4Backend.isOptedIn, Metal4Backend.isSupported(by: device),
             let metal4 = try? Metal4Backend(device: device)
         {
@@ -200,6 +200,27 @@ nonisolated final class TerminalRenderer {
         } else {
             self.quadRenderer = try QuadRenderer(device: device)
         }
+        // B12 (issue #39) cross-pane evaluation — why the atlas is per-pane
+        // while the pipelines moved to `QuadPipelineCache`. Pipeline states
+        // are immutable after creation, so sharing them is a dictionary
+        // lookup. A `GlyphAtlas` is the opposite: single-threaded *mutable*
+        // state whose eviction rewinds a page's allocator, clears its cache
+        // and bumps `generation`, and every consumer's instance cache
+        // full-rebuilds when that counter moves (`updateInstances`'s
+        // one-retry path). Sharing one atlas across panes would therefore
+        // couple every pane's damage tracking to the union of all panes'
+        // glyph churn — one emoji- or CJK-heavy pane evicting would force
+        // full rebuilds in panes showing unchanged text, a cost paid per
+        // frame, not per split — and it would only deduplicate anything for
+        // panes with identical font, size and scale (a font change already
+        // resets an atlas in place via `setFont`, never reallocating the
+        // textures). What sharing would buy is memory, not speed: two
+        // 2048² textures per pane, ~20 MB. If per-pane atlas memory ever
+        // becomes the binding constraint, the plausible shape is a shared
+        // read-only base layer (the ASCII page, rasterised once per
+        // font/scale) with per-pane overflow pages on top — a new eviction
+        // and generation design, not a cache lookup, and deliberately not
+        // part of this batch.
         self.glyphAtlas = GlyphAtlas(device: device, font: atlasFont, atlasPixelSize: atlasPixelSize)
         self.kittyImageRenderer = KittyImageRenderer(device: device)
         self.pointMetrics = CellMetrics(font: font, scale: scale)
@@ -409,6 +430,41 @@ nonisolated final class TerminalRenderer {
                 quadRenderer: quadRenderer, renderPassDescriptor: renderPassDescriptor,
                 commandBuffer: commandBuffer)
         }
+    }
+
+    /// The Metal 4 counterpart to `draw(rect:drawableSize:renderPassDescriptor:commandBuffer:)`
+    /// (B12): the backend owns the command buffer, the render pass, the
+    /// commit and the drawable presentation (`Metal4FrameBackend`), so this
+    /// takes the render target, clear colour and drawable directly rather
+    /// than the Metal 3 pass/buffer pair. `ViewController.render(into:...)`
+    /// calls it when the selected backend is a Metal 4 one; the pass order —
+    /// background, glyphs, color glyphs, images — is deliberately identical
+    /// to the MTL3 path's.
+    func draw(
+        through backend: any Metal4FrameBackend,
+        rect: CGRect, drawableSize: CGSize, target: MTLTexture, clearColor: MTLClearColor,
+        drawable: (any MTLDrawable)?, label: String,
+        onCompleted: (@Sendable ((any Error)?) -> Void)?
+    ) {
+        backend.beginFrame(target: target, clearColor: clearColor, label: label)
+        backend.drawSolidQuads(cachedBackground, rect: rect, drawableSize: drawableSize)
+        backend.drawGlyphQuads(
+            cachedGlyphs, atlas: glyphAtlas.texture, rect: rect, drawableSize: drawableSize)
+        // Skipped outright when no cell produced a color glyph, exactly like
+        // the MTL3 path.
+        if !cachedColorGlyphs.isEmpty {
+            backend.drawColorQuads(
+                cachedColorGlyphs, atlas: glyphAtlas.colorTexture, rect: rect,
+                drawableSize: drawableSize)
+        }
+        if cachedImagePlacements.placementCount > 0 {
+            kittyImageRenderer.draw(
+                table: cachedImagePlacements, cellWidth: Float(metrics.cellWidth),
+                cellHeight: Float(metrics.cellHeight), rows: cachedLines.count, offset: cachedOffset,
+                scrollbackTotalPushed: cachedScrollbackTotalPushed, rect: rect,
+                drawableSize: drawableSize, metal4: backend)
+        }
+        backend.endFrame(presenting: drawable, onCompleted: onCompleted)
     }
 
     /// Full rebuild: every row's instances, straight into the cached arrays.

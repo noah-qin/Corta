@@ -81,10 +81,17 @@ import simd
 /// `texture(for:)`, `cachedTextureBytes` and `textureCount` are internal
 /// rather than private so `CortaTests` can inspect the cache directly
 /// without a render pass.
-nonisolated final class KittyImageRenderer {
+///
+/// `@unchecked Sendable` because it genuinely is used from two threads —
+/// the render thread and whatever `decodeScheduler` runs on — and every
+/// piece of mutable state is behind `lock` (the decode result is installed
+/// under it, `deinit` reads under it). The conformance is what lets the
+/// scheduled decode be a `@Sendable` closure without a warning standing in
+/// for a fact the type already has to uphold.
+nonisolated final class KittyImageRenderer: @unchecked Sendable {
     private let makeTextureImpl: (MTLTextureDescriptor) -> MTLTexture?
     private let decodeImageImpl: (KittyGraphics.ImageData) -> DecodedImage?
-    private let decodeScheduler: (@escaping () -> Void) -> Void
+    private let decodeScheduler: (@escaping @Sendable () -> Void) -> Void
     private let textureByteBudget: Int
     private let globalBudget: GlobalTextureBudget
 
@@ -144,7 +151,7 @@ nonisolated final class KittyImageRenderer {
         textureByteBudget: Int = KittyGraphics.maximumPaneTextureBytes,
         globalBudget: GlobalTextureBudget = .shared,
         decodeImage: ((KittyGraphics.ImageData) -> DecodedImage?)? = nil,
-        decodeScheduler: ((@escaping () -> Void) -> Void)? = nil,
+        decodeScheduler: ((@escaping @Sendable () -> Void) -> Void)? = nil,
         // Last so an unlabeled trailing closure binds here, as it did before
         // `decodeImage`/`decodeScheduler` existed.
         makeTexture: ((MTLTextureDescriptor) -> MTLTexture?)? = nil
@@ -350,6 +357,48 @@ nonisolated final class KittyImageRenderer {
         quadRenderer: any TerminalRenderBackend, renderPassDescriptor: MTLRenderPassDescriptor,
         commandBuffer: MTLCommandBuffer
     ) {
+        forEachVisiblePlacement(
+            table: table, cellWidth: cellWidth, cellHeight: cellHeight, rows: rows,
+            offset: offset, scrollbackTotalPushed: scrollbackTotalPushed
+        ) { instance, texture in
+            quadRenderer.drawColorQuads(
+                [instance], atlas: texture, rect: rect, drawableSize: drawableSize,
+                renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
+            // The glyph/color passes never clear (`TerminalRenderer.draw`'s
+            // comment on why) — each placement's draw call has to keep that
+            // true for the next one, the same way the glyph pass already
+            // does for the pass after it.
+            renderPassDescriptor.colorAttachments[0].loadAction = .load
+        }
+    }
+
+    /// The Metal 4 half of `draw` (B12): the same placements in the same
+    /// order, encoded into the frame the backend currently has open
+    /// (`Metal4FrameBackend.beginFrame`), so there is no render pass
+    /// descriptor to thread through and no load action to flip.
+    func draw(
+        table: ImagePlacementTable, cellWidth: Float, cellHeight: Float, rows: Int,
+        offset: Int, scrollbackTotalPushed: Int, rect: CGRect, drawableSize: CGSize,
+        metal4 backend: any Metal4FrameBackend
+    ) {
+        forEachVisiblePlacement(
+            table: table, cellWidth: cellWidth, cellHeight: cellHeight, rows: rows,
+            offset: offset, scrollbackTotalPushed: scrollbackTotalPushed
+        ) { instance, texture in
+            backend.drawColorQuads(
+                [instance], atlas: texture, rect: rect, drawableSize: drawableSize)
+        }
+    }
+
+    /// The placement walk both `draw` paths share: computes each visible,
+    /// already-cached placement's quad in z-index then transmission order
+    /// and yields it with its texture. The culling math lives exactly once
+    /// so the two paths can never disagree about *what* draws.
+    private func forEachVisiblePlacement(
+        table: ImagePlacementTable, cellWidth: Float, cellHeight: Float, rows: Int,
+        offset: Int, scrollbackTotalPushed: Int,
+        body: (QuadInstance, MTLTexture) -> Void
+    ) {
         let placements = table.orderedPlacements().sorted { $0.zIndex < $1.zIndex }
         guard !placements.isEmpty else { return }
 
@@ -371,14 +420,7 @@ nonisolated final class KittyImageRenderer {
                 origin: .init(Float(placement.column) * cellWidth, Float(viewportRow) * cellHeight),
                 size: .init(Float(columns) * cellWidth, Float(placementRows) * cellHeight),
                 color: .one, uvRect: .init(0, 0, 1, 1))
-            quadRenderer.drawColorQuads(
-                [instance], atlas: texture, rect: rect, drawableSize: drawableSize,
-                renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
-            // The glyph/color passes never clear (`TerminalRenderer.draw`'s
-            // comment on why) — each placement's draw call has to keep that
-            // true for the next one, the same way the glyph pass already
-            // does for the pass after it.
-            renderPassDescriptor.colorAttachments[0].loadAction = .load
+            body(instance, texture)
         }
     }
 

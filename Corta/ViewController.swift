@@ -467,8 +467,19 @@ class ViewController: NSViewController {
     func gridSize(fitting size: CGSize) -> TerminalSize {
         let metrics = cellMetrics
         return TerminalSize(
-            rows: UInt16(max(1, (size.height - verticalInsets) / metrics.cellHeight)),
-            columns: UInt16(max(1, (size.width - TerminalLayout.insetWidth) / metrics.cellWidth)))
+            rows: Self.cellCount((size.height - verticalInsets) / metrics.cellHeight),
+            columns: Self.cellCount((size.width - TerminalLayout.insetWidth) / metrics.cellWidth))
+    }
+
+    /// A cell count from a pixel-over-metric quotient, clamped into what a
+    /// `TerminalSize` field holds. A zero cell metric (a pane whose atlas
+    /// could not measure a face) makes the quotient infinite, and
+    /// `UInt16(.infinity)` is a trap — seen once as a full-suite crash in
+    /// `PaneZoomTests` — so the bounds are applied before the conversion,
+    /// and a non-finite quotient reads as the one-cell minimum.
+    nonisolated static func cellCount(_ quotient: CGFloat) -> UInt16 {
+        guard quotient.isFinite else { return 1 }
+        return UInt16(min(max(1, quotient), CGFloat(UInt16.max)))
     }
 
     /// The window size that fits the initial grid exactly. With
@@ -1396,13 +1407,24 @@ class ViewController: NSViewController {
     private func render(
         into renderPassDescriptor: MTLRenderPassDescriptor, drawableSize: CGSize, drawable: CAMetalDrawable
     ) {
-        guard let session, let terminalRenderer, let commandQueue,
-            let commandBuffer = commandQueue.makeCommandBuffer()
-        else { return }
+        guard let session, let terminalRenderer else { return }
         // A GPU-frame-capture/Instruments label, not behavior: lets a Metal
         // System Trace correlate a captured command buffer back to the pane
         // that submitted it (B12 platform-diagnostics scope item).
-        commandBuffer.label = "Corta.frame.\(ObjectIdentifier(self).hashValue)"
+        let frameLabel = "Corta.frame.\(ObjectIdentifier(self).hashValue)"
+        // B12: a Metal 4 backend owns command submission end to end — there
+        // is no `MTLCommandBuffer` here to make or to present on — so the
+        // whole frame goes through `Metal4FrameBackend` instead.
+        if let metal4 = terminalRenderer.quadRenderer as? any Metal4FrameBackend {
+            renderThroughMetal4(
+                metal4, session: session, renderer: terminalRenderer,
+                renderPassDescriptor: renderPassDescriptor, drawableSize: drawableSize,
+                drawable: drawable, frameLabel: frameLabel)
+            return
+        }
+        guard let commandQueue, let commandBuffer = commandQueue.makeCommandBuffer()
+        else { return }
+        commandBuffer.label = frameLabel
         guard let context = pendingFrameContext else {
             // Should not happen on any real call path — see the doc comment
             // above — but if it ever does, diff-and-draw the old way rather
@@ -1430,6 +1452,60 @@ class ViewController: NSViewController {
             drawableSize: drawableSize,
             renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
         presentAndCommit(commandBuffer: commandBuffer, drawable: drawable)
+    }
+
+    /// The Metal 4 frame path (B12) — what `render(into:...)` runs when the
+    /// pane's backend is a `Metal4FrameBackend`. Mirrors the MTL3 path's
+    /// shape exactly: the same defensive diff when `prepareFrame` left no
+    /// context, the same `contentRect`, and the same `.gpu`/`.commit`
+    /// signposts and `RenderMetrics` records — only the command submission
+    /// itself moves into the backend (`Metal4FrameBackend.endFrame`).
+    private func renderThroughMetal4(
+        _ backend: any Metal4FrameBackend, session: TerminalSession, renderer: TerminalRenderer,
+        renderPassDescriptor: MTLRenderPassDescriptor, drawableSize: CGSize,
+        drawable: CAMetalDrawable, frameLabel: String
+    ) {
+        let gridRows: Int
+        if let context = pendingFrameContext {
+            gridRows = context.grid.rows
+        } else {
+            // Should not happen on any real call path — the MTL3 path's doc
+            // comment above has the details. Diff first, then draw what was
+            // cached, rather than drawing whatever the cache happens to hold.
+            let grid = session.snapshot()
+            renderer.updateInstances(
+                grid: grid, scrollOffset: scrollOffset,
+                cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
+                searchMatches: searchMatches.map { TerminalSelection($0, grid: grid) },
+                currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink)
+            gridRows = grid.rows
+        }
+        let rect = Self.contentRect(
+            in: drawableSize, scale: renderer.scale,
+            gridHeight: CGFloat(gridRows) * renderer.metrics.cellHeight,
+            topInset: topInset)
+        let gpu = InputLatencySignposts.begin(.gpu)
+        let gpuStart = RenderMetrics.isEnabled ? DispatchTime.now() : nil
+        let onCompleted: (@Sendable ((any Error)?) -> Void)? =
+            (gpu != nil || gpuStart != nil)
+            ? { @Sendable _ in
+                InputLatencySignposts.end(.gpu, gpu)
+                if let gpuStart {
+                    let ms =
+                        Double(DispatchTime.now().uptimeNanoseconds - gpuStart.uptimeNanoseconds)
+                        / 1_000_000
+                    RenderMetrics.record(.gpu, milliseconds: ms)
+                }
+            }
+            : nil
+        let commit = InputLatencySignposts.begin(.commit)
+        let attachment = renderPassDescriptor.colorAttachments[0]
+        renderer.draw(
+            through: backend, rect: rect, drawableSize: drawableSize,
+            target: attachment?.texture ?? drawable.texture,
+            clearColor: attachment?.clearColor ?? MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1),
+            drawable: drawable, label: frameLabel, onCompleted: onCompleted)
+        InputLatencySignposts.end(.commit, commit)
     }
 
     /// `commit` covers encode-and-submit; `gpu` runs from submission to the

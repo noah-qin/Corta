@@ -75,90 +75,20 @@ nonisolated final class QuadRenderer {
     /// use — the pipelines are built against it up front.
     static let pixelFormat: MTLPixelFormat = .bgra8Unorm
 
-    /// Serialises every `QuadRenderer.init`'s binary-archive load/write
-    /// against every other's — see the lock's use-site in `init` for why.
-    private static let binaryArchiveLock = NSLock()
-
+    /// The pipelines and sampler come from `QuadPipelineCache` (B12): one
+    /// compile per device per process, shared by every pane and by
+    /// `Metal4Backend`, instead of each pane re-running the compile/archive
+    /// path. The M9 binary-archive warm-up now lives in the cache's
+    /// creation path — it still accelerates the first (cold) creation per
+    /// launch; the cache shares that result with panes 2...n, which is the
+    /// half the archive never covered.
     init(device: MTLDevice) throws {
         self.device = device
-        guard let library = device.makeDefaultLibrary() else {
-            throw QuadRendererError.libraryUnavailable
-        }
-        guard let vertexFunction = library.makeFunction(name: "quad_vertex"),
-            let solidFragment = library.makeFunction(name: "quad_fragment_solid"),
-            let glyphFragment = library.makeFunction(name: "quad_fragment_glyph"),
-            let colorGlyphFragment = library.makeFunction(name: "quad_fragment_color")
-        else {
-            throw QuadRendererError.functionUnavailable
-        }
-
-        // M9: load a cached `MTLBinaryArchive` if one exists from a
-        // previous launch, so these three pipelines are looked up instead of
-        // compiled — the cold-start cost this exists to remove is entirely
-        // on first window paint, first glyph, first emoji and a font switch,
-        // never inside a frame. `nil` (no archive support on this device, no
-        // write access to the cache directory, first launch ever) falls
-        // straight through to the ordinary synchronous compile below; this
-        // is a startup-latency optimisation; it does not change what gets
-        // drawn if it is unavailable.
-        //
-        // `binaryArchiveLock` serialises everything from here through the
-        // `serialize` call below against every other `QuadRenderer.init` —
-        // `-[_MTLDevice recordBinaryArchiveUsage:]` is device-wide
-        // bookkeeping, undocumented as to whether it tolerates two threads
-        // registering an archive at once. The lock only ever serialises
-        // this one-time-per-renderer setup, never a frame, so the cost of
-        // being conservative here is nothing measurable.
-        QuadRenderer.binaryArchiveLock.lock()
-        defer { QuadRenderer.binaryArchiveLock.unlock() }
-        let archive = QuadRenderer.loadOrCreateBinaryArchive(device: device)
-
-        func makePipeline(fragment: MTLFunction, premultipliedSource: Bool = false) throws -> MTLRenderPipelineState {
-            let descriptor = MTLRenderPipelineDescriptor()
-            descriptor.vertexFunction = vertexFunction
-            descriptor.fragmentFunction = fragment
-            let attachment = descriptor.colorAttachments[0]!
-            attachment.pixelFormat = QuadRenderer.pixelFormat
-            attachment.isBlendingEnabled = true
-            attachment.rgbBlendOperation = .add
-            attachment.alphaBlendOperation = .add
-            // `.one` for a premultiplied source (the color atlas): the
-            // sample's rgb is already alpha-scaled, so multiplying by
-            // sourceAlpha again would double-darken every translucent texel.
-            attachment.sourceRGBBlendFactor = premultipliedSource ? .one : .sourceAlpha
-            // `.one`, not `.sourceAlpha`: the drawable is composited by Core
-            // Animation as premultiplied alpha, so the alpha channel must
-            // accumulate as src.a + dst.a*(1-src.a). Squaring it here made
-            // every translucent pixel report less coverage than it has.
-            attachment.sourceAlphaBlendFactor = .one
-            attachment.destinationRGBBlendFactor = .oneMinusSourceAlpha
-            attachment.destinationAlphaBlendFactor = .oneMinusSourceAlpha
-            if let archive {
-                descriptor.binaryArchives = [archive]
-                // Duplicates across launches are silently accepted (Metal's
-                // own doc comment on this method) — this both seeds a
-                // first-ever-launch archive and keeps a stale one current,
-                // with no need to first check whether today's descriptor is
-                // already in it.
-                try? archive.addRenderPipelineFunctions(descriptor: descriptor)
-            }
-            return try device.makeRenderPipelineState(descriptor: descriptor)
-        }
-
-        self.solidPipeline = try makePipeline(fragment: solidFragment)
-        self.glyphPipeline = try makePipeline(fragment: glyphFragment)
-        self.colorGlyphPipeline = try makePipeline(fragment: colorGlyphFragment, premultipliedSource: true)
-        if let archive, let url = QuadRenderer.binaryArchiveURL {
-            QuadRenderer.serialize(archive, to: url)
-        }
-
-        let samplerDescriptor = MTLSamplerDescriptor()
-        samplerDescriptor.minFilter = .linear
-        samplerDescriptor.magFilter = .linear
-        guard let sampler = device.makeSamplerState(descriptor: samplerDescriptor) else {
-            throw QuadRendererError.samplerUnavailable
-        }
-        self.sampler = sampler
+        let entry = try QuadPipelineCache.entry(for: device)
+        self.solidPipeline = entry.solidPipeline
+        self.glyphPipeline = entry.glyphPipeline
+        self.colorGlyphPipeline = entry.colorGlyphPipeline
+        self.sampler = entry.sampler
     }
 
     /// Where a compiled-pipeline cache from a previous launch is looked for,
@@ -227,8 +157,9 @@ nonisolated final class QuadRenderer {
     /// same directory first, then atomically replaces `url` with it
     /// (`FileManager.replaceItemAt`, a single `rename(2)` on the same
     /// volume) — so a reader can never open a half-written file, only the
-    /// old complete one or the new complete one.
-    private static func serialize(_ archive: any MTLBinaryArchive, to url: URL) {
+    /// old complete one or the new complete one. Not `private`: called from
+    /// `QuadPipelineCache.makeEntry`, where the archive path now lives.
+    static func serialize(_ archive: any MTLBinaryArchive, to url: URL) {
         let temporaryURL =
             url.deletingLastPathComponent()
             .appendingPathComponent("\(UUID().uuidString).tmp")
@@ -278,14 +209,15 @@ nonisolated final class QuadRenderer {
     /// Opens the cached archive from a previous launch if one exists at
     /// `binaryArchiveURL` — unless `isRunningUnderXCTest`, in which case a
     /// fresh, empty archive is created instead and the file is never read
-    /// (its doc comment has the full account of why). Either way, `init`
-    /// above adds this launch's three pipeline descriptors to it and
+    /// (its doc comment has the full account of why). Either way, the caller
+    /// (`QuadPipelineCache.makeEntry`, the one place the archive path runs
+    /// now) adds this launch's three pipeline descriptors to it and
     /// re-serialises it, so a first-ever launch — or every hosted-test
     /// launch — seeds or refreshes the cache a later real launch benefits
     /// from. `nil` on any failure (no archive support, no writable cache
     /// directory): callers fall back to an ordinary synchronous compile,
     /// unconditionally correct either way.
-    private static func loadOrCreateBinaryArchive(device: MTLDevice) -> (any MTLBinaryArchive)? {
+    static func loadOrCreateBinaryArchive(device: MTLDevice) -> (any MTLBinaryArchive)? {
         let descriptor = MTLBinaryArchiveDescriptor()
         if !isRunningUnderXCTest, let url = binaryArchiveURL,
             FileManager.default.fileExists(atPath: url.path)
@@ -354,10 +286,19 @@ nonisolated final class QuadRenderer {
         commandBuffer: MTLCommandBuffer,
         label: String
     ) {
-        // Even with zero instances, the encoder still has to run: a `.clear`
+        // Even with zero instances, a `.clear` pass still has to run: the
         // load action must happen so a frame that draws nothing (an all-
         // default-colour blank grid) doesn't leave the previous frame on
-        // screen.
+        // screen. A `.load` pass with zero instances is the opposite case —
+        // it draws nothing and preserves nothing — so skipping it outright
+        // is pixel-identical and saves the tile load/store round trip an
+        // empty render pass still costs (the glyph pass on a blank screen
+        // used to pay one every frame; B12 audit).
+        if instances.isEmpty,
+            renderPassDescriptor.colorAttachments[0].loadAction == .load
+        {
+            return
+        }
         guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)
         else { return }
         // Correlates an Instruments/Metal System Trace capture with which of
