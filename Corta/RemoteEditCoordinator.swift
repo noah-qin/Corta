@@ -65,6 +65,25 @@ final class RemoteEditCoordinator {
         var promptUpload: @MainActor (PendingUpload) -> Void
         var promptConflict: @MainActor (UploadConflict) -> Void
         var showError: @MainActor (String) -> Void
+        /// The first connection to a host this run (`RemoteHostConsent`):
+        /// the host is the remote shell's report, not the user's typing,
+        /// so fetching a file from it is asked — host and path named —
+        /// before any process is spawned. `true` means connect.
+        var confirmConnection: @MainActor (_ host: String, _ remotePath: String) async -> Bool
+
+        init(
+            promptUpload: @escaping @MainActor (PendingUpload) -> Void,
+            promptConflict: @escaping @MainActor (UploadConflict) -> Void,
+            showError: @escaping @MainActor (String) -> Void,
+            confirmConnection: @escaping @MainActor (String, String) async -> Bool = { _, _ in
+                true
+            }
+        ) {
+            self.promptUpload = promptUpload
+            self.promptConflict = promptConflict
+            self.showError = showError
+            self.confirmConnection = confirmConnection
+        }
     }
 
     let store: RemoteEditStore
@@ -127,6 +146,16 @@ final class RemoteEditCoordinator {
     func open(
         host: String, remotePath: String, line: Int, column: Int?
     ) async throws(SFTPError) -> Bool {
+        // A host named by the pane's OSC 7 report is child output; the
+        // first connection to it is the user's decision, not the far
+        // end's (`RemoteHostConsent`). A reused copy still goes through
+        // this: opening it starts a watch whose upload would connect.
+        if !RemoteHostConsent.isConfirmed(host) {
+            guard await presenter.confirmConnection(host, remotePath) else {
+                throw .cancelled
+            }
+            RemoteHostConsent.confirm(host)
+        }
         let copy = try await materialize(host: host, remotePath: remotePath)
         store.recordOpen(copy)
         watch(copy)
@@ -471,6 +500,15 @@ extension RemoteEditCoordinator.RemoteEditPresenter {
                 alert.messageText = message
                 alert.alertStyle = .warning
                 alert.runModal()
+            },
+            confirmConnection: { host, remotePath in
+                let alert = NSAlert()
+                alert.messageText = L10n.format("remoteEdit.connect.title", host)
+                alert.informativeText = L10n.format(
+                    "remoteEdit.connect.message", remotePath, host)
+                alert.addButton(withTitle: L10n.text("sftp.host.connect"))
+                alert.addButton(withTitle: L10n.text("common.cancel"))
+                return alert.runModal() == .alertFirstButtonReturn
             })
     }
 }

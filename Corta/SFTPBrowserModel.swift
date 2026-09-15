@@ -275,13 +275,23 @@ final class SFTPBrowserModel {
     /// for one.
     private var abandoned: Set<UUID> = []
 
+    /// A host the pane *reported* but the user has not yet agreed to
+    /// connect to (`RemoteHostConsent`): shown prefilled in the host field
+    /// with wording that says where the name came from, and connected to
+    /// only when the user says so. `nil` when there is no suggestion (a
+    /// `.remoteUnknown` pane) or when `host` is already decided.
+    let suggestedHost: String?
+
     init(
         host: String?,
         startDirectory: String?,
+        suggestedHost: String? = nil,
         makeClient: (@Sendable (String) -> any SFTPClient)? = nil
     ) {
         self.host = host
         self.startDirectory = startDirectory
+        self.suggestedHost = host == nil ? suggestedHost : nil
+        if host == nil, let suggestedHost { hostField = suggestedHost }
         self.makeClient = makeClient ?? { SFTPConnection(host: $0) }
         connectionState = host == nil ? .needsHost : .connecting
     }
@@ -1016,6 +1026,9 @@ final class SFTPBrowserModel {
             case .hostUnreachable(let diagnostics):
                 return L10n.format(
                     "sftp.error.unreachable", host, trimmedDiagnostics(diagnostics))
+            case .hostKeyUnverified(let diagnostics):
+                return L10n.format(
+                    "sftp.error.hostKey", host, trimmedDiagnostics(diagnostics))
             case .subprocessFailed(let code, let diagnostics):
                 return L10n.format(
                     "sftp.error.subprocess", host, code, trimmedDiagnostics(diagnostics))

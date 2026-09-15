@@ -81,6 +81,9 @@ extension ViewController {
                 }
             } catch {
                 let error = SFTPBrowserModel.sftpError(error)
+                // A declined first connection (`RemoteHostConsent`) is the
+                // user's answer, not a failure to report.
+                if case .cancelled = error { return }
                 terminalView?.showToast(
                     SFTPBrowserModel.errorMessage(error, host: reference.host), kind: .warning)
             }
