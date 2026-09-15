@@ -141,11 +141,17 @@ extension ViewController: NSMenuItemValidation {
     /// position.
     @objc func openFileReferenceInCommand(_ sender: Any?) {
         guard isOperable else { return }
-        guard let reference = fileReferenceInCommand(effectiveCommand) else {
-            terminalView?.showToast(L10n.text("toast.noFileReferenceInCommand"), kind: .warning)
+        if let reference = fileReferenceInCommand(effectiveCommand) {
+            open(reference)
             return
         }
-        open(reference)
+        // B14 — a remote pane's reference opens the managed local copy of
+        // the remote file (downloaded on demand), at the same line.
+        if let remote = remoteFileReferenceInCommand(effectiveCommand) {
+            openRemote(remote)
+            return
+        }
+        terminalView?.showToast(L10n.text("toast.noFileReferenceInCommand"), kind: .warning)
     }
 
     /// B08 — opens `CommandHistoryController`, the search/find/fill/run
@@ -396,6 +402,7 @@ extension ViewController: NSMenuItemValidation {
         case #selector(openFileReferenceInCommand(_:)):
             guard isOperable else { return false }
             return fileReferenceInCommand(effectiveCommand) != nil
+                || remoteFileReferenceInCommand(effectiveCommand) != nil
         case #selector(searchCommandHistory(_:)):
             return isOperable
         case #selector(clearScreen(_:)), #selector(clearHistory(_:)),
@@ -406,6 +413,11 @@ extension ViewController: NSMenuItemValidation {
             // whose child is now gone, has anything to reconnect. For every
             // other pane the item is greyed rather than live and silent.
             return canReconnectRemote
+        case #selector(browseRemoteFiles(_:)):
+            // B14 — a remote pane has a host to browse (or, when the host
+            // is genuinely unknown, a window that asks for it). A local or
+            // uncertain pane has neither, and the item is greyed.
+            return canBrowseRemoteFiles
         case #selector(exportText(_:)):
             return isOperable
         case #selector(revealWorkingDirectoryInFinder(_:)), #selector(copyWorkingDirectoryPath(_:)),

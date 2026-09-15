@@ -12,6 +12,47 @@ what to edit.
 
 ### Added
 
+- **B14 — SFTP and remote editing (first slice).** Built on B13's remote
+  context. The engine is a self-contained SFTPv3 wire-protocol client in
+  the CortaTerminal package whose transport is the system's `ssh -s --
+  <host> sftp` subprocess over plain pipes — authentication, host keys,
+  `ProxyJump` and all of `~/.ssh/config` stay with OpenSSH; Corta adds no
+  SSH library. The codec treats the peer as hostile (bounded lengths,
+  checked counts, truncation is a typed error, never a trap). Shell ▸
+  Browse Remote Files… opens a per-host browser window from a remote pane.
+  The host a pane names is the remote shell's own report — program output
+  — so the first connection to a host in each run is asked, with the name
+  prefilled, editable and its provenance stated, from the browser and from
+  a ⌘-clicked file reference alike; Corta never connects on the far end's
+  say-so. The channel has no terminal, so ssh cannot prompt on it: a
+  password, an agent-less passphrase or an unknown host key fails as its
+  own typed error that says to connect once in the terminal first. Then:
+  directory listing, mkdir, rename, delete (confirming host, path and
+  entry count), explicit upload/download with a transfers list (progress,
+  per-transfer cancel, retry for transport-class failures only) and an
+  overwrite/resume/keep-both/skip conflict sheet naming host, path, sizes
+  and mtimes. Destination writes are atomic via a `.corta-part` partial
+  renamed over the target — an interrupted transfer never leaves a
+  silently-accepted partial at the destination name, and resume validates
+  both endpoints before continuing. Remote editing maps a remote file to a
+  managed local copy (`~/Library/Application Support/Corta/RemoteEdit/`),
+  opened through the existing `open-file-command` `{file}/{line}/{column}`
+  template; `path:line` references in a remote pane resolve to the same
+  flow. Local edits are detected by file watch (no polling) and offered as
+  an explicit upload; the remote is re-checked first, and a changed or
+  deleted remote forces an explicit resolution — upload anyway, re-download
+  discarding local edits, or save the local copy elsewhere. Server features
+  that are unavailable (`statvfs@openssh.com`) degrade explicitly rather
+  than being guessed. The engine is verified against the real OpenSSH
+  `sftp-server` on this machine (`SFTPRealServerTests`, and the launched
+  app in `RemoteWorkflowUITests` — see CONFORMANCE §4.4); that first run
+  found and fixed a spawn that never returned, a write size the server
+  rejected and a SIGPIPE that terminated the app. What this does *not*
+  do: anything against a real remote host over ssh — authentication and
+  host keys are recorded as not judged.
+
+### Added
+
 - **B13 — OpenSSH configuration and remote context (first slice).** A pane
   now knows — and says — which machine it is talking to. OSC 7 reports
   naming a remote host were previously dropped by the parser; they are now

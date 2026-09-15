@@ -71,7 +71,7 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 | `command-history-limit` | 0–10000 | `512` | How many completed/running commands a session's structured command history (jumping, copy/export by identity, Command History search) keeps at once — separate from `scrollback-lines`, which bounds visible text, not command records. **Applies to sessions opened afterwards**, same reason as `scrollback-lines`. |
 | `bell` | `visual`, `audible`, `muted` | `visual` | `visual` flashes the pane; `audible` is `NSSound.beep()`. |
 | `option-as-meta` | boolean | `false` | Whether ⌥ acts as Meta — an ESC prefix on the base character, the way a PC keyboard's Alt does — instead of composing the layout's alternate character. Off by default because on macOS ⌥ *is* text input: it types `é`, `ø`, `–`, and starts dead-key sequences, and an international layout needs that. Turn it on when a program wants `M-x` and `M-b`. Special keys are unaffected either way: ⌥ already reaches the child there as the xterm modifier parameter, and an IME still sees every event it would otherwise see. |
-| `open-file-command` | string | *(empty)* | The command run when a `path:line` reference in program output is ⌘-clicked. `{file}`, `{line}` and `{column}` are substituted, one argument at a time. The executable must be an **absolute path** and is run directly — never through a shell — so a path containing `;` or `$(…)` stays a path. Empty means the system default application for the file's type, which cannot be told a line number; the hover tooltip says so. |
+| `open-file-command` | string | *(empty)* | The command run when a `path:line` reference in program output is ⌘-clicked. `{file}`, `{line}` and `{column}` are substituted, one argument at a time. The executable must be an **absolute path** and is run directly — never through a shell — so a path containing `;` or `$(…)` stays a path. Empty means the system default application for the file's type, which cannot be told a line number; the hover tooltip says so. In a **remote** pane the same template is used for the managed local copy the remote-editing flow downloads — `{file}` is the copy, the line and column are the reference's own. |
 | `search-regex` | boolean | `false` | Whether the search field is read as a regular expression (ICU syntax, as `NSRegularExpression` accepts it). The **`*`** button in the search bar writes this key. Three things are reported rather than shown as "no results": a pattern that does not compile, a pattern whose shape makes a backtracking engine take exponential time (`(a+)+`, `(a*)*`, `(a\|a)+` — every one has a linear equivalent, and it is refused *before* it runs because ICU's time limit is not reachable from Swift), and a sweep that stopped on its 500 ms budget or on a line longer than 64,000 units, which the match count marks with a `+`. |
 | `search-case-sensitive` | boolean | `false` | Whether scrollback search distinguishes case. Off by default: a person searching a log for `error` wants `Error` and `ERROR` too. The **Match Case** button in the search bar writes this key, so the choice survives closing the bar and restarting. |
 | `copy-on-select` | boolean | `true` | A finished selection goes straight to the clipboard, confirmed by a label in the corner of the pane. Set `false` for ⌘C only. |
@@ -415,6 +415,7 @@ the key against both rows, which is how you spot it.
 | `clear-history` | Clear History | *(none)* |
 | `reset-terminal` | Reset Terminal | *(none)* |
 | `reconnect-remote` | Reconnect to Host | *(none)* |
+| `browse-remote-files` | Browse Remote Files… | *(none)* |
 | `previous-command` | Previous Command | `cmd+up` |
 | `next-command` | Next Command | `cmd+down` |
 | `settings` | Settings… | `cmd+,` |
@@ -453,6 +454,31 @@ the dead remote shell or its scrollback came back. When the recorded command
 itself attaches to a remote multiplexer (`tmux attach`, `screen -r`), the
 copy says the command reattaches to whatever session exists on the host —
 the reattach is the remote program's doing, not Corta's.
+
+`browse-remote-files` opens the SFTP browser for the focused pane's host —
+enabled only for a pane known to be remote. The host name comes from the
+remote shell's own report, which is program output, so the first
+connection to a host in each run is a question: the browser opens with the
+name prefilled and editable (correct it to the alias you would pass to
+`ssh`), and connects only when you press Connect; a ⌘-clicked file
+reference in a remote pane asks the same question once. The channel is the
+system's `ssh -s -- <host> sftp`, so authentication and `~/.ssh/config`
+belong to OpenSSH; there is nothing to configure here — but the channel has
+**no terminal**, so ssh cannot prompt on it: a password, a key passphrase
+the agent does not hold, or a host key not yet in `known_hosts` fails with
+a message saying so rather than asking. Use a key held by `ssh-agent` or
+the keychain, and connect once in the terminal first for a new host.
+(`CORTA_SFTP_SSH`, an environment variable and never a config key, names
+an absolute path to run instead of `/usr/bin/ssh` with the same argv — a
+verification hook for driving the channel against a local
+`sftp-server`, in the same class as `CORTA_METAL4`.) Transfers are
+atomic (a
+`.corta-part` partial renamed over the destination), resumable with both
+endpoints re-validated, and every overwrite is a decision you make in a
+sheet, not a default. A remote file's **Edit** action — or ⌘-clicking a
+`path:line` reference in a remote pane — downloads a managed copy, opens it
+through `open-file-command`, and treats uploading your edits back as an
+explicit question, re-checking the remote for changes first.
 
 `export-text` writes the selection — or, with nothing selected, the whole
 scrollback and screen — to a text file. It is the same text ⌘C would put on

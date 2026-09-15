@@ -313,11 +313,7 @@ enum SessionRestore {
     /// Where the state and its restore marker live. Overridable so a test
     /// can exercise the crash-marker protocol against a real filesystem
     /// without writing into the user's own Application Support (U07).
-    nonisolated(unsafe) static var directory: URL = {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
-            .first ?? FileManager.default.homeDirectoryForCurrentUser
-        return base.appendingPathComponent("Corta")
-    }()
+    nonisolated(unsafe) static var directory: URL = AppPaths.applicationSupportDirectory
 
     /// The saved windows, oldest first, or an empty array when there is
     /// nothing to restore. A malformed file is treated as no file: a

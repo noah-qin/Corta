@@ -349,11 +349,15 @@ extension AppDelegate {
         }
         // B08 — directory navigation: reveal/copy first (reads only), then
         // the two things a `cd` primitive with real callers looks like.
+        // B14 adds Browse Remote Files at the end: directory navigation
+        // too, but of the host the pane is talking to rather than this one,
+        // and enabled only for panes that are remote (B13's gate).
         shell.addItem(.separator())
         for command in [
             TerminalCommand.revealWorkingDirectory, .copyWorkingDirectoryPath,
             .changeDirectoryToParent, .changeDirectoryToProjectRoot,
             .openParentDirectoryInNewPane, .openProjectRootInNewPane,
+            .browseRemoteFiles,
         ] {
             shell.addItem(item(for: command))
         }

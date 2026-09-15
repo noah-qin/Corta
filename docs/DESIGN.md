@@ -715,6 +715,37 @@ Ordered by how badly they are usually underestimated.
    `cursorStyle` already was — a real gap a review round caught, not
    something reasoned out in advance.
 
+9. **SFTP without an SSH library (B14).** A file-transfer feature wants
+   libssh2 or a Swift SSH stack; Corta has neither and adds no dependency.
+   The engine speaks the SFTPv3 wire protocol itself
+   (`CortaTerminal/Sources/CortaTerminal/SFTP/`) over a channel that is
+   simply the system's `ssh -s -- <host> sftp` subprocess with **plain
+   pipes** — a PTY would corrupt binary frames — so authentication, host
+   keys, `ProxyJump` and every `~/.ssh/config` behavior stay with OpenSSH,
+   where they belong (B13's rule). Two consequences are owned rather than
+   hidden. The channel has no terminal (it is spawned into its own
+   session), so ssh can prompt for nothing: password, passphrase and
+   host-key questions fail as their own typed errors whose wording says
+   to connect once in the terminal first — agent- or keychain-held keys
+   and a host already in `known_hosts` are what work. And the host a
+   pane names is the remote shell's OSC 7 report — child output — so it
+   is never connected to on the far end's say-so: the first connection
+   to a host per run is asked with the name in front of the user,
+   editable (`RemoteHostConsent`), whether from the browser or a ⌘-click.
+   The hard parts this creates are all
+   owned deliberately: the codec treats the peer as hostile (bounded frame
+   and field lengths, checked counts before allocation, every truncation a
+   typed error rather than a trap — the same discipline as the escape
+   parser); a cancelled request's id is tombstoned until its late reply
+   lands so it is never mistaken for a protocol violation; and destination
+   writes go to a `<name>.corta-part` partial that is renamed over
+   the target only on completion, so an interrupted transfer can never
+   leave a silently-accepted partial file. Resume validates both endpoints
+   — the partial's own mtime carries the source's mtime stamp, and any
+   drift restarts from zero rather than appending to a file that no longer
+   matches. Where the server cannot answer (`statvfs@openssh.com`
+   unadvertised), the capability reports unavailable instead of guessing.
+
 ---
 
 ## 8. What "Done" Looks Like
