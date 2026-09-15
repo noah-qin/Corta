@@ -76,6 +76,7 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
         window.contentViewController = NSHostingController(
             rootView: SFTPBrowserView(model: model))
         model.onTitleChange = { [weak window] title in window?.title = title }
+        model.publishTitle()
         model.onConnected = { [weak self] host in
             guard let self else { return }
             Self.unconnected.removeValue(forKey: ObjectIdentifier(self))
@@ -112,7 +113,11 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     private func present() {
-        model.connect()
+        // Only a *decided* host connects on presentation. A window opened
+        // on the host-entry step — no host, or a reported one waiting for
+        // consent — has its field prefilled, and `connect()` would take
+        // that text as the answer; the user's Connect is the answer.
+        if model.host != nil { model.connect() }
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
     }
