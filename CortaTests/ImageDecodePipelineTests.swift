@@ -38,7 +38,7 @@ struct ImageDecodePipelineTests {
     private static func makeRenderer(
         device: MTLDevice,
         decodeCount: Counter,
-        scheduled: @escaping (@escaping () -> Void) -> Void
+        scheduled: @escaping (@escaping @Sendable () -> Void) -> Void
     ) -> KittyImageRenderer {
         KittyImageRenderer(
             device: device,
@@ -58,7 +58,7 @@ struct ImageDecodePipelineTests {
             return
         }
         let decodeCount = Counter()
-        var work: [() -> Void] = []
+        var work: [@Sendable () -> Void] = []
         let renderer = Self.makeRenderer(device: device, decodeCount: decodeCount) { work.append($0) }
         var terminal = Terminal(rows: 10, columns: 40)
         Self.placeRGBA(&terminal, id: 1, byte: 0xFF)

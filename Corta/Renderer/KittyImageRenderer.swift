@@ -81,10 +81,17 @@ import simd
 /// `texture(for:)`, `cachedTextureBytes` and `textureCount` are internal
 /// rather than private so `CortaTests` can inspect the cache directly
 /// without a render pass.
-nonisolated final class KittyImageRenderer {
+///
+/// `@unchecked Sendable` because it genuinely is used from two threads —
+/// the render thread and whatever `decodeScheduler` runs on — and every
+/// piece of mutable state is behind `lock` (the decode result is installed
+/// under it, `deinit` reads under it). The conformance is what lets the
+/// scheduled decode be a `@Sendable` closure without a warning standing in
+/// for a fact the type already has to uphold.
+nonisolated final class KittyImageRenderer: @unchecked Sendable {
     private let makeTextureImpl: (MTLTextureDescriptor) -> MTLTexture?
     private let decodeImageImpl: (KittyGraphics.ImageData) -> DecodedImage?
-    private let decodeScheduler: (@escaping () -> Void) -> Void
+    private let decodeScheduler: (@escaping @Sendable () -> Void) -> Void
     private let textureByteBudget: Int
     private let globalBudget: GlobalTextureBudget
 
@@ -144,7 +151,7 @@ nonisolated final class KittyImageRenderer {
         textureByteBudget: Int = KittyGraphics.maximumPaneTextureBytes,
         globalBudget: GlobalTextureBudget = .shared,
         decodeImage: ((KittyGraphics.ImageData) -> DecodedImage?)? = nil,
-        decodeScheduler: ((@escaping () -> Void) -> Void)? = nil,
+        decodeScheduler: ((@escaping @Sendable () -> Void) -> Void)? = nil,
         // Last so an unlabeled trailing closure binds here, as it did before
         // `decodeImage`/`decodeScheduler` existed.
         makeTexture: ((MTLTextureDescriptor) -> MTLTexture?)? = nil

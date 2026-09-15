@@ -143,10 +143,43 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
     /// `CAMetalDisplayLink` drawable stream — every `beginFrame` past the
     /// ring depth then waited out its full timeout and the window rendered
     /// ~1 frame/second (B12 live-run debugging).
-    private let completionLock = NSCondition()
-    /// Highest frame number whose commit feedback has arrived. Guarded by
-    /// `completionLock`; written from the commit-feedback thread.
-    private var completedFrame: UInt64 = 0
+    private let completion = FrameCompletion()
+
+    /// The one piece of state the commit-feedback thread touches: the
+    /// highest frame number whose feedback has arrived, behind its own
+    /// condition. Boxed separately from the backend so the `@Sendable`
+    /// feedback handler captures exactly this and never `self` — the
+    /// backend's other state is render-thread-only and not `Sendable`,
+    /// and the compiler was right to say so.
+    private final class FrameCompletion: @unchecked Sendable {
+        private let lock = NSCondition()
+        private var completedFrame: UInt64 = 0
+
+        var completed: UInt64 {
+            lock.lock()
+            defer { lock.unlock() }
+            return completedFrame
+        }
+
+        /// Records a frame's completion and wakes any waiter.
+        func note(_ frame: UInt64) {
+            lock.lock()
+            if frame > completedFrame { completedFrame = frame }
+            lock.signal()
+            lock.unlock()
+        }
+
+        /// Blocks until `frame` has completed or `deadline` passes;
+        /// returns whether it completed.
+        func wait(for frame: UInt64, until deadline: Date) -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            while completedFrame < frame && Date() < deadline {
+                lock.wait(until: deadline)
+            }
+            return completedFrame >= frame
+        }
+    }
 
     private let solidPipeline: MTLRenderPipelineState
     private let glyphPipeline: MTLRenderPipelineState
@@ -379,12 +412,7 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
     /// would save the process anyway.
     deinit {
         if frameNumber > 0 {
-            completionLock.lock()
-            let deadline = Date().addingTimeInterval(1)
-            while completedFrame < frameNumber && Date() < deadline {
-                completionLock.wait(until: deadline)
-            }
-            completionLock.unlock()
+            _ = completion.wait(for: frameNumber, until: Date().addingTimeInterval(1))
         }
     }
 
@@ -398,9 +426,7 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         frameNumber += 1
         currentSlot = Int((frameNumber - 1) % UInt64(Self.frameSlotCount))
 
-        completionLock.lock()
-        let completed = completedFrame
-        completionLock.unlock()
+        let completed = completion.completed
         dropRetired(through: completed)
 
         // The slot this frame reuses was last written by frame
@@ -410,13 +436,8 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
             let predecessor = frameNumber - UInt64(Self.frameSlotCount)
             var caughtUp = completed >= predecessor
             if !caughtUp {
-                completionLock.lock()
-                let deadline = Date().addingTimeInterval(1)
-                while completedFrame < predecessor && Date() < deadline {
-                    completionLock.wait(until: deadline)
-                }
-                caughtUp = completedFrame >= predecessor
-                completionLock.unlock()
+                caughtUp = completion.wait(
+                    for: predecessor, until: Date().addingTimeInterval(1))
             }
             if !caughtUp {
                 // A second behind is not a slow frame, it is a hung GPU.
@@ -514,15 +535,6 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
             rect: rect, drawableSize: drawableSize, label: "Corta.colorGlyph")
     }
 
-    /// Records a frame's completion (feedback arrived or nothing was
-    /// committed) and wakes any `beginFrame` waiting on it.
-    private func noteFrameCompleted(_ frame: UInt64) {
-        completionLock.lock()
-        if frame > completedFrame { completedFrame = frame }
-        completionLock.signal()
-        completionLock.unlock()
-    }
-
     func endFrame(
         presenting drawable: (any MTLDrawable)?, onCompleted: (@Sendable ((any Error)?) -> Void)?
     ) {
@@ -534,7 +546,7 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
             // see `FrameScheduler`'s replacement rule. The frame is still
             // recorded complete so a later frame's completion wait never
             // blocks on a frame number nothing will ever commit.
-            noteFrameCompleted(frameNumber)
+            completion.note(frameNumber)
             drawable?.present()
             onCompleted?(nil)
             return
@@ -556,13 +568,14 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         // one commit-lifecycle callback MTL4 reliably delivers here.
         let options = MTL4CommitOptions()
         let frame = frameNumber
+        let completion = completion
         options.addFeedbackHandler { feedback in
             // A faulted commit is loud, once per fault, bounded — the
             // alternative is a window that silently renders nothing.
             if let error = feedback.error {
                 Metal4Diagnostics.reportCommitFault(error)
             }
-            self.noteFrameCompleted(frame)
+            completion.note(frame)
             onCompleted?(feedback.error)
         }
         queue.commit([commandBuffer], options: options)
