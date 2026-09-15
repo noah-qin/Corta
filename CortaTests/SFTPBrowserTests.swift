@@ -208,6 +208,26 @@ struct SFTPBrowserModelTests {
         #expect(model.connectionState == .connecting)
     }
 
+    /// A server's entry name is one path component or it is nothing: a
+    /// hostile `../../.zshrc` would otherwise be appended to a chosen
+    /// download folder and land outside it.
+    @Test("an entry name that is not a plain component is dropped from the listing")
+    func nonComponentNamesAreDropped() async {
+        let fake = FakeSFTPClient()
+        fake.listings["/srv/app"] = [
+            makeEntry("ok.txt", permissions: 0o100644),
+            makeEntry("../../.zshrc", permissions: 0o100644),
+            makeEntry("sub/child", permissions: 0o100644),
+            makeEntry("", permissions: 0o100644),
+        ]
+        let model = await connectedModel(fake: fake)
+        defer { model.disconnect() }
+        #expect(model.entries.map(\.name) == ["ok.txt"])
+        #expect(!SFTPBrowserModel.isPlainEntryName("a/b"))
+        #expect(!SFTPBrowserModel.isPlainEntryName("a\0b"))
+        #expect(SFTPBrowserModel.isPlainEntryName("a b's — ✨.txt"))
+    }
+
     @Test("connecting lists the pane's directory, filtering the server's dot entries")
     func connectLists() async {
         let fake = FakeSFTPClient()
