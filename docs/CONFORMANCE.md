@@ -372,6 +372,22 @@ under `Corta/` is therefore verified by launching the app and checking:
    responder, so `keyDown` fires and First-Responder menu items (⌘V, ⌘=)
    are not dead.
 
+**Remote workflows (B13/B14) have a launched-app check of their own**,
+`CortaUITests/RemoteWorkflowUITests`, which is the shape every
+remote-path change is verified in: a throwaway `HOME` carries the config
+(a preset whose `shell` is a script named `ssh` standing in for the
+remote shell — banner, a remote `OSC 7`, then `/bin/sh -i`), and
+`CORTA_SFTP_SSH` points the SFTP channel at a script that `exec`s the
+real `/usr/libexec/sftp-server`. One test walks preset → `⟂` badge →
+Browse Remote Files… (asked first, host prefilled) → a listing answered
+by OpenSSH's own server → Edit → the managed copy edited on disk → the
+upload prompt → the remote file changed with no partial left → the fake
+shell exiting → Reconnect → the badge back. Nothing on the machine is
+changed and no network is used. What it cannot cover, and a human
+still judges against a real host: authentication and host keys (there
+is no `ssh` in the loop), and how the panes look — they are Metal
+surfaces the accessibility tree cannot read.
+
 ### 4.4.2 Real-program verification (P0, M8.20)
 
 Render tests and golden-file grid tests both assert that a byte stream

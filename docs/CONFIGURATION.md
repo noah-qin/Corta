@@ -468,7 +468,11 @@ belong to OpenSSH; there is nothing to configure here — but the channel has
 the agent does not hold, or a host key not yet in `known_hosts` fails with
 a message saying so rather than asking. Use a key held by `ssh-agent` or
 the keychain, and connect once in the terminal first for a new host.
-Transfers are atomic (a
+(`CORTA_SFTP_SSH`, an environment variable and never a config key, names
+an absolute path to run instead of `/usr/bin/ssh` with the same argv — a
+verification hook for driving the channel against a local
+`sftp-server`, in the same class as `CORTA_METAL4`.) Transfers are
+atomic (a
 `.corta-part` partial renamed over the destination), resumable with both
 endpoints re-validated, and every overwrite is a decision you make in a
 sheet, not a default. A remote file's **Edit** action — or ⌘-clicking a
