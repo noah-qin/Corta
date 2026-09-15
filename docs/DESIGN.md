@@ -722,7 +722,17 @@ Ordered by how badly they are usually underestimated.
    simply the system's `ssh -s -- <host> sftp` subprocess with **plain
    pipes** — a PTY would corrupt binary frames — so authentication, host
    keys, `ProxyJump` and every `~/.ssh/config` behavior stay with OpenSSH,
-   where they belong (B13's rule). The hard parts this creates are all
+   where they belong (B13's rule). Two consequences are owned rather than
+   hidden. The channel has no terminal (it is spawned into its own
+   session), so ssh can prompt for nothing: password, passphrase and
+   host-key questions fail as their own typed errors whose wording says
+   to connect once in the terminal first — agent- or keychain-held keys
+   and a host already in `known_hosts` are what work. And the host a
+   pane names is the remote shell's OSC 7 report — child output — so it
+   is never connected to on the far end's say-so: the first connection
+   to a host per run is asked with the name in front of the user,
+   editable (`RemoteHostConsent`), whether from the browser or a ⌘-click.
+   The hard parts this creates are all
    owned deliberately: the codec treats the peer as hostile (bounded frame
    and field lengths, checked counts before allocation, every truncation a
    typed error rather than a trap — the same discipline as the escape

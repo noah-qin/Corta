@@ -10,8 +10,17 @@ import Synchronization
 /// `ssh -s -- <host> sftp`, with plain pipes on stdin/stdout carrying
 /// binary SFTP frames and stderr captured for diagnostics. All
 /// authentication, host-key, ProxyJump and `~/.ssh/config` behaviour
-/// belongs to ssh itself (B13's division of responsibility): nothing in
-/// this file knows what a password or a known-hosts file is. The channel
+/// belongs to OpenSSH — with one consequence stated plainly: the child
+/// has **no terminal** (it is spawned into its own session, so it cannot
+/// inherit one either), so ssh can ask nothing interactively. A password,
+/// a key passphrase the agent does not hold, or a host key not yet in
+/// `known_hosts` all fail here rather than prompt — as their own typed
+/// errors (`authenticationFailed`, `hostKeyUnverified`), each of which
+/// says the remedy is a connection in the terminal first. An
+/// `SSH_ASKPASS` helper in the environment is honoured by ssh itself, as
+/// anywhere else. The rest of the OpenSSH behaviour belongs to ssh itself
+/// (B13's division of responsibility): nothing in this file knows what a
+/// password or a known-hosts file is. The channel
 /// sees three outcomes: bytes flow, the subprocess fails in a way stderr
 /// can classify, or the local spawn itself fails.
 ///
@@ -54,6 +63,11 @@ public enum SFTPTransportError: Error, Equatable {
     /// ssh exited 255 with stderr matching a name-resolution, routing or
     /// connection failure. Carries the captured diagnostics.
     case hostUnreachable(diagnostics: String)
+    /// ssh exited 255 because it could not verify the host key without a
+    /// terminal to ask on: the host is not in `known_hosts`, or its key
+    /// changed. The channel has no tty by design, so "yes" can never be
+    /// typed here — the fix is a connection in the terminal first.
+    case hostKeyUnverified(diagnostics: String)
     /// ssh exited 255 in a way stderr could not classify further.
     case subprocessFailed(exitCode: Int32, diagnostics: String)
 
@@ -75,6 +89,11 @@ public enum SFTPTransportError: Error, Equatable {
             return .connectionLost
         }
         let text = diagnostics.lowercased()
+        if text.contains("host key verification failed")
+            || text.contains("remote host identification has changed")
+        {
+            return .hostKeyUnverified(diagnostics: diagnostics)
+        }
         if text.contains("permission denied") || text.contains("authentication")
             || text.contains("no supported authentication methods")
         {
@@ -225,10 +244,15 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
         // comment), but the same hygiene as `Spawn.child`: nothing this
         // process has open leaks into the child, and the child inherits
         // neither signal handlers nor a blocked set.
+        // `SETSID` as well: a Corta launched from a terminal would
+        // otherwise hand ssh that terminal as its controlling tty, and ssh
+        // would prompt there — a password or host-key question hanging in
+        // a window the user is not looking at. With no controlling
+        // terminal the prompt fails fast and is classified (`classify`).
         posix_spawnattr_setflags(
             &attributes,
             Int16(POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF
-                | POSIX_SPAWN_SETSIGMASK))
+                | POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSID))
         var allSignals = sigset_t()
         sigfillset(&allSignals)
         posix_spawnattr_setsigdefault(&attributes, &allSignals)
