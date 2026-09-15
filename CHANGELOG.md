@@ -43,9 +43,13 @@ what to edit.
   deleted remote forces an explicit resolution — upload anyway, re-download
   discarding local edits, or save the local copy elsewhere. Server features
   that are unavailable (`statvfs@openssh.com`) degrade explicitly rather
-  than being guessed. What this does *not* do: anything against a real
-  remote host — the entire flow is tested against a scripted in-memory
-  server, and the live-host matrix is recorded as not judged.
+  than being guessed. The engine is verified against the real OpenSSH
+  `sftp-server` on this machine (`SFTPRealServerTests`, and the launched
+  app in `RemoteWorkflowUITests` — see CONFORMANCE §4.4); that first run
+  found and fixed a spawn that never returned, a write size the server
+  rejected and a SIGPIPE that terminated the app. What this does *not*
+  do: anything against a real remote host over ssh — authentication and
+  host keys are recorded as not judged.
 
 ### Added
 
