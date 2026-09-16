@@ -64,6 +64,23 @@ echo "    Download URL prefix: $download_url_prefix"
 "$sparkle_bin/generate_appcast" --download-url-prefix "$download_url_prefix" "$work"
 cp "$work/appcast.xml" "$repo_root/appcast.xml"
 
+# The archive just signed is the one the feed now advertises: unzip it and
+# hold the app, the archive, the sidecar and the new appcast entry to the
+# one check every packaging route runs (B15). A feed entry whose build
+# number, URL or length disagrees with the archive is an update nobody can
+# install, and this is the last moment it can be caught before the push.
+echo "==> Checking the app, the archive and the appcast entry agree"
+unpacked="$work/unpacked"
+rm -rf "$unpacked"
+mkdir -p "$unpacked"
+ditto -x -k "$archive" "$unpacked"
+sidecar="$archive.sha256"
+if [ ! -f "$sidecar" ]; then
+  shasum -a 256 "$archive" > "$sidecar"
+fi
+"$repo_root/scripts/check-release.sh" "$unpacked/Corta.app" --version "$version" \
+  --archive "$archive" --appcast --require-notarized
+
 cat <<EOF
 
 Done. appcast.xml updated in place at $repo_root/appcast.xml.

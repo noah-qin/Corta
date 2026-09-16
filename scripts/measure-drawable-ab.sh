@@ -39,4 +39,4 @@ run_one "B (maximumDrawableCount=2)" \
   env CORTA_RESTORE_WINDOWS=0 CORTA_MAX_DRAWABLES=2 "$app/Contents/MacOS/Corta"
 
 echo "==> Both runs done. Record all four Typometer numbers (min/avg/max/SD) for"
-echo "    each in docs/PERFORMANCE.md §5.4, and check ROADMAP.md's M8.18 box."
+echo "    each in docs/PERFORMANCE.md §5.4, and check docs/history/ROADMAP-0.1.md's M8.18 box."

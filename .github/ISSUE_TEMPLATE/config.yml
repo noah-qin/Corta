@@ -1,8 +1,11 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Troubleshooting
+    url: https://github.com/noah-qin/Corta/blob/main/docs/TROUBLESHOOTING.md
+    about: Installing, starting, behaviour that differs from other terminals, and uninstalling cleanly — check here before filing an install blocker.
   - name: v1 roadmap
     url: https://github.com/noah-qin/Corta/milestone/1
-    about: Follow or contribute to the ordered B01-B16 implementation batches.
+    about: The ordered B01-B16 implementation batches, all landed; new work is opened as issues in the same shape.
   - name: Question, idea or general discussion
     url: https://github.com/noah-qin/Corta/discussions
     about: Anything that is not a reproducible bug or a concrete feature request belongs in Discussions.
@@ -10,5 +13,5 @@ contact_links:
     url: https://github.com/noah-qin/Corta/security/advisories/new
     about: Report privately. Never open a public issue for a security problem.
   - name: Things Corta deliberately does not do
-    url: https://github.com/noah-qin/Corta/blob/main/docs/DESIGN.md
-    about: Multiplexing, cross-platform, tmux control mode, AI features and RTL text were each considered and rejected. Read §6 before requesting one.
+    url: https://github.com/noah-qin/Corta/blob/main/docs/DECISIONS.md
+    about: Multiplexing, cross-platform, tmux control mode, AI features, automation that runs commands and RTL text were each considered and rejected. Read the decision before requesting one.

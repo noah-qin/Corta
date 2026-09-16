@@ -1,134 +1,77 @@
 # Corta
 
-## Next-development scope
-
-The active v1 plan lives in the ordered `B01`–`B16` GitHub roadmap issues.
-Work one issue as a coherent batch: inspect its dependencies, implement related
-changes, run proportional automated and app-level verification, and report each
-unchecked or human-only result honestly. Built-in AI is excluded; existing AI
-CLI compatibility is terminal correctness. The Claude Code slash-command Tab
-completion failure belongs to B02 and must remain explicitly tracked. Intelligent
-navigation and SSH/SFTP supersede conflicting historical auxiliary-workflow
-restrictions in this file and DESIGN.md. A roadmap issue is planned work, not a
-shipped capability, and never relaxes correctness, resource limits or explicit
-execution boundaries.
-
 A native macOS terminal emulator in pure Swift. Metal rendering, Core
 Text shaping, AppKit shell, a hand-written VT parser.
 
-**Status: 0.1.0, the first release — M1 through M10 are all done.** M6.12
-was measured with Typometer at 45.5 ms average keypress-to-pixel
-latency; M6.16 (signed, notarized direct-download packaging) is the
-milestone this release *is* — both blockers it once named are cleared
-(a valid Developer ID identity on the build machine, all six `MACOS_*`
-CI secrets present), the pipeline verified locally through `spctl`'s
-`Unnotarized Developer ID` rejection before submission, and `v0.1.0`
-is tagged and pushed. The one step past the tag itself
-(`CHANGELOG.md`'s checklist step 5: signing the reviewed archive into
-`appcast.xml`) is what makes the update visible to an already-installed
-Corta, and needs the maintainer's own review of the draft release's
-built archive first. M7 closed the places the terminal was still
-guessing — font behaviour, command boundaries (OSC 133), and window
-lifecycle. M8 is fully done: M8.19 closed with a real `os_signpost`
-trace after fixing two real gaps (a silently-swallowed launch-focus
-failure, and `InputLatencySignposts.keyDown` never having instrumented
-the path ordinary typing actually takes) — `scripts/
-record-signpost-trace.sh` carries the fix; M8.18 closed with a real
-Typometer A/B (`scripts/measure-drawable-ab.sh`) showing default vs.
-`CORTA_MAX_DRAWABLES=2` within noise of each other, so the default
-stays. M9's mechanism is done and its Typometer number is recorded
-(70.1 ms average, default configuration) but `docs/ROADMAP.md`'s M9
-section flags why it isn't a clean before/after against M6.12's 45.5 ms
-figure — the fixed-benchmark-environment table (`PERFORMANCE.md` §5.2)
-wasn't fully held for that run, and a same-conditions re-measurement is
-what would turn it into one. M10 (Kitty graphics) is done, including a
-real-client verification pass against `kitten icat` that found and
-fixed four protocol bugs no hand-written test had caught.
-`docs/ROADMAP.md` is the tracking record.
+**Status: 0.1.1 is the shipped release; every batch of the v1.0.0
+roadmap (`B01`–`B16`) has landed on `main`.** `CHANGELOG.md`'s
+`[Unreleased]` section is the record of what has landed since 0.1.1, and
+the next release is cut from it. Compatibility with AI command-line tools
+is terminal correctness; built-in AI is a non-goal. A roadmap issue is
+planned work, not a shipped capability, and never relaxes correctness,
+resource limits or the explicit execution boundaries in `docs/SECURITY.md`.
+
+## How work is scoped
+
+New work is opened as a GitHub issue in the shape the `B`-series used:
+outcome, scope, acceptance, dependencies. Work one issue as a coherent
+batch — inspect its dependencies, implement the related changes, run
+proportional automated *and* app-level verification, and report each
+unchecked or human-only result honestly in the pull request. A pull
+request closes its issue; the issue is not closed by hand.
 
 ## Documentation
 
 Read the relevant document before making a design decision. They are the
-source of truth; this file is an index.
+source of truth; this file is an index. `docs/README.md` is the fuller one.
 
-| Document                | Covers                                                     |
-| ----------------------- | ---------------------------------------------------------- |
-| `docs/CONFIGURATION.md` | Every config-file key: settings, themes, keybindings, and when each applies |
-| `docs/DESIGN.md`        | Goals, locked decisions, architecture, modules, milestones, non-goals |
-| `docs/ROADMAP.md`       | The ordered step-by-step plan — start here when implementing |
-| `docs/CONFORMANCE.md`   | Feature priorities (P0/P1/P2), the daily-driver checklist, test strategy |
-| `docs/PERFORMANCE.md`   | Targets, the two decisions that matter, hot-path rules, benchmarks |
-| `docs/SECURITY.md`      | Threat model, escape-sequence injection, resource caps, process safety |
-| `CONTRIBUTING.md`       | Commit convention, branches, pull requests                 |
+| Document                   | Covers                                                     |
+| -------------------------- | ---------------------------------------------------------- |
+| `docs/CONFIGURATION.md`    | Every config-file key: settings, themes, keybindings, presets, and when each applies |
+| `docs/DECISIONS.md`        | The settled decisions, one record each — read before proposing an architecture change |
+| `docs/DESIGN.md`           | Goals, architecture, modules, non-goals                     |
+| `docs/CONFORMANCE.md`      | Feature priorities (P0/P1/P2), the daily-driver checklist, test strategy, the five-point manual check |
+| `docs/PERFORMANCE.md`      | Targets, the hot-path rules, how each number is measured, the numbers |
+| `docs/SECURITY.md`         | Threat model, escape-sequence injection, resource caps, process safety, the three trust boundaries |
+| `docs/TROUBLESHOOTING.md`  | What a user sees when something fails, and the fix          |
+| `docs/history/`            | The M1–M10 roadmap and the 0.1.1 audit notes — the record, never edited except to fix a link |
+| `CONTRIBUTING.md`          | Commit convention, branches, pull requests                 |
 
 ## Decisions That Are Settled
 
-Do not reopen these without a concrete new reason. Each is explained in
-`docs/DESIGN.md` §2.
+`docs/DECISIONS.md` holds each with its reason and its cost to reopen. Do
+not reopen one without a concrete new reason, and reopen it there. In one
+line each:
 
-- **macOS only.** Metal and Core Text directly, no abstraction layer.
-- **Pure Swift, no FFI.** The VT parser is written here, not bound.
-- **Lines carry a `wrapped` flag from M1** — reflow, selection and search
-  all depend on it. Adding it later means rewriting the grid.
-- **The terminal core is not `@MainActor`.** It lives in a local SwiftPM
-  package (`CortaTerminal`) with default actor isolation disabled; the
-  Xcode project's `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` applies to
-  the AppKit shell only.
-- **Cells are fixed-size; complex graphemes spill to a side table.** Rows
-  are variable-length.
-- **Selection lives in the core and is document-anchored.** Selection
-  coordinates are document rows (scrollback counts backwards from the
-  screen boundary), never viewport rows, and the rules that consult the
-  `wrapped` flag live in `CortaTerminal/Selection.swift` — the app stores
-  only the range. See `docs/DESIGN.md` §2.7.
-- **Multi-viewport from day one.** Render into a given rect, never into
-  "the window". No singletons in the core.
-- **`$TERM` is `xterm-256color`.** A deliberate lie until conformance is
-  proven.
-- **No multiplexer, no cross-platform, no tmux control mode, no AI
-  features.** See `docs/DESIGN.md` §6. Settings are one native page in
-  the menu bar next to Edit/Shell, backed by a single text config file
-  (M6.1) — the page edits the file, which remains the source of truth.
-- **The config file at `~/.config/corta/config` is the only settings
-  store, and `docs/CONFIGURATION.md` is its reference.** A key added to
-  `Configuration` without a row in that document is a key nobody can
-  find. `ConfigurationStore` reads it, writes it and watches it; the
-  settings page is a front over that and holds no state of its own. Do
-  not add a `UserDefaults` key for something the config file could
-  carry — two stores drift, and the file has to win because a user can
-  edit it. This is not hypothetical: `BellMode` kept reading a
-  `UserDefaults` key after the settings page started writing `bell` to
-  the file, so the Bell setting silently did nothing until M7.13.
-- **Corta offers one theme and one font; it resolves several.** The
-  settings page and the View menu list `Theme.builtIn` (just `corta`) and
-  no font family picker at all — the system monospaced face is the one
-  Corta stands behind. `Theme.known` still resolves `solarized` and
-  `mono`, and `font-family` still accepts any family
-  `MonospacedFontCatalog` vouches for, so a config file naming either
-  keeps working. Offering a palette or a face means having read text in it
-  for a working day; passing a mechanical check is not the same claim. Add
-  to the offered list only after that, not because the code supports it.
-- **A font family is verified, never trusted.** `isFixedPitch` on one
-  face does not mean the family's bold, italic and bold-italic faces
-  advance the same; `MonospacedFontCatalog` measures every ASCII
-  printable across all four, and the renderer scales an overwide glyph
-  into its cell as a structural backstop. Do not reintroduce a
-  first-face check, and do not let a glyph paint outside its cell.
-- **A cell is 16 bytes and now full.** `Cell.scalar` is 21 bits and the
-  OSC 8 hyperlink id (M6.8) is the other 11. Anything else that wants
-  per-cell identity needs a side table keyed by position, not a new
-  field: `CellLayoutTests` asserts the size, and `PERFORMANCE.md` §4
-  measures what a byte per cell costs over a 100k-line scrollback.
+- **D01** macOS only. **D02** Pure Swift, no FFI. **D03** Lines carry a
+  `wrapped` flag. **D04** The terminal core is not `@MainActor`. **D05**
+  Cells are 16 bytes and full; anything else is a side table. **D06**
+  Selection lives in the core, document-anchored. **D07** Multi-viewport
+  from day one; no singletons in the core. **D08** `$TERM` is
+  `xterm-256color`.
+- **D09** No multiplexer, no cross-platform, no tmux control mode, no AI
+  features, no automation that runs commands. **D10** The config file is
+  the only settings store and `docs/CONFIGURATION.md` is its reference —
+  a key without a row is a key nobody can find; no `UserDefaults` for
+  anything the file could carry. **D11** One theme and one font offered;
+  several resolved. **D12** A font family is verified, never trusted.
+- **D13** Never change the machine to test. **D14** App-layer changes
+  are verified by launching the app. **D15** Never size the session from
+  a transient layout. **D16** Window setup is staged before the
+  storyboard runs. **D17** Re-measure the frame-CPU baseline after
+  touching the render loop. **D18** No tool or session identifier in a
+  commit message.
 
 ## Working Rules
 
-**Where to start.** `docs/ROADMAP.md` is the working checklist. Steps
-are ordered deliberately; do not start one before the previous is done.
+**Where to start.** The open GitHub issues are the working list; an
+issue's dependencies say what has to be done first. `CHANGELOG.md`'s
+`[Unreleased]` section gets an entry for every user-visible change in the
+same pull request that makes it.
 
-**Scope.** M2 (`vim`/`tmux`/`htop` render correctly) is the checkpoint.
-Before M2, do not add features, change scope, or refactor architecture.
-Ligatures, transparency and the config system are the classic scope
-creep here.
+**Scope.** The issue's scope is the deliverable. Ligatures, transparency
+and a second settings store are the classic scope creep here; each is a
+decision (`docs/DECISIONS.md`) before it is a feature.
 
 **Performance.** The hot path is PTY read → parse → grid write →
 instance buffer build. There: `struct` and `ContiguousArray`, raw
@@ -151,12 +94,6 @@ a Corta bug. Pass a test shell in the environment of the launch you
 control (`SHELL=/path ... Corta.app/Contents/MacOS/Corta`), never through
 `launchctl setenv`, `defaults write`, the user's shell rc files, or
 anything else that outlives the test. Clean up what you create.
-
-**App-layer changes are verified by launching the app.** Offscreen render
-tests assert pixel coverage and cannot see view-hierarchy, orientation or
-startup-ordering defects — four such bugs shipped a blank window while
-those tests stayed green. See `docs/CONFORMANCE.md` §4.4 for the
-four-point check.
 
 **App-layer changes are verified by launching the app.** Offscreen render
 tests assert pixel coverage and cannot see view-hierarchy, orientation,
@@ -188,12 +125,25 @@ and the first call mismeasures the chrome by a full titlebar height.
 "fix" the size earlier in `viewWillAppear` or `viewWillLayout`, where the
 measurement is stale.
 
-**Testing.** Golden-file grid tests are built during M1, not later:
-feed a byte stream, serialise the grid to text, diff against a checked-in
-expectation. Record `esctest` pass rate and benchmark numbers at each
-milestone — `CONFORMANCE.md` §4.2 has the exact esctest invocation, and
-§4.3 the fuzz harness (`corta-fuzz`; libFuzzer does not link on macOS
-with the current Xcode, so a seeded mutation driver runs instead).
+**Testing.** Golden-file grid tests: feed a byte stream, serialise the
+grid to text, diff against a checked-in expectation. Record the `esctest`
+pass rate and benchmark numbers at each release — `CONFORMANCE.md` §4.2
+has the exact esctest invocation, and §4.3 the fuzz harness (`corta-fuzz`;
+libFuzzer does not link on macOS with the current Xcode, so a seeded
+mutation driver runs instead). A test never registers a real global
+hotkey or flips the machine's secure-input mode; `GlobalHotKey` is tested
+at its key-code mapping and `SecureInput` through an injected `System`.
+
+**Window setup is staged, not assigned.** `instantiateInitialController`
+loads the content view and spawns the root pane before it returns. A
+restore, a preset or a working directory for the root pane goes through
+`AppDelegate.instantiateWindowController(setup:)`, never onto the
+controller afterwards (D16).
+
+**Packaging has one check.** `scripts/check-release.sh` is the only
+implementation of the release rules; `package-release.sh`, `release.sh`
+and `.github/workflows/release.yml` call it. A new rule goes there and
+nowhere else.
 
 **Measure the frame-CPU baseline after touching the render loop.**
 The M6 render work took it from 2.40 ms to 4.19 ms — a per-cell read of
@@ -213,7 +163,9 @@ xcodebuild -project Corta.xcodeproj -scheme Corta build
 xcodebuild -project Corta.xcodeproj -scheme Corta test
 ```
 
-Fuzzing and the core benchmark are SwiftPM products:
+Documentation for the core builds with
+`xcodebuild docbuild -project Corta.xcodeproj -scheme Corta`. Fuzzing and
+the core benchmark are SwiftPM products:
 
 ```sh
 swift build --package-path CortaTerminal -c release --product corta-fuzz

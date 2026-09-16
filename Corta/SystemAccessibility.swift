@@ -51,12 +51,6 @@ enum SystemAccessibility {
         increaseContrast ? .labelColor : .secondaryLabelColor
     }
 
-    /// Same, one step fainter — the config-file path under the settings page,
-    /// and anything else that is deliberately quiet until it is needed.
-    static var tertiaryLabelColor: NSColor {
-        increaseContrast ? .labelColor : .secondaryLabelColor
-    }
-
     /// The border a panel draws to separate itself from what is behind it.
     /// Under Increase Contrast (or Reduce Transparency, where the panel is
     /// opaque and so has no material edge of its own) it has to be a visible

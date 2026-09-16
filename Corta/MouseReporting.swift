@@ -2,7 +2,7 @@ import CoreGraphics
 
 /// Translates mouse events into SGR (?1006) reports — press, release and
 /// wheel, as `ESC [ < Cb ; Cx ; Cy M` (press/wheel) or `... m` (release)
-/// (ROADMAP.md M2.7).
+/// (history/ROADMAP-0.1.md M2.7).
 ///
 /// `nonisolated`: pure byte encoding, no AppKit — the app target's MainActor
 /// default would only make it untestable.

@@ -674,12 +674,6 @@ final class SFTPBrowserModel {
         entries.filter { selection.contains($0.id) }
     }
 
-    /// Whether the Open action has something to open: exactly one
-    /// directory selected.
-    var canOpenSelection: Bool {
-        selectedEntries.count == 1 && selectedEntries.first?.kind == .directory
-    }
-
     /// Whether Download has anything it can act on: files and directories
     /// both; a symbolic link or special file is not, since neither
     /// following it nor recreating it is what a download means.

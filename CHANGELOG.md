@@ -12,6 +12,40 @@ what to edit.
 
 ### Added
 
+- **B16 — system entry points and the Quick Terminal.** Three App Intents
+  for Shortcuts, Spotlight and `shortcuts run`: *Open Corta Window*
+  (optionally in a folder), *Focus Corta Window* and *Toggle Quick
+  Terminal*. Windows are addressed by an identity minted at creation and
+  saved with the arrangement, never by title, and a stale identity fails
+  with an error rather than picking a nearby window; no intent carries
+  text toward a shell, by rule (`SECURITY.md` §4.6). The Quick Terminal is
+  an ordinary Corta window dressed as a panel — floating, on every Space
+  and beside full-screen apps, no tabs, never saved into the arrangement —
+  summoned by a Carbon hotkey (`quick-terminal-key`, default ⌥Space) that
+  needs no Accessibility permission; dismissing it returns focus to the
+  application it was summoned from. Off by default: `quick-terminal =
+  false` claims no key, and View ▸ Quick Terminal, the palette and the
+  intent still open it. Secure Keyboard Entry ships under Shell, as
+  `secure-keyboard-entry`, engaged only while a terminal window is key and
+  Corta is active, with a titlebar lock showing the engaged state and the
+  system counter released at quit. Settings ▸ General reports which key
+  summons the panel and whether the system granted it.
+- **B15 — one packaging check, and documentation split by audience.**
+  `scripts/check-release.sh` is the single implementation of the release
+  rules — Info.plist against `project.pbxproj` for version, build number
+  and deployment target; CHANGELOG and README naming the version; the
+  signature (Developer ID, staple and Gatekeeper when required); the
+  archive, its SHA-256 sidecar and the appcast entry's build, URL, length
+  and signature — and `package-release.sh`, `release.sh` and the release
+  workflow all call it, so a local package and a CI package are refused
+  for the same reasons. The release notes read the minimum OS from the
+  built app instead of a literal that had drifted. `docs/` now separates
+  durable documents from the record: `docs/README.md` is the index,
+  `docs/DECISIONS.md` the settled decisions, `docs/TROUBLESHOOTING.md`
+  the install and fallback guide, and `docs/history/` holds the M1–M10
+  roadmap and the 0.1.1 audit notes. Issue templates (bug, install
+  blocker, "went back to my old terminal", feature) and a pull request
+  template describe what a report or a change needs to carry.
 - **B12 — a real Metal 4 rendering backend, plus rendering evidence
   (first slice).** The forwarding `Metal4Backend` stub is replaced by a
   genuine MTL4 submission path — `MTL4CommandQueue`, persistent per-slot
@@ -83,9 +117,6 @@ what to edit.
   rejected and a SIGPIPE that terminated the app. What this does *not*
   do: anything against a real remote host over ssh — authentication and
   host keys are recorded as not judged.
-
-### Added
-
 - **B13 — OpenSSH configuration and remote context (first slice).** A pane
   now knows — and says — which machine it is talking to. OSC 7 reports
   naming a remote host were previously dropped by the parser; they are now
@@ -116,10 +147,6 @@ what to edit.
   does *not* do: parse or merge OpenSSH configuration, share connections
   itself, or verify any of this against a real remote host — that matrix is
   recorded as not judged.
-||||||| parent of 92fe2d2 (docs: close out the b12 metal 4 and rendering records)
-
-### Added
-
 - **B10 — mark every non-English string `needs_review` (first slice).**
   `Localizable.xcstrings` conflated "has a translation" with "a native
   speaker has read it in context" — every one of the 222 keys across 8
@@ -148,9 +175,6 @@ what to edit.
   incorrect behavior tolerable. Known gap: a pane split off a zoomed
   window opens at the plain default rather than matching its zoomed
   siblings.
-
-### Added
-
 - **B08 — smart directory and contextual command navigation (first
   slice).** `DirectoryHistory` ranks directories a completed command
   actually ran in (frecency — visit count that halves every three days —
@@ -211,7 +235,6 @@ what to edit.
   Swift Testing `Attachment` output for the offscreen render-correctness
   tests, so a pixel-mismatch failure carries the rendered PNG instead of
   only the failed comparison.
-
 - **B04 — the scrolled-away viewport now stays anchored to what it was
   showing.** `scrollOffset` was a raw distance from the live bottom, so it
   silently pointed at different text every time output arrived while the
@@ -225,7 +248,6 @@ what to edit.
   §7 has the full account, including what is still open (a unified
   viewport/selection/search coordinate mapping, and a discoverable
   selection/mouse-reporting override blocked on `?1002`/`?1003` support).
-
 - **B06 — an OSC 4 indexed-palette override now repaints, not just
   answers a query.** `TerminalRenderer` consults a session's overrides
   when resolving an indexed colour, with a new `IndexedPalette
@@ -239,7 +261,6 @@ what to edit.
   `Dictionary` parameter costs a retain/release pair per cell even when
   empty), fixed by making the parameter an optional the common case
   passes as `nil` instead — `docs/DESIGN.md` §7 has the full account.
-
 - **B06 — special colours query, set and reset (OSC 5/105).** The
   behavioural-decision blocker B06's original pass named for OSC 5 was
   the lack of an independently verifiable specification, not esctest
@@ -250,7 +271,6 @@ what to edit.
   ordinary SGR-attribute rendering applies), and the query form answers
   black for an unset slot rather than silence, matching OSC 4's own
   precedent.
-
 - **B06 — indexed palette query, set and reset (OSC 4/104).** A program
   naming a colour by number (`\e]4;137;?\e\\`) got silence, and setting or
   resetting one (`\e]4;1;#ff0000\e\\`, `\e]104\e\\`) was a no-op. Added
@@ -266,6 +286,14 @@ what to edit.
 
 ### Fixed
 
+- **A restored or preset window's first pane spawned in the wrong
+  place.** The storyboard loads a window's content view — and spawns its
+  root pane — *inside* `instantiateInitialController`, so a restore or a
+  preset assigned to the controller afterwards was read only when the
+  splits were rebuilt. The root pane of a restored window came up in the
+  home directory under the default shell; only its siblings were right.
+  `SplitViewController.pendingSetup` stages the values before the
+  storyboard runs, with a regression test for each of the three callers.
 - **B04 — a selection drag kept running after the window lost focus.**
   `handleSelectionMouseDown`'s blocking local event loop already exited if
   the pane closed mid-drag, but not if the window simply lost key status
@@ -516,7 +544,7 @@ the order they were met:
   run has recorded the machine beyond "MacBook Air, Apple silicon". The
   same run is the re-measurement M9 has owed since it landed.
 - **Manual verification (2026-09-09)** — the six checks in
-  `docs/V0.1.1-MANUAL-VERIFICATION.md`, run by the maintainer. VoiceOver
+  `docs/history/V0.1.1-MANUAL-VERIFICATION.md`, run by the maintainer. VoiceOver
   reads the grid with correct row and column, and its cursor box covers a
   wide character whole. The IME candidate window follows the preedit across
   font-size changes, both panes of a split, and fullscreen. A German layout
@@ -527,7 +555,7 @@ the order they were met:
 - **esctest (2026-09-08)** — 112 passed, 335 known bugs, 121 failed of
   568, against M6's 106 / 335 / 127. xterm-compatibility is 78.7%, up
   from 77.6%. The failures are classified by real application impact in
-  `docs/V0.1.1-QUALITY-PLAN.md` Q01, and every failing test name is kept
+  `docs/history/V0.1.1-QUALITY-PLAN.md` Q01, and every failing test name is kept
   in `docs/esctest/0.1.1-results.txt` so the next run is a diff. The
   largest single cause is one absence: OSC 4/5 indexed palette set and
   query are not implemented.
@@ -924,7 +952,7 @@ For the maintainer, cutting any release:
    `VersionAgreementTests` fails if the marketing version and the core
    constant disagree, or if the build number is one a 0.1.0 install could
    not be offered.
-3. Re-record the tracking table in `docs/ROADMAP.md` if any number moved.
+3. Re-record the tracking table in `docs/history/ROADMAP-0.1.md` if any number moved.
 4. Commit as `chore: release x.y.z`, then tag `vx.y.z` and push the tag.
    The release workflow builds from the tag and opens a **draft** release
    for review — it is never published automatically.
