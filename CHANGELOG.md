@@ -13,7 +13,8 @@ what to edit.
 ### Added
 
 - **B16 — system entry points and the Quick Terminal.** Three App Intents
-  for Shortcuts, Spotlight and `shortcuts run`: *Open Corta Window*
+  for the Shortcuts app (and, through a Shortcut built there,
+  `shortcuts run`): *Open Corta Window*
   (optionally in a folder), *Focus Corta Window* and *Toggle Quick
   Terminal*. Windows are addressed by an identity minted at creation and
   saved with the arrangement, never by title, and a stale identity fails

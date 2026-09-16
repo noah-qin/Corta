@@ -1,8 +1,17 @@
 import AppIntents
 import AppKit
 
-/// B16 — the App Intents Corta exposes to Shortcuts, Spotlight and
-/// `shortcuts run`.
+/// B16 — the App Intents Corta exposes to the Shortcuts app and, through a
+/// Shortcut built there, to `shortcuts run`.
+///
+/// **No `AppShortcutsProvider`, deliberately.** A provider gives Siri and
+/// Spotlight phrases for free, and it also makes the framework register
+/// those phrases with the system at every launch. With one in the bundle
+/// the test host's main thread stalled for about forty seconds at launch
+/// on the hosted CI runner — no user session behind it — and every
+/// main-actor suite in the run timed out; without it the run is clean.
+/// The intents themselves need no launch-time work: the Shortcuts app
+/// reads them from the bundle's metadata.
 ///
 /// **Three verbs, all about surfaces, none about text.** Open a window,
 /// focus a window, toggle the Quick Terminal. There is deliberately no
@@ -161,21 +170,5 @@ struct ToggleQuickTerminalIntent: AppIntent {
     func perform() async throws -> some IntentResult {
         QuickTerminalController.shared.toggle()
         return .result()
-    }
-}
-
-/// The phrases Siri and Spotlight answer to without any setup in Shortcuts.
-struct CortaShortcuts: AppShortcutsProvider {
-    static var appShortcuts: [AppShortcut] {
-        AppShortcut(
-            intent: OpenTerminalWindowIntent(),
-            phrases: ["Open a new \(.applicationName) window", "New \(.applicationName) window"],
-            shortTitle: "New Window",
-            systemImageName: "macwindow.badge.plus")
-        AppShortcut(
-            intent: ToggleQuickTerminalIntent(),
-            phrases: ["Toggle \(.applicationName) Quick Terminal", "\(.applicationName) Quick Terminal"],
-            shortTitle: "Quick Terminal",
-            systemImageName: "rectangle.topthird.inset.filled")
     }
 }

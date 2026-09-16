@@ -185,7 +185,7 @@ Numbers that have not been measured are left blank rather than estimated.
 **The system**
 - Three Shortcuts actions — *Open Corta Window* (optionally in a folder),
   *Focus Corta Window* and *Toggle Quick Terminal* — usable from the
-  Shortcuts app, Spotlight and `shortcuts run`. Windows are addressed by a
+  Shortcuts app and, through a Shortcut built there, `shortcuts run`. Windows are addressed by a
   stable identity, never by title, and no action carries text toward a
   shell ([`docs/SECURITY.md`](docs/SECURITY.md) §4.6).
 - A Quick Terminal: one terminal summoned over any application by a
