@@ -389,12 +389,11 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         // `QuadPipelineCache` (B12) — same shaders, pixel format and blend
         // state, so the two backends produce identical pixels for identical
         // instances, and a pane pays the compile at most once per process
-        // whichever backend it gets. The M9 `MTLBinaryArchive` warm-up now
-        // also covers this backend: it lives in the cache's creation path
-        // (the pipelines are classic `MTLRenderPipelineState`s whichever
-        // submission API encodes them), so the "no binary archive here"
-        // gap this init used to document is closed by sharing rather than
-        // by an MTL4Archive/MTL4Compiler port.
+        // whichever backend it gets. The M9 `MTLBinaryArchive` warm-up
+        // covers this backend too: it lives in the cache's creation path,
+        // and the pipelines are classic `MTLRenderPipelineState`s whichever
+        // submission API encodes them — no MTL4Archive/MTL4Compiler port
+        // is needed for the warm-up to apply here.
         let pipelines = try QuadPipelineCache.entry(for: device)
         self.solidPipeline = pipelines.solidPipeline
         self.glyphPipeline = pipelines.glyphPipeline

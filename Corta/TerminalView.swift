@@ -270,7 +270,7 @@ final class TerminalView: NSView, CALayerDelegate {
         // An environment variable and not a config key: this is a measurement
         // harness, not a setting anybody should be tuning, and a key nobody
         // should set is a row `docs/CONFIGURATION.md` should not have to
-        // carry (`CLAUDE.md`). Same reasoning as `CORTA_RESTORE_WINDOWS`.
+        // carry (`docs/DECISIONS.md` D10). Same reasoning as `CORTA_RESTORE_WINDOWS`.
         if let raw = ProcessInfo.processInfo.environment["CORTA_MAX_DRAWABLES"],
             let count = Int(raw), (2...3).contains(count)
         {

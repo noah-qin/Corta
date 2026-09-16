@@ -7,11 +7,9 @@ import SwiftUI
 ///
 /// The search field keeps focus the whole time the palette is open — arrow
 /// keys, Return and Escape are all read off it directly (`.onKeyPress`/
-/// `.onExitCommand`) rather than through a table view's own selection, which
-/// is what let the old AppKit version's local key-event monitor go away
-/// entirely: a plain `NSTextField` never consumed vertical arrow keys either,
-/// so intercepting them at the field is the same behavior SwiftUI gives for
-/// free.
+/// `.onExitCommand`) rather than through a table view's own selection, so
+/// no local key-event monitor is needed: a text field never consumes
+/// vertical arrow keys, and intercepting them at the field is enough.
 struct CommandPaletteView: View {
     @Bindable var model: CommandPaletteModel
     @FocusState private var searchFocused: Bool

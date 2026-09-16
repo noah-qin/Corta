@@ -8,7 +8,7 @@ import Foundation
 /// page existed — and when the page arrived it wrote the config file while
 /// the bell kept reading the defaults key, so changing Bell in Settings did
 /// exactly nothing. Two stores for one setting is the failure mode
-/// `CLAUDE.md` warns about, and this is what it looks like.
+/// `docs/DECISIONS.md` D10 exists to prevent, and this is what it looks like.
 nonisolated enum BellMode: String, CaseIterable, Sendable {
     /// `NSSound.beep()`. Not the default: an audible bell in a terminal that
     /// runs training jobs is hostile.

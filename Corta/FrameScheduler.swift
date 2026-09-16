@@ -115,13 +115,12 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
 
     /// Arms the first-present flash guard and returns immediately — used to
     /// paint before the window is ordered on screen, and after a live theme
-    /// change. The old `presentSynchronously` instead resumed the link and
-    /// pumped the main run loop for up to 0.5 s with a swapped-in
-    /// `onRenderFrame` wrapper: bounded, but reentrant — every timer,
-    /// delegate and second `drawNow` the loop serviced ran nested inside
-    /// what looked like a leaf call (E05).
+    /// change. It never pumps the main run loop to wait for a frame: a
+    /// synchronous wait here is reentrant, and every timer, delegate and
+    /// second `drawNow` the loop services runs nested inside what looks
+    /// like a leaf call (E05).
     ///
-    /// The replacement is an explicit state transition, not a wait. The
+    /// So this is an explicit state transition, not a wait. The
     /// window needs no pixel-perfect first frame, only a guarantee it never
     /// shows what is behind it: the layer's `backgroundColor` is set to the
     /// theme's clear colour — exactly what the first frame's render pass

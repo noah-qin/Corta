@@ -15,7 +15,7 @@ import AppKit
 /// These are *system* preferences, deliberately not config-file keys: the user
 /// has already expressed them once, for every app, and a second copy in
 /// `~/.config/corta/config` would be a store that drifts from the one macOS
-/// actually reports (`CLAUDE.md`).
+/// actually reports (`docs/DECISIONS.md` D10).
 @MainActor
 enum SystemAccessibility {
     /// "Reduce motion". A surface that would animate should arrive at its

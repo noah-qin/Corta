@@ -1,10 +1,10 @@
 import AppKit
 import SwiftUI
 
-/// The one line on the settings page that says what just happened —
-/// SwiftUI replacement for `SettingsStatusView`, reused for the overall save
-/// line, the font's resolution, shell integration, directory history, and
-/// the notification-permission notice.
+/// The one line on the settings page that says what just happened — reused
+/// for the overall save line, the font's resolution, shell integration,
+/// directory history, the notification-permission notice and the Quick
+/// Terminal's hotkey.
 ///
 /// **Why it exists.** Every control on the settings page writes the config
 /// file the moment it changes, which is the right behaviour and was also

@@ -1565,7 +1565,8 @@ class ViewController: NSViewController {
     /// family named in the config file only has to pass that check — the atlas
     /// can still fail to build for a face it vouched for, or for a size at
     /// which the metrics degenerate. The system monospaced face at the default
-    /// size is the one combination Corta stands behind (`CLAUDE.md`), so it is
+    /// size is the one combination Corta stands behind (`docs/DECISIONS.md`
+    /// D11), so it is
     /// the fallback rather than a failure.
     private func makeRenderer(device: MTLDevice, scale: CGFloat) throws -> TerminalRenderer {
         let renderer: TerminalRenderer
