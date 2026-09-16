@@ -67,7 +67,11 @@ nonisolated struct CellMetrics {
         // Width no longer inflates the row. The height follows the font's
         // own line metrics independently, which is also what lets 120x30
         // match Terminal in both axes.
-        self.cellHeight = snapUp(lineHeight)
+        // Never zero, like the width: a face whose line metrics come back
+        // empty (seen once, under a parallel test run, as a `UInt16(inf)`
+        // trap in `ViewController.gridSize(fitting:)` dividing by this)
+        // gets a one-pixel row rather than an infinite grid.
+        self.cellHeight = max(1 / pixels, snapUp(lineHeight))
         // The baseline moves with the row: the extra height is leading, and
         // splitting it evenly keeps the glyph centred rather than letting it
         // ride the top of a taller cell.
