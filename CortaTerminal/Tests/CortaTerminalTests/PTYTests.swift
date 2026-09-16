@@ -81,8 +81,12 @@ struct PTYTests {
 
     @Test("the child's environment is sanitised and TERM is xterm-256color")
     func childEnvironmentIsSanitised() throws {
+        // `env` then a sentinel, so the read stops at the *end* of the
+        // listing: stopping at the first `TERM=` raced whatever `env`
+        // printed after it (`TERM_PROGRAM` was sometimes still in flight).
         let pty = try PTY.spawn(
-            executable: "/usr/bin/env",
+            executable: "/bin/sh",
+            arguments: ["-c", "/usr/bin/env; echo ENV-COMPLETE"],
             environment: ChildEnvironment.sanitized(inheriting: [
                 "PATH": "/usr/bin:/bin",
                 "TERM": "inherited-and-wrong",
@@ -92,7 +96,7 @@ struct PTYTests {
         )
         defer { pty.close() }
 
-        let output = pty.readOutput(containing: "TERM=")
+        let output = pty.readOutput(containing: "ENV-COMPLETE")
         #expect(output.contains("TERM=xterm-256color"))
         #expect(output.contains("TERM_PROGRAM=Corta"))
         #expect(output.contains("PATH=/usr/bin:/bin"))
