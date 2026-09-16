@@ -48,21 +48,45 @@ final class SplitViewController: NSViewController {
     var panes: [ViewController] { children.compactMap { $0 as? ViewController } }
     var hasMultiplePanes: Bool { tree?.leafCount ?? 1 > 1 }
 
-    /// The layout this window is being restored into (M7.4), set by
-    /// `AppDelegate` before the view loads. The root pane needs its working
-    /// directory at spawn time, which is why this has to be here rather than
-    /// applied afterwards.
+    /// What the next storyboard-instantiated window's root pane spawns as.
+    ///
+    /// **Set before `instantiateInitialController`, not after.** The
+    /// storyboard loads the window controller's window, and with it the
+    /// content view, *inside* `instantiateInitialController` — `viewDidLoad`
+    /// has run and the root pane has already spawned its shell by the time
+    /// the caller gets the controller back. A restore or a preset assigned to
+    /// the instance afterwards was therefore read only by `viewWillAppear`
+    /// (for the splits) and never by the root pane, which came up in the
+    /// home directory under whatever shell the config file named: the one
+    /// case `SessionRestore`'s doc comment says cannot be repaired after the
+    /// fact. `AppDelegate.instantiateWindowController(setup:)` stages the
+    /// values here and `viewDidLoad` takes them, so the root pane is right at
+    /// spawn time.
+    struct Setup {
+        var restore: WindowState?
+        var preset: Preset?
+        /// B16 — where the root pane spawns when an App Intent asks for a
+        /// directory; ignored when `restore` or `preset` already names one.
+        var workingDirectory: String?
+    }
+    static var pendingSetup: Setup?
+
+    /// The layout this window is being restored into (M7.4): taken from
+    /// `pendingSetup` in `viewDidLoad`, where the root pane needs its working
+    /// directory at spawn time, and consumed by `viewWillAppear`, where the
+    /// splits need the window's final frame.
     var pendingRestore: WindowState?
 
-    /// U16 — the preset this window's first pane should spawn from. Set
-    /// before the view loads, for the same reason `pendingRestore` is: the
-    /// root pane needs its shell, directory and environment at spawn time,
-    /// and a preset applied afterwards would relabel a child that had already
-    /// started somewhere else.
+    /// U16 — the preset this window's first pane spawned from, from
+    /// `pendingSetup` for the same reason.
     var pendingPreset: Preset?
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        let setup = Self.pendingSetup
+        Self.pendingSetup = nil
+        pendingRestore = setup?.restore
+        pendingPreset = setup?.preset
         // B09 — the root pane's own preset, resolved by name against the
         // *current* config file: a restored window that was launched from a
         // preset gets its shell/env back too, not just its directory, and a
@@ -72,8 +96,8 @@ final class SplitViewController: NSViewController {
             ConfigurationStore.shared.configuration.presets.first { $0.name == name }
         }
         let pane = makePane(
-            workingDirectory: pendingRestore?.layout.firstDirectory, initialGridSize: nil,
-            preset: pendingPreset ?? restoredPreset)
+            workingDirectory: pendingRestore?.layout.firstDirectory ?? setup?.workingDirectory,
+            initialGridSize: nil, preset: pendingPreset ?? restoredPreset)
         focusedPane = pane
         tree = SplitTree(root: pane.view)
         installRoot()

@@ -156,6 +156,12 @@ struct SettingsView: View {
                 StatusRowView(status: model.shellIntegrationStatus, action: model.toggleShellIntegration)
             }
             .help(L10n.text("settings.help.shellIntegration"))
+
+            Toggle(
+                L10n.text("command.secureKeyboardEntry"),
+                isOn: Binding(get: { model.secureKeyboardEntry }, set: { model.setSecureKeyboardEntry($0) })
+            )
+            .help(L10n.text("settings.help.secureKeyboardEntry"))
         }
         .formStyle(.grouped)
     }
@@ -184,6 +190,26 @@ struct SettingsView: View {
                 Toggle(
                     L10n.text("settings.label.restoreWindows"),
                     isOn: Binding(get: { model.restoreWindows }, set: { model.setRestoreWindows($0) }))
+            }
+            Section(L10n.text("settings.section.quickTerminal")) {
+                Toggle(
+                    L10n.text("settings.label.quickTerminalHotkey"),
+                    isOn: Binding(get: { model.quickTerminal }, set: { model.setQuickTerminal($0) })
+                )
+                .help(L10n.text("settings.help.quickTerminal"))
+                StatusRowView(status: model.quickTerminalStatus)
+                Picker(L10n.text("settings.label.quickTerminalPosition"), selection: $model.quickTerminalPosition) {
+                    ForEach(Configuration.QuickTerminalPosition.allCases, id: \.self) { position in
+                        Text(L10n.text("settings.quickTerminalPosition.\(position.rawValue)")).tag(position)
+                    }
+                }
+                .onChange(of: model.quickTerminalPosition) { _, value in model.setQuickTerminalPosition(value) }
+                Picker(L10n.text("settings.label.quickTerminalScreen"), selection: $model.quickTerminalScreen) {
+                    ForEach(Configuration.QuickTerminalScreen.allCases, id: \.self) { screen in
+                        Text(L10n.text("settings.quickTerminalScreen.\(screen.rawValue)")).tag(screen)
+                    }
+                }
+                .onChange(of: model.quickTerminalScreen) { _, value in model.setQuickTerminalScreen(value) }
             }
             Section(L10n.text("settings.section.closing")) {
                 Toggle(

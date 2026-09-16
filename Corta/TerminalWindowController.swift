@@ -13,6 +13,70 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         contentViewController as? SplitViewController
     }
 
+    /// B16 — the identity an App Intent names this window by
+    /// (`TerminalWindowEntity`). Minted when the controller is created and
+    /// carried through `WindowState`, so a Shortcut that focuses "the build
+    /// window" still resolves after a relaunch restores it. Never derived
+    /// from the title: titles are written by the child process and change
+    /// with every `cd`.
+    var windowID: String = UUID().uuidString
+
+    /// B16 — set for the Quick Terminal's window, which is summoned by a
+    /// hotkey rather than opened by the user and is therefore neither
+    /// saved into the arrangement nor listed as an ordinary window.
+    var isQuickTerminal = false
+
+    /// B16 — the lock in the titlebar while Secure Keyboard Entry is
+    /// actually engaged for this window. Visible state is the point of the
+    /// feature: the effect itself is invisible (keystrokes simply stop
+    /// reaching other processes), so without an indicator a user cannot tell
+    /// whether the password they are about to type is covered. It follows
+    /// `SecureInput.engaged`, not the setting — the lock is open the moment
+    /// another app is frontmost, and the titlebar says so.
+    private var secureInputIndicator: NSTitlebarAccessoryViewController?
+    private var secureInputObserver: NSObjectProtocol?
+
+    override func windowDidLoad() {
+        super.windowDidLoad()
+        installSecureInputIndicator()
+    }
+
+    private func installSecureInputIndicator() {
+        guard let window else { return }
+        let image = NSImageView(
+            image: NSImage(systemSymbolName: "lock.fill", accessibilityDescription: nil)
+                ?? NSImage())
+        image.contentTintColor = .secondaryLabelColor
+        image.toolTip = L10n.text("secureInput.indicator.tooltip")
+        image.setAccessibilityLabel(L10n.text("secureInput.indicator.tooltip"))
+        image.translatesAutoresizingMaskIntoConstraints = false
+        let container = NSView()
+        container.addSubview(image)
+        NSLayoutConstraint.activate([
+            image.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -10),
+            image.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            container.widthAnchor.constraint(equalToConstant: 28),
+            container.heightAnchor.constraint(equalToConstant: 22),
+        ])
+        let accessory = NSTitlebarAccessoryViewController()
+        accessory.view = container
+        accessory.layoutAttribute = .trailing
+        accessory.isHidden = true
+        window.addTitlebarAccessoryViewController(accessory)
+        secureInputIndicator = accessory
+        secureInputObserver = NotificationCenter.default.addObserver(
+            forName: SecureInput.didChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.updateSecureInputIndicator() }
+        }
+        updateSecureInputIndicator()
+    }
+
+    private func updateSecureInputIndicator() {
+        guard let window else { return }
+        secureInputIndicator?.isHidden = !(SecureInput.shared.engaged && window.isKeyWindow)
+    }
+
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         guard let splitController else { return true }
         let running = splitController.panesWithRunningJobs
@@ -22,7 +86,9 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     /// The layout this window would be restored as (M7.4). Read at quit and
     /// whenever a window closes, so state survives both routes.
     var restorableState: WindowState? {
-        guard let window, let splitController else { return nil }
-        return splitController.windowState(frame: window.frame)
+        guard let window, let splitController, !isQuickTerminal else { return nil }
+        var state = splitController.windowState(frame: window.frame)
+        state?.id = windowID
+        return state
     }
 }

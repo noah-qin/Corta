@@ -25,9 +25,10 @@ struct MenuStructureTests {
         return groups.filter { !$0.isEmpty }
     }
 
-    /// The Shell menu reads as six groups, in the order of what each one is
+    /// The Shell menu reads as eight groups, in the order of what each one is
     /// *for*: open a terminal a particular way, create panes, go somewhere
-    /// else, throw terminal state away, change the geometry.
+    /// else, throw terminal state away, change the geometry — and last, alone,
+    /// the one item that changes the machine rather than a pane (B16).
     ///
     /// The order is the assertion. Command-to-command jumping sits with the
     /// focus moves because both answer "go somewhere else"; it used to sit
@@ -35,11 +36,12 @@ struct MenuStructureTests {
     /// navigation families. The terminal-state commands (U11) are their own
     /// group because each one discards something, and grouping them with
     /// anything else would make that less obvious, not more.
-    @Test("Shell groups presets, create, move, directories, clear, then resize")
+    @Test("Shell groups presets, create, move, directories, clear, resize, then secure entry")
     func shellMenuGrouping() throws {
         let groups = try Self.shellGroups()
         #expect(
-            groups.count == 7, "presets, splits, focus, navigation, directories, state, resize")
+            groups.count == 8,
+            "presets, splits, focus, navigation, directories, state, resize, secure entry")
 
         let split = #selector(SplitViewController.splitRight(_:))
         let focusLeft = #selector(SplitViewController.moveFocusLeft(_:))
@@ -75,9 +77,14 @@ struct MenuStructureTests {
         #expect(groups[5].first == clearScreen)
         #expect(groups[5].contains(reset))
 
-        // Geometry last, zoom at its head (U13).
+        // Geometry, zoom at its head (U13).
         #expect(groups[6].first == zoom)
         #expect(groups[6].last == equalize)
+
+        // B16 — Secure Keyboard Entry alone at the end: a system-wide input
+        // mode, not a pane command, and Terminal.app's own Shell menu puts
+        // it in the same place.
+        #expect(groups[7] == [#selector(AppDelegate.toggleSecureKeyboardEntry(_:))])
     }
 
     @Test("View has one Theme submenu holding appearance, then themes")

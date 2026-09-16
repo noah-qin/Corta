@@ -195,6 +195,8 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     case resetTerminal = "reset-terminal"
     case reconnectRemote = "reconnect-remote"
     case browseRemoteFiles = "browse-remote-files"
+    case quickTerminal = "quick-terminal"
+    case secureKeyboardEntry = "secure-keyboard-entry"
     case settings
     case commandPalette = "command-palette"
 
@@ -254,6 +256,8 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .resetTerminal: return L10n.text("command.resetTerminal")
         case .reconnectRemote: return L10n.text("command.reconnectRemote")
         case .browseRemoteFiles: return L10n.text("command.browseRemoteFiles")
+        case .quickTerminal: return L10n.text("command.quickTerminal")
+        case .secureKeyboardEntry: return L10n.text("command.secureKeyboardEntry")
         case .settings: return L10n.text("command.settings")
         case .commandPalette: return L10n.text("command.commandPalette")
         }
@@ -326,6 +330,8 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .resetTerminal: return #selector(ViewController.resetTerminal(_:))
         case .reconnectRemote: return #selector(ViewController.reconnectRemote(_:))
         case .browseRemoteFiles: return #selector(ViewController.browseRemoteFiles(_:))
+        case .quickTerminal: return #selector(AppDelegate.toggleQuickTerminal(_:))
+        case .secureKeyboardEntry: return #selector(AppDelegate.toggleSecureKeyboardEntry(_:))
         case .settings: return #selector(AppDelegate.showSettings(_:))
         case .commandPalette: return #selector(AppDelegate.showCommandPalette(_:))
         }
@@ -408,6 +414,15 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         // is a mouse's or a menu's gesture more than a keystroke's — and a
         // key spent here is a key the child process can never have.
         case .browseRemoteFiles: return nil
+        // Unbound in the app: the Quick Terminal's key is the *system-wide*
+        // hotkey `quick-terminal-key` names, held by `GlobalHotKey`, and
+        // an in-app key equivalent beside it would be a second binding for
+        // the same gesture that only works while Corta is frontmost.
+        case .quickTerminal: return nil
+        // Unbound: a key that flips a system-wide input mode by accident
+        // is not a default, and the state is a checkmark in a menu, not a
+        // thing anyone toggles rapidly.
+        case .secureKeyboardEntry: return nil
         case .settings: return Shortcut(",", .command)
         case .commandPalette: return Shortcut("p", [.command, .shift])
         }
@@ -422,7 +437,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     /// replacing that knowledge.
     var category: CommandCategory {
         switch self {
-        case .newWindow, .newTab, .close: return .window
+        case .newWindow, .newTab, .close, .quickTerminal: return .window
         case .splitRight, .splitDown, .focusLeft, .focusRight, .focusUp, .focusDown,
             .growPaneHorizontally, .shrinkPaneHorizontally, .growPaneVertically,
             .shrinkPaneVertically, .equalizePanes, .zoomPane, .reopenClosedPane:
@@ -435,7 +450,8 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
             .changeDirectoryToProjectRoot, .openParentDirectoryInNewPane,
             .openProjectRootInNewPane, .searchCommandHistory:
             return .view
-        case .clearScreen, .clearHistory, .resetTerminal, .reconnectRemote, .browseRemoteFiles:
+        case .clearScreen, .clearHistory, .resetTerminal, .reconnectRemote, .browseRemoteFiles,
+            .secureKeyboardEntry:
             return .terminal
         case .find, .copy, .paste, .selectAll, .exportText: return .edit
         case .settings, .commandPalette: return .app
@@ -451,6 +467,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .newTab: return 0
         case .newWindow: return 1
         case .close: return 2
+        case .quickTerminal: return 3
         case .splitRight: return 0
         case .splitDown: return 1
         case .focusLeft: return 2
@@ -496,6 +513,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .resetTerminal: return 2
         case .reconnectRemote: return 3
         case .browseRemoteFiles: return 4
+        case .secureKeyboardEntry: return 5
         case .settings: return 0
         case .commandPalette: return 1
         }
