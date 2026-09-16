@@ -137,10 +137,10 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
         let panel = NSOpenPanel()
         panel.title = L10n.text("sftp.action.upload")
         panel.canChooseFiles = true
-        // No directory walking: the engine transfers files, and silently
-        // recursing into a chosen folder would be a feature wearing a
-        // picker's clothes.
-        panel.canChooseDirectories = false
+        // A chosen folder is a directory transfer — the whole tree, one
+        // atomic file at a time, links skipped and reported
+        // (`SFTPTransferEngine.uploadDirectory`).
+        panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
         let response = await panel.beginSheetModal(for: window)
         guard response == .OK else { return [] }
@@ -151,9 +151,11 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
         for entries: [SFTPBrowserModel.Entry]
     ) async -> SFTPBrowserModel.DownloadDestination? {
         guard let window else { return nil }
-        if entries.count == 1, let entry = entries.first {
+        if entries.count == 1, let entry = entries.first, entry.kind != .directory {
             // One file: a save panel, so the local name is the user's to
-            // choose, prefilled with the remote one.
+            // choose, prefilled with the remote one. A directory goes
+            // through the folder chooser below and lands as
+            // `<chosen>/<name>`.
             let panel = NSSavePanel()
             panel.title = L10n.text("sftp.action.download")
             panel.nameFieldStringValue = entry.name

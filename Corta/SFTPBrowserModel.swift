@@ -113,6 +113,13 @@ final class SFTPBrowserModel {
     nonisolated struct Transfer: Identifiable, Equatable {
         let id: UUID
         let isUpload: Bool
+        /// A directory transfer; the row shows files done of files total
+        /// alongside the bytes.
+        var isDirectory = false
+        /// Directory transfers only: files completed and the total the
+        /// walk found, for the row.
+        var filesCompleted = 0
+        var filesTotal = 0
         /// Display name — the file's own name, no path.
         let name: String
         var remotePath: String
@@ -257,6 +264,11 @@ final class SFTPBrowserModel {
     /// question is answered.
     private struct Plan {
         var isUpload: Bool
+        /// A whole tree (`SFTPTransferEngine.uploadDirectory`/
+        /// `downloadDirectory`) rather than one file. Directories merge and
+        /// the conflict policy applies per file inside, so the pre-flight
+        /// only asks whether the destination directory already exists.
+        var isDirectory = false
         var remotePath: String
         var localURL: URL
         var sourceSize: UInt64?
@@ -609,9 +621,15 @@ final class SFTPBrowserModel {
         Task {
             let urls = await pickUploadFiles()
             for url in urls {
+                // A chosen folder is a directory transfer — the whole tree,
+                // one atomic file at a time, symbolic links skipped and
+                // reported (`SFTPTransferEngine.uploadDirectory`).
+                let isDirectory =
+                    (try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]))
+                    .map { $0.isDirectory == true && $0.isSymbolicLink != true } ?? false
                 enqueue(
                     Plan(
-                        isUpload: true,
+                        isUpload: true, isDirectory: isDirectory,
                         remotePath: Self.joinPath(currentPath, url.lastPathComponent),
                         localURL: url))
             }
@@ -619,12 +637,13 @@ final class SFTPBrowserModel {
     }
 
     /// Download via the injected destination picker (save panel for one
-    /// file, directory chooser for several). Directories cannot be
-    /// downloaded — the engine transfers files, and silently walking a
-    /// remote tree is its own feature, not a button's side effect.
+    /// file, directory chooser for several or for any directory). A chosen
+    /// directory is a directory transfer: the whole tree, one atomic file
+    /// at a time, into `<destination>/<name>`. Symbolic links are neither
+    /// followed nor recreated; the engine reports them skipped.
     func requestDownload() {
         guard connectionState == .connected, let pickDownloadDestination else { return }
-        let chosen = selectedEntries.filter { $0.kind != .directory }
+        let chosen = selectedEntries.filter { $0.kind == .file || $0.kind == .directory }
         guard !chosen.isEmpty else { return }
         Task {
             guard let destination = await pickDownloadDestination(chosen) else { return }
@@ -642,10 +661,10 @@ final class SFTPBrowserModel {
                 }
                 enqueue(
                     Plan(
-                        isUpload: false,
+                        isUpload: false, isDirectory: entry.kind == .directory,
                         remotePath: Self.joinPath(currentPath, entry.name),
                         localURL: local,
-                        sourceSize: entry.size,
+                        sourceSize: entry.kind == .directory ? nil : entry.size,
                         sourceModified: entry.modified))
             }
         }
@@ -661,9 +680,11 @@ final class SFTPBrowserModel {
         selectedEntries.count == 1 && selectedEntries.first?.kind == .directory
     }
 
-    /// Whether Download has anything it can act on.
+    /// Whether Download has anything it can act on: files and directories
+    /// both; a symbolic link or special file is not, since neither
+    /// following it nor recreating it is what a download means.
     var canDownloadSelection: Bool {
-        selectedEntries.contains { $0.kind != .directory }
+        selectedEntries.contains { $0.kind == .file || $0.kind == .directory }
     }
 
     /// Edit acts on exactly one plain file. A symlink is excluded on
@@ -690,7 +711,7 @@ final class SFTPBrowserModel {
             : (plan.remotePath as NSString).lastPathComponent
         transfers.append(
             Transfer(
-                id: id, isUpload: plan.isUpload, name: name,
+                id: id, isUpload: plan.isUpload, isDirectory: plan.isDirectory, name: name,
                 remotePath: plan.remotePath, localURL: plan.localURL,
                 host: host, state: .queued))
         plans[id] = plan
@@ -704,6 +725,31 @@ final class SFTPBrowserModel {
     /// attributes for a download's destination, LSTAT for an upload's.
     private func preflight(id: UUID) async {
         guard var plan = plans[id], let client else { return }
+        if plan.isDirectory {
+            // Directories merge; the only question is whether one is
+            // already there, and the sheet's answer becomes the per-file
+            // policy inside. Partials belong to the files, not the tree.
+            if plan.isUpload {
+                plan.destinationExists = (try? await client.lstat(path: plan.remotePath)) != nil
+            } else {
+                plan.destinationExists = FileManager.default.fileExists(atPath: plan.localURL.path)
+            }
+            plans[id] = plan
+            guard !abandoned.contains(id) else { return }
+            guard plan.destinationExists else {
+                start(id: id, resolution: .fail)
+                return
+            }
+            guard let transfer = transfers.first(where: { $0.id == id }) else { return }
+            conflictPrompts.append(
+                ConflictPrompt(
+                    id: UUID(), transferID: id,
+                    path: transfer.isUpload ? plan.remotePath : plan.localURL.path,
+                    sourceDescription: L10n.text("sftp.conflict.directory"),
+                    destinationDescription: L10n.text("sftp.conflict.directoryExists"),
+                    canResume: true, partialOnly: false))
+            return
+        }
         if plan.isUpload {
             let local = try? FileManager.default.attributesOfItem(atPath: plan.localURL.path)
             plan.sourceSize = (local?[.size] as? NSNumber)?.uint64Value
@@ -829,6 +875,25 @@ final class SFTPBrowserModel {
                 }
             }
             do {
+                if plan.isDirectory {
+                    let directoryProgress: SFTPTransferEngine.DirectoryProgressHandler = { p in
+                        Task { @MainActor [weak self] in
+                            self?.applyDirectoryProgress(p, to: id)
+                        }
+                    }
+                    let receipt: SFTPTransferEngine.DirectoryTransferReceipt
+                    if plan.isUpload {
+                        receipt = try await client.uploadDirectory(
+                            from: plan.localURL, to: plan.remotePath,
+                            policy: resolution.policy, progress: directoryProgress)
+                    } else {
+                        receipt = try await client.downloadDirectory(
+                            remotePath: plan.remotePath, to: plan.localURL,
+                            policy: resolution.policy, progress: directoryProgress)
+                    }
+                    finishDirectory(id: id, receipt: receipt, isUpload: plan.isUpload)
+                    return
+                }
                 let receipt: SFTPTransferEngine.SFTPTransferReceipt
                 if plan.isUpload {
                     receipt = try await client.upload(
@@ -867,6 +932,46 @@ final class SFTPBrowserModel {
         default:
             return
         }
+    }
+
+    private func applyDirectoryProgress(
+        _ progress: SFTPTransferEngine.DirectoryTransferProgress, to id: UUID
+    ) {
+        guard let index = transfers.firstIndex(where: { $0.id == id }) else { return }
+        switch transfers[index].state {
+        case .queued, .active:
+            if case .active(let completed, _) = transfers[index].state,
+                progress.completedBytes < completed
+            { return }
+            transfers[index].filesCompleted = progress.filesCompleted
+            transfers[index].filesTotal = progress.filesTotal
+            transfers[index].state = .active(
+                completed: progress.completedBytes, total: progress.totalBytes)
+        default:
+            return
+        }
+    }
+
+    /// A directory's receipt: the row records the bytes, and anything the
+    /// walk skipped (symbolic links, special files, unsafe names) is
+    /// surfaced on the listing's error line — a skipped entry must never
+    /// be silent.
+    private func finishDirectory(
+        id: UUID, receipt: SFTPTransferEngine.DirectoryTransferReceipt, isUpload: Bool
+    ) {
+        tasks[id] = nil
+        plans[id] = nil
+        if let index = transfers.firstIndex(where: { $0.id == id }) {
+            transfers[index].filesCompleted = receipt.filesTransferred
+            transfers[index].filesTotal = receipt.filesTransferred
+        }
+        setState(id, .done(bytes: receipt.bytesTransferred))
+        if !receipt.skipped.isEmpty {
+            listingError = L10n.format(
+                "sftp.directory.skipped", receipt.skipped.count,
+                receipt.skipped.prefix(3).map(\.relativePath).joined(separator: ", "))
+        }
+        if isUpload { refresh() }
     }
 
     private func finish(

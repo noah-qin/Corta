@@ -745,6 +745,12 @@ Ordered by how badly they are usually underestimated.
    drift restarts from zero rather than appending to a file that no longer
    matches. Where the server cannot answer (`statvfs@openssh.com`
    unadvertised), the capability reports unavailable instead of guessing.
+   A directory is a walk plus one such file transfer per regular file —
+   nothing re-implemented — with two rules of its own: directories merge
+   (the policy is asked about files, as it would be for each alone), and
+   only regular files and directories move; a symbolic link at either end
+   is skipped and reported, since following one is how "download this
+   folder" walks off into `/etc`.
 
 ---
 

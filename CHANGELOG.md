@@ -72,7 +72,11 @@ what to edit.
   deleted remote forces an explicit resolution — upload anyway, re-download
   discarding local edits, or save the local copy elsewhere. Server features
   that are unavailable (`statvfs@openssh.com`) degrade explicitly rather
-  than being guessed. The engine is verified against the real OpenSSH
+  than being guessed. Folders transfer as trees (`SFTPTransferEngine
+  .downloadDirectory`/`uploadDirectory`): one atomic file at a time,
+  folders merging, the conflict policy applied per file, symbolic links
+  and special files skipped and reported — never followed. The engine is
+  verified against the real OpenSSH
   `sftp-server` on this machine (`SFTPRealServerTests`, and the launched
   app in `RemoteWorkflowUITests` — see CONFORMANCE §4.4); that first run
   found and fixed a spawn that never returned, a write size the server

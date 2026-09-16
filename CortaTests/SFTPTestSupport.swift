@@ -117,6 +117,67 @@ final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
             bytesTransferred: 100, resumedFromOffset: 0, attempts: 1)
     }
 
+    /// Directory transfers, recorded like the file ones; `onDirectoryTransfer`
+    /// can fail or stall them, otherwise a two-file receipt comes back.
+    struct DirectoryCall: Equatable {
+        var isUpload: Bool
+        var remotePath: String
+        var localPath: String
+        var policy: String
+    }
+    var directoryCalls: [DirectoryCall] = []
+    var onDirectoryTransfer:
+        ((DirectoryCall, SFTPTransferEngine.DirectoryProgressHandler?) async throws -> Void)?
+
+    func downloadDirectory(
+        remotePath: String, to localDirectory: URL,
+        policy: SFTPTransferEngine.ConflictPolicy,
+        progress: SFTPTransferEngine.DirectoryProgressHandler?
+    ) async throws(SFTPError) -> SFTPTransferEngine.DirectoryTransferReceipt {
+        try await directoryTransfer(
+            isUpload: false, remotePath: remotePath, localPath: localDirectory.path,
+            policy: policy, progress: progress)
+    }
+
+    func uploadDirectory(
+        from localDirectory: URL, to remotePath: String,
+        policy: SFTPTransferEngine.ConflictPolicy,
+        progress: SFTPTransferEngine.DirectoryProgressHandler?
+    ) async throws(SFTPError) -> SFTPTransferEngine.DirectoryTransferReceipt {
+        try await directoryTransfer(
+            isUpload: true, remotePath: remotePath, localPath: localDirectory.path,
+            policy: policy, progress: progress)
+    }
+
+    private func directoryTransfer(
+        isUpload: Bool, remotePath: String, localPath: String,
+        policy: SFTPTransferEngine.ConflictPolicy,
+        progress: SFTPTransferEngine.DirectoryProgressHandler?
+    ) async throws(SFTPError) -> SFTPTransferEngine.DirectoryTransferReceipt {
+        let call = DirectoryCall(
+            isUpload: isUpload, remotePath: remotePath, localPath: localPath,
+            policy: Self.policyName(policy))
+        directoryCalls.append(call)
+        if let onDirectoryTransfer {
+            do {
+                try await onDirectoryTransfer(call, progress)
+            } catch let error as SFTPError {
+                throw error
+            } catch is CancellationError {
+                throw .cancelled
+            } catch {
+                throw .protocolViolation("\(error)")
+            }
+        } else {
+            progress?(
+                .init(filesCompleted: 1, filesTotal: 2, completedBytes: 100, totalBytes: 300, currentFile: "b"))
+            progress?(
+                .init(filesCompleted: 2, filesTotal: 2, completedBytes: 300, totalBytes: 300, currentFile: ""))
+        }
+        return SFTPTransferEngine.DirectoryTransferReceipt(
+            filesTransferred: 2, directoriesCreated: 1, bytesTransferred: 300, skipped: [])
+    }
+
     private static func policyName(_ policy: SFTPTransferEngine.ConflictPolicy) -> String {
         switch policy {
         case .fail: return "fail"
