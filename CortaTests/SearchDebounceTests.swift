@@ -195,8 +195,14 @@ struct SearchDebounceTests {
         }
         for pane in [paneA, paneB] {
             let session = try #require(pane.session)
-            session.write(Array("echo Hello hello\n".utf8))
-            #expect(await waitUpTo(10) { self.gridContains(pane, "Hello hello") })
+            // A sentinel *after* the echo: "Hello hello" alone is satisfied
+            // by the shell echoing the typed command back, before its
+            // output has printed — and a pane that had only the command
+            // line when the sweep snapshotted its grid found as many
+            // case-insensitive matches as the other pane found
+            // case-sensitive ones (the flake this closes).
+            session.write(Array("echo Hello hello; echo SEARCH-READY\n".utf8))
+            #expect(await waitUpTo(10) { self.gridContains(pane, "SEARCH-READY") })
         }
 
         paneA.showSearchBar()

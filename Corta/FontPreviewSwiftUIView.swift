@@ -20,16 +20,20 @@ struct FontPreviewSwiftUIView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("~/corta $ echo hello")
+            Text(verbatim: "~/corta $ echo hello")
                 .font(Font(nsFont))
                 .foregroundStyle(Self.color(variant.foreground))
-            // Two colours in one line: `Text` interpolation composes styled
-            // runs (the `+` operator is deprecated on macOS 26).
-            Text(
-                "\(Text("ok  ").foregroundStyle(Self.color(variant.ansi[2])))\(Text("failed").foregroundStyle(Self.color(variant.ansi[1])))"
-            )
+            // Two colours in one line, as two runs side by side: `Text + Text`
+            // is deprecated on macOS 26, and interpolating styled `Text`s
+            // makes a `"%@%@"` localizable key Xcode extracts into the
+            // catalog. `verbatim` throughout — this is sample terminal
+            // output, not UI copy.
+            HStack(spacing: 0) {
+                Text(verbatim: "ok  ").foregroundStyle(Self.color(variant.ansi[2]))
+                Text(verbatim: "failed").foregroundStyle(Self.color(variant.ansi[1]))
+            }
             .font(Font(nsFont))
-            Text("The quick brown fox jumps over the lazy dog.")
+            Text(verbatim: "The quick brown fox jumps over the lazy dog.")
                 .font(Font(nsFont))
                 .foregroundStyle(Self.color(variant.foreground))
         }

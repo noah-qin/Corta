@@ -32,27 +32,28 @@ final class SettingsUITests: XCTestCase {
         XCTAssertTrue(settings.waitForExistence(timeout: 5), "the settings page must open")
         // Three tabs in a native `TabView` — SwiftUI's own tab chrome
         // replaced the AppKit page's `NSToolbar` (a deliberate visual
-        // change; see the PR that introduced this file's rewrite). A native
-        // macOS `TabView` exposes its tab items as buttons inside a
-        // `tabGroup`, not inside `toolbars` as the old `NSToolbar`-backed
-        // page did.
-        //
-        // NOTE: this file could not be run in the environment that wrote
-        // this rewrite (XCUITest automation times out there) — it is a
-        // best-effort port of the assertions' *intent*, not a verified pass.
+        // change; see the PR that introduced this file's rewrite). On
+        // macOS 26 the tab bar is a `tabGroup` labelled "Navigation Tab
+        // Bar" whose items are `tab` elements (not buttons — the earlier
+        // best-effort port of this file assumed buttons and never passed).
         let tabGroup = settings.tabGroups.firstMatch
         XCTAssertTrue(tabGroup.waitForExistence(timeout: 3), "the settings page must have a tab view")
         for tab in ["Appearance", "Terminal", "General"] {
             XCTAssertTrue(
-                tabGroup.buttons[tab].waitForExistence(timeout: 3), "the \(tab) tab must exist")
+                tabGroup.tabs[tab].waitForExistence(timeout: 3), "the \(tab) tab must exist")
         }
 
         // The Appearance pane: light-or-dark, the font family (a label, not
         // a picker — Corta ships one font) and the size field. The theme
         // pop-up is hidden while only one theme is offered.
-        XCTAssertTrue(settings.staticTexts["Light or Dark"].waitForExistence(timeout: 3))
+        // The catalog's string, letter for letter ("Light or dark"); whether
+        // SwiftUI exposes a `Picker`'s label as a static text or as the
+        // pop-up's own label varies by release, so any element will do.
+        XCTAssertTrue(
+            settings.descendants(matching: .any)["Light or dark"].waitForExistence(timeout: 3),
+            "the Appearance pane must show the light-or-dark picker")
 
-        tabGroup.buttons["Terminal"].click()
+        tabGroup.tabs["Terminal"].click()
         // Bell and link activation are pop-up-style pickers; copy-on-select
         // and the clipboard-write toggle are switches; scrollback is a
         // field.

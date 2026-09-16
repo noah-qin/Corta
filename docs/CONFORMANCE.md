@@ -398,8 +398,10 @@ What it cannot cover, and a human still judges against a real host:
 authentication and host keys (there is no `ssh` in the loop), and how
 the panes look — they are Metal surfaces the accessibility tree cannot
 read. `SFTPRealServerTests` in the core package drives the same server
-without the app. Run it with an English input source active: a CJK
-input method composes the typed command instead of delivering it.
+without the app. The test selects the ABC keyboard layout for its own
+duration and restores the previous input source afterwards — a CJK
+input method would otherwise compose every typed line into candidates
+instead of delivering it to the terminal.
 
 ### 4.4.2 Real-program verification (P0, M8.20)
 

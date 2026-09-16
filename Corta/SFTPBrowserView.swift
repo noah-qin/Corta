@@ -289,21 +289,37 @@ struct SFTPBrowserView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             case .active(let completed, let total):
-                if let total, total > 0 {
-                    ProgressView(value: Double(completed), total: Double(total))
-                        .progressViewStyle(.linear)
-                } else {
-                    ProgressView()
-                        .progressViewStyle(.linear)
+                VStack(alignment: .leading, spacing: 2) {
+                    if let total, total > 0 {
+                        ProgressView(value: Double(completed), total: Double(total))
+                            .progressViewStyle(.linear)
+                    } else {
+                        ProgressView()
+                            .progressViewStyle(.linear)
+                    }
+                    // A directory transfer says where in the tree it is.
+                    if transfer.isDirectory, transfer.filesTotal > 0 {
+                        Text(
+                            L10n.format(
+                                "sftp.transfer.files", transfer.filesCompleted, transfer.filesTotal))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
                 }
             case .cancelling:
                 Text(L10n.text("sftp.transfer.cancelling"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             case .done(let bytes):
-                Text(L10n.format(
-                    "sftp.transfer.doneBytes",
-                    SFTPBrowserView.byteCount.string(fromByteCount: Int64(bytes))))
+                Text(
+                    transfer.isDirectory
+                        ? L10n.format(
+                            "sftp.transfer.doneDirectory", transfer.filesTotal,
+                            SFTPBrowserView.byteCount.string(fromByteCount: Int64(bytes)))
+                        : L10n.format(
+                            "sftp.transfer.doneBytes",
+                            SFTPBrowserView.byteCount.string(fromByteCount: Int64(bytes)))
+                )
                 .font(.caption)
                 .foregroundStyle(.secondary)
             case .cancelled(let partialKept):

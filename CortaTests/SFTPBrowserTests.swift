@@ -459,6 +459,71 @@ struct SFTPBrowserModelTests {
         #expect(model.conflictPrompts.isEmpty)
     }
 
+    /// A selected folder downloads as a tree into `<chosen>/<name>` through
+    /// the directory transfer; the row counts files, and what the walk
+    /// skipped is surfaced rather than silent.
+    @Test("a directory downloads as a tree and reports what was skipped")
+    func directoryDownload() async throws {
+        let directory = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fake = FakeSFTPClient()
+        fake.listings["/srv/app"] = [makeEntry("src", permissions: 0o040755, size: nil)]
+        fake.onDirectoryTransfer = { _, progress in
+            progress?(.init(filesCompleted: 1, filesTotal: 3, completedBytes: 10, totalBytes: 30, currentFile: "a"))
+        }
+        let model = await connectedModel(fake: fake)
+        defer { model.disconnect() }
+        #expect(model.canDownloadSelection == false)
+        model.selection = ["src"]
+        #expect(model.canDownloadSelection, "a directory is downloadable now")
+        model.pickDownloadDestination = { _ in .directory(directory) }
+        model.requestDownload()
+
+        await waitUntil("done") {
+            if case .done = model.transfers.first?.state { return true } else { return false }
+        }
+        let call = try #require(fake.directoryCalls.first)
+        #expect(!call.isUpload)
+        #expect(call.remotePath == "/srv/app/src")
+        #expect(call.localPath == directory.appendingPathComponent("src").path)
+        #expect(call.policy == "fail", "no destination → no question → per-file .fail")
+        #expect(fake.transferCalls.isEmpty, "the tree goes through the directory transfer, not file by file here")
+        let row = try #require(model.transfers.first)
+        #expect(row.isDirectory)
+        #expect(row.filesTotal == 2, "the fake's receipt: two files")
+        #expect(row.state == .done(bytes: 300))
+    }
+
+    /// A folder chosen in the upload panel is a directory upload to
+    /// `<current>/<name>`; an existing remote folder of that name asks
+    /// first, and Overwrite becomes the per-file policy inside.
+    @Test("uploading a folder onto an existing remote folder asks, and Overwrite applies per file")
+    func directoryUploadConflict() async throws {
+        let directory = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = directory.appendingPathComponent("proj")
+        try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
+        let fake = FakeSFTPClient()
+        fake.listings["/srv/app"] = [makeEntry("proj", permissions: 0o040755, size: nil)]
+        fake.lstatResults["/srv/app/proj"] = SFTPAttributes(permissions: 0o040755)
+        let model = await connectedModel(fake: fake)
+        defer { model.disconnect() }
+        model.pickUploadFiles = { [source] }
+        model.requestUpload()
+
+        await waitUntil("conflict sheet") { !model.conflictPrompts.isEmpty }
+        let prompt = try #require(model.conflictPrompts.first)
+        #expect(prompt.path == "/srv/app/proj")
+        #expect(fake.directoryCalls.isEmpty, "nothing moves before the answer")
+        model.resolveConflict(prompt.id, choice: .overwrite)
+        await waitUntil("done") {
+            if case .done = model.transfers.first?.state { return true } else { return false }
+        }
+        let call = try #require(fake.directoryCalls.first)
+        #expect(call.isUpload && call.remotePath == "/srv/app/proj" && call.policy == "overwrite")
+        #expect(call.localPath == source.path)
+    }
+
     @Test("an existing destination raises the conflict sheet; each choice maps to its policy")
     func downloadConflictChoices() async throws {
         let directory = try makeTempDirectory()

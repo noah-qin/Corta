@@ -64,3 +64,18 @@ struct CellMetricsTests {
         }
     }
 }
+
+/// The two cell dimensions are divisors in `ViewController.gridSize
+/// (fitting:)`; a zero from a degenerate face would make that quotient
+/// infinite. Both are floored at one device pixel, whatever the font says.
+struct CellMetricsFloorTests {
+    @Test("a face with empty line metrics still yields a non-zero cell")
+    func degenerateFaceGetsAOnePixelFloor() {
+        // A zero-size font has zero ascent, descent and leading.
+        let font = CTFontCreateWithName("Menlo" as CFString, 0, nil)
+        let metrics = CellMetrics(font: font, scale: 2)
+        #expect(metrics.cellHeight >= 0.5)
+        #expect(metrics.cellWidth >= 0.5)
+        #expect(metrics.cellHeight.isFinite && metrics.cellWidth.isFinite)
+    }
+}

@@ -71,6 +71,23 @@ public protocol SFTPClient: AnyObject, Sendable {
         progress: SFTPTransferEngine.ProgressHandler?
     ) async throws(SFTPError) -> SFTPTransferEngine.SFTPTransferReceipt
 
+    /// Whole trees, one atomic file transfer at a time — see
+    /// `SFTPTransferEngine.downloadDirectory`/`uploadDirectory` for what
+    /// merges, what is skipped and how the policy applies per file.
+    @discardableResult
+    func downloadDirectory(
+        remotePath: String, to localDirectory: URL,
+        policy: SFTPTransferEngine.ConflictPolicy,
+        progress: SFTPTransferEngine.DirectoryProgressHandler?
+    ) async throws(SFTPError) -> SFTPTransferEngine.DirectoryTransferReceipt
+
+    @discardableResult
+    func uploadDirectory(
+        from localDirectory: URL, to remotePath: String,
+        policy: SFTPTransferEngine.ConflictPolicy,
+        progress: SFTPTransferEngine.DirectoryProgressHandler?
+    ) async throws(SFTPError) -> SFTPTransferEngine.DirectoryTransferReceipt
+
     /// Ends the session and the channel behind it. Idempotent.
     func close()
 }
@@ -224,6 +241,30 @@ public final class SFTPConnection: SFTPClient, @unchecked Sendable {
             try await engine().upload(
                 from: localSource, to: remotePath, policy: policy,
                 partialDisposition: partialDisposition, progress: progress)
+        }
+    }
+
+    @discardableResult
+    public func downloadDirectory(
+        remotePath: String, to localDirectory: URL,
+        policy: SFTPTransferEngine.ConflictPolicy,
+        progress: SFTPTransferEngine.DirectoryProgressHandler?
+    ) async throws(SFTPError) -> SFTPTransferEngine.DirectoryTransferReceipt {
+        try await classify {
+            try await engine().downloadDirectory(
+                remotePath: remotePath, to: localDirectory, policy: policy, progress: progress)
+        }
+    }
+
+    @discardableResult
+    public func uploadDirectory(
+        from localDirectory: URL, to remotePath: String,
+        policy: SFTPTransferEngine.ConflictPolicy,
+        progress: SFTPTransferEngine.DirectoryProgressHandler?
+    ) async throws(SFTPError) -> SFTPTransferEngine.DirectoryTransferReceipt {
+        try await classify {
+            try await engine().uploadDirectory(
+                from: localDirectory, to: remotePath, policy: policy, progress: progress)
         }
     }
 

@@ -20769,6 +20769,301 @@
           }
         }
       }
+    },
+    "sftp.conflict.directory": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A folder (its files are compared one by one)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "一个文件夹（其中的文件逐个比较）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "一個資料夾（其中的檔案逐一比較）"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "フォルダ（中のファイルは1つずつ比較されます）"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "폴더(안의 파일은 하나씩 비교됩니다)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ein Ordner (seine Dateien werden einzeln verglichen)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Un dossier (ses fichiers sont comparés un par un)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Una carpeta (sus archivos se comparan uno a uno)"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Uma pasta (seus arquivos são comparados um a um)"
+          }
+        }
+      }
+    },
+    "sftp.conflict.directoryExists": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A folder with this name already exists here. Overwrite replaces files that exist in both; Resume continues interrupted files; Keep Both uses a new folder name; Skip transfers nothing."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "此处已有同名文件夹。覆盖会替换两边都有的文件；续传会继续被中断的文件；保留两者使用新文件夹名；跳过则不传输任何内容。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "此處已有同名資料夾。覆寫會取代兩邊都有的檔案；續傳會繼續被中斷的檔案；保留兩者使用新資料夾名稱；略過則不傳輸任何內容。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "同名のフォルダが既にここにあります。上書きは両方にあるファイルを置き換え、再開は中断したファイルを続け、両方を保持は新しいフォルダ名を使い、スキップは何も転送しません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "같은 이름의 폴더가 이미 있습니다. 덮어쓰기는 양쪽에 있는 파일을 교체하고, 재개는 중단된 파일을 이어가고, 둘 다 유지는 새 폴더 이름을 쓰고, 건너뛰기는 아무것도 전송하지 않습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ein Ordner mit diesem Namen existiert hier bereits. Überschreiben ersetzt Dateien, die auf beiden Seiten vorhanden sind; Fortsetzen setzt unterbrochene Dateien fort; Beide behalten verwendet einen neuen Ordnernamen; Überspringen überträgt nichts."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Un dossier de ce nom existe déjà ici. Remplacer écrase les fichiers présents des deux côtés ; Reprendre poursuit les fichiers interrompus ; Conserver les deux utilise un nouveau nom de dossier ; Ignorer ne transfère rien."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ya existe aquí una carpeta con este nombre. Sobrescribir reemplaza los archivos presentes en ambos lados; Reanudar continúa los archivos interrumpidos; Conservar ambos usa un nombre de carpeta nuevo; Omitir no transfiere nada."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Já existe aqui uma pasta com este nome. Substituir troca os arquivos presentes em ambos os lados; Retomar continua os arquivos interrompidos; Manter ambos usa um novo nome de pasta; Ignorar não transfere nada."
+          }
+        }
+      }
+    },
+    "sftp.directory.skipped": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$d item(s) were not transferred (symbolic links or special files): %2$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$d 项未传输（符号链接或特殊文件）：%2$@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$d 項未傳輸（符號連結或特殊檔案）：%2$@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$d 項目は転送されませんでした（シンボリックリンクまたは特殊ファイル）: %2$@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$d개 항목이 전송되지 않았습니다(심볼릭 링크 또는 특수 파일): %2$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$d Objekt(e) wurden nicht übertragen (symbolische Links oder Spezialdateien): %2$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$d élément(s) non transféré(s) (liens symboliques ou fichiers spéciaux) : %2$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$d elemento(s) no se transfirieron (enlaces simbólicos o archivos especiales): %2$@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$d item(ns) não foram transferidos (links simbólicos ou arquivos especiais): %2$@"
+          }
+        }
+      }
+    },
+    "sftp.transfer.files": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$d of %2$d files"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$d / %2$d 个文件"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$d / %2$d 個檔案"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$d / %2$d ファイル"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "파일 %1$d / %2$d"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$d von %2$d Dateien"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$d fichiers sur %2$d"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$d de %2$d archivos"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$d de %2$d arquivos"
+          }
+        }
+      }
+    },
+    "sftp.transfer.doneDirectory": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done — %1$d files, %2$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "完成——%1$d 个文件，%2$@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "完成——%1$d 個檔案，%2$@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "完了 — %1$d ファイル、%2$@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "완료 — 파일 %1$d개, %2$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Fertig – %1$d Dateien, %2$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Terminé — %1$d fichiers, %2$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Listo: %1$d archivos, %2$@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Concluído — %1$d arquivos, %2$@"
+          }
+        }
+      }
     }
   }
 }
