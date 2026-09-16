@@ -17,6 +17,11 @@ nonisolated struct WindowState: Equatable, Sendable {
     static let currentVersion = 1
 
     var version: Int
+    /// B16 — `TerminalWindowController.windowID`, so the identity an App
+    /// Intent resolved before a relaunch still names the same window after
+    /// it. `nil` for data saved before this existed; the restored window
+    /// then mints a fresh one.
+    var id: String?
     var frame: Frame
     var layout: PaneLayout
     /// B09 — `NSWindow.tabbingIdentifier` at save time, so windows that were
@@ -114,12 +119,13 @@ nonisolated struct WindowState: Equatable, Sendable {
 
 nonisolated extension WindowState: Codable {
     private enum CodingKeys: String, CodingKey {
-        case version, frame, layout, tabGroupID, tabIndex, isSelectedTab
+        case version, id, frame, layout, tabGroupID, tabIndex, isSelectedTab
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 0
+        id = try container.decodeIfPresent(String.self, forKey: .id)
         frame = try container.decode(Frame.self, forKey: .frame)
         layout = try container.decode(PaneLayout.self, forKey: .layout)
         tabGroupID = try container.decodeIfPresent(String.self, forKey: .tabGroupID)
@@ -130,6 +136,7 @@ nonisolated extension WindowState: Codable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(Self.currentVersion, forKey: .version)
+        try container.encodeIfPresent(id, forKey: .id)
         try container.encode(frame, forKey: .frame)
         try container.encode(layout, forKey: .layout)
         try container.encodeIfPresent(tabGroupID, forKey: .tabGroupID)

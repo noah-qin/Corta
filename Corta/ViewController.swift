@@ -1556,12 +1556,6 @@ class ViewController: NSViewController {
             height: gridHeight)
     }
 
-    override var representedObject: Any? {
-        didSet {
-            // Update the view, if already loaded.
-        }
-    }
-
     // MARK: - Failure paths
 
     /// The atlas for the configured face, falling back to the system face at

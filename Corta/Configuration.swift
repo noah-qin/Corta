@@ -17,9 +17,10 @@ import Foundation
 /// than dropped: a config written by a newer Corta must survive a round trip
 /// through an older one.
 ///
-/// Two families of key are structured rather than scalar, and both use a
+/// Three families of key are structured rather than scalar, and all use a
 /// dotted prefix so the flat format does not need nesting: `theme.<name>.…`
-/// defines a colour theme (M7.6), and `bind.<command>` rebinds a keyboard
+/// defines a colour theme (M7.6), `preset.<name>.…` a shell/directory/
+/// environment preset (U16), and `bind.<command>` rebinds a keyboard
 /// shortcut (M7.7).
 nonisolated struct Configuration: Equatable, Sendable {
     /// Which of a theme's two variants is live (M6.13).
@@ -38,6 +39,26 @@ nonisolated struct Configuration: Equatable, Sendable {
         /// so the target is visible before the click. Selection still wins
         /// the moment the mouse moves, so dragging across a URL selects it.
         case click
+    }
+
+    /// B16 — where the Quick Terminal's panel sits on its screen.
+    enum QuickTerminalPosition: String, CaseIterable, Sendable {
+        /// A band across the top edge, the width of the screen.
+        case top
+        /// The same band along the bottom edge.
+        case bottom
+        /// A window centred on the screen, smaller than either band.
+        case center
+    }
+
+    /// B16 — which display the Quick Terminal opens on.
+    enum QuickTerminalScreen: String, CaseIterable, Sendable {
+        /// The screen under the pointer at the moment the hotkey is pressed
+        /// — the one the user is looking at, on a multi-display desk.
+        case mouse
+        /// `NSScreen.main`: the screen holding the key window, or the primary
+        /// display when nothing is key.
+        case main
     }
 
     var fontFamily: String = Configuration.systemFontFamily
@@ -169,6 +190,27 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// either moves it or says not to ask again.
     var suggestApplicationsFolder: Bool = true
 
+    /// B16 — whether a global hotkey summons the Quick Terminal.
+    ///
+    /// Off by default. A global hotkey is claimed system-wide, in every
+    /// application, and the key a person would want for it is one another
+    /// tool on their machine may already own; nothing is taken from the
+    /// rest of the desktop until the user asks in this file.
+    var quickTerminal: Bool = false
+    /// The hotkey, in `bind.*` notation. Matched by *key position* on the
+    /// ANSI layout (`GlobalHotKey`), the way every Carbon hotkey is — the
+    /// letter names the key cap, not the character it types under the
+    /// current input source.
+    var quickTerminalKey: Shortcut? = Shortcut.parse(Configuration.defaultQuickTerminalKey)
+    var quickTerminalPosition: QuickTerminalPosition = .top
+    var quickTerminalScreen: QuickTerminalScreen = .mouse
+    /// B16 — Secure Keyboard Entry: while a Corta window is key, the system
+    /// stops other processes from observing keystrokes (`SecureInput`). Off
+    /// by default because it is system-wide — it also blocks the
+    /// accessibility tools, macro utilities and text expanders a person
+    /// may rely on — so it is a choice only the user can make.
+    var secureKeyboardEntry: Bool = false
+
     /// Themes defined in the config file itself (M7.6), in file order.
     var customThemes: [Theme] = []
 
@@ -181,6 +223,11 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// The sentinel meaning "whatever `NSFont.monospacedSystemFont` gives",
     /// which is the default and tracks the OS rather than pinning a face.
     static let systemFontFamily = "system"
+
+    /// The hotkey a fresh `quick-terminal = true` gets. ⌥Space is the key
+    /// launchers and quick-access panels on the Mac have settled on; a user
+    /// whose launcher already holds it changes `quick-terminal-key`.
+    static let defaultQuickTerminalKey = "alt+space"
 
     init() {}
 
@@ -344,6 +391,30 @@ nonisolated struct Configuration: Equatable, Sendable {
         case "suggest-applications-folder":
             guard let parsed = Self.parseBool(value) else { return false }
             suggestApplicationsFolder = parsed
+        case "quick-terminal":
+            guard let parsed = Self.parseBool(value) else { return false }
+            quickTerminal = parsed
+        case "quick-terminal-key":
+            // An empty value means "no hotkey": the Quick Terminal is then
+            // reachable from the menu and the palette only. A shortcut with
+            // no modifier at all is refused — a bare `space` claimed
+            // system-wide would swallow the key in every application.
+            if value.isEmpty {
+                quickTerminalKey = nil
+            } else {
+                guard let shortcut = Shortcut.parse(value), GlobalHotKey.isRegistrable(shortcut)
+                else { return false }
+                quickTerminalKey = shortcut
+            }
+        case "quick-terminal-position":
+            guard let parsed = QuickTerminalPosition(rawValue: value) else { return false }
+            quickTerminalPosition = parsed
+        case "quick-terminal-screen":
+            guard let parsed = QuickTerminalScreen(rawValue: value) else { return false }
+            quickTerminalScreen = parsed
+        case "secure-keyboard-entry":
+            guard let parsed = Self.parseBool(value) else { return false }
+            secureKeyboardEntry = parsed
         default:
             return false
         }
@@ -528,6 +599,13 @@ nonisolated struct Configuration: Equatable, Sendable {
             "confirm-close = \(confirmClose)",
             "update-auto-check = \(updateAutoCheck)",
             "suggest-applications-folder = \(suggestApplicationsFolder)",
+            "secure-keyboard-entry = \(secureKeyboardEntry)",
+            "",
+            "# Quick Terminal (B16): a panel summoned by a system-wide hotkey.",
+            "quick-terminal = \(quickTerminal)",
+            "quick-terminal-key = \(quickTerminalKey?.text ?? "")",
+            "quick-terminal-position = \(quickTerminalPosition.rawValue)",
+            "quick-terminal-screen = \(quickTerminalScreen.rawValue)",
             "",
             "# Notifications",
             "notify-on-long-task = \(notifyOnLongTask)",

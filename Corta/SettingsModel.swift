@@ -52,6 +52,11 @@ final class SettingsModel {
     var confirmClose: Bool = true
     var notifyOnLongTask: Bool = false
     var notificationThreshold: Double = 30
+    var quickTerminal: Bool = false
+    var quickTerminalKey: Shortcut? = Shortcut.parse(Configuration.defaultQuickTerminalKey)
+    var quickTerminalPosition: Configuration.QuickTerminalPosition = .top
+    var quickTerminalScreen: Configuration.QuickTerminalScreen = .mouse
+    var secureKeyboardEntry: Bool = false
 
     /// The bell modes in the order the picker lists them.
     static let bellModes: [BellMode] = [.visual, .audible, .muted]
@@ -68,6 +73,8 @@ final class SettingsModel {
     var shellIntegrationStatus = RowStatus()
     var directoryHistoryStatus = RowStatus()
     var notificationPermissionNotice = RowStatus()
+    /// B16 — which key summons the Quick Terminal, or why none does.
+    var quickTerminalStatus = RowStatus()
 
     private var clearTask: Task<Void, Never>?
 
@@ -87,6 +94,11 @@ final class SettingsModel {
             forName: TaskNotifier.permissionDidChange, object: nil, queue: .main
         ) { [weak self] _ in
             Task { @MainActor in self?.refreshNotificationPermissionNotice() }
+        }
+        NotificationCenter.default.addObserver(
+            forName: QuickTerminalController.hotKeyStatusDidChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.refreshQuickTerminalStatus() }
         }
     }
 
@@ -120,6 +132,12 @@ final class SettingsModel {
         confirmClose = configuration.confirmClose
         notifyOnLongTask = configuration.notifyOnLongTask
         notificationThreshold = configuration.notificationThreshold
+        quickTerminal = configuration.quickTerminal
+        quickTerminalKey = configuration.quickTerminalKey
+        quickTerminalPosition = configuration.quickTerminalPosition
+        quickTerminalScreen = configuration.quickTerminalScreen
+        secureKeyboardEntry = configuration.secureKeyboardEntry
+        refreshQuickTerminalStatus()
         refreshFontStatus()
         refreshShellIntegrationStatus()
         refreshDirectoryHistoryStatus()
@@ -252,6 +270,63 @@ final class SettingsModel {
         commit { configuration in
             configuration.restoreWindows = value
             return nil
+        }
+    }
+
+    // MARK: - System entry points (B16)
+
+    func setQuickTerminal(_ value: Bool) {
+        commit { configuration in
+            configuration.quickTerminal = value
+            return nil
+        }
+    }
+
+    func setQuickTerminalPosition(_ value: Configuration.QuickTerminalPosition) {
+        commit { configuration in
+            configuration.quickTerminalPosition = value
+            return nil
+        }
+    }
+
+    func setQuickTerminalScreen(_ value: Configuration.QuickTerminalScreen) {
+        commit { configuration in
+            configuration.quickTerminalScreen = value
+            return nil
+        }
+    }
+
+    func setSecureKeyboardEntry(_ value: Bool) {
+        commit { configuration in
+            configuration.secureKeyboardEntry = value
+            return nil
+        }
+    }
+
+    /// The hotkey line under the Quick Terminal toggle. The key itself is
+    /// edited in the config file (`quick-terminal-key`), like every `bind.*`
+    /// shortcut: a key-capture control would be a second editor for one
+    /// value. What the page adds is the fact the file cannot show — whether
+    /// the system actually granted the key.
+    private func refreshQuickTerminalStatus() {
+        guard quickTerminal else {
+            quickTerminalStatus = RowStatus(
+                kind: .none, message: L10n.text("settings.status.quickTerminalOff"))
+            return
+        }
+        guard let key = quickTerminalKey else {
+            quickTerminalStatus = RowStatus(
+                kind: .adjusted, message: L10n.text("settings.status.quickTerminalNoKey"))
+            return
+        }
+        if QuickTerminalController.shared.hotKeyRegistrationFailed {
+            quickTerminalStatus = RowStatus(
+                kind: .failed,
+                message: L10n.format("settings.status.quickTerminalKeyTaken", key.displayText))
+        } else {
+            quickTerminalStatus = RowStatus(
+                kind: .saved,
+                message: L10n.format("settings.status.quickTerminalKey", key.displayText))
         }
     }
 

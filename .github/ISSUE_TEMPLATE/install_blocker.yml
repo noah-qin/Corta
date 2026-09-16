@@ -1,0 +1,66 @@
+name: Installation blocker
+description: You could not get Corta downloaded, opened, or started on your Mac.
+labels: ["install"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        An install that fails is a bug in the release, the packaging or the
+        documentation, and every one is worth fixing — thank you for taking
+        the time. Check [`docs/TROUBLESHOOTING.md`](https://github.com/noah-qin/Corta/blob/main/docs/TROUBLESHOOTING.md)
+        first; if it has an entry for what you saw and the entry is wrong,
+        say so here.
+
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Where it stopped
+      options:
+        - Downloading the release archive
+        - Verifying the checksum
+        - Opening Corta.app (Gatekeeper, "damaged", "cannot check for malicious software")
+        - Corta starts but shows no window, or a blank window
+        - Corta starts but the shell does not
+        - Building from source
+        - Updating an installed Corta (Check for Updates…)
+        - Somewhere else
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: Exactly what you saw
+      description: The dialog text, the command's output, or a screenshot. Paste text as text where you can.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Corta version and where it came from
+      placeholder: "0.1.1 from the GitHub release / built from main at abc1234"
+    validations:
+      required: true
+
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version and Mac
+      placeholder: "macOS 26.1 (25B…), MacBook Air M3"
+    validations:
+      required: true
+
+  - type: textarea
+    id: checks
+    attributes:
+      label: What the archive check says, if you got that far
+      description: The output of `shasum -a 256 -c Corta-<version>.zip.sha256`, and of `spctl --assess --type exec /Applications/Corta.app` if the app is on disk.
+      render: shell
+
+  - type: textarea
+    id: shell
+    attributes:
+      label: If Corta starts but the shell does not
+      description: The output of `echo $SHELL`, `launchctl getenv SHELL`, and the text of the failure view in the pane.
+      render: shell

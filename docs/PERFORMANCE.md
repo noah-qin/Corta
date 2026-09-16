@@ -317,7 +317,7 @@ core-side only; it says nothing about the AppKit/render stages §5.3 and
 
 ### 5.2 The fixed benchmark environment
 
-Numbers recorded in this document or in `ROADMAP.md` are only comparable
+Numbers recorded in this document or in `docs/history/ROADMAP-0.1.md` are only comparable
 against numbers taken the same way. Any run that is quoted must state:
 
 | Variable          | Fixed at                                              |

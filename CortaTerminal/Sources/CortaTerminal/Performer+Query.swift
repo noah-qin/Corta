@@ -162,7 +162,7 @@ extension Performer {
     /// implementation is either colour-managed properly or it is a wrong
     /// number dressed as a right one. The esctest cases covering them are
     /// recorded as expected failures for exactly this reason
-    /// (`docs/ROADMAP.md`, `docs/CONFORMANCE.md` §3). Refusing is also the
+    /// (`docs/history/ROADMAP-0.1.md`, `docs/CONFORMANCE.md` §3). Refusing is also the
     /// safe direction: a program that sets a background it cannot verify and
     /// gets no change is a program whose text stays legible, whereas a
     /// mis-converted `CIELab` black-on-black is a terminal you cannot read.

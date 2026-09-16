@@ -119,7 +119,7 @@ translation's state are worth knowing before touching this file:
   Xcode's own String Catalog editor takes it to mean: this text has not
   been checked by a native speaker in context, whatever produced it
   (currently: an AI assistant, for every non-English string in the file
-  as of B10 — `docs/ROADMAP.md`'s B10 entry). It is not a placeholder and
+  as of B10 — `docs/history/ROADMAP-0.1.md`'s B10 entry). It is not a placeholder and
   not broken; it ships and reads correctly to Corta at runtime exactly
   like `"translated"` — the state is an editorial marker, not a build
   gate. Adding a string keeps this pattern: write the English value,
@@ -159,6 +159,10 @@ than one that looks done and is not.
 - **Bugs and feature requests** — open an issue. The forms ask for the
   byte sequence that reproduces the problem; that is the part that makes a
   VT bug fixable.
+- **Could not install or start Corta** — the *Installation blocker* form.
+  Check `docs/TROUBLESHOOTING.md` first, and say so if its entry was wrong.
+- **Tried Corta and went back** — the *Went back to my old terminal* form.
+  No reproduction needed; the reason is the report.
 - **Questions and ideas** — Discussions, not issues.
 - **Security vulnerabilities** — never in public. `SECURITY.md` has the
   private reporting channel.

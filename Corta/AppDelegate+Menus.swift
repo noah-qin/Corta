@@ -379,6 +379,12 @@ extension AppDelegate {
         ] {
             shell.addItem(item(for: command))
         }
+        // B16 — Secure Keyboard Entry, last and alone: it is the one item in
+        // this menu that changes the *machine's* input mode rather than a
+        // pane, and Terminal.app's own Shell menu puts it in the same place.
+        // Checkmarked from the config file (`validateMenuItem`).
+        shell.addItem(.separator())
+        shell.addItem(item(for: .secureKeyboardEntry))
     }
 
     /// Export Text…, under File — where a Mac app puts "write what is here
@@ -418,6 +424,12 @@ extension AppDelegate {
         }
         view.addItem(.separator())
         view.addItem(item(for: .commandPalette))
+        // B16 — the Quick Terminal, beside the palette: both are "bring a
+        // surface to me" rather than a change to the window in front. Its
+        // key equivalent stays empty by design: the system-wide hotkey is
+        // `quick-terminal-key`, held by `GlobalHotKey`, and Settings ▸
+        // General shows which key that is.
+        view.addItem(item(for: .quickTerminal))
         view.addItem(.separator())
 
         let themeItem = NSMenuItem(title: L10n.text("settings.label.theme"), action: nil, keyEquivalent: "")

@@ -218,6 +218,36 @@ closing a window stopped what was in it.
 
 ---
 
+### 4.5 Secure keyboard entry
+
+Shipped in B16 as `secure-keyboard-entry` (`docs/CONFIGURATION.md` §2),
+off by default. `SecureInput` is the only caller of
+`EnableSecureEventInput`/`DisableSecureEventInput`; it holds one bit of
+state and recomputes it from three facts — the setting, whether Corta is
+active, whether a terminal window is key — so the system counter is never
+above one and is released at quit whatever else happened. A lock in the
+titlebar reflects the *engaged* state, not the setting: the moment another
+application is frontmost the lock is open, and the titlebar says so. It is
+a user-facing option rather than a default because it is system-wide and
+also blocks accessibility clients, macro tools and text expanders.
+
+### 4.6 External automation is a third trust boundary
+
+B16 adds two ways for something *outside* a Corta window to act on Corta:
+a system-wide hotkey and three App Intents (open a window, focus a window,
+toggle the Quick Terminal). Neither accepts text for a child's stdin, and
+neither ever will: an automation assembled from a shared Shortcut or a web
+page is no more trusted than escape sequences off the PTY. The one
+parameter an intent takes is a directory, checked to exist and handed to
+`spawn` as its working directory. Windows are addressed by an identity
+minted at creation (`TerminalWindowController.windowID`), never by title —
+titles are written by the child process — and a stale identity fails with
+an error rather than resolving to whichever window is nearest. The hotkey
+is a Carbon `RegisterEventHotKey`, dispatched by the window server: it
+needs no Accessibility permission (rule 7) and, unlike an `NSEvent`
+global monitor, keeps working under Secure Keyboard Entry. Terminal
+transcripts are never indexed for Spotlight.
+
 ## 5. Data at Rest
 
 **Scrollback is never persisted to disk.** It routinely contains
@@ -248,15 +278,6 @@ from the terminal stream is ever written into it.
 If session persistence is ever added, it is opt-in, documented as storing
 plaintext, and off by default.
 
-### Secure keyboard entry
-
-Consider exposing `EnableSecureEventInput` (as iTerm2 does). It prevents
-other processes from observing keystrokes while the terminal has focus,
-which matters when typing passwords at a `sudo` or SSH prompt. It has a
-system-wide cost, so it is a user-facing option rather than a default.
-
----
-
 ## 6. Rules Summary
 
 For quick reference during implementation and review:
@@ -275,6 +296,16 @@ For quick reference during implementation and review:
 
 ## 7. Change Log
 
+- **S10 — 2026-09-16: system entry points added without a command path
+  (B16).** Three App Intents (open a window, focus a window by identity,
+  toggle the Quick Terminal), one Carbon hotkey and Secure Keyboard Entry
+  shipped. None of them carries text toward a child's stdin, and §4.6 says
+  that none ever will; the one intent parameter is a directory checked to
+  exist. The hotkey uses `RegisterEventHotKey` rather than an `NSEvent`
+  global monitor precisely so that Corta never asks for Accessibility
+  access (rule 7). `SecureInput` is the sole caller of the secure-input
+  counter and releases it at quit; a titlebar lock shows the engaged state
+  rather than the setting.
 - **S05 — 2026-09-06: OSC 7 working-directory reports are host-checked.**
   The payload of OSC 7 is a `file://host/path` URL, and a shell reached over
   `ssh` (or a pane inside `tmux` on one) reports a directory on *that* host.

@@ -355,6 +355,7 @@ Explicitly out of scope. Each has been considered and rejected.
 | Cross-platform                                | Forfeits Metal and Core Text, the entire premise            |
 | tmux control mode (`-CC`)                     | A second protocol *and* a second window model; same cost class as building a multiplexer |
 | AI features, command blocks, cloud sync       | Conflicts with "small, not heavy"                           |
+| Automation that runs commands (a "run this" intent or URL) | An external input reaching a child's stdin; `SECURITY.md` §4.6. Open/focus intents ship; execution does not |
 | Implementing SSH or git                       | They are programs running on a PTY; rendering correctly is the whole job |
 | Bidirectional text (RTL)                      | Large complexity, and a security footgun (see `SECURITY.md`) |
 | Terminal title *query* responses              | Command injection vector; see `SECURITY.md` §2.2            |
@@ -517,7 +518,7 @@ Ordered by how badly they are usually underestimated.
    | Owner | Isolation | Mechanism |
    |---|---|---|
    | `Parser`, `Performer`, `Grid`, `Scrollback` | `nonisolated` | Pure value types / state machines; mutated only while `TerminalSession.state`'s lock is held. |
-   | `TerminalSession` | `nonisolated`, `@unchecked Sendable` | `Synchronization.Mutex` around every mutable field (`State`, `Callbacks`, `PendingWrites`, `stopped`, `started`, `requestedResize`). Verified case by case (`docs/V0.1.1-ENGINEERING-AUDIT.md` A02); no `@unchecked` is load-bearing on its own. |
+   | `TerminalSession` | `nonisolated`, `@unchecked Sendable` | `Synchronization.Mutex` around every mutable field (`State`, `Callbacks`, `PendingWrites`, `stopped`, `started`, `requestedResize`). Verified case by case (`docs/history/V0.1.1-ENGINEERING-AUDIT.md` A02); no `@unchecked` is load-bearing on its own. |
    | `PTY` | `nonisolated`, `@unchecked Sendable` | Same pattern: a `Mutex<State>` around the exit/reaping/closed flags a descriptor's use depends on (S08). |
    | AppKit shell (`ViewController`, `SplitViewController`, `AppDelegate`, `TaskNotifier`) | `@MainActor` (project default) | The Xcode target's `SWIFT_DEFAULT_ACTOR_ISOLATION`; see §2.2 for why the core opts out instead. |
 

@@ -5,7 +5,7 @@ import Foundation
 import Synchronization
 
 /// `corta-bench` — measures the numbers `docs/PERFORMANCE.md` §1 sets
-/// targets for and `docs/ROADMAP.md` M1.21 asks to be recorded, not
+/// targets for and `docs/history/ROADMAP-0.1.md` M1.21 asks to be recorded, not
 /// estimated. Run release for real numbers:
 ///
 ///     swift run -c release corta-bench

@@ -131,12 +131,12 @@ extension AppDelegate {
             return
         }
         // A new window's own first pane is created as its view loads, so the
-        // preset is set before that happens rather than opening a second pane
-        // and closing the first — which is what an extra split would be.
-        guard let controller = instantiateWindowController(),
-            let split = controller.contentViewController as? SplitViewController
+        // preset is staged before that happens rather than opening a second
+        // pane and closing the first — which is what an extra split would be.
+        guard
+            let controller = instantiateWindowController(
+                setup: SplitViewController.Setup(preset: preset))
         else { return }
-        split.pendingPreset = preset
         controller.showWindow(self)
         controller.window?.makeKeyAndOrderFront(self)
     }

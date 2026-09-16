@@ -291,12 +291,6 @@ public struct SFTPStatus: Equatable, Sendable {
     }
 
     public var messageString: String { String(decoding: message, as: UTF8.self) }
-
-    /// True for the statuses that answer a question definitively — as
-    /// opposed to transport trouble, which retrying might get past. The
-    /// transfer engine's retry policy keys off this: a definitive server
-    /// answer is never retried.
-    public var isDefinitiveAnswer: Bool { true }
 }
 
 /// The pflags word of OPEN (§8.1.1).
@@ -394,14 +388,6 @@ public enum SFTPPayload: Equatable, Sendable {
         case .name: SFTPCodec.MessageType.name
         case .attrs: SFTPCodec.MessageType.attrs
         case .extendedReply: SFTPCodec.MessageType.extendedReply
-        }
-    }
-
-    /// Whether this payload's message carries a request-id on the wire.
-    var hasRequestID: Bool {
-        switch self {
-        case .initialize, .version: false
-        default: true
         }
     }
 

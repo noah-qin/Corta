@@ -98,7 +98,7 @@ properly or it is a wrong number dressed as a right one. Refusing is also
 the safe direction: a program that sets a colour and sees no change keeps
 legible text, whereas a mis-converted `CIELab` black-on-black is a
 terminal you cannot read. The corresponding esctest cases are recorded as
-expected failures for this reason (`ROADMAP.md`), and
+expected failures for this reason (`docs/history/ROADMAP-0.1.md`), and
 `Performer+Query.parseColorSpecification` carries the policy in full.
 
 **DECSCL gates DECRQM.** A program that announced VT200 with
@@ -277,7 +277,7 @@ SHELL=/tmp/corta-esctest.sh Corta.app/Contents/MacOS/Corta
 **0.1.1 result (2026-09-08): 112 passed, 335 known bugs, 121 failed of
 568.** Against the M6 record (106 / 335 / 127) that is six more passing
 and none regressed. The failures are classified by real application
-impact in `docs/V0.1.1-QUALITY-PLAN.md` Q01, and every failing test name
+impact in `docs/history/V0.1.1-QUALITY-PLAN.md` Q01, and every failing test name
 is kept in `docs/esctest/0.1.1-results.txt` so the next run is a diff
 rather than a re-reading. The largest single cause is one absence: OSC
 4/5 indexed palette set and query are not implemented, which accounts
@@ -371,6 +371,25 @@ under `Corta/` is therefore verified by launching the app and checking:
 5. gestures and menu actions reach the pane — the terminal view is first
    responder, so `keyDown` fires and First-Responder menu items (⌘V, ⌘=)
    are not dead.
+
+**System entry points (B16) are checked by hand, and the record says
+what was and was not.** A hotkey and a floating panel are properties of
+the window server, not of the view hierarchy, so the check is: with
+`quick-terminal = true` in a staged config (`CORTA_STAGE_DIR`), the key
+summons the panel over another application and dismisses it again;
+dismissing returns focus to that application; the panel appears beside a
+full-screen app without leaving its Space; ⌘T from it opens a normal
+window; Shell ▸ Secure Keyboard Entry shows the titlebar lock only while
+a terminal window is key, and the lock clears when another app comes
+forward. Multi-display placement (`quick-terminal-screen`) needs two
+displays and is recorded as *not judged* when the machine has one. A
+simulated keypress (`osascript` `key code`) does reach a Carbon hotkey,
+which is how the summon/dismiss half and the titlebar lock were
+exercised when B16 landed — over a single display, with the panel
+opening as a top band and hiding when another app came forward. Focus
+return to the summoning app, the full-screen-Space case and ⌘T from the
+panel are *not judged* by that run and are the maintainer's hand check
+before the next release.
 
 **Remote workflows (B13/B14) have a launched-app check of their own**,
 `CortaUITests/RemoteWorkflowUITests`, which is the shape every
@@ -524,7 +543,7 @@ alone:
 
 Items 7, 8 and 10 above have no automated substitute and are recorded with
 an explicit **not judged** state when a pass has not actually run one
-(precedent: `V0.1.1-MANUAL-VERIFICATION.md`'s VoiceOver read-through, marked
+(precedent: `docs/history/V0.1.1-MANUAL-VERIFICATION.md`'s VoiceOver read-through, marked
 "not judged" rather than silently skipped when the tester could not follow
 spoken English closely enough to have an opinion). "Not judged" means
 exactly that — no automated check stands in for it, and no claim of success
@@ -614,7 +633,7 @@ than silently skipped:
   audit above tests the *data* VoiceOver consumes, not the experience of
   hearing it — that needs a person with working audio judgment running
   VoiceOver live, which this pass did not have. Precedent:
-  `V0.1.1-MANUAL-VERIFICATION.md`'s identical "not judged" state for the
+  `docs/history/V0.1.1-MANUAL-VERIFICATION.md`'s identical "not judged" state for the
   same reason.
 - **Not judged: native-speaker translation review.** The mechanical audit
   above (format specifiers, untranslated copies) is not a substitute for

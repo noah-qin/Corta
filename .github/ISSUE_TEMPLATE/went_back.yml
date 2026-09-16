@@ -1,0 +1,55 @@
+name: Went back to my old terminal
+description: You tried Corta and returned to Terminal.app, iTerm2, Ghostty, kitty or something else. Tell us why.
+labels: ["retention"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is not a bug report and needs no reproduction. A terminal that
+        someone tried and left tells the project something no test can, and
+        "it just felt off" is an acceptable answer. Nothing here obliges you
+        to come back.
+
+  - type: input
+    id: previous
+    attributes:
+      label: What you went back to
+      placeholder: "iTerm2 3.5"
+    validations:
+      required: true
+
+  - type: input
+    id: duration
+    attributes:
+      label: How long you used Corta
+      placeholder: "an afternoon / two weeks as my daily terminal"
+
+  - type: textarea
+    id: why
+    attributes:
+      label: What sent you back
+      description: >
+        The thing that made the decision, in your own words. A missing
+        feature, a rendering problem, a program that misbehaved, speed,
+        a habit the keys did not match — whatever it was.
+    validations:
+      required: true
+
+  - type: textarea
+    id: kept
+    attributes:
+      label: Anything you would have kept
+      description: Optional. What Corta did that your old terminal does not.
+
+  - type: input
+    id: version
+    attributes:
+      label: Corta version
+      placeholder: "0.1.1"
+
+  - type: checkboxes
+    id: followup
+    attributes:
+      label: Follow-up
+      options:
+        - label: I am willing to answer a question or two about this.

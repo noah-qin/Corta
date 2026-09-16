@@ -16,6 +16,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// nothing else retains a window controller, and a deallocated
     /// controller takes its window (and its session) down with it.
     private var windowControllers: [NSWindowController] = []
+    /// B16 — the windows an App Intent may name: every ordinary terminal
+    /// window, in the order they were opened. The Quick Terminal is left
+    /// out — it has its own intent and is not a window a person arranges.
+    var terminalWindowControllers: [TerminalWindowController] {
+        windowControllers.compactMap { $0 as? TerminalWindowController }.filter { !$0.isQuickTerminal }
+    }
     /// The debounced arrangement write (U07); see `noteLayoutChanged`.
     var pendingLayoutSave: DispatchWorkItem?
     /// Set as the app starts quitting, so the windows closing on the way out
@@ -29,16 +35,48 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// `TerminalSession` — so a new window is composition, not new
     /// mechanism (`DESIGN.md` §2.4).
     @objc func newDocument(_ sender: Any?) {
-        guard let controller = instantiateWindowController() else { return }
+        openWindow(workingDirectory: nil)
+    }
+
+    /// B16 — the one route every "open a window" caller takes: ⌘N, the Dock
+    /// click, and the App Intent. `workingDirectory` is where the first pane
+    /// spawns, or `nil` for the home directory; it is a *path*, handed to the
+    /// spawn as its cwd and never written to the child's stdin.
+    @discardableResult
+    func openWindow(workingDirectory: String?) -> TerminalWindowController? {
+        guard
+            let controller = instantiateWindowController(
+                setup: SplitViewController.Setup(workingDirectory: workingDirectory))
+                as? TerminalWindowController
+        else { return nil }
         // Offset from the window it was opened from. Placed at the same
         // origin the new window is invisible behind the old one, and ⌘N
-        // looks like it did nothing.
-        if let previous = NSApp.keyWindow, let window = controller.window {
+        // looks like it did nothing. The Quick Terminal is not "the window
+        // it was opened from": its band across the screen edge is nowhere a
+        // normal window should be placed relative to.
+        if let previous = NSApp.keyWindow, let window = controller.window,
+            !QuickTerminalController.shared.owns(previous)
+        {
             window.setFrameTopLeftPoint(
                 NSPoint(x: previous.frame.minX + 24, y: previous.frame.maxY - 24))
         }
-        controller.showWindow(sender)
-        controller.window?.makeKeyAndOrderFront(sender)
+        controller.showWindow(nil)
+        controller.window?.makeKeyAndOrderFront(nil)
+        return controller
+    }
+
+    /// B16 — brings one window forward by identity, for the App Intent. The
+    /// window is made key and its tab selected; the app is activated so the
+    /// window actually reaches the front rather than ordering front inside
+    /// a background app. Returns false when no window has that id anymore.
+    @discardableResult
+    func focusWindow(id: String) -> Bool {
+        guard let controller = terminalWindowControllers.first(where: { $0.windowID == id }),
+            let window = controller.window
+        else { return false }
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
+        return true
     }
 
     /// File > New Tab (⌘T, M4.7): native window tabbing. The new session is
@@ -50,7 +88,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             let window = controller.window
         else { return }
         window.tabbingMode = .automatic
-        if let keyWindow = NSApp.keyWindow, keyWindow !== window {
+        // The Quick Terminal takes no tabs (`QuickTerminalController`): ⌘T
+        // from it opens the tab in a normal window instead — which, with no
+        // ordinary key window to join, is a new standalone window.
+        if let keyWindow = NSApp.keyWindow, keyWindow !== window,
+            !QuickTerminalController.shared.owns(keyWindow)
+        {
             // Join at the group's size: being born at the default size and
             // then resized by the tab group reads as a flash.
             window.setFrame(keyWindow.frame, display: false)
@@ -75,8 +118,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     /// One storyboard window controller, tracked so it lives as long as its
-    /// window does.
-    func instantiateWindowController() -> NSWindowController? {
+    /// window does. `setup` reaches the root pane *before* it spawns — see
+    /// `SplitViewController.pendingSetup` for why it cannot be assigned to
+    /// the controller afterwards.
+    func instantiateWindowController(setup: SplitViewController.Setup? = nil) -> NSWindowController? {
+        SplitViewController.pendingSetup = setup
+        defer { SplitViewController.pendingSetup = nil }
         guard let controller = NSStoryboard(name: "Main", bundle: nil)
             .instantiateInitialController() as? NSWindowController
         else { return nil }
@@ -86,7 +133,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     /// Retains `controller` until its window closes, so the array does not
     /// grow without bound and no open window loses its controller.
-    private func track(_ controller: NSWindowController) {
+    func track(_ controller: NSWindowController) {
         guard !windowControllers.contains(controller) else { return }
         windowControllers.append(controller)
         NotificationCenter.default.addObserver(
@@ -136,6 +183,28 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         CommandPaletteController.shared.show(sender)
     }
 
+    // MARK: - System entry points (B16)
+
+    /// View ▸ Quick Terminal, the palette, and the App Intent. The hotkey
+    /// reaches `QuickTerminalController.toggle` directly.
+    @objc func toggleQuickTerminal(_ sender: Any?) {
+        QuickTerminalController.shared.toggle()
+    }
+
+    /// Shell ▸ Secure Keyboard Entry. Writes the config file, which is the
+    /// setting's only store; `SecureInput` follows the file, so the menu,
+    /// the Settings page and a hand edit are one path with one state.
+    @objc func toggleSecureKeyboardEntry(_ sender: Any?) {
+        let turningOn = !ConfigurationStore.shared.configuration.secureKeyboardEntry
+        ConfigurationStore.shared.update { $0.secureKeyboardEntry = turningOn }
+        // Said in the pane, where the user is looking, because the effect is
+        // invisible by nature: nothing on screen changes when keystrokes stop
+        // reaching other processes.
+        let key = turningOn ? "secureInput.toast.on" : "secureInput.toast.off"
+        (NSApp.keyWindow?.contentViewController as? SplitViewController)?
+            .focusedPane?.terminalView?.showToast(L10n.text(key))
+    }
+
     @objc func selectTheme(_ sender: NSMenuItem) {
         let themes = Theme.all(in: ConfigurationStore.shared.configuration)
         guard sender.tag < themes.count else { return }
@@ -162,6 +231,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             menuItem.state =
                 Configuration.Appearance.allCases[menuItem.tag] == configuration.appearance
                 ? .on : .off
+        case #selector(toggleSecureKeyboardEntry(_:)):
+            menuItem.state = configuration.secureKeyboardEntry ? .on : .off
         default:
             break
         }
@@ -176,6 +247,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         _ = ConfigurationStore.shared
         _ = UpdateController.shared
         AppearanceController.shared.start()
+        // B16 — both follow the config file from here on. Before any window:
+        // the hotkey has to be held the moment the app is up, and Secure
+        // Keyboard Entry has to see the first window become key.
+        SecureInput.shared.start()
+        QuickTerminalController.shared.start()
         installMenus()
         // Before any window opens: a "move to Applications, then relaunch"
         // answer should not have to first show — and tear down — a shell
@@ -276,12 +352,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let preopened = windowControllers.first
         var restored: [(state: WindowState, controller: NSWindowController)] = []
         for state in states {
-            guard let controller = instantiateWindowController(),
-                let split = controller.contentViewController as? SplitViewController
+            // Staged before the view loads: the root pane needs its working
+            // directory (and, B09, its preset) at spawn time.
+            guard
+                let controller = instantiateWindowController(
+                    setup: SplitViewController.Setup(restore: state))
             else { continue }
-            // Before the view loads: the root pane needs its working
-            // directory (and now, B09, its preset) at spawn time.
-            split.pendingRestore = state
+            // B16 — the saved identity, so an intent resolved against last
+            // run's window still names this one.
+            if let id = state.id, let terminal = controller as? TerminalWindowController {
+                terminal.windowID = id
+            }
             controller.showWindow(nil)
             controller.window?.makeKeyAndOrderFront(nil)
             restored.append((state, controller))
@@ -381,6 +462,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     func applicationWillTerminate(_ aNotification: Notification) {
         isTerminating = true
         flushLayoutSave()
+        // B16 — the secure-input counter must be back at zero before the
+        // process ends; no notification will arrive to do it afterwards.
+        SecureInput.shared.disengage()
+        QuickTerminalController.shared.teardown()
         // Quit does not route through `windowWillClose` on every path, so
         // tear down explicitly rather than leaving the children to the
         // process-exit SIGHUP. Idempotent against windows already closed.

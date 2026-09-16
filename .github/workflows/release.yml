@@ -221,14 +221,18 @@ jobs:
             DEVELOPMENT_TEAM="" \
             -quiet
 
-      - name: Package
+      # The same script a maintainer runs locally (`scripts/package-release.sh`
+      # → `scripts/check-release.sh`): versions, build number, deployment
+      # target, CHANGELOG/README agreement, signature, archive and sidecar.
+      # One implementation of the rules, so the two routes reject the same
+      # artifact (B15).
+      - name: Package and check
         id: package
         run: |
           app=build/Build/Products/Release/Corta.app
           test -d "$app" || { echo "no app at $app"; exit 1; }
           zip="Corta-${{ steps.version.outputs.version }}.zip"
-          ditto -c -k --keepParent --sequesterRsrc "$app" "$zip"
-          shasum -a 256 "$zip" > "$zip.sha256"
+          scripts/package-release.sh "$app" "${{ steps.version.outputs.version }}" .
           echo "zip=$zip" >> "$GITHUB_OUTPUT"
 
       - name: Notarise and staple
@@ -249,21 +253,25 @@ jobs:
           codesign --verify --deep --strict --verbose=2 \
             build/Build/Products/Release/Corta.app
           rm -f /tmp/notary.p8 "${{ steps.package.outputs.zip }}"
-          ditto -c -k --keepParent --sequesterRsrc \
-            build/Build/Products/Release/Corta.app \
-            "${{ steps.package.outputs.zip }}"
-          shasum -a 256 "${{ steps.package.outputs.zip }}" \
-            > "${{ steps.package.outputs.zip }}.sha256"
+          # Re-packaged with the ticket stapled, and re-checked — this time
+          # requiring the Developer ID signature, the staple and
+          # Gatekeeper's acceptance.
+          scripts/package-release.sh build/Build/Products/Release/Corta.app \
+            "${{ steps.version.outputs.version }}" . --require-notarized
 
+      # The minimum OS is read from the app, not typed here: a note that
+      # said "26.5" while the app said 26.0 is exactly the drift T11 found.
       - name: Write the release notes
         run: |
           sha=$(shasum -a 256 "${{ steps.package.outputs.zip }}" | cut -d' ' -f1)
+          minimum=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' \
+            build/Build/Products/Release/Corta.app/Contents/Info.plist)
           {
             echo "## Corta ${{ steps.version.outputs.tag }}"
             echo
             echo "See [CHANGELOG.md](https://github.com/noah-qin/Corta/blob/${{ steps.version.outputs.tag }}/CHANGELOG.md) for what changed."
             echo
-            echo "Requires macOS 26.5 or later."
+            echo "Requires macOS $minimum or later."
             echo
             if [ "${{ steps.signing.outputs.available }}" != "true" ]; then
               echo "> [!WARNING]"
