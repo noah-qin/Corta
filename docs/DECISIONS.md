@@ -71,7 +71,7 @@ walk and the scrollback's memory predictable (`PERFORMANCE.md` §4 measures
 what one byte per cell costs over 100k lines).
 
 **Consequence.** Anything that wants per-cell identity needs a side table
-keyed by position, not a new field. `CellLayoutTests` asserts the size.
+keyed by position, not a new field. `CellTests` asserts the size.
 
 ## D06 — Selection lives in the core and is document-anchored
 

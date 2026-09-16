@@ -5,11 +5,10 @@ import SwiftUI
 
 /// B09 — a read-only preview of the *currently resolved* theme and font in
 /// the Appearance tab's own colours and glyphs, not the swatch of a picker.
-/// Nothing here can be clicked or chosen; CLAUDE.md's settled "Corta offers
+/// Nothing here can be clicked or chosen; `docs/DECISIONS.md` D11's "Corta offers
 /// one theme and one font; it resolves several" is untouched — this shows
 /// what that one theme and font actually look like instead of asking the
-/// reader to imagine it from two names. SwiftUI replacement for
-/// `FontPreviewView`.
+/// reader to imagine it from two names.
 struct FontPreviewSwiftUIView: View {
     let theme: Theme
     let font: CTFont

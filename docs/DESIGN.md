@@ -74,7 +74,7 @@ and benchmarkable without launching an app.
 ### 2.3 Cells are fixed-size; complex graphemes spill to a side table
 
 A cell stores a `UInt32` word plus attributes and two 16-bit table keys,
-16 bytes in total, asserted by `CellLayoutTests`. Grapheme clusters that
+16 bytes in total, asserted by `CellTests`. Grapheme clusters that
 do not fit in one scalar (combining marks, emoji ZWJ sequences such as
 `👨‍👩‍👧‍👦`) store a tag pointing into an interned side table.
 

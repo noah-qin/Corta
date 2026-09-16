@@ -12,7 +12,7 @@ import Testing
 ///
 /// Real panes, like `PaneZoomTests`: each spawns a genuine `zsh -l`, torn
 /// down at the end of every test. Never writes `ConfigurationStore.shared`
-/// (`CLAUDE.md` — never change the machine to test); every assertion here
+/// (`docs/DECISIONS.md` D13 — never change the machine to test); every assertion here
 /// either reads it or checks it is unchanged.
 @MainActor
 @Suite(.serialized)

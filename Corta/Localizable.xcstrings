@@ -21048,19 +21048,19 @@
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Saisie sécurisée du clavier"
+            "value": "Saisie clavier sécurisée"
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Entrada segura de teclado"
+            "value": "Entrada de teclado segura"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Entrada segura de teclado"
+            "value": "Entrada de teclado segura"
           }
         }
       }
@@ -21107,19 +21107,19 @@
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Saisie sécurisée du clavier activée"
+            "value": "Saisie clavier sécurisée activée"
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Entrada segura de teclado activada"
+            "value": "Entrada de teclado segura activada"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Entrada segura de teclado ativada"
+            "value": "Entrada de teclado segura ativada"
           }
         }
       }
@@ -21166,19 +21166,19 @@
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Saisie sécurisée du clavier désactivée"
+            "value": "Saisie clavier sécurisée désactivée"
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Entrada segura de teclado desactivada"
+            "value": "Entrada de teclado segura desactivada"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Entrada segura de teclado desativada"
+            "value": "Entrada de teclado segura desativada"
           }
         }
       }
@@ -21225,19 +21225,19 @@
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "La saisie sécurisée du clavier est activée : les autres apps ne peuvent pas observer ce que vous tapez ici."
+            "value": "La saisie clavier sécurisée est activée : les autres apps ne peuvent pas observer ce que vous tapez ici."
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "La entrada segura de teclado está activada: otras apps no pueden observar lo que escribes aquí."
+            "value": "La entrada de teclado segura está activada: otras apps no pueden observar lo que escribes aquí."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "A entrada segura de teclado está ativada: outros apps não podem observar o que você digita aqui."
+            "value": "A entrada de teclado segura está ativada: outros apps não podem observar o que você digita aqui."
           }
         }
       }
@@ -21437,7 +21437,7 @@
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "預設關閉：該按鍵會在所有應用程式中被佔用。面板始終可透過「顯示 ▸ 快捷終端機」、指令面板和「捷徑」開啟；此設定只負責加入快速鍵。"
+            "value": "預設關閉：該按鍵會在所有應用程式中被佔用。面板始終可透過「檢視 ▸ 快捷終端機」、指令面板和「捷徑」開啟；此設定只負責加入快速鍵。"
           }
         },
         "ja": {
@@ -21473,7 +21473,7 @@
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Desativado por padrão: a tecla é reservada em todos os apps. O painel está sempre disponível em Visualizar ▸ Terminal rápido, na paleta de comandos e no app Atalhos; isto só adiciona o atalho."
+            "value": "Desativado por padrão: a tecla é reservada em todos os apps. O painel está sempre disponível em Visualização ▸ Terminal rápido, na paleta de comandos e no app Atalhos; isto só adiciona o atalho."
           }
         }
       }
@@ -21496,7 +21496,7 @@
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "未佔用任何按鍵。仍可透過「顯示 ▸ 快捷終端機」開啟。"
+            "value": "未佔用任何按鍵。仍可透過「檢視 ▸ 快捷終端機」開啟。"
           }
         },
         "ja": {
@@ -21532,7 +21532,7 @@
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Nenhuma tecla reservada. Visualizar ▸ Terminal rápido ainda o abre."
+            "value": "Nenhuma tecla reservada. Visualização ▸ Terminal rápido ainda o abre."
           }
         }
       }

@@ -39,8 +39,8 @@ nonisolated struct TerminalSelection: Equatable {
 /// touches (`ScreenLines.swift`), compared as a single `UInt64` rather than
 /// the row's full `Line` value. Scrolled into history (`offset > 0`), rows
 /// come from immutable scrollback storage that carries no such stamp, so
-/// that path still compares `Line` values directly, exactly as the whole
-/// cache used to (see `rebuildDamagedRows`). Either way, only the damaged
+/// that path compares `Line` values directly (`rebuildDamagedRows`).
+/// Either way, only the damaged
 /// rows' instances are rebuilt and spliced into the cached arrays. A fully
 /// static frame rebuilds nothing and reports "no damage", which is what lets
 /// the shell skip the frame entirely (no drawable, no command buffer, ~0%

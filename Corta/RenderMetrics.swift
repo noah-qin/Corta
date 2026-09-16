@@ -14,7 +14,7 @@ import OSLog
 ///
 /// Gated by `CORTA_RENDER_METRICS` — a measurement harness like
 /// `CORTA_MAX_DRAWABLES` (`TerminalView.swift`), not a config key nobody
-/// should be setting (`CLAUDE.md`). `isEnabled` is read once at process
+/// should be setting (`docs/DECISIONS.md` D10). `isEnabled` is read once at process
 /// start; every call site below checks the cached value, so a normal run
 /// pays one Bool comparison per call and nothing else.
 nonisolated enum RenderMetrics {

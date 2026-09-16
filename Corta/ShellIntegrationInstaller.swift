@@ -60,7 +60,7 @@ struct ShellIntegrationInstaller {
     /// The rc file this instance reads and writes — injected so a test can
     /// point at a temporary file instead of the user's real rc file. Never
     /// change the file a running Corta actually reads to test this
-    /// (`CLAUDE.md` — "Never change the machine to test").
+    /// (`docs/DECISIONS.md` D13 — never change the machine to test).
     let rcFileURL: URL
 
     init(shell: ShellKind, rcFileURL: URL) {

@@ -1,6 +1,6 @@
 /// The side table for Kitty graphics image placements (M10) — kept off
 /// `Cell` for the same reason `HyperlinkTable` is a side table rather than a
-/// cell field: a 16-byte cell has no spare bits left (`CLAUDE.md`: "anything
+/// cell field: a 16-byte cell has no spare bits left (`docs/DECISIONS.md` D05: "anything
 /// else that wants per-cell identity needs a side table keyed by position,
 /// not a new field"), and an image placement spans many cells anyway, so a
 /// per-cell reference would mean storing the same image reference thousands

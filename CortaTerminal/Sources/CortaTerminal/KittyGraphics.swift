@@ -60,7 +60,7 @@ public enum KittyGraphics {
     }
 
     /// `f=` — pixel format of a *direct* transmission. PNG is decoded by the
-    /// app layer (`CoreTerminal` has no ImageIO dependency, by design —
+    /// app layer (`CortaTerminal` has no ImageIO dependency, by design —
     /// `DESIGN.md` §2: the core is pure Swift with no platform-framework
     /// pulled in beyond what parsing itself needs); RGB/RGBA are decoded
     /// nowhere, just memcpy'd into a texture, since they already are pixels.

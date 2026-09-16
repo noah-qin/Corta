@@ -30,10 +30,9 @@ import Metal
 ///
 /// Thread safety: `lock` serialises both the lookup and the one-time
 /// creation. Creation includes the binary-archive load/compile/serialise
-/// path, so this lock also replaces `QuadRenderer`'s old
-/// `binaryArchiveLock` — archive bookkeeping never happens outside entry
-/// creation anymore, and entry creation happens at most once per device per
-/// process. Panes are created on the main thread today regardless; the lock
+/// path, so this is the only lock the archive bookkeeping needs — it never
+/// happens outside entry creation, and entry creation happens at most once
+/// per device per process. Panes are created on the main thread today regardless; the lock
 /// is the cheap guarantee, not a response to an observed race.
 nonisolated enum QuadPipelineCache {
     /// The immutable bundle both backends draw with. A class so the cache's

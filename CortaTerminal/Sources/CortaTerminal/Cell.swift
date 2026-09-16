@@ -5,7 +5,7 @@
 /// jam (`PERFORMANCE.md` §3, `DESIGN.md` §2.3).
 ///
 /// The layout is deliberate — 4 + 4 + 4 + 2 + 2 = 16 bytes, asserted by
-/// `CellLayoutTests`. Growing it is a real cost: a 200×100k scrollback is
+/// `CellTests`. Growing it is a real cost: a 200×100k scrollback is
 /// 16 bytes × every cell that is actually stored.
 ///
 /// That budget is why the OSC 8 hyperlink id (M6.8) is not a field of its
