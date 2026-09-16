@@ -24,7 +24,7 @@ struct PaneTeardownTests {
         return pane
     }
 
-    @Test func teardownTerminatesTheChildProcess() throws {
+    @Test func teardownTerminatesTheChildProcess() async throws {
         let pane = makePane()
         let session = try #require(pane.session)
         let pid = session.pty.processIdentifier
@@ -32,15 +32,13 @@ struct PaneTeardownTests {
 
         pane.teardown()
 
-        #expect(
-            session.pty.waitForExit(timeout: .seconds(10)) != nil,
-            "teardown must let the child be reaped")
+        #expect(await exited(session.pty), "teardown must let the child be reaped")
         #expect(
             kill(pid, 0) == -1 && errno == ESRCH,
             "the child PID must be gone after teardown, not merely signalled")
     }
 
-    @Test func teardownIsIdempotent() throws {
+    @Test func teardownIsIdempotent() async throws {
         let pane = makePane()
         let session = try #require(pane.session)
         let pid = session.pty.processIdentifier
@@ -50,11 +48,11 @@ struct PaneTeardownTests {
         // its window's close); the second pass must be a no-op.
         pane.teardown()
 
-        #expect(session.pty.waitForExit(timeout: .seconds(10)) != nil)
+        #expect(await exited(session.pty))
         #expect(kill(pid, 0) == -1 && errno == ESRCH)
     }
 
-    @Test func closingASplitPaneTearsDownItsSession() throws {
+    @Test func closingASplitPaneTearsDownItsSession() async throws {
         let split = SplitViewController()
         _ = split.view
         let first = try #require(split.panes.first)
@@ -65,7 +63,7 @@ struct PaneTeardownTests {
 
         split.closePane(second)
 
-        #expect(session.pty.waitForExit(timeout: .seconds(10)) != nil)
+        #expect(await exited(session.pty))
         #expect(kill(pid, 0) == -1 && errno == ESRCH)
         // The surviving pane is untouched.
         #expect(first.session != nil)
@@ -73,7 +71,7 @@ struct PaneTeardownTests {
         first.teardown()
     }
 
-    @Test func windowTeardownStopsEveryPane() throws {
+    @Test func windowTeardownStopsEveryPane() async throws {
         let split = SplitViewController()
         _ = split.view
         split.splitFocusedPane(orientation: .rows)
@@ -84,12 +82,12 @@ struct PaneTeardownTests {
 
         for session in sessions {
             #expect(
-                session.pty.waitForExit(timeout: .seconds(10)) != nil,
+                await exited(session.pty),
                 "every pane's child must be reaped by the window-level teardown")
         }
     }
 
-    @Test func teardownRecoversFileDescriptorsAndThreads() throws {
+    @Test func teardownRecoversFileDescriptorsAndThreads() async throws {
         // Baselines include the test host's own windows and their sessions;
         // only the delta this pane adds and then returns matters.
         let baselineFDs = Self.openFileDescriptorCount()
@@ -99,14 +97,14 @@ struct PaneTeardownTests {
         let session = try #require(pane.session)
 
         pane.teardown()
-        #expect(session.pty.waitForExit(timeout: .seconds(10)) != nil)
+        #expect(await exited(session.pty))
 
         // The PTY master closes synchronously in `stop()`; the reader thread
         // exits once its blocked read observes the closed descriptor, so both
         // are polled rather than read once. GCD keeps spare worker threads
         // around, so the thread check allows one of slack — a leaked reader
         // thread still trips it once the host's own baseline has settled.
-        let recovered = waitUntilTrue(timeout: .seconds(10)) {
+        let recovered = await waitUntilTrue(timeout: .seconds(10)) {
             Self.openFileDescriptorCount() <= baselineFDs
                 && Self.threadCount() <= baselineThreads + 1
         }
@@ -117,13 +115,28 @@ struct PaneTeardownTests {
             "teardown must return the PTY descriptor and the reader thread; baselines fds=\(baselineFDs) threads=\(baselineThreads), now fds=\(fdCount) threads=\(threads)")
     }
 
+    /// Whether the child has exited within `timeout` — polled with a
+    /// non-blocking reap and an *async* sleep. This suite is `@MainActor`,
+    /// and the blocking `waitForExit(timeout:)` it used to call held the
+    /// main thread for up to ten seconds per test while a slow child shut
+    /// down; on the CI runner that starved every other main-actor test in
+    /// the run for half a minute and failed them on their own timeouts.
+    private func exited(_ pty: PTY, timeout: Duration = .seconds(10)) async -> Bool {
+        let deadline = ContinuousClock.now + timeout
+        while ContinuousClock.now < deadline {
+            if pty.waitForExit(timeout: .zero) != nil { return true }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return pty.waitForExit(timeout: .zero) != nil
+    }
+
     private func waitUntilTrue(
         timeout: Duration, _ condition: () -> Bool
-    ) -> Bool {
+    ) async -> Bool {
         let deadline = ContinuousClock.now + timeout
         while ContinuousClock.now < deadline {
             if condition() { return true }
-            Thread.sleep(forTimeInterval: 0.01)
+            try? await Task.sleep(for: .milliseconds(10))
         }
         return condition()
     }
