@@ -172,7 +172,7 @@ struct SettingsView: View {
                             format: .number)
                             .frame(width: 54)
                             .multilineTextAlignment(.trailing)
-                        Text("×").foregroundStyle(.secondary)
+                        Text(verbatim: "×").foregroundStyle(.secondary)
                         TextField(
                             "", value: Binding(get: { model.rows }, set: { model.setRows($0) }), format: .number
                         )
