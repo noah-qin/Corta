@@ -133,7 +133,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     /// Retains `controller` until its window closes, so the array does not
     /// grow without bound and no open window loses its controller.
-    private func track(_ controller: NSWindowController) {
+    func track(_ controller: NSWindowController) {
         guard !windowControllers.contains(controller) else { return }
         windowControllers.append(controller)
         NotificationCenter.default.addObserver(

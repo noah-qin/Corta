@@ -246,10 +246,33 @@ struct WindowIdentityStateTests {
     }
 }
 
+/// The intents are exercised against programmatic window controllers — an
+/// `NSWindow` with a plain view controller, tracked by the delegate exactly
+/// as a storyboard window is — rather than by opening real terminal
+/// windows. A storyboard window brings a Metal layer, a first present and a
+/// spawned shell with it, and on the hosted CI runner that held the main
+/// thread for long enough to time out every other main-actor suite in the
+/// run (the same starvation PR #76 closed for the teardown tests). What
+/// these tests are about — identity, listing, focus, refusal — needs none
+/// of that; `WindowSetupStagingTests` covers the root pane's spawn inputs
+/// without a window at all.
 @MainActor
 struct AppIntentTests {
     private var delegate: AppDelegate {
         get throws { try #require(NSApp.delegate as? AppDelegate) }
+    }
+
+    /// A tracked terminal window controller with no terminal in it.
+    private func makeTrackedWindow(title: String = "") throws -> TerminalWindowController {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+            styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.title = title
+        let controller = TerminalWindowController(window: window)
+        controller.contentViewController = NSViewController()
+        try delegate.track(controller)
+        return controller
     }
 
     @Test("a folder parameter must be an existing directory; nothing means home")
@@ -273,18 +296,14 @@ struct AppIntentTests {
         #expect(try delegate.focusWindow(id: "no-such-window") == false)
     }
 
-    @Test("an opened window is listed by identity, focusable by it, and spawns where it was asked to")
-    func openListFocus() throws {
+    @Test("a tracked window is listed by identity, titled for display, and focusable by id")
+    func listAndFocus() throws {
         let delegate = try delegate
-        let directory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-            .standardizedFileURL.path
-        let controller = try #require(delegate.openWindow(workingDirectory: directory))
+        let controller = try makeTrackedWindow(title: "build — zsh")
         defer { controller.window?.close() }
-        let split = try #require(controller.contentViewController as? SplitViewController)
-        #expect(split.panes.first?.inheritedWorkingDirectory == directory)
-
         let listed = TerminalWindowQuery.openWindows()
-        #expect(listed.contains { $0.id == controller.windowID })
+        let entity = try #require(listed.first { $0.id == controller.windowID })
+        #expect(entity.title == "build — zsh")
         #expect(Set(listed.map(\.id)).count == listed.count, "ids must be unique across windows")
         #expect(delegate.focusWindow(id: controller.windowID))
         // Frontmost among the app's windows. Not `isKeyWindow`: a test host
@@ -292,10 +311,25 @@ struct AppIntentTests {
         #expect(NSApp.orderedWindows.first === controller.window)
     }
 
+    @Test("an untitled window is presented as Corta, never as an empty row")
+    func emptyTitleFallsBack() throws {
+        let controller = try makeTrackedWindow(title: "")
+        defer { controller.window?.close() }
+        #expect(TerminalWindowEntity(controller: controller).title == "Corta")
+    }
+
+    @Test("a closed window leaves the listing, so its id resolves to nothing")
+    func closedWindowIsGone() throws {
+        let controller = try makeTrackedWindow()
+        let id = controller.windowID
+        controller.window?.close()
+        #expect(!TerminalWindowQuery.openWindows().contains { $0.id == id })
+        #expect(try delegate.focusWindow(id: id) == false)
+    }
+
     @Test("the Quick Terminal is not an entity: it is summoned, not arranged")
     func quickTerminalIsNotListed() throws {
-        let delegate = try delegate
-        let controller = try #require(delegate.openWindow(workingDirectory: nil))
+        let controller = try makeTrackedWindow()
         defer { controller.window?.close() }
         controller.isQuickTerminal = true
         #expect(!TerminalWindowQuery.openWindows().contains { $0.id == controller.windowID })
@@ -307,49 +341,68 @@ struct AppIntentTests {
 /// root pane's shell — *inside* `instantiateInitialController`. A restore or
 /// a preset assigned to the controller afterwards therefore never reached
 /// the root pane; only the splits (rebuilt in `viewWillAppear`) got their
-/// directories. `SplitViewController.pendingSetup` stages the values first.
+/// directories. `SplitViewController.pendingSetup` stages the values first,
+/// and `viewDidLoad` is what consumes them — so the consumption is tested
+/// here on a bare `SplitViewController`, the way `PaneTeardownTests` build
+/// panes: loading its view spawns a real shell but opens no window and
+/// touches no Metal layer.
 @MainActor
 struct WindowSetupStagingTests {
+    private func makeSplit(_ setup: SplitViewController.Setup) -> SplitViewController {
+        SplitViewController.pendingSetup = setup
+        let split = SplitViewController()
+        _ = split.view
+        return split
+    }
+
     @Test("a restored window's root pane spawns in the saved directory, not the home directory")
     func restoredRootPaneDirectory() throws {
-        let delegate = try #require(NSApp.delegate as? AppDelegate)
         let directory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
             .standardizedFileURL.path
         let state = WindowState(
             frame: WindowState.Frame(NSRect(x: 0, y: 0, width: 900, height: 560)),
             layout: .pane(directory: directory, isFocused: true))
-        let controller = try #require(
-            delegate.instantiateWindowController(setup: SplitViewController.Setup(restore: state)))
-        defer { controller.window?.close() }
-        let split = try #require(controller.contentViewController as? SplitViewController)
+        let split = makeSplit(SplitViewController.Setup(restore: state))
+        defer { split.teardown() }
         #expect(split.panes.first?.inheritedWorkingDirectory == directory)
         #expect(split.pendingRestore == state, "the splits are still applied when the window appears")
     }
 
     @Test("a preset staged for a new window reaches its root pane")
     func presetReachesRootPane() throws {
-        let delegate = try #require(NSApp.delegate as? AppDelegate)
         var preset = Preset(name: "staged")
         preset.directory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
             .standardizedFileURL.path
-        let controller = try #require(
-            delegate.instantiateWindowController(setup: SplitViewController.Setup(preset: preset)))
-        defer { controller.window?.close() }
-        let split = try #require(controller.contentViewController as? SplitViewController)
+        let split = makeSplit(SplitViewController.Setup(preset: preset))
+        defer { split.teardown() }
         #expect(split.panes.first?.preset?.name == "staged")
+    }
+
+    @Test("an intent's working directory reaches the root pane, and loses to a restore's")
+    func workingDirectoryReachesRootPane() throws {
+        let directory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .standardizedFileURL.path
+        let plain = makeSplit(SplitViewController.Setup(workingDirectory: directory))
+        defer { plain.teardown() }
+        #expect(plain.panes.first?.inheritedWorkingDirectory == directory)
+
+        let state = WindowState(
+            frame: WindowState.Frame(NSRect(x: 0, y: 0, width: 900, height: 560)),
+            layout: .pane(directory: "/", isFocused: true))
+        let restored = makeSplit(
+            SplitViewController.Setup(restore: state, workingDirectory: directory))
+        defer { restored.teardown() }
+        #expect(restored.panes.first?.inheritedWorkingDirectory == "/")
     }
 
     @Test("the staging is consumed: the next plain window gets nothing left over")
     func stagingIsConsumed() throws {
-        let delegate = try #require(NSApp.delegate as? AppDelegate)
-        let first = try #require(
-            delegate.instantiateWindowController(
-                setup: SplitViewController.Setup(workingDirectory: NSTemporaryDirectory())))
-        defer { first.window?.close() }
-        let second = try #require(delegate.instantiateWindowController())
-        defer { second.window?.close() }
-        let split = try #require(second.contentViewController as? SplitViewController)
-        #expect(split.panes.first?.inheritedWorkingDirectory == nil)
+        let first = makeSplit(SplitViewController.Setup(workingDirectory: NSTemporaryDirectory()))
+        defer { first.teardown() }
         #expect(SplitViewController.pendingSetup == nil)
+        let second = SplitViewController()
+        _ = second.view
+        defer { second.teardown() }
+        #expect(second.panes.first?.inheritedWorkingDirectory == nil)
     }
 }
