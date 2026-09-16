@@ -1,3 +1,4 @@
+import Carbon.HIToolbox
 import XCTest
 
 /// B13/B14 against the live app, end to end, with nothing on the machine
@@ -24,8 +25,44 @@ final class RemoteWorkflowUITests: XCTestCase {
     /// the last step removes it through the same terminal.
     private static let stage = URL(fileURLWithPath: "/private/tmp/corta-remote-ui", isDirectory: true)
 
+    /// The input source the machine had before the test, restored in
+    /// `tearDown`. `typeText` delivers key events, and a CJK input method
+    /// composes them into candidates instead of passing them to the
+    /// terminal — every typed line here would silently go nowhere. The
+    /// test selects the ABC layout for its own duration and puts the
+    /// user's choice back afterwards, so nothing about the machine is
+    /// changed once it has run.
+    private var previousInputSource: TISInputSource?
+
     override func setUpWithError() throws {
         continueAfterFailure = false
+        previousInputSource = Self.selectLatinInputSource()
+    }
+
+    override func tearDownWithError() throws {
+        if let previousInputSource { TISSelectInputSource(previousInputSource) }
+    }
+
+    /// Selects `com.apple.keylayout.ABC` (or any enabled Latin keyboard
+    /// layout) and returns what was selected before, or `nil` when the
+    /// current source is already a plain keyboard layout.
+    private static func selectLatinInputSource() -> TISInputSource? {
+        let current = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
+        func property(_ source: TISInputSource, _ key: CFString) -> String? {
+            guard let raw = TISGetInputSourceProperty(source, key) else { return nil }
+            return Unmanaged<CFString>.fromOpaque(raw).takeUnretainedValue() as String
+        }
+        if property(current, kTISPropertyInputSourceType) == "TISTypeKeyboardLayout" {
+            return nil
+        }
+        let filter = [kTISPropertyInputSourceType as String: "TISTypeKeyboardLayout"]
+        guard let list = TISCreateInputSourceList(filter as CFDictionary, false)?.takeRetainedValue()
+            as? [TISInputSource]
+        else { return nil }
+        let abc = list.first { property($0, kTISPropertyInputSourceID) == "com.apple.keylayout.ABC" }
+            ?? list.first
+        guard let abc, TISSelectInputSource(abc) == noErr else { return nil }
+        return current
     }
 
     /// Two launches. The first is an ordinary terminal that runs the
