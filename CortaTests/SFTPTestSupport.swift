@@ -205,10 +205,13 @@ func waitUntil(
     sourceLocation: SourceLocation = #_sourceLocation
 ) async {
     // Generous: a passing wait returns the moment the condition holds, and
-    // on a loaded CI VM the main actor can be away for well over five
-    // seconds — a timeout there failed a suite that was merely slow, and
-    // the index that followed it took the whole test host down.
-    let deadline = ContinuousClock.now + .seconds(30)
+    // on the hosted CI runner the main actor is away for about forty
+    // seconds once per process — every main-actor test that happens to be
+    // queued behind that stall reports ~40 s, whichever suite it is in —
+    // so a deadline under a minute failed this suite about one run in
+    // three while the app was fine (runs on #75, #77 and #80). Two minutes
+    // costs nothing on a pass; the condition is polled every 5 ms.
+    let deadline = ContinuousClock.now + .seconds(120)
     while !condition() {
         if ContinuousClock.now > deadline {
             Issue.record("timed out waiting for \(description)", sourceLocation: sourceLocation)

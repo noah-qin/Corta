@@ -50,13 +50,19 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         image.toolTip = L10n.text("secureInput.indicator.tooltip")
         image.setAccessibilityLabel(L10n.text("secureInput.indicator.tooltip"))
         image.translatesAutoresizingMaskIntoConstraints = false
-        let container = NSView()
+        // Sized by frame, not by constraints: AppKit places an accessory
+        // view with autoresizing constraints of its own (a fixed 32pt
+        // container height, a pinned origin), and a width/height
+        // constraint on top of those was unsatisfiable — logged as
+        // "Conflicting constraints detected" on every window until the
+        // 2026-09-17 pass read the console. The frame is what the
+        // titlebar reads for the accessory's width; the height follows
+        // the titlebar.
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 28, height: 22))
         container.addSubview(image)
         NSLayoutConstraint.activate([
             image.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -10),
             image.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            container.widthAnchor.constraint(equalToConstant: 28),
-            container.heightAnchor.constraint(equalToConstant: 22),
         ])
         let accessory = NSTitlebarAccessoryViewController()
         accessory.view = container
