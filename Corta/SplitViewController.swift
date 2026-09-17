@@ -85,8 +85,10 @@ final class SplitViewController: NSViewController {
         super.viewDidLoad()
         let setup = Self.pendingSetup
         Self.pendingSetup = nil
-        pendingRestore = setup?.restore
-        pendingPreset = setup?.preset
+        // Staged values win; a value assigned to a hand-built controller
+        // before its view loads (tests do this) is kept.
+        if let restore = setup?.restore { pendingRestore = restore }
+        if let preset = setup?.preset { pendingPreset = preset }
         // B09 — the root pane's own preset, resolved by name against the
         // *current* config file: a restored window that was launched from a
         // preset gets its shell/env back too, not just its directory, and a
@@ -265,6 +267,27 @@ final class SplitViewController: NSViewController {
         frame.origin.y -= chrome - last
         frame.size.height += chrome - last
         window.setFrame(frame, display: true)
+    }
+
+    /// The chrome changed under a window that must *keep* its frame: a
+    /// restored window joining its saved tab group (`AppDelegate.
+    /// regroupRestoredTabs`). The saved frame already includes the tab bar
+    /// — it was captured with the bar up — so absorbing the bar's height
+    /// again would grow the window by a bar and hand every pane two rows it
+    /// never had. What the panes do need is to lay out against the new
+    /// chrome: a window that is not the selected tab never lays out on its
+    /// own, and its first row stayed under the bar until the user resized
+    /// it. Records the chrome so the next `viewDidLayout` does not absorb
+    /// it either, then lays the panes out now.
+    func adoptChromeWithoutAbsorbing() {
+        guard let window = view.window else { return }
+        lastChromeHeight = window.frame.height - window.contentLayoutRect.height
+        for pane in panes { pane.view.needsLayout = true }
+        view.layoutSubtreeIfNeeded()
+        for pane in panes {
+            pane.resizeSessionToFitView()
+            pane.invalidateDisplay()
+        }
     }
 
     /// The one-time correction for `setContentSize` mismeasuring the chrome

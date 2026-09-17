@@ -164,4 +164,36 @@ struct SFTPRealServerTests {
         let client = SFTPConnection(host: "x", sshExecutable: "/nonexistent/ssh")
         await #expect(throws: SFTPError.self) { try await client.connect() }
     }
+
+    /// The first connect is the one a password prompt fails: ssh has no
+    /// terminal to ask on, writes "Permission denied" and exits 255 before
+    /// a single frame. That has to reach the caller as an authentication
+    /// failure — which it did not, because the reclassification read the
+    /// connection's *stored* channel, and nothing is stored until a session
+    /// is up. An `ssh` stand-in that refuses the way ssh does covers the
+    /// path without a network.
+    @Test("a refusal on the first connect is classified, not reported as a lost connection")
+    func firstConnectRefusalIsClassified() async throws {
+        let script = FileManager.default.temporaryDirectory
+            .appendingPathComponent("corta-sftp-refuse-\(UUID().uuidString).sh")
+        try """
+            #!/bin/sh
+            echo 'noah@example.com: Permission denied (publickey,password).' >&2
+            exit 255
+            """.write(to: script, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+        defer { try? FileManager.default.removeItem(at: script) }
+
+        let client = SFTPConnection(host: "example.com", sshExecutable: script.path)
+        do {
+            _ = try await client.connect()
+            Issue.record("connect must fail against a refusing ssh")
+        } catch let error as SFTPError {
+            guard case .transport(.authenticationFailed(let diagnostics)) = error else {
+                Issue.record("expected .authenticationFailed, got \(error)")
+                return
+            }
+            #expect(diagnostics.contains("Permission denied"))
+        }
+    }
 }

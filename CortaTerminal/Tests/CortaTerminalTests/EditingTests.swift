@@ -93,6 +93,50 @@ struct EditingTests {
         #expect(grid.line(0).count == 4)
     }
 
+    /// ECMA-48 §8.3.38: ECH erases in place — nothing shifts, the cursor
+    /// stays — and clamps at the right margin. tmux draws its status line as
+    /// left part, `CSI n X`, right part; with ECH unimplemented the gap kept
+    /// the previous screen's cells (B16 test pass, a shrunk tmux window).
+    @Test("erasing characters blanks in place and leaves the cursor alone")
+    func eraseCharactersInPlace() {
+        var grid = Grid(rows: 2, columns: 8)
+        write("abcdefgh", to: &grid)
+        grid.moveCursor(row: 0, column: 2)
+        grid.eraseCharacters(3)
+
+        #expect(grid.cursor.column == 2)
+        #expect(grid[0, 1].scalar == 0x62)  // "b"
+        #expect(grid[0, 2] == .blank)
+        #expect(grid[0, 4] == .blank)
+        #expect(grid[0, 5].scalar == 0x66)  // "f" — nothing shifted
+        #expect(grid[0, 7].scalar == 0x68)
+
+        // Past the margin: clamped, not wrapped onto the next row.
+        grid.moveCursor(row: 0, column: 6)
+        grid.eraseCharacters(50)
+        #expect(grid[0, 5].scalar == 0x66)
+        #expect(grid[0, 6] == .blank && grid[0, 7] == .blank)
+        #expect(grid[1, 0] == .blank)
+        // Zero means one, as xterm treats it.
+        grid.moveCursor(row: 0, column: 0)
+        grid.eraseCharacters(0)
+        #expect(grid[0, 0] == .blank && grid[0, 1].scalar == 0x62)
+    }
+
+    /// ECH under a background colour stores the colour (BCE), and reaches
+    /// the grid from the wire as `CSI n X`.
+    @Test("erasing characters paints the background and dispatches from CSI X")
+    func eraseCharactersFromTheWire() {
+        var terminal = Terminal(rows: 2, columns: 8)
+        terminal.feed(Array("abcdefgh\u{1B}[1;3H\u{1B}[44m\u{1B}[2X".utf8))
+        let grid = terminal.grid
+        #expect(grid[0, 2].scalar == 0x20 || grid[0, 2].scalar == 0)
+        #expect(grid[0, 2].background == .indexed(4))
+        #expect(grid[0, 3].background == .indexed(4))
+        #expect(grid[0, 4].scalar == 0x65)  // "e"
+        #expect(grid.cursor.column == 2)
+    }
+
     /// BCE: inserted cells carry the current background, and a row erased
     /// under a colour is stored, not dropped.
     @Test("inserting under a background colour paints it")

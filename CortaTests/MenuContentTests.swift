@@ -35,6 +35,18 @@ struct MenuContentTests {
         #expect(new.title == L10n.text("command.newWindow"))
     }
 
+    /// The menu bar shows a top-level item by its *submenu's* title. Only
+    /// the item was localised, so the bar read File / Shell / … in every
+    /// language while everything beneath it was translated.
+    @Test("every top-level menu's submenu title is the localised item title")
+    func menuBarTitlesAreLocalised() throws {
+        let menu = try #require(NSApp.mainMenu)
+        for item in menu.items.dropFirst() {  // the app menu's title is the app's name
+            let submenu = try #require(item.submenu, "top-level item \(item.title) has no submenu")
+            #expect(submenu.title == item.title, "\(submenu.title) vs \(item.title)")
+        }
+    }
+
     @Test("Corta Help opens the documentation, not an empty help book")
     func cortaHelpHasARealDestination() throws {
         let menu = try #require(NSApp.mainMenu)

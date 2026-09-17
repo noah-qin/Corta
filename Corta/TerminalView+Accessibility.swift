@@ -190,10 +190,34 @@ extension TerminalView {
     /// the project's performance rules forbid it (`PERFORMANCE.md` §2).
     func noteAccessibilityValueChanged() {
         guard NSWorkspace.shared.isVoiceOverEnabled else { return }
-        let now = CACurrentMediaTime()
-        guard now - lastAccessibilityPost >= Self.accessibilityPostInterval else { return }
-        lastAccessibilityPost = now
+        // The grid moved on, whatever happens to the notification: a
+        // snapshot built before this change must not answer the next
+        // question.
         cachedAccessibilitySnapshot = nil
+        let now = CACurrentMediaTime()
+        let elapsed = now - lastAccessibilityPost
+        guard elapsed >= Self.accessibilityPostInterval else {
+            // Inside the interval the change used to be dropped outright —
+            // which for a burst of output meant the *last* change, the one
+            // that leaves the screen in its final state, was the one never
+            // announced, and VoiceOver went on reading the state before it
+            // (B16 test pass: "what I hear is not what is on screen").
+            // Trail instead: one post when the interval ends, carrying
+            // every change since.
+            guard pendingAccessibilityPost == nil else { return }
+            let item = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                self.pendingAccessibilityPost = nil
+                self.lastAccessibilityPost = CACurrentMediaTime()
+                self.cachedAccessibilitySnapshot = nil
+                NSAccessibility.post(element: self, notification: .valueChanged)
+            }
+            pendingAccessibilityPost = item
+            DispatchQueue.main.asyncAfter(
+                deadline: .now() + (Self.accessibilityPostInterval - elapsed), execute: item)
+            return
+        }
+        lastAccessibilityPost = now
         NSAccessibility.post(element: self, notification: .valueChanged)
     }
 

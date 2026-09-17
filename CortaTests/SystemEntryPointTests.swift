@@ -406,3 +406,44 @@ struct WindowSetupStagingTests {
         #expect(second.panes.first?.inheritedWorkingDirectory == nil)
     }
 }
+
+/// B09's restored tab groups come back in saved order with the saved tab
+/// selected. Programmatic windows with plain view controllers, tabbed for
+/// real: AppKit's own `addTabbedWindow` ordering is what was wrong.
+@MainActor
+struct RestoredTabOrderTests {
+    private func makeWindow(_ title: String) -> TerminalWindowController {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+            styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.title = title
+        window.tabbingMode = .preferred
+        let controller = TerminalWindowController(window: window)
+        controller.contentViewController = NSViewController()
+        window.orderFront(nil)
+        return controller
+    }
+
+    private func state(index: Int, selected: Bool) -> WindowState {
+        WindowState(
+            frame: WindowState.Frame(NSRect(x: 0, y: 0, width: 400, height: 300)),
+            layout: .pane(directory: nil), tabGroupID: "group", tabIndex: index,
+            isSelectedTab: selected)
+    }
+
+    @Test("three saved tabs come back first, second, third — not first, third, second")
+    func savedOrderIsKept() throws {
+        let delegate = try #require(NSApp.delegate as? AppDelegate)
+        let a = makeWindow("a"), b = makeWindow("b"), c = makeWindow("c")
+        defer { for w in [a, b, c] { w.window?.close() } }
+        delegate.regroupRestoredTabs([
+            (state(index: 2, selected: true), c),
+            (state(index: 0, selected: false), a),
+            (state(index: 1, selected: false), b),
+        ])
+        let tabs = try #require(a.window?.tabbedWindows)
+        #expect(tabs.map(\.title) == ["a", "b", "c"])
+        #expect(a.window?.tabGroup?.selectedWindow === c.window)
+    }
+}

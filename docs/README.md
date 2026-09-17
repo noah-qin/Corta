@@ -44,6 +44,7 @@ catalog exists so that a contributor can find where a byte goes.
 | [`history/V0.1.1-UI-WALKTHROUGH.md`](history/V0.1.1-UI-WALKTHROUGH.md) | The native-behaviour walkthrough. |
 | [`history/TECHNOLOGY-DIRECTION.md`](history/TECHNOLOGY-DIRECTION.md) | The technology candidates considered between 0.1.1 and the v1 roadmap; the ones adopted are B-series issues. |
 | [`esctest/`](esctest/) | esctest result files per release. |
+| [`test-results/`](test-results/) | Dated records of interactive test passes — what a person checked, what passed, what failed and what was skipped. The findings are worked off in the CHANGELOG; the record stays as written. |
 
 The active plan is not a document here: it is the sixteen ordered
 `B01`–`B16` issues under the

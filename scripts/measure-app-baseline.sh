@@ -16,9 +16,9 @@
 #     occlusion and window close use the AX API directly.
 #   * Splits cannot be keyboard-driven, so multi-pane windows are built via
 #     SessionRestore: the script temporarily flips `restore-windows` to true
-#     in ~/.config/corta/config, writes a 2- or 4-pane state.json, launches,
-#     then reverts the config. The original config is restored byte-for-byte
-#     on every exit path; state.json is consumed by the restore itself.
+#     in a staged config (`CORTA_STAGE_DIR`, never ~/.config/corta/config),
+#     writes a 2- or 4-pane state.json there, launches, then flips it back.
+#     The real config and the real window arrangement are never touched.
 #
 # Phases, in order:
 #   A launch   — P09: process start -> first window on screen, 1 "cold-ish"
@@ -45,20 +45,20 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 app=$("$repo_root/scripts/find-release-app.sh")
-config_file="$HOME/.config/corta/config"
-state_dir="$HOME/Library/Application Support/Corta"
+# A throwaway stage (`CORTA_STAGE_DIR`, `AppPaths`) holds this run's config
+# and Application Support: the real `~/.config/corta/config` is never read
+# or edited, and the real window arrangement is never overwritten by the
+# restore phases below. Same reason as `measure-energy.sh`.
+stage=$(mktemp -d /tmp/corta-baseline-stage.XXXXXX)
+config_file="$stage/config"
+state_dir="$stage/ApplicationSupport"
 state_file="$state_dir/state.json"
-config_backup=""
-state_backup=""
+mkdir -p "$state_dir"
+printf 'restore-windows = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n' > "$config_file"
 
 cleanup() {
-  [ -n "$config_backup" ] && cp "$config_backup" "$config_file" 2>/dev/null || true
-  if [ -n "$state_backup" ]; then
-    cp "$state_backup" "$state_file" 2>/dev/null || true
-  else
-    rm -f "$state_file" 2>/dev/null || true
-  fi
   [ -n "${app_pid:-}" ] && kill "$app_pid" 2>/dev/null || true
+  rm -rf "$stage"
 }
 trap cleanup EXIT
 
@@ -88,11 +88,11 @@ echo
 launch() { # $2: "metrics" = render metrics, restore off; "restore-metrics" = metrics, restore left on
   case "${2:-}" in
     metrics)
-      CORTA_RESTORE_WINDOWS=0 CORTA_RENDER_METRICS=1 "$app/Contents/MacOS/Corta" >/dev/null 2>&1 & ;;
+      CORTA_STAGE_DIR="$stage" CORTA_RESTORE_WINDOWS=0 CORTA_RENDER_METRICS=1 "$app/Contents/MacOS/Corta" >/dev/null 2>&1 & ;;
     restore-metrics)
-      CORTA_RENDER_METRICS=1 "$app/Contents/MacOS/Corta" >/dev/null 2>&1 & ;;
+      CORTA_STAGE_DIR="$stage" CORTA_RENDER_METRICS=1 "$app/Contents/MacOS/Corta" >/dev/null 2>&1 & ;;
     *)
-      CORTA_RESTORE_WINDOWS=0 "$app/Contents/MacOS/Corta" >/dev/null 2>&1 & ;;
+      CORTA_STAGE_DIR="$stage" CORTA_RESTORE_WINDOWS=0 "$app/Contents/MacOS/Corta" >/dev/null 2>&1 & ;;
   esac
   app_pid=$!
 }
@@ -255,13 +255,11 @@ EOF
 }
 
 echo "== phases C/D: multi-pane (P07) via SessionRestore =="
-cp "$config_file" /tmp/corta-config-backup.$$ && config_backup=/tmp/corta-config-backup.$$
-[ -f "$state_file" ] && cp "$state_file" /tmp/corta-state-backup.$$ && state_backup=/tmp/corta-state-backup.$$
 sed -i '' 's/^restore-windows = false/restore-windows = true/' "$config_file"
 if ! grep -q '^restore-windows = true' "$config_file"; then
-  echo "ABORT: could not flip restore-windows in config"; exit 1
+  echo "ABORT: could not flip restore-windows in the staged config"; exit 1
 fi
-echo "config restore-windows flipped to true (backup at $config_backup)"
+echo "staged config restore-windows flipped to true ($config_file)"
 
 for n in 2 4; do
   write_layout "$n"
@@ -285,10 +283,7 @@ for n in 2 4; do
   sleep 2
 done
 
-# Restore the user's config (also done by the trap; do it now so a later
-# failure cannot leave it flipped).
-cp "$config_backup" "$config_file"; config_backup=""
 rm -f "$state_file"
-echo "config restored; state.json cleaned."
 echo "== done =="
 trap - EXIT
+rm -rf "$stage"

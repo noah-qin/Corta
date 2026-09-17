@@ -74,3 +74,32 @@ struct CommandHistoryModelTests {
         model.run(id: 999)
     }
 }
+
+/// The text filter over the history rows, and the text each row carries.
+/// The window used to show a time, a status and a directory per command
+/// and nothing a person could read the command back from or search by
+/// (B16 test pass).
+@MainActor
+struct CommandHistoryTextFilterTests {
+    private func row(_ id: Int, _ text: String?) -> CommandHistoryModel.Row {
+        CommandHistoryModel.Row(
+            id: id, statusSymbolName: "checkmark.circle.fill", statusDescription: "succeeded",
+            timestamp: "t", directoryText: "d", directoryTooltip: nil, commandText: text,
+            canFillOrRun: text != nil, accessibilityLabel: "")
+    }
+
+    @Test("an empty query keeps every row, including ones whose text is gone")
+    func emptyQueryKeepsAll() {
+        let rows = [row(1, "ls -la"), row(2, nil), row(3, "git status")]
+        #expect(CommandHistoryModel.filter(rows, query: "").map { $0.id } == [1, 2, 3])
+        #expect(CommandHistoryModel.filter(rows, query: "   ").map { $0.id } == [1, 2, 3])
+    }
+
+    @Test("a query matches case-insensitively on the command text and drops textless rows")
+    func queryFilters() {
+        let rows = [row(1, "ls -la"), row(2, nil), row(3, "Git Status"), row(4, "git log")]
+        #expect(CommandHistoryModel.filter(rows, query: "git").map { $0.id } == [3, 4])
+        #expect(CommandHistoryModel.filter(rows, query: "STATUS").map { $0.id } == [3])
+        #expect(CommandHistoryModel.filter(rows, query: "nothing").isEmpty)
+    }
+}

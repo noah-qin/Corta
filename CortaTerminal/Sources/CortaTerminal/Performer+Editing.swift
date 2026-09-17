@@ -21,6 +21,8 @@ extension Performer {
             grid.deleteLines(parameters.value(0, default: 1))
         case 0x50:  // DCH — ECMA-48 §8.3.26
             grid.deleteCharacters(parameters.value(0, default: 1))
+        case 0x58:  // ECH — ECMA-48 §8.3.38
+            grid.eraseCharacters(parameters.value(0, default: 1))
         case 0x53:  // SU — ECMA-48 §8.3.147
             grid.scrollUp(parameters.value(0, default: 1))
         case 0x54:  // SD — ECMA-48 §8.3.113

@@ -164,6 +164,41 @@ two-character spelling): the line is preserved in the config file
 unchanged and the default applies. View ▸ Quick Terminal and the *Toggle
 Quick Terminal* Shortcuts action open the panel regardless.
 
+### A remote pane's badge says "host unknown", or a local `tmux` says "remote?"
+
+The badge names a host only from the remote shell's own `OSC 7` report —
+never from the `ssh` command line (aliases, `~/.ssh/config` names and
+jump-host chains all read back wrong) and never from the prompt text.
+Without that report an `ssh` pane says *host unknown*, which is the
+truth. To get the host, put the shell integration block from Settings ▸
+Terminal into the remote machine's `~/.zshrc` too; it emits the `OSC 7`
+the badge reads. A `tmux` or `screen` in the foreground reads *remote?*
+because the session it is attached to may itself be on another machine
+and nothing here can tell — it is uncertainty, not an accusation.
+
+### Browse Remote Files… says authentication failed, but `ssh` works in the pane
+
+The SFTP channel has no terminal, so `ssh` cannot ask for a password or a
+passphrase there. It works when a key is held by `ssh-agent` or the
+keychain, or when `ControlMaster` in `~/.ssh/config` lets it reuse the
+connection the pane already opened. A host that only takes a password
+cannot be browsed; the error says so rather than hanging.
+
+### Command History shows "(command text no longer in scrollback)"
+
+The command's text is recovered from the grid, not stored: once its
+prompt line has scrolled past `scrollback-lines`, the record keeps its
+time, status and directory but the text is gone, and Fill and Run are
+not offered for it. Raise `scrollback-lines` if that happens often.
+
+### I cannot scroll back to the beginning of a long run
+
+`scrollback-lines` (default 10,000) is a per-session cap, and it counts
+*physical* rows — a 200-column line wrapped at 100 columns is two. Output
+older than the cap is discarded as it arrives; the pill at the top says
+how far back the viewport is. Raise the cap (up to 1,000,000; memory is
+about 16 bytes per stored cell) or export as you go.
+
 ### Secure Keyboard Entry is on but my macro tool still works
 
 The lock in the titlebar shows when it is *engaged*, which is only while a
