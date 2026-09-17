@@ -438,6 +438,20 @@ what to edit.
   so Escape in one pane could close a search bar open in a different pane
   or window. Scoped to the window the event actually belongs to.
 
+### Changed
+
+- **A local Release build is development-signed; Developer ID is the
+  release workflow's job.** The Release configuration hardcoded
+  `CODE_SIGN_IDENTITY = "Developer ID Application"`, which Xcode 27 flags
+  under "Update to recommended settings" and which made a plain
+  `xcodebuild -configuration Release` on a machine without that
+  certificate fail. It now signs with Apple Development like Debug;
+  `release.yml` has always passed the Developer ID identity explicitly at
+  archive time, and `scripts/check-release.sh --require-notarized` is
+  where a Developer ID signature is demanded. Xcode's "Missing
+  Localizability" analyzer check is on for the project, since it ships
+  nine languages.
+
 ## [0.1.1] - 2026-09-09
 
 The quality release. Nothing here changes what Corta is; all of it is
