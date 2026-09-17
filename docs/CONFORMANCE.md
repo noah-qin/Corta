@@ -274,6 +274,17 @@ chmod +x /tmp/corta-esctest.sh
 SHELL=/tmp/corta-esctest.sh Corta.app/Contents/MacOS/Corta
 ```
 
+**2026-09-17 result: 126 passed, 334 known bugs, 107 failed of 567 —
+81.1%.** Run on `main` after the interactive-pass fixes, against esctest2
+`2798f12`. Against the 0.1.1 list the failures are a strict subset: 14
+tests now pass — B06's OSC 4/104 and 5/105 set/query/reset, SCORC, and
+the multi-column reverse-wraparound case — and none regressed. The suite
+itself lost one test and one "known bug" between the two runs, so the
+totals are not identical columns. `docs/esctest/2026-09-17-results.txt`
+has every failing name; the remaining classes are the ones the 0.1.1
+classification below already names, XtermWinops (28) still the largest
+and still deliberate.
+
 **0.1.1 result (2026-09-08): 112 passed, 335 known bugs, 121 failed of
 568.** Against the M6 record (106 / 335 / 127) that is six more passing
 and none regressed. The failures are classified by real application
@@ -283,15 +294,10 @@ rather than a re-reading. The largest single cause is one absence: OSC
 4/5 indexed palette set and query are not implemented, which accounts
 for 45 of the 121.
 
-**This snapshot predates B06** (`docs/DESIGN.md` §7), which implements
-OSC 4/104 (including the renderer integration that should move esctest's
-`ChangeColor`/`ResetColor` cases) and OSC 5/105 (query/set/reset only —
-no renderer integration for the five special-colour slots) and fixes
-`SCORC`/`DECRC` and `BS`/`CUB` reverse-wrap, the other open items this
-section named. B06 could not re-run esctest in its sandbox, so the
-45-failure attribution and the 112/335/121 counts above remain the last
-real numbers; they are not current evidence that any of these fixes are
-absent, only that none has been scored yet.
+**The 0.1.1 snapshot predates B06** (`docs/DESIGN.md` §7), which
+implements OSC 4/104 and OSC 5/105 and fixes `SCORC`/`DECRC` and
+`BS`/`CUB` reverse-wrap; the 2026-09-17 run above is the first to score
+those, and the 14 tests they moved are listed in its results file.
 
 **M6 result: 106 passed, 335 known bugs, 127 failed of 568.** Against the
 M2 record (50 / 334 / 184) that is 57 failures fixed and none
@@ -301,7 +307,7 @@ including the soft-reset isolation esctest itself relies on.
 
 xterm-compatibility — passes plus "known bugs", the number comparable
 across terminals — was **77.6%** at M6, up from the 67.6% carried since
-M2, and is **78.7%** at 0.1.1.
+M2, **78.7%** at 0.1.1, and **81.1%** on 2026-09-17.
 
 ### 4.3 Fuzzing
 
@@ -370,7 +376,30 @@ under `Corta/` is therefore verified by launching the app and checking:
 4. output longer than the screen scrolls and uses every row,
 5. gestures and menu actions reach the pane — the terminal view is first
    responder, so `keyDown` fires and First-Responder menu items (⌘V, ⌘=)
-   are not dead.
+   are not dead,
+6. a *restored* tabbed window (three tabs, `kill -9`, relaunch) comes
+   back in saved order with the saved tab selected and its first row
+   below the tab bar — the one arrangement whose layout nothing but
+   `regroupRestoredTabs` drives, and where 2026-09-17 found both the
+   order and the inset wrong,
+7. in a non-English locale (`-AppleLanguages '(zh-Hans)'` on the launch),
+   the *menu bar* is translated, not only the menus beneath it.
+
+**The 2026-09-17 interactive pass** (`docs/test-results/2026-09-17-interactive.md`,
+run by a person with a UI-driving tool and then by hand) is the first
+full sweep of §4.6 and the batch-level "not judged" items since 0.1.1.
+What it found and what changed as a result: ECH unimplemented (above);
+the SFTP browser reporting a refused password login as a lost connection
+(`SFTPConnection.openSession` classified against a channel it had not
+stored yet); a restored tab group coming back in the wrong order with the
+tab bar over the first row; a transparent frame on every window reopen;
+font zoom moving the titlebar instead of the bottom edge; Command History
+with no command text and no text search; the menu bar unlocalised in every
+language; the Bell picker showing the config-file word. Still open from
+that pass, honestly: ⌘, not opening Settings on the tester's machine (not
+reproduced here under Pinyin, with or without a composition open), and
+VoiceOver reading state that did not match the screen (one cause found —
+a dropped trailing `valueChanged` — but not confirmed by listening).
 
 **System entry points (B16) are checked by hand, and the record says
 what was and was not.** A hotkey and a floating panel are properties of
@@ -435,7 +464,7 @@ that a passing grid test is compatible with:
 | Scroll regions and the viewport | `tmux` with several panes, `less` on a long file | A region scroll does not disturb rows outside it; scrollback follows the bottom; scrolling back and returning lands where it started | Pass, with one exception below |
 | Left/right margins and wide characters | `vim` with a CJK file, `tmux` split narrow | A wide glyph never straddles the right margin; a resize rewraps without stranding rows | Pass |
 | Insert and delete (ICH/IL/DCH/DL) | `vim` editing mid-line, `readline` with IRM | The redraw range matches the edit; nothing is left behind to the right of an insert | Pass |
-| Erase (ED/EL/ECH) | `clear`, `htop` redraw, `tmux` window switch | No residue from the previous screen, and the cursor ends where the sequence says | Pass |
+| Erase (ED/EL/ECH) | `clear`, `htop` redraw, `tmux` window switch, **`tmux` window shrink** | No residue from the previous screen, and the cursor ends where the sequence says | Pass for ED/EL. **ECH was not implemented at all** until 2026-09-17 — this row said Pass on the strength of `clear`/`htop`, which never send it; tmux's status line (left part, `CSI n X`, right part) kept the previous screen's cells in the gap after a window shrink. Now implemented and covered by `EditingTests`. |
 
 Run interactively on the release build (`vim ~/.zshrc`; `tmux` split
 `%`/`"` and window switch `n`/`p`; `htop` refresh; `less` on

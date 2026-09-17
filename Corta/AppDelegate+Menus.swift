@@ -81,7 +81,15 @@ extension AppDelegate {
         ]
         for item in menu.items {
             if let key = titles[item.title] { item.title = L10n.text(key) }
-            if let submenu = item.submenu { localizeStoryboardMenuTitles(in: submenu) }
+            if let submenu = item.submenu {
+                // The menu *bar* shows a top-level item by its submenu's
+                // title, not the item's — so with only the item localised
+                // the bar still read File / Shell / Edit / View / Window /
+                // Help in every language while the menus beneath it were
+                // translated (B16 test pass, Chinese). Same table, both.
+                if let key = titles[submenu.title] { submenu.title = L10n.text(key) }
+                localizeStoryboardMenuTitles(in: submenu)
+            }
         }
     }
 

@@ -1032,6 +1032,28 @@ public struct Grid: Sendable {
         pendingWrap = false
     }
 
+    /// ECH — ECMA-48 §8.3.38: erases `count` cells from the cursor
+    /// rightwards, in place — nothing shifts, unlike DCH — and leaves the
+    /// cursor where it is. Clamped to the right margin; a count of zero
+    /// erases one, as xterm does.
+    ///
+    /// Missing until B16's test pass: tmux draws its status line as the
+    /// left part, `CSI n X` over the gap, then the right part, and with the
+    /// erase ignored the gap kept whatever the previous screen had there —
+    /// a slice of htop's function-key row, after a window shrink, for the
+    /// life of the session. `CONFORMANCE.md` had listed ECH as passing.
+    public mutating func eraseCharacters(_ count: Int) {
+        let start = cursor.column
+        guard start < columns else { return }
+        let end = min(columns, start + max(1, count))
+        let template = pen.eraseCell
+        lines[cursor.row].erase(start..<end, with: template)
+        // A wide pair cut on either edge of the range is half-erased;
+        // the survivor is not a glyph and is erased too.
+        repairWidePairs(row: cursor.row, template: template)
+        pendingWrap = false
+    }
+
     /// A cleared row: blank, or filled with the erase background when one is
     /// set (BCE — an erased cell under a colour is visible, so it is stored).
     private func erasedLine() -> Line {

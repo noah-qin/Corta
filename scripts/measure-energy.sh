@@ -9,7 +9,7 @@
 #   2 occluded                — same window AXMinimized (app-baseline's method)
 #   3 background-output flood — still minimized, `yes` into the pane's tty:
 #                               the "occluded window must not render" case
-#   4 multi-window            — 2 windows via SessionRestore (config flip,
+#   4 multi-window            — 2 windows via SessionRestore (staged config,
 #                               reverted on every exit path, same as
 #                               measure-app-baseline.sh)
 #   5 kitty-image             — a generated 64x64 PNG transmitted to the pane
@@ -39,21 +39,22 @@ out="${1:-$repo_root/dist/energy-$(date '+%Y%m%d-%H%M%S').txt}"
 exec > >(tee "$out") 2>&1
 
 window_secs=${CORTA_ENERGY_WINDOW:-20}
-config_file="$HOME/.config/corta/config"
-state_dir="$HOME/Library/Application Support/Corta"
+# Every launch below runs against a throwaway stage (`CORTA_STAGE_DIR`,
+# `AppPaths`): its own config file and Application Support, so the real
+# `~/.config/corta/config` and the real window arrangement are never read,
+# flipped or written by a measurement — the B16 test pass declined to run
+# this script because it used to edit the real config in place.
+stage=$(mktemp -d /tmp/corta-energy-stage.XXXXXX)
+config_file="$stage/config"
+state_dir="$stage/ApplicationSupport"
 state_file="$state_dir/state.json"
-config_backup=""
-state_backup=""
+mkdir -p "$state_dir"
+printf 'restore-windows = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n' > "$config_file"
 app_pid=""
 
 cleanup() {
-  [ -n "$config_backup" ] && cp "$config_backup" "$config_file" 2>/dev/null || true
-  if [ -n "$state_backup" ]; then
-    cp "$state_backup" "$state_file" 2>/dev/null || true
-  else
-    rm -f "$state_file" 2>/dev/null || true
-  fi
   [ -n "$app_pid" ] && kill "$app_pid" 2>/dev/null || true
+  rm -rf "$stage"
 }
 trap cleanup EXIT
 
@@ -81,9 +82,9 @@ echo
 
 launch() { # $2: "restore" = leave session restore on (multi-window scenario)
   if [ "${2:-}" = "restore" ]; then
-    "$app/Contents/MacOS/Corta" >/dev/null 2>&1 &
+    CORTA_STAGE_DIR="$stage" "$app/Contents/MacOS/Corta" >/dev/null 2>&1 &
   else
-    CORTA_RESTORE_WINDOWS=0 "$app/Contents/MacOS/Corta" >/dev/null 2>&1 &
+    CORTA_STAGE_DIR="$stage" CORTA_RESTORE_WINDOWS=0 "$app/Contents/MacOS/Corta" >/dev/null 2>&1 &
   fi
   app_pid=$!
 }
@@ -205,8 +206,6 @@ echo
 
 # ================= scenario 4: two windows via SessionRestore ===============
 echo "== scenario 4/5: multi-window (2 windows, both visible, ${window_secs}s) =="
-cp "$config_file" /tmp/corta-energy-config.$$ && config_backup=/tmp/corta-energy-config.$$
-[ -f "$state_file" ] && cp "$state_file" /tmp/corta-energy-state.$$ && state_backup=/tmp/corta-energy-state.$$
 sed -i '' 's/^restore-windows = false/restore-windows = true/' "$config_file"
 if ! grep -q '^restore-windows = true' "$config_file"; then
   echo "config has no 'restore-windows = false' line to flip — scenario NOT RUN"
@@ -224,7 +223,7 @@ EOF
   sample_window "multi-window-2"
   kill_app
 fi
-cp "$config_backup" "$config_file"; config_backup=""
+sed -i '' 's/^restore-windows = true/restore-windows = false/' "$config_file"
 rm -f "$state_file"
 echo
 

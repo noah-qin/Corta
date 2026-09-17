@@ -287,6 +287,67 @@ what to edit.
 
 ### Fixed
 
+- **`CSI n X` (ECH) was not implemented.** Erase Character was dispatched
+  nowhere, so tmux's status line — drawn as its left part, an ECH over
+  the gap, then its right part — kept whatever the previous screen had in
+  the gap: after shrinking a window with two `htop` panes, a slice of the
+  function-key row sat in the status line for the rest of the session.
+  Implemented per ECMA-48 §8.3.38 (in place, cursor unmoved, clamped at
+  the margin, BCE, wide pairs repaired), with `EditingTests` covering it.
+  `CONFORMANCE.md`'s real-program table had listed ECH as passing on the
+  strength of programs that never send it; corrected. (2026-09-17
+  interactive pass, G25.)
+- **The SFTP browser reported a refused login as "the connection was
+  lost".** `SFTPConnection.openSession` reclassified a first-connect
+  failure against the connection's *stored* channel, and nothing is stored
+  until a session is up — so ssh's "Permission denied", exit 255, never
+  became the authentication error whose text says the channel has no
+  terminal to prompt on. Classified over the channel that failed;
+  regression test with a refusing `ssh` stand-in. (F21/F24.)
+- **A restored tab group came back in the wrong order, with the tab bar
+  over the first row.** `addTabbedWindow(_:ordered: .above)` inserts
+  directly after the receiver, and every tab was added after the *first*,
+  so three saved tabs came back first–third–second and the selected one
+  sat in the middle. And only the selected tab laid out against the bar:
+  the others kept the titlebar-only inset and drew their first row under
+  it until resized. Tabs are now chained in saved order, and every window
+  in the group lays out against the bar without absorbing it — the saved
+  frame already includes it, which is also why a restored tabbed window
+  used to come back two rows taller. (C11.)
+- **Every window reopened through the desktop for one frame.** The
+  first-present stand-in was retired in the same transaction that
+  *scheduled* the first drawable, one compositor frame before that drawable
+  was on the glass; a screen recording of the Dock-click reopen showed the
+  window transparent for a sixtieth of a second. The stand-in now outlives
+  the submitting tick and the next display-link callback retires it.
+  (`FirstPresentTests` covers the state.)
+- **⌘+ / ⌘− moved the titlebar instead of the bottom edge.** AppKit sizes
+  a window from its bottom-left origin, so each step jumped the whole
+  window — and the prompt the eye is on — up or down by the height delta.
+  Zoom is anchored at the top-left now, clamped to the screen. (C12.)
+- **Command History showed no command text and had nothing to search
+  by.** Each row carried a time, a status and a directory. Rows now show
+  the command as typed (recovered from the grid; a record whose prompt
+  line has scrolled away says so) and a search field filters on it,
+  case-insensitively. (B7.)
+- **The menu bar was English in every language.** The bar shows a
+  top-level item by its *submenu's* title and only the items were
+  localised, so File / Shell / Edit / View / Window / Help stayed English
+  above fully translated menus. The Bell picker showed the config-file
+  word (`Visual`) rather than a localised name. Chinese copy corrected
+  where the pass flagged it: one word for *pane* (窗格), the snapshot
+  command's wording, the scrollback label. (D15.)
+- **VoiceOver could be left reading a state the screen had moved past.**
+  A `valueChanged` notice arriving inside the 0.4 s rate limit was dropped
+  outright, so the last change of a burst — the one that leaves the screen
+  in its final state — was the one never announced. Trailing post added;
+  the snapshot cache is invalidated on every change regardless. One cause
+  of the D14 report, not confirmed by listening.
+- **`scripts/measure-energy.sh` and `scripts/measure-app-baseline.sh`
+  edited the real config file and window arrangement.** Both now run
+  against a throwaway `CORTA_STAGE_DIR`, so a measurement never reads,
+  flips or overwrites `~/.config/corta/config` or the saved windows.
+  (E17.)
 - **A restored or preset window's first pane spawned in the wrong
   place.** The storyboard loads a window's content view — and spawns its
   root pane — *inside* `instantiateInitialController`, so a restore or a

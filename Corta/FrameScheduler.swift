@@ -137,14 +137,30 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         link?.isPaused = false
     }
 
-    /// The transition out of `.awaitingFrame`, run only after a frame has
-    /// actually been rendered and presented. Called from
-    /// `metalDisplayLink(_:needsUpdate:)` — and directly by tests, since
-    /// driving a real `CAMetalDisplayLink` needs a visible window and a
-    /// turning run loop. A no-op in `.idle`, so a stray callback can never
+    /// The first frame's command buffer has been committed and its drawable
+    /// scheduled for presentation — which is not the same as the frame
+    /// being on the glass. The GPU still has to run it and the compositor
+    /// still has to pick it up, and stripping the stand-in in the same
+    /// transaction left one compositor frame with a layer that had neither
+    /// a background nor contents: a transparent window, the desktop showing
+    /// through for a sixtieth of a second, on every reopen (found on a
+    /// screen recording of the Dock-click path, frame by frame). So the
+    /// stand-in stays up for one more display-link tick, and the *next*
+    /// callback — by which time the first drawable has been on screen for
+    /// a whole frame — retires it.
+    func noteFrameSubmitted() {
+        guard firstPresentState == .awaitingFrame else { return }
+        firstPresentState = .submitted
+    }
+
+    /// The transition to `.idle`, run once the first frame is actually on
+    /// the glass. Called from `metalDisplayLink(_:needsUpdate:)` on the tick
+    /// after the one that submitted the frame — and directly by tests,
+    /// since driving a real `CAMetalDisplayLink` needs a visible window and
+    /// a turning run loop. A no-op in `.idle`, so a stray callback can never
     /// strip a stand-in a *newer* request just armed.
     func notePresentedFrame() {
-        guard firstPresentState == .awaitingFrame else { return }
+        guard firstPresentState != .idle else { return }
         firstPresentState = .idle
         metalLayer.backgroundColor = nil
     }
@@ -174,14 +190,20 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
             RenderMetrics.record(.drawableWait, milliseconds: max(0, latenessMS))
         }
         let stillPending = shouldRenderFrame?() ?? true
+        // The frame submitted on the previous tick is on the glass now;
+        // the stand-in behind it can go (`noteFrameSubmitted`).
+        let retiringStandIn = firstPresentState == .submitted
+        if retiringStandIn { notePresentedFrame() }
         let drawable = update.drawable
         if let onRenderFrame {
             onRenderFrame(FrameScheduler.clearPass(for: drawable), metalLayer.drawableSize, drawable)
-            // The frame is presented (the handler presents synchronously),
-            // so the first-present stand-in — if armed — is now redundant.
-            notePresentedFrame()
+            noteFrameSubmitted()
         }
-        if !stillPending {
+        // One more tick is owed while a stand-in is still up, even with
+        // nothing else to draw: pausing here would leave it in place until
+        // the next unrelated frame — harmless, but then the retirement
+        // would ride on output rather than on time.
+        if !stillPending && firstPresentState != .submitted {
             link.isPaused = true
         }
     }
@@ -207,4 +229,8 @@ enum FirstPresentState: Equatable {
     /// layer's `backgroundColor` (the theme's clear colour) stands in so the
     /// transparent window can never show what is behind it.
     case awaitingFrame
+    /// The first frame's drawable has been scheduled but has not had a
+    /// display-link tick to reach the glass; the stand-in stays up until the
+    /// next tick (`FrameScheduler.noteFrameSubmitted`).
+    case submitted
 }

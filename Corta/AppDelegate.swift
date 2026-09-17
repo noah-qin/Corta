@@ -380,7 +380,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// instead of every restore turning previously-tabbed windows back into
     /// standalone ones. Grouped by `tabGroupID`; a group of one (or a `nil`
     /// ID) is left exactly as `restoreWindowsIfConfigured` already made it.
-    private func regroupRestoredTabs(
+    func regroupRestoredTabs(
         _ restored: [(state: WindowState, controller: NSWindowController)]
     ) {
         let byGroup = Dictionary(grouping: restored.filter { $0.state.tabGroupID != nil }) {
@@ -389,13 +389,27 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         for (_, members) in byGroup {
             guard members.count > 1 else { continue }
             let ordered = members.sorted { ($0.state.tabIndex ?? 0) < ($1.state.tabIndex ?? 0) }
-            guard let first = ordered.first?.controller.window else { continue }
+            guard var previous = ordered.first?.controller.window else { continue }
+            // Each tab goes in *after the one before it*. `addTabbedWindow(_:
+            // ordered: .above)` inserts directly after the receiver, so
+            // adding every tab after the first put the third tab between
+            // the first and the second — and, since the selected tab was
+            // the last one saved, "selected" landed in the middle of the
+            // bar (B16 test pass).
             for member in ordered.dropFirst() {
                 guard let window = member.controller.window else { continue }
-                first.addTabbedWindow(window, ordered: .above)
+                previous.addTabbedWindow(window, ordered: .above)
+                previous = window
             }
             if let selected = ordered.first(where: { $0.state.isSelectedTab })?.controller.window {
                 selected.makeKeyAndOrderFront(nil)
+            }
+            // The tab bar just appeared over every window in the group, and
+            // only the selected one will lay out on its own. The saved
+            // frames already include the bar (`adoptChromeWithoutAbsorbing`).
+            for member in ordered {
+                (member.controller.contentViewController as? SplitViewController)?
+                    .adoptChromeWithoutAbsorbing()
             }
         }
     }

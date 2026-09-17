@@ -8,6 +8,9 @@ struct CommandHistoryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            TextField(L10n.text("commandHistory.searchPlaceholder"), text: $model.query)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel(L10n.text("commandHistory.searchLabel"))
             filterRow
             if let message = model.noPaneMessage {
                 Text(message)
@@ -77,13 +80,23 @@ private struct CommandHistoryRowView: View {
                 .accessibilityHidden(true)
             Text(row.timestamp)
                 .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+            // The command itself, monospaced: what the row is *about*. A
+            // record whose prompt line has scrolled away says so rather
+            // than showing a blank — the timestamp and status still stand.
+            Text(row.commandText ?? L10n.text("commandHistory.textGone"))
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(row.commandText == nil ? .tertiary : .primary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .help(row.commandText ?? "")
             Text(row.directoryText)
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .help(row.directoryTooltip ?? "")
-            Spacer()
+            Spacer(minLength: 8)
             Button(L10n.text("commandHistory.find")) { model.find(id: row.id) }
             Button(L10n.text("commandHistory.fill")) { model.fill(id: row.id) }
                 .disabled(!row.canFillOrRun)

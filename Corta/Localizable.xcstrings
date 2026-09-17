@@ -6681,7 +6681,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "pane 中仍有任务运行时询问。"
+            "value": "窗格中仍有任务运行时询问。"
           }
         },
         "zh-Hant": {
@@ -7743,7 +7743,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "滚动回看"
+            "value": "保留历史行数"
           }
         },
         "zh-Hant": {
@@ -13230,7 +13230,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "为正在运行的命令的输出拍摄快照"
+            "value": "保存当前命令输出快照"
           }
         },
         "zh-Hant": {
@@ -13879,7 +13879,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "在新面板中打开上级目录"
+            "value": "在新窗格中打开上级目录"
           }
         },
         "zh-Hant": {
@@ -13938,7 +13938,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "在新面板中打开项目根目录"
+            "value": "在新窗格中打开项目根目录"
           }
         },
         "zh-Hant": {
@@ -14056,7 +14056,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "此面板没有已知的工作目录"
+            "value": "此窗格没有已知的工作目录"
           }
         },
         "zh-Hant": {
@@ -14764,7 +14764,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "没有可搜索的面板"
+            "value": "没有可搜索的窗格"
           }
         },
         "zh-Hant": {
@@ -15466,55 +15466,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@, %@, %@"
+            "value": "%@, %@, %@, %@"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%@，%@，%@"
+            "value": "%@，%@，%@，%@"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%@，%@，%@"
+            "value": "%@，%@，%@，%@"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%@、%@、%@"
+            "value": "%@、%@、%@、%@"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%@, %@, %@"
+            "value": "%@, %@, %@, %@"
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%@, %@, %@"
+            "value": "%@, %@, %@, %@"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%@, %@, %@"
+            "value": "%@, %@, %@, %@"
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%@, %@, %@"
+            "value": "%@, %@, %@, %@"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%@, %@, %@"
+            "value": "%@, %@, %@, %@"
           }
         }
       }
@@ -15885,7 +15885,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "此面板已连接到远程主机，但具体主机未知。请输入主机名，与传给 ssh 的写法一致："
+            "value": "此窗格已连接到远程主机，但具体主机未知。请输入主机名，与传给 ssh 的写法一致："
           }
         },
         "zh-Hant": {
@@ -20428,7 +20428,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "此面板的 shell 报告它位于“%@”。这个名字来自远端 shell 的输出，而不是你输入的——请核对（或改成你会传给 ssh 的写法），然后连接："
+            "value": "此窗格的 shell 报告它位于“%@”。这个名字来自远端 shell 的输出，而不是你输入的——请核对（或改成你会传给 ssh 的写法），然后连接："
           }
         },
         "zh-Hant": {
@@ -22123,6 +22123,360 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Tela principal"
+          }
+        }
+      }
+    },
+    "commandHistory.searchPlaceholder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search commands"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "搜索命令"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "搜尋命令"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "コマンドを検索"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "명령 검색"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Befehle durchsuchen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Rechercher des commandes"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Buscar comandos"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Buscar comandos"
+          }
+        }
+      }
+    },
+    "commandHistory.searchLabel": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search command text"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "搜索命令文本"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "搜尋命令文字"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "コマンドのテキストを検索"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "명령 텍스트 검색"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Befehlstext durchsuchen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Rechercher dans le texte des commandes"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Buscar en el texto de los comandos"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Buscar no texto dos comandos"
+          }
+        }
+      }
+    },
+    "commandHistory.textGone": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(command text no longer in scrollback)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "（命令文本已不在回滚历史中）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "（命令文字已不在回捲歷史中）"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "（コマンドのテキストはスクロールバックに残っていません）"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "(명령 텍스트가 스크롤백에 더 이상 없음)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "(Befehlstext nicht mehr im Verlauf)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "(texte de la commande plus dans l’historique)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "(el texto del comando ya no está en el historial)"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "(texto do comando não está mais no histórico)"
+          }
+        }
+      }
+    },
+    "bell.visual": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visual"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "视觉提示"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "視覺提示"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "画面フラッシュ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "시각 알림"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Visuell"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Visuel"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Visual"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Visual"
+          }
+        }
+      }
+    },
+    "bell.audible": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audible"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "声音"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "聲音"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "サウンド"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "소리"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Akustisch"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Sonore"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Sonora"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Sonora"
+          }
+        }
+      }
+    },
+    "bell.muted": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Muted"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "静音"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "靜音"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "消音"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "음소거"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Stumm"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Silencieuse"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Silenciada"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Silenciada"
           }
         }
       }

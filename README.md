@@ -84,12 +84,12 @@ SFTP and remote editing; the documentation and packaging you are reading;
 and system entry points — App Intents, a Quick Terminal and Secure
 Keyboard Entry. [`CHANGELOG.md`](CHANGELOG.md) has each one in detail.
 
-Conformance, measured against esctest2 on 2026-09-08: 112 passed, 335
-known bugs, 121 failed of 568 — 78.7% xterm-compatibility. The
-classification is in
-[`docs/history/V0.1.1-QUALITY-PLAN.md`](docs/history/V0.1.1-QUALITY-PLAN.md);
+Conformance, measured against esctest2 on 2026-09-17: 126 passed, 334
+known bugs, 107 failed of 567 — 81.1% xterm-compatibility, up from 78.7%
+at 0.1.1 with no test regressed. The classification of what still fails
+is in [`docs/history/V0.1.1-QUALITY-PLAN.md`](docs/history/V0.1.1-QUALITY-PLAN.md);
 the failing test names are in
-[`docs/esctest/0.1.1-results.txt`](docs/esctest/0.1.1-results.txt).
+[`docs/esctest/2026-09-17-results.txt`](docs/esctest/2026-09-17-results.txt).
 
 The method behind each number is in
 [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md), with the date and
@@ -102,7 +102,7 @@ configuration of every run:
 | Memory, 100k × 120 lines | ~200 MB | **185.0 MB** | ✅ |
 | Core feed throughput | > 100 MB/s | **130.0 MiB/s** (5-run mean) | ✓ |
 | Keypress → pixel | < 1 frame + input | **57.8 ms avg** (200 samples) | ⚠️ above target |
-| `esctest` xterm conformance | — | **78.7%** — 121 of 568 failing | |
+| `esctest` xterm conformance | — | **81.1%** — 107 of 567 failing | |
 
 The number that misses its target is printed here rather than omitted.
 Numbers that have not been measured are left blank rather than estimated.
@@ -239,9 +239,9 @@ a feature request for one of them.
 
 ## Known limits
 
-- **`TERM` is `xterm-256color`**, deliberately, and 121 of esctest's 568
+- **`TERM` is `xterm-256color`**, deliberately, and 107 of esctest's 567
   cases still fail — the list is in
-  [`docs/esctest/0.1.1-results.txt`](docs/esctest/0.1.1-results.txt). A
+  [`docs/esctest/2026-09-17-results.txt`](docs/esctest/2026-09-17-results.txt). A
   program that misbehaves in Corta and not in xterm is a bug to report.
 - **Shell integration ships for zsh only.** Fish and bash users keep the
   keystroke-and-idle heuristic for the long-task notification and get no

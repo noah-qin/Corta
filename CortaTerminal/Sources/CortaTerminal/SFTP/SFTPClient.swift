@@ -179,7 +179,14 @@ public final class SFTPConnection: SFTPClient, @unchecked Sendable {
             _ = try await session.connect()
         } catch {
             session.close()
-            throw await classified(error)
+            // *This* channel, by hand: the connection's pointer is moved to
+            // a child only once its session is up, so on the first connect
+            // there is nothing in `state` yet and `classified(_:)` alone
+            // would hand back the bare `.connectionLost` — which is what a
+            // password prompt that ssh could not show looked like in the
+            // browser, "The connection was lost", with the "connect once in
+            // the terminal first" guidance never reached (B16 test pass).
+            throw await classified(error, over: channel)
         }
         return (channel, session)
     }
@@ -316,9 +323,11 @@ public final class SFTPConnection: SFTPClient, @unchecked Sendable {
     /// A lost connection over a dead ssh child is really whatever the
     /// child's exit said — authentication, reachability, an ssh-level
     /// failure — so the UI's wording can name the actual class.
-    private func classified(_ error: SFTPError) async -> SFTPError {
+    private func classified(
+        _ error: SFTPError, over channel: SFTPSubprocessChannel? = nil
+    ) async -> SFTPError {
         guard case .transport(.connectionLost) = error,
-            let channel = state.withLock({ $0.channel }),
+            let channel = channel ?? state.withLock({ $0.channel }),
             let exit = channel.awaitExit()
         else { return error }
         return .transport(SFTPTransportError.classify(exit: exit, diagnostics: channel.diagnosticOutput))

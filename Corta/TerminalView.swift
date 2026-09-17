@@ -54,6 +54,9 @@ final class TerminalView: NSView, CALayerDelegate {
     var cachedAccessibilitySnapshot: TerminalAccessibilitySnapshot?
     var cachedAccessibilitySnapshotTime: CFTimeInterval = 0
     var lastAccessibilityPost: CFTimeInterval = 0
+    /// The trailing `valueChanged` post owed for changes that arrived inside
+    /// the rate-limit interval (`noteAccessibilityValueChanged`).
+    var pendingAccessibilityPost: DispatchWorkItem?
 
     /// Called once per accepted frame, on the main thread, with the
     /// drawable's render pass descriptor and pixel size. Forwarded to

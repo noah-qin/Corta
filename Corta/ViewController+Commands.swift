@@ -205,9 +205,22 @@ extension ViewController {
         // matches and sends no resize. `lastRequestedSize` is set in
         // `viewDidLoad`, so it is non-nil whenever `didSizeWindow` holds.
         guard let gridSize = lastRequestedSize else { return }
+        // Anchored at the top-left, the way Terminal.app grows on ⌘+. AppKit
+        // sizes a window from its bottom-left origin, so the titlebar — and
+        // with it every row of text, which hangs from the top — used to
+        // jump upward by the height delta on each step and back down on
+        // each ⌘−, while the window's *bottom* stood still. The reader's
+        // eye is on the prompt near the top; keep that where it is and let
+        // the bottom edge move, clamped to the screen so a window at the
+        // Dock's edge grows upward instead of off-screen.
+        let topLeft = NSPoint(x: window.frame.minX, y: window.frame.maxY)
         window.setContentSize(NSSize(
             width: CGFloat(gridSize.columns) * metrics.cellWidth + TerminalLayout.insetWidth,
             height: CGFloat(gridSize.rows) * metrics.cellHeight + verticalInsets))
+        var frame = window.frame
+        frame.origin.y = topLeft.y - frame.height
+        frame.origin.x = topLeft.x
+        window.setFrame(window.constrainFrameRect(frame, to: window.screen), display: true)
         invalidateDisplay()
     }
 }

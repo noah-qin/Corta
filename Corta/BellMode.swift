@@ -18,5 +18,8 @@ nonisolated enum BellMode: String, CaseIterable, Sendable {
     case visual
     case muted
 
-    var displayName: String { rawValue.capitalized }
+    /// The picker's label — localised, not the config-file word capitalised,
+    /// which is what the Settings page showed in every language until the
+    /// B16 test pass read it in Chinese.
+    var displayName: String { L10n.text("bell.\(rawValue)") }
 }

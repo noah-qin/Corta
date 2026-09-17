@@ -110,6 +110,24 @@ struct FirstPresentTests {
         #expect(layer.backgroundColor == nil)
     }
 
+    /// Submitting the first frame is not presenting it: the stand-in has to
+    /// outlive the tick that scheduled the drawable, because stripping it in
+    /// the same transaction showed the desktop through the window for one
+    /// compositor frame on every reopen. Only the *next* tick retires it.
+    @Test func standInOutlivesTheSubmittingTick() {
+        let (scheduler, layer) = Self.makeScheduler()
+        scheduler.requestFirstPresent()
+        scheduler.noteFrameSubmitted()
+        #expect(scheduler.firstPresentState == .submitted)
+        #expect(layer.backgroundColor != nil, "the frame is scheduled, not on the glass")
+        scheduler.notePresentedFrame()
+        #expect(scheduler.firstPresentState == .idle)
+        #expect(layer.backgroundColor == nil)
+        // A theme change re-arms from idle; a stray submit in idle is a no-op.
+        scheduler.noteFrameSubmitted()
+        #expect(scheduler.firstPresentState == .idle)
+    }
+
     /// A present notification that arrives with nothing armed (every steady-
     /// state frame takes this path) must not disturb the layer.
     @Test func presentWhileIdleIsANoOp() {

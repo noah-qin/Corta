@@ -43,6 +43,10 @@ final class CommandHistoryModel {
         let timestamp: String
         let directoryText: String
         let directoryTooltip: String?
+        /// The command as typed, recovered from the grid — `nil` once its
+        /// prompt line has left the scrollback, which is also when Fill
+        /// and Run stop being offered.
+        let commandText: String?
         let canFillOrRun: Bool
         let accessibilityLabel: String
     }
@@ -52,6 +56,11 @@ final class CommandHistoryModel {
     var projectOnly = false
     var exitFilter: ExitFilter = .any
     var hostScope: HostScope = .any
+    /// B16 test pass — a history you cannot search by what was typed is a
+    /// list of timestamps. Case-insensitive substring over the recovered
+    /// command text; a record whose text is gone from the scrollback
+    /// cannot match a non-empty query and is left out of the results.
+    var query: String = ""
     /// Set by `CommandHistoryController`; called when an action (Find,
     /// successful Fill or Run) wants the window to close, same moment the
     /// AppKit version called `window?.close()` directly.
@@ -101,7 +110,19 @@ final class CommandHistoryModel {
         case .succeeded: records = records.filter { $0.exitStatus == 0 }
         case .failed: records = records.filter { $0.didFail }
         }
-        return records.map { Self.row(for: $0, grid: grid) }
+        let rows = records.map { Self.row(for: $0, grid: grid) }
+        return Self.filter(rows, query: query)
+    }
+
+    /// The text filter, as a pure function so it is testable on rows built
+    /// by hand.
+    nonisolated static func filter(_ rows: [Row], query: String) -> [Row] {
+        let needle = query.trimmingCharacters(in: .whitespaces)
+        guard !needle.isEmpty else { return rows }
+        return rows.filter { row in
+            row.commandText?.range(of: needle, options: [.caseInsensitive, .diacriticInsensitive])
+                != nil
+        }
     }
 
     private static func row(for record: CommandRecord, grid: Grid) -> Row {
@@ -133,13 +154,15 @@ final class CommandHistoryModel {
             directoryTooltip = record.workingDirectory
         }
         let timestamp = timestampFormatter.string(from: record.startedAt)
+        let commandText = ViewController.commandLineText(grid: grid, record: record)
         return Row(
             id: record.id, statusSymbolName: symbolName, statusDescription: statusDescription,
             timestamp: timestamp, directoryText: directoryText,
-            directoryTooltip: directoryTooltip,
-            canFillOrRun: ViewController.commandLineText(grid: grid, record: record) != nil,
+            directoryTooltip: directoryTooltip, commandText: commandText,
+            canFillOrRun: commandText != nil,
             accessibilityLabel: L10n.format(
-                "commandHistory.a11yRow", statusDescription, timestamp, directoryText))
+                "commandHistory.a11yRow", statusDescription, timestamp, directoryText,
+                commandText ?? L10n.text("commandHistory.textGone")))
     }
 
     func clearHistory() {
