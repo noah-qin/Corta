@@ -44,7 +44,10 @@ struct TerminalWindowEntity: AppEntity {
     let title: String
 
     var displayRepresentation: DisplayRepresentation {
-        DisplayRepresentation(title: "\(title)")
+        // A window's title is the child's text, not a string to localise;
+        // a `LocalizedStringResource` interpolation here was extracted into
+        // the catalog as a bare `%@` key.
+        DisplayRepresentation(title: LocalizedStringResource(stringLiteral: title))
     }
 
     @MainActor
