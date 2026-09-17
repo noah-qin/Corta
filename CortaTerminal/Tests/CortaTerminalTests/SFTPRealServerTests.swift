@@ -185,15 +185,23 @@ struct SFTPRealServerTests {
         defer { try? FileManager.default.removeItem(at: script) }
 
         let client = SFTPConnection(host: "example.com", sshExecutable: script.path)
+        // Bound outside the catch: binding the typed error with `catch let
+        // error as SFTPError` and switching on it in the same clause crashed
+        // the CI toolchain's SILGen (Swift 6.3.3, Xcode 26.6).
+        var caught: SFTPError?
         do {
             _ = try await client.connect()
-            Issue.record("connect must fail against a refusing ssh")
-        } catch let error as SFTPError {
-            guard case .transport(.authenticationFailed(let diagnostics)) = error else {
-                Issue.record("expected .authenticationFailed, got \(error)")
-                return
-            }
-            #expect(diagnostics.contains("Permission denied"))
+        } catch {
+            caught = error
         }
+        guard let caught else {
+            Issue.record("connect must fail against a refusing ssh")
+            return
+        }
+        guard case .transport(.authenticationFailed(let diagnostics)) = caught else {
+            Issue.record("expected .authenticationFailed, got \(caught)")
+            return
+        }
+        #expect(diagnostics.contains("Permission denied"))
     }
 }
