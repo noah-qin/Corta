@@ -91,17 +91,17 @@ is in [`docs/history/V0.1.1-QUALITY-PLAN.md`](docs/history/V0.1.1-QUALITY-PLAN.m
 the failing test names are in
 [`docs/esctest/2026-09-17-results.txt`](docs/esctest/2026-09-17-results.txt).
 
-The method behind each number is in
-[`docs/PERFORMANCE.md`](docs/PERFORMANCE.md), with the date and
-configuration of every run:
+Measured for 1.0.0 on 2026-09-18 (Apple M5, macOS 27.0, on battery —
+the one deviation from the fixed environment, stated in
+[`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) §5.6 with every other row):
 
 | Metric | Target | Measured | |
 | :--- | :--- | :--- | :--- |
-| Frame CPU | < 4 ms | **1.88 ms** | ✅ |
-| Idle CPU | ~0% | **0.0%** | ✅ |
+| Frame CPU (120×40 full rebuild, Debug) | < 4 ms | **2.26 ms** (3-run mean) | ✅ |
+| Idle CPU (Release, 20 s) | ~0% | **0.05%** | ✅ |
 | Memory, 100k × 120 lines | ~200 MB | **185.0 MB** | ✅ |
-| Core feed throughput | > 100 MB/s | **130.0 MiB/s** (5-run mean) | ✓ |
-| Keypress → pixel | < 1 frame + input | **57.8 ms avg** (200 samples) | ⚠️ above target |
+| Core feed throughput | > 100 MB/s | **144.2 MiB/s** (5-run mean) | ✓ |
+| Keypress → pixel | < 1 frame + input | **57.8 ms avg** (200 samples, 0.1.1 — not re-measured) | ⚠️ above target |
 | `esctest` xterm conformance | — | **81.1%** — 107 of 567 failing | |
 
 The number that misses its target is printed here rather than omitted.
