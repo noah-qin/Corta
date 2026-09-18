@@ -101,7 +101,7 @@ the one deviation from the fixed environment, stated in
 | Idle CPU (Release, 20 s) | ~0% | **0.05%** | ✅ |
 | Memory, 100k × 120 lines | ~200 MB | **185.0 MB** | ✅ |
 | Core feed throughput | > 100 MB/s | **144.2 MiB/s** (5-run mean) | ✓ |
-| Keypress → glass | < 1 frame + input | **61.9 ms avg**, p95 69.7 (200 scripted samples, in-app measure; 0.1.1's Typometer read 57.8) | ⚠️ above target |
+| Keypress → glass | < 1 frame + input | **61.9 ms avg**, p95 69.7 (200 scripted samples, measured in-app; 0.1.1 read 57.8) | ⚠️ above target |
 | `esctest` xterm conformance | — | **81.1%** — 107 of 567 failing | |
 
 The number that misses its target is printed here rather than omitted.

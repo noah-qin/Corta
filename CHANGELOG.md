@@ -27,8 +27,9 @@ subset of 0.1.1's.
 troubleshooting entry or a conformance note rather than a claim:
 
 - Keypress-to-glass latency is above its target (61.9 ms average,
-  measured from inside the app on 2026-09-18; 0.1.1's Typometer read
-  57.8); the README prints the number rather than omitting it.
+  measured from inside the app on 2026-09-18; 0.1.1's screen-capture
+  measurement read 57.8); the README prints the number rather than
+  omitting it.
 - One tester's ⌘, did not open Settings; not reproduced on the same
   machine under Pinyin with or without a composition open, and the
   menu item works. Reported under `CONFORMANCE.md` §4.4.
@@ -55,8 +56,8 @@ troubleshooting entry or a conformance note rather than a claim:
   the child's echo (`MTLDrawable.presentedTime`, the moment on the glass).
   A drawable the compositor replaced hands its keystroke to the next one
   rather than dropping the sample. `scripts/measure-keypress-latency.sh`
-  drives or waits for 200 samples and reads the line back; no Typometer,
-  no screen capture, no permission. `PERFORMANCE.md` §5.7 says what the
+  drives or waits for 200 samples and reads the line back; no third-party
+  tool, no screen capture, no permission. `PERFORMANCE.md` §5.7 says what the
   scripted and `--manual` kinds each include. Dumps of every
   render metric now carry p95 as well.
 - **B16 — system entry points and the Quick Terminal.** Three App Intents
@@ -122,7 +123,7 @@ troubleshooting entry or a conformance note rather than a claim:
   experiments) and `scripts/measure-energy.sh` (idle/occluded/flood/
   multi-window/image energy scenarios; powermetrics sampling itself needs
   a sudo-capable session and was not run — recorded as not judged, along
-  with Typometer typing latency and thermal/low-power forcing).
+  with end-to-end typing latency and thermal/low-power forcing).
 - **B14 — SFTP and remote editing (first slice).** Built on B13's remote
   context. The engine is a self-contained SFTPv3 wire-protocol client in
   the CortaTerminal package whose transport is the system's `ssh -s --
@@ -664,14 +665,14 @@ the order they were met:
 
 ### Verification
 
-- **Keypress → pixel (2026-09-09)** — Typometer 1.0.1 at M6.12's settings
+- **Keypress → pixel (2026-09-09)** — an external screen-capture tool at M6.12's settings
   against the Release build: **57.8 ms average, 45.3 ms min, 78.9 ms max,
   5.6 ms SD** over 200 samples, with `PERFORMANCE.md` §5.2's environment
   table held and recorded in full for the first time — machine and chip,
   OS, build, panel and refresh rate, scale, font, window, power source, and
   the test program (`cat > /dev/null`). That is 12.3 ms above M6.12's
   45.5 ms, and §5 records why the comparison is softer than it looks:
-  M6.12 recorded its Typometer settings and not its test program, and no
+  M6.12 recorded its capture settings and not its test program, and no
   run has recorded the machine beyond "MacBook Air, Apple silicon". The
   same run is the re-measurement M9 has owed since it landed.
 - **Manual verification (2026-09-09)** — the six checks in
@@ -1031,7 +1032,7 @@ M1–M10.
 - Core feed throughput is **130.0 MiB/s** (five-run mean), above the
   100 MB/s target; parser-only and parser+grid are measured separately.
 - `esctest` xterm conformance is **77.6%** — 127 of 568 tests failing.
-- Typometer measures keypress-to-pixel latency at **45.5 ms average**
+- An external screen-capture tool measures keypress-to-pixel latency at **45.5 ms average**
   (24.8 ms minimum, 56.4 ms maximum, 6.8 ms standard deviation), above the
   one-frame-plus-input target; the in-process path to the grid is 0.005 ms.
   Measured alongside iTerm2 (42.7 ms) and Ghostty (31.9 ms) on the same
@@ -1043,7 +1044,7 @@ M1–M10.
 - OSC 133 marks only appear if the user's shell emits them; Corta ships no
   shell snippets yet.
 - `maximumDrawableCount = 2` measured within noise of the default —
-  70.1 ms vs. 70.4 ms average across a real Typometer A/B, so the
+  70.1 ms vs. 70.4 ms average across a real end-to-end A/B, so the
   default (3) ships (`docs/PERFORMANCE.md` §5.4). A 12-second real-typing
   `os_signpost` trace found no `output` → `frame` gap exceeding one
   frame period — no evidence, in that sample, of a redraw missing its
@@ -1052,7 +1053,7 @@ M1–M10.
   §5.2's fixed-environment table (in particular, other background load
   on the machine) wasn't held for either run. The render-pipeline
   rewrite (M9) landed and is covered by its own unit tests, but a
-  same-conditions Typometer re-measurement against the 45.5 ms baseline
+  same-conditions end-to-end re-measurement against the 45.5 ms baseline
   is still open.
 
 ---
