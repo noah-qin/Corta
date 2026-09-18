@@ -82,3 +82,14 @@ struct ScrollbackCoordinatesTests {
         }
     }
 }
+
+extension ScrollbackCoordinatesTests {
+    @Test func rangeUsesTheSameMappingAsViewportAndPreservesColumns() {
+        let range = SelectionRange(start: .init(row: -2, column: 3), end: .init(row: 4, column: 7))
+        let shifted = range.reanchored(from: 50, to: 60)
+        #expect(shifted.start == SelectionPoint(row: -12, column: 3))
+        #expect(shifted.end == SelectionPoint(row: -6, column: 7))
+        #expect(range.reanchored(from: 60, to: 50) == range)
+        #expect(ScrollbackCoordinates.absoluteRow(shifted.start.row, totalPushed: 60) == 48)
+    }
+}

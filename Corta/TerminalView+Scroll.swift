@@ -1,4 +1,5 @@
 import AppKit
+import CortaTerminal
 
 /// U03: the leftover sub-line scroll distance for one view, kept per device
 /// class. Trackpads report *precise* deltas in points, wheel mice report
@@ -58,7 +59,7 @@ extension TerminalView {
         guard event.scrollingDeltaY != 0 else { return }
         // With mouse reporting on, the wheel belongs to the child (SGR 64/65
         // per notch), not to the scrollback.
-        if isMouseReportingEnabled?() == true, cellSize.width > 0, cellSize.height > 0 {
+        if effectiveMouseTrackingMode != .off, !overridesMouseReporting(event), cellSize.width > 0, cellSize.height > 0 {
             let (column, row) = cellUnder(event)
             onMouseBytes?(
                 SGRMouse.wheel(

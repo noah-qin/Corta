@@ -1,3 +1,5 @@
+import AppKit
+import CortaTerminal
 import CoreGraphics
 import Foundation
 import Testing
@@ -63,5 +65,64 @@ struct MouseReportingTests {
         let view = TerminalView(frame: NSRect(x: 0, y: 0, width: 1000, height: 600))
         view.cellSize = CGSize(width: 10, height: 20)
         #expect(view.cellUnder(point: CGPoint(x: 55, y: 45)) == (column: 5, row: 2))
+    }
+}
+
+extension MouseReportingTests {
+    @Test func motionEncodesHeldAndUnheldButtons() {
+        #expect(SGRMouse.motion(button: .left, column: 5, row: 3) == Array("\u{1B}[<32;6;4M".utf8))
+        #expect(SGRMouse.motion(button: .right, column: 0, row: 0, modifiers: .init(control: true)) == Array("\u{1B}[<50;1;1M".utf8))
+        #expect(SGRMouse.motion(button: nil, column: 5, row: 3) == Array("\u{1B}[<35;6;4M".utf8))
+    }
+
+    @MainActor private func mouseEvent(_ type: NSEvent.EventType, x: CGFloat = 15,
+                                       flags: NSEvent.ModifierFlags = []) -> NSEvent {
+        NSEvent.mouseEvent(with: type, location: NSPoint(x: x, y: 15), modifierFlags: flags,
+                          timestamp: 0, windowNumber: 0, context: nil, eventNumber: 1,
+                          clickCount: 1, pressure: 1)!
+    }
+
+    @MainActor @Test func modesGateMotionAndCoalesceByCell() {
+        let view = TerminalView(frame: NSRect(x: 0, y: 0, width: 100, height: 100))
+        view.cellSize = CGSize(width: 10, height: 10)
+        view.cellAtPoint = { (column: Int($0.x / 10), row: 1) }
+        var mode = CortaTerminal.MouseTrackingMode.off
+        view.mouseTrackingMode = { mode }
+        var reports: [[UInt8]] = []
+        view.onMouseBytes = { reports.append($0) }
+        view.mouseMoved(with: mouseEvent(.mouseMoved))
+        #expect(reports.isEmpty)
+        mode = .normal
+        view.mouseDown(with: mouseEvent(.leftMouseDown))
+        view.mouseDragged(with: mouseEvent(.leftMouseDragged, x: 25))
+        #expect(reports.count == 1)
+        mode = .buttonEvent
+        view.mouseDragged(with: mouseEvent(.leftMouseDragged, x: 25))
+        view.mouseDragged(with: mouseEvent(.leftMouseDragged, x: 26))
+        #expect(reports.count == 2)
+        #expect(reports.last == Array("\u{1B}[<32;3;2M".utf8))
+        view.mouseUp(with: mouseEvent(.leftMouseUp, x: 25))
+        view.mouseMoved(with: mouseEvent(.mouseMoved, x: 35))
+        #expect(reports.count == 3)
+        mode = .anyEvent
+        view.mouseMoved(with: mouseEvent(.mouseMoved, x: 35))
+        #expect(reports.last == Array("\u{1B}[<35;4;2M".utf8))
+        #expect(reports.count == 4)
+    }
+
+    @MainActor @Test func overrideNeverLeaksADragOrReleaseAfterModifierChanges() {
+        let view = TerminalView(frame: NSRect(x: 0, y: 0, width: 100, height: 100))
+        view.cellSize = CGSize(width: 10, height: 10)
+        view.mouseTrackingMode = { .anyEvent }
+        var reports: [[UInt8]] = []
+        view.onMouseBytes = { reports.append($0) }
+        for modifier in Configuration.MouseOverrideModifier.allCases {
+            view.mouseOverrideModifier = modifier
+            view.mouseDown(with: mouseEvent(.leftMouseDown, flags: modifier.flags))
+            view.mouseDragged(with: mouseEvent(.leftMouseDragged, x: 25))
+            view.mouseUp(with: mouseEvent(.leftMouseUp, x: 25))
+            view.mouseMoved(with: mouseEvent(.mouseMoved, x: 35, flags: modifier.flags))
+        }
+        #expect(reports.isEmpty)
     }
 }

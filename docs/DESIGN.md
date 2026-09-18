@@ -233,22 +233,18 @@ constraints that each cost a shadow data structure or a fight with the
 engine's own defaults, for benefits narrower than they first look: **not
 adopted**. `Selection.swift` stays hand-rolled.
 
-**Still open, deliberately not attempted**, because each is a substantially
-larger, riskier piece than the fixes above: unifying the document/absolute/
-viewport conversions duplicated across the render, `ViewController
-+ShellIntegration`, `ViewController+Search` and now the scroll-anchor paths
-into one shared mapping, rather than fixing each concrete divergence found as
-it turned up (four call sites now share the identical `totalPushed`-delta
-shape, which is the functional requirement; consolidating them into one
-helper afterward is a pure refactor with real risk to already-tested code and
-no behavior change, not something this pass's fixes depend on); and a
-discoverable override separating terminal text selection from application
-mouse reporting — blocked on there being no `?1002`/`?1003` motion-tracking-
-mode support to override *to* in the first place (every drag today
-unconditionally becomes a local selection, which already makes selection
-achievable in a reporting-enabled TUI, but means Corta cannot forward a drag
-as reports at all — implementing motion-tracking mouse modes is a new
-protocol capability, not a bug fix, and belongs in its own pass).
+**Follow-up (#88/#89).** `ScrollbackCoordinates` now supplies the shared
+mapping for viewport anchoring, selection, search, command navigation and
+image placements, including both ends of a copied selection. Mouse event
+subscriptions (`?1000`, `?1002`, `?1003`) are tracked separately from SGR
+encoding (`?1006`). Normal tracking sends press/release and wheel reports;
+button-event tracking adds held-button motion, and any-event tracking also
+adds motion with no button. Motion is coalesced to cell changes.
+
+The TUI owns a plain gesture when tracking and SGR encoding are enabled.
+Holding `mouse-override-modifier` (Option by default) at mouse-down instead
+selects terminal text for that entire gesture, even if the modifier is
+released before mouse-up. A pane-local first-use hint makes this discoverable.
 
 ---
 

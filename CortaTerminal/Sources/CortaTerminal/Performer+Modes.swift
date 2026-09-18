@@ -10,6 +10,11 @@ extension Performer {
                 state.applicationCursorKeysEnabled = enabled
             case 2004:  // bracketed paste (M2.6)
                 state.bracketedPasteEnabled = enabled
+            case 1000, 1002, 1003:
+                if let mode = MouseTrackingMode(rawValue: Int(parameters[index])) {
+                    if enabled { state.mouseTrackingMode = mode }
+                    else if state.mouseTrackingMode == mode { state.mouseTrackingMode = .off }
+                }
             case 1006:  // SGR mouse reporting (M2.7)
                 state.sgrMouseEncodingEnabled = enabled
             case 2026:  // synchronized output (M4.3)

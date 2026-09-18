@@ -10,7 +10,19 @@ what to edit.
 
 ## [Unreleased]
 
+### Added
+
+- TUI mouse drag and motion tracking (`?1002`/`?1003`), with an Option-drag
+  text-selection override, configurable through `mouse-override-modifier`.
+  SGR encoding alone no longer enables unsolicited mouse reports.
+
+
 ### Changed
+
+- Selection copying now uses the same scrollback coordinate mapping as
+  viewport anchoring, search, command navigation and image placement.
+- Nightly compatibility results retain the exact Xcode, Swift and SDK
+  identity alongside test outcomes and deprecation diagnostics.
 
 - Reorganized the project overview, feature reference and contributor guide;
   clarified public release availability and the interpretation of conformance results.
@@ -364,13 +376,17 @@ troubleshooting entry or a conformance note rather than a claim:
   window", "this pane" and "Corta" were English literals substituted
   into a localised title, so a Chinese user read "要关闭this window吗？".
   Three keys in nine languages now.
-- **The terminal answered `AXSelectedTextRange` but not
-  `AXSelectedTextRanges`.** `NSTextView` answers both; a screen reader
-  that asks the plural first found nothing. The second VoiceOver pass
-  heard "No selection." over a real selection while the singular
-  attribute reported it correctly through the accessibility API, which
-  makes this the likeliest cause; `AccessibilityMappingTests` covers
-  both forms.
+- **VoiceOver's *Read selected text* (VO-Fn-F6) said "No selection."
+  over a real selection.** The unified-log trace showed VoiceOver
+  reading `AXSelectedTextRange` correctly and asking nothing further the
+  terminal could answer: it speaks a range through
+  `AXAttributedStringForRange`, which `NSTextView` provides and the
+  terminal did not (TextEdit, asked the same way, read its selection).
+  The terminal now answers `AXAttributedStringForRange` (the plain
+  substring, attributed), `AXRangeForIndex` (the whole grapheme) and
+  `AXStyleRangeForIndex` (the row), alongside the plural
+  `AXSelectedTextRanges` it also lacked; `AccessibilityMappingTests`
+  covers each.
 - **`CSI n X` (ECH) was not implemented.** Erase Character was dispatched
   nowhere, so tmux's status line — drawn as its left part, an ECH over
   the gap, then its right part — kept whatever the previous screen had in

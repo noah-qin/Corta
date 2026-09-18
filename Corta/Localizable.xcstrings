@@ -2,6 +2,65 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
+    "toast.mouseOverride": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold %@ and drag to select text while this program uses the mouse."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "程序使用鼠标时，按住 %@ 拖动以选择文本。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "程式使用滑鼠時，按住 %@ 拖移以選取文字。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "このプログラムがマウスを使用中は、%@ を押しながらドラッグしてテキストを選択します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "프로그램이 마우스를 사용하는 동안 %@ 키를 누른 채 드래그하여 텍스트를 선택하세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Halte %@ gedrückt und ziehe, um Text auszuwählen, während dieses Programm die Maus verwendet."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Maintenez %@ et faites glisser pour sélectionner du texte lorsque ce programme utilise la souris."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Mantén %@ y arrastra para seleccionar texto mientras este programa usa el ratón."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Segure %@ e arraste para selecionar texto enquanto este programa usa o mouse."
+          }
+        }
+      }
+    },
     "a11y.terminal.help": {
       "extractionState": "manual",
       "localizations": {

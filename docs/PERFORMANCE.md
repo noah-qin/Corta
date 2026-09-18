@@ -355,6 +355,40 @@ unfalsifiable. Recorded on the machine this run was measured on
 | macOS (build machine) | 26.6.2, build 25G83 (`sw_vers`) — the OS actually running the benchmark, not a promise every contributor matches it |
 | Deployment target    | `MACOSX_DEPLOYMENT_TARGET = 26.0` (`Corta.xcodeproj/project.pbxproj`) — the oldest OS the shipped binary claims to run on, independent of the two rows above |
 
+**Compatibility channels (2026-09-18 follow-up, #90).** The benchmark
+identity above is historical; the installed toolchain has since changed.
+Compatibility checks below are not new benchmark measurements.
+
+| Channel | Xcode / build | Swift compiler | macOS SDK / build | Language / deployment | Core / app result |
+| --- | --- | --- | --- | --- | --- |
+| Stable, current | 27.0 / 27A266a | 6.4 (`swiftlang-6.4.0.34.1`, `clang-2100.3.34.1`) | 27.0 / 26A425 | Swift 6 / macOS 26.0 | See the dated verification record below |
+| Preview | Not installed on this machine | Not measured | Not measured | Swift 6 / macOS 26.0 (project settings) | **Not run**; a stable build is not evidence of a preview pass |
+
+The host runs macOS 27.0 (26A428). Xcode's exact build is listed as the
+September 14 stable release in [Apple's release list](https://developer.apple.com/news/releases/).
+Do not relabel it as beta merely because that build was previously an RC.
+To record a separately installed preview without changing the machine's
+selected Xcode:
+
+```sh
+export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
+scripts/record-toolchain.sh preview
+swift test --package-path CortaTerminal
+xcodebuild test -project Corta.xcodeproj -scheme Corta \
+  -destination 'platform=macOS' -skip-testing:CortaUITests \
+  CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual \
+  CODE_SIGNING_REQUIRED=NO DEVELOPMENT_TEAM= \
+  -resultBundlePath /tmp/CortaPreview.xcresult
+```
+
+After running, replace the preview placeholders with the actual identity,
+pass/fail counts and deprecation diagnostics. Until then, the preview
+acceptance check remains outstanding. `nightly.yml` now records the exact
+selected Xcode, compiler, SDK, language mode and deployment target, retains
+both test logs and `.xcresult`, and summarizes results and deprecations even
+on failure. The newest installed toolchain is not assumed to be a beta;
+preview naming is identified explicitly and the exact build is always kept.
+
 A run quoted without this table is a run from before B01 that predates the
 distinction — not a claim that it used a different toolchain.
 

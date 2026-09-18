@@ -58,6 +58,11 @@ nonisolated enum SGRMouse {
         report(code: button.code | modifiers.bits, column: column, row: row, final: 0x6D)  // 'm'
     }
 
+    /// Motion sets bit 32; code 3 means no button is held (?1003).
+    static func motion(button: Button?, column: Int, row: Int, modifiers: Modifiers = Modifiers()) -> [UInt8] {
+        report(code: (button?.code ?? 3) | 32 | modifiers.bits, column: column, row: row, final: 0x4D)
+    }
+
     /// One wheel notch: 64 up, 65 down. Wheel events have no release report.
     static func wheel(up: Bool, column: Int, row: Int, modifiers: Modifiers = Modifiers()) -> [UInt8] {
         report(code: (up ? 64 : 65) | modifiers.bits, column: column, row: row, final: 0x4D)

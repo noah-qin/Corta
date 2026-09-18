@@ -58,6 +58,13 @@ public struct SelectionRange: Equatable, Sendable {
         self.init(anchor: start, head: end)
     }
 
+    /// Applies the shared row mapping to both ends, preserving columns.
+    public func reanchored(from oldTotal: Int, to newTotal: Int) -> SelectionRange {
+        SelectionRange(
+            start: SelectionPoint(row: ScrollbackCoordinates.reanchoredRow(start.row, from: oldTotal, to: newTotal), column: start.column),
+            end: SelectionPoint(row: ScrollbackCoordinates.reanchoredRow(end.row, from: oldTotal, to: newTotal), column: end.column))
+    }
+
     /// Re-anchors after output pushed `growth` lines from the screen into
     /// the scrollback: the line that was live row `r` is now scrollback, and
     /// every document row counts one further from the screen boundary. The

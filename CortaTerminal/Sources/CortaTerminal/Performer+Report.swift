@@ -1,5 +1,12 @@
 /// Terminal state that is not the grid, owned by the performer and surfaced
 /// read-only through `Terminal` and `TerminalSession`.
+public enum MouseTrackingMode: Int, Sendable {
+    case off = 0
+    case normal = 1000
+    case buttonEvent = 1002
+    case anyEvent = 1003
+}
+
 public struct PerformerState: Sendable {
     /// Query responses waiting to be written to the child's stdin.
     ///
@@ -12,8 +19,11 @@ public struct PerformerState: Sendable {
     /// `?2004` — bracketed paste (M2.6). Off until the child turns it on.
     public internal(set) var bracketedPasteEnabled = false
 
-    /// `?1006` — SGR encoding for mouse reports (M2.7). Reporting itself
-    /// (`?1000` and friends) is the app layer's side of M2.7.
+    /// Event subscription is independent of the wire encoding. The last
+    /// enabled tracking mode wins; resetting another mode leaves it alone.
+    public internal(set) var mouseTrackingMode: MouseTrackingMode = .off
+
+    /// `?1006` selects SGR encoding; it does not subscribe to events.
     public internal(set) var sgrMouseEncodingEnabled = false
 
     /// `?2026` — synchronized output (M4.3). While set, the app must present

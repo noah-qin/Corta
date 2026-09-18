@@ -621,6 +621,13 @@ public final class TerminalSession: @unchecked Sendable {
 
     /// Whether the child has asked for SGR-encoded mouse reports (`?1006`,
     /// M2.7).
+    /// Effective SGR tracking subscription, read atomically with its encoding.
+    public var sgrMouseTrackingMode: MouseTrackingMode {
+        state.withLock {
+            $0.terminal.isSgrMouseEncodingEnabled ? $0.terminal.mouseTrackingMode : .off
+        }
+    }
+
     public var isSgrMouseEncodingEnabled: Bool {
         state.withLock { $0.terminal.isSgrMouseEncodingEnabled }
     }

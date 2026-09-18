@@ -7,7 +7,7 @@ extension ViewController {
     /// The core's ?1006 SGR mouse-reporting flag (M2.7). While off, clicks
     /// and the wheel keep their normal terminal behaviour.
     func mouseReportingEnabled() -> Bool {
-        session?.isSgrMouseEncodingEnabled ?? false
+        (session?.sgrMouseTrackingMode ?? .off) != .off
     }
 
     /// Typing or pasting while scrolled away from the bottom returns the
@@ -137,20 +137,8 @@ extension ViewController {
 
     // MARK: - Mouse selection (M3.7)
 
-    /// Every left mouse down, reporting on or off. Tracks the drag in a
-    /// local event loop so the anchor and the gesture's unit never need
-    /// storage: plain drag selects characters, double-click-drag words,
-    /// triple-click-drag logical lines, shift-click extends the existing
-    /// selection.
-    ///
-    /// Reporting only wins when the gesture resolves as a plain click that
-    /// never moved — decided here, at mouse-up, rather than up front in
-    /// `TerminalView`, because a drag starting exactly the same way means
-    /// the user wants to select text and gets it, whatever the child asked
-    /// for. That is what makes the click reportable-or-not rather than
-    /// simply not reportable: an app that has turned on mouse tracking for
-    /// its own clickable UI (Claude Code among them) still gets an
-    /// unmoved click, just not a drag.
+    /// Local selection owns the whole gesture once chosen at mouse-down,
+    /// even if the override modifier is released during the drag.
     func handleSelectionMouseDown(_ event: NSEvent, in terminalView: TerminalView) {
         guard let window = terminalView.window, session != nil, terminalRenderer != nil
         else { return }
@@ -234,11 +222,6 @@ extension ViewController {
                     // on every intermediate drag position would rewrite the
                     // clipboard dozens of times per gesture.
                     if ConfigurationStore.shared.configuration.copyOnSelect { copy(nil) }
-                } else if mouseReportingEnabled() {
-                    // A click that never moved, with the child asking for
-                    // every click (M2.7): only now, knowing it was not the
-                    // start of a drag, is it safe to say the report wins.
-                    terminalView.reportClick(down: event, up: next)
                 } else {
                     // A click that never moved, with no modifier: in
                     // `link-activation = click` this is how a link opens
@@ -304,9 +287,7 @@ extension ViewController {
         let range = SelectionRange(
             start: SelectionPoint(row: selection.start.row, column: selection.start.column),
             end: SelectionPoint(row: selection.end.row, column: selection.end.column))
-        return range.shifted(
-            byScrollbackGrowth: max(
-                0, grid.scrollback.totalPushed - selection.baseScrollbackTotal))
+        return range.reanchored(from: selection.baseScrollbackTotal, to: grid.scrollback.totalPushed)
     }
 
     /// The document position under an event: view point → grid cell, then

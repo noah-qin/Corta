@@ -194,6 +194,11 @@ final class TerminalView: NSView, CALayerDelegate {
     /// answers from the core's mode flags. When off, mouse events keep their
     /// normal meaning (scrolling the scrollback).
     var isMouseReportingEnabled: (() -> Bool)?
+    var mouseTrackingMode: (() -> MouseTrackingMode)?
+    var mouseOverrideModifier: Configuration.MouseOverrideModifier = .option
+    var reportedMouseButtons: Set<Int> = []
+    var lastMouseReportCell: (column: Int, row: Int)?
+    var didShowMouseOverrideHint = false
 
     /// Called with the SGR report bytes for one mouse event.
     var onMouseBytes: (([UInt8]) -> Void)?
