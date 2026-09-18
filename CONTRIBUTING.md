@@ -119,7 +119,11 @@ translation's state are worth knowing before touching this file:
   Xcode's own String Catalog editor takes it to mean: this text has not
   been checked by a native speaker in context, whatever produced it
   (currently: an AI assistant, for every non-English string in the file
-  as of B10 — `docs/history/ROADMAP-0.1.md`'s B10 entry). It is not a placeholder and
+  as of B10 — `docs/history/ROADMAP-0.1.md`'s B10 entry; zh-Hans was
+  then read string by string against its place in the UI on 2026-09-18,
+  at the maintainer's request and by the same assistant, and is marked
+  `translated` on that basis — `docs/CONFORMANCE.md` §4.6 records what
+  the review changed). It is not a placeholder and
   not broken; it ships and reads correctly to Corta at runtime exactly
   like `"translated"` — the state is an editorial marker, not a build
   gate. Adding a string keeps this pattern: write the English value,

@@ -72,6 +72,18 @@ extension TerminalView {
         return (snapshot.text as NSString).substring(with: snapshot.selectedRange)
     }
 
+    /// The plural form (`AXSelectedTextRanges`), which `NSTextView` answers
+    /// alongside the singular and which a screen reader may ask for first.
+    /// A terminal has one selection, so the list is that one range — or
+    /// empty when there is nothing selected, rather than a zero-length
+    /// range at the insertion point, which is what "selected ranges" would
+    /// take to mean "one empty selection".
+    override func accessibilitySelectedTextRanges() -> [NSValue]? {
+        guard let snapshot = accessibilitySnapshot(), snapshot.selectedRange.length > 0
+        else { return [] }
+        return [NSValue(range: snapshot.selectedRange)]
+    }
+
     /// The *visible* line the cursor is on. `cursorRow` is a document row,
     /// and the two differ by the scroll offset — scrolled into the history,
     /// the cursor's line number was being reported as if the live screen were

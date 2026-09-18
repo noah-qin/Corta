@@ -573,7 +573,7 @@ final class SplitViewController: NSViewController {
         }
         guard confirmClose(
             of: focusedPane.session?.hasForegroundJob == true ? [focusedPane] : [],
-            scope: "this pane")
+            scope: L10n.text("close.scope.pane"))
         else { return }
         closePane(focusedPane)
     }

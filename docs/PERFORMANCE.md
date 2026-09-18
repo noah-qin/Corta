@@ -589,6 +589,7 @@ the app-side numbers, built-in panel at native scale, system monospaced
 | Reflow, 100k lines, 120 → 80 columns | 94.1 ms | `corta-bench` |
 | Search, 100k lines, one query | ~395 ms warm, 100 000 matches | `corta-bench` |
 | Keypress → glass (end to end, scripted) | **61.9 ms** avg, p50 61.4 / p95 69.7 / p99 70.9, 200 samples — HID stage excluded, see §5.7 | `scripts/measure-keypress-latency.sh`, in-app `keypressToPresent` |
+| Keypress → glass (end to end, a person typing) | **66.3 ms** avg, p50 67.0 / p95 78.7 / p99 84.5 / max 87.3, 200 samples, built-in keyboard, AC — the HID stage included, see §5.7 | `scripts/measure-keypress-latency.sh --manual`, 2026-09-18 20:17 |
 | Energy | measured — see below | `scripts/measure-energy.sh` with `sudo powermetrics` |
 
 The one-pane flood's render-metrics ring did not fill inside the
@@ -612,7 +613,8 @@ figure), first five samples of each window.
 | Background output flood (`yes`, occluded) | p50 10.2 W, p95 10.5 W | ≈1210 | ≈6 300–6 500 |
 | Two windows, both visible, idle | p50 339 mW, p95 756 mW | 0.15–1.25 | ≈0 |
 | Kitty image placed, then static | p50 276 mW, p95 369 mW | 0.05–0.7 | ≈0 |
-| Thermal pressure / Low Power Mode | **not judged** — machine-wide state the script must not change | — | — |
+| Low Power Mode — see the second table | measured, 20:24 the same day | | |
+| Thermal pressure | **not judged** — no safe way to force it without holding the machine at full load for a long time | — | — |
 
 Reading: an idle or occluded Corta is within the machine's own noise
 floor (the whole machine idles at tens to hundreds of milliwatts); a
@@ -620,9 +622,33 @@ sustained flood is a full core's worth of CPU (the reader → parse →
 grid path) and is what the display-link pause and per-line damage are
 there to keep off the *rendering* side — the GPU column stayed under
 0.5 ms/frame throughout the baseline run. A placed image costs nothing
-once it is static: the kitty row reads the same as idle. Thermal and
-Low Power Mode were not forced: both change machine-wide state and need
-a dedicated session.
+once it is static: the kitty row reads the same as idle.
+
+**Low Power Mode (2026-09-18 20:24, the maintainer's own session:
+System Settings ▸ Battery ▸ Low Power Mode set to *Always* for the run
+and put back afterwards; `pmset` reported `lowpowermode 1`; battery at
+98% and charging).** Same script, same five scenarios. One deviation to
+read the numbers with: a second, idle Corta process from an earlier
+manual check was still alive for the whole run — its rows appear in the
+tasks sampler at 0.02–1.4 CPU ms/s and are inside the machine-wide
+figure, which therefore bounds Corta from above by a little more than
+usual.
+
+| Scenario | Combined CPU+GPU+ANE, machine-wide | Corta CPU ms/s | Corta Energy Impact |
+| --- | --- | --- | --- |
+| Idle, one window frontmost | p50 318 mW, p95 453 mW | 0.05–1.4 | ≈0 |
+| Occluded (minimised) | p50 237 mW, p95 402 mW | 0.04–0.3 | ≈0 |
+| Background output flood (`yes`, occluded) | p50 2.60 W, p95 2.67 W | ≈1200 | ≈1 530–1 545 |
+| Two windows, both visible, idle | p50 569 mW, p95 629 mW | 0.05–0.8 | ≈0 |
+| Kitty image placed, then static | p50 287 mW, p95 379 mW | 0.05–0.65 | ≈0 |
+
+Reading: the idle, occluded, two-window and image rows are the same
+hundreds of milliwatts as the mains run — Low Power Mode has nothing to
+take from a terminal that is already asleep. The flood is where it
+shows: the same full core of CPU time (≈1200 ms/s in both runs) costs
+2.6 W instead of 10.2 W, because the core is being held at a lower
+clock. Corta does no more or less work under Low Power Mode; the
+machine spends less per unit of it. Thermal pressure stays not judged.
 
 ### 5.7 Keypress → glass, measured from inside the app
 
@@ -659,12 +685,23 @@ says which:
 
 **1.0.0, scripted, 2026-09-18** (Release, built-in panel, AC, 120×30):
 **avg 61.9 ms, p50 61.4, p95 69.7, p99 70.9, max 71.0** over 200 samples.
-Beside 0.1.1's 57.8 ms avg the two agree within the HID stage
-and the capture method — and both say the same thing the target row in
-§1 says: above one frame plus input latency, on a 60 Hz panel a good
-three frames. Where those frames go is the `os_signpost` chain's job
-(§5.3); the in-app number is what says whether a change moved it. A
-`--manual` run by a person is what would replace the 0.1.1 row outright.
+
+**1.0.0, `--manual`, 2026-09-18 20:17** (the same build and panel, AC,
+the maintainer typing on the built-in keyboard under the ABC input
+source): **avg 66.3 ms, p50 67.0, p95 78.7, p99 84.5, max 87.3** over
+200 samples. This is the row that replaces 0.1.1's screen-capture
+figure (57.8 ms avg): it includes everything that one did — the
+keyboard's HID stage and a real person's key timing — and is measured
+at the glass rather than at a capture tool's polling interval. The
+4.4 ms between the scripted and the manual average is the HID stage
+plus the wider spread of human keystrokes (a synthetic `key code`
+arrives at a fixed cadence; a typist's do not, and the p95–p99 tail
+is where that shows).
+
+Both numbers say the same thing the target row in §1 says: above one
+frame plus input latency, on a 60 Hz panel a good three to four frames.
+Where those frames go is the `os_signpost` chain's job (§5.3); the
+in-app number is what says whether a change moved it.
 
 ## 6. B11 — CPU, locking and memory hot-path pass (2026-09-13)
 

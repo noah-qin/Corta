@@ -11,6 +11,11 @@ import AppKit
 /// Window menu and the saved arrangement. A second window class would be a
 /// second copy of every rule in `SplitViewController.viewWillAppear`, and
 /// D.1's sizing gate is the kind of rule that is wrong twice as easily.
+/// The one thing that *is* different is the window object itself: a
+/// non-activating `NSPanel` in place of the storyboard's `NSWindow`,
+/// because an ordinary window from an inactive application never reaches
+/// a full-screen Space (`TerminalWindowController.adoptNonactivatingPanel`
+/// has the measurement).
 ///
 /// **Focus goes back where it came from.** The application that was
 /// frontmost when the hotkey was pressed is remembered and re-activated
@@ -122,11 +127,18 @@ final class QuickTerminalController {
             self.controller = created
         }
         guard let window = controller.window else { return }
-        NSApp.activate()
         let offset = Self.slideOffset(for: configuration.quickTerminalPosition)
         window.alphaValue = 0
         window.setFrameOrigin(NSPoint(x: frame.minX + offset.width, y: frame.minY + offset.height))
+        // Order first, activate second. The panel is non-activating
+        // (`TerminalWindowController.adoptNonactivatingPanel`), so it is on
+        // screen and key — beside a full-screen application too — before
+        // the application is asked to activate; activating first would
+        // have the window server pick a Space for Corta's *other* windows,
+        // pulling the user out of the full-screen one they pressed the
+        // hotkey in.
         window.makeKeyAndOrderFront(nil)
+        NSApp.activate()
         animate {
             window.animator().alphaValue = 1
             window.animator().setFrame(frame, display: true)
@@ -174,7 +186,8 @@ final class QuickTerminalController {
             frame: WindowState.Frame(frame), layout: .pane(directory: nil, isFocused: true))
         guard let delegate = NSApp.delegate as? AppDelegate,
             let controller = delegate.instantiateWindowController(
-                setup: SplitViewController.Setup(restore: state)) as? TerminalWindowController,
+                setup: SplitViewController.Setup(restore: state), asPanel: true)
+                as? TerminalWindowController,
             let window = controller.window
         else { return nil }
         controller.isQuickTerminal = true
