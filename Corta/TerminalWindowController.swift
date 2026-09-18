@@ -41,8 +41,56 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         installSecureInputIndicator()
     }
 
+    /// B16 — swaps the storyboard's `NSWindow` for a non-activating
+    /// `NSPanel` carrying the same content, before the window is shown.
+    ///
+    /// **Why a panel.** An ordinary window ordered front by an application
+    /// that is not active never reaches the screen while another
+    /// application is full-screen: the window server keeps it on the
+    /// desktop Space, `.canJoinAllSpaces` and `.fullScreenAuxiliary`
+    /// notwithstanding, and `NSApp.activate()` is either refused (the
+    /// hotkey is not an interaction the system credits to Corta) or, when
+    /// it is honoured, drags the user out of the full-screen Space to
+    /// wherever Corta's other windows are. Measured on macOS 27 with
+    /// TextEdit full-screen: `kCGWindowIsOnscreen` stayed false for every
+    /// `NSWindow` variant and became true for a `.nonactivatingPanel`,
+    /// which can be key without the application being active. This is the
+    /// panel class Spotlight-style overlays are made of, and the reason
+    /// every terminal with a hotkey window uses one.
+    ///
+    /// The swap happens here, on the controller, because it is the one
+    /// place that knows what `windowDidLoad` put on the old window (the
+    /// secure-input lock) and has to put on the new one. Everything
+    /// `SplitViewController.viewWillAppear` does — style flags, sizing,
+    /// first responder — runs later against the panel, exactly as it
+    /// would against the window.
+    func adoptNonactivatingPanel() {
+        guard let old = window, !(old is NSPanel) else { return }
+        let panel = NSPanel(
+            contentRect: old.contentRect(forFrameRect: old.frame),
+            styleMask: old.styleMask.union(.nonactivatingPanel),
+            backing: .buffered, defer: false)
+        panel.isReleasedWhenClosed = false
+        // NSPanel hides itself when the application deactivates;
+        // `QuickTerminalController` animates that dismissal and decides
+        // whether focus goes back to the previous application.
+        panel.hidesOnDeactivate = false
+        panel.title = old.title
+        let content = old.contentViewController
+        old.delegate = nil
+        old.contentViewController = nil
+        panel.contentViewController = content
+        panel.delegate = self
+        window = panel
+        installSecureInputIndicator()
+    }
+
     private func installSecureInputIndicator() {
         guard let window else { return }
+        // Called once per window this controller has owned
+        // (`adoptNonactivatingPanel`): the previous window's observer must
+        // not keep updating an accessory on a window that is gone.
+        if let secureInputObserver { NotificationCenter.default.removeObserver(secureInputObserver) }
         let image = NSImageView(
             image: NSImage(systemSymbolName: "lock.fill", accessibilityDescription: nil)
                 ?? NSImage())
@@ -86,7 +134,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         guard let splitController else { return true }
         let running = splitController.panesWithRunningJobs
-        return splitController.confirmClose(of: running, scope: "this window")
+        return splitController.confirmClose(of: running, scope: L10n.text("close.scope.window"))
     }
 
     /// The layout this window would be restored as (M7.4). Read at quit and

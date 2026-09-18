@@ -153,6 +153,35 @@ struct AccessibilityMappingTests {
         #expect(snapshot.cursorOffset == 5)
     }
 
+    /// The view answers the singular and the plural selection attributes
+    /// from the same range: `AXSelectedText` and `AXSelectedTextRange` for
+    /// a client that asks the way `NSTextView` is usually asked, and
+    /// `AXSelectedTextRanges` for one that asks the way `NSTextView` also
+    /// answers. With nothing selected the plural list is empty, not a
+    /// zero-length range dressed as a selection.
+    @Test func selectionIsAnsweredInBothForms() {
+        let view = TerminalView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        var terminal = Self.terminal()
+        terminal.feed(Array("hello world".utf8))
+        let grid = terminal.grid
+        let selection = SelectionRange(
+            anchor: SelectionPoint(row: 0, column: 6), head: SelectionPoint(row: 0, column: 11))
+        view.accessibilitySnapshotProvider = {
+            TerminalAccessibilitySnapshot(grid: grid, selection: selection)
+        }
+        let expected = NSRange(location: 6, length: 5)
+        #expect(view.accessibilitySelectedTextRange() == expected)
+        #expect(view.accessibilitySelectedText() == "world")
+        #expect(view.accessibilitySelectedTextRanges() == [NSValue(range: expected)])
+
+        let empty = TerminalView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        empty.accessibilitySnapshotProvider = {
+            TerminalAccessibilitySnapshot(grid: grid, selection: nil)
+        }
+        #expect(empty.accessibilitySelectedText() == nil)
+        #expect(empty.accessibilitySelectedTextRanges() == [])
+    }
+
     // MARK: - Screen coordinates
 
     /// `accessibilityRange(for:)` is handed a **screen** point. Converting it

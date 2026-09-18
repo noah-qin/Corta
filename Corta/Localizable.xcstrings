@@ -13,7 +13,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%1$d 行 × %2$d 列。光标位于第 %3$d 行第 %4$d 列。"
           }
         },
@@ -72,7 +72,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "终端"
           }
         },
@@ -131,7 +131,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "许可证"
           }
         },
@@ -190,7 +190,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "发行说明"
           }
         },
@@ -249,7 +249,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "报告版本 %@"
           }
         },
@@ -308,7 +308,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "原生 macOS 终端模拟器。"
           }
         },
@@ -367,7 +367,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "关于 Corta"
           }
         },
@@ -426,7 +426,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "版本 %@（%@）"
           }
         },
@@ -485,7 +485,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "选择并复制——提交错误报告时需要这一行。"
           }
         },
@@ -544,7 +544,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "网站"
           }
         },
@@ -603,7 +603,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "仍然关闭"
           }
         },
@@ -662,7 +662,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%@仍在运行，关闭后将终止它们。"
           }
         },
@@ -721,7 +721,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "仍有一个进程在运行，关闭后将终止它。"
           }
         },
@@ -780,7 +780,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "仍有任务运行，要关闭%@吗？"
           }
         },
@@ -839,7 +839,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "关闭"
           }
         },
@@ -898,7 +898,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "命令面板…"
           }
         },
@@ -957,7 +957,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "缩小"
           }
         },
@@ -1016,7 +1016,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "均分窗格"
           }
         },
@@ -1075,7 +1075,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "查找…"
           }
         },
@@ -1134,7 +1134,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "向下移动焦点"
           }
         },
@@ -1193,7 +1193,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "向左移动焦点"
           }
         },
@@ -1252,7 +1252,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "向右移动焦点"
           }
         },
@@ -1311,7 +1311,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "向上移动焦点"
           }
         },
@@ -1370,7 +1370,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "水平扩大窗格"
           }
         },
@@ -1429,7 +1429,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "垂直扩大窗格"
           }
         },
@@ -1488,7 +1488,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "放大"
           }
         },
@@ -1547,7 +1547,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "新标签页"
           }
         },
@@ -1606,7 +1606,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "新窗口"
           }
         },
@@ -1665,7 +1665,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "下一条命令"
           }
         },
@@ -1724,7 +1724,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "上一条命令"
           }
         },
@@ -1783,7 +1783,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "实际大小"
           }
         },
@@ -1842,7 +1842,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "向下滚动一页"
           }
         },
@@ -1901,7 +1901,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "向上滚动一页"
           }
         },
@@ -1960,7 +1960,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "滚动到底部"
           }
         },
@@ -2019,7 +2019,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "滚动到顶部"
           }
         },
@@ -2078,7 +2078,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "设置…"
           }
         },
@@ -2137,7 +2137,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "水平缩小窗格"
           }
         },
@@ -2196,7 +2196,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "垂直缩小窗格"
           }
         },
@@ -2255,7 +2255,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "向下拆分窗格"
           }
         },
@@ -2314,7 +2314,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "向右拆分窗格"
           }
         },
@@ -2373,7 +2373,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "应用程序"
           }
         },
@@ -2432,7 +2432,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "编辑"
           }
         },
@@ -2491,8 +2491,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "分屏"
+            "state": "translated",
+            "value": "窗格"
           }
         },
         "zh-Hant": {
@@ -2550,7 +2550,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "最近使用"
           }
         },
@@ -2609,7 +2609,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "视图"
           }
         },
@@ -2668,7 +2668,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "窗口与标签页"
           }
         },
@@ -2727,7 +2727,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "未找到命令"
           }
         },
@@ -2786,7 +2786,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "命令"
           }
         },
@@ -2845,7 +2845,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "取消"
           }
         },
@@ -2904,8 +2904,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "复制"
+            "state": "translated",
+            "value": "拷贝"
           }
         },
         "zh-Hant": {
@@ -2963,7 +2963,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "粘贴"
           }
         },
@@ -3022,7 +3022,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "全选"
           }
         },
@@ -3081,7 +3081,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "重试"
           }
         },
@@ -3140,7 +3140,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "重新连接"
           }
         },
@@ -3199,7 +3199,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "打开设置…"
           }
         },
@@ -3258,7 +3258,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Corta 使用 Metal 绘制终端，但这台 Mac 未报告任何 Metal 设备。"
           }
         },
@@ -3317,7 +3317,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已在主目录启动——之前的工作目录不可用。"
           }
         },
@@ -3376,7 +3376,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已改用 %@ 启动——配置的登录 shell 无法运行。"
           }
         },
@@ -3435,7 +3435,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "“重新连接”会建立到同一台主机的新连接，不会恢复先前会话的任何状态。"
           }
         },
@@ -3494,7 +3494,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Metal 不可用"
           }
         },
@@ -3553,7 +3553,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "文本渲染器无法启动"
           }
         },
@@ -3612,7 +3612,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法启动 shell"
           }
         },
@@ -3671,7 +3671,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "关于 Corta"
           }
         },
@@ -3730,7 +3730,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "将全部置于最前"
           }
         },
@@ -3789,7 +3789,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "检查更新…"
           }
         },
@@ -3848,7 +3848,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Corta"
           }
         },
@@ -3907,7 +3907,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Corta 帮助"
           }
         },
@@ -3966,7 +3966,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "剪切"
           }
         },
@@ -4025,7 +4025,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "删除"
           }
         },
@@ -4084,7 +4084,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "编辑"
           }
         },
@@ -4143,7 +4143,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "进入全屏"
           }
         },
@@ -4202,7 +4202,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "文件"
           }
         },
@@ -4261,7 +4261,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "查找"
           }
         },
@@ -4320,7 +4320,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "查找下一个"
           }
         },
@@ -4379,7 +4379,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "查找上一个"
           }
         },
@@ -4438,7 +4438,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "帮助"
           }
         },
@@ -4497,7 +4497,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "隐藏 Corta"
           }
         },
@@ -4556,7 +4556,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "隐藏其他"
           }
         },
@@ -4615,7 +4615,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "跳转到所选内容"
           }
         },
@@ -4674,7 +4674,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "最小化"
           }
         },
@@ -4733,7 +4733,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "粘贴并匹配样式"
           }
         },
@@ -4792,7 +4792,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "退出 Corta"
           }
         },
@@ -4851,7 +4851,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "重做"
           }
         },
@@ -4910,7 +4910,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "服务"
           }
         },
@@ -4969,7 +4969,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Shell"
           }
         },
@@ -5028,7 +5028,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "全部显示"
           }
         },
@@ -5087,7 +5087,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "撤销"
           }
         },
@@ -5146,7 +5146,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "使用所选内容查找"
           }
         },
@@ -5205,7 +5205,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "显示"
           }
         },
@@ -5264,7 +5264,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "窗口"
           }
         },
@@ -5323,7 +5323,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "缩放"
           }
         },
@@ -5382,7 +5382,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "不再询问"
           }
         },
@@ -5441,7 +5441,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法移动 Corta"
           }
         },
@@ -5500,7 +5500,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Corta 在\"应用程序\"文件夹里运行效果最好——检查更新和从聚焦搜索重新打开都依赖这个位置。"
           }
         },
@@ -5559,7 +5559,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "移到应用程序"
           }
         },
@@ -5618,7 +5618,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "暂不"
           }
         },
@@ -5677,7 +5677,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "要把 Corta 移到\"应用程序\"文件夹吗？"
           }
         },
@@ -5736,7 +5736,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%@，耗时 %@。"
           }
         },
@@ -5795,7 +5795,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "失败（状态 %lld）"
           }
         },
@@ -5854,7 +5854,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已完成"
           }
         },
@@ -5913,7 +5913,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "终端中的应用未启用括号粘贴模式，因此每一行都会像手动输入一样执行。"
           }
         },
@@ -5972,7 +5972,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "要粘贴包含换行的文本吗？"
           }
         },
@@ -6031,7 +6031,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "查找"
           }
         },
@@ -6090,7 +6090,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "自动"
           }
         },
@@ -6149,7 +6149,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "深色"
           }
         },
@@ -6208,7 +6208,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "跟随系统"
           }
         },
@@ -6267,7 +6267,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "浅色"
           }
         },
@@ -6326,7 +6326,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "系统等宽字体"
           }
         },
@@ -6385,7 +6385,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Corta 使用系统等宽字体。可在配置文件中设置 `font-family` 使用其他字体。"
           }
         },
@@ -6444,7 +6444,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "配置文件路径"
           }
         },
@@ -6503,7 +6503,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "显示配置文件"
           }
         },
@@ -6562,7 +6562,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "此页面上的所有设置都保存在此文件中。"
           }
         },
@@ -6621,7 +6621,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "允许程序将文本写入剪贴板，但永远不允许读取。"
           }
         },
@@ -6680,7 +6680,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "窗格中仍有任务运行时询问。"
           }
         },
@@ -6739,7 +6739,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Corta 使用系统等宽字体。若要使用其他字体，请在下方的配置文件中设置 font-family。"
           }
         },
@@ -6798,7 +6798,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "列 × 行。窗口像素大小会随字体变化。"
           }
         },
@@ -6857,7 +6857,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "仅在窗口处于后台时通知。"
           }
         },
@@ -6916,7 +6916,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "每个会话保留的行数；仅适用于新会话。"
           }
         },
@@ -6975,7 +6975,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "允许终端程序写入剪贴板"
           }
         },
@@ -7034,7 +7034,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "响铃"
           }
         },
@@ -7093,7 +7093,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "列数"
           }
         },
@@ -7152,7 +7152,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "确认关闭"
           }
         },
@@ -7211,7 +7211,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "选中即复制"
           }
         },
@@ -7270,7 +7270,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "字体"
           }
         },
@@ -7329,7 +7329,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "浅色或深色"
           }
         },
@@ -7388,7 +7388,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "超过"
           }
         },
@@ -7447,7 +7447,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "新窗口"
           }
         },
@@ -7506,7 +7506,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "长任务完成时通知"
           }
         },
@@ -7565,7 +7565,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "打开链接方式"
           }
         },
@@ -7624,7 +7624,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "恢复窗口"
           }
         },
@@ -7683,7 +7683,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "行数"
           }
         },
@@ -7742,7 +7742,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "保留历史行数"
           }
         },
@@ -7801,7 +7801,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "秒"
           }
         },
@@ -7860,7 +7860,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "大小"
           }
         },
@@ -7919,7 +7919,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "主题"
           }
         },
@@ -7978,7 +7978,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "点按"
           }
         },
@@ -8037,7 +8037,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Command 点按"
           }
         },
@@ -8096,7 +8096,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "关闭"
           }
         },
@@ -8155,7 +8155,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "通知"
           }
         },
@@ -8214,7 +8214,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "窗口"
           }
         },
@@ -8273,7 +8273,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%1$@ 必须在 %2$@ 和 %3$@ 之间——已保存为 %4$@。"
           }
         },
@@ -8332,7 +8332,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "macOS 未投递 Corta 的通知。"
           }
         },
@@ -8391,7 +8391,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "打开系统设置"
           }
         },
@@ -8450,7 +8450,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "重试"
           }
         },
@@ -8509,7 +8509,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已保存"
           }
         },
@@ -8568,7 +8568,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "未保存——无法写入配置文件。%@"
           }
         },
@@ -8627,7 +8627,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "未报告原因。"
           }
         },
@@ -8686,7 +8686,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "外观"
           }
         },
@@ -8745,7 +8745,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "通用"
           }
         },
@@ -8804,7 +8804,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "终端"
           }
         },
@@ -8863,7 +8863,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Corta 设置"
           }
         },
@@ -8922,7 +8922,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%1$@，%2$@"
           }
         },
@@ -8981,7 +8981,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%@，无快捷键"
           }
         },
@@ -9040,7 +9040,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "短横线表示该命令尚未绑定按键。所有快捷键都可通过配置文件中的 bind. 行修改。"
           }
         },
@@ -9099,7 +9099,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "键盘快捷键"
           }
         },
@@ -9158,8 +9158,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "已复制"
+            "state": "translated",
+            "value": "已拷贝"
           }
         },
         "zh-Hant": {
@@ -9217,7 +9217,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "将 Option 用作 Meta"
           }
         },
@@ -9276,7 +9276,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "发送 Escape 前缀，而不是输入键盘布局的替代字符。使用国际键盘布局和死键时请保持关闭。"
           }
         },
@@ -9335,7 +9335,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "清除屏幕"
           }
         },
@@ -9394,7 +9394,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "清除历史记录"
           }
         },
@@ -9453,7 +9453,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "重置终端"
           }
         },
@@ -9512,7 +9512,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "重新连接到主机"
           }
         },
@@ -9571,7 +9571,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "浏览远程文件…"
           }
         },
@@ -9630,7 +9630,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "终端"
           }
         },
@@ -9689,7 +9689,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已清除屏幕"
           }
         },
@@ -9748,7 +9748,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已清除历史记录"
           }
         },
@@ -9807,7 +9807,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已重置终端"
           }
         },
@@ -9866,8 +9866,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "放大窗格"
+            "state": "translated",
+            "value": "最大化窗格"
           }
         },
         "zh-Hant": {
@@ -9925,7 +9925,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "还原窗格"
           }
         },
@@ -9984,7 +9984,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "拷贝上一条命令的输出"
           }
         },
@@ -10043,7 +10043,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "导出命令输出…"
           }
         },
@@ -10102,7 +10102,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "打开命令输出中的文件引用"
           }
         },
@@ -10161,7 +10161,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "上一条失败的命令"
           }
         },
@@ -10220,7 +10220,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "下一条失败的命令"
           }
         },
@@ -10279,7 +10279,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已拷贝命令输出"
           }
         },
@@ -10338,7 +10338,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "没有可拷贝的已完成命令"
           }
         },
@@ -10397,7 +10397,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "尚未设置 Shell 集成"
           }
         },
@@ -10456,7 +10456,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "区分大小写"
           }
         },
@@ -10515,7 +10515,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "跳到底部"
           }
         },
@@ -10574,7 +10574,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "下方有新输出"
           }
         },
@@ -10633,7 +10633,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "向上 %1$@ 行"
           }
         },
@@ -10692,7 +10692,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "重新打开已关闭的窗格"
           }
         },
@@ -10751,7 +10751,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "导出文本…"
           }
         },
@@ -10810,7 +10810,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "保存所选文本。"
           }
         },
@@ -10869,7 +10869,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "保存回滚内容和当前屏幕。"
           }
         },
@@ -10928,7 +10928,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "保存此命令的输出。"
           }
         },
@@ -10987,7 +10987,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已保存"
           }
         },
@@ -11046,7 +11046,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "没有可保存的内容"
           }
         },
@@ -11105,7 +11105,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "正则表达式"
           }
         },
@@ -11164,7 +11164,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "表达式无效"
           }
         },
@@ -11223,7 +11223,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "使用预设新建窗格"
           }
         },
@@ -11282,7 +11282,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法运行 open-file-command"
           }
         },
@@ -11341,7 +11341,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%@（打开时不带行号）"
           }
         },
@@ -11400,7 +11400,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "表达式过慢"
           }
         },
@@ -11459,7 +11459,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "打开文件方式"
           }
         },
@@ -11518,7 +11518,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "当输出中的 path:line 引用被 ⌘ 点按时运行。{file}、{line} 和 {column} 会被替换。命令必须是绝对路径；留空则使用默认应用程序，但默认应用程序无法接收行号。"
           }
         },
@@ -11577,7 +11577,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "“打开文件方式”需要绝对路径，且只能使用 {file}、{line} 和 {column}；已保持原值。"
           }
         },
@@ -11636,7 +11636,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "要清除此窗格的历史记录吗？"
           }
         },
@@ -11695,7 +11695,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "要重置此终端吗？"
           }
         },
@@ -11754,7 +11754,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "将丢弃 %1$lld 行回滚内容。此操作无法撤销。"
           }
         },
@@ -11813,7 +11813,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "丢弃"
           }
         },
@@ -11872,7 +11872,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "在新窗口中打开“%1$@”"
           }
         },
@@ -11931,7 +11931,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "粘贴已停止——Shell 未在读取输入。"
           }
         },
@@ -11990,7 +11990,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Shell 已退出。"
           }
         },
@@ -12049,7 +12049,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "连接已结束。在 Shell 菜单中选择“重新连接到主机”可建立新连接。"
           }
         },
@@ -12108,7 +12108,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已建立新连接。先前的会话未被恢复。"
           }
         },
@@ -12167,7 +12167,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已建立新连接。该命令会重新挂接到远端现存的会话。"
           }
         },
@@ -12226,8 +12226,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "%lld秒"
+            "state": "translated",
+            "value": "%lld 秒"
           }
         },
         "zh-Hant": {
@@ -12285,8 +12285,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "%lld分钟"
+            "state": "translated",
+            "value": "%lld 分钟"
           }
         },
         "zh-Hant": {
@@ -12344,8 +12344,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "%lld分%lld秒"
+            "state": "translated",
+            "value": "%lld 分 %lld 秒"
           }
         },
         "zh-Hant": {
@@ -12403,8 +12403,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "%lld小时%lld分钟"
+            "state": "translated",
+            "value": "%lld 小时 %lld 分钟"
           }
         },
         "zh-Hant": {
@@ -12462,7 +12462,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "当前没有正在运行的命令"
           }
         },
@@ -12521,7 +12521,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "此命令的输出中未找到文件引用"
           }
         },
@@ -12580,7 +12580,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "— 于 %@ 拍摄的快照 —"
           }
         },
@@ -12639,7 +12639,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已拷贝正在运行命令的输出快照"
           }
         },
@@ -12698,7 +12698,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Shell 集成"
           }
         },
@@ -12757,7 +12757,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "让 Corta 知道每条命令在哪里开始、结束及是否失败。以可逆的方式安装到你所用 shell（zsh、bash 或 fish）的启动文件。"
           }
         },
@@ -12816,7 +12816,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "未安装"
           }
         },
@@ -12875,7 +12875,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已安装到 %@"
           }
         },
@@ -12934,7 +12934,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "可能与 %@ 自身的 Shell 集成冲突"
           }
         },
@@ -12993,7 +12993,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法更新 %@"
           }
         },
@@ -13052,7 +13052,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "安装"
           }
         },
@@ -13111,7 +13111,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "仍然安装"
           }
         },
@@ -13170,7 +13170,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "移除"
           }
         },
@@ -13229,8 +13229,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "保存当前命令输出快照"
+            "state": "translated",
+            "value": "拷贝当前命令输出的快照"
           }
         },
         "zh-Hant": {
@@ -13288,7 +13288,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "历史记录"
           }
         },
@@ -13347,7 +13347,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "记住访问过的目录"
           }
         },
@@ -13406,7 +13406,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "根据你实际工作过的目录（OSC 7）进行排序，供目录切换器使用。数据不会离开本应用。"
           }
         },
@@ -13465,7 +13465,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "目录历史"
           }
         },
@@ -13524,7 +13524,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已记住 %lld 个目录"
           }
         },
@@ -13583,7 +13583,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "清除"
           }
         },
@@ -13642,7 +13642,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "在访达中显示工作目录"
           }
         },
@@ -13701,7 +13701,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "拷贝工作目录路径"
           }
         },
@@ -13760,7 +13760,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "切换到上级目录"
           }
         },
@@ -13819,7 +13819,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "切换到项目根目录"
           }
         },
@@ -13878,7 +13878,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "在新窗格中打开上级目录"
           }
         },
@@ -13937,7 +13937,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "在新窗格中打开项目根目录"
           }
         },
@@ -13996,7 +13996,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "搜索命令历史…"
           }
         },
@@ -14055,7 +14055,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "此窗格没有已知的工作目录"
           }
         },
@@ -14114,7 +14114,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已拷贝工作目录"
           }
         },
@@ -14173,7 +14173,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "在此目录之上未找到项目根目录（.git）"
           }
         },
@@ -14232,7 +14232,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "当前无法填充命令行"
           }
         },
@@ -14291,7 +14291,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "命令历史"
           }
         },
@@ -14350,7 +14350,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "此目录"
           }
         },
@@ -14409,7 +14409,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "此项目"
           }
         },
@@ -14468,7 +14468,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "任意状态"
           }
         },
@@ -14527,7 +14527,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "成功"
           }
         },
@@ -14586,7 +14586,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "失败"
           }
         },
@@ -14645,7 +14645,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "清除命令历史"
           }
         },
@@ -14704,7 +14704,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%lld 条命令"
           }
         },
@@ -14763,7 +14763,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "没有可搜索的窗格"
           }
         },
@@ -14822,7 +14822,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "查找"
           }
         },
@@ -14881,7 +14881,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "填充"
           }
         },
@@ -14940,7 +14940,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "运行"
           }
         },
@@ -14999,7 +14999,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "仍在运行"
           }
         },
@@ -15058,7 +15058,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "成功"
           }
         },
@@ -15117,7 +15117,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "以状态 %lld 失败"
           }
         },
@@ -15176,8 +15176,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "任何主机"
+            "state": "translated",
+            "value": "任意主机"
           }
         },
         "zh-Hant": {
@@ -15235,7 +15235,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "本机"
           }
         },
@@ -15294,7 +15294,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "主机未知"
           }
         },
@@ -15353,7 +15353,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "远程？"
           }
         },
@@ -15412,7 +15412,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "未知目录"
           }
         },
@@ -15471,7 +15471,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%@，%@，%@，%@"
           }
         },
@@ -15530,7 +15530,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "字体状态"
           }
         },
@@ -15589,7 +15589,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "预览"
           }
         },
@@ -15648,7 +15648,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "未安装“%@”——已改用系统等宽字体"
           }
         },
@@ -15707,7 +15707,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "“%@”字宽不均匀，无法使用——已改用系统等宽字体"
           }
         },
@@ -15766,7 +15766,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "远程文件"
           }
         },
@@ -15825,7 +15825,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "正在连接到 %@…"
           }
         },
@@ -15884,7 +15884,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "此窗格已连接到远程主机，但具体主机未知。请输入主机名，与传给 ssh 的写法一致："
           }
         },
@@ -15943,7 +15943,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "主机"
           }
         },
@@ -16002,7 +16002,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "连接"
           }
         },
@@ -16061,7 +16061,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "重试"
           }
         },
@@ -16120,7 +16120,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "请输入以 / 开头的绝对路径。"
           }
         },
@@ -16179,7 +16179,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "请输入不含 / 的名称。"
           }
         },
@@ -16238,7 +16238,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "向上"
           }
         },
@@ -16297,7 +16297,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "刷新"
           }
         },
@@ -16356,7 +16356,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "新建目录…"
           }
         },
@@ -16415,7 +16415,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "重命名…"
           }
         },
@@ -16474,7 +16474,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "删除…"
           }
         },
@@ -16533,7 +16533,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "删除"
           }
         },
@@ -16592,7 +16592,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "上传…"
           }
         },
@@ -16651,7 +16651,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "下载…"
           }
         },
@@ -16710,7 +16710,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "名称"
           }
         },
@@ -16769,7 +16769,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "类型"
           }
         },
@@ -16828,7 +16828,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "大小"
           }
         },
@@ -16887,7 +16887,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "权限"
           }
         },
@@ -16946,7 +16946,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "修改时间"
           }
         },
@@ -17005,7 +17005,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "文件"
           }
         },
@@ -17064,7 +17064,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "文件夹"
           }
         },
@@ -17123,7 +17123,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "替身"
           }
         },
@@ -17182,7 +17182,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "其他"
           }
         },
@@ -17241,7 +17241,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "新建目录"
           }
         },
@@ -17300,7 +17300,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "在 %1$@ 中新建目录的名称："
           }
         },
@@ -17359,7 +17359,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "重命名"
           }
         },
@@ -17418,7 +17418,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%1$@ 的新名称："
           }
         },
@@ -17477,8 +17477,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "在 %1$@ 上删除？"
+            "state": "translated",
+            "value": "要在 %1$@ 上删除吗？"
           }
         },
         "zh-Hant": {
@@ -17536,7 +17536,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "要删除 %2$@ 上的“%1$@”吗？此操作无法撤销。"
           }
         },
@@ -17595,7 +17595,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "要删除 %2$@ 上的文件夹“%1$@”吗？其中包含 %3$ld 个条目。文件夹必须为空才能删除，且删除无法撤销。"
           }
         },
@@ -17654,7 +17654,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "要删除 %2$@ 上的 %1$ld 个条目吗？此操作无法撤销。"
           }
         },
@@ -17713,7 +17713,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "卷信息不可用"
           }
         },
@@ -17772,7 +17772,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "可用 %1$@"
           }
         },
@@ -17831,7 +17831,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "大小未知"
           }
         },
@@ -17890,7 +17890,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%1$@，修改于 %2$@"
           }
         },
@@ -17949,7 +17949,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "目标已存在"
           }
         },
@@ -18008,7 +18008,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "“%1$@”已存在。\n\n现有：%2$@\n传入：%3$@"
           }
         },
@@ -18067,7 +18067,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "一次中断的传输为“%1$@”留下了未完成的部分文件。\n\n部分文件：%2$@\n传入：%3$@"
           }
         },
@@ -18126,7 +18126,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "覆盖"
           }
         },
@@ -18185,7 +18185,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "继续传输"
           }
         },
@@ -18244,7 +18244,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "保留两者"
           }
         },
@@ -18303,7 +18303,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "跳过"
           }
         },
@@ -18362,7 +18362,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "传输"
           }
         },
@@ -18421,7 +18421,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "排队中"
           }
         },
@@ -18480,7 +18480,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "正在取消…"
           }
         },
@@ -18539,7 +18539,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已取消"
           }
         },
@@ -18598,8 +18598,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "已取消 — 保留了可继续传输的部分文件"
+            "state": "translated",
+            "value": "已取消——保留了可继续传输的部分文件"
           }
         },
         "zh-Hant": {
@@ -18657,7 +18657,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已跳过"
           }
         },
@@ -18716,8 +18716,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "完成 — %1$@"
+            "state": "translated",
+            "value": "完成——%1$@"
           }
         },
         "zh-Hant": {
@@ -18775,8 +18775,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "来自 %2$@ 的 %1$@"
+            "state": "translated",
+            "value": "从 %2$@ 下载 %1$@"
           }
         },
         "zh-Hant": {
@@ -18834,7 +18834,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "上传 %1$@ 到 %2$@"
           }
         },
@@ -18893,7 +18893,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "连接 %1$@ 时认证失败：\n%2$@\n\nSFTP 连接没有终端，ssh 在这里无法询问密码或密钥口令。请使用 ssh-agent 或钥匙串持有的密钥，或先在终端里连接一次。"
           }
         },
@@ -18952,7 +18952,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法连接到 %1$@：\n%2$@"
           }
         },
@@ -19011,7 +19011,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "连接 %1$@ 时 ssh 失败（退出码 %2$d）：\n%3$@"
           }
         },
@@ -19070,7 +19070,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法启动 ssh（错误 %1$d）。"
           }
         },
@@ -19129,7 +19129,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法启动 ssh：路径不是绝对路径。"
           }
         },
@@ -19188,7 +19188,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "与 %1$@ 的连接中断（I/O 错误 %2$d）。"
           }
         },
@@ -19247,7 +19247,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "与 %1$@ 的连接已断开。"
           }
         },
@@ -19306,7 +19306,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%1$@ 发送了无效的 SFTP 数据，连接已断开：%2$@"
           }
         },
@@ -19365,7 +19365,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "在 %1$@ 上权限不足：%2$@"
           }
         },
@@ -19424,7 +19424,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%1$@ 上的服务器返回了错误（%2$ld）：%3$@"
           }
         },
@@ -19483,7 +19483,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "目标已存在：%1$@"
           }
         },
@@ -19542,7 +19542,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "本地文件操作失败（%1$@，错误 %2$d）。"
           }
         },
@@ -19601,7 +19601,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "编辑"
           }
         },
@@ -19660,8 +19660,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "%1$@ — 打开一个受管理的本地副本"
+            "state": "translated",
+            "value": "%1$@——打开受管理的本地副本"
           }
         },
         "zh-Hant": {
@@ -19719,8 +19719,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "上传更改？"
+            "state": "translated",
+            "value": "要上传更改吗？"
           }
         },
         "zh-Hant": {
@@ -19778,7 +19778,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%2$@ 上“%1$@”的本地副本已被编辑。要将更改上传到远程文件吗？"
           }
         },
@@ -19837,7 +19837,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "上传"
           }
         },
@@ -19896,7 +19896,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "暂不上传"
           }
         },
@@ -19955,7 +19955,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "远程文件已更改"
           }
         },
@@ -20014,7 +20014,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%2$@ 上的“%1$@”在下载后已被更改。\n\n下载时：%3$@\n远程现在：%4$@\n\n上传会覆盖远程文件；重新下载会丢弃本地编辑。"
           }
         },
@@ -20073,7 +20073,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "“%1$@”在 %2$@ 上已不存在。下载时：%3$@。\n\n上传将以本地副本的内容重新创建它。"
           }
         },
@@ -20132,7 +20132,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "已删除"
           }
         },
@@ -20191,7 +20191,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "仍然上传"
           }
         },
@@ -20250,7 +20250,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "重新下载（丢弃本地编辑）"
           }
         },
@@ -20309,7 +20309,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "将本地副本另存到别处…"
           }
         },
@@ -20368,7 +20368,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "上传“%1$@”到 %2$@ 失败：%3$@\n\n远程文件未被更改。"
           }
         },
@@ -20427,7 +20427,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "此窗格的 shell 报告它位于“%@”。这个名字来自远端 shell 的输出，而不是你输入的——请核对（或改成你会传给 ssh 的写法），然后连接："
           }
         },
@@ -20486,8 +20486,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "连接到“%@”以获取此文件？"
+            "state": "translated",
+            "value": "要连接到“%@”获取此文件吗？"
           }
         },
         "zh-Hant": {
@@ -20545,8 +20545,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "Corta 将运行系统 ssh，把 %2$@ 上的 %1$@ 下载为受管本地副本。主机名来自远端 shell 的报告，不是你输入的；只有当它确实是你预期的主机时才连接。"
+            "state": "translated",
+            "value": "Corta 将运行系统 ssh，把 %2$@ 上的 %1$@ 下载为受管理的本地副本。主机名来自远端 shell 的报告，不是你输入的；只有当它确实是你预期的主机时才连接。"
           }
         },
         "zh-Hant": {
@@ -20604,7 +20604,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "无法验证 %1$@ 的主机密钥：\n%2$@\n\nSFTP 连接没有终端，ssh 在这里无法请你接受新的或已变更的主机密钥。请先在终端里连接一次，审核并接受后再试。"
           }
         },
@@ -20663,7 +20663,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "一个文件夹（其中的文件逐个比较）"
           }
         },
@@ -20722,8 +20722,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "此处已有同名文件夹。覆盖会替换两边都有的文件；续传会继续被中断的文件；保留两者使用新文件夹名；跳过则不传输任何内容。"
+            "state": "translated",
+            "value": "此处已有同名文件夹。“覆盖”会替换两边都有的文件；“继续传输”会继续被中断的文件；“保留两者”使用新的文件夹名；“跳过”则不传输任何内容。"
           }
         },
         "zh-Hant": {
@@ -20781,7 +20781,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%1$d 项未传输（符号链接或特殊文件）：%2$@"
           }
         },
@@ -20840,7 +20840,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%1$d / %2$d 个文件"
           }
         },
@@ -20899,7 +20899,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "完成——%1$d 个文件，%2$@"
           }
         },
@@ -20958,7 +20958,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "快捷终端"
           }
         },
@@ -21017,7 +21017,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "安全键盘输入"
           }
         },
@@ -21076,7 +21076,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "安全键盘输入已开启"
           }
         },
@@ -21135,7 +21135,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "安全键盘输入已关闭"
           }
         },
@@ -21194,7 +21194,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "安全键盘输入已开启：其他应用无法看到你在此输入的内容。"
           }
         },
@@ -21253,7 +21253,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "当 Corta 窗口位于最前时，其他进程无法监听按键。系统级设置：生效期间也会阻止宏工具和文本扩展工具。标题栏中的锁形图标表示当前已生效。"
           }
         },
@@ -21312,7 +21312,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "快捷终端"
           }
         },
@@ -21371,7 +21371,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "通过全局热键呼出"
           }
         },
@@ -21430,7 +21430,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "默认关闭：该按键会在所有应用中被占用。面板始终可通过“显示 ▸ 快捷终端”、命令面板和“快捷指令”打开；此设置只负责添加热键。"
           }
         },
@@ -21489,7 +21489,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "未占用任何按键。仍可通过“显示 ▸ 快捷终端”打开。"
           }
         },
@@ -21548,7 +21548,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "quick-terminal-key 为空。请在配置文件中设置。"
           }
         },
@@ -21607,7 +21607,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%@ 已被其他应用占用。请在配置文件中修改 quick-terminal-key。"
           }
         },
@@ -21666,7 +21666,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "在任意应用中按 %@ 即可呼出。可在配置文件中通过 quick-terminal-key 修改。"
           }
         },
@@ -21725,7 +21725,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "位置"
           }
         },
@@ -21784,7 +21784,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "顶部"
           }
         },
@@ -21843,7 +21843,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "底部"
           }
         },
@@ -21902,7 +21902,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "居中"
           }
         },
@@ -21961,7 +21961,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "屏幕"
           }
         },
@@ -22020,7 +22020,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "指针所在屏幕"
           }
         },
@@ -22079,7 +22079,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "主屏幕"
           }
         },
@@ -22138,7 +22138,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "搜索命令"
           }
         },
@@ -22197,7 +22197,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "搜索命令文本"
           }
         },
@@ -22256,7 +22256,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "（命令文本已不在回滚历史中）"
           }
         },
@@ -22315,7 +22315,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "视觉提示"
           }
         },
@@ -22374,8 +22374,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "声音"
+            "state": "translated",
+            "value": "声音提示"
           }
         },
         "zh-Hant": {
@@ -22433,7 +22433,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "静音"
           }
         },
@@ -22492,7 +22492,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "打开 Corta 窗口"
           }
         },
@@ -22551,7 +22551,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "打开一个新的 Corta 终端窗口，位于你的个人文件夹或你选择的文件夹。"
           }
         },
@@ -22610,7 +22610,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "文件夹"
           }
         },
@@ -22669,7 +22669,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "shell 启动的位置。留空表示你的个人文件夹。"
           }
         },
@@ -22728,7 +22728,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "在 ${directory} 中打开 Corta 窗口"
           }
         },
@@ -22787,7 +22787,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "聚焦 Corta 窗口"
           }
         },
@@ -22846,7 +22846,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "将 Corta 已打开的某个窗口置于最前。"
           }
         },
@@ -22905,7 +22905,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "窗口"
           }
         },
@@ -22964,7 +22964,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "聚焦 ${window}"
           }
         },
@@ -23023,7 +23023,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "切换快捷终端"
           }
         },
@@ -23082,7 +23082,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "快捷终端隐藏时显示它，显示时隐藏它。"
           }
         },
@@ -23141,7 +23141,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "窗口"
           }
         },
@@ -23200,7 +23200,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Corta 窗口"
           }
         },
@@ -23259,8 +23259,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "该 Corta 窗口已不再打开。"
+            "state": "translated",
+            "value": "该 Corta 窗口已关闭。"
           }
         },
         "zh-Hant": {
@@ -23318,7 +23318,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "%@ 不是文件夹。"
           }
         },
@@ -23377,7 +23377,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "Corta 无法打开窗口。"
           }
         },
@@ -23421,6 +23421,183 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "O Corta não conseguiu abrir uma janela."
+          }
+        }
+      }
+    },
+    "close.scope.window": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "this window"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此窗口"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "此視窗"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "このウインドウ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "이 윈도우"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "dieses Fenster"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "cette fenêtre"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "esta ventana"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "esta janela"
+          }
+        }
+      }
+    },
+    "close.scope.pane": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "this pane"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此窗格"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "此窗格"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "このペイン"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "이 패널"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "diesen Bereich"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ce volet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "este panel"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "este painel"
+          }
+        }
+      }
+    },
+    "close.scope.app": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corta"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corta"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta"
           }
         }
       }

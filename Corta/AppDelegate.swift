@@ -120,13 +120,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// One storyboard window controller, tracked so it lives as long as its
     /// window does. `setup` reaches the root pane *before* it spawns — see
     /// `SplitViewController.pendingSetup` for why it cannot be assigned to
-    /// the controller afterwards.
-    func instantiateWindowController(setup: SplitViewController.Setup? = nil) -> NSWindowController? {
+    /// the controller afterwards. `asPanel` swaps the storyboard window for
+    /// a non-activating panel before anything observes it
+    /// (`TerminalWindowController.adoptNonactivatingPanel`) — the Quick
+    /// Terminal needs one to appear beside a full-screen application.
+    func instantiateWindowController(
+        setup: SplitViewController.Setup? = nil, asPanel: Bool = false
+    ) -> NSWindowController? {
         SplitViewController.pendingSetup = setup
         defer { SplitViewController.pendingSetup = nil }
         guard let controller = NSStoryboard(name: "Main", bundle: nil)
             .instantiateInitialController() as? NSWindowController
         else { return nil }
+        if asPanel { (controller as? TerminalWindowController)?.adoptNonactivatingPanel() }
         track(controller)
         return controller
     }
@@ -470,7 +476,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         guard let split = windowControllers.first?.contentViewController as? SplitViewController,
             !running.isEmpty
         else { return .terminateNow }
-        return split.confirmClose(of: running, scope: "Corta") ? .terminateNow : .terminateCancel
+        return split.confirmClose(of: running, scope: L10n.text("close.scope.app")) ? .terminateNow : .terminateCancel
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {

@@ -26,27 +26,32 @@ subset of 0.1.1's.
 **Known and open at this release, not blocking it** — each with a
 troubleshooting entry or a conformance note rather than a claim:
 
-- Keypress-to-glass latency is above its target (61.9 ms average,
-  measured from inside the app on 2026-09-18; 0.1.1's screen-capture
-  measurement read 57.8); the README prints the number rather than
-  omitting it.
-- One tester's ⌘, did not open Settings; not reproduced on the same
-  machine under Pinyin with or without a composition open, and the
-  menu item works. Reported under `CONFORMANCE.md` §4.4.
-- VoiceOver was heard reading state the screen had moved past; one
-  cause (a dropped trailing `valueChanged` notice) is fixed, and nobody
-  has listened since. `CONFORMANCE.md` §4.6 keeps it *not judged*.
-- Multi-display Quick Terminal placement, Touch ID under Secure Keyboard
-  Entry, the energy scenarios (`scripts/measure-energy.sh` needs a sudo
-  session) and thermal/low-power forcing: not judged, listed where each
-  batch left them.
-- Deferred by their batches, still unchecked on the closed issues: a
-  keypress-to-pixel p50/p95/p99 baseline and the preview-toolchain
-  versions (B01); the reported Tab failure's original evidence and the
-  wider Escape-scoping verification (B02); one shared reflow mapping for
-  viewport, selection, search, commands and images, and a selection /
-  mouse-reporting override, which needs `?1002`/`?1003` motion tracking
-  first (B04).
+- Keypress-to-glass latency is above its target: 66.3 ms average with
+  a person typing (p95 78.7), 61.9 ms scripted, both measured from
+  inside the app on 2026-09-18 (`PERFORMANCE.md` §5.7); the README
+  prints the number rather than omitting it.
+- One tester's ⌘, did not open Settings once. Two passes since could
+  not reproduce it — Release and Debug builds, ABC and Pinyin input
+  sources, with and without a composition open, and the palette's
+  Settings command — and the menu item works. Reported under
+  `CONFORMANCE.md` §4.4 as unexplained, not as fixed.
+- VoiceOver: the second listening pass (2026-09-18) heard the geometry
+  and the read-through correctly and *Read selected text* answer "No
+  selection." over a six-line mouse selection that the accessibility
+  API reported correctly when probed. The plural `AXSelectedTextRanges`
+  attribute `NSTextView` also answers is now implemented; whether that
+  was the cause needs one more listen. `CONFORMANCE.md` §4.6.
+- Multi-display Quick Terminal placement (no second display on the test
+  machine), Touch ID under Secure Keyboard Entry (sudo on the test
+  machine is not configured for Touch ID) and thermal forcing: not
+  judged. The energy scenarios ran twice, on mains and under Low Power
+  Mode (`PERFORMANCE.md` §5.6).
+- Deferred by their batches and now tracked as their own issues: mouse
+  motion tracking (`?1002`/`?1003`) and a selection / mouse-reporting
+  override (#88), one shared reflow mapping for viewport, selection,
+  search, commands and images (#89), the preview-toolchain versions
+  (#90). The reported Tab failure's original evidence (B02) cannot be
+  recovered and stays unchecked.
 
 ### Added
 
@@ -335,6 +340,30 @@ troubleshooting entry or a conformance note rather than a claim:
 
 ### Fixed
 
+- **The Quick Terminal never appeared beside a full-screen
+  application.** With another app full-screen, the hotkey moved the
+  panel's frame and made nothing visible: an ordinary `NSWindow` ordered
+  front by an application that is not active does not reach a
+  full-screen Space, whatever its collection behaviour, and
+  `NSApp.activate()` is either refused for a hotkey or switches the
+  user out of the full-screen Space. The panel is now a non-activating
+  `NSPanel` carrying the storyboard's content
+  (`TerminalWindowController.adoptNonactivatingPanel`), ordered front
+  before the application activates; measured on macOS 27 with TextEdit
+  full-screen, `kCGWindowIsOnscreen` false for every window variant
+  and true for the panel, no Space switch, focus back in TextEdit on
+  dismissal. (2026-09-18 pass, Quick Terminal 4b.)
+- **The close confirmation's subject was never localised.** "this
+  window", "this pane" and "Corta" were English literals substituted
+  into a localised title, so a Chinese user read "要关闭this window吗？".
+  Three keys in nine languages now.
+- **The terminal answered `AXSelectedTextRange` but not
+  `AXSelectedTextRanges`.** `NSTextView` answers both; a screen reader
+  that asks the plural first found nothing. The second VoiceOver pass
+  heard "No selection." over a real selection while the singular
+  attribute reported it correctly through the accessibility API, which
+  makes this the likeliest cause; `AccessibilityMappingTests` covers
+  both forms.
 - **`CSI n X` (ECH) was not implemented.** Erase Character was dispatched
   nowhere, so tmux's status line — drawn as its left part, an ECH over
   the gap, then its right part — kept whatever the previous screen had in
