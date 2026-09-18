@@ -101,7 +101,7 @@ the one deviation from the fixed environment, stated in
 | Idle CPU (Release, 20 s) | ~0% | **0.05%** | ✅ |
 | Memory, 100k × 120 lines | ~200 MB | **185.0 MB** | ✅ |
 | Core feed throughput | > 100 MB/s | **144.2 MiB/s** (5-run mean) | ✓ |
-| Keypress → pixel | < 1 frame + input | **57.8 ms avg** (200 samples, 0.1.1 — not re-measured) | ⚠️ above target |
+| Keypress → glass | < 1 frame + input | **61.9 ms avg**, p95 69.7 (200 scripted samples, in-app measure; 0.1.1's Typometer read 57.8) | ⚠️ above target |
 | `esctest` xterm conformance | — | **81.1%** — 107 of 567 failing | |
 
 The number that misses its target is printed here rather than omitted.
@@ -246,9 +246,11 @@ a feature request for one of them.
 - **Shell integration ships for zsh only.** Fish and bash users keep the
   keystroke-and-idle heuristic for the long-task notification and get no
   prompt marks.
-- **Keypress-to-pixel latency is above its target** (57.8 ms measured
-  against a one-frame-plus-input goal); the table above says so rather
-  than hiding it.
+- **Keypress-to-glass latency is above its target** (about 60 ms against
+  a one-frame-plus-input goal, three frames on a 60 Hz panel); the table
+  above says so rather than hiding it, and Corta now measures it from
+  the inside (`docs/PERFORMANCE.md` §5.7) so a change that moves it is
+  a number, not a feeling.
 - **Kitty graphics** implement direct transmission only: no file-based
   transmission (by design), no animation frames, no Unicode-placeholder
   placement.

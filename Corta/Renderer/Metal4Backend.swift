@@ -582,6 +582,7 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
             // After committing everything that targets the drawable, before
             // presenting it — `MTL4CommandQueue.signalDrawable`'s contract.
             queue.signalDrawable(drawable)
+            RenderMetrics.notePresent(of: drawable)
             drawable.present()
         }
     }

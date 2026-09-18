@@ -1105,6 +1105,7 @@ class ViewController: NSViewController {
         // would close began in `keyDown` on another thread
         // (`InputLatencySignposts`).
         InputLatencySignposts.emit(.output)
+        RenderMetrics.noteOutputForKeystroke()
         outputPending.withLock { $0 = true }
         // The MainActor hop, measured separately: this is the stage a busy
         // main thread lengthens, and the one an end-to-end number cannot
@@ -1528,6 +1529,7 @@ class ViewController: NSViewController {
             }
         }
         let commit = InputLatencySignposts.begin(.commit)
+        RenderMetrics.notePresent(of: drawable)
         commandBuffer.present(drawable)
         commandBuffer.commit()
         InputLatencySignposts.end(.commit, commit)

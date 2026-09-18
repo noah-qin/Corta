@@ -156,7 +156,7 @@ flood_panes() { # seconds — `yes`, not `seq`: a bounded burst drains at core
 collect_metrics() { # label start-timestamp("YYYY-MM-DD HH:MM:SS")
   echo "-- render-metrics log, phase: $1"
   sleep 2
-  log show --start "$2" --style compact \
+  /usr/bin/log show --start "$2" --style compact \
     --predicate 'subsystem == "dev.noahqin.Corta" AND category == "render-metrics"' 2>/dev/null \
     | grep -E '(cpuFrame|gpu|drawableWait):' | tail -40 || echo "   (no render-metrics dumps — rings may not have filled)"
 }
