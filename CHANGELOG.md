@@ -39,6 +39,13 @@ troubleshooting entry or a conformance note rather than a claim:
   Entry, the energy scenarios (`scripts/measure-energy.sh` needs a sudo
   session) and thermal/low-power forcing: not judged, listed where each
   batch left them.
+- Deferred by their batches, still unchecked on the closed issues: a
+  keypress-to-pixel p50/p95/p99 baseline and the preview-toolchain
+  versions (B01); the reported Tab failure's original evidence and the
+  wider Escape-scoping verification (B02); one shared reflow mapping for
+  viewport, selection, search, commands and images, and a selection /
+  mouse-reporting override, which needs `?1002`/`?1003` motion tracking
+  first (B04).
 
 ### Added
 
