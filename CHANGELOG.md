@@ -42,9 +42,8 @@ troubleshooting entry or a conformance note rather than a claim:
   attribute `NSTextView` also answers is now implemented; whether that
   was the cause needs one more listen. `CONFORMANCE.md` §4.6.
 - Multi-display Quick Terminal placement (no second display on the test
-  machine), Touch ID under Secure Keyboard Entry (sudo on the test
-  machine is not configured for Touch ID) and thermal forcing: not
-  judged. The energy scenarios ran twice, on mains and under Low Power
+  machine) and thermal forcing: not judged. Touch ID under Secure
+  Keyboard Entry passed by hand (`CONFORMANCE.md` §4.6). The energy scenarios ran twice, on mains and under Low Power
   Mode (`PERFORMANCE.md` §5.6).
 - Deferred by their batches and now tracked as their own issues: mouse
   motion tracking (`?1002`/`?1003`) and a selection / mouse-reporting
