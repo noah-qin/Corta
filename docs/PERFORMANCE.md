@@ -39,7 +39,7 @@ rather than filled in with a guess.
 
 | Category      | Target                                              | Held accountable by |
 | -------------- | ---------------------------------------------------- | -------------------- |
-| Input          | Keypress → pixel feels immediate; §1's latency target | Typometer (§5.1–§5.3), `corta-bench`'s `benchmarkKeypressLatency` |
+| Input          | Keypress → glass feels immediate; §1's latency target | `RenderMetrics.keypressToPresent` via `scripts/measure-keypress-latency.sh` (§5.7), `corta-bench`'s `benchmarkKeypressLatency` |
 | Sustained output | A flood (`yes`, a build log, a training run) does not fall behind or drop frames below §1's frame budget | `corta-bench`'s parse-throughput and write-backpressure benchmarks; `scripts/measure-app-baseline.sh` phase B flood |
 | Scrolling      | Scrolling a long buffer tracks the pointer/trackpad with no visible stutter | `scripts/measure-render-metrics.sh` (`CORTA_RENDER_METRICS` ring buffer); no dedicated automated scroll benchmark exists yet — a real gap, not an oversight |
 | Startup        | A warm launch reaches an interactive window fast enough that switching to Corta does not feel like waiting for an app to open | `scripts/measure-app-baseline.sh` phase A (5 warm launches + 1 cold-ish) |
@@ -209,18 +209,20 @@ Because the terminal core is a separate SwiftPM package (`DESIGN.md`
 | Neovim scrolling a large file in tmux  | Interactive full-screen redraw path    |
 | Parser-only harness over a byte corpus | Isolates parse cost from rendering     |
 
-Latency (keypress → pixel) is measured separately with a tool such as
-Typometer; it is invisible to throughput benchmarks and is the number
-users actually perceive.
+Latency (keypress → glass) is measured separately — since 1.0.0 from
+inside the app (§5.7); before that with an external screen-capture tool
+whose figures the two historical rows below are. It is invisible to
+throughput benchmarks and is the number users actually perceive.
 
-**M6 measurement:** Typometer 1.0.1 against a Release build, 200
-characters, 150 ms delay, 50 ms period, 1,000 ms length, synchronous mode:
+**M6 measurement:** external screen-capture tool against a Release
+build, 200 characters, 150 ms delay, 50 ms period, 1,000 ms length,
+synchronous mode:
 45.5 ms average, 24.8 ms minimum, 56.4 ms maximum, 6.8 ms standard
 deviation. The in-process write → PTY echo → parse → grid portion measured
 separately at 0.005 ms average / 0.007 ms p95, placing essentially all of
 the observed latency after the grid mutation.
 
-**0.1.1 measurement (2026-09-09):** Typometer 1.0.1, same settings — 200
+**0.1.1 measurement (2026-09-09):** the same tool, same settings — 200
 characters, 150 ms delay, 50 ms period, 1,000 ms length, synchronous, no
 intermediate pauses — against the Release build at commit `12ac1b8`:
 **57.8 ms average, 45.3 ms minimum, 78.9 ms maximum, 5.6 ms standard
@@ -234,7 +236,7 @@ foreground; **test program `cat > /dev/null`**, so the tty echoes and no
 shell line editor is between the keystroke and the screen.
 
 **Against M6.12's 45.5 ms this is 12.3 ms worse, and the comparison is
-weaker than it looks.** M6.12 recorded its Typometer settings and not its
+weaker than it looks.** M6.12 recorded its capture settings and not its
 test program, and neither run recorded the machine beyond "MacBook Air,
 Apple silicon" — §5.2's own first row. So the two runs are known to differ
 in at least one variable that was never written down, and possibly in the
@@ -247,19 +249,19 @@ that it could not be read against 45.5 ms. It still cannot; what exists now
 is a properly held measurement of the same configuration, which is the
 number future work should move.
 
-**Still not §5.1-shaped.** Typometer reports minimum, maximum, average and
-standard deviation — not p50, p95 and p99. That is exactly the shape §5.1
-objects to, and it is a limit of the tool rather than a choice: the
-percentiles need the raw samples exported and summarised. `corta-bench`
-reports all four for the parts of the path it can see.
+**Those two rows are not §5.1-shaped.** The external tool reported
+minimum, maximum, average and standard deviation — not p50, p95 and p99 —
+which is exactly the shape §5.1 objects to. The in-app measure (§5.7)
+reports the percentiles, and is why the tool is no longer used or
+needed.
 
-**The percentile-shaped alternative for the render stage (B01).** Between
-`corta-bench` (headless, core-only) and a full Typometer run (end-to-end,
-but avg/min/max/SD only) sits `CORTA_RENDER_METRICS=1`
+**The percentile-shaped view of the render stage (B01).** Between
+`corta-bench` (headless, core-only) and the end-to-end §5.7 number sits
+`CORTA_RENDER_METRICS=1`
 (`RenderMetrics.swift`'s 600-sample ring buffer, streamed by
 `scripts/measure-render-metrics.sh`): it dumps real p50/p99 for `cpuFrame`,
 `drawableWait` and `gpu` from a live, on-screen app, without Instruments.
-Its limit is the opposite of Typometer's: it needs a person at the keyboard
+Its limit: it needs a person at the keyboard
 typing and scrolling for the ring to fill with real frames (the
 `scripts/measure-app-baseline.sh` finding that synthetic System Events keystrokes
 never reach `TerminalView` applies here too — a scripted flood through the
@@ -274,8 +276,9 @@ first priority" is a slogan rather than a constraint.
 
 Every latency number in this document must carry **p50, p95, p99 and the
 maximum**. `corta-bench` reports all four (`LatencyDistribution`); the
-M6 Typometer figure above predates the rule and is reported as its
-average, which is exactly the shape of the problem.
+M6 and 0.1.1 end-to-end figures above predate the rule and are reported
+as averages, which is exactly the shape of the problem; §5.7's number has
+the four.
 
 An average is the one statistic a latency measurement should not be
 reduced to. Keypress latency is not normally distributed — a tight body
@@ -309,7 +312,7 @@ Parser-only throughput 628.3 MiB/s, parser+grid 141.1 MiB/s, core feed
 185.0 MB resident, inside §1's ~200 MB target. Full raw output, including
 the resize-delivery, spawn-decomposition and multi-pane-fixed-cost
 benchmarks not tabulated above, is reproducible with the command above; it
-is headless and scripted, so — unlike the Typometer numbers below — this
+is headless and scripted, so — unlike the M6/0.1.1 end-to-end rows above — this
 much of §5.2's table is trivially held exactly by running it again. This is
 core-side only; it says nothing about the AppKit/render stages §5.3 and
 §5.4 cover, which is exactly the boundary `scripts/measure-app-baseline.sh` and
@@ -483,7 +486,7 @@ saving, it appears as the `frame` interval growing at its front.
 **Preliminary signal, not the A/B itself.** `RenderMetrics`
 (`Corta/RenderMetrics.swift`, `CORTA_RENDER_METRICS=1`,
 `scripts/measure-render-metrics.sh`) reports `drawableWait` — how long
-`nextDrawable()` blocks — directly, without Typometer or Instruments. One
+`nextDrawable()` blocks — directly, without Instruments. One
 informal run at the default drawable count (3), auto-repeat plus `yes`
 for a few seconds, held nothing else about the machine fixed the way
 §5.2 requires:
@@ -498,16 +501,18 @@ for a few seconds, held nothing else about the machine fixed the way
 is not blocking on this machine under this load, which is the condition
 under which dropping to 2 has nothing to buy back and can plausibly only
 cost (more frequent blocking, not less). Not a substitute for the actual
-Typometer A/B this section is still waiting on — that is the only way to
-turn "probably not worth it" into a number — but reason enough to
-de-prioritize it behind M8.19 and M9's own measurement pass.
+end-to-end A/B — that is the only way to turn "probably not worth it"
+into a number — but reason enough to de-prioritize it behind M8.19 and
+M9's own measurement pass.
 
-**The Typometer A/B itself.** `scripts/measure-drawable-ab.sh` launches
-the same Release build twice, back to back, so the only variable between
-the two Typometer runs is `CORTA_MAX_DRAWABLES`. Same machine, same
-Typometer settings as §5.5 (200 chars / 150 ms delay / 50 ms period /
-1,000 ms length, synchronous mode, no intermediate pauses), mains power,
-Corta frontmost with nothing else running:
+**The end-to-end A/B itself (M8.18).** `scripts/measure-drawable-ab.sh`
+runs the same Release build twice, back to back, so the only variable
+between the two runs is `CORTA_MAX_DRAWABLES`; since 1.0.0 each run is
+`scripts/measure-keypress-latency.sh` (§5.7) and prints the percentile
+line itself. The M8.18 pair was taken with the external screen-capture
+tool of the day (200 chars / 150 ms delay / 50 ms period / 1,000 ms
+length, synchronous, no pauses), mains power, Corta frontmost with
+nothing else running:
 
 | Run | Min, ms | Max, ms | Avg, ms | SD, ms |
 | --- | ------- | ------- | ------- | ------ |
@@ -525,7 +530,7 @@ frame or a busier machine.
 
 (These two runs' Avg/SD are higher across the board than §5.5's earlier
 single-run numbers for Corta — 70 ms vs. 45 ms — despite identical
-Typometer settings; §5.2's environment table was not fully controlled for
+capture settings; §5.2's environment table was not fully controlled for
 this pair either, e.g. other background load on the machine varied
 between sessions. The A vs. B *comparison* is still valid, since both
 runs shared whatever that day's uncontrolled conditions were — only the
@@ -533,9 +538,12 @@ absolute numbers should not be cross-cited against §5.5's.)
 
 ### 5.5 Cross-terminal comparison
 
-Typometer 1.0.1, 200 characters / 150 ms delay / 50 ms period / 1000 ms
-length, synchronous mode, same machine, same font (system monospaced,
-12 pt), power connected, target app frontmost with nothing else running:
+Taken at M6 with an external screen-capture latency tool — the only
+kind of measure that can be pointed at another terminal, which is why
+this table is not refreshed by §5.7's in-app measure. 200 characters /
+150 ms delay / 50 ms period / 1000 ms length, synchronous mode, same
+machine, same font (system monospaced, 12 pt), power connected, target
+app frontmost with nothing else running:
 
 | Terminal | Min, ms | Max, ms | Avg, ms | SD, ms |
 | -------- | ------- | ------- | ------- | ------ |
@@ -544,9 +552,9 @@ length, synchronous mode, same machine, same font (system monospaced,
 | Ghostty  | 17.8    | 45.2    | 31.9    | 5.9    |
 
 Corta is slower on average than iTerm2 and noticeably slower than
-Ghostty on this machine. (Terminal.app is missing — Typometer would not
-measure it; figures above are Typometer's min/max/avg/SD, not the §5.1
-percentile distribution.)
+Ghostty on this machine. (Terminal.app is missing — the tool would not
+measure it; figures above are min/max/avg/SD, not the §5.1 percentile
+distribution.)
 
 ---
 
@@ -616,12 +624,12 @@ once it is static: the kitty row reads the same as idle. Thermal and
 Low Power Mode were not forced: both change machine-wide state and need
 a dedicated session.
 
-### 5.7 Keypress → glass without Typometer
+### 5.7 Keypress → glass, measured from inside the app
 
-The end-to-end number used to need Typometer — a third-party app that
-screen-captures the window in a loop until the pixels change. Since
-1.0.0 Corta measures the same interval from the inside, with nothing
-installed and no permission asked:
+The end-to-end number used to need a third-party screen-capture tool —
+one that grabs the window in a loop until the pixels change. Since 1.0.0
+Corta measures the same interval from the inside, with nothing installed
+and no permission asked:
 
 - `TerminalView`'s three key-delivery sites hand `RenderMetrics` the
   event's `timestamp` — the HID timestamp for a real key, the posting
@@ -647,17 +655,16 @@ says which:
 | Kind | Includes | Comparable to |
 | --- | --- | --- |
 | Scripted (`key code` via System Events) | Corta's whole path plus the compositor and scanout; **not** the keyboard's HID stage (1–8 ms on USB/Bluetooth) | a lower bound on what a finger sees |
-| `--manual` (a person typing) | everything Typometer saw | the M6.12 / 0.1.1 Typometer rows |
+| `--manual` (a person typing) | everything a screen-capture tool saw | the M6.12 / 0.1.1 rows in §5 |
 
 **1.0.0, scripted, 2026-09-18** (Release, built-in panel, AC, 120×30):
 **avg 61.9 ms, p50 61.4, p95 69.7, p99 70.9, max 71.0** over 200 samples.
-Beside 0.1.1's Typometer 57.8 ms avg the two agree within the HID stage
+Beside 0.1.1's 57.8 ms avg the two agree within the HID stage
 and the capture method — and both say the same thing the target row in
 §1 says: above one frame plus input latency, on a 60 Hz panel a good
 three frames. Where those frames go is the `os_signpost` chain's job
 (§5.3); the in-app number is what says whether a change moved it. A
-`--manual` run by a person is what would replace the 0.1.1 Typometer
-row outright.
+`--manual` run by a person is what would replace the 0.1.1 row outright.
 
 ## 6. B11 — CPU, locking and memory hot-path pass (2026-09-13)
 
@@ -889,7 +896,7 @@ repeatable. The drawable-2 and latency-2 deltas are likewise within
 run-to-run drift and change nothing: defaults stand, both env hooks stay
 as measurement seams. The `preferredFrameLatency` follow-up named in
 `RenderPolicy.swift` is now instrumented (`CORTA_FRAME_LATENCY`) but its
-numbers here are flood-only; typing-latency judgment needs Typometer —
+numbers here are flood-only; typing-latency judgment is §5.7's measure —
 not judged.
 
 **Re-measured after the residency grace (2026-09-15, review pass).**

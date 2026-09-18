@@ -153,7 +153,7 @@ func benchmarkScrollbackMemory() {
 /// 1. It is not a full keypress-to-photon measurement. That also needs one
 ///    vsync period (already bounded by `FrameCPUBaselineTests`, < 4 ms CPU
 ///    against an 8.3 ms 120 Hz frame) plus real display/compositor latency,
-///    which needs a tool like Typometer against actual hardware and cannot
+///    which needs the app's own end-to-end measure (`RenderMetrics.keypressToPresent`) and cannot
 ///    come from a headless benchmark.
 /// 2. `/bin/cat` is the child so the number isolates PTY + parse + grid
 ///    write from a particular shell's own processing cost — but the pty

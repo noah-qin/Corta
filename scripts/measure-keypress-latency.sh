@@ -1,5 +1,5 @@
 #!/bin/bash
-# Keypress → glass, measured from inside Corta — no Typometer, no screen
+# Keypress → glass, measured from inside Corta — no third-party tool, no screen
 # capture, no third-party tool. `RenderMetrics.keypressToPresent` takes
 # the key event's timestamp and closes the sample in the drawable's
 # presented handler, which fires when the frame carrying the child's echo
@@ -16,7 +16,7 @@
 # the number, and the result is a lower bound on what a finger sees.
 # `--manual` includes it — type 200 ordinary characters at a shell
 # prompt (no Return needed) — and is the number to quote beside a
-# Typometer-style figure. Both are stated as which they are.
+# screen-capture figure. Both are stated as which they are.
 #
 # The fixed environment of PERFORMANCE.md §5.2 applies: Release build,
 # built-in display, mains, nothing else in front. Runs against a

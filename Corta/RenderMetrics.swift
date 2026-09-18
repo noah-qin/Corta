@@ -39,7 +39,7 @@ nonisolated enum RenderMetrics {
     /// keystroke burst without holding an unbounded array.
     private static let capacity = 600
     /// Keystrokes arrive at typing speed, not frame rate: 200 is the sample
-    /// size the Typometer runs used, and a person types it in a minute.
+    /// size the earlier end-to-end runs used, and a person types it in a minute.
     /// `CORTA_RENDER_METRICS_KEYSTROKES=<n>` overrides it for a shorter run.
     private static let keystrokeCapacity: Int = {
         let raw = ProcessInfo.processInfo.environment["CORTA_RENDER_METRICS_KEYSTROKES"] ?? ""

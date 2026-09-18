@@ -668,7 +668,7 @@ Ordered by how badly they are usually underestimated.
    the render loop") was followed with `CortaTests/FrameCPUBaselineTests`
    — the same headless, scriptable tool the M6 render-loop regression
    this rule itself documents was found and fixed with, not the
-   Typometer/live-signpost route the first attempt at this pass assumed
+   screen-capture/live-signpost route the first attempt at this pass assumed
    was the only option (that route needs a real, focused GUI session;
    this one does not). The first implementation *did* measure a real,
    reproducible regression — about 5%, ~0.1 ms, isolated by A/B runs

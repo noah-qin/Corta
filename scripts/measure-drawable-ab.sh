@@ -1,42 +1,24 @@
 #!/bin/bash
-# M8.18: launches the Release build twice, back to back — once at the
+# M8.18: the same Release build measured twice, back to back — once at the
 # default maximumDrawableCount (3), once at CORTA_MAX_DRAWABLES=2 — so the
-# only variable between the two Typometer runs you do against them is that
-# one launch environment flag (PERFORMANCE.md §5.4).
+# only variable between the two runs is that one launch environment flag
+# (PERFORMANCE.md §5.4). Each run is scripts/measure-keypress-latency.sh,
+# which launches, drives 230 synthetic keystrokes and prints the in-app
+# keypress-to-glass distribution (§5.7); the environment flag is inherited
+# by the launch inside it. Pass --manual to type the samples yourself in
+# both runs (HID stage included).
 #
-# This script only launches; it does not run Typometer for you (Typometer
-# has to watch the physical screen, which nothing scripted can stand in
-# for). Between the two launches it pauses and tells you which run to do.
-#
-# Usage: scripts/measure-drawable-ab.sh
+# Usage: scripts/measure-drawable-ab.sh [--manual]
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-app=$("$repo_root/scripts/find-release-app.sh")
-echo "==> Using $app"
-echo "==> Typometer settings for both runs: 200 chars / 150ms delay / 50ms period /"
-echo "    1000ms length / synchronous mode, no intermediate pauses (PERFORMANCE.md §5.5)."
+mode=${1:-}
+
+echo "=== Run A (default, maximumDrawableCount=3) ==="
+"$repo_root/scripts/measure-keypress-latency.sh" $mode
 echo
-
-run_one() {
-  local label="$1"; shift
-  echo "=== Run $label ==="
-  echo "Launching..."
-  "$@" &
-  local pid=$!
-  echo "Corta is running (pid $pid). Bring it frontmost, run Typometer's $label pass now."
-  echo "Press Enter here when that Typometer run is done (this will quit Corta)."
-  read -r _
-  kill "$pid" 2>/dev/null || true
-  wait "$pid" 2>/dev/null || true
-  echo
-}
-
-run_one "A (default, maximumDrawableCount=3)" \
-  env CORTA_RESTORE_WINDOWS=0 "$app/Contents/MacOS/Corta"
-
-run_one "B (maximumDrawableCount=2)" \
-  env CORTA_RESTORE_WINDOWS=0 CORTA_MAX_DRAWABLES=2 "$app/Contents/MacOS/Corta"
-
-echo "==> Both runs done. Record all four Typometer numbers (min/avg/max/SD) for"
-echo "    each in docs/PERFORMANCE.md §5.4, and check docs/history/ROADMAP-0.1.md's M8.18 box."
+echo "=== Run B (maximumDrawableCount=2) ==="
+CORTA_MAX_DRAWABLES=2 "$repo_root/scripts/measure-keypress-latency.sh" $mode
+echo
+echo "==> Compare the two keypressToPresent lines; a difference inside either"
+echo "    run's p50–p95 spread is noise (PERFORMANCE.md §5.4)."

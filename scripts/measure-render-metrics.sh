@@ -4,9 +4,9 @@
 # (RenderMetrics.swift — a 600-sample ring buffer per stage, ~10s of
 # continuous frames at 60Hz, dumped to the unified log the moment it fills).
 #
-# Answers, without Typometer: whether drawableWait is worth an M8.18 A/B
+# Answers, without a screen-capture tool: whether drawableWait is worth an M8.18 A/B
 # at all (Step 2's job if it is), and gives a cpuFrame/gpu sanity check
-# for M9 before spending time on a full Typometer run.
+# for M9 before spending time on a full end-to-end run (§5.7).
 #
 # Usage: scripts/measure-render-metrics.sh
 #   Then, in the launched Corta window: hold a key to auto-repeat for

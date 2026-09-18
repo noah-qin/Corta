@@ -5,8 +5,8 @@ import OSLog
 /// `os_signpost` across the whole keypress-to-pixel chain, so the number in
 /// `docs/PERFORMANCE.md` §1 can be attributed instead of only measured.
 ///
-/// **The gap this closes.** M6.12 measured 45.5 ms keypress-to-pixel with
-/// Typometer, and `corta-bench` measures the core half of it — but between
+/// **The gap this closes.** M6.12 measured 45.5 ms keypress-to-pixel end
+/// to end, and `corta-bench` measures the core half of it — but between
 /// them there was nothing that said *where* the 45 ms goes. A one-number
 /// end-to-end measurement can only ever tell you whether the last change
 /// helped; it cannot tell you that a regression is in the parse, in the
