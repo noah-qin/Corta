@@ -1,4 +1,5 @@
 import AppKit
+import OSLog
 
 /// VoiceOver, Switch Control, Voice Control and every other assistive
 /// technology, for a view that draws its text with Metal.
@@ -22,6 +23,16 @@ import AppKit
 /// AppKit asks a dozen of them per VoiceOver step and each would otherwise
 /// take the terminal's lock and walk the grid.
 extension TerminalView {
+    /// What an assistive technology asked and what it was told, on the
+    /// unified log (`log show --last 5m --predicate 'subsystem ==
+    /// "dev.noahqin.Corta" and category == "accessibility"'`). Notice
+    /// level, not debug, so it is there after the fact; nothing but an
+    /// assistive client makes these calls, so it is silent otherwise. VoiceOver
+    /// cannot be run by a test and reports only what it concluded, never
+    /// which attribute it read — "No selection." over a selection the API
+    /// reported correctly (2026-09-18) is exactly the case this exists for.
+    private static let trace = Logger(subsystem: "dev.noahqin.Corta", category: "accessibility")
+
     // MARK: - Element identity
 
     override func isAccessibilityElement() -> Bool { true }
@@ -42,13 +53,17 @@ extension TerminalView {
 
     // MARK: - Text
 
-    override func accessibilityValue() -> Any? { accessibilitySnapshot()?.text }
+    override func accessibilityValue() -> Any? {
+        Self.trace.notice("value")
+        return accessibilitySnapshot()?.text
+    }
 
     override func accessibilityNumberOfCharacters() -> Int {
         accessibilitySnapshot()?.text.utf16.count ?? 0
     }
 
     override func accessibilityString(for range: NSRange) -> String? {
+        Self.trace.notice("string(for:) \(range.location, privacy: .public)+\(range.length, privacy: .public)")
         guard let snapshot = accessibilitySnapshot() else { return nil }
         let full = snapshot.text as NSString
         guard let clamped = Self.clamp(range, to: full.length) else { return nil }
@@ -63,13 +78,20 @@ extension TerminalView {
     // MARK: - Cursor and selection
 
     override func accessibilitySelectedTextRange() -> NSRange {
-        accessibilitySnapshot()?.selectedRange ?? NSRange(location: 0, length: 0)
+        let range = accessibilitySnapshot()?.selectedRange ?? NSRange(location: 0, length: 0)
+        Self.trace.notice("selectedTextRange -> \(range.location, privacy: .public)+\(range.length, privacy: .public)")
+        return range
     }
 
     override func accessibilitySelectedText() -> String? {
         guard let snapshot = accessibilitySnapshot(), snapshot.selectedRange.length > 0
-        else { return nil }
-        return (snapshot.text as NSString).substring(with: snapshot.selectedRange)
+        else {
+            Self.trace.notice("selectedText -> nil")
+            return nil
+        }
+        let text = (snapshot.text as NSString).substring(with: snapshot.selectedRange)
+        Self.trace.notice("selectedText -> \(text.utf16.count, privacy: .public) units")
+        return text
     }
 
     /// The plural form (`AXSelectedTextRanges`), which `NSTextView` answers
@@ -80,7 +102,11 @@ extension TerminalView {
     /// take to mean "one empty selection".
     override func accessibilitySelectedTextRanges() -> [NSValue]? {
         guard let snapshot = accessibilitySnapshot(), snapshot.selectedRange.length > 0
-        else { return [] }
+        else {
+            Self.trace.notice("selectedTextRanges -> []")
+            return []
+        }
+        Self.trace.notice("selectedTextRanges -> [\(snapshot.selectedRange.location, privacy: .public)+\(snapshot.selectedRange.length, privacy: .public)]")
         return [NSValue(range: snapshot.selectedRange)]
     }
 
@@ -238,6 +264,7 @@ extension TerminalView {
     func noteAccessibilitySelectionChanged() {
         guard NSWorkspace.shared.isVoiceOverEnabled else { return }
         cachedAccessibilitySnapshot = nil
+        Self.trace.notice("post selectedTextChanged")
         NSAccessibility.post(element: self, notification: .selectedTextChanged)
     }
 
