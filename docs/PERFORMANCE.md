@@ -581,12 +581,36 @@ the app-side numbers, built-in panel at native scale, system monospaced
 | Reflow, 100k lines, 120 → 80 columns | 94.1 ms | `corta-bench` |
 | Search, 100k lines, one query | ~395 ms warm, 100 000 matches | `corta-bench` |
 | Keypress → pixel (end to end) | **not re-measured** — needs Typometer, a person and mains; 0.1.1's 57.8 ms avg stands | — |
-| Energy | **not run** — `scripts/measure-energy.sh` needs a sudo-capable session | — |
+| Energy | measured — see below | `scripts/measure-energy.sh` with `sudo powermetrics` |
 
 The one-pane flood's render-metrics ring did not fill inside the
 script's 20 s window on this run (the 2- and 4-pane rings did), so the
 one-pane live frame number is absent rather than copied from the
 Debug-build baseline above.
+
+**Energy (2026-09-18 19:23, same machine, AC attached at 57%, sudo
+`powermetrics --samplers tasks,cpu_power,gpu_power`, 20 samples at 1 Hz
+per scenario).** The combined figure is machine-wide — every process —
+so it bounds Corta from above; the per-process columns are
+`powermetrics`' tasks sampler (CPU ms/s, then its Energy Impact
+figure), first five samples of each window.
+
+| Scenario | Combined CPU+GPU+ANE, machine-wide | Corta CPU ms/s | Corta Energy Impact |
+| --- | --- | --- | --- |
+| Idle, one window frontmost | p50 477 mW, p95 1297 mW | 2.5–24 (settling after launch) | 0.5–9.4 |
+| Occluded (minimised) | p50 83 mW, p95 619 mW | 0.05–0.8 | ≈0 |
+| Background output flood (`yes`, occluded) | p50 9.7 W, p95 10.9 W | ≈1210 | ≈6 300–6 500 |
+| Two windows, both visible, idle | p50 63 mW, p95 915 mW | 0.07–1.4 | ≈0 |
+| Kitty image placed, then static | **not run** — the script's PNG generator raised before the scenario (fixed the same day); a re-run records it | — | — |
+
+Reading: an idle or occluded Corta is within the machine's own noise
+floor (the whole machine idles at tens to hundreds of milliwatts); a
+sustained flood is a full core's worth of CPU (the reader → parse →
+grid path) and is what the display-link pause and per-line damage are
+there to keep off the *rendering* side — the GPU column stayed under
+0.5 ms/frame throughout the baseline run. Thermal and Low Power Mode
+were not forced: both change machine-wide state and need a dedicated
+session.
 
 ## 6. B11 — CPU, locking and memory hot-path pass (2026-09-13)
 
