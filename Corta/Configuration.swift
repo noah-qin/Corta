@@ -97,6 +97,26 @@ nonisolated struct Configuration: Equatable, Sendable {
     var copyOnSelect: Bool = true
     /// M7.9 — see `LinkActivation`.
     var linkActivation: LinkActivation = .command
+    enum MouseOverrideModifier: String, CaseIterable, Sendable {
+        case option, shift, control
+
+        var flags: NSEvent.ModifierFlags {
+            switch self {
+            case .option: return .option
+            case .shift: return .shift
+            case .control: return .control
+            }
+        }
+
+        var symbol: String {
+            switch self {
+            case .option: return "⌥"
+            case .shift: return "⇧"
+            case .control: return "⌃"
+            }
+        }
+    }
+    var mouseOverrideModifier: MouseOverrideModifier = .option
     /// U05 — ⌥ as Meta: an Option-modified text key sends ESC plus the base
     /// character, the way a PC's Alt key reaches readline (`\eb` for
     /// Option+B, and so on). Off by default: on a Mac, Option is how the
@@ -370,6 +390,9 @@ nonisolated struct Configuration: Equatable, Sendable {
         case "copy-on-select":
             guard let parsed = Self.parseBool(value) else { return false }
             copyOnSelect = parsed
+        case "mouse-override-modifier":
+            guard let modifier = MouseOverrideModifier(rawValue: value) else { return false }
+            mouseOverrideModifier = modifier
         case "link-activation":
             guard let activation = LinkActivation(rawValue: value) else { return false }
             linkActivation = activation
@@ -589,6 +612,7 @@ nonisolated struct Configuration: Equatable, Sendable {
             "bell = \(bell.rawValue)",
             "copy-on-select = \(copyOnSelect)",
             "link-activation = \(linkActivation.rawValue)",
+            "mouse-override-modifier = \(mouseOverrideModifier.rawValue)",
             "option-as-meta = \(optionAsMeta)",
             "search-case-sensitive = \(searchCaseSensitive)",
             "search-regex = \(searchRegex)",

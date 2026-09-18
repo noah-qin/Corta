@@ -1,11 +1,7 @@
 import AppKit
+import CortaTerminal
 
-/// Mouse reporting (M2.7, SGR ?1006): click and release events are
-/// translated to SGR report bytes when the child asked for them — except
-/// the left button, whose gesture might turn into a drag, so it is decided
-/// in `handleSelectionMouseDown` rather than here. The stored properties
-/// these methods use (`isMouseReportingEnabled`, `onMouseBytes`, `cellSize`)
-/// live on the class itself — extensions cannot add storage.
+/// Routes a gesture to the subscribed TUI or to local text selection.
 extension TerminalView {
     override func mouseDown(with event: NSEvent) {
         // M5.2: a click focuses its pane — keyboard input follows focus, and
@@ -21,25 +17,16 @@ extension TerminalView {
             let controller = paneController,
             controller.handleLinkClick(event, in: self)
         { return }
-        // A left mouse down never picks between reporting and selection by
-        // itself — whether the child gets it depends on what the gesture
-        // turns out to be, which isn't known until it ends (see
-        // `handleSelectionMouseDown`'s doc comment). With no controller to
-        // make that call there is no selection state to defer to, so an
-        // unwired view (tests) keeps the old immediate-report-or-not
-        // behaviour.
+        showMouseOverrideHintIfNeeded()
+        if report(event, phase: .press(.left)) { return }
         guard let controller = paneController else {
-            if !report(event, phase: .press(.left)) { super.mouseDown(with: event) }
+            super.mouseDown(with: event)
             return
         }
         controller.handleSelectionMouseDown(event, in: self)
     }
 
     override func mouseUp(with event: NSEvent) {
-        // The left button's up event is consumed inside
-        // `handleSelectionMouseDown`'s own tracking loop and never reaches
-        // here through the normal responder chain; this override only ever
-        // fires for the unwired fallback above, or another button.
         guard report(event, phase: .release(.left)) else { super.mouseUp(with: event); return }
     }
 
@@ -75,31 +62,61 @@ extension TerminalView {
         case release(SGRMouse.Button)
     }
 
-    /// Sends the press-then-release pair for a left click that
-    /// `handleSelectionMouseDown` has determined, only once the gesture is
-    /// over, never turned into a drag — the report was withheld until that
-    /// was known, so it goes out retroactively, both halves at once.
-    func reportClick(down: NSEvent, up: NSEvent) {
-        _ = report(down, phase: .press(.left))
-        _ = report(up, phase: .release(.left))
+    var effectiveMouseTrackingMode: MouseTrackingMode {
+        mouseTrackingMode?() ?? (isMouseReportingEnabled?() == true ? .normal : .off)
     }
 
-    /// Sends the SGR report for one event; returns false when mouse reporting
-    /// is off and the event should follow its normal path.
+    func overridesMouseReporting(_ event: NSEvent) -> Bool {
+        event.modifierFlags.contains(mouseOverrideModifier.flags)
+    }
+
+    func showMouseOverrideHintIfNeeded() {
+        guard effectiveMouseTrackingMode != .off, !didShowMouseOverrideHint else { return }
+        didShowMouseOverrideHint = true
+        showToast(L10n.format("toast.mouseOverride", mouseOverrideModifier.symbol))
+    }
+
+    /// A release is only sent for a press we delivered. Gesture ownership is
+    /// fixed at mouse-down, so releasing the override cannot leak a report.
     private func report(_ event: NSEvent, phase: MousePhase) -> Bool {
-        guard isMouseReportingEnabled?() == true, cellSize.width > 0, cellSize.height > 0
-        else { return false }
+        guard effectiveMouseTrackingMode != .off, cellSize.width > 0, cellSize.height > 0 else {
+            reportedMouseButtons.removeAll()
+            lastMouseReportCell = nil
+            return false
+        }
         let (column, row) = cellUnder(event)
         let modifiers = Self.mouseModifiers(of: event)
         let bytes: [UInt8]
         switch phase {
         case .press(let button):
+            guard !overridesMouseReporting(event) else { return false }
+            reportedMouseButtons.insert(button.code)
             bytes = SGRMouse.press(button: button, column: column, row: row, modifiers: modifiers)
         case .release(let button):
+            guard reportedMouseButtons.remove(button.code) != nil else { return false }
             bytes = SGRMouse.release(button: button, column: column, row: row, modifiers: modifiers)
         }
+        lastMouseReportCell = (column, row)
         onMouseBytes?(bytes)
         return true
+    }
+
+    override func mouseDragged(with event: NSEvent) { reportMotion(event, button: .left) }
+    override func rightMouseDragged(with event: NSEvent) { reportMotion(event, button: .right) }
+    override func otherMouseDragged(with event: NSEvent) { reportMotion(event, button: .middle) }
+
+    private func reportMotion(_ event: NSEvent, button: SGRMouse.Button?) {
+        let mode = effectiveMouseTrackingMode
+        guard mode == .anyEvent || (mode == .buttonEvent && button != nil),
+            cellSize.width > 0, cellSize.height > 0 else { return }
+        if let button {
+            guard reportedMouseButtons.contains(button.code) else { return }
+        } else if overridesMouseReporting(event) { return }
+        let cell = cellUnder(event)
+        guard lastMouseReportCell?.column != cell.column || lastMouseReportCell?.row != cell.row else { return }
+        lastMouseReportCell = cell
+        onMouseBytes?(SGRMouse.motion(button: button, column: cell.column, row: cell.row,
+                                     modifiers: Self.mouseModifiers(of: event)))
     }
 
     /// The cell under the event, in grid coordinates. Also used by the
@@ -126,6 +143,7 @@ extension TerminalView {
     // MARK: - ⌘-hover link feedback (M4.6)
 
     override func mouseMoved(with event: NSEvent) {
+        reportMotion(event, button: nil)
         guard let controller = paneController else {
             super.mouseMoved(with: event)
             return

@@ -75,6 +75,40 @@ extension TerminalView {
         NSRange(location: 0, length: accessibilitySnapshot()?.text.utf16.count ?? 0)
     }
 
+    /// The attributed form of a range (`AXAttributedStringForRange`), which
+    /// `NSTextView` answers and VoiceOver asks for when it *speaks* a range
+    /// rather than navigates it. A screen reader with a correct
+    /// `AXSelectedTextRange` in hand still said "No selection." over a
+    /// six-line mouse selection until this existed (2026-09-19; TextEdit,
+    /// asked the same way, read its selection). The terminal has no text
+    /// attributes worth speaking — colour and bold are not semantics — so
+    /// the answer is the plain substring, attributed.
+    override func accessibilityAttributedString(for range: NSRange) -> NSAttributedString? {
+        Self.trace.notice("attributedString(for:) \(range.location, privacy: .public)+\(range.length, privacy: .public)")
+        guard let text = accessibilityString(for: range) else { return nil }
+        return NSAttributedString(string: text)
+    }
+
+    /// The character range containing a UTF-16 index (`AXRangeForIndex`):
+    /// the whole grapheme, so a client never lands between the units of an
+    /// astral emoji or splits a combining sequence.
+    override func accessibilityRange(for index: Int) -> NSRange {
+        guard let snapshot = accessibilitySnapshot() else { return NSRange(location: 0, length: 0) }
+        let full = snapshot.text as NSString
+        guard index >= 0, index < full.length else {
+            return NSRange(location: full.length, length: 0)
+        }
+        return full.rangeOfComposedCharacterSequence(at: index)
+    }
+
+    /// The run of uniform style around an index (`AXStyleRangeForIndex`).
+    /// The exposed text carries no attributes, so the whole line is one
+    /// run — a client stepping by style steps by line, which is what a
+    /// terminal's rows are.
+    override func accessibilityStyleRange(for index: Int) -> NSRange {
+        accessibilityRange(forLine: accessibilityLine(for: index))
+    }
+
     // MARK: - Cursor and selection
 
     override func accessibilitySelectedTextRange() -> NSRange {

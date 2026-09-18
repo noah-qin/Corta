@@ -100,18 +100,39 @@ jobs:
       # The other half of pinning the required lane: something still has to
       # find out that a newer SDK broke the build, and this is where finding
       # it out is a bug report rather than a blocked pull request.
-      - name: Select the newest installed Xcode
+      - name: Select and record the newest installed Xcode
+        id: toolchain
         run: |
-          latest=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
-          echo "Using $latest"
-          sudo xcode-select -s "$latest"
-          xcodebuild -version
-          swift --version
+          # Bundle versions, not path names: Xcode.app sorts after versioned
+          # bundles even when it contains an older compiler.
+          latest=$(python3 - <<'PYTHON'
+          import glob, plistlib, re
+          from pathlib import Path
+          candidates = []
+          for app in glob.glob('/Applications/Xcode*.app'):
+              with open(Path(app) / 'Contents/version.plist', 'rb') as source:
+                  info = plistlib.load(source)
+              version = tuple(int(n) for n in re.findall(r'\d+', info['CFBundleVersion']))
+              candidates.append((version, app))
+          print(max(candidates)[1])
+          PYTHON
+          )
+          export DEVELOPER_DIR="$latest/Contents/Developer"
+          echo "DEVELOPER_DIR=$DEVELOPER_DIR" >> "$GITHUB_ENV"
+          # Runner bundle names identify preview installs. Always retain the
+          # exact version/build as the authoritative identity.
+          channel=unspecified
+          case "$latest" in *[Bb]eta*|*[Rr][Cc]*) channel=preview ;; esac
+          scripts/record-toolchain.sh "$channel" | tee toolchain.txt
+          cat toolchain.txt >> "$GITHUB_STEP_SUMMARY"
 
       - name: Core build and test
-        run: swift test --package-path CortaTerminal
+        id: core
+        run: swift test --package-path CortaTerminal 2>&1 | tee core-toolchain.log
 
       - name: App build and test
+        id: app
+        if: ${{ !cancelled() && steps.toolchain.outcome == 'success' }}
         run: |
           xcodebuild test \
             -project Corta.xcodeproj \
@@ -123,13 +144,29 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             DEVELOPMENT_TEAM="" \
             -resultBundlePath NewestToolchain.xcresult \
-            -quiet
+            2>&1 | tee app-toolchain.log
 
-      - name: Keep the test results when the newer toolchain breaks something
-        if: failure()
+      - name: Summarize compatibility results
+        if: always()
+        env:
+          CORE_RESULT: ${{ steps.core.outcome }}
+          APP_RESULT: ${{ steps.app.outcome }}
+        run: |
+          printf '\nCore: %s\nApp: %s\n' "$CORE_RESULT" "$APP_RESULT" >> "$GITHUB_STEP_SUMMARY"
+          # Include deprecations without hiding the full build logs.
+          { grep -i 'deprecated' core-toolchain.log app-toolchain.log || true; } > deprecations.txt
+          cat deprecations.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep toolchain identity, diagnostics and test results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: xcresult-newest-toolchain
-          path: NewestToolchain.xcresult
+          path: |
+            toolchain.txt
+            core-toolchain.log
+            app-toolchain.log
+            deprecations.txt
+            NewestToolchain.xcresult
           if-no-files-found: ignore
           retention-days: 14

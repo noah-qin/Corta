@@ -824,6 +824,10 @@ class ViewController: NSViewController {
         view.isMouseReportingEnabled = { [weak self] in
             self?.mouseReportingEnabled() ?? false
         }
+        view.mouseTrackingMode = { [weak self] in
+            self?.session?.sgrMouseTrackingMode ?? .off
+        }
+        view.mouseOverrideModifier = ConfigurationStore.shared.configuration.mouseOverrideModifier
         view.onMouseBytes = { [weak self] bytes in
             self?.session.write(bytes)
         }

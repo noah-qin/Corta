@@ -73,6 +73,8 @@ public struct Terminal: Sendable {
 
     /// `?1006` — whether the child has asked for SGR-encoded mouse reports
     /// (M2.7).
+    public var mouseTrackingMode: MouseTrackingMode { performer.state.mouseTrackingMode }
+
     public var isSgrMouseEncodingEnabled: Bool { performer.state.sgrMouseEncodingEnabled }
 
     /// `?2026` — whether synchronized output is active (M4.3). While true

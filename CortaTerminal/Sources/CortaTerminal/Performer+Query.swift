@@ -57,6 +57,7 @@ extension Performer {
         case 1: return state.applicationCursorKeysEnabled ? 1 : 2
         case 1049: return grid.isAlternateScreenActive ? 1 : 2
         case 2004: return state.bracketedPasteEnabled ? 1 : 2
+        case 1000, 1002, 1003: return state.mouseTrackingMode.rawValue == mode ? 1 : 2
         case 1006: return state.sgrMouseEncodingEnabled ? 1 : 2
         case 2026: return state.synchronizedOutputEnabled ? 1 : 2
         case 1004: return state.focusReportingEnabled ? 1 : 2

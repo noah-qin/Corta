@@ -25,6 +25,7 @@ extension ViewController {
 
     @objc func configurationChanged() {
         let configuration = ConfigurationStore.shared.configuration
+        terminalView?.mouseOverrideModifier = configuration.mouseOverrideModifier
         // The font size goes through `setFontSize`, which is the same path
         // ⌘+/⌘− takes: it rebuilds the atlas, re-derives the cell box and
         // re-fits the window. A family change has to force that work even

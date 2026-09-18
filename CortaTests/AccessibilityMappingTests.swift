@@ -182,6 +182,29 @@ struct AccessibilityMappingTests {
         #expect(empty.accessibilitySelectedTextRanges() == [])
     }
 
+    /// The three range attributes `NSTextView` answers beyond the plain
+    /// string: the attributed form of a range (what VoiceOver asks for when
+    /// it speaks a selection), the grapheme around an index, and the style
+    /// run around an index — one row, since the text carries no styles.
+    @Test func rangeAttributesMatchNSTextViewsShape() {
+        let view = TerminalView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        var terminal = Self.terminal()
+        terminal.feed(Array("ab😀cd\r\nsecond".utf8))
+        let grid = terminal.grid
+        view.accessibilitySnapshotProvider = {
+            TerminalAccessibilitySnapshot(grid: grid, selection: nil)
+        }
+        #expect(view.accessibilityAttributedString(for: NSRange(location: 0, length: 4))?.string == "ab😀")
+        // Index 3 is the emoji's low surrogate; the range is the whole character.
+        #expect(view.accessibilityRange(for: 3) == NSRange(location: 2, length: 2))
+        #expect(view.accessibilityRange(for: 0) == NSRange(location: 0, length: 1))
+        // The style run around an index on the second row is that row.
+        let secondRow = view.accessibilityRange(forLine: 1)
+        #expect(view.accessibilityStyleRange(for: secondRow.location + 2) == secondRow)
+        // Past the end: an empty range at the end, not a crash.
+        #expect(view.accessibilityRange(for: 10_000).length == 0)
+    }
+
     // MARK: - Screen coordinates
 
     /// `accessibilityRange(for:)` is handed a **screen** point. Converting it

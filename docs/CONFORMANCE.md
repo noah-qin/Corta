@@ -43,7 +43,7 @@ measured. Priorities:
 | **CSI s / u (SCOSC/SCORC)** — cursor save/restore alias (B06) | P1 | Corta has no DECLRMM, so these are unconditional aliases for DECSC/DECRC, matching xterm without left/right margins |
 | **`?45` — reverse-wraparound mode** (B06) | P2 | `BS`/`CUB` cross onto the row above when it auto-wrapped into this one; off by default, matching xterm. Not DECBKM, which is the separate `?67` backarrow-key mode |
 | Bracketed paste (`?2004`)                               | P0   | A safety feature, not a convenience — see `SECURITY.md` §2.3 |
-| Mouse reporting (SGR, `?1006`)                          | P1   | Mouse inside tmux and vim                               |
+| Mouse reporting (`?1000`/`?1002`/`?1003`, SGR `?1006`) | P1 | Press/release, wheel, cell-coalesced drag and motion; configurable local-selection override |
 | Focus reporting (`?1004`)                               | P2   | Implemented; Neovim autoread and tmux focus events                |
 | OSC 8 — hyperlinks                                      | P2   | Implemented; display text and target may differ — see `SECURITY.md` §2.4 |
 | DCS and rare CSI sequences                              | P2   | The long tail                                           |

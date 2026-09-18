@@ -190,3 +190,25 @@ struct BellTests {
         #expect(!terminal.applicationKeypadEnabled)
     }
 }
+
+extension PrivateModeTests {
+    @Test func mouseTrackingIsIndependentOfEncodingAndLastEnabledWins() throws {
+        var terminal = Terminal()
+        terminal.feed(try Golden.decode("\\e[?1006h"))
+        #expect(terminal.mouseTrackingMode == .off)
+        for (mode, expected) in [(1000, MouseTrackingMode.normal), (1002, .buttonEvent), (1003, .anyEvent)] {
+            terminal.feed(Array("\u{1B}[?\(mode)h".utf8))
+            #expect(terminal.mouseTrackingMode == expected)
+            terminal.feed(Array("\u{1B}[?\(mode)$p".utf8))
+            #expect(terminal.takeOutput() == Array("\u{1B}[?\(mode);1$y".utf8))
+        }
+        terminal.feed(try Golden.decode("\\e[?1002l"))
+        #expect(terminal.mouseTrackingMode == .anyEvent)
+        terminal.feed(try Golden.decode("\\e[?1003l"))
+        #expect(terminal.mouseTrackingMode == .off)
+        #expect(terminal.isSgrMouseEncodingEnabled)
+        terminal.feed(try Golden.decode("\\e[?1002h\\ec"))
+        #expect(terminal.mouseTrackingMode == .off)
+        #expect(!terminal.isSgrMouseEncodingEnabled)
+    }
+}

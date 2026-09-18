@@ -314,3 +314,18 @@ struct ConfigurationStoreTests {
         var count = 0
     }
 }
+
+extension ConfigurationTests {
+    @Test func mouseOverrideRoundTripsAndRejectsUnsupportedValues() {
+        #expect(Configuration().mouseOverrideModifier == .option)
+        for modifier in Configuration.MouseOverrideModifier.allCases {
+            let (parsed, unknown) = Configuration.parse("mouse-override-modifier = \(modifier.rawValue)")
+            #expect(unknown.isEmpty)
+            #expect(parsed.mouseOverrideModifier == modifier)
+            #expect(Configuration.parse(parsed.serialized()).0 == parsed)
+        }
+        let (parsed, unknown) = Configuration.parse("mouse-override-modifier = command")
+        #expect(parsed.mouseOverrideModifier == .option)
+        #expect(!unknown.isEmpty)
+    }
+}
