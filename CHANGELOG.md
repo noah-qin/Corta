@@ -334,6 +334,14 @@ troubleshooting entry or a conformance note rather than a claim:
   `CONFORMANCE.md`'s real-program table had listed ECH as passing on the
   strength of programs that never send it; corrected. (2026-09-17
   interactive pass, G25.)
+- **An ssh exit could be classified before its stderr was read.**
+  `awaitExit` returned as soon as the child was reaped, but the pipe can
+  still hold ssh's last line at that moment, so a refused login was
+  occasionally reported as "ssh failed (exit 255)" with no diagnostics
+  instead of the authentication error that says the channel has no
+  terminal to prompt on. The wait now needs both the exit and the
+  drain's EOF. Caught by the regression test below on CI, where it
+  raced one run in several.
 - **The SFTP browser reported a refused login as "the connection was
   lost".** `SFTPConnection.openSession` reclassified a first-connect
   failure against the connection's *stored* channel, and nothing is stored
