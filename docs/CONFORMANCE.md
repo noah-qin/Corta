@@ -396,10 +396,12 @@ tab bar over the first row; a transparent frame on every window reopen;
 font zoom moving the titlebar instead of the bottom edge; Command History
 with no command text and no text search; the menu bar unlocalised in every
 language; the Bell picker showing the config-file word. Still open from
-that pass, honestly: ⌘, not opening Settings on the tester's machine (not
-reproduced here under Pinyin, with or without a composition open), and
-VoiceOver reading state that did not match the screen (one cause found —
-a dropped trailing `valueChanged` — but not confirmed by listening).
+that pass, honestly, and **not blocking 1.0.0** (the CHANGELOG's release
+notes list them): ⌘, not opening Settings on the tester's machine (not
+reproduced here under Pinyin, with or without a composition open; the
+menu item works), and VoiceOver reading state that did not match the
+screen (one cause found — a dropped trailing `valueChanged` — but not
+confirmed by listening).
 
 **System entry points (B16) are checked by hand, and the record says
 what was and was not.** A hotkey and a floating panel are properties of
