@@ -73,10 +73,12 @@ echo "window per scenario: ${window_secs}s at 1 sample/s"
 power_sampler="unavailable"
 power_note="powermetrics needs root and neither (a) running as root nor (b) passwordless sudo is available — power/wattage sampling is NOT RUN, recorded honestly as unavailable"
 if [ "$(id -u)" -eq 0 ]; then
-  power_sampler="powermetrics"
+  power_sampler="powermetrics"; power_note=""
 elif sudo -n true 2>/dev/null; then
-  power_sampler="sudo-powermetrics"
+  power_sampler="sudo-powermetrics"; power_note=""
 fi
+# The note is printed only when it is true — the first real run printed
+# "NOT RUN" beside a sampler that was, in fact, running.
 echo "sampler: $power_sampler ${power_note:+($power_note)}"
 echo
 
@@ -198,7 +200,7 @@ sleep 3
 flood_pid=""
 for t in $(pane_ttys); do yes > "/dev/$t" 2>/dev/null & flood_pid=$!; done
 sample_window "background-output-flood"
-[ -n "$flood_pid" ] && kill "$flood_pid" 2>/dev/null || true
+[ -n "$flood_pid" ] && { kill "$flood_pid" 2>/dev/null; wait "$flood_pid" 2>/dev/null; } || true
 set_minimized false
 sleep 2
 kill_app
@@ -236,7 +238,7 @@ def chunk(kind, payload):
     return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", zlib.crc32(kind + payload))
 ihdr = struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0)
 raw = b"".join(
-    b"\x00" + bytes([(x * 4) % 256, (y * 4) % 256, 192, 255] * w)
+    b"\x00" + b"".join(bytes([(x * 4) % 256, (y * 4) % 256, 192, 255]) for x in range(w))
     for y in range(h)
 )
 png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
