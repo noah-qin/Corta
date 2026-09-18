@@ -1,5 +1,7 @@
 # Decisions
 
+[Documentation index](README.md) · [Project overview](../README.md)
+
 The decisions that are settled, one per entry, in the shape of an
 architecture decision record: what was decided, why, and what it costs
 to reopen. `DESIGN.md` §2 carries the longer argument for the first

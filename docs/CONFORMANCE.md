@@ -1,5 +1,7 @@
 # Corta — Feature Conformance
 
+[Documentation index](README.md) · [Project overview](../README.md)
+
 What Corta must implement, in what order, and how completeness is
 measured. Priorities:
 
@@ -42,8 +44,8 @@ measured. Priorities:
 | **`?45` — reverse-wraparound mode** (B06) | P2 | `BS`/`CUB` cross onto the row above when it auto-wrapped into this one; off by default, matching xterm. Not DECBKM, which is the separate `?67` backarrow-key mode |
 | Bracketed paste (`?2004`)                               | P0   | A safety feature, not a convenience — see `SECURITY.md` §2.3 |
 | Mouse reporting (SGR, `?1006`)                          | P1   | Mouse inside tmux and vim                               |
-| Focus reporting (`?1004`)                               | P2   | Neovim autoread, tmux focus events; scheduled, M6.7                |
-| OSC 8 — hyperlinks                                      | P2   | Display text and target differ by design; see `SECURITY.md` §2.4. Scheduled, M6.8 |
+| Focus reporting (`?1004`)                               | P2   | Implemented; Neovim autoread and tmux focus events                |
+| OSC 8 — hyperlinks                                      | P2   | Implemented; display text and target may differ — see `SECURITY.md` §2.4 |
 | DCS and rare CSI sequences                              | P2   | The long tail                                           |
 
 ### 1.2 Query / response sequences
@@ -125,7 +127,7 @@ be **fixed-format and never echo attacker-controlled text** — see
 | Configurable key bindings                        | P1   |                                                    |
 | Click-to-position, drag-to-select                | P1   |                                                    |
 | ⌘-click to open a URL                            | P1   | Scheme allowlist required — `SECURITY.md` §2.4      |
-| Kitty keyboard protocol                          | P2   | Scheduled, M6.9                                        |
+| Kitty keyboard protocol                          | P2   | Implemented; progressive enhancement flags and protocol stack                                        |
 
 **B02 — Tab through a candidate UI.** The reported regression was Claude
 Code's slash-command Tab-completion not accepting the highlighted candidate
@@ -275,7 +277,7 @@ SHELL=/tmp/corta-esctest.sh Corta.app/Contents/MacOS/Corta
 ```
 
 **2026-09-17 result: 126 passed, 334 known bugs, 107 failed of 567 —
-81.1%.** Run on `main` after the interactive-pass fixes, against esctest2
+81.1% when passes and known bugs are combined; this is not a pass rate.** Run on `main` after the interactive-pass fixes, against esctest2
 `2798f12`. Against the 0.1.1 list the failures are a strict subset: 14
 tests now pass — B06's OSC 4/104 and 5/105 set/query/reset, SCORC, and
 the multi-column reverse-wraparound case — and none regressed. The suite
@@ -745,7 +747,7 @@ Power Mode). Recorded item by item, with what each one found:
   dash style; spaced units in durations) and one real defect surfaced:
   the close-confirmation title substituted English "this window"/"this
   pane"/"Corta" into every language (fixed, three keys, nine locales).
-  zh-Hans is now `translated` throughout; the other eight locales keep
+  zh-Hans is now `translated` throughout; the other seven non-English locales keep
   `needs_review` — the three new keys included — until a reader of each
   language goes through them.
 - **Touch ID under Secure Keyboard Entry — passes** (later the same

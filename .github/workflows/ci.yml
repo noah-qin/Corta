@@ -33,6 +33,15 @@ env:
 
 
 jobs:
+  docs:
+    name: Documentation links
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check local links and image assets
+        run: python3 scripts/check-docs.py
+
   core:
     name: Terminal core (SwiftPM)
     runs-on: macos-26

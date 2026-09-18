@@ -1,44 +1,36 @@
-## What this changes
+## Change
 
-<!-- One paragraph. What behaviour is different after this PR, and why. -->
+<!-- What problem does this solve, and what will a user or contributor observe? -->
 
-## Why
+## Related issue
 
-<!-- The reason, not the diff. If it fixes an issue, write "Fixes #123". -->
+<!-- Use "Fixes #123" only if this change fully resolves the issue. -->
 
-## Checklist
+## Verification
 
-- [ ] The commit messages follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/), in English, subject ≤ 72 characters (`CONTRIBUTING.md`).
-- [ ] `xcodebuild -project Corta.xcodeproj -scheme Corta test` passes.
-- [ ] `swift test --package-path CortaTerminal` passes.
-- [ ] This does not reopen a decision in `docs/DECISIONS.md`, or if it does, the PR edits that entry and says what the concrete new reason is.
-- [ ] Every user-visible change has an entry under `CHANGELOG.md` `[Unreleased]`.
-- [ ] A new or changed config key has its row in `docs/CONFIGURATION.md` §2 and, if it applies at a particular moment, §7.
-- [ ] A new user-facing string is in `Localizable.xcstrings` for all nine locales, non-English ones marked `needs_review` (`CONTRIBUTING.md` › Localization).
-- [ ] What was **not** verified — human-only checks, hardware you do not have, remote hosts — is listed below rather than left implied.
+<!-- List commands and results. For docs, include the link check and rendered review.
+     Choose relevant checks from docs/TESTING.md; remove inapplicable rows. -->
 
-## Not verified
+| Check | Result |
+| :--- | :--- |
+| | |
 
-<!-- List it. "Multi-display focus return was not tested; I have one display." An honest gap is a note for the reviewer, not a mark against the PR. -->
+## Limitations / not verified
 
-### If this touches the AppKit shell, the renderer or the window
+<!-- State missing hardware, human-only checks, skipped tests or known failures. -->
 
-- [ ] **Verified by launching the app**, not only by tests — `docs/CONFORMANCE.md` §4.4. Offscreen render tests cannot see view-hierarchy, orientation, startup-ordering or gesture defects.
+## Review checklist
 
-### If this touches the render loop or the hot path
+- [ ] The scope is focused and the title follows Conventional Commits in English.
+- [ ] Documentation and `[Unreleased]` reflect any user-visible change.
+- [ ] Relevant checks from `docs/TESTING.md` are recorded above.
+- [ ] Existing decisions in `docs/DECISIONS.md` are respected or updated with a reason.
 
-- [ ] **The frame-CPU baseline was re-measured** and is reported below. `docs/PERFORMANCE.md` has the method.
+<!-- Keep only the following checks that apply. -->
 
-```
-frame CPU before:
-frame CPU after:
-```
-
-### If this touches packaging, versions or the release workflow
-
-- [ ] `scripts/check-release.sh` still passes against a built app, and any new rule was added there — not in `package-release.sh`, `release.sh` or `release.yml`, which only call it.
-
-### If this touches the parser, the grid or anything reading PTY bytes
-
-- [ ] The fuzz corpus still replays clean: `corta-fuzz --fuzz 500000 --seed 1 CortaTerminal/Tests/Fuzz/corpus`.
-- [ ] No byte derived from terminal output is written back to the child's stdin (`docs/SECURITY.md` §6).
+- [ ] App / input / window changes: launched the app and completed the manual check in `docs/CONFORMANCE.md` §4.4.
+- [ ] Renderer / hot path: included comparable before/after frame-CPU measurements.
+- [ ] Parser / PTY input: added a focused regression and replayed the fuzz corpus; preserved the trust boundaries in `docs/SECURITY.md`.
+- [ ] Configuration: documented keys, defaults and when changes apply.
+- [ ] Localization: updated all nine locales and marked unreviewed translations `needs_review`.
+- [ ] Packaging: ran `scripts/check-release.sh` against the artifact; kept release rules in that script.

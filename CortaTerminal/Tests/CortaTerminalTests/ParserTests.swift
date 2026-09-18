@@ -26,7 +26,7 @@ struct RecordingPerformer: ParserPerformer {
     mutating func oscDispatch(_ bytes: ArraySlice<UInt8>) { actions.append(.osc(Array(bytes))) }
 }
 
-/// M1.8 and M1.9 — the VT500 state machine and its parameter caps.
+/// Verifies VT500 parser transitions and bounded parameter accumulation.
 ///
 /// The expectations follow Paul Williams' parser diagram
 /// (<https://vt100.net/emu/dec_ansi_parser>) and ECMA-48 §5.4, which defines

@@ -1,5 +1,7 @@
 # Troubleshooting
 
+[Documentation index](README.md) · [Project overview](../README.md)
+
 What to do when Corta will not install, will not start, or does something
 your previous terminal did not. Each entry says what you will see, why,
 and the fix — and the last section says how to go back to your old
@@ -18,8 +20,8 @@ If an entry here is wrong or missing, open an issue with the
 
 You have a build that is not notarised: one you built yourself, or a
 release the workflow produced without signing secrets (its release notes
-carry a warning box saying so). The signed release from
-<https://github.com/noah-qin/Corta/releases/latest> does not show this.
+carry a warning box saying so). Check the signing notes for the exact asset you downloaded on
+[GitHub Releases](https://github.com/noah-qin/Corta/releases).
 
 If you trust the build, clear the quarantine flag once:
 
@@ -29,7 +31,8 @@ xattr -dr com.apple.quarantine /Applications/Corta.app
 
 ### "Corta is damaged and can't be opened"
 
-The archive was altered or truncated in transit. Check it against the
+The archive may be incomplete, altered or rejected by macOS signature
+validation. First check it against the
 `.sha256` file published beside it:
 
 ```sh
@@ -38,7 +41,8 @@ shasum -a 256 -c Corta-<version>.zip.sha256
 
 A mismatch means download again. Every release archive is checked against
 its sidecar before it is published (`scripts/check-release.sh`), so a
-mismatch is the download, not the release.
+mismatch is a reason to stop and download again. If the checksum matches,
+include the release version and macOS error in your report.
 
 ### Corta offers to move itself to /Applications
 
@@ -224,7 +228,8 @@ check; the menu item always works.
 
 ## Going back to your old terminal
 
-Nothing Corta installs outlives it except what you asked for:
+Quit Corta before removing its files. Review managed remote-edit copies
+for unsaved work before deleting application data:
 
 1. **Shell integration**, if you installed it from Settings ▸ Terminal:
    remove it there, or delete the block between
@@ -237,7 +242,9 @@ Nothing Corta installs outlives it except what you asked for:
    out.
 3. **Settings and state**: `~/.config/corta/` (the config file) and
    `~/Library/Application Support/Corta/` (window arrangement, directory
-   history). Delete both to leave nothing behind.
+   history and managed remote-edit copies). Delete these only after keeping
+   any local edits you still need. The renderer also keeps disposable cache
+   files under `~/Library/Caches/dev.noahqin.Corta/`; these can be removed.
 4. Move `Corta.app` to the Trash.
 
 Then, if you are willing, open an issue with the **Went back to my old

@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M1.6 — the golden-file tests themselves.
+/// Specification-based regression cases for the terminal grid.
 ///
 /// Every expectation in `Golden/` is written by hand from the specification,
 /// and the `.in` file cites the behaviour it anchors. Nothing here is

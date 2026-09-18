@@ -1,19 +1,15 @@
 # Corta — Design
 
-> **Next-development scope (2026-09-10).** The active
-> [B01–B16 GitHub roadmap](https://github.com/noah-qin/Corta/milestone/1)
-> includes intelligent navigation, SSH/SFTP, modern macOS/Swift UI work and a
-> real Metal 4 backend. Built-in AI remains excluded; compatibility with
-> existing AI command-line tools is in scope. This supersedes conflicting
-> auxiliary-workflow restrictions below. Native macOS, the Swift terminal
-> core, correctness and explicit resource/security boundaries remain. Roadmap
-> entries describe planned work, not shipped capabilities; the milestones and
-> pre-M1 status below are historical design context.
+[Documentation index](README.md) · [Project overview](../README.md)
 
-A native macOS terminal emulator written in pure Swift. Optimised for
-performance, deliberately small in scope.
+A native macOS terminal emulator written in Swift, with an AppKit shell,
+Metal rendering and an independent terminal core.
 
-Status: **pre-M1** (project scaffold only).
+This document describes the development tree preparing 1.0.0. The B01–B16
+implementation batches have landed; public release availability is listed in
+[the README](../README.md#install). Historical milestone plans live in
+[history/](history/), and current limitations are listed in
+[Features](FEATURES.md#known-limits).
 
 ---
 
@@ -34,9 +30,8 @@ conflicts with a row here, the row wins.
 
 **The accepted core trade-off:** we write the VT parser ourselves. In
 exchange we get zero FFI, the tightest possible system integration, and a
-single-language codebase. Realistic cost is **6,000–10,000 lines** for a
-terminal that is correct for daily use — not the 3,000 that a first
-estimate suggests. The parser skeleton is small; the long tail is not.
+single-language codebase. The cost is maintaining protocol correctness,
+resource limits and a regression suite alongside the parser.
 
 ---
 
@@ -57,9 +52,8 @@ record that fact. This is required by three separate features:
   command inserts a spurious newline),
 - **Search** matching across a wrap boundary.
 
-The flag is mandatory in M1. The reflow *implementation* may land later;
-reflow of a large scrollback must be incremental or lazy, because a live
-window drag fires resize continuously.
+The flag is part of every line. Reflow of a large scrollback must be
+incremental or lazy, because a live window drag fires resize continuously.
 
 ### 2.2 The terminal core is not `@MainActor`
 
@@ -323,25 +317,10 @@ The two thread boundaries are the interesting part of this diagram:
 
 ## 5. Milestones
 
-| Milestone            | Done when                                                              |
-| -------------------- | ---------------------------------------------------------------------- |
-| **M1 — It runs**     | One window, a real shell, colour output, scrollback, scrolling         |
-| **M2 — No garbage**  | `vim`, `htop`, `tmux` render correctly (alt screen, scroll region, widths) |
-| **M3 — CJK & input** | IME composition and candidates correct, no width drift, bracketed paste |
-| **M4 — Modern**      | ⌘F search, font zoom, URL click, tabs                                  |
-| **M5 — Splits**      | Layout tree, focus routing, multi-viewport rendering                   |
-| **M6 — Polish & hardening** | Settings page, themes, notifications; query-response class closed (esctest score up), OSC 8, focus reporting, kitty keyboard, fuzzing; native macOS integration, notarized distribution |
-
-**M2 is the checkpoint.** Do not change scope, add features, or refactor
-the architecture before M2 is done. By M2 most of the learning value is
-banked and the decision to continue can be made honestly.
-
-If M2 takes more than ~3 months of part-time work, the cause is almost
-always scope creep (ligatures, transparency, a config system) rather than
-difficulty. The response is to cut scope, not to work harder.
-
-The test harness in `CONFORMANCE.md` §4 is built during **M1**, not
-later. Fixing the long tail without golden-file tests is misery.
+The original M1–M10 plan and its measurements are preserved in
+[the 0.1 roadmap](history/ROADMAP-0.1.md). The completed B01–B16 implementation
+batches are in the [v1 milestone](https://github.com/noah-qin/Corta/milestone/1).
+Neither is a list of remaining work; consult open issues for follow-up tasks.
 
 ---
 
@@ -360,68 +339,25 @@ Explicitly out of scope. Each has been considered and rejected.
 | Bidirectional text (RTL)                      | Large complexity, and a security footgun (see `SECURITY.md`) |
 | Terminal title *query* responses              | Command injection vector; see `SECURITY.md` §2.2            |
 
-A graphical settings UI was on this list until M6 planning reversed it:
-M6.1 adds one native settings page, kept honest by remaining a thin
-front over the single text config file.
+The native Settings window edits the same text configuration file as a
+manual edit; it is not a separate settings store.
 
 ### Deferred, not rejected
 
-Worth doing eventually, deliberately not in the M1–M6 path:
-
-- ~~**Kitty graphics protocol**~~ — shipped as M10: direct (base64,
-  in-band) transmission and placement in RGB, RGBA and PNG, exactly the
-  side table the M6.4 reassessment below predicted it would cost.
-  File-based transmission (`t=f`/`t=t`/`t=s` — the remote stream names a
-  local path to read) is not implemented and will not be: `SECURITY.md`
-  §1 assumes every PTY byte is hostile, and a stream that can make Corta
-  open an arbitrary local file is exactly what that threat model exists
-  to reject. Animation frames and Unicode placeholder ("virtual")
-  placement are also not implemented — real protocol features, out of
-  scope for a first pass rather than attempted badly.
-- ~~**Shell integration / OSC 133**~~ — shipped as M7.2: prompt and
-  exit-status marks on the line, command-to-command jumping, and an exact
-  long-task notification. It cost four sequences and a per-line mark, as
-  the M6.4 reassessment below predicted. Corta still ships no shell
-  snippets, so the marks appear only for a shell the user has configured
-  to emit them — the distribution half of the problem is open.
-
-The kitty keyboard protocol was on this list; it shipped as M6.9.
+- **Kitty graphics:** direct RGB, RGBA and PNG transmission and placement
+  are implemented. Animation and Unicode-placeholder placement remain out
+  of scope. File-based transmission is rejected because terminal output must
+  not cause arbitrary local files to be read; see [Security](SECURITY.md).
+- **Shell integration:** OSC 133 command boundaries and installable zsh
+  hooks are implemented. Bundled bash and fish hooks remain unavailable.
+- **Kitty keyboard:** implemented; see [Conformance](CONFORMANCE.md).
 
 #### M6.4 — the reassessment
 
-Both items were re-examined at the end of M6, as that step required.
-Neither moves into M6; both keep their place, and the ordering between
-them changed.
-
-**OSC 133 moves to the front, and now has a caller.** M6.3 shipped a
-long-task notification built on a heuristic — Return starts a task, an
-idle output stream ends it — because a terminal without shell
-integration cannot see command boundaries. That heuristic is the
-feature's whole weakness: it is off by default precisely because a
-command that pauses for two seconds mid-run gets an early notification.
-OSC 133 replaces the guess with a fact, and the same marks pay for jump
-to previous prompt, per-command duration and exit-code marks. It is the
-next thing to build, and it is small: four sequences and a per-line
-mark, no new rendering.
-
-The cost that stopped it being pulled into M6 is not the terminal side.
-It is that the marks only exist if the user's shell emits them, which
-means shipping and installing shell snippets for zsh, bash and fish —
-distribution work, and M6.16 shows distribution is not yet solved.
-
-**The kitty graphics protocol stayed deferred through M6-M8, and shipped
-as M10.** The M6 estimate — a placement side table keyed by document
-position, plus a second texture path — held: `ImagePlacementTable`
-(`CortaTerminal/Sources/CortaTerminal/ImagePlacementTable.swift`) is
-exactly that table, addressed by document row the same way
-`TerminalSelection` is, and images draw through the existing color quad
-pipeline (`Corta/Renderer/KittyImageRenderer.swift`) rather than a third
-one — a placed image is geometrically a rect, which the instanced-quad
-path already draws. What the M6 estimate did not anticipate: reflow
-across a column resize is not attempted — a resize drops every live
-placement rather than re-wrapping image geometry, on the reasoning that
-a wrongly-positioned image is worse than a missing one that a client can
-re-place without re-transmitting (`ImagePlacementTable`'s doc comment).
+The original ordering decision is recorded in [the roadmap](history/ROADMAP-0.1.md).
+The resulting graphics implementation uses `ImagePlacementTable` and the
+existing colour-quad pipeline. Column resize discards live image placements
+rather than reflowing image geometry; clients can place retained images again.
 
 ---
 

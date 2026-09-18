@@ -39,7 +39,7 @@ body:
     id: version
     attributes:
       label: Corta version or commit
-      description: "`git rev-parse --short HEAD` of the build you tested."
+      description: "Use Corta ▸ About Corta, or `git rev-parse --short HEAD` for a source build."
     validations:
       required: true
 
@@ -64,4 +64,4 @@ body:
     id: extra
     attributes:
       label: Anything else
-      description: Screenshots, a screen recording, your `~/.config/corta/config`, the shell and program you were running.
+      description: Relevant screenshots, configuration, shell and program versions. Remove tokens, hostnames and other private data before attaching logs or config.

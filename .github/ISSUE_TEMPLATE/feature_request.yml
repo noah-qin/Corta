@@ -8,15 +8,15 @@ body:
         Corta is deliberately small. `docs/DESIGN.md` §6 lists what has already
         been considered and rejected — a built-in multiplexer, cross-platform
         support, tmux control mode, AI features, RTL text and terminal title
-        query responses. Requests for those are closed with a pointer to the
-        reason, so please check first.
+        query responses. Please read the design rationale first. If new evidence changes a
+        trade-off, describe it along with the workflow you want to improve.
 
   - type: checkboxes
     id: read-non-goals
     attributes:
       label: Prerequisite
       options:
-        - label: I have read the non-goals in `docs/DESIGN.md` §6 and this is not one of them.
+        - label: I have read the non-goals in `docs/DESIGN.md` §6 and explained any proposed change to them.
           required: true
 
   - type: textarea

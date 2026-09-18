@@ -1,5 +1,7 @@
 # Corta — Performance
 
+[Documentation index](README.md) · [Project overview](../README.md)
+
 Performance is the first priority (`DESIGN.md` §1). This document states
 the targets, the rules that protect them, and how they are measured.
 
@@ -560,11 +562,12 @@ distribution.)
 
 ### 5.6 The 1.0.0 run (2026-09-18)
 
-Every number the README quotes for 1.0.0, taken on `main` at the release
-commit. One deviation from §5.2, stated rather than hidden: the machine
-was on **battery**, not mains. Everything else held — Release build for
-the app-side numbers, built-in panel at native scale, system monospaced
-12 pt, 120×30 one pane, nothing else in the foreground.
+Measurements for the 1.0.0 development tree on `main`. The initial
+benchmark session ran on **battery**, unlike the mains baseline in §5.2.
+The later keypress and energy runs used AC; their rows state this explicitly.
+App measurements use Release builds unless labelled Debug. Pane counts and
+grid sizes vary by workload and are recorded below; these are not all
+measurements of one fixed configuration.
 
 | Variable | Value |
 | --- | --- |

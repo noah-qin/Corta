@@ -4,6 +4,55 @@ Thanks for taking the time to contribute! This document describes the
 conventions this repository follows. They apply to every contributor —
 human or AI assistant.
 
+## Start here
+
+Small, focused contributions are welcome: improve a confusing instruction,
+reduce a terminal bug to a byte sequence, review a translation in context,
+or add a regression test. For substantial work, discuss the scope on an issue
+first so contributors do not duplicate effort.
+
+1. Fork and clone the repository, then create a branch for your change.
+2. Install Xcode with Swift 6.2 or later on macOS 26.0 or later.
+3. Run `swift test --package-path CortaTerminal` for a first core check.
+4. Open `Corta.xcodeproj` to work on the app. It resolves Sparkle on the
+   first build. For builds without a developer account, use the ad-hoc
+   signing flags in [Testing](docs/TESTING.md).
+5. Run the checks relevant to the change and open a pull request against
+   `main`, including results and anything you could not verify.
+
+## Repository map
+
+| Path | Responsibility |
+| :--- | :--- |
+| `Corta/` | AppKit shell, input, configuration, fonts and Metal renderer |
+| `CortaTerminal/Sources/CortaTerminal/` | Parser, grid, PTY, search and terminal protocols |
+| `CortaTerminal/Tests/` | Core tests, golden fixtures and fuzz corpus |
+| `CortaTests/`, `CortaUITests/` | App-hosted tests and interactive UI tests |
+| `docs/` | User guides, architecture and verification evidence |
+| `scripts/`, `.github/` | Benchmarks, packaging and continuous integration |
+
+## Tests and documentation
+
+[Testing](docs/TESTING.md) maps each change to its checks. Documentation-only
+changes need documentation checks and a rendered review; they do not require
+launching the app. App-layer changes do. Changes to the render loop also need
+a measured frame-CPU baseline.
+
+Keep public guides in English and use relative links within the repository.
+Document defaults, units, prerequisites and limitations alongside examples.
+Keep release snapshots dated; do not present planned behaviour as shipped.
+Historical records under `docs/history/` retain their original findings.
+
+Use `///` comments for API contracts: units, coordinate systems, ownership,
+threading and failure behaviour. Use `//` for a non-obvious implementation
+reason or invariant. Avoid narrating the code or using a milestone number as
+the only explanation. Test names should describe observable behaviour and
+fixture comments should identify the rule being checked.
+
+```sh
+python3 scripts/check-docs.py
+```
+
 ## Commit Messages
 
 Corta follows [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/).
@@ -110,35 +159,21 @@ Before writing a commit, work through this checklist:
 
 ## Localization
 
-Every user-facing string lives in `Corta/Localizable.xcstrings` (a String
-Catalog — English is `sourceLanguage`; the app currently ships zh-Hans,
-zh-Hant, ja, ko, de, fr, es and pt-BR alongside it). Two things about a
-translation's state are worth knowing before touching this file:
+User-facing strings live in `Corta/Localizable.xcstrings`. English is the
+source language; the other locales are zh-Hans, zh-Hant, ja, ko, de, fr, es
+and pt-BR.
 
-- **`"state": "needs_review"`** on a non-English localization means what
-  Xcode's own String Catalog editor takes it to mean: this text has not
-  been checked by a native speaker in context, whatever produced it
-  (currently: an AI assistant, for every non-English string in the file
-  as of B10 — `docs/history/ROADMAP-0.1.md`'s B10 entry; zh-Hans was
-  then read string by string against its place in the UI on 2026-09-18,
-  at the maintainer's request and by the same assistant, and is marked
-  `translated` on that basis — `docs/CONFORMANCE.md` §4.6 records what
-  the review changed). It is not a placeholder and
-  not broken; it ships and reads correctly to Corta at runtime exactly
-  like `"translated"` — the state is an editorial marker, not a build
-  gate. Adding a string keeps this pattern: write the English value,
-  translate the rest as best available, mark the non-English entries
-  `needs_review`.
-- **`"state": "translated"`** on a non-English localization is a claim
-  that a native speaker has actually read it in Corta, in context — the
-  same bar `CLAUDE.md` sets for offering a theme or a font: "passing a
-  mechanical check is not the same claim." Flipping a string to
-  `translated` is the review; there is no separate log to update.
+For a new string, provide the English source, preserve format specifiers in
+translations, and mark unreviewed non-English entries `needs_review`. This
+state is an editorial marker: the translation still ships at runtime.
 
-A language with no native-speaker reviewer available stays
-`needs_review` indefinitely rather than being guessed into
-`translated` — an unreviewed language marked honestly is more useful
-than one that looks done and is not.
+Prefer a native speaker's review in the running app before marking a
+translation `translated`. The current zh-Hans catalog is an explicit
+exception: it was marked `translated` after an assistant review on
+2026-09-18, not a native-speaker sign-off. That record is in
+[Conformance §4.6](docs/CONFORMANCE.md#46-manual-scenario-pass).
+Do not infer native-speaker verification from catalog state alone; describe
+the reviewer and scope in the PR, and record any human-only gaps.
 
 ## Branches
 
@@ -150,7 +185,8 @@ than one that looks done and is not.
 - The PR title follows the same Conventional Commits format as a subject
   line.
 - Describe the motivation and how you verified the change.
-- Make sure `CortaTests` and `CortaUITests` pass before requesting review.
+- Run the applicable checks in [Testing](docs/TESTING.md) before requesting review;
+  list skipped or unavailable checks explicitly.
 - A template is filled in for you when you open the PR. The three
   conditional sections are not decoration: app-layer changes are verified
   by launching the app, render-loop changes report a re-measured frame-CPU

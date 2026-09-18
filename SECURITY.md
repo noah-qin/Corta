@@ -10,9 +10,11 @@ that follow from it are in [`docs/SECURITY.md`](docs/SECURITY.md).
 
 ## Supported versions
 
-Corta has not had a tagged release yet. Until it does, the supported version
-is **the tip of `main`**. Please reproduce against a fresh build of `main`
-before reporting.
+Report vulnerabilities in the latest published release or the development
+branch, `main`. Include the exact version or commit. Older releases do not
+have a separate maintenance branch; fixes are delivered in a new release.
+If you can safely reproduce against `main`, include that result, but do not
+delay a report to do so.
 
 ## Reporting a vulnerability
 

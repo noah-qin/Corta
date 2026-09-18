@@ -3,7 +3,8 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M1.6 — the golden-file harness (`CONFORMANCE.md` §4.1).
+/// Decodes terminal fixtures and compares grid dumps with reviewed expectations.
+/// See `docs/TESTING.md` for fixture authoring and update rules.
 ///
 /// A case is two files in `Golden/`:
 ///

@@ -1,5 +1,7 @@
 # Configuration
 
+[Documentation index](README.md) · [Project overview](../README.md)
+
 Every setting Corta has, in the one file that holds them:
 `~/.config/corta/config`.
 

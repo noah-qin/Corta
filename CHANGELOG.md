@@ -10,9 +10,17 @@ what to edit.
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- Reorganized the project overview, feature reference and contributor guide;
+  clarified public release availability and the interpretation of conformance results.
+- Added a testing guide and automated checks for local documentation links,
+  with streamlined GitHub contribution templates.
 
 ## [1.0.0] - 2026-09-18
+
+**Prepared on `main`; not yet tagged or publicly released.** The date above
+is the preparation date and must be updated when the release is published.
 
 The v1.0.0 milestone: the sixteen ordered batches `B01`–`B16` that took
 Corta from a quality release to a terminal with explicit session and
@@ -1112,7 +1120,9 @@ For the maintainer, cutting any release:
    `VersionAgreementTests` fails if the marketing version and the core
    constant disagree, or if the build number is one a 0.1.0 install could
    not be offered.
-3. Re-record the tracking table in `docs/history/ROADMAP-0.1.md` if any number moved.
+3. Record current measurements in `docs/PERFORMANCE.md` and test results in
+   `docs/CONFORMANCE.md`; preserve dated historical snapshots. Update the
+   README download instructions and release links after publication.
 4. Commit as `chore: release x.y.z`, then tag `vx.y.z` and push the tag.
    The release workflow builds from the tag and opens a **draft** release
    for review — it is never published automatically.
@@ -1121,7 +1131,7 @@ For the maintainer, cutting any release:
    push that file — that is what makes the update visible to every
    already-installed Corta.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/noah-qin/Corta/releases/tag/v1.0.0
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v0.1.1...main
+[1.0.0]: https://github.com/noah-qin/Corta/milestone/1
 [0.1.1]: https://github.com/noah-qin/Corta/releases/tag/v0.1.1
 [0.1.0]: https://github.com/noah-qin/Corta/releases/tag/v0.1.0

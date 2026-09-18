@@ -2,13 +2,21 @@
 ///
 /// This is the unit a golden test feeds and a viewport renders
 /// (`DESIGN.md` §2.4) — no singletons, no window, no PTY. `TerminalSession`
-/// adds the PTY around it in M1.19.
+/// owns the child process and synchronizes access to this value.
 ///
-/// Nonisolated: it runs on the reader thread (`DESIGN.md` §2.2).
+/// This value has no actor isolation. Callers sharing mutable terminal state
+/// must synchronize access; `TerminalSession` provides that boundary.
 public struct Terminal: Sendable {
     private var parser = Parser()
     private var performer: Performer
 
+    /// Creates an empty terminal with bounded scrollback and command history.
+    ///
+    /// - Parameters:
+    ///   - rows: Initial number of visible grid rows.
+    ///   - columns: Initial number of cells in each visible row.
+    ///   - scrollbackLimit: Maximum retained history rows above the screen.
+    ///   - commandHistoryLimit: Maximum retained shell-integration command records.
     public init(
         rows: Int = 24,
         columns: Int = 80,
@@ -21,7 +29,7 @@ public struct Terminal: Sendable {
         self.performer.state.commandRecords = CommandRecordStore(capacity: commandHistoryLimit)
     }
 
-    /// B08 — retention control distinct from `reset()`'s scrollback clear:
+    /// Retention control distinct from `reset()`'s scrollback clear:
     /// a session's structured command history can be emptied on its own,
     /// the same way `DirectoryHistoryStore.clear()` is independent of
     /// clearing the visible scrollback.
@@ -35,7 +43,7 @@ public struct Terminal: Sendable {
         set { performer.grid = newValue }
     }
 
-    /// U11 — a full reset, as `RIS` (`ESC c`) performs it: modes, screens,
+    /// A full reset, as `RIS` (`ESC c`) performs it: modes, screens,
     /// tab stops, title, cursor, the screen and the scrollback. Exposed so
     /// the app can offer "Reset Terminal" without writing a control sequence
     /// to the child's *input*, which is a channel reserved for what the user

@@ -1,5 +1,7 @@
 # Corta — Security Model
 
+[Documentation index](README.md) · [Project overview](../README.md)
+
 A terminal emulator is a program that renders **untrusted input with
 full user privileges**. Every byte it parses may come from a hostile
 source: a crafted filename, a malicious repository's `git log`, the

@@ -21,6 +21,28 @@ never writes stream-supplied text back to the child. The fuzz harness
 Start with <doc:Pipeline> to see where a byte goes, then read the symbols
 in the order the pipeline names them.
 
+## Try the core
+
+Create a terminal, feed bytes, and inspect its grid without starting a child
+process or opening a window:
+
+```swift
+import CortaTerminal
+
+var terminal = Terminal(rows: 4, columns: 20)
+terminal.feed(Array("Hello, Corta!\r\n".utf8))
+print(terminal.dump())
+```
+
+Keep the same value across chunks: a UTF-8 character or escape sequence can
+span several reads. Use ``TerminalSession`` when a real PTY and child process
+are needed. Sharing mutable terminal state requires synchronization; the
+core's lack of actor isolation does not make concurrent mutation safe.
+
+From the repository root, run `swift test --package-path CortaTerminal` to
+exercise the core. The repository's `docs/TESTING.md` explains golden fixtures,
+fuzzing and app-level verification.
+
 ## Topics
 
 ### The pipeline

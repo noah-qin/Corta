@@ -37,14 +37,14 @@ let package = Package(
             dependencies: ["CortaTerminal"],
             swiftSettings: [.defaultIsolation(nil)]
         ),
-        // M1.21's baseline: parse throughput and scrollback memory,
+        // Baseline measurements: parse throughput and scrollback memory,
         // measured, not estimated. Run with `-c release` for real numbers.
         .executableTarget(
             name: "corta-bench",
             dependencies: ["CortaTerminal"],
             swiftSettings: [.defaultIsolation(nil)]
         ),
-        // M6.11 — the libFuzzer harness over the feed path. Built with
+        // Fuzz harness over the terminal feed path. Built with
         // `-Xswiftc -sanitize=fuzzer` it is a fuzz target; built plainly it
         // replays files named on the command line, so a crashing input can
         // be reproduced and the checked-in corpus can run in CI without a
