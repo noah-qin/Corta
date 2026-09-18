@@ -550,6 +550,44 @@ percentile distribution.)
 
 ---
 
+### 5.6 The 1.0.0 run (2026-09-18)
+
+Every number the README quotes for 1.0.0, taken on `main` at the release
+commit. One deviation from §5.2, stated rather than hidden: the machine
+was on **battery**, not mains. Everything else held — Release build for
+the app-side numbers, built-in panel at native scale, system monospaced
+12 pt, 120×30 one pane, nothing else in the foreground.
+
+| Variable | Value |
+| --- | --- |
+| Machine | MacBook Air, Apple M5, built-in 2560×1664 Retina panel |
+| macOS | 27.0 (26A428) |
+| Xcode / Swift | 27.0 (27A266a) / 6.3.3; language mode 6; deployment target 26.0 |
+| Power | Battery (§5.2 asks for mains — a re-run on mains is what would make this a clean before/after against the M6 and 0.1.1 rows) |
+
+| Metric | 1.0.0 | How |
+| --- | --- | --- |
+| Core feed throughput | **144.2 MiB/s** (5-run mean; 141.2–146.6) | `corta-bench`, `-c release` |
+| Parser-only / parser + grid | 806.3 / 166.9 MiB/s | same run |
+| Memory @ 100k × 120 lines | **185.0 MB** (resident 141.9 → 326.9 MB) | `corta-bench` |
+| Keypress → grid (core side) | p50 0.014 / p95 0.018 / p99 0.020 ms, 2000 samples, 0 timed out | `corta-bench`; excludes vsync and display |
+| Frame CPU, 120×40 full rebuild, Debug | **2.26 ms** avg (3 runs: 2.31 / 2.26 / 2.20; p95 5.4–5.6) | `FrameCPUBaselineTests`, the same measure as every milestone row |
+| Live frame CPU, Release, 2 panes flooded | avg 0.60 ms, p50 0.38, p99 2.59 | `scripts/measure-app-baseline.sh`, `CORTA_RENDER_METRICS` ring |
+| Live frame CPU, Release, 4 panes flooded | avg 0.14–0.49 ms, p99 0.38–0.45 | same |
+| GPU, 2 / 4 panes flooded | avg 0.49 / 0.47 ms | same |
+| Idle CPU, Release, 20 s | **0.05%**; occluded (minimised) 0.0–0.1% | same script |
+| Launch → first window | 208 ms (2-pane restore), 451 ms (4-pane restore) | same script |
+| Spawn: `zsh -l` → first output | p50 44.5 ms | `corta-bench` |
+| Reflow, 100k lines, 120 → 80 columns | 94.1 ms | `corta-bench` |
+| Search, 100k lines, one query | ~395 ms warm, 100 000 matches | `corta-bench` |
+| Keypress → pixel (end to end) | **not re-measured** — needs Typometer, a person and mains; 0.1.1's 57.8 ms avg stands | — |
+| Energy | **not run** — `scripts/measure-energy.sh` needs a sudo-capable session | — |
+
+The one-pane flood's render-metrics ring did not fill inside the
+script's 20 s window on this run (the 2- and 4-pane rings did), so the
+one-pane live frame number is absent rather than copied from the
+Debug-build baseline above.
+
 ## 6. B11 — CPU, locking and memory hot-path pass (2026-09-13)
 
 **Locking.** `TerminalSession` already carries exactly one hot-path lock

@@ -1021,13 +1021,13 @@ security rules in `SECURITY.md` §6.
 Fill these in at each milestone. `PERFORMANCE.md` §1 has the targets.
 Trends matter more than absolute values.
 
-| Metric                    | M1     | M2 | M3 | M4 | M5 | M6 | 0.1.1 |
-| ------------------------- | ------ | -- | -- | -- | -- | -- | ----- |
-| Core feed throughput (MiB/s) | 109.9 | 80.0 | 80.8 | 75.5 | 76.7 | 130.0 (5-run mean) | — |
-| Frame CPU (ms)            | 1.67   | 1.72 | 2.32 | 2.26 | 2.40 | 2.32 | — |
-| Idle CPU (%)              | ~4     | ~0   | ~0   | ~0   | ~0   | 0.0 | — |
-| Memory @ 100k lines (MB)  | 265.7  | 265.7 | 265.7 | 184.6 | 184.6 | 185.0 | — |
-| Keypress → pixel (ms)     | —      | —    | —    | —    | —    | 45.5 avg / 24.8 min / 56.4 max / 6.8 SD | 57.8 avg / 45.3 min / 78.9 max / 5.6 SD |
+| Metric                    | M1     | M2 | M3 | M4 | M5 | M6 | 0.1.1 | 1.0.0 (battery; `PERFORMANCE.md` §5.6) |
+| ------------------------- | ------ | -- | -- | -- | -- | -- | ----- | ----- |
+| Core feed throughput (MiB/s) | 109.9 | 80.0 | 80.8 | 75.5 | 76.7 | 130.0 (5-run mean) | — | 144.2 (5-run mean) |
+| Frame CPU (ms)            | 1.67   | 1.72 | 2.32 | 2.26 | 2.40 | 2.32 | — | 2.26 (3-run mean) |
+| Idle CPU (%)              | ~4     | ~0   | ~0   | ~0   | ~0   | 0.0 | — | 0.05 |
+| Memory @ 100k lines (MB)  | 265.7  | 265.7 | 265.7 | 184.6 | 184.6 | 185.0 | — | 185.0 |
+| Keypress → pixel (ms)     | —      | —    | —    | —    | —    | 45.5 avg / 24.8 min / 56.4 max / 6.8 SD | 57.8 avg / 45.3 min / 78.9 max / 5.6 SD | — (not re-measured) |
 | `esctest` pass rate (%)   | —      | 8.8 (50/568) | 8.8 (50/568) | 8.8 (50/568, M3 carry) | 8.8 (M3 carry) | 18.7 (106/568) | 19.7 (112/568) |
 | `esctest` xterm-compat (%)| —      | 67.6 | 67.6 | 67.6 | 67.6 | 77.6 | 78.7 |
 | Core LOC                  | 2,547  | 3,972 | 4,247 | 4,908 | 4,959 | 5,884 | — |
