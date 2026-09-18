@@ -748,9 +748,15 @@ Power Mode). Recorded item by item, with what each one found:
   zh-Hans is now `translated` throughout; the other eight locales keep
   `needs_review` — the three new keys included — until a reader of each
   language goes through them.
-- **Touch ID under Secure Keyboard Entry — not judged.** sudo on the
-  test machine is not configured for `pam_tid`, so there was nothing to
-  press.
+- **Touch ID under Secure Keyboard Entry — passes** (later the same
+  evening, after the tester enabled `pam_tid.so` through
+  `/etc/pam.d/sudo_local`). `sudo -k; sudo true` in an ordinary window
+  with the titlebar lock showing: the Touch ID prompt appears and the
+  command passes on a fingerprint; cancelling the prompt with Esc falls
+  back to `Password:` and the typed password is accepted; the same in
+  the Quick Terminal panel; and with Secure Keyboard Entry switched off
+  as the control. Secure input does not interfere with the Touch ID
+  sheet or with the password fallback.
 - **Low Power Mode — measured**, `PERFORMANCE.md` §5.6's second energy
   table. Thermal pressure stays not judged: forcing it means holding the
   machine at full load for a long time, which nothing here should do.
