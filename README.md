@@ -19,7 +19,7 @@ first-class CJK input, and a terminal core with zero third-party dependencies.
 [![Contributors](https://img.shields.io/github/contributors/noah-qin/Corta?style=flat-square)](https://github.com/noah-qin/Corta/graphs/contributors)
 [![Sponsors](https://img.shields.io/github/sponsors/noah-qin?style=flat-square)](https://github.com/sponsors/noah-qin)
 
-[**Download Corta 0.1.1**](https://github.com/noah-qin/Corta/releases/latest) ·
+[**Download Corta 1.0.0**](https://github.com/noah-qin/Corta/releases/latest) ·
 [Roadmap](https://github.com/noah-qin/Corta/milestone/1) ·
 [Report a bug](https://github.com/noah-qin/Corta/issues/new?template=bug_report.yml)
 
@@ -71,9 +71,9 @@ things Corta deliberately does **not** do.
 
 ## Status
 
-**Version 0.1.1, with the v1.0.0 roadmap complete on `main`.** Corta
-renders `vim`, `tmux` and `htop` correctly and is used daily by its author.
-Since 0.1.1 the sixteen ordered roadmap batches (`B01`–`B16`) have landed:
+**Version 1.0.0.** Corta renders `vim`, `tmux` and `htop` correctly and
+is used daily by its author. Between 0.1.1 and 1.0.0 the sixteen ordered
+roadmap batches (`B01`–`B16`) landed:
 keyboard, IME and focus routing; explicit session lifecycle and input
 backpressure; anchored scrollback and selection; responsive search and
 export; terminal-conformance gaps; shell integration and command-level
@@ -257,17 +257,23 @@ a feature request for one of them.
   names the key cap, not what your input source types there.
 - **Remote editing** is over `sftp` with a managed local copy; there is no
   in-terminal editor and no sync of anything you did not open.
+- **Two reports from the 1.0.0 test pass are open, not blocking:** one
+  tester's ⌘, did not open Settings (not reproduced; the menu item
+  works), and VoiceOver was once heard reading state the screen had
+  moved past (one cause fixed, not re-listened). Both are in
+  [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) and the
+  [`CHANGELOG`](CHANGELOG.md) rather than hidden.
 
 ## Install
 
-Corta 0.1.1 requires **macOS 26.0 or later**. Download the signed and
-notarised `Corta-0.1.1.zip` and its SHA-256 file from the
+Corta 1.0.0 requires **macOS 26.0 or later**. Download the signed and
+notarised `Corta-1.0.0.zip` and its SHA-256 file from the
 [latest GitHub release](https://github.com/noah-qin/Corta/releases/latest),
 check the archive, unzip it, and move `Corta.app` to `/Applications`:
 
 ```sh
-shasum -a 256 -c Corta-0.1.1.zip.sha256
-unzip Corta-0.1.1.zip && mv Corta.app /Applications/
+shasum -a 256 -c Corta-1.0.0.zip.sha256
+unzip Corta-1.0.0.zip && mv Corta.app /Applications/
 ```
 
 Every release archive is checked before it is published — versions, build
@@ -329,7 +335,7 @@ CortaTerminal/.build/release/corta-fuzz --fuzz 500000 --seed 1 \
 To package a build the way a release is packaged:
 
 ```sh
-scripts/package-release.sh path/to/Corta.app 0.1.1 dist
+scripts/package-release.sh path/to/Corta.app 1.0.0 dist
 ```
 
 ## Roadmap

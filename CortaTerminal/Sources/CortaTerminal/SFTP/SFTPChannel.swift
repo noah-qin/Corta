@@ -170,6 +170,13 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
     /// without bound if ssh is verbose.
     private static let diagnosticsLimit = 64 * 1024
     private let diagnostics = Mutex(Data())
+    /// Set once the stderr drain has read EOF — the moment `diagnostics`
+    /// is complete. A reaped exit is not that moment: the pipe can still
+    /// hold ssh's last line when `waitpid` returns, and a classification
+    /// read before the drain caught up saw exit 255 with empty
+    /// diagnostics — `.subprocessFailed` where `.authenticationFailed` was
+    /// the truth (CI, one run in several).
+    private let stderrDrained = Mutex(false)
 
     /// What the child wrote to stderr so far (bounded tail).
     public var diagnosticOutput: String {
@@ -190,9 +197,14 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
     /// Polls the non-blocking reap, so a live child is never disturbed.
     public func awaitExit(timeout: Duration = .seconds(2)) -> ChildExit? {
         let deadline = ContinuousClock.now + timeout
+        var exit: ChildExit?
         while true {
-            if let exit = reap(blocking: false) { return exit }
-            if ContinuousClock.now >= deadline { return state.withLock { $0.exit } }
+            if exit == nil { exit = reap(blocking: false) }
+            // Both the exit *and* the end of stderr: the diagnostics the
+            // classification reads are not complete until the drain has
+            // seen EOF, which the child's exit does not guarantee.
+            if exit != nil, stderrDrained.withLock({ $0 }) { return exit }
+            if ContinuousClock.now >= deadline { return exit ?? state.withLock { $0.exit } }
             Thread.sleep(forTimeInterval: 0.01)
         }
     }
@@ -323,6 +335,7 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
                 Darwin.read(stderrRead, buffer.baseAddress, buffer.count)
             }
             guard count > 0 else {
+                self.stderrDrained.withLock { $0 = true }
                 stderrSource.cancel()
                 return
             }

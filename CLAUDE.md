@@ -3,10 +3,12 @@
 A native macOS terminal emulator in pure Swift. Metal rendering, Core
 Text shaping, AppKit shell, a hand-written VT parser.
 
-**Status: 0.1.1 is the shipped release; every batch of the v1.0.0
-roadmap (`B01`–`B16`) has landed on `main`.** `CHANGELOG.md`'s
-`[Unreleased]` section is the record of what has landed since 0.1.1, and
-the next release is cut from it. Compatibility with AI command-line tools
+**Status: 1.0.0 is cut on `main` — versions bumped, `CHANGELOG.md`
+`[1.0.0]` written — and awaits the maintainer's tag, the draft release
+and the appcast signing (`CHANGELOG.md` › Release checklist, steps 4–5).**
+Every batch of the v1.0.0 roadmap (`B01`–`B16`) is on `main`.
+`CHANGELOG.md`'s `[Unreleased]` section is the record of what lands
+after it. Compatibility with AI command-line tools
 is terminal correctness; built-in AI is a non-goal. A roadmap issue is
 planned work, not a shipped capability, and never relaxes correctness,
 resource limits or the explicit execution boundaries in `docs/SECURITY.md`.

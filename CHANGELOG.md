@@ -10,6 +10,43 @@ what to edit.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [1.0.0] - 2026-09-18
+
+The v1.0.0 milestone: the sixteen ordered batches `B01`–`B16` that took
+Corta from a quality release to a terminal with explicit session and
+input semantics, shell integration and command-level navigation, one
+configuration file for everything, a real Metal 4 backend, remote
+context with SFTP and remote editing, the packaging and documentation
+of an open-source project, and system entry points. esctest2:
+126 passed, 334 known bugs, 107 failed of 567 (81.1%), every failure a
+subset of 0.1.1's.
+
+**Known and open at this release, not blocking it** — each with a
+troubleshooting entry or a conformance note rather than a claim:
+
+- Keypress-to-pixel latency is above its target (57.8 ms average at
+  0.1.1's measurement); the README prints the number rather than
+  omitting it.
+- One tester's ⌘, did not open Settings; not reproduced on the same
+  machine under Pinyin with or without a composition open, and the
+  menu item works. Reported under `CONFORMANCE.md` §4.4.
+- VoiceOver was heard reading state the screen had moved past; one
+  cause (a dropped trailing `valueChanged` notice) is fixed, and nobody
+  has listened since. `CONFORMANCE.md` §4.6 keeps it *not judged*.
+- Multi-display Quick Terminal placement, Touch ID under Secure Keyboard
+  Entry, the energy scenarios (`scripts/measure-energy.sh` needs a sudo
+  session) and thermal/low-power forcing: not judged, listed where each
+  batch left them.
+- Deferred by their batches, still unchecked on the closed issues: a
+  keypress-to-pixel p50/p95/p99 baseline and the preview-toolchain
+  versions (B01); the reported Tab failure's original evidence and the
+  wider Escape-scoping verification (B02); one shared reflow mapping for
+  viewport, selection, search, commands and images, and a selection /
+  mouse-reporting override, which needs `?1002`/`?1003` motion tracking
+  first (B04).
+
 ### Added
 
 - **B16 — system entry points and the Quick Terminal.** Three App Intents
@@ -1037,6 +1074,7 @@ For the maintainer, cutting any release:
    push that file — that is what makes the update visible to every
    already-installed Corta.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/noah-qin/Corta/releases/tag/v1.0.0
 [0.1.1]: https://github.com/noah-qin/Corta/releases/tag/v0.1.1
 [0.1.0]: https://github.com/noah-qin/Corta/releases/tag/v0.1.0
