@@ -26,9 +26,9 @@ subset of 0.1.1's.
 **Known and open at this release, not blocking it** — each with a
 troubleshooting entry or a conformance note rather than a claim:
 
-- Keypress-to-pixel latency is above its target (57.8 ms average at
-  0.1.1's measurement); the README prints the number rather than
-  omitting it.
+- Keypress-to-glass latency is above its target (61.9 ms average,
+  measured from inside the app on 2026-09-18; 0.1.1's Typometer read
+  57.8); the README prints the number rather than omitting it.
 - One tester's ⌘, did not open Settings; not reproduced on the same
   machine under Pinyin with or without a composition open, and the
   menu item works. Reported under `CONFORMANCE.md` §4.4.
@@ -49,6 +49,16 @@ troubleshooting entry or a conformance note rather than a claim:
 
 ### Added
 
+- **Keypress-to-glass latency measured from inside the app.**
+  `CORTA_RENDER_METRICS=1` now also collects `keypressToPresent`: the key
+  event's timestamp to the presented time of the first frame carrying
+  the child's echo (`MTLDrawable.presentedTime`, the moment on the glass).
+  A drawable the compositor replaced hands its keystroke to the next one
+  rather than dropping the sample. `scripts/measure-keypress-latency.sh`
+  drives or waits for 200 samples and reads the line back; no Typometer,
+  no screen capture, no permission. `PERFORMANCE.md` §5.7 says what the
+  scripted and `--manual` kinds each include. Dumps of every
+  render metric now carry p95 as well.
 - **B16 — system entry points and the Quick Terminal.** Three App Intents
   for the Shortcuts app (and, through a Shortcut built there,
   `shortcuts run`): *Open Corta Window*

@@ -580,7 +580,7 @@ the app-side numbers, built-in panel at native scale, system monospaced
 | Spawn: `zsh -l` → first output | p50 44.5 ms | `corta-bench` |
 | Reflow, 100k lines, 120 → 80 columns | 94.1 ms | `corta-bench` |
 | Search, 100k lines, one query | ~395 ms warm, 100 000 matches | `corta-bench` |
-| Keypress → pixel (end to end) | **not re-measured** — needs Typometer, a person and mains; 0.1.1's 57.8 ms avg stands | — |
+| Keypress → glass (end to end, scripted) | **61.9 ms** avg, p50 61.4 / p95 69.7 / p99 70.9, 200 samples — HID stage excluded, see §5.7 | `scripts/measure-keypress-latency.sh`, in-app `keypressToPresent` |
 | Energy | measured — see below | `scripts/measure-energy.sh` with `sudo powermetrics` |
 
 The one-pane flood's render-metrics ring did not fill inside the
@@ -615,6 +615,49 @@ there to keep off the *rendering* side — the GPU column stayed under
 once it is static: the kitty row reads the same as idle. Thermal and
 Low Power Mode were not forced: both change machine-wide state and need
 a dedicated session.
+
+### 5.7 Keypress → glass without Typometer
+
+The end-to-end number used to need Typometer — a third-party app that
+screen-captures the window in a loop until the pixels change. Since
+1.0.0 Corta measures the same interval from the inside, with nothing
+installed and no permission asked:
+
+- `TerminalView`'s three key-delivery sites hand `RenderMetrics` the
+  event's `timestamp` — the HID timestamp for a real key, the posting
+  time for a synthetic one;
+- the reader thread marks the first parse batch after that keystroke
+  as its echo (the assumption a screen-capture tool makes too: "the
+  pixels changed after the key");
+- the next drawable to be presented closes the sample in its
+  *presented handler*, using `MTLDrawable.presentedTime` — the moment
+  the frame reached the glass, not the moment it was scheduled. A
+  drawable the compositor replaced before showing (`presentedTime ==
+  0`, about half the frames of a burst) hands the keystroke back so
+  the frame that *did* show the echo closes it; dropping those would
+  keep only the lucky frames.
+
+`CORTA_RENDER_METRICS=1` turns it on; 200 samples print one line on the
+unified log (`keypressToPresent: n=200 avg=… p50=… p95=… p99=… max=…`),
+and `scripts/measure-keypress-latency.sh` launches, drives 230 synthetic
+keystrokes (or, with `--manual`, waits while a person types) and reads
+the line back. Two kinds of number come out of it, and a quoted figure
+says which:
+
+| Kind | Includes | Comparable to |
+| --- | --- | --- |
+| Scripted (`key code` via System Events) | Corta's whole path plus the compositor and scanout; **not** the keyboard's HID stage (1–8 ms on USB/Bluetooth) | a lower bound on what a finger sees |
+| `--manual` (a person typing) | everything Typometer saw | the M6.12 / 0.1.1 Typometer rows |
+
+**1.0.0, scripted, 2026-09-18** (Release, built-in panel, AC, 120×30):
+**avg 61.9 ms, p50 61.4, p95 69.7, p99 70.9, max 71.0** over 200 samples.
+Beside 0.1.1's Typometer 57.8 ms avg the two agree within the HID stage
+and the capture method — and both say the same thing the target row in
+§1 says: above one frame plus input latency, on a 60 Hz panel a good
+three frames. Where those frames go is the `os_signpost` chain's job
+(§5.3); the in-app number is what says whether a change moved it. A
+`--manual` run by a person is what would replace the 0.1.1 Typometer
+row outright.
 
 ## 6. B11 — CPU, locking and memory hot-path pass (2026-09-13)
 

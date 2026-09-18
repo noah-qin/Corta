@@ -73,6 +73,7 @@ extension TerminalView {
         // The first link in the keypress-to-pixel chain
         // (`InputLatencySignposts`): everything from here to the GPU
         // completion handler is attributable in one trace.
+        RenderMetrics.noteKeystroke(at: event.timestamp)
         InputLatencySignposts.measure(.keyDown) { onKeyBytes?(bytes) }
     }
 
