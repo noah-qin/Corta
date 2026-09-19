@@ -25,6 +25,12 @@
 /// named for which one a caller means, rather than one signed primitive a
 /// caller has to remember to negate correctly.
 public enum ScrollbackCoordinates {
+    /// Nonnegative growth shared by both coordinate sign conventions.
+    @inlinable
+    public static func growth(from oldTotal: Int, to newTotal: Int) -> Int {
+        max(0, newTotal - oldTotal)
+    }
+
     /// Re-anchors a document row (`Selection`'s or an image placement's
     /// `baseScrollbackTotal`-relative row, a search match's start row) so
     /// it still names the same absolute position after `totalPushed` has
@@ -34,7 +40,7 @@ public enum ScrollbackCoordinates {
     /// data, or a reset) shifts by zero rather than going negative.
     @inlinable
     public static func reanchoredRow(_ row: Int, from oldTotal: Int, to newTotal: Int) -> Int {
-        row - max(0, newTotal - oldTotal)
+        row - growth(from: oldTotal, to: newTotal)
     }
 
     /// Re-anchors a "lines above the bottom" value (`scrollOffset`,
@@ -44,7 +50,7 @@ public enum ScrollbackCoordinates {
     /// of `reanchoredRow`, for values stored the other way around.
     @inlinable
     public static func reanchoredOffset(_ offset: Int, from oldTotal: Int, to newTotal: Int) -> Int {
-        offset + max(0, newTotal - oldTotal)
+        offset + growth(from: oldTotal, to: newTotal)
     }
 
     /// The document-absolute row a viewport-relative row (a search match,
