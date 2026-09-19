@@ -1,3 +1,4 @@
+import CoreText
 import Testing
 
 @testable import Corta
@@ -115,6 +116,19 @@ struct SettingsModelTests {
         model.setOpenFileCommand("/usr/bin/open {file}:{line}")
         #expect(model.openFileCommand == "/usr/bin/open {file}:{line}")
         #expect(model.saveStatus.kind == .saved)
+    }
+
+    @Test("the preview font is rebuilt when the size changes, and only then")
+    func previewFontFollowsTheSize() {
+        let model = SettingsModel()
+        let original = model.fontSize
+        defer { model.setFontSize(original) }
+
+        model.setFontSize(16)
+        #expect(CTFontGetSize(model.previewFont) == 16)
+        let before = model.previewFont
+        model.setCopyOnSelect(model.copyOnSelect)
+        #expect(model.previewFont === before, "an unrelated change must not rebuild the face")
     }
 
     // MARK: - Conditional visibility
