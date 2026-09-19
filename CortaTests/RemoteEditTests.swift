@@ -45,7 +45,8 @@ struct RemoteEditStoreTests {
         store.recordOpen(copy, at: Date(timeIntervalSince1970: 1_789_000_100))
 
         // The file itself carries the version (JSONEncoder is compact).
-        let raw = try String(contentsOf: root.appendingPathComponent("manifest.json"))
+        let raw = try String(
+            contentsOf: root.appendingPathComponent("manifest.json"), encoding: .utf8)
         #expect(raw.contains("\"version\":1"))
 
         let reloaded = RemoteEditStore(rootURL: root)
