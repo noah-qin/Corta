@@ -37,9 +37,11 @@ for updates.
 | Quick Terminal and Shortcuts | Bracketed paste and OSC 8 links | Shell integration and command history |
 | Secure Keyboard Entry | Kitty keyboard and direct graphics protocols | OpenSSH, SFTP and remote editing |
 
-The table describes the development tree. See the [feature reference](docs/FEATURES.md)
-for details, requirements and limitations. Corta focuses on macOS; its
-[design decisions](docs/DECISIONS.md) explain the scope.
+The table describes the development tree on `main`; the latest download
+may not have every row yet. The [feature reference](docs/FEATURES.md) has
+the details, requirements and limitations, and the
+[design decisions](docs/DECISIONS.md) explain what Corta deliberately
+leaves out.
 
 ## Install
 
@@ -54,10 +56,11 @@ shasum -a 256 -c Corta-0.1.1.zip.sha256
 unzip Corta-0.1.1.zip
 ```
 
-**Release status, checked 2026-09-18:** v0.1.1 is the latest public release.
-The development tree is preparing 1.0.0; its planned archive is
-`Corta-1.0.0.zip`. The features on `main` may not be in the download yet.
-See the [changelog](CHANGELOG.md) for the development record.
+> [!NOTE]
+> **Release status, checked 2026-09-19:** v0.1.1 is the latest public
+> release. The development tree is preparing 1.0.0, whose archive will be
+> `Corta-1.0.0.zip`; features on `main` may not be in the download yet.
+> The [changelog](CHANGELOG.md) is the development record.
 
 For updates, use **Corta ▸ Check for Updates…** or download a newer release.
 Installation help and uninstall instructions are in
@@ -96,6 +99,9 @@ swift test --package-path CortaTerminal
 
 # Build the macOS app.
 xcodebuild -project Corta.xcodeproj -scheme Corta build
+
+# Or build, ad-hoc sign and launch it against a throwaway config.
+scripts/build-and-run.sh
 ```
 
 Start with the [contributor guide](CONTRIBUTING.md) for local signing and

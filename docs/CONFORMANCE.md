@@ -124,37 +124,20 @@ be **fixed-format and never echo attacker-controlled text** — see
 | **CJK IME** (`NSTextInputClient`)                | P0   | Harder than it looks — `DESIGN.md` §7.1. Composition, candidate window and commit verified in the launched app (§4.4) |
 | Copy / paste with bracketed paste                | P0   | Copy joins soft-wrapped lines into one and trims trailing blanks; ⌘C / Edit ▸ Copy |
 | Keyboard and mouse text selection                | P0   | Drag, double-click word, triple-click logical line, ⇧-click extend; document-anchored — `DESIGN.md` §2.7 |
-| Configurable key bindings                        | P1   |                                                    |
-| Click-to-position, drag-to-select                | P1   |                                                    |
+| Configurable key bindings                        | P1   | `bind.<command>` in the config file, one table for menus, palette and file — `CONFIGURATION.md` §5 |
+| Click-to-position, drag-to-select                | P1   | Drag selects; a TUI that owns the mouse is overridden with `mouse-override-modifier` |
 | ⌘-click to open a URL                            | P1   | Scheme allowlist required — `SECURITY.md` §2.4      |
 | Kitty keyboard protocol                          | P2   | Implemented; progressive enhancement flags and protocol stack                                        |
+| Tab / Shift-Tab through a candidate UI            | P0   | A completion menu or IME that resolves Tab as a command sends `insertTab(_:)` / `insertBacktab(_:)` to `doCommand(by:)`; both are forwarded to the child (B02) — `DESIGN.md` §7.1, `TerminalViewIMETests.doCommandForwardsTabAndBacktab` |
 
-**B02 — Tab through a candidate UI.** The reported regression was Claude
-Code's slash-command Tab-completion not accepting the highlighted candidate
-inside Corta. Tracing `NSEvent -> inputContext.handleEvent -> doCommand(by:)`
-found the gap directly: `doCommand(by:)` (`TerminalView+IME.swift`) had no
-case for `insertTab(_:)` / `insertBacktab(_:)`, so a Tab press any candidate
-window resolved as a command — rather than committing it as text — was
-silently dropped before reaching the PTY. Fixed by forwarding both selectors
-(`0x09` and the same `CSI Z` backtab `TerminalView+Keyboard.swift` already
-sends for the direct path); see `DESIGN.md` §7.1 and
-`TerminalViewIMETests.doCommandForwardsTabAndBacktab`. A second scope bug
-turned up in the same area: the search bar's Escape key monitor
-(`NSEvent.addLocalMonitorForEvents`, `ViewController+Search.swift`) fired for
-every window in the app, so Escape in one pane could close another pane's
-search bar; scoped to the event's own window
-(`handleGlobalSearchEscape(_:)`), covered by
-`SearchDebounceTests.escapeOnlyClosesTheSearchBarInItsOwnWindow`.
+The candidate-UI row is the one whose evidence is incomplete. The code gap
+was real and is closed, but a live confirmation that Claude Code's
+slash-command menu accepts Tab inside a built Corta, compared side by side
+with a reference terminal under an English input source, a CJK source with
+no marked text and an active composition, has not been collected: the
+original report's environment cannot be recovered (CHANGELOG 1.0.0). The
+2026-09-17 record's A1 items are the closest evidence since.
 
-What the code-level fix does **not** cover, and what remains manual/human-only
-(no automated harness can drive a real candidate window or IME —
-`DESIGN.md` §7.1's verification caveat): a live confirmation that Claude Code
-itself, running inside a built Corta, now accepts Tab on its slash-command
-menu; a side-by-side comparison against a reference terminal (Terminal.app /
-iTerm2) under an English input source, a CJK input source with no marked
-text, and active CJK composition; and whether the originally reported failure
-was purely this code gap or also involved Claude Code's own configuration.
-That evidence is not yet collected — reported here rather than claimed.
 
 ### 2.2 Rendering
 
@@ -164,13 +147,13 @@ That evidence is not yet collected — reported here rather than claimed.
 | Foreground / background, bold, italic, underline | P0   | Real faces where the family has them; synthetic oblique and stroked weight where it does not |
 | Missing glyph is visible, not blank              | P0   | Hollow box for a scalar no font in the cascade covers |
 | Every glyph clipped to its cell box              | P0   | Overwide ink is scaled to fit rather than painted into the next column |
-| Cursor: block / bar / underline, blink           | P0   |                                                    |
+| Cursor: block / bar / underline, blink           | P0   | DECSCUSR shapes; blinking variants render steadily (see below) |
 | Selection highlight                              | P0   | Document-anchored quads; follows its text as output scrolls |
-| Retina / HiDPI scaling                           | P0   |                                                    |
+| Retina / HiDPI scaling                           | P0   | Grid laid out in pixels, not points — one of §4.4's shipped bugs |
 | **Font fallback** for CJK and emoji              | P0   | Core Text cascade list; the shaped run's font rasterises the glyph (M3.5) |
 | Atlas eviction (LRU or multi-page)               | P0   | Full-page reset on exhaustion + `generation` rebuild (M3, `DESIGN.md` §7.4) |
 | Gamma-corrected glyph blending                   | P1   | Otherwise light-on-dark text looks too thin         |
-| Runtime font scaling (⌘+ / ⌘−)                   | P1   |                                                    |
+| Runtime font scaling (⌘+ / ⌘−)                   | P1   | Per-window, temporary; never writes `font-size` |
 | Ligatures                                        | P2   | Conflicts with the cell grid — `DESIGN.md` §7.3     |
 | Background transparency, blur, padding           | P2   |                                                    |
 
@@ -197,11 +180,11 @@ frames on an idle screen (`PERFORMANCE.md` §1, idle CPU ~0%).
 | Multiple windows (⌘N), each its own session             | P1   | Landed at M3; composition, not new mechanism |
 | PTY lifecycle: spawn, read/write, `TIOCSWINSZ`, `SIGCHLD` | P0 | Resize must be reported or remote `vim` and `htop` desynchronise |
 | Resize debouncing                                       | P1   | A live window drag otherwise hammers the child |
-| Tabs                                                    | P1   |                                              |
+| Tabs                                                    | P1   | Native window tabs; a restored group keeps its order and selection (§4.4 item 6) |
 | Split panes (layout tree + focus routing)               | P1   | Renderer and input are multi-viewport from M1 |
 | Search scrollback (⌘F)                                  | P1   | Must match across soft-wrapped lines          |
-| Scrolling (wheel, ⌘↑↓, page)                            | P0   |                                              |
-| Bell (audible / visual / mute)                          | P1   |                                              |
+| Scrolling (wheel, ⌘↑↓, page)                            | P0   | ⌘↑↓ jump between commands once shell integration reports them; ⇧Page/Home/End scroll |
+| Bell (audible / visual / mute)                          | P1   | `bell` in the config file |
 | Settings page                                           | P1   | Native page in the menu bar next to Edit/Shell, backed by one text file needing no third-party parser — M6.1 |
 | Multiplexing                                            | —    | Not doing; use tmux                           |
 
@@ -219,18 +202,22 @@ ate the last commands that ran.
 
 The operational definition of success from `DESIGN.md` §8. If all ten
 hold, Corta has replaced Terminal.app for this repository's own use.
+Each row names the record that last verified it by hand; an automated
+suite is listed only where one pins the behaviour afterwards. A row
+whose record is a roadmap tick has not been re-run since it landed.
 
-- [ ] Opens to a working shell with correct colour output
-- [ ] `vim` / `less` / `htop` render without artifacts
-- [ ] Chinese input works, displays, and never drifts out of alignment
-- [ ] Copy and paste work; pasting multi-line code does not auto-execute
-- [ ] Scrollback holds a long training run and scrolls smoothly
-- [ ] ⌘F searches scrollback
-- [x] New tab and split pane (M4.7, M5; and a new tab no longer shrinks
-      the window — `SearchAndTabUITests`)
-- [x] ⌘+ / ⌘− resize the font
-- [ ] Resizing the window resizes the program inside it
-- [ ] ⌘-clicking a `localhost:` URL opens the browser
+| # | Holds when | Last verified by hand | Pinned by |
+| --- | --- | --- | --- |
+| 1 | Opens to a working shell with correct colour output | 2026-09-17 pass, H31 and G29 ([record](test-results/2026-09-17-interactive.md)) | §4.4's five-point check |
+| 2 | `vim` / `less` / `htop` render without artifacts | 2026-09-17 pass: `less` and `git log` clean (G29); `tmux` + `htop` left residue after a window shrink (G25) — ECH was unimplemented, fixed the same day (§4.4.2) | `EditingTests`, golden fixtures |
+| 3 | Chinese input works, displays, and never drifts out of alignment | 2026-09-17 pass, A1 on a physical keyboard, both panes of a split | `TerminalViewIMETests`, `WideGlyphRenderTests` |
+| 4 | Copy and paste work; pasting multi-line code does not auto-execute | 2026-09-17 pass, G28 (the multi-line warning appeared for a REPL without bracketed paste) and 2026-09-19 (Option-drag selection to the clipboard) | `PasteTests`, `MouseReportingTests` |
+| 5 | Scrollback holds a long training run and scrolls smoothly | 2026-09-17 pass, G27: 120 s of continuous output, the other window still responsive; the top of the run was past the 10,000-line default cap, as documented | `corta-bench` write-backpressure |
+| 6 | ⌘F searches scrollback | M4.4 roadmap tick ([record](history/ROADMAP-0.1.md)); not re-run by hand since | `SearchTests`, `SearchAndTabUITests` |
+| 7 | New tab and split pane | 2026-09-17 pass, C11: a restored two-pane window and a three-tab group | `SplitPaneUITests`, `SearchAndTabUITests` |
+| 8 | ⌘+ / ⌘− resize the font | 2026-09-17 pass, C12 and H31 | `FontSizeZoomTests` |
+| 9 | Resizing the window resizes the program inside it | 2026-09-17 pass, D16: `vim` through full screen and back, 120×30 → 207×62 → 120×30 | `PTYWindowSizeTests`, `ResizeDebouncerTests` |
+| 10 | ⌘-clicking a `localhost:` URL opens the browser | M4.6 roadmap tick ([record](history/ROADMAP-0.1.md)); not re-run by hand since | `LinkDetectionTests` |
 
 ---
 
@@ -276,40 +263,18 @@ chmod +x /tmp/corta-esctest.sh
 SHELL=/tmp/corta-esctest.sh Corta.app/Contents/MacOS/Corta
 ```
 
-**2026-09-17 result: 126 passed, 334 known bugs, 107 failed of 567 —
-81.1% when passes and known bugs are combined; this is not a pass rate.** Run on `main` after the interactive-pass fixes, against esctest2
-`2798f12`. Against the 0.1.1 list the failures are a strict subset: 14
-tests now pass — B06's OSC 4/104 and 5/105 set/query/reset, SCORC, and
-the multi-column reverse-wraparound case — and none regressed. The suite
-itself lost one test and one "known bug" between the two runs, so the
-totals are not identical columns. `docs/esctest/2026-09-17-results.txt`
-has every failing name; the remaining classes are the ones the 0.1.1
-classification below already names, XtermWinops (28) still the largest
-and still deliberate.
+**Results, one row per run.** "xterm-compatibility" is passes plus
+"known bugs" — the number esctest reports and the one comparable across
+terminals; it is **not** a pass rate, and every row states all three
+counts. The failing names of each run are kept in [`esctest/`](esctest/)
+so the next run is a diff rather than a re-reading.
 
-**0.1.1 result (2026-09-08): 112 passed, 335 known bugs, 121 failed of
-568.** Against the M6 record (106 / 335 / 127) that is six more passing
-and none regressed. The failures are classified by real application
-impact in `docs/history/V0.1.1-QUALITY-PLAN.md` Q01, and every failing test name
-is kept in `docs/esctest/0.1.1-results.txt` so the next run is a diff
-rather than a re-reading. The largest single cause is one absence: OSC
-4/5 indexed palette set and query are not implemented, which accounts
-for 45 of the 121.
-
-**The 0.1.1 snapshot predates B06** (`docs/DESIGN.md` §7), which
-implements OSC 4/104 and OSC 5/105 and fixes `SCORC`/`DECRC` and
-`BS`/`CUB` reverse-wrap; the 2026-09-17 run above is the first to score
-those, and the 14 tests they moved are listed in its results file.
-
-**M6 result: 106 passed, 335 known bugs, 127 failed of 568.** Against the
-M2 record (50 / 334 / 184) that is 57 failures fixed and none
-introduced — the failing-test list is a strict subset. The closeout pass
-added programmable tabs, CNL/CPL/CHT/CBT, IND/NEL/RI, RIS and DECSTR,
-including the soft-reset isolation esctest itself relies on.
-
-xterm-compatibility — passes plus "known bugs", the number comparable
-across terminals — was **77.6%** at M6, up from the 67.6% carried since
-M2, **78.7%** at 0.1.1, and **81.1%** on 2026-09-17.
+| Run | Build | Passed | Known bugs | Failed | Total | xterm-compat. | Against the previous row |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| M2 (2026-09-02) | M2 closeout | 50 | 334 | 184 | 568 | 67.6% | Baseline |
+| M6 (2026-09-03) | M6 closeout | 106 | 335 | 127 | 568 | 77.6% | 57 failures fixed, none introduced: programmable tabs, CNL/CPL/CHT/CBT, IND/NEL/RI, RIS and DECSTR, including the soft-reset isolation esctest itself relies on |
+| 0.1.1 (2026-09-08) | v0.1.1 | 112 | 335 | 121 | 568 | 78.7% | Six more passing, none regressed; classified by application impact in [the quality plan](history/V0.1.1-QUALITY-PLAN.md) Q01; names in [`esctest/0.1.1-results.txt`](esctest/0.1.1-results.txt). 45 of the 121 were OSC 4/5 palette set and query, then unimplemented |
+| 2026-09-17 | `main`, esctest2 `2798f12` | 126 | 334 | 107 | 567 | 81.1% | 14 tests moved to pass — B06's OSC 4/104 and 5/105 set/query/reset, SCORC, and the multi-column reverse-wraparound case — none regressed; the suite itself lost one test and one known bug, so the totals are not identical columns. Names in [`esctest/2026-09-17-results.txt`](esctest/2026-09-17-results.txt); XtermWinops (28) is still the largest class and still deliberate |
 
 ### 4.3 Fuzzing
 
@@ -387,27 +352,6 @@ under `Corta/` is therefore verified by launching the app and checking:
 7. in a non-English locale (`-AppleLanguages '(zh-Hans)'` on the launch),
    the *menu bar* is translated, not only the menus beneath it.
 
-**The 2026-09-17 interactive pass** (`docs/test-results/2026-09-17-interactive.md`,
-run by a person with a UI-driving tool and then by hand) is the first
-full sweep of §4.6 and the batch-level "not judged" items since 0.1.1.
-What it found and what changed as a result: ECH unimplemented (above);
-the SFTP browser reporting a refused password login as a lost connection
-(`SFTPConnection.openSession` classified against a channel it had not
-stored yet); a restored tab group coming back in the wrong order with the
-tab bar over the first row; a transparent frame on every window reopen;
-font zoom moving the titlebar instead of the bottom edge; Command History
-with no command text and no text search; the menu bar unlocalised in every
-language; the Bell picker showing the config-file word. Still open from
-that pass, honestly, and **not blocking 1.0.0** (the CHANGELOG's release
-notes list them): ⌘, not opening Settings on the tester's machine — not
-reproduced by the maintainer under Pinyin with or without a composition
-open, and not reproduced by the tester either in the 2026-09-18 pass
-below (Release and Debug builds, ABC and Pinyin, composition open, and
-the palette's Settings command all opened it; `grep bind
-~/.config/corta/config` showed no rebinding); the one failure is
-unexplained rather than fixed — and VoiceOver, which the 2026-09-18 pass
-took further (§4.6).
-
 **System entry points (B16) are checked by hand, and the record says
 what was and was not.** A hotkey and a floating panel are properties of
 the window server, not of the view hierarchy, so the check is: with
@@ -423,19 +367,8 @@ simulated keypress (`osascript` `key code`) does reach a Carbon hotkey,
 which is how the summon/dismiss half and the titlebar lock were
 exercised when B16 landed — over a single display, with the panel
 opening as a top band and hiding when another app came forward.
-**2026-09-18, by hand and then by probe:** ⌘T from the panel opens a
-normal window and the panel grows no tab bar (tester); the
-full-screen-Space case **failed** — the tester saw the panel misbehave
-over a full-screen Safari, and a probe (`CGWindowListCopyWindowInfo`
-over TextEdit full-screen) showed the panel's frame moving with
-`kCGWindowIsOnscreen` staying false: an ordinary `NSWindow` from an
-inactive application never reaches a full-screen Space. Fixed by making
-the panel a non-activating `NSPanel` (CHANGELOG 1.0.0, Fixed); the same
-probe then read on-screen, no Space switch, and — the focus-return
-half — TextEdit frontmost and still full-screen after the dismissing
-hotkey, and the panel hidden after a click into another application.
-Multi-display placement stays *not judged*: the test machine has one
-display.
+The 2026-09-18 run of these four checks, one failure and its fix, are in
+[`test-results/2026-09-18-release-checks.md`](test-results/2026-09-18-release-checks.md).
 
 **Remote workflows (B13/B14) have a launched-app check of their own**,
 `CortaUITests/RemoteWorkflowUITests`, which is the shape every
@@ -478,7 +411,7 @@ that a passing grid test is compatible with:
 | Area                          | Verified with                                | What to look for | Result |
 | ----------------------------- | -------------------------------------------- | ---------------- | ------ |
 | Cursor movement, shape, blink, mode switches | `vim`, `nvim`, `htop`, `less`  | The cursor sits where the program thinks it does after a mode change; `DECSCUSR` shapes take effect; no ghost cursor in an unfocused pane | Pass |
-| Scroll regions and the viewport | `tmux` with several panes, `less` on a long file | A region scroll does not disturb rows outside it; scrollback follows the bottom; scrolling back and returning lands where it started | Pass, with one exception below |
+| Scroll regions and the viewport | `tmux` with several panes, `less` on a long file | A region scroll does not disturb rows outside it; scrollback follows the bottom; scrolling back and returning lands where it started | Pass; see the note below |
 | Left/right margins and wide characters | `vim` with a CJK file, `tmux` split narrow | A wide glyph never straddles the right margin; a resize rewraps without stranding rows | Pass |
 | Insert and delete (ICH/IL/DCH/DL) | `vim` editing mid-line, `readline` with IRM | The redraw range matches the edit; nothing is left behind to the right of an insert | Pass |
 | Erase (ED/EL/ECH) | `clear`, `htop` redraw, `tmux` window switch, **`tmux` window shrink** | No residue from the previous screen, and the cursor ends where the sequence says | Pass for ED/EL. **ECH was not implemented at all** until 2026-09-17 — this row said Pass on the strength of `clear`/`htop`, which never send it; tmux's status line (left part, `CSI n X`, right part) kept the previous screen's cells in the gap after a window shrink. Now implemented and covered by `EditingTests`. |
@@ -490,19 +423,11 @@ and in a narrow `tmux` split; a mid-line edit in `vim`; `clear`), judged
 by eye — not something a test target can assert. `esctest` (§4.2) covers
 the sequences; this covers the programs.
 
-**Bug found:** `less`'s search-match highlight (reverse video on a `/`
-hit) never renders in Corta — the view scrolls to the match correctly,
-but the matched text stays in plain colors. Confirmed against
-Terminal.app on the same machine and file, which highlights the same
-search normally, so this is not a `less` configuration difference.
-`Performer.swift` sets/clears `CellAttributes.reverse` correctly on SGR
-7/27, and `TerminalRenderer.swift` swaps `resolveForeground`/
-`resolveBackground` when the bit is set — the code path that should
-produce this looked correct on inspection, so the fault is not yet
-isolated. Needs a live signpost or grid-dump capture of what `less`
-actually sends for a standout match versus what a plain `ESC[7m`/`ESC[27m`
-pair sent by hand produces, to find where the two diverge. Tracked as an
-open bug, not a blocker for this checklist.
+An earlier run of this table recorded `less`'s search-match highlight
+(reverse video on a `/` hit) as never rendering, with the fault not
+isolated. The 2026-09-17 pass (G29) could not reproduce it: the highlight
+was visible on the same command. It is not tracked as open; a fresh
+reproduction with a grid dump of what `less` sends would reopen it.
 
 ### 4.4.1 IME verification (M3.1–M3.4)
 
@@ -595,170 +520,18 @@ spoken English closely enough to have an opinion). "Not judged" means
 exactly that — no automated check stands in for it, and no claim of success
 is made in its place.
 
-**2026-09-02 — M2 closeout pass (items 1 and 3).** tmux, htop and
-Neovim were not installed, so tmux 3.5a and htop 3.4.1 were built
-from source into a user-writable prefix (`/tmp/corta-tools`). Neovim
-was not installed; nothing in items 1 or 3 needs it, so item 2 is
-unaffected either way.
+### 4.7 The records
 
-- **Item 1 (`tmux` split running `htop`, resize) — ran, no
-  artifacts.** A live Corta window was launched with a `SHELL` wrapper
-  that started tmux (private socket), split the window, and ran htop
-  in the lower pane. Resizing the OS window from outside requires
-  Accessibility permission and would prompt, so that half was not
-  attempted unattended — a human still needs to drag the window edge.
-  Instead tmux's own layout changes exercised the same terminal
-  machinery from inside the child: `resize-pane` and `select-layout`
-  force DECSTBM reprogramming and deliver SIGWINCH to htop.
-  `capture-pane` after each step (baseline, grown, shrunk, two forced
-  relayouts, htop tree-view and sort toggles) showed no garbage cells,
-  no misaligned status line and no missing rows; htop's F-key footer
-  and the tmux status line stayed correct throughout. A screenshot of
-  the live window showed the htop footer and tmux status line
-  upright and full size. `stty size` in the child (30 120) agreed with
-  the tmux client size (120x30).
-- **Item 3 (`ssh` to a remote host, `vim`, resize) — cannot run
-  here.** `~/.ssh/config` contains exactly one entry, `github.com`,
-  which is a git forge with no shell access; there is no configured,
-  reachable remote host, and unknown hosts were not probed. The item
-  remains unticked until a real target exists.
-**2026-09-03 — M6 closeout pass.** What was verified against a live
-window in this milestone, and what was not:
+Every pass of §4.4, §4.4.2 and §4.6 is written up under
+[`test-results/`](test-results/) as a dated file — what was checked, what
+passed, what failed and what was *not judged* — and the findings are worked
+off in the CHANGELOG. The record stays as written.
 
-- **Verified live, by driving the running app.** ⌘T four times leaves
-  the window frame unchanged (it used to lose a chrome height per tab
-  until it hit the 49pt minimum); the settings page opens from the app
-  menu with its eight controls; the Settings menu lists every theme;
-  switching theme re-colours the open window's surface with no restart;
-  the app menu's Settings… item carries ⌘,. The first four are
-  regression tests now (`SearchAndTabUITests`, `SettingsUITests`); the
-  shortcut is checked by screenshotting the open menu, because
-  XCUITest's `typeKey` does not deliver a punctuation key equivalent
-  and a test that cannot press the key cannot tell a broken shortcut
-  from a broken harness.
-- **Not verified live: the gesture and hardware items.** Pinch-to-zoom
-  (M6.14), Force Touch → Look Up and a file drag onto a pane (M6.15)
-  need a trackpad gesture or a drag from Finder. Neither XCUITest nor
-  any unattended path produces them; the logic under each is unit
-  tested (shell quoting, the pinch's step accumulator) and the AppKit
-  entry points are the documented ones, but **a human still has to
-  pinch, force-touch and drag a file** before those three lines of the
-  milestone are honestly closed.
-- **Verified live: focus reporting end to end.** Portable Neovim 0.12.5
-  ran as the child of a Release Corta session with `FocusLost` and
-  `FocusGained` autocmds recording to a side-channel file. A detached
-  TextEdit → Corta focus cycle recorded `lost`, then `gained`; a raw PTY
-  probe independently captured the expected `CSI O` and `CSI I` bytes.
-
-- **esctest re-run — reproduces the M2 number exactly.** esctest2
-  (ThomasDickey/esctest2) with `--expected-terminal xterm
-  --max-vt-level 3`, run as the child of a live Corta window against
-  the M2-closeout build: **50 passed, 334 known bugs, 184 failed of
-  568** — identical totals to the M2 record, and the list of failing
-  tests is byte-identical to the M2 run's. No new failures, no fixes.
-
-**2026-09-12 — B10 pass (UI modernization and accessibility).** What got
-real code or a written decision, and what is recorded **not judged** rather
-than silently skipped:
-
-- **Verified by code and test.** The text-selection API spike (`DESIGN.md`
-  §2.7) is a decision, not an experiment left half-run: `NSTextView`/
-  TextKit was weighed against the grid, wide/combining text, wrapped
-  history and TUI mouse reporting, and not adopted, with the reasoning kept
-  next to the decision it explains. `TerminalView`'s `NSAccessibility`
-  overrides — never exercised by a test before this pass, only the
-  underlying `TerminalAccessibilitySnapshot` math was — now are
-  (`TerminalViewAccessibilityTests`): line navigation round-trips across
-  every line of a long-output fixture, a scrolled view reports history
-  rather than the live screen, selection and the no-provider-installed
-  degradation path all behave. The translation-consistency audit
-  (`LocalizationCoverageTests.noTranslationIsAnUntranslatedCopy`) found
-  nothing to fix — every non-English string differs from its English
-  source once legitimate shared placeholders are excluded.
-- **Not judged: listening to VoiceOver read long output.** The tree-health
-  audit above tests the *data* VoiceOver consumes, not the experience of
-  hearing it — that needs a person with working audio judgment running
-  VoiceOver live, which this pass did not have. Precedent:
-  `docs/history/V0.1.1-MANUAL-VERIFICATION.md`'s identical "not judged" state for the
-  same reason.
-- **Not judged: native-speaker translation review.** The mechanical audit
-  above (format specifiers, untranslated copies) is not a substitute for
-  `CONTRIBUTING.md`'s "Localization" bar — a bilingual human reading each
-  string in context and flipping it to `translated`. All 258 keys across
-  8 non-English locales remain `needs_review`, honestly, until reviewers
-  are available.
-- **Not judged: multi-monitor, fullscreen and external-display resize.**
-  Only resize *debouncing* has automated coverage (`ResizeDebouncerTests`).
-  Moving a window between displays of different scale factors, entering
-  and leaving fullscreen, and attaching/detaching an external display all
-  need physical hardware this pass did not have access to.
-- Not attempted at all this pass, and not claimed otherwise: system
-  materials/"Liquid Glass" adoption for B08/B09's new surfaces
-  (`CommandHistoryController`, `FontPreviewView`, `SettingsStatusView`) was
-  audited and found not to fit — the three existing `NSGlassEffectView`
-  adoptions are all floating overlays on top of live terminal content
-  (the command palette, the search bar), and none of the three audited
-  surfaces are that; a plain, opaque, accessible background is the
-  correct choice already in place for a separate utility window like
-  Command History, the same way Settings itself has no glass.
-
-**2026-09-18 — the 1.0.0 human and hardware items**, run by the
-maintainer at the machine, from the six-item operating guide written for
-them (keypress → glass with a real keyboard, VoiceOver, ⌘,, the Quick
-Terminal's four window-server checks, the Chinese UI, Touch ID and Low
-Power Mode). Recorded item by item, with what each one found:
-
-- **Keypress → glass, a person typing — measured.** `scripts/
-  measure-keypress-latency.sh --manual`, 230 keystrokes on the built-in
-  keyboard, AC: avg 66.3 ms, p50 67.0, p95 78.7, p99 84.5 over 200
-  samples. This replaces the 0.1.1 screen-capture row (`PERFORMANCE.md`
-  §5.7).
-- **VoiceOver — heard, one finding.** VoiceOver's caption panel read
-  the text area's description ("30 rows by 120 columns. Cursor on row
-  30, column 29.") correctly against the screen, and the read-through
-  steps raised nothing the tester reported. *Read selected text* over a
-  six-line mouse selection (rows 287–292 of a `seq` run, highlighted on
-  screen) answered **"No selection."** Probed afterwards through the
-  accessibility API on the same build (`AXUIElementCopyAttributeValue`
-  after a synthetic drag): `AXSelectedTextRange` and `AXSelectedText`
-  both reported the selection, and `AXSelectedTextRanges` — the plural
-  `NSTextView` also answers — was unsupported. That attribute is
-  implemented now (`AccessibilityMappingTests.selectionIsAnsweredInBothForms`);
-  whether it was VoiceOver's question is **not judged** until someone
-  listens again. The trailing-`valueChanged` fix from the 17th is what
-  step e (an unsent command line read as the last line) exercised; the
-  tester did not report it wrong.
-- **⌘, — not reproduced, second pass.** Release and Debug builds, ABC
-  and Pinyin, Pinyin with a composition open, and the palette's Settings
-  command: all opened Settings. `grep bind ~/.config/corta/config` found
-  no rebinding. The 17 September failure stays unexplained.
-- **Quick Terminal — one of four failed and is fixed.** 4a
-  multi-display: not judged, one display. 4b full-screen Space: failed
-  and fixed (§4.4 above, and the CHANGELOG). 4c ⌘T from the panel:
-  passes. 4d focus return: verified by probe after the fix, TextEdit
-  frontmost after the dismissing hotkey; the tester's own report of 4d
-  was lost to a duplicated line and is not claimed.
-- **Chinese UI — reviewed, by the maintainer's assistant rather than
-  the tester.** Every zh-Hans string (400) was read against its English
-  source and its place in the UI; twenty-one were reworded (`拷贝`
-  consistently for Copy, as the system's Edit menu has it; `窗格` for
-  Panes everywhere; *Zoom Pane* as `最大化窗格` so it cannot be read as
-  the font zoom; question-form titles for the destructive alerts; one
-  dash style; spaced units in durations) and one real defect surfaced:
-  the close-confirmation title substituted English "this window"/"this
-  pane"/"Corta" into every language (fixed, three keys, nine locales).
-  zh-Hans is now `translated` throughout; the other seven non-English locales keep
-  `needs_review` — the three new keys included — until a reader of each
-  language goes through them.
-- **Touch ID under Secure Keyboard Entry — passes** (later the same
-  evening, after the tester enabled `pam_tid.so` through
-  `/etc/pam.d/sudo_local`). `sudo -k; sudo true` in an ordinary window
-  with the titlebar lock showing: the Touch ID prompt appears and the
-  command passes on a fingerprint; cancelling the prompt with Esc falls
-  back to `Password:` and the typed password is accepted; the same in
-  the Quick Terminal panel; and with Secure Keyboard Entry switched off
-  as the control. Secure input does not interfere with the Touch ID
-  sheet or with the password fallback.
-- **Low Power Mode — measured**, `PERFORMANCE.md` §5.6's second energy
-  table. Thermal pressure stays not judged: forcing it means holding the
-  machine at full load for a long time, which nothing here should do.
+| Record | What it covers |
+| --- | --- |
+| [2026-09-02 — M2 closeout](test-results/2026-09-02-m2-closeout.md) | §4.6 items 1 and 3: `tmux` + `htop` under resize; no reachable ssh host |
+| [2026-09-03 — M6 closeout](test-results/2026-09-03-m6-closeout.md) | Tabs, the settings page and theme switching live; focus reporting end to end; the esctest re-run; the gesture items left to a human |
+| [2026-09-12 — B10 pass](test-results/2026-09-12-b10-pass.md) | The text-selection API decision, the accessibility tree audit, the translation audit, and what stayed *not judged* |
+| [2026-09-16/17 — interactive pass](test-results/2026-09-17-interactive.md) | The first full sweep of §4.6 since 0.1.1, by tool and then by hand |
+| [2026-09-18 — release checks](test-results/2026-09-18-release-checks.md) | What the 09-17 pass changed; the six human and hardware items for 1.0.0, including the Quick Terminal probe |
+| [2026-09-18/19 — issues #88–#90](test-results/2026-09-19-issues-88-90.md) | Mouse tracking, shared coordinates and the toolchain decision |

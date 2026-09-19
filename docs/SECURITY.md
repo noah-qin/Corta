@@ -298,6 +298,12 @@ For quick reference during implementation and review:
 
 ## 7. Change Log
 
+Every security-relevant change, newest first. The numbering continues
+the 0.1.1 quality plan's `S` series (`history/V0.1.1-QUALITY-PLAN.md`,
+which records S01–S04 and S07 in full); the entries below are the ones
+whose write-up belongs with the design rather than with the release that
+made them.
+
 - **S10 — 2026-09-16: system entry points added without a command path
   (B16).** Three App Intents (open a window, focus a window by identity,
   toggle the Quick Terminal), one Carbon hotkey and Secure Keyboard Entry
@@ -308,16 +314,6 @@ For quick reference during implementation and review:
   access (rule 7). `SecureInput` is the sole caller of the secure-input
   counter and releases it at quit; a titlebar lock shows the engaged state
   rather than the setting.
-- **S05 — 2026-09-06: OSC 7 working-directory reports are host-checked.**
-  The payload of OSC 7 is a `file://host/path` URL, and a shell reached over
-  `ssh` (or a pane inside `tmux` on one) reports a directory on *that* host.
-  The report feeds local spawns — new tabs, splits, session restore — so the
-  parser now accepts only a local host (empty, `localhost`, or this machine's
-  own names, compared case-insensitively and ignoring a trailing FQDN dot)
-  and drops remote reports, leaving the app its kernel-side
-  `currentWorkingDirectory` fallback. Session state saved before this filter
-  can still carry a remote path with the host already lost, so restore drops
-  any saved directory that does not exist as a local directory.
 - **S09 — 2026-09-13: remote OSC 7 reports are recorded, still isolated.**
   B13 changed the disposition of a remote-host report from *dropped* to
   *recorded as `RemoteContext`* — the pane's title badge, the command
@@ -339,21 +335,6 @@ For quick reference during implementation and review:
   `RemoteHostConsent`, in memory for the run, never persisted. Without
   that step, any bytes the far end printed could have pointed the next
   ⌘-click's download — and the agent's keys — at a host of their choosing.
-- **S06 — 2026-09-06: OSC 52 clipboard payloads are sanitised, and stricter
-  base64.** The write half of OSC 52 is text a *stream* chose, sight unseen —
-  unlike a user drag-selection there is no "copy what I saw" contract — so the
-  decoded text is now stripped of bidi embeddings/overrides/isolates
-  (U+202A–U+202E, U+2066–U+2069) and zero-width format characters (ZWSP,
-  word joiner, ZWNBSP/BOM) before it is recorded for the pasteboard: these
-  are what let pasted content display as something other than what it is
-  (§2.5, Trojan Source). ZWJ, ZWNJ and LRM/RLM are kept — emoji sequences
-  and real bidi text break without them. The base64 decoder now also rejects
-  data trailing the `=` padding rather than silently decoding the prefix.
-  The audit otherwise confirmed the existing boundaries stand: write is off
-  by default behind `allow-clipboard-write`, the read form is parsed only
-  far enough to be discarded and answers nothing, payloads are capped by
-  `Parser.maxStringLength` with whole-sequence discard on overflow, and no
-  reply path carries stream-supplied text back to the child (§2.1–2.2).
 - **S08 — 2026-09-06: PTY operations refuse a closed descriptor, and a
   reaped child's group is never signalled.** A descriptor number is the
   kernel's to recycle the instant `close()` runs, but `PTY` kept using its
@@ -372,3 +353,28 @@ For quick reference during implementation and review:
   spawns and repeated spawn/close cycles leak no descriptors, and
   foreground/background job tracking follows real job control (`tcgetpgrp`)
   through run, suspend and background transitions.
+- **S06 — 2026-09-06: OSC 52 clipboard payloads are sanitised, and stricter
+  base64.** The write half of OSC 52 is text a *stream* chose, sight unseen —
+  unlike a user drag-selection there is no "copy what I saw" contract — so the
+  decoded text is now stripped of bidi embeddings/overrides/isolates
+  (U+202A–U+202E, U+2066–U+2069) and zero-width format characters (ZWSP,
+  word joiner, ZWNBSP/BOM) before it is recorded for the pasteboard: these
+  are what let pasted content display as something other than what it is
+  (§2.5, Trojan Source). ZWJ, ZWNJ and LRM/RLM are kept — emoji sequences
+  and real bidi text break without them. The base64 decoder now also rejects
+  data trailing the `=` padding rather than silently decoding the prefix.
+  The audit otherwise confirmed the existing boundaries stand: write is off
+  by default behind `allow-clipboard-write`, the read form is parsed only
+  far enough to be discarded and answers nothing, payloads are capped by
+  `Parser.maxStringLength` with whole-sequence discard on overflow, and no
+  reply path carries stream-supplied text back to the child (§2.1–2.2).
+- **S05 — 2026-09-06: OSC 7 working-directory reports are host-checked.**
+  The payload of OSC 7 is a `file://host/path` URL, and a shell reached over
+  `ssh` (or a pane inside `tmux` on one) reports a directory on *that* host.
+  The report feeds local spawns — new tabs, splits, session restore — so the
+  parser now accepts only a local host (empty, `localhost`, or this machine's
+  own names, compared case-insensitively and ignoring a trailing FQDN dot)
+  and drops remote reports, leaving the app its kernel-side
+  `currentWorkingDirectory` fallback. Session state saved before this filter
+  can still carry a remote path with the host already lost, so restore drops
+  any saved directory that does not exist as a local directory.

@@ -11,7 +11,7 @@ pin the same stable release; update both `XCODE_PIN` values together. A failed b
 
 | Change | Automated verification | Additional evidence |
 | :--- | :--- | :--- |
-| Documentation or GitHub templates | `python3 scripts/check-docs.py` | Review rendered Markdown and examples |
+| Documentation or GitHub templates | `python3 scripts/check-docs.py`; `DocumentationDriftTests` for `CONFIGURATION.md` | Review rendered Markdown and examples |
 | Parser, grid, search or session | Core suite, focused regression test, fuzz replay for PTY input changes | Specification or minimal reproducer |
 | AppKit, input, settings or windows | Relevant `CortaTests`, then app suite | Launch the app; record the five-point manual check |
 | Rendering or hot path | Relevant rendering tests and app suite | Before/after frame CPU using the same workload |
@@ -93,15 +93,59 @@ xcodebuild test \
 ```
 
 Use a fresh result-bundle path for each run. Add
-`-only-testing:CortaTests/ConfigurationTests` to focus a suite.
+`-only-testing:CortaTests/ConfigurationTests` to focus a suite. To keep the
+test host away from your own configuration, prefix the command with
+`TEST_RUNNER_CORTA_STAGE_DIR=<dir> TEST_RUNNER_SHELL=/bin/sh
+TEST_RUNNER_CORTA_RESTORE_WINDOWS=0`, where `<dir>` already holds a `config`
+with `suggest-applications-folder`, `restore-windows`, `quick-terminal` and
+`secure-keyboard-entry` set to `false` — the same four lines
+`scripts/build-and-run.sh` writes. An empty stage directory leaves the host
+waiting on a first-launch prompt, and `xcodebuild` reports that the test
+runner hung before establishing a connection.
 UI tests require an interactive desktop session: remove `-skip-testing` and
 use `-only-testing:CortaUITests` to run that target. CI skips UI tests, and
 neither CI nor an offscreen rendering test replaces launching the app.
 
+### Launching the app in isolation
+
+App-layer changes are verified by launching the app (`DECISIONS.md` D14).
+`scripts/build-and-run.sh` builds a Debug app with ad-hoc signing and
+launches it against a staged configuration under `.build/run/` — restore,
+the global hotkey, Secure Keyboard Entry and the Applications-folder prompt
+all off, `/bin/sh` as the shell — so the launch never reads or writes your
+own config, state or shell startup files:
+
+```sh
+scripts/build-and-run.sh              # build and launch
+scripts/build-and-run.sh --verify     # exit 0 if the app is still alive after 2 s
+scripts/build-and-run.sh --logs       # launch and stream the app's log
+scripts/build-and-run.sh --telemetry  # launch and stream the dev.noahqin.Corta subsystem
+scripts/build-and-run.sh --debug      # launch under lldb
+```
+
+`CORTA_BUILD_DIR` moves the build products elsewhere. The same environment
+variables work for any launch you control: `CORTA_STAGE_DIR` relocates the
+config file and Application Support, `CORTA_RESTORE_WINDOWS=0` skips the
+restore, and `SHELL` names the shell to spawn. Then run the five-point check
+in [conformance §4.4](CONFORMANCE.md#44-app-layer-verification-requires-a-launched-app).
+
 Never change global hotkeys, secure-input state, shell startup files or
-`launchctl` environment variables just to test. Prefer injected dependencies
-and per-process environments. Use temporary directories for fixtures and
-clean up the resources you create.
+`launchctl` environment variables just to test (D13). Prefer injected
+dependencies and per-process environments. Use temporary directories for
+fixtures and clean up the resources you create.
+
+## Documentation
+
+```sh
+python3 scripts/check-docs.py
+```
+
+Checks every local link and image in the repository's Markdown, including
+files not yet staged. It does not follow remote URLs or fragments — review
+those, and the rendered result, on GitHub or in a Markdown preview.
+`DocumentationDriftTests` in the app suite pins `docs/CONFIGURATION.md` to
+the code: every key the config file is written with, and every `bind.`
+command with its default, must have a matching row.
 
 ## Report a result
 
