@@ -361,8 +361,10 @@ Compatibility checks below are not new benchmark measurements.
 
 | Channel | Xcode / build | Swift compiler | macOS SDK / build | Language / deployment | Core / app result |
 | --- | --- | --- | --- | --- | --- |
-| Stable, current | 27.0 / 27A266a | 6.4 (`swiftlang-6.4.0.34.1`, `clang-2100.3.34.1`) | 27.0 / 26A425 | Swift 6 / macOS 26.0 | See the dated verification record below |
+| Stable, current | 27.0 / 27A266a | 6.4 (`swiftlang-6.4.0.34.1`, `clang-2100.3.34.1`) | 27.0 / 26A425 | Swift 6 / macOS 26.0 | 615 core / 653 app tests passed; 4 expected known issues |
 | Preview | Not installed on this machine | Not measured | Not measured | Swift 6 / macOS 26.0 (project settings) | **Not run**; a stable build is not evidence of a preview pass |
+
+Results and diagnostics are recorded in the [dated verification record](test-results/2026-09-19-issues-88-90.md).
 
 The host runs macOS 27.0 (26A428). Xcode's exact build is listed as the
 September 14 stable release in [Apple's release list](https://developer.apple.com/news/releases/).

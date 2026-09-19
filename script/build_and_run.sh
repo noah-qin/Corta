@@ -3,6 +3,8 @@
 set -euo pipefail
 root_dir="$(cd "$(dirname "$0")/.." && pwd)"
 build_dir="${CORTA_BUILD_DIR:-$root_dir/.build/run}"
+mkdir -p "$build_dir"
+build_dir="$(cd "$build_dir" && pwd -P)"
 stage_dir="$build_dir/launch-stage"
 mode="${1:-run}"
 case "$mode" in run|--verify|--debug|--logs|--telemetry) ;; *) echo "Usage: $0 [--verify|--debug|--logs|--telemetry]" >&2; exit 2 ;; esac
@@ -29,8 +31,11 @@ fi
 export CORTA_STAGE_DIR="$stage_dir" CORTA_RESTORE_WINDOWS=0
 export SHELL=/bin/sh
 if [[ "$mode" == --debug ]]; then exec lldb -- "$app_binary"; fi
-"$app_binary" > "$stage_dir/app.log" 2>&1 &
-app_pid=$!
+/usr/bin/open -n "$build_dir/Build/Products/Debug/Corta.app" \
+    --env "CORTA_STAGE_DIR=$stage_dir" --env CORTA_RESTORE_WINDOWS=0 --env SHELL=/bin/sh \
+    --stdout "$stage_dir/app.log" --stderr "$stage_dir/app.log"
+sleep 1
+app_pid=$(pgrep -f "^$app_binary$" | tail -1)
 echo "$app_pid" > "$stage_dir/pid"
 case "$mode" in
     --verify) sleep 2; kill -0 "$app_pid" ;;

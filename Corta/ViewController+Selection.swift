@@ -4,8 +4,7 @@ import CortaTerminal
 /// Selection and the viewport it is anchored to (Track C): scrolling, and
 /// the mouse-mode query the view's mouse handlers consult.
 extension ViewController {
-    /// The core's ?1006 SGR mouse-reporting flag (M2.7). While off, clicks
-    /// and the wheel keep their normal terminal behaviour.
+    /// Tracking and SGR encoding must both be enabled before reporting.
     func mouseReportingEnabled() -> Bool {
         (session?.sgrMouseTrackingMode ?? .off) != .off
     }
@@ -144,7 +143,11 @@ extension ViewController {
         else { return }
         var grid = session.snapshot()
         var anchor = documentPosition(for: event, in: terminalView, grid: grid)
-        let extending = event.modifierFlags.contains(.shift)
+        // Shift used as the reporting override starts a fresh selection;
+        // otherwise Shift keeps its usual extend-selection meaning.
+        let shiftIsOverride = terminalView.effectiveMouseTrackingMode != .off
+            && terminalView.mouseOverrideModifier == .shift
+        let extending = event.modifierFlags.contains(.shift) && !shiftIsOverride
         let unit: SelectionUnit
         switch event.clickCount {
         case 2: unit = .word
