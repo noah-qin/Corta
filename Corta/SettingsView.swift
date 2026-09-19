@@ -301,8 +301,13 @@ struct SettingsView: View {
     /// one of its setters — the shape every control on this page has, so a
     /// clamped or refused value reflects back from the store rather than
     /// sticking in the control.
+    ///
+    /// The setter is wrapped rather than passed through: `Binding` wants a
+    /// `@Sendable` closure, and a bound `SettingsModel` method is
+    /// main-actor-isolated — handing it over directly is a warning today
+    /// and an error once the isolation is checked strictly.
     private func bind<Value>(_ value: Value, _ set: @escaping (Value) -> Void) -> Binding<Value> {
-        Binding(get: { value }, set: set)
+        Binding(get: { value }, set: { set($0) })
     }
 
     /// A right-aligned numeric field. `TextField(value:format:)` writes its
