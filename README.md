@@ -103,10 +103,11 @@ unzip Corta-1.0.0.zip
 ```
 
 > [!NOTE]
-> **Release status, checked 2026-09-19:** 1.0.0 is the current release,
-> and the feature table above describes it. Later changes on `main` are
-> recorded under `[Unreleased]` in the [changelog](CHANGELOG.md) until the
-> next release.
+> **Release status:** [1.0.0](https://github.com/noah-qin/Corta/releases/tag/v1.0.0)
+> was published on 2026-09-19 and is what the feature table above
+> describes; the archive is signed with a Developer ID and notarised.
+> Later changes on `main` are recorded under `[Unreleased]` in the
+> [changelog](CHANGELOG.md) until the next release.
 
 For updates, use **Corta ▸ Check for Updates…** or download a newer release.
 Installation help and uninstall instructions are in
