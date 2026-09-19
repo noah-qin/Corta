@@ -16,7 +16,6 @@ what to edit.
   text-selection override, configurable through `mouse-override-modifier`.
   SGR encoding alone no longer enables unsolicited mouse reports.
 
-
 ### Changed
 
 - Selection copying now uses the same scrollback coordinate mapping as
@@ -25,11 +24,33 @@ what to edit.
   Xcode release. Only released Xcode toolchains are supported.
 - The maintainer confirmed Vim mouse selection, Option-drag terminal
   selection and clipboard copying, completing the mouse-tracking acceptance.
-
 - Reorganized the project overview, feature reference and contributor guide;
   clarified public release availability and the interpretation of conformance results.
 - Added a testing guide and automated checks for local documentation links,
   with streamlined GitHub contribution templates.
+- The configuration reference now lists every `bind.` command — nine
+  (command-output export and file-reference opening, command-history
+  search, and the six working-directory actions) had shipped without a
+  row — with the spelling Corta writes back; `DocumentationDriftTests`
+  fails when a config key or command loses its row or its documented
+  default drifts from the code.
+- Documentation audit: the daily-driver checklist names the record that
+  last verified each item; the design document's hard parts are numbered
+  headings, so `§7.n` references resolve; the security change log runs
+  newest first; the performance targets table no longer says the energy
+  harness does not exist; the 2026-09-17 interactive record is in English
+  like the rest of the documentation; the isolated developer launch is
+  `scripts/build-and-run.sh` and is documented in the testing guide.
+- The dated verification passes that had accumulated inside
+  `docs/CONFORMANCE.md` (the M2 and M6 closeouts, the B10 pass, the
+  1.0.0 human and hardware items) are now files under
+  `docs/test-results/`, listed from a new §4.7; the conformance document
+  keeps the procedures, and its esctest history is one table. The `less`
+  search-highlight bug it still carried as open did not reproduce on
+  2026-09-17 and is recorded as such. The design document's selection
+  section states its invariants and the tests that pin them instead of
+  retelling the B04 investigation, and the TextKit evaluation it carried
+  is now decision D19.
 
 ## [1.0.0] - 2026-09-18
 
@@ -55,18 +76,20 @@ troubleshooting entry or a conformance note rather than a claim:
 - One tester's ⌘, did not open Settings once. Two passes since could
   not reproduce it — Release and Debug builds, ABC and Pinyin input
   sources, with and without a composition open, and the palette's
-  Settings command — and the menu item works. Reported under
-  `CONFORMANCE.md` §4.4 as unexplained, not as fixed.
+  Settings command — and the menu item works. Reported in
+  `docs/test-results/2026-09-18-release-checks.md` as unexplained, not as
+  fixed.
 - VoiceOver: the second listening pass (2026-09-18) heard the geometry
   and the read-through correctly and *Read selected text* answer "No
   selection." over a six-line mouse selection that the accessibility
   API reported correctly when probed. The plural `AXSelectedTextRanges`
   attribute `NSTextView` also answers is now implemented; whether that
-  was the cause needs one more listen. `CONFORMANCE.md` §4.6.
+  was the cause needs one more listen.
+  `docs/test-results/2026-09-18-release-checks.md`.
 - Multi-display Quick Terminal placement (no second display on the test
   machine) and thermal forcing: not judged. Touch ID under Secure
-  Keyboard Entry passed by hand (`CONFORMANCE.md` §4.6). The energy scenarios ran twice, on mains and under Low Power
-  Mode (`PERFORMANCE.md` §5.6).
+  Keyboard Entry passed by hand (the same record). The energy scenarios
+  ran twice, on mains and under Low Power Mode (`PERFORMANCE.md` §5.6).
 - Mouse motion tracking and its selection override (#88), plus shared
   viewport/selection/search/command/image mapping (#89), are complete in
   the current tree. The separate toolchain follow-up (#90) was cancelled;

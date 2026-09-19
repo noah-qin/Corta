@@ -29,13 +29,15 @@ source of truth; this file is an index. `docs/README.md` is the fuller one.
 
 | Document                   | Covers                                                     |
 | -------------------------- | ---------------------------------------------------------- |
-| `docs/CONFIGURATION.md`    | Every config-file key: settings, themes, keybindings, presets, and when each applies |
+| `docs/FEATURES.md`         | What the development tree does and its known limits, for a user |
+| `docs/CONFIGURATION.md`    | Every config-file key: settings, themes, keybindings, presets, and when each applies — `DocumentationDriftTests` pins it to the code |
 | `docs/DECISIONS.md`        | The settled decisions, one record each — read before proposing an architecture change |
 | `docs/DESIGN.md`           | Goals, architecture, modules, non-goals                     |
 | `docs/CONFORMANCE.md`      | Feature priorities (P0/P1/P2), the daily-driver checklist, test strategy, the five-point manual check |
 | `docs/PERFORMANCE.md`      | Targets, the hot-path rules, how each number is measured, the numbers |
 | `docs/SECURITY.md`         | Threat model, escape-sequence injection, resource caps, process safety, the three trust boundaries |
 | `docs/TROUBLESHOOTING.md`  | What a user sees when something fails, and the fix          |
+| `docs/TESTING.md`          | Which check each kind of change needs, and how to run it   |
 | `docs/history/`            | The M1–M10 roadmap and the 0.1.1 audit notes — the record, never edited except to fix a link |
 | `CONTRIBUTING.md`          | Commit convention, branches, pull requests                 |
 
@@ -62,7 +64,8 @@ line each:
   a transient layout. **D16** Window setup is staged before the
   storyboard runs. **D17** Re-measure the frame-CPU baseline after
   touching the render loop. **D18** No tool or session identifier in a
-  commit message.
+  commit message. **D19** Selection is hand-rolled; TextKit is not
+  adopted.
 
 ## Working Rules
 
@@ -182,9 +185,13 @@ CortaTerminal/.build/release/corta-bench
 Layout:
 
 - `Corta/` — AppKit shell, Metal renderer, font stack
-- `CortaTests/`, `CortaUITests/` — test targets
+- `CortaTerminal/` — the terminal core as a local SwiftPM package, with
+  its own tests, golden fixtures, fuzz corpus and DocC catalog
+- `CortaTests/`, `CortaUITests/` — app-hosted test targets
 - `Corta.xcodeproj/` — build settings live in `project.pbxproj`
-- `docs/` — design documentation
+- `scripts/` — measurement, packaging, release and the isolated
+  developer launch (`build-and-run.sh`)
+- `docs/` — user and design documentation, plus the dated records
 
 Deployment target is macOS 26.0, Swift 6, app sandbox disabled
 (intentionally — `docs/SECURITY.md` §4.1).

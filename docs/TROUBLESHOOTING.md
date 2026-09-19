@@ -100,10 +100,10 @@ saved arrangement is dropped and one fresh window opens.
 
 ### Tab does nothing in Claude Code's slash-command menu
 
-Fixed in 1.0.0 (B02). If it recurs, report it
-with the Claude Code version: the fix is in how `insertTab(_:)` from a
-candidate window reaches the child, and a new candidate UI could route it
-differently.
+Fixed on `main` for 1.0.0 (B02); v0.1.1 still has the bug. If it recurs
+on a newer build, report it with the Claude Code version: the fix is in how
+`insertTab(_:)` from a candidate window reaches the child, and a new
+candidate UI could route it differently.
 
 ### ⌥ types `é`, `ø`, `–` instead of acting as Meta
 

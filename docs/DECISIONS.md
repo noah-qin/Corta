@@ -226,3 +226,28 @@ away. The regression was invisible in every test that passed.
 
 **Why.** The repository is public and a commit message is the one place a
 private URL can never be deleted from.
+
+## D19 — Selection is hand-rolled; TextKit is not adopted
+
+**Decision.** `Selection.swift` and `TerminalView`'s own hit-testing stay.
+`NSTextView`/TextKit was prototyped against the grid (B10, 2026-09-12)
+and rejected.
+
+**Why.** Four things make `DESIGN.md` §2.7's invariants what they are, and TextKit
+fights each of them: it has no fixed column grid, so agreeing with the
+grid means mirroring every write into a parallel `NSTextStorage` — a
+second store that can disagree, the exact shape of the B04 bug; it places
+glyphs by measured advance, whereas a CJK character occupies exactly two
+columns by Corta's rule; `NSLayoutManager`/`NSTextLayoutManager` decide
+wrapping from content and container width, whereas `wrapped` is a fact the
+VT layer already decided from the columns the child was given; and every
+drag has to be dispatched to a TUI's mouse reporting *before* whatever
+handles it, so `NSTextView`'s built-in gestures would still have to be
+intercepted. What TextKit would buy — system drag inertia, right-click
+Services, `NSTextFinder`'s Find Bar — is narrower than it looks, and
+accessibility, the other plausible win, is already implemented by hand and
+tested end to end (`AccessibilityMappingTests`,
+`TerminalViewAccessibilityTests`).
+
+**Consequence.** A proposal to adopt a text system has to answer those
+four points with something other than a shadow data structure.

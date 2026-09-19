@@ -1,100 +1,156 @@
-# Corta 人工交互测试记录 — 2026-09-16～17
+# Interactive test record — 2026-09-16 to 17
 
-测试代码：`d63bf35`。设备：Mac17,3，macOS 27.0 (26A428)。当前代码 Debug、Release 构建均成功。通过电脑控制工具实际操作 UI；未以源码或单元测试代替人工判定。以下“跳过”包含工具无法可靠验证的子项，不能据此把 CONFORMANCE 中整组 not judged 改成通过。
+Code under test: `d63bf35`. Machine: Mac17,3, macOS 27.0 (26A428). Debug
+and Release builds of the current tree both succeeded. The UI was driven
+by a computer-control tool and then by a person at the keyboard; no
+source reading or unit test stood in for a human judgement. "Skipped"
+below includes sub-items the tool could not verify reliably, and does not
+license flipping a whole *not judged* group in `CONFORMANCE.md` to pass.
 
-## 环境与重要限制
+*Translated from the Chinese original on 2026-09-19; the findings are
+unchanged.*
 
-- 正式测试的新构建确认使用 `/tmp/corta-stage/config`，设置页路径可见。SSH 仅使用用户指定主机；报告不保存密码。
-- **准备阶段隔离异常**：按目录时间挑出的旧 Debug 包是 9 月 15 日产物，启动后显示真实配置值而不是 staged 值。真实 `~/.config/corta/config` 的 mtime 为 9 月 16 日 22:36，与旧包启动重叠；文件呈旧格式，并把新配置项放在 unknown keys 区域。没有事前副本，无法证明内容未变，也未猜测性还原。随后停止旧包、重新构建，再验证 staged 路径。
-- UI 工具的 `typeText` 在本轮会丢失部分标点：`Aa@12:>!` 在 cat 中显示为 `Aa@12`；Python 的 `corta_test(4)` 显示为 `cortatest4`。粘贴同一 Python 调用则正确。部分键盘结论因此保留为跳过/待真人复测。
-- 中文审校使用单进程 `-AppleLanguages '(zh-Hans)'`，没有写持久 AppleLanguages 偏好。未修改翻译 catalog 或其审校状态。
+## Environment and important limits
 
-## 逐项结果
+- The build under formal test was confirmed to use
+  `/tmp/corta-stage/config`; the path was visible on the Settings page.
+  SSH used only the host the user named; the report stores no password.
+- **Isolation anomaly during setup.** The old Debug bundle picked by
+  directory timestamp was a 15 September build; once launched it showed
+  the real configuration values instead of the staged ones. The real
+  `~/.config/corta/config` has an mtime of 16 September 22:36, which
+  overlaps that launch; the file is in the old format, with the newer keys
+  in the unknown-keys block. With no prior copy, it cannot be proven that
+  the contents did not change, and no speculative restore was made. The
+  old bundle was stopped, the tree rebuilt, and the staged path verified
+  before continuing.
+- The UI tool's `typeText` lost some punctuation in this round:
+  `Aa@12:>!` showed as `Aa@12` in `cat`, and Python's `corta_test(4)`
+  as `cortatest4`. Pasting the same Python call was correct. Some keyboard
+  conclusions are therefore left as skipped / awaiting a human re-test.
+- The Chinese-language review used a single-process
+  `-AppleLanguages '(zh-Hans)'`; no persistent AppleLanguages preference
+  was written. The translation catalog and its review states were not
+  modified.
 
-| 项 | 判定 | 实测现象与边界 |
+## Item-by-item results
+
+| Item | Verdict | Observed behaviour and limits |
 |---|---|---|
-| A1 中文 IME | 跳过 | 未获得可验证的原生拼音候选窗与组字过程；没有以直接输入汉字冒充 IME 测试。左右 pane 候选定位未判定。 |
-| A1 Claude Tab | 通过 | Claude Code 2.1.273 中先确认 `/he` 显示，再按 Tab，结果为 `/help`；斜杠菜单 Esc 关闭。上下键已发送，但选中行变化未逐帧核实，该子项跳过。没有发送模型请求。 |
-| A2 fzf / Vim | 通过 / 跳过 | fzf 四项列表中 Up + Tab 多选 alpha、beta，计数为 2，Return 输出两项。Ctrl-J/K、Down 已发送但未独立核实各次移动。Vim/Neovim Esc 与冒号注入不可靠，不能判断“无延迟”；该部分跳过。 |
-| A3 Option | 通过 / 跳过 | config 加 `option-as-meta = true` 后热加载，Option-B 将 `echo alpha beta` 的光标移到 beta 开头。默认 Option-E/E 得到 e，受合成输入/输入源限制，死键组合不判定。 |
-| B5 安装集成 | 通过 | Settings 显示 Installed in ~/.zshrc；diff 只有新增受标记管理的集成块。新 pane 加载成功。 |
-| B6 标记与导航 | 通过 / 跳过 | 分别执行 false、true、ls，false 的左侧标记为红色，成功为绿色。⇧⌘↑ 已发送，但命令都在同一可见屏内，未证明导航位置；三种跳转子项跳过。 |
-| B7 输出与历史 | 失败 | Copy Last Command Output 粘贴得到 ls 输出、不含提示符，此子项通过。Command History 有时间与成功/失败状态，但看不到命令文字及搜索输入框，无法搜 ls。 |
-| B8 通知 | 跳过 | 已运行 sleep 8 并尝试切换应用，但未捕获系统通知及点击跳回结果，不能记通过。 |
-| B9 目录导航 | 通过 | 从仓库 Corta 子目录点 Project Root 后 pwd 为 `/Users/noah/Developer/personal/Corta`。Finder 在 personal 中选中 Corta 文件夹，位置正确。 |
-| B10 卸载集成 | 通过 | Remove 后显示未安装；`diff` 与事前备份为空，SHA-1 均为 `c3289aa394bdc31436d8af6b08b80f1934209439`。 |
-| C11 窗口恢复 | 通过（限定） | kill -9 后恢复两个顶层窗口：一个 50:50 双 pane，一个三 tab 分组。首 pane 的 pwd 为 `/private/tmp`，另一个也在 tmp。非等分拖动未成功建立，非等分比例跳过。另发现 tab 窗口从 30 行变为 32 行；选中 tab 是否精确恢复未判定。 |
-| C12 缩放 | 通过 / 跳过 | Bigger 菜单使同一窗口两 pane 从 58×30 变为 51×28，⌘0 恢复 58×30。跨窗口独立性和带放大状态重启未完成验证。注入 ⌘= 得到字面 +，受工具限制，快捷键不判定。 |
-| C13 关闭保护 | 通过 | sleep 100 时 ⌘W 和 ⌘Q 均弹出运行中进程确认；取消后 pgrep 仍找到 sleep 100。 |
-| D14 VoiceOver | 跳过 | 没有真人听感核验；未用 AX 文本代替朗读、历史与选区听音判定。 |
-| D15 中文审校 | 失败（文案） | 已读三个 Settings tab、Shell/View/Window 菜单、命令面板、快捷终端及安全键盘提示。菜单栏标题仍为 File/Shell/Edit/View/Window/Help；响铃值 Visual 未翻译；确认关闭说明残留 pane；同菜单混用窗格/面板。建议见下文。快捷终端状态行的所有状态未覆盖。 |
-| D16 显示器/全屏 | 通过 / 跳过 | Vim 全屏进出时 120×30 → 207×62 → 120×30，内容与网格重绘正常。外接屏 scale 切换、拔线与窗口回迁需实体操作，本轮跳过。 |
-| E17 能耗 | 跳过 | `sudo -n true` 返回 password required；没有 powermetrics 瓦数。脚本还硬编码真实 config/state 路径，不满足本轮隔离条件，因此未原样运行。无数字可写入 PERFORMANCE。 |
-| F18 远程上下文 | 失败（部分） | SSH 登录成功，远端 cd /tmp 后 shell 提供的标题目录更新，但 Corta 徽章始终为 host unknown。远端没有安装 OSC 7 集成，不把普通 shell title 当成完整徽章。⌘D 新建本地 pane，pwd 为 /Users/noah，通过。 |
-| F19 重连 | 通过 | exit 显示 Connection closed；Reconnect to Host 可用，点击重新启动 SSH 并出现密码提示，是新连接。未再次登录第二次会话。 |
-| F20 ProxyJump | 跳过 | 未提供 ProxyJump 主机。 |
-| F21 浏览远端 | 失败（部分） | 首次出现可编辑主机输入，解释当前未知主机，提示部分通过；输入 user@host 后仅报 connection lost，没有列出目录。 |
-| F22 SFTP 传输 | 跳过 | F21 未成功建立 SFTP，目录增删改、文件夹传输、取消/retry 均被阻塞。没有改动远端文件。 |
-| F23 远程编辑 | 跳过 | 被 SFTP 连接失败阻塞，没有上传或覆盖远端文件。 |
-| F24 认证错误 | 失败 | 密码认证主机上 Browse Remote Files 很快失败，只显示“The connection to … was lost.”，未给出“先在终端里连接一次”或密码/密钥认证指引；没有挂住。 |
-| G25 tmux/htop | 失败 | 独立 tmux socket，两 pane 各跑 htop；窗口从 120×30 拖小到 100×24，两个 pane 重排，但底部状态/功能键行仍有旧文字残影，之后刷新仍可见。另出现本地 tmux 的“远程？”徽章，待独立调查。 |
-| G26 Neovim 宽字符 | 通过（显示部分） | 中文与 emoji 样例显示无可见跨列，光标位于对应字符单元；交互输入受上述工具限制，复杂移动编辑未判定。未保存测试编辑。 |
-| G27 持续输出 | 通过 / 失败（预期限制） | 持续 120 秒，47,485 条 × 约 209 字符完成，另一窗口 echo 正常响应。短 CPU 采样见下。滚动顶部只能到编号 42471，不能回到 0：默认 10,000 物理行 scrollback 已淘汰早期内容。因此“全部输出可回到开头”的字面要求不满足，并非无限历史配置。 |
-| G28 Python REPL | 通过 / 跳过 | Python 3.9.6 中多行函数粘贴保留缩进，corta_test(4) 返回 10。该 Python 未启用 bracketed paste，Corta 弹出多行执行提醒；bracketed-paste-on 子项跳过。 |
-| G29 git/less | 通过 | 彩色提交号和 graph 正常；`/renderer` 跳转且反色高亮可见；G 跳到 `(END)`。本轮未复现文档中旧的搜索高亮问题。 |
-| G30 睡眠唤醒 | 跳过 | 未执行实体合盖与唤醒，不能代替判断。 |
-| H31 Release 五点 | 通过 / 跳过 | 当前 Release 构建成功，默认 AX 网格 120×30、stty 返回 30 120；截图正立，长输出第一物理行填满宽度，粘贴菜单快捷键在本地 shell/Python 可用。未独立测量字符像素公式；⌘= 注入异常，不记整项通过。 |
+| A1 Chinese IME | Skipped | No verifiable native Pinyin candidate window or composition was obtained; typing Han characters directly was not passed off as an IME test. Candidate placement in the left and right panes not judged. |
+| A1 Claude Tab | Pass | In Claude Code 2.1.273, `/he` was confirmed on screen, Tab was pressed, and the result was `/help`; Esc closed the slash menu. Up/Down were sent, but the change of highlighted row was not verified frame by frame, so that sub-item is skipped. No model request was sent. |
+| A2 fzf / Vim | Pass / Skipped | In a four-item fzf list, Up + Tab multi-selected alpha and beta, the count read 2, and Return printed both. Ctrl-J/K and Down were sent but each move was not verified independently. Esc and colon injection into Vim/Neovim were unreliable, so "no delay" could not be judged; that part is skipped. |
+| A3 Option | Pass / Skipped | After adding `option-as-meta = true` the config hot-reloaded, and Option-B moved the cursor in `echo alpha beta` to the start of `beta`. With the default, Option-E then E produced `e`; because of synthetic-input and input-source limits, dead-key combinations are not judged. |
+| B5 Install integration | Pass | Settings showed *Installed in ~/.zshrc*; the diff contained only the added, marker-delimited integration block. A new pane loaded it successfully. |
+| B6 Marks and navigation | Pass / Skipped | `false`, `true` and `ls` were run in turn; the left-hand mark for `false` was red, success green. ⇧⌘↑ was sent, but all commands were on one visible screen, so the navigation position was not proven; the three jump sub-items are skipped. |
+| B7 Output and history | Fail | Copy Last Command Output pasted the `ls` output without the prompt — that sub-item passes. Command History showed time and success/failure state, but no command text and no search field, so `ls` could not be searched for. |
+| B8 Notifications | Skipped | `sleep 8` was run and an application switch attempted, but no system notification or click-back result was captured; cannot be recorded as a pass. |
+| B9 Directory navigation | Pass | From the repository's `Corta` subdirectory, Project Root gave `pwd` = `/Users/noah/Developer/personal/Corta`. Finder selected the `Corta` folder inside `personal` — the right location. |
+| B10 Remove integration | Pass | After Remove, the state read *not installed*; `diff` against the prior backup was empty and both SHA-1s were `c3289aa394bdc31436d8af6b08b80f1934209439`. |
+| C11 Window restore | Pass (qualified) | After `kill -9`, two top-level windows were restored: one 50:50 two-pane split and one three-tab group. The first pane's `pwd` was `/private/tmp`; the other was also under tmp. A non-equal drag could not be established, so non-equal proportions are skipped. The tab window also went from 30 rows to 32; whether the selected tab was restored exactly was not judged. |
+| C12 Zoom | Pass / Skipped | The Bigger menu item took both panes of one window from 58×30 to 51×28, and ⌘0 restored 58×30. Cross-window independence and relaunch with a zoom active were not completed. Injecting ⌘= produced a literal `+`, a tool limitation, so the shortcut is not judged. |
+| C13 Close protection | Pass | With `sleep 100` running, both ⌘W and ⌘Q raised the running-process confirmation; after cancelling, `pgrep` still found `sleep 100`. |
+| D14 VoiceOver | Skipped | No human listening check; AX text was not used in place of judging what is spoken for history and selection. |
+| D15 Chinese review | Fail (copy) | Read the three Settings tabs, the Shell/View/Window menus, the command palette, the Quick Terminal and the Secure Keyboard Entry hint. The menu-bar titles were still File/Shell/Edit/View/Window/Help; the bell value *Visual* was untranslated; the close confirmation still said "pane"; one menu mixed 窗格 and 面板. Suggestions below. Not every state of the Quick Terminal status row was covered. |
+| D16 Displays / full screen | Pass / Skipped | Vim entering and leaving full screen went 120×30 → 207×62 → 120×30 with content and grid redrawn correctly. External-display scale changes, unplugging and window migration need physical action; skipped this round. |
+| E17 Energy | Skipped | `sudo -n true` reported *password required*; no `powermetrics` wattage. The script also hard-codes the real config/state paths, which did not meet this round's isolation requirement, so it was not run as-is. No number to write into PERFORMANCE. |
+| F18 Remote context | Fail (partial) | SSH login succeeded; after a remote `cd /tmp` the shell-provided title directory updated, but the Corta badge stayed at *host unknown*. The remote had no OSC 7 integration installed, and an ordinary shell title is not treated as a full badge. ⌘D opened a new local pane with `pwd` = `/Users/noah` — pass. |
+| F19 Reconnect | Pass | `exit` showed *Connection closed*; Reconnect to Host was enabled and clicking it started SSH again with a password prompt — a new connection. A second session was not logged into again. |
+| F20 ProxyJump | Skipped | No ProxyJump host was provided. |
+| F21 Browse remote | Fail (partial) | The editable host field appeared on first use and explained that the host was unknown — that part passes. After entering `user@host`, only *connection lost* was reported; no directory listing. |
+| F22 SFTP transfer | Skipped | Blocked by F21's failure to establish SFTP: directory create/delete/rename, folder transfer and cancel/retry were all blocked. No remote file was changed. |
+| F23 Remote editing | Skipped | Blocked by the SFTP connection failure; nothing was uploaded or overwritten remotely. |
+| F24 Authentication error | Fail | Browse Remote Files against a password-only host failed quickly, showing only "The connection to … was lost." with no "connect once in the terminal first" or password/key guidance; it did not hang. |
+| G25 tmux / htop | Fail | A private tmux socket with `htop` in each of two panes; the window was dragged from 120×30 down to 100×24 and both panes relaid out, but the bottom status/function-key rows kept ghost text from before, still visible after later refreshes. A local tmux also showed the *remote?* badge — to be investigated separately. |
+| G26 Neovim wide characters | Pass (display) | The Chinese and emoji sample showed no visible column straddling, and the cursor sat on the matching cell; interactive input was limited by the tool issues above, so complex movement and editing are not judged. No test edit was saved. |
+| G27 Sustained output | Pass / Fail (expected limit) | 120 s of continuous output completed 47,485 lines of about 209 characters, with `echo` in another window still responding. Short CPU samples below. Scrolling to the top only reached line 42471, not 0: the default 10,000 physical-line scrollback had evicted the early output. The literal requirement "all output can be scrolled back to the start" is therefore not met; this is not an unlimited-history configuration. |
+| G28 Python REPL | Pass / Skipped | In Python 3.9.6, a pasted multi-line function kept its indentation and `corta_test(4)` returned 10. This Python does not enable bracketed paste, so Corta showed the multi-line execution warning; the bracketed-paste-on sub-item is skipped. |
+| G29 git / less | Pass | Coloured commit hashes and graph rendered; `/renderer` jumped and the reverse-video highlight was visible; `G` reached `(END)`. The older search-highlight problem in the documentation did not reproduce this round. |
+| G30 Sleep / wake | Skipped | No physical lid close and wake was performed; nothing can stand in for that judgement. |
+| H31 Release five-point check | Pass / Skipped | The current Release build succeeded; the default AX grid was 120×30 and `stty` returned `30 120`; the screenshot was upright, long output filled the first physical row's width, and the Paste menu shortcut worked in a local shell and in Python. The pixel formula was not measured independently; ⌘= injection misbehaved, so the whole item is not recorded as a pass. |
 
-原清单没有编号 4。
+The original list had no item 4.
 
-## 中文修改建议
+## Suggested Chinese wording
 
-- “为正在运行的命令的输出拍摄快照” → “保存当前命令输出快照”。
-- “在新面板中打开上级目录/项目根目录” → 统一使用“新窗格”。
-- “pane 中仍有任务运行时询问。” → “窗格中仍有任务运行时询问。”
-- “滚动回看”作为数字设置可用“回滚历史行数”或“保留历史行数”，更明确。
-- Visual → “视觉提示”；菜单栏标题也应本地化。
-- 仅提供界面审校建议，不代表真人母语者签核，未将 needs_review 改为 translated。
+- "为正在运行的命令的输出拍摄快照" → "保存当前命令输出快照".
+- "在新面板中打开上级目录/项目根目录" → use "新窗格" consistently.
+- "pane 中仍有任务运行时询问。" → "窗格中仍有任务运行时询问。".
+- For the numeric scrollback setting, "回滚历史行数" or "保留历史行数" is
+  clearer than "滚动回看".
+- *Visual* → "视觉提示"; the menu-bar titles should be localised too.
+- These are review suggestions for the UI copy only. They are not a
+  native-speaker sign-off, and no `needs_review` state was changed to
+  `translated`.
 
-## 负载采样（不是能耗结果）
+## Load samples (not an energy result)
 
-对 Release PID 70216 的 top 五次采样：首个初始化样本 0.0%，后四个为 6.0%、7.0%、7.4%、7.8%；内存从 225M 到 231M。采样仅数秒，机器还运行其他应用，不足以证明两分钟 CPU 稳态或作为性能基准。瓦数未测量。
+Five `top` samples of the Release build, PID 70216: the first,
+initialising sample read 0.0%, the next four 6.0%, 7.0%, 7.4% and 7.8%;
+memory went from 225 MB to 231 MB. The samples cover a few seconds on a
+machine running other applications, and are not evidence of a two-minute
+steady-state CPU figure or a performance baseline. Wattage was not
+measured.
 
-## 清理
+## Cleanup
 
-Shell Integration 已由界面 Remove，原 .zshrc 经 diff/hash 核实完全一致。专用 tmux 服务器已停止。最终清理结果见后续记录。
+Shell integration was removed through the UI; the original `.zshrc` was
+verified identical by diff and hash. The dedicated tmux server was
+stopped. The final cleanup state is in the following record.
 
-最终清理完成：Corta 已停止，`/tmp/corta-stage` 已删除；备份与当前 `.zshrc` 比较一致后删除备份。进程检索无本轮 staged/Corta 进程残留。真实配置的准备阶段隔离异常仍如上所述，未擅自覆盖。
+Final cleanup complete: Corta stopped, `/tmp/corta-stage` deleted; the
+backup was compared with the current `.zshrc`, found identical, and
+deleted. A process search found no staged or Corta processes left from
+this round. The isolation anomaly against the real configuration during
+setup remains as described above and was not overwritten on a guess.
 
-## 用户实体键盘补测 — 2026-09-17
+## Supplementary physical-keyboard checks by the user — 2026-09-17
 
-本节覆盖前文对应的合成输入限制；没有明确确认的子项仍保持待测。
+This section covers the synthetic-input limits noted above; sub-items
+without an explicit confirmation remain pending.
 
-- A1：用户确认拼音 nihao 候选定位及空格上屏正常；右侧分屏的重复检查未单独明确，仍待确认。
-- A1：Claude `/` 菜单 ↑、↓、Esc 均正常。
-- A2：fzf ↑、↓、Ctrl-J/K、Tab 均正常。Tab 选中后移动到下一项符合本机 fzf 手册的 toggle+down 默认绑定。
-- A2：`vim -u NONE` 中 i → abc → Esc → x 正常，实体键盘 Esc 子项通过。
-- A3：用户尚未测试 ABC 输入源 Option-E/E；当前 staged 配置已核实 option-as-meta=false。
-- H31：用户确认本地 shell ⌘V、⌘=、⌘0 均正常；快捷键子项通过。
-- 新问题：用户报告 Claude 颜色消失（之前有颜色）；截图显示 Claude Code 2.1.274 的浅色界面主要为单色。记录为待定位现象，尚不能区分 Claude 配置/环境和 Corta 颜色渲染问题。
-- 本轮用户补测已重新创建 /tmp/corta-stage 并启动 Release；前一节清理记录只描述上一轮结束时状态。
+- A1: the user confirmed that Pinyin `nihao` placed its candidates
+  correctly and Space committed them. The repeat check in the right-hand
+  split was not confirmed separately and remains pending.
+- A1: ↑, ↓ and Esc in Claude's `/` menu all behaved.
+- A2: ↑, ↓, Ctrl-J/K and Tab in fzf all behaved. Moving to the next item
+  after a Tab selection matches this machine's fzf manual (the default
+  toggle+down binding).
+- A2: in `vim -u NONE`, i → abc → Esc → x behaved; the physical-keyboard
+  Esc sub-item passes.
+- A3: the user has not yet tested Option-E, E under the ABC input source;
+  the staged config was verified to have `option-as-meta = false`.
+- H31: the user confirmed ⌘V, ⌘= and ⌘0 in a local shell; the shortcut
+  sub-item passes.
+- New: the user reported that Claude's colours had disappeared (they were
+  present before); the screenshot shows Claude Code 2.1.274's light theme
+  as mostly monochrome. Recorded as an observation to locate; it cannot
+  yet be attributed to Claude's configuration/environment or to Corta's
+  colour rendering.
+- This supplementary round recreated `/tmp/corta-stage` and launched the
+  Release build; the cleanup section above describes the state at the end
+  of the previous round only.
 
-## 用户第二轮实体测试 — 2026-09-17
+## The user's second physical round — 2026-09-17
 
-以下为用户直接反馈；覆盖前文对应待测结论。
+Direct feedback from the user; supersedes the pending conclusions above.
 
-| 项目 | 更新判定 | 证据或边界 |
+| Item | Updated verdict | Evidence or limits |
 |---|---|---|
-| A1 右侧分屏 IME | 通过 | 用户确认右 pane 拼音候选窗随光标，上屏正常。 |
-| A3 ABC 死键 | 通过 | option-as-meta=false，Option-E 再 E 得到 é。 |
-| Settings ⌘, | 失败 | 用户按快捷键无法打开 Settings，只能手动通过菜单打开。新增问题，未定位原因。 |
-| B6 命令标记与导航 | 通过 | 用户确认失败/成功颜色、⌘↑、⌘↓、⇧⌘↑ 均正常。 |
-| B8 通知及点击定位 | 通过 | 用户确认通知出现，点击后回到正确窗口、pane，并定位到对应命令。 |
-| C11 强制退出恢复 | 失败（显示子项） | 用户表示恢复其余项目正常，但窗口 B 的 tab2 显示异常。附图可见标签栏覆盖终端顶部文字，内容区域未正确避让标签栏；根因未确定。不能将整项记为通过。 |
-| C12 缩放独立与重启 | 通过（功能）/失败（视觉） | 用户确认独立性与重启正常，但放大字体时文字跳动。需复现定位缩放期间的视觉抖动。 |
-| 全窗口关闭后重开 | 失败 | 用户关闭所有窗口后点击 app logo 打开新窗口，新窗口会闪烁。记录为新复现路径，未确定是 Dock 重开或其他入口，待定位时核实。 |
-| D14 VoiceOver | 异常待定位，未通过 | 用户听到的朗读与屏幕内容不一致，尚不确定逐行、焦点、历史视口或选区哪个环节导致。保留人工反馈，不用 AX 文本替代听音判定。 |
-| D16 外接屏/拔线 | 跳过（用户明确排除） | 用户要求本轮不测此项。全屏子项此前已测。 |
-| G30 睡眠唤醒 | 通过（用户确认） | 用户确认本地恢复输入无空白/卡死，远程继续或明确断开及 Reconnect 行为正常。 |
+| A1 IME in the right-hand split | Pass | The user confirmed the Pinyin candidate window followed the cursor in the right pane and text committed correctly. |
+| A3 ABC dead keys | Pass | With `option-as-meta = false`, Option-E then E produced `é`. |
+| Settings ⌘, | Fail | The user could not open Settings with the shortcut, only through the menu. New problem, cause not located. |
+| B6 Command marks and navigation | Pass | The user confirmed the failure/success colours and ⌘↑, ⌘↓ and ⇧⌘↑ all behaved. |
+| B8 Notification and click-through | Pass | The user confirmed the notification appeared and that clicking it returned to the right window and pane and landed on the corresponding command. |
+| C11 Restore after force quit | Fail (display sub-item) | The user reported the rest of the restore correct, but tab 2 of window B displayed wrongly. The attached screenshot shows the tab bar covering the top line of the terminal; the content area did not clear the tab bar. Root cause undetermined. The whole item cannot be recorded as a pass. |
+| C12 Zoom independence and relaunch | Pass (function) / Fail (visual) | The user confirmed independence and relaunch behaved, but the text jumped while the font was being enlarged. Needs reproducing to locate the visual jitter during zoom. |
+| Reopening after closing every window | Fail | After closing all windows, clicking the app icon to open a new window made the new window flash. Recorded as a new reproduction path; whether the entry point was the Dock or something else is to be confirmed when it is located. |
+| D14 VoiceOver | Anomaly, not located, not passed | What the user heard did not match the screen; it is not yet clear whether the line-by-line reading, focus, the history viewport or the selection is at fault. Kept as human feedback; AX text was not substituted for listening. |
+| D16 External display / unplugging | Skipped (excluded by the user) | The user asked not to test this item this round. The full-screen sub-item was tested earlier. |
+| G30 Sleep / wake | Pass (user-confirmed) | The user confirmed local input resumed with no blank or hang, that a remote session either continued or disconnected cleanly, and that Reconnect behaved. |
 
-截图证据描述：2026-09-17 13:33:18，三个标签可见，当前中间标签为 Corta — zsh，左右为 ~ — zsh 与 tmp — zsh；终端首行部分被标签栏遮挡。截图本身不能单独证明各 tab 的原顺序或目录恢复，相关结论来自用户反馈。
+Screenshot evidence, described: 2026-09-17 13:33:18, three tabs visible,
+the current middle tab *Corta — zsh*, with *~ — zsh* and *tmp — zsh* on
+either side; the terminal's first line partly hidden by the tab bar. The
+screenshot alone cannot prove the original tab order or the restored
+directories; those conclusions come from the user's feedback.

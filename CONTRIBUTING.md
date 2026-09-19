@@ -30,7 +30,7 @@ first so contributors do not duplicate effort.
 | `CortaTerminal/Tests/` | Core tests, golden fixtures and fuzz corpus |
 | `CortaTests/`, `CortaUITests/` | App-hosted tests and interactive UI tests |
 | `docs/` | User guides, architecture and verification evidence |
-| `scripts/`, `.github/` | Benchmarks, packaging and continuous integration |
+| `scripts/`, `.github/` | Measurement, packaging, the isolated developer launch, and continuous integration |
 
 ## Tests and documentation
 
@@ -50,11 +50,13 @@ reason or invariant. Avoid narrating the code or using a milestone number as
 the only explanation. Test names should describe observable behaviour and
 fixture comments should identify the rule being checked.
 
+Before opening a documentation pull request, run the link check:
+
 ```sh
 python3 scripts/check-docs.py
 ```
 
-## Commit Messages
+## Commit messages
 
 Corta follows [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/).
 Every commit message MUST be written in **English**.
@@ -142,7 +144,7 @@ BREAKING CHANGE: previously saved window positions are discarded on
 first launch after this change.
 ```
 
-## For AI Assistants
+## For AI assistants
 
 Before writing a commit, work through this checklist:
 
@@ -169,10 +171,11 @@ translations, and mark unreviewed non-English entries `needs_review`. This
 state is an editorial marker: the translation still ships at runtime.
 
 Prefer a native speaker's review in the running app before marking a
-translation `translated`. The current zh-Hans catalog is an explicit
-exception: it was marked `translated` after an assistant review on
-2026-09-18, not a native-speaker sign-off. That record is in
-[Conformance §4.6](docs/CONFORMANCE.md#46-manual-scenario-pass).
+translation `translated`. The zh-Hans catalog is an explicit exception: its
+strings were marked `translated` after an assistant review on 2026-09-18,
+not a native-speaker sign-off, and strings added since are `needs_review`
+until reviewed. That record is in
+[the 1.0.0 release checks](docs/test-results/2026-09-18-release-checks.md).
 Do not infer native-speaker verification from catalog state alone; describe
 the reviewer and scope in the PR, and record any human-only gaps.
 
@@ -181,7 +184,7 @@ the reviewer and scope in the PR, and record any human-only gaps.
 - `main` is always buildable.
 - Work on `<type>/<short-description>`, e.g. `feat/preferences-window`.
 
-## Pull Requests
+## Pull requests
 
 - The PR title follows the same Conventional Commits format as a subject
   line.
@@ -195,7 +198,7 @@ the reviewer and scope in the PR, and record any human-only gaps.
 - `main` is protected. Changes land by squash merge, and the branch is
   deleted afterwards.
 
-## Reporting Problems
+## Reporting problems
 
 - **Bugs and feature requests** — open an issue. The forms ask for the
   byte sequence that reproduces the problem; that is the part that makes a
@@ -209,7 +212,7 @@ the reviewer and scope in the PR, and record any human-only gaps.
   private reporting channel.
 - **Conduct** — `CODE_OF_CONDUCT.md`.
 
-## Licence of Contributions
+## Licence of contributions
 
 Corta is licensed under the Apache License 2.0. Under Section 5 of that
 licence, anything you deliberately submit for inclusion is licensed the

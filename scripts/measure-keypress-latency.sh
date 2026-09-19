@@ -1,6 +1,6 @@
 #!/bin/bash
 # Keypress → glass, measured from inside Corta — no third-party tool, no screen
-# capture, no third-party tool. `RenderMetrics.keypressToPresent` takes
+# capture. `RenderMetrics.keypressToPresent` takes
 # the key event's timestamp and closes the sample in the drawable's
 # presented handler, which fires when the frame carrying the child's echo
 # is actually on screen (`MTLDrawable.presentedTime`), not when it was
