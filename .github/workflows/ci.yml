@@ -21,14 +21,9 @@ permissions:
   contents: read
 
 env:
-  # The required lane runs on one toolchain, not on whatever the runner
-  # image happens to ship. "Select the newest installed Xcode" made an image
-  # update an uncontrolled variable in a check that gates merges: the
-  # compiler could change under a pull request that touched nothing.
-  # This is the toolchain `docs/history/ROADMAP-0.1.md` declares. When the image stops
-  # carrying it the job fails loudly and the pin gets a deliberate bump —
-  # which is the point. The newest-SDK question moves to `nightly.yml`,
-  # where the answer is a bug report rather than a blocked pull request.
+  # Stable releases only. Keep this pin aligned with nightly.yml so
+  # runner image updates cannot silently change the compiler under a PR.
+  # If the pinned release disappears, deliberately update both workflows.
   XCODE_PIN: "26.6.0"
 
 

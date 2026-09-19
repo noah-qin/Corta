@@ -160,6 +160,9 @@ can never be deleted from. `CONTRIBUTING.md` rule 6.
 
 ## Build and Test
 
+Only stable, released Xcode toolchains are supported. Keep `XCODE_PIN`
+aligned in `.github/workflows/ci.yml` and `.github/workflows/nightly.yml`.
+
 ```sh
 xcodebuild -project Corta.xcodeproj -scheme Corta build
 xcodebuild -project Corta.xcodeproj -scheme Corta test
