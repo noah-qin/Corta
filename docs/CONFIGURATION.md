@@ -207,12 +207,16 @@ and Sparkle's update path and Spotlight/Launchpad both assume
 
 ## 3. A complete example
 
+Every scalar key, at its default unless the comment says otherwise. The
+structured families — themes (§4), presets (§4a) and shortcuts (§5) — are
+shown in their own sections.
+
 ```ini
 # Appearance
 theme = corta
 appearance = auto
 font-family = system
-font-size = 13
+font-size = 13                     # default 12
 
 # Window
 columns = 120
@@ -220,20 +224,36 @@ rows = 30
 restore-windows = true
 confirm-close = true
 
+# Quick Terminal
+quick-terminal = false
+quick-terminal-key = alt+space
+quick-terminal-position = top
+quick-terminal-screen = mouse
+
 # Terminal
-scrollback-lines = 50000
+scrollback-lines = 50000           # default 10000
+command-history-limit = 512
 bell = visual
 option-as-meta = false
-search-case-sensitive = false
-search-regex = false
 open-file-command =
+search-regex = false
+search-case-sensitive = false
 copy-on-select = true
+mouse-override-modifier = option
 link-activation = command
 allow-clipboard-write = false
+secure-keyboard-entry = false
 
 # Notifications
-notify-on-long-task = true
-notification-threshold = 60
+notify-on-long-task = true         # default false
+notification-threshold = 60        # default 30
+
+# History
+directory-history = true
+
+# Updates
+update-auto-check = true
+suggest-applications-folder = true
 ```
 
 ---
@@ -372,7 +392,9 @@ bind.<command> =                 # an empty value unbinds
 ```
 
 Modifiers: `cmd`/`command`, `ctrl`/`control`, `alt`/`opt`/`option`,
-`shift`. Joined to the key with `+`, case-insensitive.
+`shift`. Joined to the key with `+`, case-insensitive, in any order —
+Corta writes a shortcut back as `ctrl+alt+shift+cmd+key`, which is the
+spelling the table below uses.
 
 Keys: any single character (`d`, `,`, `=`, `+`), or one of the named
 keys `up`, `down`, `left`, `right`, `home`, `end`, `pageup`, `pagedown`,
@@ -404,7 +426,7 @@ the key against both rows, which is how you spot it.
 | `new-tab` | New Tab | `cmd+t` |
 | `close` | Close | `cmd+w` |
 | `split-right` | Split Pane Right | `cmd+d` |
-| `split-down` | Split Pane Down | `cmd+shift+d` |
+| `split-down` | Split Pane Down | `shift+cmd+d` |
 | `focus-left` | Move Focus Left | `alt+cmd+left` |
 | `focus-right` | Move Focus Right | `alt+cmd+right` |
 | `focus-up` | Move Focus Up | `alt+cmd+up` |
@@ -431,6 +453,15 @@ the key against both rows, which is how you spot it.
 | `next-failed-command` | Next Failed Command | `shift+cmd+down` |
 | `copy-last-command-output` | Copy Last Command Output | *(none)* |
 | `snapshot-running-command-output` | Snapshot Running Command's Output | *(none)* |
+| `export-command-output` | Export Command Output… | *(none)* |
+| `open-file-reference-in-command` | Open File Reference in Command Output | *(none)* |
+| `search-command-history` | Search Command History… | *(none)* |
+| `reveal-working-directory` | Reveal Working Directory in Finder | *(none)* |
+| `copy-working-directory-path` | Copy Working Directory Path | *(none)* |
+| `change-directory-to-parent` | Change Directory to Parent | *(none)* |
+| `change-directory-to-project-root` | Change Directory to Project Root | *(none)* |
+| `open-parent-directory-in-new-pane` | Open Parent Directory in New Pane | *(none)* |
+| `open-project-root-in-new-pane` | Open Project Root in New Pane | *(none)* |
 | `export-text` | Export Text… | `shift+cmd+s` |
 | `clear-screen` | Clear Screen | `cmd+k` |
 | `clear-history` | Clear History | *(none)* |
@@ -442,12 +473,14 @@ the key against both rows, which is how you spot it.
 | `quick-terminal` | Quick Terminal | *(none — the system-wide key is `quick-terminal-key`)* |
 | `secure-keyboard-entry` | Secure Keyboard Entry | *(none)* |
 | `settings` | Settings… | `cmd+,` |
-| `command-palette` | Command Palette… | `cmd+shift+p` |
+| `command-palette` | Command Palette… | `shift+cmd+p` |
 
 `previous-command`, `next-command`, the two failed-command jumps,
-`copy-last-command-output` and `snapshot-running-command-output` all need
+`copy-last-command-output`, `snapshot-running-command-output`,
+`export-command-output` and `open-file-reference-in-command` all need
 shell integration (OSC 133) to have anything to work with; without it their
-menu items are disabled rather than silent. `copy-last-command-output` takes
+menu items are disabled rather than silent, and `search-command-history`
+opens a window with nothing in it. `copy-last-command-output` takes
 the rows between the last command's prompt and the next one — which is right
 for a one-line prompt with the command typed on it, and takes one row too
 much for a two-line prompt or a command continued across lines, because Corta
@@ -461,6 +494,34 @@ command has printed so far, with a header naming when the snapshot was taken
 — because what a build has printed at minute three is still worth reading,
 and waiting for it to finish to read it would be Corta making the user wait
 on itself.
+
+`export-command-output` is `copy-last-command-output` written to a file
+instead of the clipboard, for a build log too long to want pasted anywhere
+but still worth attaching to a bug report. `open-file-reference-in-command`
+opens the first `path:line[:column]` reference in that command's output
+through `open-file-command` (§2), without hunting through the scrollback for
+it by eye. Both act on the command a jump (or a notification's click) landed on,
+else the one whose prompt is nearest the top of the viewport, else the
+last one that finished. `search-command-history` opens the Command History window for the
+pane — every recorded command with its time, exit status and directory,
+searchable, with **Fill** and **Run** for a command whose text is still in
+the scrollback (`command-history-limit` bounds how many are kept).
+
+The six working-directory commands act on the directory the pane's shell
+last reported through `OSC 7`, and are disabled until it has reported one.
+`reveal-working-directory` selects it in Finder and
+`copy-working-directory-path` puts the path on the clipboard.
+`change-directory-to-parent` and `change-directory-to-project-root` write a
+`cd` to the shell under the same safety gate every app-initiated directory
+change uses (§2, History): only when no command is running and the prompt is
+empty. The project root is the nearest ancestor containing `.git`, and the
+two project-root commands are disabled when there is none.
+`open-parent-directory-in-new-pane` and `open-project-root-in-new-pane`
+split the pane with a new local one rooted there instead. In a remote pane
+only `change-directory-to-parent` works — the `cd` goes to the remote shell,
+where the path lives — while the Finder, clipboard, project-root and
+new-pane commands stay disabled, because none of them may act on a path
+that belongs to another machine (`SECURITY.md` §7, S09).
 
 `reopen-closed-pane` puts a closed pane back where it was — same split, same
 side, same divider, same working directory. It restores the *arrangement*,
@@ -552,7 +613,7 @@ search away.
 | Change | Takes effect |
 | --- | --- |
 | `theme`, `appearance`, `font-family`, `font-size` | Immediately, in every open pane. |
-| `bell`, `option-as-meta`, `search-case-sensitive`, `search-regex`, `open-file-command`, `copy-on-select`, `link-activation`, `allow-clipboard-write`, `confirm-close`, notification keys | Immediately — they are read when the behaviour happens. |
+| `bell`, `option-as-meta`, `search-case-sensitive`, `search-regex`, `open-file-command`, `copy-on-select`, `mouse-override-modifier`, `link-activation`, `allow-clipboard-write`, `confirm-close`, `directory-history`, notification keys | Immediately — they are read when the behaviour happens. |
 | `bind.*` | Immediately: the menu key equivalents are re-applied on every file change. |
 | `theme.*` | Immediately, if the live theme is the one you edited. |
 | `columns`, `rows` | The next window opened. |
