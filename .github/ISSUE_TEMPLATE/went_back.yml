@@ -45,7 +45,7 @@ body:
     id: version
     attributes:
       label: Corta version
-      placeholder: "0.1.1"
+      placeholder: "1.0.0"
 
   - type: checkboxes
     id: followup

@@ -39,11 +39,55 @@ for updates.
 | Quick Terminal and Shortcuts | Bracketed paste and OSC 8 links | Shell integration and command history |
 | Secure Keyboard Entry | Kitty keyboard and direct graphics protocols | OpenSSH, SFTP and remote editing |
 
-The table describes the development tree on `main`; the latest download
-may not have every row yet. The [feature reference](docs/FEATURES.md) has
-the details, requirements and limitations, and the
-[design decisions](docs/DECISIONS.md) explain what Corta deliberately
-leaves out.
+The table describes `main`; a release may trail it by a row or two. The
+[feature reference](docs/FEATURES.md) has the details, requirements and
+limitations, and the [design decisions](docs/DECISIONS.md) explain what
+Corta deliberately leaves out.
+
+## How is Corta different?
+
+iTerm2 and Ghostty are both excellent terminals, and Corta borrows the
+standards they helped set. It makes a different set of bets.
+
+| | Corta | iTerm2 | Ghostty |
+| :--- | :--- | :--- | :--- |
+| Written in | Swift, end to end | Objective-C and Swift | Zig core, Swift and GTK front ends |
+| Platforms | macOS only, by decision | macOS | macOS and Linux |
+| Terminal core | A separate Swift package with **zero** third-party dependencies | In the app | `libghostty`, shared across platforms |
+| Rendering | Metal, with Core Text shaping and font fallback | Metal | Metal on macOS, OpenGL on Linux |
+| Settings | One text file, edited by a native Settings window too | Preferences UI and profiles | One text file |
+| Scope | Terminal correctness; no multiplexer, no AI, no scripting engine | Everything, including tmux integration and a Python API | Terminal plus a cross-platform library |
+
+**Why pick Corta.**
+
+- **It is a Mac app first, not a port.** CJK input and IME composition,
+  Secure Keyboard Entry, VoiceOver, Shortcuts, the Quick Terminal and the
+  Services menu are built on the native AppKit paths, so they behave the
+  way the rest of your Mac does — not the way a cross-platform toolkit
+  approximates it.
+- **Every byte from the PTY is treated as hostile.** The VT engine is
+  hand-written in Swift with resource caps on every unbounded input, and
+  the capabilities that let a program read your clipboard or window title
+  back are deliberately absent. The [security model](docs/SECURITY.md)
+  spells out the three trust boundaries.
+- **One config file is the whole settings store.** `~/.config/corta/config`
+  is what the Settings window edits, what a preset loads and what
+  [the reference](docs/CONFIGURATION.md) documents key by key; a test fails
+  when the documentation drifts from the code.
+- **Remote work stays in the terminal.** SSH sessions use the system
+  OpenSSH and carry their host and directory context, an SFTP browser sits
+  beside the shell, and a remote file opens in your local editor as a
+  managed copy that uploads only when you say so — with a conflict check
+  against the remote first.
+- **The numbers are published, including the bad ones.** Frame CPU, idle
+  CPU, throughput, keypress-to-glass latency and the esctest2 result are
+  measured, dated and recorded [below](#quality-with-evidence), with the
+  method for each — the latency figure is above target and the README says
+  so rather than leaving the row out.
+
+If you need tmux control mode, a Linux build or a scripting API, iTerm2 or
+Ghostty is the better choice today; those are
+[settled decisions](docs/DECISIONS.md), not gaps waiting to be filled.
 
 ## Install
 
@@ -54,15 +98,15 @@ checksum, unzip the archive and move `Corta.app` to `/Applications`.
 
 ```sh
 # Run in the directory containing both downloaded files.
-shasum -a 256 -c Corta-0.1.1.zip.sha256
-unzip Corta-0.1.1.zip
+shasum -a 256 -c Corta-1.0.0.zip.sha256
+unzip Corta-1.0.0.zip
 ```
 
 > [!NOTE]
-> **Release status, checked 2026-09-19:** v0.1.1 is the latest public
-> release. The development tree is preparing 1.0.0, whose archive will be
-> `Corta-1.0.0.zip`; features on `main` may not be in the download yet.
-> The [changelog](CHANGELOG.md) is the development record.
+> **Release status, checked 2026-09-19:** 1.0.0 is the current release,
+> and the feature table above describes it. Later changes on `main` are
+> recorded under `[Unreleased]` in the [changelog](CHANGELOG.md) until the
+> next release.
 
 For updates, use **Corta ▸ Check for Updates…** or download a newer release.
 Installation help and uninstall instructions are in

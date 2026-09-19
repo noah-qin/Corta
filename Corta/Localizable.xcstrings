@@ -13,7 +13,7 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": "程序使用鼠标时，按住 %@ 拖动以选择文本。"
           }
         },
@@ -21956,7 +21956,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Centre"
+            "value": "Center"
           }
         },
         "zh-Hans": {

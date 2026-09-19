@@ -2,8 +2,9 @@
 
 [Documentation index](README.md) · [Project overview](../README.md)
 
-This reference describes the development tree preparing **1.0.0**. The latest
-published release may have fewer features; consult its release notes.
+This reference describes **1.0.0** and the development tree on `main` since
+it; a feature added after the release is listed under `[Unreleased]` in the
+[changelog](../CHANGELOG.md).
 Configuration keys and defaults are maintained in [Configuration](CONFIGURATION.md).
 
 ## Terminal and text
