@@ -8,13 +8,15 @@
 
 Metal rendering · AppKit input · A dependency-free terminal core
 
+> Built for people who live in the terminal on Mac — real CJK / IME, Metal-smooth text, and a VT engine with **zero** third-party dependencies.
+
 [![CI](https://github.com/noah-qin/Corta/actions/workflows/ci.yml/badge.svg)](https://github.com/noah-qin/Corta/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/noah-qin/Corta?style=flat-square)](https://github.com/noah-qin/Corta/releases/latest)
 ![Platform](https://img.shields.io/badge/macOS-26.0%2B-4d4d4d?style=flat-square)
 ![Swift](https://img.shields.io/badge/Swift-6-f05138?style=flat-square)
 [![License](https://img.shields.io/badge/license-Apache--2.0-2f81f7?style=flat-square)](LICENSE)
 
-[Download](https://github.com/noah-qin/Corta/releases/latest) ·
+**[↓ Download](https://github.com/noah-qin/Corta/releases/latest)** ·
 [Documentation](docs/README.md) ·
 [Contribute](CONTRIBUTING.md) ·
 [Report a bug](https://github.com/noah-qin/Corta/issues/new?template=bug_report.yml)
