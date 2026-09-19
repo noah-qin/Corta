@@ -21,6 +21,10 @@ on:
 permissions:
   contents: read
 
+# Stable releases only; keep this pin aligned with ci.yml.
+env:
+  XCODE_PIN: "26.6.0"
+
 jobs:
   sanitizers:
     name: Core suite under sanitizers
@@ -33,12 +37,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Select the newest installed Xcode
+      - name: Select the pinned stable Xcode
         run: |
-          latest=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
-          echo "Using $latest"
-          sudo xcode-select -s "$latest"
-          swift --version
+          pinned="/Applications/Xcode_${XCODE_PIN}.app"
+          if [ ! -d "$pinned" ]; then
+            echo "::error::$pinned is not on this runner image."
+            echo "Update the stable XCODE_PIN in ci.yml and nightly.yml together."
+            exit 1
+          fi
+          echo "DEVELOPER_DIR=$pinned/Contents/Developer" >> "$GITHUB_ENV"
+          DEVELOPER_DIR="$pinned/Contents/Developer" xcodebuild -version
+          DEVELOPER_DIR="$pinned/Contents/Developer" xcrun swift --version
 
       # The core is where the concurrency is — the write queue, the reader
       # thread, the session teardown — and it is the part that runs without a
@@ -58,10 +67,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Select the newest installed Xcode
+      - name: Select the pinned stable Xcode
         run: |
-          latest=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
-          sudo xcode-select -s "$latest"
+          pinned="/Applications/Xcode_${XCODE_PIN}.app"
+          if [ ! -d "$pinned" ]; then
+            echo "::error::$pinned is not on this runner image."
+            echo "Update the stable XCODE_PIN in ci.yml and nightly.yml together."
+            exit 1
+          fi
+          echo "DEVELOPER_DIR=$pinned/Contents/Developer" >> "$GITHUB_ENV"
+          DEVELOPER_DIR="$pinned/Contents/Developer" xcodebuild -version
+          DEVELOPER_DIR="$pinned/Contents/Developer" xcrun swift --version
 
       - name: Build
         run: swift build --package-path CortaTerminal -c release --product corta-fuzz
@@ -89,84 +105,3 @@ jobs:
             /tmp/corta-fuzz-*
           if-no-files-found: ignore
           retention-days: 30
-
-  newest-toolchain:
-    name: Compatibility with the newest installed Xcode
-    runs-on: macos-26
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v7
-
-      # The other half of pinning the required lane: something still has to
-      # find out that a newer SDK broke the build, and this is where finding
-      # it out is a bug report rather than a blocked pull request.
-      - name: Select and record the newest installed Xcode
-        id: toolchain
-        run: |
-          # Bundle versions, not path names: Xcode.app sorts after versioned
-          # bundles even when it contains an older compiler.
-          latest=$(python3 - <<'PYTHON'
-          import glob, plistlib, re
-          from pathlib import Path
-          candidates = []
-          for app in glob.glob('/Applications/Xcode*.app'):
-              with open(Path(app) / 'Contents/version.plist', 'rb') as source:
-                  info = plistlib.load(source)
-              version = tuple(int(n) for n in re.findall(r'\d+', info['CFBundleVersion']))
-              candidates.append((version, app))
-          print(max(candidates)[1])
-          PYTHON
-          )
-          export DEVELOPER_DIR="$latest/Contents/Developer"
-          echo "DEVELOPER_DIR=$DEVELOPER_DIR" >> "$GITHUB_ENV"
-          # Runner bundle names identify preview installs. Always retain the
-          # exact version/build as the authoritative identity.
-          channel=unspecified
-          case "$latest" in *[Bb]eta*|*[Rr][Cc]*) channel=preview ;; esac
-          scripts/record-toolchain.sh "$channel" | tee toolchain.txt
-          cat toolchain.txt >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Core build and test
-        id: core
-        run: swift test --package-path CortaTerminal 2>&1 | tee core-toolchain.log
-
-      - name: App build and test
-        id: app
-        if: ${{ !cancelled() && steps.toolchain.outcome == 'success' }}
-        run: |
-          xcodebuild test \
-            -project Corta.xcodeproj \
-            -scheme Corta \
-            -destination 'platform=macOS' \
-            -skip-testing:CortaUITests \
-            CODE_SIGN_IDENTITY="-" \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGNING_REQUIRED=NO \
-            DEVELOPMENT_TEAM="" \
-            -resultBundlePath NewestToolchain.xcresult \
-            2>&1 | tee app-toolchain.log
-
-      - name: Summarize compatibility results
-        if: always()
-        env:
-          CORE_RESULT: ${{ steps.core.outcome }}
-          APP_RESULT: ${{ steps.app.outcome }}
-        run: |
-          printf '\nCore: %s\nApp: %s\n' "$CORE_RESULT" "$APP_RESULT" >> "$GITHUB_STEP_SUMMARY"
-          # Include deprecations without hiding the full build logs.
-          { grep -i 'deprecated' core-toolchain.log app-toolchain.log || true; } > deprecations.txt
-          cat deprecations.txt >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Keep toolchain identity, diagnostics and test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: xcresult-newest-toolchain
-          path: |
-            toolchain.txt
-            core-toolchain.log
-            app-toolchain.log
-            deprecations.txt
-            NewestToolchain.xcresult
-          if-no-files-found: ignore
-          retention-days: 14

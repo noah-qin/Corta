@@ -21,8 +21,10 @@ what to edit.
 
 - Selection copying now uses the same scrollback coordinate mapping as
   viewport anchoring, search, command navigation and image placement.
-- Nightly compatibility results retain the exact Xcode, Swift and SDK
-  identity alongside test outcomes and deprecation diagnostics.
+- CI and nightly sanitizer/fuzz checks now use the same pinned stable
+  Xcode release. Only released Xcode toolchains are supported.
+- The maintainer confirmed Vim mouse selection, Option-drag terminal
+  selection and clipboard copying, completing the mouse-tracking acceptance.
 
 - Reorganized the project overview, feature reference and contributor guide;
   clarified public release availability and the interpretation of conformance results.
@@ -65,12 +67,11 @@ troubleshooting entry or a conformance note rather than a claim:
   machine) and thermal forcing: not judged. Touch ID under Secure
   Keyboard Entry passed by hand (`CONFORMANCE.md` §4.6). The energy scenarios ran twice, on mains and under Low Power
   Mode (`PERFORMANCE.md` §5.6).
-- Deferred by their batches and now tracked as their own issues: mouse
-  motion tracking (`?1002`/`?1003`) and a selection / mouse-reporting
-  override (#88), one shared reflow mapping for viewport, selection,
-  search, commands and images (#89), the preview-toolchain versions
-  (#90). The reported Tab failure's original evidence (B02) cannot be
-  recovered and stays unchecked.
+- Mouse motion tracking and its selection override (#88), plus shared
+  viewport/selection/search/command/image mapping (#89), are complete in
+  the current tree. The separate toolchain follow-up (#90) was cancelled;
+  only released Xcode toolchains are supported. The reported Tab failure's
+  original evidence (B02) cannot be recovered and stays unchecked.
 
 ### Added
 

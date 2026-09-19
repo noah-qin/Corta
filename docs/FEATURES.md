@@ -76,8 +76,6 @@ files, remote connections and child-process input.
   by the active input source. Multi-display placement still needs verification.
 - **Remote editing uses managed local copies**, not general directory sync.
   Preserve any local edits before removing Corta's application data.
-- **Toolchain compatibility still needs follow-up.** The preview-toolchain
-  version concern is tracked in [issue #90](https://github.com/noah-qin/Corta/issues/90).
 - **Input and accessibility reports remain open.** A Settings shortcut failure
   has not been reproduced; VoiceOver selection reading needs a follow-up listening
   pass. See [Conformance](CONFORMANCE.md) and [the changelog](../CHANGELOG.md).
