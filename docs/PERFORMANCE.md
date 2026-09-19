@@ -575,7 +575,7 @@ distribution.)
 
 ### 5.6 The 1.0.0 run (2026-09-18)
 
-Measurements for the 1.0.0 development tree on `main`. The initial
+Measurements for 1.0.0, taken on `main` the day before it was tagged. The initial
 benchmark session ran on **battery**, unlike the mains baseline in §5.2.
 The later keypress and energy runs used AC; their rows state this explicitly.
 App measurements use Release builds unless labelled Debug. Pane counts and

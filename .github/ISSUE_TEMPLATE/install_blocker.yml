@@ -39,7 +39,7 @@ body:
     id: version
     attributes:
       label: Corta version and where it came from
-      placeholder: "0.1.1 from the GitHub release / built from main at abc1234"
+      placeholder: "1.0.0 from the GitHub release / built from main at abc1234"
     validations:
       required: true
 

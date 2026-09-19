@@ -3,9 +3,9 @@
 A native macOS terminal emulator in pure Swift. Metal rendering, Core
 Text shaping, AppKit shell, a hand-written VT parser.
 
-**Status (2026-09-18): v0.1.1 is the latest public release. The 1.0.0
-development tree is prepared on `main`, with versions and changelog updated;
-it has not been tagged or published. See `CHANGELOG.md` › Release checklist.**
+**Status (2026-09-19): 1.0.0 is tagged from `main` as `v1.0.0`; publishing
+the draft release and signing `appcast.xml` are the maintainer's last two
+steps in `CHANGELOG.md` › Release checklist.**
 Every batch of the v1.0.0 roadmap (`B01`–`B16`) is on `main`.
 `CHANGELOG.md`'s `[Unreleased]` section is the record of what lands
 after it. Compatibility with AI command-line tools

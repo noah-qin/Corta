@@ -10,69 +10,7 @@ what to edit.
 
 ## [Unreleased]
 
-### Added
-
-- TUI mouse drag and motion tracking (`?1002`/`?1003`), with an Option-drag
-  text-selection override, configurable through `mouse-override-modifier`.
-  SGR encoding alone no longer enables unsolicited mouse reports.
-
-### Changed
-
-- Selection copying now uses the same scrollback coordinate mapping as
-  viewport anchoring, search, command navigation and image placement.
-- CI and nightly sanitizer/fuzz checks now use the same pinned stable
-  Xcode release. Only released Xcode toolchains are supported.
-- The maintainer confirmed Vim mouse selection, Option-drag terminal
-  selection and clipboard copying, completing the mouse-tracking acceptance.
-- Reorganized the project overview, feature reference and contributor guide;
-  clarified public release availability and the interpretation of conformance results.
-- Added a testing guide and automated checks for local documentation links,
-  with streamlined GitHub contribution templates.
-- The configuration reference now lists every `bind.` command — nine
-  (command-output export and file-reference opening, command-history
-  search, and the six working-directory actions) had shipped without a
-  row — with the spelling Corta writes back; `DocumentationDriftTests`
-  fails when a config key or command loses its row or its documented
-  default drifts from the code.
-- Documentation audit: the daily-driver checklist names the record that
-  last verified each item; the design document's hard parts are numbered
-  headings, so `§7.n` references resolve; the security change log runs
-  newest first; the performance targets table no longer says the energy
-  harness does not exist; the 2026-09-17 interactive record is in English
-  like the rest of the documentation; the isolated developer launch is
-  `scripts/build-and-run.sh` and is documented in the testing guide.
-- The dated verification passes that had accumulated inside
-  `docs/CONFORMANCE.md` (the M2 and M6 closeouts, the B10 pass, the
-  1.0.0 human and hardware items) are now files under
-  `docs/test-results/`, listed from a new §4.7; the conformance document
-  keeps the procedures, and its esctest history is one table. The `less`
-  search-highlight bug it still carried as open did not reproduce on
-  2026-09-17 and is recorded as such. The design document's selection
-  section states its invariants and the tests that pin them instead of
-  retelling the B04 investigation, and the TextKit evaluation it carried
-  is now decision D19.
-
-### Fixed
-
-- Settings rows are one height: a numeric field's empty title was laid
-  out as a blank second line, making those rows 11pt taller than a
-  toggle's and sitting the "×" and "seconds" beside them below the
-  field. The Terminal tab has sections; the font-status and Quick
-  Terminal status rows appear only when they have something to say; a
-  tab opens at its top instead of wherever it was last scrolled; and the
-  font preview's second line reads "ok  failed" rather than "okfailed".
-- "Open file with" is validated when the edit is committed (Return or
-  focus loss), not per keystroke — `{file}` and a space after the command
-  could not be typed, only pasted, because every intermediate value was
-  refused or trimmed and the field snapped back.
-- A settings change refreshes the page once, not twice, and no longer
-  re-reads `~/.zshrc` or re-measures the font for every control change;
-  opening the window runs its setup once instead of twice.
-
-## [1.0.0] - 2026-09-18
-
-**Prepared on `main`; not yet tagged or publicly released.** The date above
-is the preparation date and must be updated when the release is published.
+## [1.0.0] - 2026-09-19
 
 The v1.0.0 milestone: the sixteen ordered batches `B01`–`B16` that took
 Corta from a quality release to a terminal with explicit session and
@@ -109,11 +47,15 @@ troubleshooting entry or a conformance note rather than a claim:
   ran twice, on mains and under Low Power Mode (`PERFORMANCE.md` §5.6).
 - Mouse motion tracking and its selection override (#88), plus shared
   viewport/selection/search/command/image mapping (#89), are complete in
-  the current tree. The separate toolchain follow-up (#90) was cancelled;
+  this release. The separate toolchain follow-up (#90) was cancelled;
   only released Xcode toolchains are supported. The reported Tab failure's
   original evidence (B02) cannot be recovered and stays unchecked.
 
 ### Added
+
+- TUI mouse drag and motion tracking (`?1002`/`?1003`), with an Option-drag
+  text-selection override, configurable through `mouse-override-modifier`.
+  SGR encoding alone no longer enables unsolicited mouse reports.
 
 - **Keypress-to-glass latency measured from inside the app.**
   `CORTA_RENDER_METRICS=1` now also collects `keypressToPresent`: the key
@@ -400,6 +342,23 @@ troubleshooting entry or a conformance note rather than a claim:
 
 ### Fixed
 
+- Settings rows are one height: a numeric field's empty title was laid
+  out as a blank second line, making those rows 11pt taller than a
+  toggle's and sitting the "×" and "seconds" beside them below the
+  field. The Terminal tab has sections; the font-status and Quick
+  Terminal status rows appear only when they have something to say; a
+  tab opens at its top instead of wherever it was last scrolled; and the
+  font preview's second line reads "ok  failed" rather than "okfailed".
+- "Open file with" is validated when the edit is committed (Return or
+  focus loss), not per keystroke — `{file}` and a space after the command
+  could not be typed, only pasted, because every intermediate value was
+  refused or trimmed and the field snapped back.
+- A settings change refreshes the page once, not twice, and no longer
+  re-reads `~/.zshrc` or re-measures the font for every control change;
+  opening the window runs its setup once instead of twice.
+- The Quick Terminal position option reads "Center", matching the American
+  spelling used everywhere else in the app.
+
 - **The Quick Terminal never appeared beside a full-screen
   application.** With another app full-screen, the hotkey moved the
   panel's frame and made nothing visible: an ordinary `NSWindow` ordered
@@ -588,6 +547,40 @@ troubleshooting entry or a conformance note rather than a claim:
   or window. Scoped to the window the event actually belongs to.
 
 ### Changed
+
+- Selection copying now uses the same scrollback coordinate mapping as
+  viewport anchoring, search, command navigation and image placement.
+- CI and nightly sanitizer/fuzz checks now use the same pinned stable
+  Xcode release. Only released Xcode toolchains are supported.
+- The maintainer confirmed Vim mouse selection, Option-drag terminal
+  selection and clipboard copying, completing the mouse-tracking acceptance.
+- Reorganized the project overview, feature reference and contributor guide;
+  clarified public release availability and the interpretation of conformance results.
+- Added a testing guide and automated checks for local documentation links,
+  with streamlined GitHub contribution templates.
+- The configuration reference now lists every `bind.` command — nine
+  (command-output export and file-reference opening, command-history
+  search, and the six working-directory actions) had shipped without a
+  row — with the spelling Corta writes back; `DocumentationDriftTests`
+  fails when a config key or command loses its row or its documented
+  default drifts from the code.
+- Documentation audit: the daily-driver checklist names the record that
+  last verified each item; the design document's hard parts are numbered
+  headings, so `§7.n` references resolve; the security change log runs
+  newest first; the performance targets table no longer says the energy
+  harness does not exist; the 2026-09-17 interactive record is in English
+  like the rest of the documentation; the isolated developer launch is
+  `scripts/build-and-run.sh` and is documented in the testing guide.
+- The dated verification passes that had accumulated inside
+  `docs/CONFORMANCE.md` (the M2 and M6 closeouts, the B10 pass, the
+  1.0.0 human and hardware items) are now files under
+  `docs/test-results/`, listed from a new §4.7; the conformance document
+  keeps the procedures, and its esctest history is one table. The `less`
+  search-highlight bug it still carried as open did not reproduce on
+  2026-09-17 and is recorded as such. The design document's selection
+  section states its invariants and the tests that pin them instead of
+  retelling the B04 investigation, and the TextKit evaluation it carried
+  is now decision D19.
 
 - **A local Release build is development-signed; Developer ID is the
   release workflow's job.** The Release configuration hardcoded
@@ -1188,7 +1181,7 @@ For the maintainer, cutting any release:
    push that file — that is what makes the update visible to every
    already-installed Corta.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v0.1.1...main
-[1.0.0]: https://github.com/noah-qin/Corta/milestone/1
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.0.0...main
+[1.0.0]: https://github.com/noah-qin/Corta/releases/tag/v1.0.0
 [0.1.1]: https://github.com/noah-qin/Corta/releases/tag/v0.1.1
 [0.1.0]: https://github.com/noah-qin/Corta/releases/tag/v0.1.0
