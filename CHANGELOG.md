@@ -52,6 +52,23 @@ what to edit.
   retelling the B04 investigation, and the TextKit evaluation it carried
   is now decision D19.
 
+### Fixed
+
+- Settings rows are one height: a numeric field's empty title was laid
+  out as a blank second line, making those rows 11pt taller than a
+  toggle's and sitting the "×" and "seconds" beside them below the
+  field. The Terminal tab has sections; the font-status and Quick
+  Terminal status rows appear only when they have something to say; a
+  tab opens at its top instead of wherever it was last scrolled; and the
+  font preview's second line reads "ok  failed" rather than "okfailed".
+- "Open file with" is validated when the edit is committed (Return or
+  focus loss), not per keystroke — `{file}` and a space after the command
+  could not be typed, only pasted, because every intermediate value was
+  refused or trimmed and the field snapped back.
+- A settings change refreshes the page once, not twice, and no longer
+  re-reads `~/.zshrc` or re-measures the font for every control change;
+  opening the window runs its setup once instead of twice.
+
 ## [1.0.0] - 2026-09-18
 
 **Prepared on `main`; not yet tagged or publicly released.** The date above

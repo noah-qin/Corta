@@ -18,7 +18,8 @@ struct StatusRowView: View {
         HStack(spacing: 5) {
             if let symbol {
                 Image(systemName: symbol)
-                    .foregroundStyle(SystemAccessibility.increaseContrast ? AnyShapeStyle(.primary) : tint)
+                    .foregroundStyle(
+                        SystemAccessibility.increaseContrast ? AnyShapeStyle(.primary) : tint)
             }
             Text(status.message)
                 .font(.system(size: NSFont.smallSystemFontSize))

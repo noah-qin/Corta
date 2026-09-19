@@ -27,8 +27,8 @@ struct RowStatus: Equatable {
 /// AppKit page's `commit()`/`populate()` round trip did, and an edit made in
 /// `$EDITOR` while this window is open moves the controls the same way.
 /// Unlike that page's one `commit()` for every control, each field here
-/// writes on its own — SwiftUI's bindings write per keystroke/toggle, and
-/// per-field validation is what that shape actually wants.
+/// writes on its own — a toggle or picker on change, a numeric or text
+/// field on commit — and per-field validation is what that shape wants.
 @MainActor
 @Observable
 final class SettingsModel {
@@ -78,12 +78,29 @@ final class SettingsModel {
 
     private var clearTask: Task<Void, Never>?
 
+    /// What the page last mirrored. `commit` refreshes directly, and the
+    /// store's `didChange` for that same write then arrives here too;
+    /// without this the page refreshed twice per control change. An
+    /// external edit differs from this and still refreshes.
+    private var mirrored: Configuration?
+
+    /// The family `fontStatus` was resolved for. Resolving is four CoreText
+    /// faces and an advance measurement across the printable ASCII range
+    /// (`MonospacedFontCatalog.isUsable`), so it is redone only when the
+    /// family changes or `retryFontResolution` asks.
+    private var resolvedFontFamily: String?
+
+    /// What `previewFont` was built for, so a change to any other setting
+    /// does not rebuild the face.
+    private var previewedFont: (size: Double, family: String)?
+
     init() {
         refresh()
+        refreshExternalState()
         NotificationCenter.default.addObserver(
             forName: ConfigurationStore.didChange, object: nil, queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in self?.refresh() }
+            Task { @MainActor in self?.storeDidChange() }
         }
         NotificationCenter.default.addObserver(
             forName: ConfigurationStore.writeStatusDidChange, object: nil, queue: .main
@@ -104,15 +121,26 @@ final class SettingsModel {
 
     /// The file may not exist until something writes it, and System Settings
     /// can have flipped notification permission since this window was last
-    /// open — both are re-read on every open rather than cached.
+    /// open — both are re-read on every open rather than cached. Called
+    /// once per open, from `SettingsWindowController.show`.
     func windowWillShow() {
         if !ConfigurationStore.shared.write() { reportWriteFailure() }
         TaskNotifier.refreshPermission()
         refresh()
+        refreshExternalState()
     }
 
+    private func storeDidChange() {
+        guard ConfigurationStore.shared.configuration != mirrored else { return }
+        refresh()
+    }
+
+    /// Mirrors the store: every config field, and the rows derived from
+    /// them. Not the rows whose truth is elsewhere on disk — see
+    /// `refreshExternalState`.
     func refresh() {
         let configuration = ConfigurationStore.shared.configuration
+        mirrored = configuration
         listedThemes = Theme.all(in: configuration)
         theme = configuration.theme
         appearance = configuration.appearance
@@ -137,11 +165,27 @@ final class SettingsModel {
         quickTerminalPosition = configuration.quickTerminalPosition
         quickTerminalScreen = configuration.quickTerminalScreen
         secureKeyboardEntry = configuration.secureKeyboardEntry
+        previewTheme = Theme.named(theme, in: configuration) ?? .corta
+        if previewedFont?.size != fontSize || previewedFont?.family != fontFamily {
+            refreshPreviewFont()
+        }
         refreshQuickTerminalStatus()
-        refreshFontStatus()
+        if fontFamily != resolvedFontFamily { refreshFontStatus() }
+        refreshNotificationPermissionNotice()
+    }
+
+    private func refreshPreviewFont() {
+        previewedFont = (fontSize, fontFamily)
+        previewFont = TerminalFont.primary(ofSize: fontSize, family: fontFamily)
+    }
+
+    /// The rows whose ground truth is a file this page does not own —
+    /// `~/.zshrc` and the directory history. Read on open and on demand,
+    /// not on every keystroke: a control change writes the config file,
+    /// and nothing about that moves either of these.
+    func refreshExternalState() {
         refreshShellIntegrationStatus()
         refreshDirectoryHistoryStatus()
-        refreshNotificationPermissionNotice()
     }
 
     // MARK: - Derived display
@@ -151,13 +195,12 @@ final class SettingsModel {
             ? L10n.text("settings.font.systemMonospaced") : fontFamily
     }
 
-    var previewTheme: Theme {
-        Theme.named(theme, in: ConfigurationStore.shared.configuration) ?? .corta
-    }
-
-    var previewFont: CTFont {
-        TerminalFont.primary(ofSize: fontSize, family: fontFamily)
-    }
+    /// Stored rather than computed: a computed `previewFont` re-resolved
+    /// the face — the same measurement `refreshFontStatus` does — on every
+    /// body evaluation, and the body is evaluated after every control
+    /// change.
+    private(set) var previewTheme: Theme = .corta
+    private(set) var previewFont: CTFont = TerminalFont.primary(ofSize: 12)
 
     var pathLabel: String { ConfigurationStore.fileURL.path }
 
@@ -179,7 +222,8 @@ final class SettingsModel {
 
     func setFontSize(_ value: Double) {
         commit { configuration in
-            let (clamped, message) = Self.clamp(value, 8, 64, label: L10n.text("settings.label.size"))
+            let (clamped, message) = Self.clamp(
+                value, 8, 64, label: L10n.text("settings.label.size"))
             configuration.fontSize = clamped
             return message
         }
@@ -196,7 +240,8 @@ final class SettingsModel {
 
     func setColumns(_ value: Int) {
         commit { configuration in
-            let (clamped, message) = Self.clamp(value, 20, 500, label: L10n.text("settings.label.columns"))
+            let (clamped, message) = Self.clamp(
+                value, 20, 500, label: L10n.text("settings.label.columns"))
             configuration.columns = clamped
             return message
         }
@@ -204,7 +249,8 @@ final class SettingsModel {
 
     func setRows(_ value: Int) {
         commit { configuration in
-            let (clamped, message) = Self.clamp(value, 5, 300, label: L10n.text("settings.label.rows"))
+            let (clamped, message) = Self.clamp(
+                value, 5, 300, label: L10n.text("settings.label.rows"))
             configuration.rows = clamped
             return message
         }
@@ -457,6 +503,7 @@ final class SettingsModel {
     /// exists but fails the grid's uniform-advance check, rather than
     /// leaving both as an unexplained silent substitution.
     private func refreshFontStatus() {
+        resolvedFontFamily = fontFamily
         switch TerminalFont.resolution(forFamily: fontFamily) {
         case .resolved:
             fontStatus = RowStatus()
@@ -478,6 +525,7 @@ final class SettingsModel {
     func retryFontResolution() {
         MonospacedFontCatalog.refresh()
         refreshFontStatus()
+        refreshPreviewFont()
     }
 
     // MARK: - Shell integration

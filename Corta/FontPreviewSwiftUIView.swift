@@ -27,9 +27,12 @@ struct FontPreviewSwiftUIView: View {
             // makes a `"%@%@"` localizable key Xcode extracts into the
             // catalog. `verbatim` throughout — this is sample terminal
             // output, not UI copy.
+            // The gap is the second run's leading spaces, not the first
+            // run's trailing ones: a trailing-aligned form column dropped
+            // those and drew "okfailed".
             HStack(spacing: 0) {
-                Text(verbatim: "ok  ").foregroundStyle(Self.color(variant.ansi[2]))
-                Text(verbatim: "failed").foregroundStyle(Self.color(variant.ansi[1]))
+                Text(verbatim: "ok").foregroundStyle(Self.color(variant.ansi[2]))
+                Text(verbatim: "  failed").foregroundStyle(Self.color(variant.ansi[1]))
             }
             .font(Font(nsFont))
             Text(verbatim: "The quick brown fox jumps over the lazy dog.")
