@@ -30,10 +30,16 @@ import Testing
     }
 
     /// Renders a 4x10 grid containing "abc" (cursor on row 0, column 3) with
-    /// the given DECSCUSR parameter applied, and returns the texture.
+    /// the given DECSCUSR parameter applied, and returns the texture. The
+    /// cursor is painted in `variant`'s cursor colour — the live palette is
+    /// whatever the test host's appearance resolved, so it is pinned here
+    /// for the render and put back afterwards.
     private static func renderWithCursorStyle(
-        _ decscusr: String?, queue: MTLCommandQueue
+        _ decscusr: String?, queue: MTLCommandQueue, variant: Theme.Variant = Theme.corta.dark
     ) throws -> (texture: MTLTexture, renderer: TerminalRenderer) {
+        let live = TerminalColorPalette.activeVariant
+        TerminalColorPalette.apply(variant)
+        defer { TerminalColorPalette.apply(live) }
         let device = queue.device
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
         let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
@@ -80,7 +86,7 @@ import Testing
 
         let top = Self.pixel(of: texture, x: cellX + cellW / 2, y: cellH / 2)
         let bottom = Self.pixel(of: texture, x: cellX + cellW / 2, y: cellH - 1)
-        // The cursor colour is a translucent grey over the black clear colour.
+        // The default dark theme's light cursor over the black clear colour.
         #expect(top.r < 30, "cell interior must stay background, got \(top)")
         #expect(bottom.r > 60, "bottom stroke must carry the cursor colour, got \(bottom)")
     }
@@ -117,6 +123,40 @@ import Testing
         let bottom = Self.pixel(of: texture, x: cellX + cellW / 2, y: cellH - 1)
         #expect(top.r > 60, "block must cover the cell top, got \(top)")
         #expect(bottom.r > 60, "block must cover the cell bottom, got \(bottom)")
+    }
+
+    /// `theme.<name>.<variant>.cursor` is the colour the cursor is painted
+    /// in, for every style — the key was documented and parsed before it
+    /// reached the renderer, which drew a fixed grey regardless.
+    @Test func cursorIsPaintedInTheThemeCursorColour() throws {
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            Issue.record("No Metal device available in this environment")
+            return
+        }
+        let queue = device.makeCommandQueue()!
+        var themed = Theme.corta.dark
+        themed.cursor = SIMD4<Float>(0, 0, 1, 1)  // pure blue: unmistakable
+
+        for (decscusr, sample) in [
+            ("2", "block"), ("4", "underline"), ("6", "bar"),
+        ] {
+            let (texture, renderer) = try Self.renderWithCursorStyle(
+                decscusr, queue: queue, variant: themed)
+            let cellW = Int(renderer.metrics.cellWidth)
+            let cellH = Int(renderer.metrics.cellHeight)
+            let cellX = 3 * cellW
+            // Each style's own stroke: the block anywhere, the underline at
+            // the bottom edge, the bar at the leading edge.
+            let point: (x: Int, y: Int) =
+                switch decscusr {
+                case "4": (cellX + cellW / 2, cellH - 1)
+                case "6": (cellX + 1, cellH / 2)
+                default: (cellX + cellW / 2, cellH / 2)
+                }
+            let pixel = Self.pixel(of: texture, x: point.x, y: point.y)
+            #expect(pixel.b > 100, "\(sample) cursor must carry the theme colour, got \(pixel)")
+            #expect(pixel.r < 30 && pixel.g < 30, "\(sample) cursor must not keep the old grey, got \(pixel)")
+        }
     }
 
     /// A style change alone — no line touched, cursor unmoved — must still

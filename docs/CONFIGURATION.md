@@ -278,7 +278,7 @@ both work; they are simply not recommended from the UI.
 | `theme.<name>.inherit` | A built-in to start from: `corta`, `solarized`, `mono`. Defaults to `corta`. |
 | `theme.<name>.<variant>.foreground` | Default text colour. `<variant>` is `dark` or `light`. |
 | `theme.<name>.<variant>.background` | Default background. |
-| `theme.<name>.<variant>.cursor` | Cursor colour. |
+| `theme.<name>.<variant>.cursor` | Cursor colour, for every cursor style. A block cursor is drawn translucent over the character under it, so that character stays readable. |
 | `theme.<name>.<variant>.ansi` | The whole table on one line, comma-separated. A shorter list overrides a prefix of it. |
 | `theme.<name>.<variant>.ansi<N>` | One slot, `N` from 0 to 15: black, red, green, yellow, blue, magenta, cyan, white, then the eight bright ones. |
 

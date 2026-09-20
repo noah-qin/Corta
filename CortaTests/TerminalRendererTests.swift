@@ -35,6 +35,11 @@ import Testing
         let queue = device.makeCommandQueue()!
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
         let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
+        // The cursor takes the live theme's colour; pin the dark variant so
+        // the test host's appearance cannot turn it into a dark block.
+        let live = TerminalColorPalette.activeVariant
+        TerminalColorPalette.apply(Theme.corta.dark)
+        defer { TerminalColorPalette.apply(live) }
 
         var terminal = Terminal(rows: 4, columns: 10)
         terminal.feed(Array("abc".utf8))  // cursor now sits at row 0, column 3
@@ -65,8 +70,9 @@ import Testing
         let atCursor = Self.pixel(of: texture, x: cursorX, y: cursorY)
         let elsewhere = Self.pixel(of: texture, x: width - 4, y: height - 4)
 
-        // The cursor block is a translucent grey over black — brighter than
-        // the untouched background, which stays pure black.
+        // The cursor block is the theme's light cursor, translucent over
+        // black — brighter than the untouched background, which stays pure
+        // black.
         if atCursor.r <= elsewhere.r {
             MetalRenderTarget.attachPNG(texture, named: "cursor-block-render.png")
         }

@@ -10,6 +10,15 @@ what to edit.
 
 ## [Unreleased]
 
+### Fixed
+
+- `theme.<name>.<variant>.cursor` now colours the cursor. The key was
+  documented, parsed and written back by the Settings page, but the
+  renderer painted a fixed grey for every style, so a theme's cursor
+  colour — including the built-in themes' own — never reached the screen.
+  The block cursor keeps its translucency over the character under it;
+  the bar and underline styles draw the colour as it is.
+
 ### Changed
 
 - Publishing a GitHub release now signs it into the Sparkle update feed
