@@ -18,6 +18,11 @@ what to edit.
   colour — including the built-in themes' own — never reached the screen.
   The block cursor keeps its translucency over the character under it;
   the bar and underline styles draw the colour as it is.
+- Installing or removing the shell integration, and every Settings-page
+  write to the config file, now edits the file a symbolic link points at
+  instead of replacing the link with a plain file. A `~/.zshrc` or
+  `~/.config/corta/config` kept in a dotfiles repository stays the
+  repository's copy, and the file's permission bits survive the write.
 
 ### Changed
 

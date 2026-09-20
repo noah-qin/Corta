@@ -156,11 +156,12 @@ struct ShellIntegrationInstaller {
         return lower..<upper
     }
 
+    /// Through `UserFile`: the rc file is very often a symbolic link into a
+    /// dotfiles repository, and a plain atomic write would replace the link
+    /// with a file.
     private func write(_ text: String) -> Bool {
         do {
-            try FileManager.default.createDirectory(
-                at: rcFileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try text.write(to: rcFileURL, atomically: true, encoding: .utf8)
+            try UserFile.write(text, to: rcFileURL)
             return true
         } catch {
             return false
