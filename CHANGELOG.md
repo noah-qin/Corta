@@ -23,6 +23,12 @@ what to edit.
   instead of replacing the link with a plain file. A `~/.zshrc` or
   `~/.config/corta/config` kept in a dotfiles repository stays the
   repository's copy, and the file's permission bits survive the write.
+- The directory history is written half a second after the last command
+  finishes, on a background queue, instead of being encoded and written
+  to disk inside the frame that noticed the command end. A burst of
+  commands with shell integration on is one write, not one per command,
+  and none of them sits on the render path. Quitting writes anything
+  still pending.
 
 ### Changed
 
