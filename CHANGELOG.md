@@ -1187,13 +1187,23 @@ For the maintainer, cutting any release:
    The release workflow builds from the tag and opens a **draft** release
    for review — it is never published automatically.
 5. Review the draft's archive and **publish** the release. Publishing
-   starts `.github/workflows/appcast.yml`: approve its `release`
-   environment run, and it signs the archive into `appcast.xml`, checks
+   starts the `Update feed` workflow (`.github/workflows/appcast.yml`),
+   which pauses for one approval: GitHub notifies the maintainer, and
+   the run's page under **Actions** shows **Review deployments** →
+   `release` → **Approve and deploy**. The approval is the gate on the
+   Sparkle private key (D20): nothing that can push a tag can sign an
+   update without a person saying so. An unapproved run waits, then
+   expires; nothing is signed or pushed until it is approved. Once
+   approved, the workflow signs the archive into `appcast.xml`, checks
    the item against the app, and merges the file to `main` through a
-   pull request — that is what makes the update visible to every
-   already-installed Corta (D20). If the workflow cannot run,
-   `scripts/release.sh` against the downloaded archive is the manual
-   route to the same file.
+   pull request whose CI it runs and waits for — that is what makes the
+   update visible to every already-installed Corta. If the pull request
+   is left open, a check failed; the run's log says which. To rehearse or
+   re-run: `gh workflow run appcast.yml --ref main -f tag=vX.Y.Z
+   -f dry_run=true` (a dry run stops after signing and checking), with
+   `main` temporarily allowed in the environment's deployment policy.
+   If the workflow cannot run at all, `scripts/release.sh` against the
+   downloaded archive is the manual route to the same file.
 
 [Unreleased]: https://github.com/noah-qin/Corta/compare/v1.0.0...main
 [1.0.0]: https://github.com/noah-qin/Corta/releases/tag/v1.0.0
