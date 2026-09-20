@@ -50,16 +50,16 @@ struct SearchDebounceTests {
         defer { pane.teardown() }
 
         pane.showSearchBar()
-        let field = try #require(pane.searchField)
+        let field = try #require(pane.search.field)
         field.stringValue = "P04MARKER"
         pane.updateSearchResults(scrollsToMatch: true)
         // Debounced and detached: nothing can have landed on the same
         // main-actor turn that scheduled the sweep.
-        #expect(pane.searchMatches.isEmpty)
-        #expect(pane.searchTask != nil)
+        #expect(pane.search.matches.isEmpty)
+        #expect(pane.search.task != nil)
 
-        #expect(await waitUpTo(5) { !pane.searchMatches.isEmpty })
-        #expect(pane.searchTask == nil)
+        #expect(await waitUpTo(5) { !pane.search.matches.isEmpty })
+        #expect(pane.search.task == nil)
     }
 
     @Test func aNewerQuerySupersedesTheInFlightSweep() async throws {
@@ -67,7 +67,7 @@ struct SearchDebounceTests {
         defer { pane.teardown() }
 
         pane.showSearchBar()
-        let field = try #require(pane.searchField)
+        let field = try #require(pane.search.field)
         field.stringValue = "P04MARKER"
         pane.updateSearchResults(scrollsToMatch: true)
         // Retyped before the debounce elapses: the first sweep is cancelled
@@ -75,8 +75,8 @@ struct SearchDebounceTests {
         field.stringValue = "zzz-no-such-string"
         pane.updateSearchResults(scrollsToMatch: true)
 
-        #expect(await waitUpTo(5) { pane.searchTask == nil })
-        #expect(pane.searchMatches.isEmpty)
+        #expect(await waitUpTo(5) { pane.search.task == nil })
+        #expect(pane.search.matches.isEmpty)
     }
 
     @Test func closingTheBarCancelsTheInFlightSweep() async throws {
@@ -84,14 +84,14 @@ struct SearchDebounceTests {
         defer { pane.teardown() }
 
         pane.showSearchBar()
-        let field = try #require(pane.searchField)
+        let field = try #require(pane.search.field)
         field.stringValue = "P04MARKER"
         pane.updateSearchResults(scrollsToMatch: true)
-        #expect(pane.searchTask != nil)
+        #expect(pane.search.task != nil)
 
         pane.closeSearchBar()
-        #expect(pane.searchTask == nil)
-        #expect(pane.searchMatches.isEmpty)
+        #expect(pane.search.task == nil)
+        #expect(pane.search.matches.isEmpty)
     }
 
     /// B02: `NSEvent.addLocalMonitorForEvents` fires app-wide, so without a
@@ -116,8 +116,8 @@ struct SearchDebounceTests {
         }
         paneA.showSearchBar()
         paneB.showSearchBar()
-        #expect(paneA.searchBar != nil)
-        #expect(paneB.searchBar != nil)
+        #expect(paneA.search.bar != nil)
+        #expect(paneB.search.bar != nil)
 
         let escapeForA = NSEvent.keyEvent(
             with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
@@ -127,14 +127,14 @@ struct SearchDebounceTests {
 
         let unhandledByA = paneA.handleGlobalSearchEscape(escapeForA)
         #expect(unhandledByA == nil)
-        #expect(paneA.searchBar == nil)
-        #expect(paneB.searchBar != nil)
+        #expect(paneA.search.bar == nil)
+        #expect(paneB.search.bar != nil)
 
         // B's monitor must see the same event and let it pass through
         // unmodified — it belongs to a different window.
         let unhandledByB = paneB.handleGlobalSearchEscape(escapeForA)
         #expect(unhandledByB === escapeForA)
-        #expect(paneB.searchBar != nil)
+        #expect(paneB.search.bar != nil)
     }
 
     /// B05: a split puts two panes in *one* window, so the window check
@@ -158,12 +158,12 @@ struct SearchDebounceTests {
         let paneB = panes[1]
         paneA.showSearchBar()
         paneB.showSearchBar()
-        #expect(paneA.searchBar != nil)
-        #expect(paneB.searchBar != nil)
+        #expect(paneA.search.bar != nil)
+        #expect(paneB.search.bar != nil)
 
         // `showSearchBar` already focused B's field last; refocus A's so the
         // event under test targets a deliberate, known first responder.
-        window.makeFirstResponder(paneA.searchField)
+        window.makeFirstResponder(paneA.search.field)
 
         let escape = NSEvent.keyEvent(
             with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
@@ -173,13 +173,13 @@ struct SearchDebounceTests {
 
         // A's own monitor, with A's field focused, closes A only.
         #expect(paneA.handleGlobalSearchEscape(escape) == nil)
-        #expect(paneA.searchBar == nil)
-        #expect(paneB.searchBar != nil)
+        #expect(paneA.search.bar == nil)
+        #expect(paneB.search.bar != nil)
 
         // B's monitor saw the same event (both fire app-wide) but must let
         // it pass through: the focused field belongs to A, not B.
         #expect(paneB.handleGlobalSearchEscape(escape) === escape)
-        #expect(paneB.searchBar != nil)
+        #expect(paneB.search.bar != nil)
     }
 
     /// B05: case-sensitivity used to be read live from `ConfigurationStore`
@@ -211,23 +211,23 @@ struct SearchDebounceTests {
         // config file happens to default to (never assume machine state) —
         // what this test verifies is that setting one pane's copy never
         // touches the other's, not what any particular default is.
-        paneA.searchCaseSensitive = true
-        paneB.searchCaseSensitive = false
+        paneA.search.caseSensitive = true
+        paneB.search.caseSensitive = false
 
-        try #require(paneA.searchField).stringValue = "hello"
+        try #require(paneA.search.field).stringValue = "hello"
         paneA.updateSearchResults(scrollsToMatch: true)
-        try #require(paneB.searchField).stringValue = "hello"
+        try #require(paneB.search.field).stringValue = "hello"
         paneB.updateSearchResults(scrollsToMatch: true)
 
-        #expect(await waitUpTo(5) { paneA.searchTask == nil })
-        #expect(await waitUpTo(5) { paneB.searchTask == nil })
+        #expect(await waitUpTo(5) { paneA.search.task == nil })
+        #expect(await waitUpTo(5) { paneB.search.task == nil })
         // Exact counts depend on shell echo specifics (the typed command
         // line itself contains the query too); what this test is actually
         // proving is that the two panes' sweeps disagree at all — if they
         // shared one flag (the pre-B05 bug), both counts would be equal.
-        #expect(paneA.searchMatches.count > 0)
+        #expect(paneA.search.matches.count > 0)
         #expect(
-            paneB.searchMatches.count > paneA.searchMatches.count,
+            paneB.search.matches.count > paneA.search.matches.count,
             "case-insensitive B must find strictly more than case-sensitive A for the same text")
     }
 
@@ -249,22 +249,22 @@ struct SearchDebounceTests {
 
         paneA.showSearchBar()
         paneB.showSearchBar()
-        paneA.searchRegex = true
-        paneB.searchRegex = false
+        paneA.search.regex = true
+        paneB.search.regex = false
 
         // A pattern that matches as a regex but appears nowhere as a
         // literal substring: A must find the digit runs, B must find
         // nothing, for the identical query string.
-        try #require(paneA.searchField).stringValue = "[0-9]+"
+        try #require(paneA.search.field).stringValue = "[0-9]+"
         paneA.updateSearchResults(scrollsToMatch: true)
-        try #require(paneB.searchField).stringValue = "[0-9]+"
+        try #require(paneB.search.field).stringValue = "[0-9]+"
         paneB.updateSearchResults(scrollsToMatch: true)
 
-        #expect(await waitUpTo(5) { paneA.searchTask == nil })
-        #expect(await waitUpTo(5) { paneB.searchTask == nil })
-        #expect(paneA.searchMatches.count > 0, "regex-on A must match the digit runs")
+        #expect(await waitUpTo(5) { paneA.search.task == nil })
+        #expect(await waitUpTo(5) { paneB.search.task == nil })
+        #expect(paneA.search.matches.count > 0, "regex-on A must match the digit runs")
         #expect(
-            paneB.searchMatches.isEmpty,
+            paneB.search.matches.isEmpty,
             "literal-mode B must not match \"[0-9]+\" as a substring — if it shared A's regex flag it would")
     }
 
@@ -283,18 +283,18 @@ struct SearchDebounceTests {
         // finding it at all is unambiguous proof the follow-up sweep saw
         // the output that arrived mid-sweep, with no risk of the shell's
         // own command-line echo doubling an already-nonzero count.
-        try #require(pane.searchField).stringValue = "MARKER2"
+        try #require(pane.search.field).stringValue = "MARKER2"
 
         let releaseFirstSweep = Mutex(false)
         let firstSweepEntered = Mutex(false)
-        pane.searchSweepGate = {
+        pane.search.sweepGate = {
             firstSweepEntered.withLock { $0 = true }
             while !releaseFirstSweep.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.002) }
         }
 
         pane.scheduleBackgroundSearchRefresh()
         #expect(await waitUpTo(5) { firstSweepEntered.withLock { $0 } })
-        #expect(pane.searchTask != nil, "precondition: the first sweep is parked in the gate")
+        #expect(pane.search.task != nil, "precondition: the first sweep is parked in the gate")
 
         // A second output batch arrives while the first sweep is still
         // running — this call must set `searchNeedsRefresh`, not drop it.
@@ -305,15 +305,15 @@ struct SearchDebounceTests {
         pane.session.write(Array("echo MARKER$((1+1))\n".utf8))
         #expect(await waitUpTo(10) { self.gridContains(pane, "MARKER2") })
         pane.scheduleBackgroundSearchRefresh()
-        #expect(pane.searchNeedsRefresh, "the output that arrived mid-sweep must not be dropped")
+        #expect(pane.search.needsRefresh, "the output that arrived mid-sweep must not be dropped")
 
-        pane.searchSweepGate = nil  // the follow-up sweep must not park too
+        pane.search.sweepGate = nil  // the follow-up sweep must not park too
         releaseFirstSweep.withLock { $0 = true }
 
         // The follow-up sweep this triggers picks up MARKER2 once it lands.
         #expect(
             await waitUpTo(10) {
-                pane.searchTask == nil && !pane.searchMatches.isEmpty
+                pane.search.task == nil && !pane.search.matches.isEmpty
             },
             "expected a follow-up sweep to catch the output the in-flight one missed")
     }
@@ -340,8 +340,8 @@ struct SearchDebounceTests {
         // offset to restore.
         pane.scrollOffset = 1
         pane.showSearchBar()
-        #expect(pane.scrollOffsetBeforeSearch == 1)
-        let totalPushedAtOpen = try #require(pane.totalPushedBeforeSearch)
+        #expect(pane.search.previousScrollOffset == 1)
+        let totalPushedAtOpen = try #require(pane.search.previousTotalPushed)
 
         // Output arrives while the bar is open — exactly what
         // `scheduleBackgroundSearchRefresh` exists to keep results current
@@ -385,7 +385,7 @@ struct SearchDebounceTests {
         #expect(pane.scrollOffset == 0, "precondition: at the bottom before search opens")
 
         pane.showSearchBar()
-        #expect(pane.scrollOffsetBeforeSearch == 0)
+        #expect(pane.search.previousScrollOffset == 0)
 
         pane.session.write(Array("yes filler | head -n 2000\n".utf8))
         #expect(

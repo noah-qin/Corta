@@ -31,7 +31,7 @@ extension ViewController {
     /// was consumed; `false` continues the normal key routing.
     func handleSearchKey(_ event: NSEvent) -> Bool {
         // Esc closes the bar rather than sending a raw ESC to the child.
-        if event.keyCode == 53 /* kVK_Escape */, searchBar != nil {
+        if event.keyCode == 53 /* kVK_Escape */, search.bar != nil {
             closeSearchBar()
             return true
         }
@@ -47,7 +47,7 @@ extension ViewController {
             return true
         }
         let flags = event.modifierFlags.intersection([.command, .shift])
-        guard flags.contains(.command), searchBar != nil,
+        guard flags.contains(.command), search.bar != nil,
             event.charactersIgnoringModifiers?.lowercased() == "g"
         else { return false }
         if flags.contains(.shift) { showPreviousMatch() } else { showNextMatch() }
@@ -55,7 +55,7 @@ extension ViewController {
     }
 
     /// Esc closes the bar from anywhere *in this pane's own window* — see
-    /// `searchKeyMonitor`'s comment for why a delegate method is not enough.
+    /// `search.keyMonitor`'s comment for why a delegate method is not enough.
     /// `addLocalMonitorForEvents` fires app-wide, not per-window, so without
     /// the window check here an Esc typed into any other window (a second
     /// split pane's search bar, a second Corta window) closed every open bar
@@ -88,16 +88,16 @@ extension ViewController {
     /// (its `delegate` is forwarded to the `NSSearchField` it edits on
     /// behalf of — `showSearchBar`'s `field.delegate = self` applies to the
     /// field, but the editing session's `NSText` reports the field itself as
-    /// its delegate — so comparing that against *this* pane's `searchField`
+    /// its delegate — so comparing that against *this* pane's `search.field`
     /// is what a field-editor responder needs), or one of the bar's own
     /// controls (the case/regex/prev/next/close buttons) when Full Keyboard
     /// Access has tabbed focus there instead — an ordinary view in this
-    /// pane's `searchBar` hierarchy, checked by ancestry rather than
+    /// pane's `search.bar` hierarchy, checked by ancestry rather than
     /// identity since there is no single control to name in advance.
     private var isSearchBarResponderActive: Bool {
         guard let responder = view.window?.firstResponder else { return false }
-        if let text = responder as? NSText, text.delegate === searchField { return true }
-        if let responderView = responder as? NSView, let searchBar {
+        if let text = responder as? NSText, text.delegate === search.field { return true }
+        if let responderView = responder as? NSView, let searchBar = search.bar {
             return responderView.isDescendant(of: searchBar)
         }
         return false
@@ -122,7 +122,7 @@ extension ViewController {
     /// scroll position is remembered so closing the bar puts the viewport
     /// back where the user left it.
     func showSearchBar() {
-        if let searchField {
+        if let searchField = search.field {
             view.window?.makeFirstResponder(searchField)
             return
         }
@@ -131,12 +131,12 @@ extension ViewController {
         // be excluded from the anchor either read captures — capturing
         // `scrollOffset` (pure main-thread state, no such wait) second
         // keeps the pair at least as fresh as the snapshot, never staler.
-        totalPushedBeforeSearch = session?.snapshot().scrollback.totalPushed
-        scrollOffsetBeforeSearch = scrollOffset
+        search.previousTotalPushed = session?.snapshot().scrollback.totalPushed
+        search.previousScrollOffset = scrollOffset
         // B05: seeded from the global default, then local to this pane —
-        // see `searchCaseSensitive`'s doc comment.
-        searchCaseSensitive = ConfigurationStore.shared.configuration.searchCaseSensitive
-        searchRegex = ConfigurationStore.shared.configuration.searchRegex
+        // see `search.caseSensitive`'s doc comment.
+        search.caseSensitive = ConfigurationStore.shared.configuration.searchCaseSensitive
+        search.regex = ConfigurationStore.shared.configuration.searchRegex
 
         // Symbols, not text, and all at one weight and point size so the
         // three of them read as a set rather than as three separate
@@ -316,10 +316,10 @@ extension ViewController {
             container.animator().alphaValue = 1
         }
 
-        searchBar = bar
-        searchBarContainer = container
-        searchField = field
-        searchKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        search.bar = bar
+        search.container = container
+        search.field = field
+        search.keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             self?.handleGlobalSearchEscape(event) ?? event
         }
         view.window?.makeFirstResponder(field)
@@ -330,27 +330,27 @@ extension ViewController {
     func closeSearchBar() {
         // The container is what sits in the view hierarchy; removing only
         // the glass would leave it behind empty.
-        searchBarContainer?.removeFromSuperview()
-        searchBarContainer = nil
-        searchBar = nil
-        searchField = nil
-        if let searchKeyMonitor {
+        search.container?.removeFromSuperview()
+        search.container = nil
+        search.bar = nil
+        search.field = nil
+        if let searchKeyMonitor = search.keyMonitor {
             NSEvent.removeMonitor(searchKeyMonitor)
-            self.searchKeyMonitor = nil
+            self.search.keyMonitor = nil
         }
-        searchMatches = []
-        searchMatchesTruncated = false
-        currentSearchMatchIndex = nil
+        search.matches = []
+        search.matchesTruncated = false
+        search.currentMatchIndex = nil
         // A sweep still in flight is cancelled, not just discarded (P04):
         // `Search.find` polls `Task.isCancelled` between and within lines,
         // so a dead search stops burning CPU instead of finishing into the
         // void. The generation bump keeps a result that was already past
         // the cancellation check from being applied.
-        searchTask?.cancel()
-        searchTask = nil
-        searchNeedsRefresh = false
-        searchRefreshGeneration &+= 1
-        if let beforeSearch = scrollOffsetBeforeSearch {
+        search.task?.cancel()
+        search.task = nil
+        search.needsRefresh = false
+        search.generation &+= 1
+        if let beforeSearch = search.previousScrollOffset {
             if beforeSearch == 0 {
                 // Zero is not a document position that drifts with output —
                 // it *is* "follow the live bottom." A user who opened
@@ -363,14 +363,14 @@ extension ViewController {
                 // selection's `baseScrollbackTotal` — restoring the raw
                 // offset alone would land on different text if output
                 // arrived while the bar was open
-                // (`totalPushedBeforeSearch`'s doc comment).
+                // (`search.previousTotalPushed`'s doc comment).
                 let scrollback = session?.snapshot().scrollback
                 let reanchored = ScrollbackCoordinates.reanchoredOffset(
-                    beforeSearch, from: totalPushedBeforeSearch ?? 0, to: scrollback?.totalPushed ?? 0)
+                    beforeSearch, from: search.previousTotalPushed ?? 0, to: scrollback?.totalPushed ?? 0)
                 scrollOffset = min(scrollback?.count ?? beforeSearch, reanchored)
             }
-            scrollOffsetBeforeSearch = nil
-            totalPushedBeforeSearch = nil
+            search.previousScrollOffset = nil
+            search.previousTotalPushed = nil
         }
         invalidateDisplay()
         view.window?.makeFirstResponder(terminalView)
@@ -394,40 +394,40 @@ extension ViewController {
     /// counter is the second guard: a result that was already past the
     /// cancellation checks when the cancel landed is discarded on apply.
     func updateSearchResults(scrollsToMatch: Bool) {
-        guard searchBar != nil, let searchField, session != nil else { return }
-        searchRefreshGeneration &+= 1
-        let generation = searchRefreshGeneration
-        searchTask?.cancel()
-        searchTask = nil
+        guard search.bar != nil, let searchField = search.field, session != nil else { return }
+        search.generation &+= 1
+        let generation = search.generation
+        search.task?.cancel()
+        search.task = nil
         let query = searchField.stringValue
         // An empty query needs no sweep — clear synchronously, so the
         // highlights vanish with the last character, not a debounce later.
         guard !query.isEmpty else {
-            searchMatches = []
-            searchMatchesTruncated = false
-            currentSearchMatchIndex = nil
-            // A pending output-triggered refresh (`searchNeedsRefresh`) is
+            search.matches = []
+            search.matchesTruncated = false
+            search.currentMatchIndex = nil
+            // A pending output-triggered refresh (`search.needsRefresh`) is
             // moot once there is no query to refresh — cleared here too, or
             // the next output would run a pointless empty-query sweep and
             // `applySearchResults` would then schedule a further one from
             // that.
-            searchNeedsRefresh = false
+            search.needsRefresh = false
             updateSearchCountLabel()
             invalidateDisplay()
             return
         }
         // B05: this pane's own local copy, not the live global default —
-        // see `searchCaseSensitive`'s doc comment.
-        let caseSensitive = searchCaseSensitive
-        let regex = searchRegex
+        // see `search.caseSensitive`'s doc comment.
+        let caseSensitive = search.caseSensitive
+        let regex = search.regex
         // Snapshotted on the main thread, but a Grid is copy-on-write — a
         // handful of retains, not a copy.
         let grid = session.snapshot()
         let totalPushed = grid.scrollback.totalPushed
         // A fresh, explicitly-requested sweep supersedes any pending
         // output-driven follow-up — it already reads the current grid.
-        searchNeedsRefresh = false
-        searchTask = Task.detached(priority: .userInitiated) { [weak self] in
+        search.needsRefresh = false
+        search.task = Task.detached(priority: .userInitiated) { [weak self] in
             // Debounce: a keystroke burst becomes one sweep, started once
             // the burst pauses. A cancelled sleep throws — a superseded
             // query never scans at all.
@@ -456,28 +456,28 @@ extension ViewController {
     /// At most one sweep is ever in flight: an output batch that arrives
     /// while the previous recompute is still running does not start a
     /// second one — but it is not dropped either (B05). It sets
-    /// `searchNeedsRefresh`, which `applySearchResults` checks once the
+    /// `search.needsRefresh`, which `applySearchResults` checks once the
     /// in-flight sweep lands; without that, output arriving after the last
     /// sweep that actually ran left the results stale with nothing left to
     /// nudge them, since the render loop stops calling this at all once the
     /// grid stops changing.
     func scheduleBackgroundSearchRefresh() {
-        guard searchBar != nil, let searchField, let session else { return }
-        guard searchTask == nil else {
-            searchNeedsRefresh = true
+        guard search.bar != nil, let searchField = search.field, let session else { return }
+        guard search.task == nil else {
+            search.needsRefresh = true
             return
         }
-        searchRefreshGeneration &+= 1
-        let generation = searchRefreshGeneration
+        search.generation &+= 1
+        let generation = search.generation
         let query = searchField.stringValue
         let grid = session.snapshot()
         let totalPushed = grid.scrollback.totalPushed
-        // B05: this pane's own local copy — see `searchCaseSensitive`'s doc
+        // B05: this pane's own local copy — see `search.caseSensitive`'s doc
         // comment.
-        let caseSensitive = searchCaseSensitive
-        let regex = searchRegex
-        let gate = searchSweepGate
-        searchTask = Task.detached(priority: .utility) { [weak self] in
+        let caseSensitive = search.caseSensitive
+        let regex = search.regex
+        let gate = search.sweepGate
+        search.task = Task.detached(priority: .utility) { [weak self] in
             gate?()
             let outcome = Self.sweep(
                 query, in: grid, caseSensitive: caseSensitive, regex: regex)
@@ -492,7 +492,7 @@ extension ViewController {
     /// The one place a search sweep's result touches state, and only after
     /// confirming it is still current: superseded by a newer query or
     /// refresh, or the bar closed while it was in flight — either way
-    /// `session`/`searchField` may already be gone.
+    /// `session`/`search.field` may already be gone.
     /// One sweep, whichever mode the bar is in. Pure and `nonisolated` so
     /// both detached tasks call the same thing and the mode decision lives in
     /// one place rather than being duplicated per call site.
@@ -530,40 +530,24 @@ extension ViewController {
     /// What one sweep produced, plus the things a plain match list cannot
     /// say — which are the difference between a count the user can trust and
     /// one they cannot.
-    struct SweepOutcome: Sendable {
-        var matches: [SelectionRange]
-        var status: Status
-
-        enum Status: Sendable {
-            /// The whole document was searched.
-            case complete
-            /// The sweep hit the match cap, a line too long to run a pattern
-            /// against, or its time budget. The count is a floor.
-            case incomplete
-            /// The pattern does not compile.
-            case invalidPattern
-            /// The pattern's shape makes a backtracking engine take
-            /// exponential time, so it was refused before it ran (U16).
-            case patternTooSlow
-        }
-    }
+    typealias SweepOutcome = PaneSearchState.SweepOutcome
 
     private func applySearchResults(
         _ outcome: SweepOutcome, generation: Int, scrollsToMatch: Bool, totalPushed: Int
     ) {
         let matches = outcome.matches
-        searchStatus = outcome.status
-        guard generation == searchRefreshGeneration, searchBar != nil else { return }
+        search.status = outcome.status
+        guard generation == search.generation, search.bar != nil else { return }
         // A generation match means this was the last sweep scheduled, so
-        // `searchTask` is this (now finished) task.
-        searchTask = nil
-        searchMatches = matches
-        searchMatchesTruncated = matches.count >= Search.defaultMatchLimit
-        if searchMatches.isEmpty {
-            currentSearchMatchIndex = nil
-            currentSearchMatchAnchor = nil
-        } else if scrollsToMatch || currentSearchMatchAnchor == nil {
-            currentSearchMatchIndex = searchMatches.count - 1
+        // `search.task` is this (now finished) task.
+        search.task = nil
+        search.matches = matches
+        search.matchesTruncated = matches.count >= Search.defaultMatchLimit
+        if search.matches.isEmpty {
+            search.currentMatchIndex = nil
+            search.currentMatchAnchor = nil
+        } else if scrollsToMatch || search.currentMatchAnchor == nil {
+            search.currentMatchIndex = search.matches.count - 1
             noteCurrentMatchAnchor(totalPushed: totalPushed)
             scrollToCurrentMatch()
         } else {
@@ -572,8 +556,8 @@ extension ViewController {
             // match that was "7 of 12" is 6 of 13 the moment a line scrolls;
             // keeping the number moved the highlight and the viewport to a
             // different piece of text every time the child printed.
-            currentSearchMatchIndex = Self.index(
-                closestTo: currentSearchMatchAnchor, in: searchMatches, totalPushed: totalPushed)
+            search.currentMatchIndex = Self.index(
+                closestTo: search.currentMatchAnchor, in: search.matches, totalPushed: totalPushed)
             noteCurrentMatchAnchor(totalPushed: totalPushed)
         }
         updateSearchCountLabel()
@@ -581,8 +565,8 @@ extension ViewController {
         // B05: output that arrived while this sweep was running is caught
         // up on now, rather than staying stale until something unrelated
         // (a keystroke, a scroll) happened to trigger the next sweep.
-        if searchNeedsRefresh {
-            searchNeedsRefresh = false
+        if search.needsRefresh {
+            search.needsRefresh = false
             scheduleBackgroundSearchRefresh()
         }
     }
@@ -611,12 +595,12 @@ extension ViewController {
     }
 
     private func noteCurrentMatchAnchor(totalPushed: Int) {
-        guard let index = currentSearchMatchIndex, searchMatches.indices.contains(index) else {
-            currentSearchMatchAnchor = nil
+        guard let index = search.currentMatchIndex, search.matches.indices.contains(index) else {
+            search.currentMatchAnchor = nil
             return
         }
-        currentSearchMatchAnchor = ScrollbackCoordinates.absoluteRow(
-            searchMatches[index].start.row, totalPushed: totalPushed)
+        search.currentMatchAnchor = ScrollbackCoordinates.absoluteRow(
+            search.matches[index].start.row, totalPushed: totalPushed)
     }
 
     func showNextMatch() {
@@ -636,15 +620,15 @@ extension ViewController {
             !firstLine.isEmpty
         else { return }
         showSearchBar()
-        searchField?.stringValue = firstLine
+        search.field?.stringValue = firstLine
         updateSearchResults(scrollsToMatch: true)
     }
 
     private func stepCurrentMatch(by delta: Int) {
-        guard !searchMatches.isEmpty, session != nil else { return }
-        let current = currentSearchMatchIndex ?? searchMatches.count - 1
-        currentSearchMatchIndex =
-            (current + delta + searchMatches.count) % searchMatches.count
+        guard !search.matches.isEmpty, session != nil else { return }
+        let current = search.currentMatchIndex ?? search.matches.count - 1
+        search.currentMatchIndex =
+            (current + delta + search.matches.count) % search.matches.count
         noteCurrentMatchAnchor(totalPushed: session.snapshot().scrollback.totalPushed)
         scrollToCurrentMatch()
         updateSearchCountLabel()
@@ -655,11 +639,11 @@ extension ViewController {
     /// viewport row `r + scrollOffset`, so the offset that centres it is
     /// `rows/2 - r`; a live-screen match needs no scrolling at all.
     private func scrollToCurrentMatch() {
-        guard let index = currentSearchMatchIndex, searchMatches.indices.contains(index),
+        guard let index = search.currentMatchIndex, search.matches.indices.contains(index),
             session != nil
         else { return }
         let grid = session.snapshot()
-        let row = searchMatches[index].start.row
+        let row = search.matches[index].start.row
         scrollOffset =
             row >= 0
             ? 0
@@ -670,29 +654,29 @@ extension ViewController {
         // The label is the stack view's second arranged view; rebuilding the
         // bar keeps it that way — find it by type, not a stored reference,
         // so the bar's construction stays in one place.
-        let label = searchBar?.contentView?.subviews
+        let label = search.bar?.contentView?.subviews
             .compactMap { $0 as? NSStackView }.first?
             .arrangedSubviews.compactMap { $0 as? NSTextField }
             .first { !($0 is NSSearchField) }
         guard let label else { return }
-        if searchStatus == .invalidPattern {
+        if search.status == .invalidPattern {
             // Not "No Results": the pattern never ran, and saying it found
             // nothing would send the user looking for the missing text
             // instead of the missing bracket (U16).
             label.stringValue = L10n.text("search.invalidPattern")
-        } else if searchStatus == .patternTooSlow {
+        } else if search.status == .patternTooSlow {
             label.stringValue = L10n.text("search.patternTooSlow")
-        } else if searchMatches.isEmpty {
-            label.stringValue = searchField?.stringValue.isEmpty == false ? "No Results" : ""
-        } else if let current = currentSearchMatchIndex {
+        } else if search.matches.isEmpty {
+            label.stringValue = search.field?.stringValue.isEmpty == false ? "No Results" : ""
+        } else if let current = search.currentMatchIndex {
             // "+" when the sweep stopped at the match cap: the document may
             // hold more matches than were kept (`Search.defaultMatchLimit`).
             // "+" when the sweep stopped early — the match cap, a line too
             // long to run a pattern against, or the time budget. Either way
             // the document may hold matches that were never counted.
             label.stringValue =
-                "\(current + 1)/\(searchMatches.count)"
-                + (searchStatus == .incomplete ? "+" : "")
+                "\(current + 1)/\(search.matches.count)"
+                + (search.status == .incomplete ? "+" : "")
         }
     }
 
@@ -701,37 +685,37 @@ extension ViewController {
     /// one; an already-open bar in another pane keeps its own local value
     /// and button state until *it* is next opened fresh.
     @objc private func toggleSearchCase(_ sender: Any?) {
-        searchCaseSensitive.toggle()
-        if !ConfigurationStore.shared.update({ $0.searchCaseSensitive = self.searchCaseSensitive }) {
+        search.caseSensitive.toggle()
+        if !ConfigurationStore.shared.update({ $0.searchCaseSensitive = self.search.caseSensitive }) {
             // `update` rolls its own copy back on a failed write (a
             // read-only or full config path) — this pane's local flag
             // must match that truth too, or the active bar would keep
             // showing a mode no persisted default, and no later bar,
             // agrees with.
-            searchCaseSensitive = ConfigurationStore.shared.configuration.searchCaseSensitive
+            search.caseSensitive = ConfigurationStore.shared.configuration.searchCaseSensitive
         }
         if let button = sender as? NSButton { updateCaseButton(button) }
         // The match list changes, so the place is re-found rather than kept:
         // a case-sensitive sweep may not contain the match the user was on.
-        currentSearchMatchAnchor = nil
+        search.currentMatchAnchor = nil
         updateSearchResults(scrollsToMatch: true)
     }
 
     /// U16 — flips this pane's local regex mode (B05) and persists it as
     /// the new default; see `toggleSearchCase`.
     @objc private func toggleSearchRegex(_ sender: Any?) {
-        searchRegex.toggle()
-        if !ConfigurationStore.shared.update({ $0.searchRegex = self.searchRegex }) {
+        search.regex.toggle()
+        if !ConfigurationStore.shared.update({ $0.searchRegex = self.search.regex }) {
             // See `toggleSearchCase`'s identical reasoning.
-            searchRegex = ConfigurationStore.shared.configuration.searchRegex
+            search.regex = ConfigurationStore.shared.configuration.searchRegex
         }
         if let button = sender as? NSButton { updateRegexButton(button) }
-        currentSearchMatchAnchor = nil
+        search.currentMatchAnchor = nil
         updateSearchResults(scrollsToMatch: true)
     }
 
     private func updateRegexButton(_ button: NSButton) {
-        let on = searchRegex
+        let on = search.regex
         button.contentTintColor = on ? .controlAccentColor : SystemAccessibility.secondaryLabelColor
         button.setAccessibilityValue(on ? 1 : 0)
         button.toolTip = L10n.text("search.regex")
@@ -740,7 +724,7 @@ extension ViewController {
     /// State on a borderless icon button has to be legible without colour —
     /// the tint says it at a glance, the accessibility value says it at all.
     private func updateCaseButton(_ button: NSButton) {
-        let on = searchCaseSensitive
+        let on = search.caseSensitive
         button.contentTintColor = on ? .controlAccentColor : SystemAccessibility.secondaryLabelColor
         button.setAccessibilityValue(on ? 1 : 0)
         button.toolTip = L10n.text("search.caseSensitive")
@@ -762,7 +746,7 @@ extension ViewController {
 /// The search field's live updates and its editor's special keys.
 extension ViewController: NSSearchFieldDelegate {
     func controlTextDidChange(_ notification: Notification) {
-        guard (notification.object as? NSTextField) === searchField else { return }
+        guard (notification.object as? NSTextField) === search.field else { return }
         updateSearchResults(scrollsToMatch: true)
     }
 
@@ -771,7 +755,7 @@ extension ViewController: NSSearchFieldDelegate {
     func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector)
         -> Bool
     {
-        guard control === searchField else { return false }
+        guard control === search.field else { return false }
         if commandSelector == #selector(NSResponder.insertNewline(_:)) {
             showNextMatch()
             return true

@@ -2,12 +2,7 @@ import AppKit
 import CortaTerminal
 import Observation
 
-/// B10 — the shared state model behind `CommandHistoryView`, and this
-/// project's first SwiftUI surface. Everything the view reads or writes
-/// lives here as plain properties instead of being read back out of live
-/// `NSButton`/`NSPopUpButton` state the way the AppKit version this
-/// replaces had to (`git log` has that version, in `CommandHistoryController
-/// .swift`, if a future surface wants the comparison).
+/// Cached command history and lightweight filters for the history window.
 @MainActor
 @Observable
 final class CommandHistoryModel {
@@ -28,14 +23,11 @@ final class CommandHistoryModel {
     /// (`Performer+ShellIntegration.swift`), so "this host" and "local" are
     /// a real question the records can answer, not a guess from text.
     enum HostScope: Hashable {
-        case any, local, host(String)
+        case any, local
+        case host(String)
     }
 
-    /// One row's already-formatted display state — computed once per
-    /// `rows` access rather than per SwiftUI body evaluation, since
-    /// `canFillOrRun` reads the grid (`ViewController.commandLineText`) and
-    /// a window with the maximum command-history backlog should not
-    /// re-walk it on every render pass.
+    /// A formatted row retained until the session snapshot changes.
     struct Row: Identifiable {
         let id: Int
         let statusSymbolName: String
@@ -51,7 +43,7 @@ final class CommandHistoryModel {
         let accessibilityLabel: String
     }
 
-    weak var pane: ViewController?
+    weak var pane: ViewController? { didSet { refresh() } }
     var directoryOnly = false
     var projectOnly = false
     var exitFilter: ExitFilter = .any
@@ -77,41 +69,107 @@ final class CommandHistoryModel {
         pane?.session == nil ? L10n.text("commandHistory.noPane") : nil
     }
 
-    /// The hosts this pane's records name, for the scope picker's list.
-    /// Sorted rather than in record order: the list is a chooser, and a
-    /// chooser that reshuffles as new commands land is unusable.
-    var knownHosts: [String] {
-        guard let session = pane?.session else { return [] }
-        return Set(session.commandRecords.records.compactMap(\.host)).sorted()
+    @ObservationIgnored private let projectRoot: @Sendable (String) -> String?
+
+    init(
+        projectRoot: @escaping @Sendable (String) -> String? = {
+            DirectoryHistory.projectRoot(for: $0)
+        }
+    ) {
+        self.projectRoot = projectRoot
+    }
+
+    private(set) var knownHosts: [String] = []
+    private var cachedRecords: [CommandRecord] = []
+    private var cachedRows: [Row] = []
+    private var currentDirectory: String?
+    private var projectRoots: [String: String] = [:]
+    @ObservationIgnored private var snapshotStamp: [UInt64] = []
+
+    /// Rebuild formatted rows only when the session changes, never from a body getter.
+    func refresh() {
+        guard let session = pane?.session else {
+            cachedRecords = []
+            cachedRows = []
+            knownHosts = []
+            currentDirectory = nil
+            snapshotStamp = []
+            return
+        }
+        let records = session.commandRecords.records(inDirectory: nil)
+        let grid = session.snapshot()
+        refresh(records: records, grid: grid, directory: session.workingDirectory)
+    }
+
+    func refresh(records: [CommandRecord], grid: Grid, directory: String?) {
+        let stamp =
+            [
+                grid.linesGeneration, UInt64(grid.scrollback.totalPushed),
+                UInt64(grid.scrollback.count),
+            ]
+            + (0..<grid.rows).map { grid.lineRevision($0) }
+        if currentDirectory != directory { currentDirectory = directory }
+        guard records != cachedRecords || stamp != snapshotStamp else { return }
+        cachedRecords = records
+        snapshotStamp = stamp
+        cachedRows = records.map { Self.row(for: $0, grid: grid) }
+        knownHosts = Set(records.compactMap(\.host)).sorted()
+    }
+
+    var projectLookupPaths: [String] {
+        guard projectOnly else { return [] }
+        return Set(
+            cachedRecords.compactMap(\.workingDirectory)
+                + [currentDirectory].compactMap { $0 }
+        ).sorted()
+    }
+
+    /// Runs once per distinct set of directories; cancellation prevents stale publication.
+    func resolveProjectRoots() async {
+        let paths = projectLookupPaths
+        let roots = await Self.lookupProjectRoots(paths, resolve: projectRoot)
+        guard !Task.isCancelled, paths == projectLookupPaths else { return }
+        projectRoots = roots
+    }
+
+    @concurrent
+    private static func lookupProjectRoots(
+        _ paths: [String], resolve: @Sendable (String) -> String?
+    ) async -> [String: String] {
+        var roots: [String: String] = [:]
+        for path in paths {
+            guard !Task.isCancelled else { break }
+            roots[path] = resolve(path)
+        }
+        return roots
     }
 
     var rows: [Row] {
-        guard let pane, let session = pane.session else { return [] }
-        let grid = session.snapshot()
-        let directory = directoryOnly ? session.workingDirectory : nil
-        let host: String? =
+        let root = currentDirectory.flatMap { projectRoots[$0] }
+        let selected = zip(cachedRecords, cachedRows).compactMap { record, row -> Row? in
+            if directoryOnly, let currentDirectory,
+                record.workingDirectory != currentDirectory
+            {
+                return nil
+            }
             switch hostScope {
-            case .any, .local: nil
-            case .host(let name): name
+            case .any: break
+            case .local: if record.host != nil { return nil }
+            case .host(let name): if record.host != name { return nil }
             }
-        var records = session.commandRecords.records(inDirectory: directory, host: host)
-        if case .local = hostScope {
-            records = records.filter { $0.host == nil }
-        }
-        if projectOnly, let cwd = session.workingDirectory,
-            let root = DirectoryHistory.projectRoot(for: cwd)
-        {
-            records = records.filter {
-                $0.workingDirectory.flatMap { DirectoryHistory.projectRoot(for: $0) } == root
+            if projectOnly, let root,
+                record.workingDirectory.flatMap({ projectRoots[$0] }) != root
+            {
+                return nil
             }
+            switch exitFilter {
+            case .any: break
+            case .succeeded: if record.exitStatus != 0 { return nil }
+            case .failed: if !record.didFail { return nil }
+            }
+            return row
         }
-        switch exitFilter {
-        case .any: break
-        case .succeeded: records = records.filter { $0.exitStatus == 0 }
-        case .failed: records = records.filter { $0.didFail }
-        }
-        let rows = records.map { Self.row(for: $0, grid: grid) }
-        return Self.filter(rows, query: query)
+        return Self.filter(selected, query: query)
     }
 
     /// The text filter, as a pure function so it is testable on rows built
@@ -149,7 +207,8 @@ final class CommandHistoryModel {
             directoryText = "⟂ \(host)"
             directoryTooltip = nil
         } else {
-            directoryText = record.workingDirectory.map { ($0 as NSString).lastPathComponent }
+            directoryText =
+                record.workingDirectory.map { ($0 as NSString).lastPathComponent }
                 ?? L10n.text("commandHistory.unknownDirectory")
             directoryTooltip = record.workingDirectory
         }
@@ -167,6 +226,7 @@ final class CommandHistoryModel {
 
     func clearHistory() {
         pane?.session?.clearCommandRecords()
+        refresh()
     }
 
     func find(id: Int) {

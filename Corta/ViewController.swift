@@ -118,7 +118,7 @@ class ViewController: NSViewController {
     /// total to keep the *document position* the viewport shows fixed while
     /// scrolled away, rather than the row count "N lines above the bottom,"
     /// which drifts forward as the live bottom moves (B04). The same
-    /// `totalPushed`-delta pattern `scrollOffsetBeforeSearch` and
+    /// `totalPushed`-delta pattern `search.previousScrollOffset` and
     /// `Selection.baseScrollbackTotal` already use elsewhere.
     var scrollAnchorTotalPushed: Int?
 
@@ -226,77 +226,8 @@ class ViewController: NSViewController {
     /// re-fit the window to keep this grid size at the new cell metrics.
     var lastRequestedSize: TerminalSize?
 
-    // Search (M4.4), owned by `ViewController+Search.swift`. Storage lives
-    // here because extensions cannot add their own.
+    let search = PaneSearchState()
 
-    /// The Liquid Glass search bar; `nil` when closed.
-    var searchBar: NSGlassEffectView?
-    var searchBarContainer: NSGlassEffectContainerView?
-    var searchField: NSTextField?
-    /// Every current match, oldest first — recomputed on each query or grid
-    /// change, not incrementally maintained. Capped at
-    /// `Search.defaultMatchLimit`; the cap keeps the newest matches (P04).
-    var searchMatches: [SelectionRange] = []
-    var currentSearchMatchIndex: Int?
-
-    /// U12 — the current match's *absolute* row (`totalPushed + row`), which
-    /// is the only identity it has that survives new output.
-    ///
-    /// An index does not: a match list is recomputed whenever the child
-    /// prints, and by then every earlier match has moved and "match 7" is a
-    /// different piece of text. A document row does not either — it is
-    /// measured backwards from the live screen, so it shifts as the screen
-    /// scrolls. The absolute row is fixed for the life of the line, the same
-    /// property that makes it the right address for a shell-integration mark
-    /// (`Grid+Marks.swift`).
-    var currentSearchMatchAnchor: Int?
-
-    /// U16 — what the last sweep was able to do. Four states, because
-    /// "no matches", "that pattern does not compile", "that pattern would
-    /// never finish" and "there may be more than this" are four different
-    /// things to tell someone.
-    var searchStatus: SweepOutcome.Status = .complete
-    /// True when the last sweep stopped at the match cap — the count label
-    /// reads "N+" rather than claiming a total it does not have. A sweep
-    /// that found exactly the cap's worth of matches reads "+" too; the
-    /// alternative is a second pass to tell the cases apart.
-    var searchMatchesTruncated = false
-    /// The in-flight debounce-and-sweep task (P04). Every keystroke and
-    /// every output-driven refresh cancels and replaces it, so only the
-    /// newest query's work is ever running; the sweep polls
-    /// `Task.isCancelled` cooperatively (`Search.find`'s `shouldStop`).
-    var searchTask: Task<Void, Never>?
-    /// The scroll position from before the search bar opened, restored on
-    /// Esc.
-    var scrollOffsetBeforeSearch: Int?
-    /// `Scrollback.totalPushed` when `scrollOffsetBeforeSearch` was
-    /// captured (B05). Output arriving while the bar is open grows
-    /// `totalPushed`, so restoring the raw offset alone would land the
-    /// viewport on different text than what was actually on screen before
-    /// search opened — the same class of drift `docs/DESIGN.md` §2.7
-    /// documents for a selection's `baseScrollbackTotal`, applied here to
-    /// the pre-search anchor instead.
-    var totalPushedBeforeSearch: Int?
-    /// Bumped by every `scheduleBackgroundSearchRefresh` call (M9); a
-    /// background sweep applies its result only if this still matches what
-    /// it captured when it started, so a superseded or late-arriving one is
-    /// silently discarded instead of clobbering a newer result.
-    var searchRefreshGeneration = 0
-    /// B05: set when `scheduleBackgroundSearchRefresh` is called while a
-    /// sweep is already in flight, rather than silently dropping the output
-    /// that triggered the call. Consumed in `applySearchResults` once the
-    /// in-flight sweep lands, which starts the follow-up sweep that output
-    /// asked for — without this, output arriving at the tail of a burst
-    /// (after which nothing else re-triggers a sweep, since the render loop
-    /// pauses once the grid stops changing) left the search results stale
-    /// until something unrelated nudged them.
-    var searchNeedsRefresh = false
-    /// Test hook: run at the start of `scheduleBackgroundSearchRefresh`'s
-    /// detached task, before the sweep, so a test can hold one sweep open
-    /// deterministically and observe the "already in flight" branch rather
-    /// than racing a real one. `nil` in production. Assign before calling
-    /// `scheduleBackgroundSearchRefresh`.
-    var searchSweepGate: (@Sendable () -> Void)?
     /// B05: the in-flight large copy/export text build, if any — building a
     /// potentially whole-scrollback string is O(scrollback), so it runs off
     /// the interaction path (`ViewController+Export.swift`, `copy(_:)`).
@@ -319,31 +250,13 @@ class ViewController: NSViewController {
     /// clipboard contents.
     var pasteboardForTesting: NSPasteboard?
     /// Test hook: run at the start of `copy(_:)`'s detached build, before
-    /// `Selection.text`, matching `searchSweepGate`'s purpose — `nil` in
+    /// `Selection.text`, matching `search.sweepGate`'s purpose — `nil` in
     /// production. `Task.detached` gives no scheduling barrier, so without
     /// this a test asserting "the build hasn't landed yet" immediately
     /// after `copy(_:)` returns can pass or fail depending on how fast the
     /// scheduler happens to run it for a given grid, rather than on
     /// whether the implementation is actually asynchronous.
     var largeTextBuildGateForTesting: (@Sendable () -> Void)?
-    /// B05: local to this pane once the bar is open — seeded from the
-    /// global default when it opens, toggled independently of any other
-    /// currently-open bar, and pushed back to `ConfigurationStore` only as
-    /// the new default for bars opened after this one. Reading
-    /// `ConfigurationStore` live on every sweep (the pre-B05 behaviour)
-    /// meant toggling case-sensitivity in one pane silently changed what a
-    /// second, already-open pane's *next* sweep would match, without that
-    /// pane's own button ever updating to say so.
-    var searchCaseSensitive = false
-    var searchRegex = false
-    /// Local key monitor for Esc while the bar is open: the field editor
-    /// turns Esc into `cancelOperation:`, which NSSearchField can swallow
-    /// without ever calling the delegate — a monitor sees the key before
-    /// any of that. Scoped to this pane's own window by
-    /// `handleGlobalSearchEscape(_:)`, since the monitor itself fires
-    /// app-wide. Removed when the bar closes.
-    var searchKeyMonitor: Any?
-
     /// The drag is over — the child should see the final size now, not after
     /// the debounce window expires. Wired to `TerminalView`'s
     /// `viewDidEndLiveResize` (live-resize notifications live on the view).
@@ -505,36 +418,13 @@ class ViewController: NSViewController {
         setUpPane()
     }
 
-    /// Builds the pane: renderer, session, view hierarchy, wiring.
-    ///
-    /// Separate from `viewDidLoad` because it is also the retry path. Three
-    /// things have to exist before a pane can draw — a Metal device, an atlas
-    /// for the configured face, and a child on a PTY — and each can fail on a
-    /// machine Corta is otherwise fine on: a `$SHELL` pointing at a shell that
-    /// was uninstalled, a restored working directory on an unmounted volume.
-    /// Until M7 each of those was a `fatalError` or a `try!`, so the answer to
-    /// "your login shell moved" was a crash report. Now the recoverable ones
-    /// degrade (`startSession`, `makeRenderer`) and the rest present
-    /// `PaneFailureView`, whose Try Again runs this again.
-    ///
-    /// `strictRespawn` is the reconnect path (B13): the recorded command is
-    /// re-run *exactly*, with no fallback ladder. Degrading is the right
-    /// answer to "open me a terminal" — a bad `$SHELL` still gets you a
-    /// shell — and the wrong answer to "reconnect to that host", where
-    /// quietly landing in a local `/bin/zsh` would turn a remote pane local
-    /// while claiming otherwise. Reconnect succeeds as the same command or
-    /// fails as itself.
+    /// Builds a pane or retries a failed setup. Reconnect must reuse the exact
+    /// recorded command; ordinary startup may fall back to a working shell.
     private func setUpPane(strictRespawn: Bool = false) {
-        // The settings page's font and size (M6.1). Read here rather than
-        // pushed in later: a pane created at any time — a split, a new tab —
-        // gets the current values by asking, and nothing has to remember to
-        // tell it.
         let configuration = ConfigurationStore.shared.configuration
         fontSize = min(64, max(8, configuration.fontSize))
         fontFamily = configuration.fontFamily
         guard let device = self.device ?? MTLCreateSystemDefaultDevice() else {
-            // Not retryable: a Mac that reports no Metal device will not grow
-            // one while the app is running.
             presentFailure(
                 title: L10n.text("failure.title.metal"),
                 detail: L10n.text("failure.detail.metal"), canRetry: false)
@@ -552,9 +442,6 @@ class ViewController: NSViewController {
         }
         commandQueue = device.makeCommandQueue()
 
-        // The session comes before the view hierarchy: with no child there is
-        // no terminal to lay out, and the failure view should take the pane
-        // rather than sit behind a live canvas with nothing driving it.
         var initialSize = initialGridSize ?? configuredGridSize
         if let terminalRenderer {
             let pixels = pixelSize(
@@ -588,16 +475,9 @@ class ViewController: NSViewController {
         session = started.session
         launchedCommand = (started.executable, started.arguments)
         sessionGeneration += 1
-        // The facts cache predates this session; a retried pane must not
-        // show the dead one's process, directory or remote badge until the
-        // refresh interval runs out.
         invalidateProcessFacts()
         cachedRemoteState = .local
         remoteReportTracker = PaneRemoteState.ReportTracker()
-        let generation = sessionGeneration
-        // OSC 11 must answer with what is actually on screen (M6.6) — a
-        // program that queries the background before choosing its own
-        // colours needs the live theme's variant, not the type's default.
         session.dynamicColors =
             AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)
             .dynamicColors
@@ -607,43 +487,19 @@ class ViewController: NSViewController {
         pendingSessionNotice = started.notice
         lastRequestedSize = initialSize
 
+        installPaneViews()
+        installSessionCallbacks(generation: sessionGeneration)
+        installTerminalCallbacks(on: terminalView)
+        // The PTY reader must not run until all callbacks and views are ready.
+        session.start()
+    }
+
+    private func installPaneViews() {
         let contentSize = initialWindowContentSize
-        // Size the container to the target content size *before* the first
-        // layout. Otherwise the storyboard's 480x270 produces a transient
-        // 53x15 session, the shell's early output is laid out against that,
-        // and growing the window afterwards leaves that output stranded in
-        // the top half with fifteen blank rows below it.
         self.view.setFrameSize(contentSize)
 
         let view = TerminalView(frame: NSRect(origin: .zero, size: contentSize))
-        // Deliberately no autoresizing mask. The mask applies the superview's
-        // resize *delta*, and this view is born at the target content size
-        // while the storyboard's view is still its own smaller size. The
-        // `setContentSize` in `viewDidAppear` then grew the superview by
-        // (240, 138) and the mask added that delta on top of a view already
-        // at the target — leaving it 960x546 inside a 720x408 superview.
-        //
-        // In AppKit's bottom-left coordinates the overflow sits above the
-        // visible content, so row 0 — the only row with anything on it in a
-        // fresh shell — was drawn entirely inside the clipped strip and the
-        // window looked black. `viewDidLayout` sets the frame outright.
-        // The terminal canvas is the CONTENT layer, and content layers are
-        // opaque. Liquid Glass belongs to the navigation and control layer —
-        // a small surface floating *over* content, refracting what is behind
-        // it. Wrapping the whole canvas in `NSGlassEffectView` used it the
-        // wrong way round: there was nothing underneath worth refracting, and
-        // the material's own light raised the background's luminance, costing
-        // every colour about a fifth of its contrast ratio. The glass now
-        // lives where it is meant to — see `ViewController+Search`.
         self.view.addSubview(view)
-        // Constraints, not a frame set from a layout callback. The view is
-        // born at the target content size while the storyboard's view is
-        // still its own smaller size, and `viewWillAppear`'s `setContentSize`
-        // then grows the superview — but a frame assigned in `viewDidLayout`
-        // only tracks if that callback runs again afterwards, which it did
-        // not: the view stayed 480x270 inside a 1080x510 superview, so the
-        // drawable was half size and the grid came out 53x15 instead of
-        // 120x30. AppKit maintains constraints regardless of callback order.
         view.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             view.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
@@ -654,8 +510,6 @@ class ViewController: NSViewController {
         terminalView = view
 
         let dim = PassthroughView()
-        // Layer-backed: a subview without a backing layer never composites
-        // over the Metal layer and the dim would be silently invisible.
         dim.wantsLayer = true
         dim.layer?.backgroundColor = NSColor.black.withAlphaComponent(Self.unfocusedDim).cgColor
         dim.isHidden = true
@@ -669,22 +523,6 @@ class ViewController: NSViewController {
         ])
         focusDimView = dim
 
-        // The focus *indicator*, as opposed to the dim.
-        //
-        // A 22%-black wash over every pane but one was the whole signal, and
-        // it said the wrong thing: a heavily dimmed pane reads as disabled or
-        // suspended, not as "running, just not typing here" — and it took a
-        // fifth of the contrast off text the user was still reading, in a
-        // split whose entire purpose is watching two things at once. The
-        // signal is now positive and on the active pane: a softened
-        // accent-coloured ring around the pane that has the keyboard, with
-        // the dim reduced to a hint. A ring is also the convention every
-        // other split UI on this platform uses, so it needs no learning.
-        // The light background lift under the ring, only on the pane that
-        // truly has the keyboard right now. On top of the terminal canvas
-        // like the dim, but a positive tint rather than a negative one —
-        // low enough alpha that it reads as an elevation, not a recolour of
-        // the text underneath.
         let highlight = PassthroughView()
         highlight.wantsLayer = true
         highlight.layer?.backgroundColor =
@@ -708,12 +546,6 @@ class ViewController: NSViewController {
         ring.isHidden = true
         ring.translatesAutoresizingMaskIntoConstraints = false
         self.view.addSubview(ring)
-        // Inset by the border's own width: drawn flush to the pane's edge,
-        // half the border falls outside the view and the ring reads as
-        // half-weight on the window's outer edges and full weight against a
-        // divider. The top constraint is retensioned per layout
-        // (`updateFocusRingLayout`) to clear the chrome on a top pane, so it
-        // is kept rather than folded into this literal block.
         let ringTop = ring.topAnchor.constraint(
             equalTo: self.view.topAnchor, constant: Self.focusRingWidth / 2)
         NSLayoutConstraint.activate([
@@ -727,7 +559,9 @@ class ViewController: NSViewController {
         ])
         focusRingTopConstraint = ringTop
         focusRingView = ring
+    }
 
+    private func installSessionCallbacks(generation: Int) {
         resizeDebouncer = ResizeDebouncer { [weak self] size in
             self?.session?.resize(to: size)
         }
@@ -736,24 +570,17 @@ class ViewController: NSViewController {
             observeWindowFocus()
             observeConfiguration()
         }
-        // Fires on the reader thread after every parse batch.
         session.onOutput = { [weak self] in
             self?.noteOutput(generation: generation)
         }
-        // Fires once, from the reader thread, after the child has exited and
-        // the reader loop has stopped (B03) — previously never installed, so
-        // a child that exited on its own (`exit`, a crash, `kill`) produced
-        // no UI reaction at all, indistinguishable from a pane the user is
-        // still looking at a live shell in.
         session.onChildExit = { [weak self] childExit in
             Task(priority: .userInitiated) { @MainActor in
                 self?.noteChildExit(childExit, generation: generation)
             }
         }
-        // Configure-before-start (E02): callbacks must be installed before
-        // the reader thread begins draining the PTY, so this stays last.
-        session.start()
+    }
 
+    private func installTerminalCallbacks(on view: TerminalView) {
         view.onRenderFrame = { [weak self] pass, drawableSize, drawable in
             self?.render(into: pass, drawableSize: drawableSize, drawable: drawable)
         }
@@ -762,8 +589,6 @@ class ViewController: NSViewController {
         }
         view.onKeyBytes = { [weak self] bytes in
             guard let self else { return }
-            // A Return is the one moment a terminal without shell
-            // integration knows the user asked for something (M6.3).
             if bytes.contains(0x0D) { taskNotifier.noteCommandSubmitted(in: view.window) }
             returnToBottomOnInput()
             session.write(bytes)
@@ -812,8 +637,6 @@ class ViewController: NSViewController {
             self?.handleSearchKey(event) ?? false
         }
         view.cellSize = CGSize(width: terminalRenderer.pointMetrics.cellWidth, height: terminalRenderer.pointMetrics.cellHeight)
-        // The preedit overlay draws with the renderer's own font stack at
-        // the current size, so ⌘=/⌘- resizes marked text too.
         view.preeditFontProvider = { [weak self] in
             guard let self else {
                 return NSFont.monospacedSystemFont(
@@ -831,16 +654,10 @@ class ViewController: NSViewController {
         view.onMouseBytes = { [weak self] bytes in
             self?.session.write(bytes)
         }
-        // Click-to-focus, ⌘⌥ arrows, split and close all converge on
-        // `makeFirstResponder`; this is how the split controller learns
-        // which pane owns input (M5.2).
         view.onFocus = { [weak self] in
             guard let self else { return }
             self.splitController?.noteFocus(self)
         }
-        // Track A's IME layer positions the candidate window and the preedit
-        // overlay from this: the cursor cell's rect in view coordinates,
-        // derived here where the insets and metrics live.
         view.cursorRectProvider = { [weak self] in
             guard let self, let terminalRenderer, session != nil else { return nil }
             let metrics = terminalRenderer.pointMetrics
@@ -850,11 +667,6 @@ class ViewController: NSViewController {
                 y: topInset + CGFloat(cursor.row) * metrics.cellHeight,
                 width: metrics.cellWidth, height: metrics.cellHeight)
         }
-        // Accessibility (`TerminalView+Accessibility.swift`). The view draws
-        // with Metal and so has no text for AppKit to derive an accessibility
-        // tree from; these closures are that text. The snapshot is taken at
-        // the current scroll offset, so a screen reader scrolled into the
-        // history reads the history (U01).
         view.accessibilitySnapshotProvider = { [weak self] in
             guard let self, let session else { return nil }
             let grid = session.snapshot()
@@ -871,14 +683,6 @@ class ViewController: NSViewController {
                 y: topInset + CGFloat(row) * metrics.cellHeight,
                 width: metrics.cellWidth, height: metrics.cellHeight)
         }
-        // SGR mouse reports name an on-screen cell, so they need the same
-        // inset-aware, bottom-anchored mapping as selection hit-testing
-        // (`documentPosition`) — a raw divide of the view point by the cell
-        // size reports a cell off by the insets. scrollOffset is 0 here: the
-        // answer is a *viewport* row, which is what a mouse report names, and
-        // what accessibility hit-testing then shifts into document space
-        // itself. Both callers must agree on which space this is; they do,
-        // and this one is the viewport's.
         view.cellAtPoint = { [weak self] point in
             guard let self, let terminalRenderer, session != nil, let terminalView
             else { return (column: 0, row: 0) }
@@ -1005,7 +809,7 @@ class ViewController: NSViewController {
             sawOutputWhileScrolled = true
             updateScrollPositionIndicator()
         }
-        if hasOutput, searchBar != nil {
+        if hasOutput, search.bar != nil {
             scheduleBackgroundSearchRefresh()
         }
         if hasOutput {
@@ -1069,20 +873,20 @@ class ViewController: NSViewController {
                 scrollAnchorTotalPushed = grid.scrollback.totalPushed
             }
         }
-        let mappedSearchMatches = searchMatches.map { TerminalSelection($0, grid: grid) }
+        let mappedSearchMatches = search.matches.map { TerminalSelection($0, grid: grid) }
         let indexedPalette = session.indexedPalette
         let damaged = terminalRenderer.updateInstances(
             grid: grid, scrollOffset: scrollOffset,
             cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
             searchMatches: mappedSearchMatches,
-            currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink,
+            currentSearchMatchIndex: search.currentMatchIndex, hoveredLink: hoveredLink,
             indexedOverrides: indexedPalette.overrides,
             indexedOverridesGeneration: indexedPalette.overridesGeneration)
         pendingFrameContext = FrameContext(
             grid: grid, scrollOffset: scrollOffset,
             cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
             searchMatches: mappedSearchMatches,
-            currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink)
+            currentSearchMatchIndex: search.currentMatchIndex, hoveredLink: hoveredLink)
         return forced || damaged
     }
 
@@ -1443,8 +1247,8 @@ class ViewController: NSViewController {
                     topInset: topInset),
                 drawableSize: drawableSize,
                 cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
-                searchMatches: searchMatches.map { TerminalSelection($0, grid: grid) },
-                currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink,
+                searchMatches: search.matches.map { TerminalSelection($0, grid: grid) },
+                currentSearchMatchIndex: search.currentMatchIndex, hoveredLink: hoveredLink,
                 renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
             presentAndCommit(commandBuffer: commandBuffer, drawable: drawable)
             return
@@ -1481,8 +1285,8 @@ class ViewController: NSViewController {
             renderer.updateInstances(
                 grid: grid, scrollOffset: scrollOffset,
                 cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
-                searchMatches: searchMatches.map { TerminalSelection($0, grid: grid) },
-                currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink)
+                searchMatches: search.matches.map { TerminalSelection($0, grid: grid) },
+                currentSearchMatchIndex: search.currentMatchIndex, hoveredLink: hoveredLink)
             gridRows = grid.rows
         }
         let rect = Self.contentRect(

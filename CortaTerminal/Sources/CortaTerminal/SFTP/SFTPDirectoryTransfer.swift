@@ -232,9 +232,11 @@ extension SFTPTransferEngine {
     func enumerateRemote(root: String) async throws(SFTPError) -> TreePlan {
         var plan = TreePlan()
         var pending = [""]
-        while !pending.isEmpty {
+        var nextDirectory = 0
+        while nextDirectory < pending.count {
             if Task.isCancelled { throw .cancelled }
-            let directory = pending.removeFirst()
+            let directory = pending[nextDirectory]
+            nextDirectory += 1
             let path = directory.isEmpty ? root : Self.join(root, directory)
             for entry in try await listDirectory(path: path) {
                 let name = entry.filenameUTF8

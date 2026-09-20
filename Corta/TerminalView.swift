@@ -23,13 +23,8 @@ final class TerminalView: NSView, CALayerDelegate {
     /// reports scroll-gesture phase changes to it, and extensions cannot
     /// add their own storage.
     var renderPolicy: RenderPolicy?
-    /// A window occluded (covered, minimized, off-screen) still fires vsync
-    /// callbacks unless the scheduler is paused explicitly — vsync alone
-    /// doesn't know visibility. Removed and re-added alongside the window in
-    /// `viewDidMoveToWindow`. `NotificationCenter.removeObserver` is
-    /// thread-safe, so this can be read from `deinit`, which runs
-    /// nonisolated even on a MainActor-isolated class.
-    nonisolated(unsafe) private var occlusionObserver: NSObjectProtocol?
+    /// Pauses rendering while the window is occluded; replaced when changing windows.
+    private var occlusionObserver: NSObjectProtocol?
     /// Mouse-moved tracking for ⌘-hover link feedback (M4.6); `.inVisibleRect`
     /// keeps it glued to the visible area across resizes.
     private var mouseTrackingArea: NSTrackingArea?
@@ -380,7 +375,7 @@ final class TerminalView: NSView, CALayerDelegate {
         }
     }
 
-    deinit {
+    isolated deinit {
         if let occlusionObserver {
             NotificationCenter.default.removeObserver(occlusionObserver)
         }

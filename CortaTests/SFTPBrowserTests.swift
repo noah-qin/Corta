@@ -730,3 +730,41 @@ struct SFTPBrowserModelTests {
         #expect(fake.transferCalls.count == 1, "no retry for a definitive answer")
     }
 }
+
+@MainActor
+struct SFTPTransferQueueLifecycleTests {
+    @Test func cancellingConflictRemovesPromptAndCannotStartLater() async throws {
+        let directory = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let destination = directory.appendingPathComponent("existing.txt")
+        try Data("existing".utf8).write(to: destination)
+        let fake = FakeSFTPClient()
+        let queue = SFTPTransferQueue()
+        queue.client = fake
+        queue.host = "test-host"
+        queue.enqueue(.init(isUpload: false, remotePath: "/existing.txt", localURL: destination))
+        await waitUntil("conflict") { !queue.conflictPrompts.isEmpty }
+        let prompt = try #require(queue.conflictPrompts.first)
+        queue.cancelTransfer(prompt.transferID)
+        #expect(queue.conflictPrompts.isEmpty)
+        queue.resolveConflict(prompt.id, choice: .overwrite)
+        #expect(queue.transfers.first?.state == .cancelled(partialKept: false))
+        #expect(fake.transferCalls.isEmpty)
+    }
+
+    @Test func disconnectBeforePreflightPreventsTransfer() async throws {
+        let directory = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fake = FakeSFTPClient()
+        let queue = SFTPTransferQueue()
+        queue.client = fake
+        queue.host = "test-host"
+        queue.enqueue(.init(isUpload: false, remotePath: "/new.txt",
+                            localURL: directory.appendingPathComponent("new.txt")))
+        queue.disconnect()
+        await Task.yield()
+        #expect(queue.transfers.first?.state == .cancelled(partialKept: false))
+        #expect(queue.conflictPrompts.isEmpty)
+        #expect(fake.transferCalls.isEmpty)
+    }
+}

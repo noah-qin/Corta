@@ -7,6 +7,7 @@ struct CommandHistoryView: View {
     @Bindable var model: CommandHistoryModel
 
     var body: some View {
+        let rows = model.rows
         VStack(alignment: .leading, spacing: 8) {
             TextField(L10n.text("commandHistory.searchPlaceholder"), text: $model.query)
                 .textFieldStyle(.roundedBorder)
@@ -18,12 +19,13 @@ struct CommandHistoryView: View {
                     .foregroundStyle(.secondary)
                 Spacer()
             } else {
-                Text(L10n.format("commandHistory.count", model.rows.count))
+                Text(L10n.format("commandHistory.count", rows.count))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                resultsList
+                resultsList(rows)
             }
         }
+        .task(id: model.projectLookupPaths) { await model.resolveProjectRoots() }
         .padding(16)
         .frame(minWidth: 420, minHeight: 240)
     }
@@ -58,10 +60,10 @@ struct CommandHistoryView: View {
         }
     }
 
-    private var resultsList: some View {
+    private func resultsList(_ rows: [CommandHistoryModel.Row]) -> some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 4) {
-                ForEach(model.rows) { row in
+                ForEach(rows) { row in
                     CommandHistoryRowView(row: row, model: model)
                 }
             }

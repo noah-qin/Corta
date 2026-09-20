@@ -19,10 +19,11 @@ import SwiftUI
 /// only one can be meaningfully in front at a time and the history it shows
 /// is only ever "this pane's".
 @MainActor
-final class CommandHistoryController: NSWindowController {
+final class CommandHistoryController: NSWindowController, NSWindowDelegate {
     static let shared = CommandHistoryController()
 
     let model = CommandHistoryModel()
+    private var refreshTask: Task<Void, Never>?
 
     private init() {
         let window = NSWindow(
@@ -32,15 +33,29 @@ final class CommandHistoryController: NSWindowController {
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 420, height: 240)
         super.init(window: window)
+        window.delegate = self
         window.contentViewController = NSHostingController(
             rootView: CommandHistoryView(model: model))
-        model.onDismiss = { [weak self] in self?.window?.close() }
+        model.onDismiss = { [weak self] in
+            self?.refreshTask?.cancel()
+            self?.window?.close()
+        }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
+    func windowWillClose(_ notification: Notification) { refreshTask?.cancel() }
+
     func show(for pane: ViewController) {
         model.pane = pane
+        refreshTask?.cancel()
+        refreshTask = Task { [weak self] in
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(1)) } catch { return }
+                guard let self, self.window?.isVisible == true else { return }
+                self.model.refresh()
+            }
+        }
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
     }

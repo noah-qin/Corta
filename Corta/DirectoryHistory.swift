@@ -131,7 +131,7 @@ struct DirectoryHistory: Equatable {
     /// exists to jump to project roots reliably, not to guess at every build
     /// system's own marker file, and a wrong guess sends a directory change
     /// somewhere the user did not ask for.
-    static func projectRoot(for path: String, fileManager: FileManager = .default) -> String? {
+    nonisolated static func projectRoot(for path: String, fileManager: FileManager = .default) -> String? {
         var url = URL(fileURLWithPath: path)
         while url.pathComponents.count > 1 {
             var isDirectory: ObjCBool = false

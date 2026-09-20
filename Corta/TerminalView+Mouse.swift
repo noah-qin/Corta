@@ -8,7 +8,7 @@ extension TerminalView {
         // focus is the only routing rule a split window has. Not while the
         // pane's search bar owns the keyboard, though: clicking a match with
         // the bar open must not strand the bar.
-        if paneController?.searchBar == nil {
+        if paneController?.search.bar == nil {
             window?.makeFirstResponder(self)
         }
         // ⌘-click opens a link (M4.6) before anything else sees the click —
@@ -35,7 +35,7 @@ extension TerminalView {
         // Mouse reporting is off: the right button belongs to the pane's
         // context menu (copy/paste, split, close). The click focuses the
         // pane first so the menu acts on what the user is looking at.
-        if paneController?.searchBar == nil {
+        if paneController?.search.bar == nil {
             window?.makeFirstResponder(self)
         }
         if let menu = paneController?.contextMenu(for: self) {

@@ -28,14 +28,10 @@ import QuartzCore
 /// follow-up once there is a keypress-to-pixel trace to tune it against.
 final class RenderPolicy {
     private weak var scheduler: FrameScheduler?
-    private weak var window: NSWindow?
-    // `nonisolated(unsafe)`: read from `deinit`, which runs nonisolated even
-    // on this MainActor-isolated class — `NotificationCenter.removeObserver`
-    // is thread-safe, matching `TerminalView.occlusionObserver`'s reasoning.
-    nonisolated(unsafe) private var thermalObserver: NSObjectProtocol?
-    nonisolated(unsafe) private var powerStateObserver: NSObjectProtocol?
-    nonisolated(unsafe) private var keyObserver: NSObjectProtocol?
-    nonisolated(unsafe) private var resignObserver: NSObjectProtocol?
+    private var thermalObserver: NSObjectProtocol?
+    private var powerStateObserver: NSObjectProtocol?
+    private var keyObserver: NSObjectProtocol?
+    private var resignObserver: NSObjectProtocol?
     private var isWindowActive: Bool
     private var isScrolling = false
 
@@ -51,11 +47,9 @@ final class RenderPolicy {
     private static let lowPower = CAFrameRateRange(minimum: 1, maximum: 30, preferred: 15)
     private static let thermalPressure = CAFrameRateRange(minimum: 1, maximum: 20, preferred: 10)
 
-    /// - Parameter window: observed for key/resign to track focus; weak,
-    ///   like `scheduler` — this outlives neither.
+    /// - Parameter window: observed for key/resign to track focus.
     init(scheduler: FrameScheduler, window: NSWindow?) {
         self.scheduler = scheduler
-        self.window = window
         self.isWindowActive = window?.isKeyWindow ?? true
 
         let center = NotificationCenter.default
@@ -84,7 +78,7 @@ final class RenderPolicy {
         apply()
     }
 
-    deinit {
+    isolated deinit {
         let center = NotificationCenter.default
         if let thermalObserver { center.removeObserver(thermalObserver) }
         if let powerStateObserver { center.removeObserver(powerStateObserver) }
