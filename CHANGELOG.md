@@ -10,6 +10,16 @@ what to edit.
 
 ## [Unreleased]
 
+### Changed
+
+- Publishing a GitHub release now signs it into the Sparkle update feed
+  from CI: the `Update feed` workflow runs after the maintainer publishes
+  the draft, waits for their approval of the `release` environment, signs
+  the archive with the key held there, checks the feed item against the
+  shipped app, and merges `appcast.xml` through a pull request. Signing
+  by hand with `scripts/release.sh` is the fallback rather than the
+  route. Decision D20 records where the key lives and what that costs.
+
 ## [1.0.0] - 2026-09-19
 
 The v1.0.0 milestone: the sixteen ordered batches `B01`–`B16` that took
@@ -1176,10 +1186,14 @@ For the maintainer, cutting any release:
 4. Commit as `chore: release x.y.z`, then tag `vx.y.z` and push the tag.
    The release workflow builds from the tag and opens a **draft** release
    for review — it is never published automatically.
-5. Once the draft's archive is reviewed, run `scripts/release.sh` against
-   the downloaded archive to sign it into `appcast.xml`, then commit and
-   push that file — that is what makes the update visible to every
-   already-installed Corta.
+5. Review the draft's archive and **publish** the release. Publishing
+   starts `.github/workflows/appcast.yml`: approve its `release`
+   environment run, and it signs the archive into `appcast.xml`, checks
+   the item against the app, and merges the file to `main` through a
+   pull request — that is what makes the update visible to every
+   already-installed Corta (D20). If the workflow cannot run,
+   `scripts/release.sh` against the downloaded archive is the manual
+   route to the same file.
 
 [Unreleased]: https://github.com/noah-qin/Corta/compare/v1.0.0...main
 [1.0.0]: https://github.com/noah-qin/Corta/releases/tag/v1.0.0

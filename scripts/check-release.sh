@@ -1,6 +1,7 @@
 #!/bin/bash
 # The one packaging check (B15 / T11). `scripts/package-release.sh`,
-# `scripts/release.sh` and `.github/workflows/release.yml` all call this
+# `scripts/release.sh`, `.github/workflows/release.yml` and
+# `.github/workflows/appcast.yml` all call this
 # rather than each carrying its own copy of the rules, so a local package
 # and a CI package are rejected for the same reasons — and a rule added
 # here reaches every route at once.

@@ -2,10 +2,12 @@
 # Signs one already-built, notarized release archive into appcast.xml.
 #
 # `.github/workflows/release.yml` is what builds, signs, notarizes, staples
-# and drafts the GitHub Release when a `v*` tag is pushed — this script does
-# not repeat any of that (building the same artifact in two places is how
-# they drift). Run this after downloading that workflow's .zip from the
-# draft release you have reviewed and are ready to publish.
+# and drafts the GitHub Release when a `v*` tag is pushed, and
+# `.github/workflows/appcast.yml` is what signs the published release into
+# appcast.xml (D20) — this script does not repeat any of that (building
+# the same artifact in two places is how they drift). It is the manual
+# route for when the workflow cannot run: download the published .zip,
+# run this, and open a pull request with the result.
 #
 # Requires, once per machine:
 #   - Sparkle's generate_keys already run (its private key lives in the

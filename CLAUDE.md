@@ -65,7 +65,8 @@ line each:
   storyboard runs. **D17** Re-measure the frame-CPU baseline after
   touching the render loop. **D18** No tool or session identifier in a
   commit message. **D19** Selection is hand-rolled; TextKit is not
-  adopted.
+  adopted. **D20** The update feed is signed from CI; the key lives in
+  the reviewed `release` environment.
 
 ## Working Rules
 
@@ -146,9 +147,9 @@ restore, a preset or a working directory for the root pane goes through
 controller afterwards (D16).
 
 **Packaging has one check.** `scripts/check-release.sh` is the only
-implementation of the release rules; `package-release.sh`, `release.sh`
-and `.github/workflows/release.yml` call it. A new rule goes there and
-nowhere else.
+implementation of the release rules; `package-release.sh`, `release.sh`,
+`.github/workflows/release.yml` and `appcast.yml` call it. A new rule goes
+there and nowhere else.
 
 **Measure the frame-CPU baseline after touching the render loop.**
 The M6 render work took it from 2.40 ms to 4.19 ms — a per-cell read of

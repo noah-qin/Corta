@@ -250,6 +250,25 @@ needs no Accessibility permission (rule 7) and, unlike an `NSEvent`
 global monitor, keeps working under Secure Keyboard Entry. Terminal
 transcripts are never indexed for Spotlight.
 
+### 4.7 The update feed is signed, and the key is the release's fourth secret
+
+An installed Corta accepts an update only when `appcast.xml` on `main`
+carries an EdDSA signature that the public key baked into the app
+verifies — Developer ID and notarisation satisfy Gatekeeper, not Sparkle.
+Since 1.0.0 that signature is produced by `.github/workflows/appcast.yml`
+after a person publishes the GitHub release (D20). The private key is a
+secret of the `release` GitHub environment: only a `v*` tag may use it,
+every run waits for the maintainer's approval, and the key reaches
+`generate_appcast` on stdin rather than as a file or an argument. The
+feed item is then held to `scripts/check-release.sh --appcast
+--require-notarized` — build number, enclosure URL, exact length,
+signature, Developer ID, staple, Gatekeeper — before a pull request
+carries it to `main` through the ordinary checks. The key has no
+revocation path (a new public key is unknown to every copy that has not
+updated), which is why it lives behind an approval rather than beside the
+certificate as a plain repository secret, and why every third-party
+action and Sparkle's own tools in that workflow are pinned by hash.
+
 ## 5. Data at Rest
 
 **Scrollback is never persisted to disk.** It routinely contains
@@ -304,6 +323,14 @@ which records S01–S04 and S07 in full); the entries below are the ones
 whose write-up belongs with the design rather than with the release that
 made them.
 
+- **S11 — 2026-09-20: the update feed is signed from CI (D20).** The
+  Sparkle EdDSA key moved from the maintainer's login keychain to the
+  `release` GitHub environment — `v*` tags only, maintainer approval on
+  every run — and `appcast.yml` signs a published release into
+  `appcast.xml` through a pull request, holding the item to
+  `check-release.sh --appcast --require-notarized` first (§4.7). The key
+  is piped, never written; actions and Sparkle's tools are pinned by hash.
+  `scripts/release.sh` remains the manual route.
 - **S10 — 2026-09-16: system entry points added without a command path
   (B16).** Three App Intents (open a window, focus a window by identity,
   toggle the Quick Terminal), one Carbon hotkey and Secure Keyboard Entry
