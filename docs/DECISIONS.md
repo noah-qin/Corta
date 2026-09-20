@@ -251,3 +251,38 @@ tested end to end (`AccessibilityMappingTests`,
 
 **Consequence.** A proposal to adopt a text system has to answer those
 four points with something other than a shadow data structure.
+
+## D20 — The update feed is signed from CI, with the key in a reviewed environment
+
+**Decision.** Publishing a GitHub release is the last step a person
+takes. `.github/workflows/appcast.yml` then signs the published archive
+into `appcast.xml` with the Sparkle EdDSA key and merges the result
+through a pull request. The private key is a secret of the `release`
+GitHub environment, which only `v*` tags may use and which requires the
+maintainer's approval on every run; the key is piped to
+`generate_appcast --ed-key-file -` and never written to disk.
+`scripts/release.sh` remains the manual route and runs the same
+`scripts/check-release.sh --appcast --require-notarized`.
+
+**Why.** Until 1.0.0 the feed was signed by hand from the maintainer's
+login keychain — the one step of a release that depended on one machine.
+The Developer ID certificate and the notary key, which can sign and
+notarise *any* Mac program, have been repository secrets since
+2026-09-03, so GitHub was already the trust anchor for what ships; the
+Sparkle key adds one more secret, not a new anchor.
+
+**What it costs.** The Sparkle key is the one secret with no revocation:
+a leaked Developer ID certificate is revoked and replaced, but a new
+Sparkle public key is only known to copies that already updated, so a
+rotation strands every install that did not. Hence the environment
+rather than a repository secret: a workflow that reaches the key has to
+run from a release tag and be approved by a person, so neither a pull
+request nor a pushed branch can read it. Third-party actions in that
+workflow are pinned by commit SHA, and Sparkle's tools by the tarball's
+SHA-256. The maintainer keeps no separate backup of the key by choice;
+the login keychain it was exported from is the only readable copy.
+
+**Consequence.** A change to `appcast.yml` is a change to what can sign
+updates, and is reviewed as such. Adding the key to any other
+environment, a repository secret, or a workflow with a broader trigger
+reopens this decision.

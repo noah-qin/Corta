@@ -2,7 +2,8 @@ name: Release
 
 # Cutting a release: follow the checklist at the bottom of CHANGELOG.md,
 # then push a tag. This builds from the tag and opens a DRAFT release for
-# review — nothing is ever published automatically.
+# review — nothing is ever published automatically. Once a person
+# publishes the draft, `appcast.yml` signs it into the update feed (D20).
 #
 # Signing and notarisation (M6.16) run only when all six repository
 # secrets below exist. Until they do, the workflow still produces an

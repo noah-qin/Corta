@@ -219,9 +219,10 @@ engaged state rather than the setting.
 
 Corta compares **build numbers**, not version strings, against
 `appcast.xml` on the `main` branch. A release that is tagged and drafted
-but whose archive has not yet been signed into the appcast
-(`scripts/release.sh`, a maintainer step) is not visible to installed
-copies yet. `update-auto-check = false` disables only the daily background
+but not yet published is not in the feed; once it is published, the
+update-feed workflow signs it in through a pull request that the
+maintainer approves, so allow a little while after the release appears
+on GitHub. `update-auto-check = false` disables only the daily background
 check; the menu item always works.
 
 ---
