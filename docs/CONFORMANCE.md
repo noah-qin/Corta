@@ -535,3 +535,4 @@ off in the CHANGELOG. The record stays as written.
 | [2026-09-16/17 — interactive pass](test-results/2026-09-17-interactive.md) | The first full sweep of §4.6 since 0.1.1, by tool and then by hand |
 | [2026-09-18 — release checks](test-results/2026-09-18-release-checks.md) | What the 09-17 pass changed; the six human and hardware items for 1.0.0, including the Quick Terminal probe |
 | [2026-09-18/19 — issues #88–#90](test-results/2026-09-19-issues-88-90.md) | Mouse tracking, shared coordinates and the toolchain decision |
+| [2026-09-21 — 1.0.1 release checks](test-results/2026-09-21-1.0.1-checks.md) | §4.4 points 1–5 for the patch release, the themed cursor on screen, what was not re-run and why |

@@ -10,6 +10,14 @@ what to edit.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-09-21
+
+A patch release: three fixes, no new features, no configuration change.
+It is planned as the last release that runs on Intel Macs — the 1.1.0
+milestone builds for Apple silicon only (issue #108) — and it is the
+first release signed into the update feed from CI rather than by hand
+(D20).
+
 ### Fixed
 
 - `theme.<name>.<variant>.cursor` now colours the cursor. The key was
@@ -1225,7 +1233,8 @@ For the maintainer, cutting any release:
    If the workflow cannot run at all, `scripts/release.sh` against the
    downloaded archive is the manual route to the same file.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.0.0...main
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.0.1...main
+[1.0.1]: https://github.com/noah-qin/Corta/releases/tag/v1.0.1
 [1.0.0]: https://github.com/noah-qin/Corta/releases/tag/v1.0.0
 [0.1.1]: https://github.com/noah-qin/Corta/releases/tag/v0.1.1
 [0.1.0]: https://github.com/noah-qin/Corta/releases/tag/v0.1.0
