@@ -147,6 +147,7 @@ struct DirectoryHistoryStoreTests {
         defer { removeDirectory() }
         let store = DirectoryHistoryStore(fileURL: file)
         store.record("/Users/noah/Developer/personal/Corta")
+        store.flush()
         let reloaded = DirectoryHistoryStore(fileURL: file)
         #expect(reloaded.history.entries["/Users/noah/Developer/personal/Corta"]?.visitCount == 1)
     }
@@ -156,10 +157,38 @@ struct DirectoryHistoryStoreTests {
         defer { removeDirectory() }
         let store = DirectoryHistoryStore(fileURL: file)
         store.record("/tmp")
+        store.flush()
         #expect(FileManager.default.fileExists(atPath: file.path))
         store.clear()
         #expect(!FileManager.default.fileExists(atPath: file.path))
         #expect(store.history.entries.isEmpty)
+    }
+
+    @Test("recording does not touch the disk on the caller's thread; the write is debounced")
+    func recordingIsDebounced() async throws {
+        defer { removeDirectory() }
+        let store = DirectoryHistoryStore(fileURL: file)
+        store.record("/tmp")
+        store.record("/var")
+        #expect(store.hasPendingSave)
+        #expect(!FileManager.default.fileExists(atPath: file.path))
+        #expect(store.history.entries.count == 2, "the in-memory history is current at once")
+        try await Task.sleep(for: .seconds(DirectoryHistoryStore.saveDelay + 0.5))
+        store.flush()
+        #expect(!store.hasPendingSave)
+        let reloaded = DirectoryHistoryStore(fileURL: file)
+        #expect(reloaded.history.entries.count == 2)
+    }
+
+    @Test("clearing after a pending save leaves no file behind")
+    func clearCancelsThePendingSave() async throws {
+        defer { removeDirectory() }
+        let store = DirectoryHistoryStore(fileURL: file)
+        store.record("/tmp")
+        store.clear()
+        #expect(!store.hasPendingSave)
+        try await Task.sleep(for: .seconds(DirectoryHistoryStore.saveDelay + 0.5))
+        #expect(!FileManager.default.fileExists(atPath: file.path))
     }
 
     @Test("an absent file starts with an empty history, not an error")
@@ -197,6 +226,7 @@ struct DirectoryHistoryStoreTests {
         defer { removeDirectory() }
         let store = DirectoryHistoryStore(fileURL: file)
         store.record("/tmp")
+        store.flush()
         let raw = try Data(contentsOf: file)
         let object = try JSONSerialization.jsonObject(with: raw) as? [String: Any]
         #expect(object?["version"] as? Int == 1)

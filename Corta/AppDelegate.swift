@@ -482,6 +482,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     func applicationWillTerminate(_ aNotification: Notification) {
         isTerminating = true
         flushLayoutSave()
+        DirectoryHistoryStore.shared.flush()
         // B16 — the secure-input counter must be back at zero before the
         // process ends; no notification will arrive to do it afterwards.
         SecureInput.shared.disengage()

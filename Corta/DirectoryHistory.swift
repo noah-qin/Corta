@@ -151,6 +151,15 @@ struct DirectoryHistory: Equatable {
 /// `OSC 7`, not a setting a person edits. `directory-history = false` stops
 /// it being read *or* written, so turning the feature off leaves nothing
 /// behind — B08's "history can be disabled and cleared."
+///
+/// Writes are debounced and run off the main thread. `record` is called
+/// from the render path — a command finishing is noticed on the output
+/// batch the frame is built from — and encoding the history and writing
+/// it there put a JSON encode and an atomic file write inside the vsync
+/// callback for every command that ran. The in-memory history is always
+/// current; the file catches up once things go quiet, and `flush()` at
+/// quit writes whatever is still pending, the same shape as the window
+/// arrangement's save (`AppDelegate.noteLayoutChanged`).
 @MainActor
 final class DirectoryHistoryStore {
     static let shared = DirectoryHistoryStore(fileURL: DirectoryHistoryStore.defaultFileURL)
@@ -159,6 +168,15 @@ final class DirectoryHistoryStore {
     /// Injected so a test can point at a temporary file instead of the
     /// user's real Application Support directory.
     let fileURL: URL
+
+    /// How long after the last change the file is written. A burst of
+    /// commands is one write, not one per command.
+    static let saveDelay: TimeInterval = 0.5
+
+    private var pendingSave: DispatchWorkItem?
+    /// Serial, so writes land in the order they were scheduled and a clear
+    /// cannot be undone by a write that was already in flight.
+    private let writeQueue = DispatchQueue(label: "Corta.DirectoryHistoryStore", qos: .utility)
 
     static var defaultFileURL: URL {
         AppPaths.applicationSupportDirectory.appendingPathComponent("directory-history.json")
@@ -169,30 +187,60 @@ final class DirectoryHistoryStore {
         load()
     }
 
-    /// Records a visit and persists it, unless the setting is off — in
+    /// Records a visit and schedules a save, unless the setting is off — in
     /// which case this is a no-op rather than a write nobody asked for.
     func record(_ path: String) {
         guard ConfigurationStore.shared.configuration.directoryHistory else { return }
         history.record(path)
-        save()
+        scheduleSave()
     }
 
     func setFavorite(_ isFavorite: Bool, for path: String) {
         history.setFavorite(isFavorite, for: path)
-        save()
+        scheduleSave()
     }
 
     /// Wipes the in-memory history and the file behind it — not just an
     /// empty write, so nothing is left to reappear if the setting is turned
-    /// back on later.
+    /// back on later. Waits for a write already in flight, so the removal
+    /// is the last word.
     func clear() {
+        pendingSave?.cancel()
+        pendingSave = nil
         history.clear()
-        try? FileManager.default.removeItem(at: fileURL)
+        let fileURL = fileURL
+        writeQueue.sync {
+            try? FileManager.default.removeItem(at: fileURL)
+        }
+    }
+
+    /// Writes a pending save now, and waits for it — for quit, where the
+    /// debounce would otherwise never fire.
+    func flush() {
+        guard pendingSave != nil else { return }
+        pendingSave?.cancel()
+        pendingSave = nil
+        save()
+        writeQueue.sync {}
+    }
+
+    /// Whether a save is scheduled and not yet written. Test hook.
+    var hasPendingSave: Bool { pendingSave != nil }
+
+    private func scheduleSave() {
+        pendingSave?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.pendingSave = nil
+            self.save()
+        }
+        pendingSave = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.saveDelay, execute: item)
     }
 
     /// B09 — the on-disk shape, versioned so a future incompatible change
     /// can be given real migration code instead of the file just vanishing.
-    private struct Persisted: Codable {
+    private nonisolated struct Persisted: Codable {
         static let currentVersion = 1
         var version: Int
         var entries: [DirectoryHistory.Entry]
@@ -217,12 +265,18 @@ final class DirectoryHistoryStore {
         history = DirectoryHistory(entries: entries)
     }
 
+    /// Snapshots the entries on the main actor and encodes and writes them
+    /// on `writeQueue`; nothing here touches the disk on the caller's
+    /// thread.
     private func save() {
         let persisted = Persisted(
             version: Persisted.currentVersion, entries: Array(history.entries.values))
-        guard let data = try? JSONEncoder().encode(persisted) else { return }
-        try? FileManager.default.createDirectory(
-            at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? data.write(to: fileURL, options: .atomic)
+        let fileURL = fileURL
+        writeQueue.async {
+            guard let data = try? JSONEncoder().encode(persisted) else { return }
+            try? FileManager.default.createDirectory(
+                at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? data.write(to: fileURL, options: .atomic)
+        }
     }
 }
