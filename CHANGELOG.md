@@ -10,6 +10,14 @@ what to edit.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-09-21
+
+A patch release: three fixes, no new features, no configuration change.
+It is planned as the last release that runs on Intel Macs — the 1.1.0
+milestone builds for Apple silicon only (issue #108) — and it is the
+first release signed into the update feed from CI rather than by hand
+(D20).
+
 ### Fixed
 
 - `theme.<name>.<variant>.cursor` now colours the cursor. The key was
@@ -1201,8 +1209,10 @@ For the maintainer, cutting any release:
    constant disagree, or if the build number is one a 0.1.0 install could
    not be offered.
 3. Record current measurements in `docs/PERFORMANCE.md` and test results in
-   `docs/CONFORMANCE.md`; preserve dated historical snapshots. Update the
-   README download instructions and release links after publication.
+   `docs/CONFORMANCE.md`; preserve dated historical snapshots. Point the
+   README's download instructions at `Corta-x.y.z.zip` in the same
+   commit — `scripts/check-release.sh` verifies that name at the tag, so
+   it cannot wait for publication.
 4. Commit as `chore: release x.y.z`, then tag `vx.y.z` and push the tag.
    The release workflow builds from the tag and opens a **draft** release
    for review — it is never published automatically.
@@ -1225,7 +1235,8 @@ For the maintainer, cutting any release:
    If the workflow cannot run at all, `scripts/release.sh` against the
    downloaded archive is the manual route to the same file.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.0.0...main
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.0.1...main
+[1.0.1]: https://github.com/noah-qin/Corta/releases/tag/v1.0.1
 [1.0.0]: https://github.com/noah-qin/Corta/releases/tag/v1.0.0
 [0.1.1]: https://github.com/noah-qin/Corta/releases/tag/v0.1.1
 [0.1.0]: https://github.com/noah-qin/Corta/releases/tag/v0.1.0

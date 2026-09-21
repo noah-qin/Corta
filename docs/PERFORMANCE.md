@@ -719,6 +719,43 @@ frame plus input latency, on a 60 Hz panel a good three to four frames.
 Where those frames go is the `os_signpost` chain's job (§5.3); the
 in-app number is what says whether a change moved it.
 
+### 5.8 The 1.0.1 run (2026-09-21)
+
+A patch release: two fixes and one write moved off the frame path
+(`CHANGELOG.md`). The render loop was touched once (the cursor overlay
+now reads the theme's cursor colour), so the frame-CPU baseline is
+re-measured (D17); the core benchmark is re-run because it is scripted
+and free. Nothing else in §5.6 was repeated — no parser, grid, PTY or
+window change since that run — and the rows below say so rather than
+copying the 1.0.0 figures forward.
+
+| Variable | Value |
+| --- | --- |
+| Machine | MacBook Air, Apple M5, built-in 2560×1664 Retina panel (same machine as §5.6) |
+| macOS | 27.0 (26A428) |
+| Xcode / Swift | 27.0 (27A266a) / 6.4; language mode 6; deployment target 26.0 |
+| Power | Battery, 89%, no other foreground work — as in §5.6's benchmark session, not the mains §5.2 asks for |
+
+| Metric | 1.0.1 | 1.0.0 (§5.6) | How |
+| --- | --- | --- | --- |
+| Core feed throughput | 138.5 MiB/s (one run) | 144.2 (5-run mean) | `corta-bench`, `-c release` |
+| Parser-only / parser + grid | 766.9 / 161.4 MiB/s | 806.3 / 166.9 | same run |
+| Memory @ 100k × 120 lines | 184.4 MB | 185.0 | `corta-bench` |
+| Keypress → grid (core side) | p50 0.009 / p95 0.011 / p99 0.012 ms, 2000 samples, 0 timed out | p50 0.014 / p99 0.020 | `corta-bench` |
+| Frame CPU, 120×40 full rebuild, Debug | **1.79 ms** avg (3 runs: 1.76 / 1.75 / 1.87; p95 2.7–3.5) | 2.26 avg | `FrameCPUBaselineTests` |
+| Spawn: `zsh -l` → first output | p50 46.8 ms | 44.5 | `corta-bench` |
+| Reflow, 100k lines, 120 → 80 columns | 97.9 ms | 94.1 | `corta-bench` |
+| Search, 100k lines, one query | ~400 ms warm, 100 000 matches | ~395 | `corta-bench` |
+| Keypress → glass, live frame CPU, energy, launch | **not re-measured** — no change on those paths since §5.6 | — | — |
+
+Reading: every re-run figure is inside the run-to-run spread §5.6 and §8
+record for this machine (the one-run core feed sits 4% under a 5-run
+mean whose own range was 141–147). The frame-CPU baseline moved from
+2.26 to 1.79 ms; the cursor change adds a read of one static per frame
+and cannot account for that, so the difference is the machine's state
+on the day, not the change — the number is recorded because D17 says
+to record it, and the claim is only "no regression".
+
 ## 6. B11 — CPU, locking and memory hot-path pass (2026-09-13)
 
 **Locking.** `TerminalSession` already carries exactly one hot-path lock
