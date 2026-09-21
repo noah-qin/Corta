@@ -1209,8 +1209,10 @@ For the maintainer, cutting any release:
    constant disagree, or if the build number is one a 0.1.0 install could
    not be offered.
 3. Record current measurements in `docs/PERFORMANCE.md` and test results in
-   `docs/CONFORMANCE.md`; preserve dated historical snapshots. Update the
-   README download instructions and release links after publication.
+   `docs/CONFORMANCE.md`; preserve dated historical snapshots. Point the
+   README's download instructions at `Corta-x.y.z.zip` in the same
+   commit — `scripts/check-release.sh` verifies that name at the tag, so
+   it cannot wait for publication.
 4. Commit as `chore: release x.y.z`, then tag `vx.y.z` and push the tag.
    The release workflow builds from the tag and opens a **draft** release
    for review — it is never published automatically.
