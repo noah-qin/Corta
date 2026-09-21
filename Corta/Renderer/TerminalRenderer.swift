@@ -73,9 +73,13 @@ nonisolated final class TerminalRenderer {
     /// something current to hand `kittyImageRenderer`.
     private var cachedImagePlacements = ImagePlacementTable()
 
-    /// Alpha for the cursor block and selection highlight, over the cell's
-    /// own background.
-    private static let cursorColor = SIMD4<Float>(0.6, 0.6, 0.6, 0.6)
+    /// How much of the theme's cursor colour a block cursor lets through:
+    /// it sits under the glyph pass, so the character it covers stays
+    /// readable through it. The bar and underline styles cover no ink and
+    /// draw the colour as it is. The colour itself is the active theme's
+    /// `cursor` (`theme.<name>.<variant>.cursor`), read in `rebuildOverlay`.
+    private static let blockCursorAlpha: Float = 0.6
+    /// Alpha for the selection highlight, over the cell's own background.
     private static let selectionColor = SIMD4<Float>(0.25, 0.45, 0.85, 0.4)
     /// M4.4: every search match highlights; the current one differently.
     private static let searchMatchColor = SIMD4<Float>(0.85, 0.75, 0.2, 0.35)
@@ -674,19 +678,22 @@ nonisolated final class TerminalRenderer {
             // The stroke is an eighth of a cell (2pt at the 2x baseline),
             // floored at 2 device pixels so it stays visible at 1x.
             let stroke = max(2, (cellHeight / 8).rounded(.down))
+            let cursorColor = TerminalColorPalette.cursorColor
             switch grid.cursorStyle {
             case .block, .blinkingBlock:
                 overlayScratch.append(
-                    QuadInstance(origin: cellOrigin, size: .init(cellWidth, cellHeight), color: Self.cursorColor))
+                    QuadInstance(
+                        origin: cellOrigin, size: .init(cellWidth, cellHeight),
+                        color: .init(cursorColor.x, cursorColor.y, cursorColor.z, Self.blockCursorAlpha)))
             case .underline, .blinkingUnderline:
                 overlayScratch.append(
                     QuadInstance(
                         origin: .init(cellOrigin.x, cellOrigin.y + cellHeight - stroke),
-                        size: .init(cellWidth, stroke), color: Self.cursorColor))
+                        size: .init(cellWidth, stroke), color: cursorColor))
             case .bar, .blinkingBar:
                 overlayScratch.append(
                     QuadInstance(
-                        origin: cellOrigin, size: .init(stroke, cellHeight), color: Self.cursorColor))
+                        origin: cellOrigin, size: .init(stroke, cellHeight), color: cursorColor))
             }
         }
         let end = cachedBackground.count
