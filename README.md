@@ -98,8 +98,8 @@ checksum, unzip the archive and move `Corta.app` to `/Applications`.
 
 ```sh
 # Run in the directory containing both downloaded files.
-shasum -a 256 -c Corta-1.0.0.zip.sha256
-unzip Corta-1.0.0.zip
+shasum -a 256 -c Corta-1.0.1.zip.sha256
+unzip Corta-1.0.1.zip
 ```
 
 > [!NOTE]
