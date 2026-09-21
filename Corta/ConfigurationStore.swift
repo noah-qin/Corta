@@ -131,9 +131,9 @@ final class ConfigurationStore {
         let url = fileURL
         let text = configuration.serialized(preserving: unknownKeys)
         do {
-            try FileManager.default.createDirectory(
-                at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try text.write(to: url, atomically: true, encoding: .utf8)
+            // Through the link, if the config file is one: a dotfiles
+            // repository's copy has to stay the copy (`UserFile`).
+            try UserFile.write(text, to: url)
         } catch {
             noteWriteResult(error)
             return false

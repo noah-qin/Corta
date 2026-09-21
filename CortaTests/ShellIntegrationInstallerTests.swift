@@ -41,6 +41,29 @@ struct ShellIntegrationInstallerTests {
         #expect(text.contains(ShellIntegrationScript.zsh))
     }
 
+    @Test("installing into a symlinked rc file keeps the link and edits its target")
+    func installFollowsASymbolicLink() throws {
+        defer { removeDirectory() }
+        let repository = directory.appendingPathComponent("dotfiles")
+        try FileManager.default.createDirectory(
+            at: repository, withIntermediateDirectories: true)
+        let target = repository.appendingPathComponent("zshrc")
+        try "export PATH=/usr/local/bin:$PATH\n".write(to: target, atomically: true, encoding: .utf8)
+        try FileManager.default.createSymbolicLink(at: file, withDestinationURL: target)
+
+        #expect(installer.install())
+        #expect(installer.status() == .installed)
+        let attributes = try FileManager.default.attributesOfItem(atPath: file.path)
+        #expect(attributes[.type] as? FileAttributeType == .typeSymbolicLink)
+        let text = try String(contentsOf: target, encoding: .utf8)
+        #expect(text.hasPrefix("export PATH=/usr/local/bin:$PATH\n"))
+        #expect(text.contains(ShellIntegrationScript.zsh))
+
+        #expect(installer.uninstall())
+        #expect(installer.status() == .notInstalled)
+        #expect(try String(contentsOf: target, encoding: .utf8) == "export PATH=/usr/local/bin:$PATH\n")
+    }
+
     @Test("installing appends after existing content, on its own line")
     func installAppendsAfterExistingContent() throws {
         defer { removeDirectory() }
