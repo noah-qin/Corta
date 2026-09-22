@@ -10,6 +10,25 @@ what to edit.
 
 ## [Unreleased]
 
+### Fixed
+
+- Two races in the SFTP session, found by looping its tests under the
+  thread sanitizer on a saturated machine. The in-flight window counted
+  requests from the moment they registered a reply waiter rather than
+  from the moment they were admitted, so a burst of concurrent senders
+  could all pass the check at once and the window bounded nothing. And a
+  request cancelled between admission and registration had its id
+  recycled at once, so the next request — the CLOSE after an aborted
+  download, in practice — could take that id, find the cancellation
+  marker meant for the other request, and fail as cancelled without ever
+  being sent, leaving the server's handle open.
+- The nightly sanitizer job had failed every run since 2026-09-15: the
+  SFTP test rig's idle-read deadline was a fixed 10 seconds that a
+  sanitizer-slowed, fully loaded runner exceeded while nothing was
+  wrong. Its deadlines now scale with `CORTA_TEST_TIMEOUT_SCALE` like
+  every other test ceiling, and three transfer tests that assumed the
+  window's READs arrive in offset order assert the resume offset itself.
+
 ## [1.0.1] - 2026-09-21
 
 A patch release: three fixes, no new features, no configuration change.

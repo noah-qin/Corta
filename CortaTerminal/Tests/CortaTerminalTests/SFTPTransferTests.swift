@@ -171,11 +171,14 @@ struct SFTPTransferTests {
         #expect(receipt.attempts == 2)
         #expect(receipt.resumedFromOffset == 512)
 
-        // The second attempt's first READ began exactly at the partial's
-        // size — endpoint validation accepted the partial (its mtime
-        // records the source's mtime of 4242).
+        // The second attempt's READs began exactly at the partial's size
+        // — endpoint validation accepted the partial (its mtime records
+        // the source's mtime of 4242). The lowest offset, not the first
+        // logged: the engine issues a window of READs from concurrent
+        // tasks, and which one the server sees first is the scheduler's
+        // choice, not the engine's promise.
         let secondLog = try #require(secondServerBox.withLock { $0 }?.log)
-        #expect(secondLog.readOffsets.first == 512)
+        #expect(secondLog.readOffsets.min() == 512)
     }
 
     @Test("a changed source invalidates the partial and restarts from zero")
@@ -210,9 +213,11 @@ struct SFTPTransferTests {
         let receipt = try await engine.download(
             remotePath: "/big.bin", to: destination, policy: .resume)
         #expect(localContents(destination) == contents)
-        // Endpoint validation rejected the stale partial: from zero.
+        // Endpoint validation rejected the stale partial: from zero. The
+        // lowest READ offset is the evidence — the window's requests are
+        // sent from concurrent tasks and arrive in no fixed order.
         #expect(receipt.resumedFromOffset == 0)
-        #expect(server.log.readOffsets.first == 0)
+        #expect(server.log.readOffsets.min() == 0)
     }
 
     // MARK: - Conflict policy
@@ -337,9 +342,13 @@ struct SFTPTransferTests {
             from: source, to: "/dest/up.bin", policy: .resume)
         #expect(receipt.resumedFromOffset == 1024)
         #expect(rig.fileSystem.file("/dest/up.bin")?.data == contents)
-        // The writes continued where the partial ended.
+        // The writes continued where the partial ended: nothing below
+        // 1024 was written, and the block at 1024 was. Not "the first
+        // logged write" — the window's requests are sent from concurrent
+        // tasks and arrive in no fixed order.
         let writeOps = rig.server.log.operations.filter { $0.hasPrefix("write @") }
-        #expect(writeOps.first == "write @1024 512b")
+        #expect(writeOps.contains("write @1024 512b"))
+        #expect(!writeOps.contains { $0.hasPrefix("write @0 ") || $0.hasPrefix("write @512 ") })
     }
 
     @Test("a changed local source restarts the upload from zero")
@@ -387,7 +396,7 @@ struct SFTPTransferTests {
             ) { _ in progress.mark() }
         }
         // Wait for the transfer to actually be mid-flight, then cancel.
-        let deadline = Date().addingTimeInterval(5)
+        let deadline = Date().addingTimeInterval(testTimeoutInterval(15))
         while !progress.wasSeen, Date() < deadline {
             try await Task.sleep(for: .milliseconds(5))
         }
@@ -431,7 +440,7 @@ struct SFTPTransferTests {
                 remotePath: "/big.bin", to: destination, policy: .resume
             ) { _ in progress.mark() }
         }
-        let deadline = Date().addingTimeInterval(5)
+        let deadline = Date().addingTimeInterval(testTimeoutInterval(15))
         while !progress.wasSeen, Date() < deadline {
             try await Task.sleep(for: .milliseconds(5))
         }

@@ -89,7 +89,19 @@ func fields(of text: String) -> [String] {
 /// lane sets `CORTA_TEST_TIMEOUT_SCALE`; nothing else does, so every other
 /// run keeps the original number.
 func testTimeout(_ seconds: Int) -> Duration {
+    .seconds(seconds * testTimeoutScale)
+}
+
+/// The same ceiling as a `TimeInterval`, for the waits that are expressed
+/// in `Date` arithmetic (the SFTP test rig's idle-read deadline and its
+/// log polling).
+func testTimeoutInterval(_ seconds: TimeInterval) -> TimeInterval {
+    seconds * TimeInterval(testTimeoutScale)
+}
+
+/// `CORTA_TEST_TIMEOUT_SCALE`, or 1 when unset or not a positive integer.
+var testTimeoutScale: Int {
     let scale = ProcessInfo.processInfo.environment["CORTA_TEST_TIMEOUT_SCALE"]
         .flatMap(Int.init) ?? 1
-    return .seconds(seconds * max(1, scale))
+    return max(1, scale)
 }

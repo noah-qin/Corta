@@ -74,8 +74,31 @@ CORTA_TEST_TIMEOUT_SCALE=10 swift test --package-path CortaTerminal --sanitize=a
 CI uses a fixed mutation seed for reproducibility. Nightly runs rotate it and
 retain failing inputs. Include the seed, command, toolchain and crashing input
 when reporting a failure. The timeout scale accommodates instrumented runs;
-it does not change assertions. See [conformance §4.3](CONFORMANCE.md#43-fuzzing)
-for invariants and harness details.
+it does not change assertions. Every ceiling a test waits on goes through
+`testTimeout` / `testTimeoutInterval` (`PTYTestSupport.swift`) so the scale
+reaches it — the SFTP rig's idle-read deadline included. See
+[conformance §4.3](CONFORMANCE.md#43-fuzzing) for invariants and harness
+details.
+
+A test that passes on a fast machine and fails on the CI runner is a timing
+bug until proven otherwise, and the runner's conditions can be reproduced:
+a few cores, all busy. Pin the CPU with `yes` and loop the suite under the
+thread sanitizer:
+
+```sh
+for i in $(seq 1 14); do (yes > /dev/null &); done
+swift build --package-path CortaTerminal --build-tests --sanitize=thread
+for i in $(seq 1 30); do
+  CORTA_TEST_TIMEOUT_SCALE=10 swift test --package-path CortaTerminal \
+    --skip-build --sanitize=thread --filter SFTP 2>&1 | grep '✘ Test'
+done | sort | uniq -c
+pkill -x yes
+```
+
+This is how the two `SFTPSession` bugs behind the 2026-09-15 → 09-21
+nightly failures were found: both were real races (window admission
+counted from registration rather than from acquisition; a cancelled id
+recycled before its marker was consumed), not slow-runner noise.
 
 ## App tests
 
