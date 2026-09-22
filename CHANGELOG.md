@@ -1251,6 +1251,13 @@ For the maintainer, cutting any release:
    re-run: `gh workflow run appcast.yml --ref main -f tag=vX.Y.Z
    -f dry_run=true` (a dry run stops after signing and checking), with
    `main` temporarily allowed in the environment's deployment policy.
+   The pull request is opened with the workflow's own token, which the
+   repository must allow: Settings › Actions › General › Workflow
+   permissions › *Allow GitHub Actions to create and approve pull
+   requests*. With it off, the `sign` job still pushes the signed
+   `chore/appcast-vX.Y.Z` branch and the `merge` job fails at
+   `gh pr create`; opening the pull request from that branch by hand
+   is the recovery (1.0.1 shipped that way).
    If the workflow cannot run at all, `scripts/release.sh` against the
    downloaded archive is the manual route to the same file.
 
