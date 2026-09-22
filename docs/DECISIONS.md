@@ -285,4 +285,9 @@ the login keychain it was exported from is the only readable copy.
 **Consequence.** A change to `appcast.yml` is a change to what can sign
 updates, and is reviewed as such. Adding the key to any other
 environment, a repository secret, or a workflow with a broader trigger
-reopens this decision.
+reopens this decision. The workflow's last step opens a pull request
+with its own token, which needs the repository setting *Allow GitHub
+Actions to create and approve pull requests* (Settings › Actions ›
+General › Workflow permissions); 1.0.1's feed had to be merged by hand
+because that switch was off, and it is the one thing the dry run cannot
+exercise.
