@@ -204,12 +204,25 @@ public final class SFTPSession: @unchecked Sendable {
         var freeRequestIDs: [UInt32] = []
         /// Requests the server still owes a reply, by id.
         var inFlight: [UInt32: CheckedContinuation<Result<SFTPMessage, SFTPError>, Never>] = [:]
+        /// Window slots handed out and not yet given back — one per
+        /// admitted sender, from `acquireRequestSlot` until its request is
+        /// answered, fails, is cancelled, or turns out not to be sent.
+        /// Counted separately from `inFlight` because a sender holds its
+        /// slot *before* it registers there: a burst of concurrent senders
+        /// all passed the `inFlight.count` check while none had registered
+        /// yet, and the window bounded nothing.
+        var windowUsed = 0
         /// Ids cancelled while in flight: their continuations are already
         /// resumed; the late reply must be swallowed, and only then may
         /// the id be recycled.
         var cancelledIDs: Set<UInt32> = []
         /// Ids cancelled after allocation but before their continuation
-        /// was registered — the registration checks this first.
+        /// was registered — the registration checks this first, and only
+        /// that registration recycles the id. Recycling it at cancellation
+        /// time handed the same id to the next sender, whose registration
+        /// then found the marker meant for the cancelled one and failed
+        /// with `.cancelled` without sending anything — the CLOSE after an
+        /// aborted download went missing exactly this way.
         var pendingCancelIDs: Set<UInt32> = []
         /// Senders suspended on the window, FIFO by token.
         var windowWaiters: [(token: UInt64, continuation: CheckedContinuation<Bool, Never>)] = []
@@ -512,13 +525,18 @@ public final class SFTPSession: @unchecked Sendable {
                         return false
                     }
                     if state.pendingCancelIDs.remove(requestID) != nil {
+                        recycleRequestID(requestID, &state)
                         return false
                     }
                     state.inFlight[requestID] = continuation
                     return true
                 }
                 guard registered else {
-                    let failure = state.withLock { $0.closed } ?? SFTPError.cancelled
+                    // The slot was acquired and will never be used.
+                    let failure = state.withLock { state -> SFTPError in
+                        releaseWindowSlot(&state)
+                        return state.closed ?? SFTPError.cancelled
+                    }
                     continuation.resume(returning: .failure(failure))
                     return
                 }
@@ -546,8 +564,9 @@ public final class SFTPSession: @unchecked Sendable {
         // Fast path: the window has room.
         let fastID = state.withLock { state -> UInt32? in
             guard state.closed == nil,
-                state.inFlight.count < configuration.maxInFlightRequests
+                state.windowUsed < configuration.maxInFlightRequests
             else { return nil }
+            state.windowUsed += 1
             return allocateRequestID(&state)
         }
         if let fastID { return fastID }
@@ -605,9 +624,10 @@ public final class SFTPSession: @unchecked Sendable {
                 releaseWindowSlot(&state)
                 continuation.resume(returning: .failure(.cancelled))
             } else {
-                // Cancelled between slot acquisition and registration.
+                // Cancelled between slot acquisition and registration: the
+                // registration, which always follows, gives the slot and
+                // the id back.
                 state.pendingCancelIDs.insert(requestID)
-                recycleRequestID(requestID, &state)
             }
         }
     }
@@ -624,10 +644,14 @@ public final class SFTPSession: @unchecked Sendable {
         }
     }
 
-    /// Admits the next FIFO waiter, if any. Called with the window count
-    /// already decremented; the admitted waiter holds the freed slot.
+    /// Gives a slot back: to the next FIFO waiter if there is one — the
+    /// slot passes to it and `windowUsed` does not move — otherwise to the
+    /// window.
     private func releaseWindowSlot(_ state: inout State) {
-        guard !state.windowWaiters.isEmpty else { return }
+        guard !state.windowWaiters.isEmpty else {
+            state.windowUsed -= 1
+            return
+        }
         state.windowWaiters.removeFirst().continuation.resume(returning: true)
     }
 
@@ -681,6 +705,7 @@ public final class SFTPSession: @unchecked Sendable {
             state.inFlight.removeAll()
             let waiters = state.windowWaiters.map { $0.continuation }
             state.windowWaiters.removeAll()
+            state.windowUsed = 0
             return (handshakes, requests, waiters, false)
         }
         guard !drained.alreadyClosed else { return }

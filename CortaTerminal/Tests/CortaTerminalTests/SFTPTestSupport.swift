@@ -24,7 +24,18 @@ import Synchronization
 final class SFTPLoopbackConnection: @unchecked Sendable {
     /// Reads block up to this long before failing, so a broken test fails
     /// instead of hanging the suite.
-    static let readDeadline: TimeInterval = 10
+    ///
+    /// The pipe is idle whenever the peer is simply busy — a test awaiting
+    /// something else, the engine backing off before a reconnect — so this
+    /// has to be generous, and it scales with `CORTA_TEST_TIMEOUT_SCALE`
+    /// like every other ceiling (`testTimeout`): under a sanitizer the
+    /// suite is an order of magnitude slower and shares a few cores, and
+    /// at a fixed 10 seconds the nightly sanitizer job failed every run
+    /// from 2026-09-15 on — an idle server read timed out, the fake server
+    /// closed the connection, and the client saw `connectionLost` in the
+    /// middle of a transfer that was fine. Only a genuinely stuck test
+    /// ever waits this out.
+    static var readDeadline: TimeInterval { testTimeoutInterval(30) }
 
     private struct Side {
         var buffer: [UInt8] = []
@@ -273,9 +284,12 @@ final class FakeSFTPServer: @unchecked Sendable {
     /// Waits until the log satisfies `predicate` or the deadline passes.
     /// Polling, but bounded — a missing event fails the test with what was
     /// actually recorded.
+    /// A passing test returns from this in milliseconds; the default
+    /// `timeout` only decides how long a failing one takes to say so, and
+    /// scales with `CORTA_TEST_TIMEOUT_SCALE` like `readDeadline`.
     func waitFor(
         _ description: String,
-        timeout: TimeInterval = 5,
+        timeout: TimeInterval = testTimeoutInterval(15),
         predicate: (FakeServerLog) -> Bool
     ) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
