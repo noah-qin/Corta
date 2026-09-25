@@ -156,6 +156,11 @@ measured they returned early instead, which is indistinguishable from
 passing: every Metal 4 test in `TerminalRenderBackendTests` went
 unexecuted on CI for the whole of 1.0 while the job stayed green.
 
+`ci.yml` prints both halves of that on every run: the capability line
+before the build, and `tests: total=… passed=… skipped=…` after it. The
+test command uses `-quiet`, which hides every per-test line, so without
+the counts a green run would still not say what it had skipped.
+
 Metal 4 hardware is therefore the only place those tests mean anything,
 and there are two ways to get there:
 

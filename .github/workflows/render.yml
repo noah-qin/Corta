@@ -69,6 +69,13 @@ jobs:
             -resultBundlePath RenderTests.xcresult \
             -quiet
 
+      - name: Summarise the test run
+        if: always()
+        run: |
+          xcrun xcresulttool get test-results summary \
+            --path RenderTests.xcresult --format json \
+            | jq -r '"tests: total=\(.totalTestCount) passed=\(.passedTests) failed=\(.failedTests) skipped=\(.skippedTests) expected-failures=\(.expectedFailures)"'
+
       - name: Keep the test results when something fails
         if: failure()
         uses: actions/upload-artifact@v4

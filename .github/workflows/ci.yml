@@ -153,6 +153,18 @@ jobs:
             -resultBundlePath TestResults.xcresult \
             -quiet
 
+      # `-quiet` hides every per-test line, so a green run says nothing about
+      # what it skipped. On this runner the five Metal 4 tests skip — the
+      # capability step above says why — and they used to do so invisibly.
+      # Printing the counts is what keeps "passed" and "never ran" apart in
+      # a log nobody downloads the result bundle for.
+      - name: Summarise the test run
+        if: always()
+        run: |
+          xcrun xcresulttool get test-results summary \
+            --path TestResults.xcresult --format json \
+            | jq -r '"tests: total=\(.totalTestCount) passed=\(.passedTests) failed=\(.failedTests) skipped=\(.skippedTests) expected-failures=\(.expectedFailures)"'
+
       # Without the bundle a failed run is a scrolled-off log line. With it
       # the failing test, its message and its attachments come back.
       - name: Keep the test results when something fails
