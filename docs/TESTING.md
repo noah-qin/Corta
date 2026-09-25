@@ -138,6 +138,59 @@ file in `CortaTests` uses `@testable import Corta`; that emits
 `-enable-testing`, which inhibits optimisation and so changes the very
 number a Release measurement is for. Issue #110 settles that trade.
 
+### Which environments can run the render tests
+
+Measured 2026-09-25 (issue #107). `scripts/metal-capability.swift` is the
+one implementation of the question — `ci.yml` prints it on every run,
+`render.yml` requires it, and you can ask it yourself:
+
+```sh
+swift scripts/metal-capability.swift                  # print the families
+swift scripts/metal-capability.swift --require-metal4  # exit 1 without Metal 4
+```
+
+
+| Environment | Device | `MTLGPUFamily.metal4` | Families |
+| ----------- | ------ | --------------------- | -------- |
+| GitHub hosted `macos-26` | `Apple Paravirtual device` | **no** | `apple5` |
+| Apple silicon hardware (M1 or later) | e.g. `Apple M5` | yes | `metal4`, `apple9`, … |
+
+So the hosted runner runs the ordinary offscreen render tests — it does
+have a Metal device — but **cannot** run the Metal 4 suites. Those carry
+`.enabled(if: MetalRenderTarget.supportsMetal4, …)`, so a run without the
+family reports them as *skipped, with the reason*. Until this was
+measured they returned early instead, which is indistinguishable from
+passing: every Metal 4 test in `TerminalRenderBackendTests` went
+unexecuted on CI for the whole of 1.0 while the job stayed green.
+
+`ci.yml` prints both halves of that on every run: the capability line
+before the build, and `tests: total=… passed=… skipped=…` after it. The
+test command uses `-quiet`, which hides every per-test line, so without
+the counts a green run would still not say what it had skipped.
+
+Metal 4 hardware is therefore the only place those tests mean anything,
+and there are two ways to get there:
+
+- `.github/workflows/render.yml` — the same test plan on a **self-hosted**
+  Apple silicon runner. It is `workflow_dispatch` only, on purpose: this
+  repository is public, and a `pull_request` trigger would let a stranger's
+  fork run code on the maintainer's machine. It fails before the tests if
+  the machine does not report `metal4`, records which Xcode produced the
+  result, and sets `CORTA_METAL4=1` — without that
+  `TerminalRenderer.init` still builds a `QuadRenderer`
+  (`Metal4Backend.isOptedIn`), so the selection path #109 turns into the
+  only path would go untaken even on Metal 4 hardware.
+- Locally, before a release:
+  `TEST_RUNNER_CORTA_METAL4=1 xcodebuild test -scheme Corta -testPlan Unit`
+  on an M1 or later, with the result recorded under `docs/test-results/`.
+  The five-point launched-app check (`CONFORMANCE.md` §4.4) is done on the
+  same machine and carries the rest of the guarantee.
+
+Once #109 makes Metal 4 the only backend, the hosted runner will not be
+able to construct a renderer at all, and *every* render test moves to
+those two routes. That is the trade #107 measured and #109 accepts; it is
+not a reason to keep a second backend alive.
+
 ### The test host cannot reach your own configuration
 
 The Debug configuration builds a separate application — `CortaDev.app`,
