@@ -674,20 +674,27 @@ benchmarkSearchResponseDistribution()
 
 /// The case the ASCII fast path (#115) cannot take, and the one it could
 /// make *worse*: an ASCII query over a document whose lines are not ASCII,
-/// so `appendASCIILogicalLine` is attempted and rejected on every line
+/// so `fillWithASCIILogicalLine` is attempted and rejected on every line
 /// before the `String` path runs anyway. If this number moves up, the fast
 /// path is being paid for by the searches that cannot use it.
+///
+/// The non-ASCII character sits at the *end* of the line deliberately. Put
+/// it near the front and the byte walk bails after a few cells, which is
+/// the cheap case and measures almost nothing; a log line terminated by a
+/// status glyph — `✓`, `…`, a box-drawing character — makes the walk
+/// traverse the whole chain before rejecting it, so the row is walked
+/// twice. That is the shape this guard has to be able to see.
 func benchmarkNonASCIISearchResponse() {
     var terminal = Terminal(rows: 50, columns: 120, scrollbackLimit: 100_000)
-    let line = "the quick 棕色 fox jumps over the lazy dog\r\n"
+    let line = "the quick brown fox jumps over the lazy dog ✓\r\n"
     let lineBytes = Array(line.utf8)
     for _ in 0..<100_000 {
         terminal.feed(lineBytes)
     }
 
     var samplesNanoseconds: [UInt64] = []
-    samplesNanoseconds.reserveCapacity(20)
-    for _ in 0..<20 {
+    samplesNanoseconds.reserveCapacity(50)
+    for _ in 0..<50 {
         let start = DispatchTime.now()
         _ = Search.find("fox", in: terminal.grid)
         samplesNanoseconds.append(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds)

@@ -85,24 +85,30 @@ extension Grid {
     /// needs them. A search that can answer from the cells themselves
     /// (`Search.find`'s ASCII path) walks these instead and pays for a
     /// `LogicalLine` only on the lines that force it.
-    public func reversedLogicalLineSpans() -> ReversedLogicalLineSpanSequence {
+    func reversedLogicalLineSpans() -> ReversedLogicalLineSpanSequence {
         ReversedLogicalLineSpanSequence(grid: self)
     }
 
     /// Fills `text` with the chain `firstRow...lastRow` as ASCII bytes, and
-    /// `rows`/`columns` with the grid position each byte came from.
+    /// `rows`/`columns` with the grid position each byte came from. The
+    /// three buffers are *replaced*, not appended to — they are the
+    /// caller's so a sweep over the whole document allocates once rather
+    /// than per line.
     ///
     /// Returns `false` the moment it meets a cell this representation cannot
     /// hold — a grapheme cluster, or a scalar outside ASCII — leaving the
     /// buffers partly filled, since the caller is about to fall back to
-    /// `logicalLine(containing:)` for that chain and does not read them.
+    /// `logicalLine(firstRow:lastRow:)` for that chain and does not read
+    /// them.
     ///
-    /// The three buffers are the caller's so a sweep over the whole document
-    /// allocates once rather than per line. Trailing blanks are trimmed
-    /// exactly as `joinedLogicalLine` trims them: per row, and only where
-    /// the row does not continue into the next, so the two paths agree on
-    /// where a line ends.
-    public func appendASCIILogicalLine(
+    /// Trailing blanks are trimmed exactly as `joinedLogicalLine` trims
+    /// them: per row, and only where the row does not continue into the
+    /// next, so the two paths agree on where a line ends.
+    ///
+    /// `firstRow...lastRow` must already be one wrap chain, as
+    /// `reversedLogicalLineSpans()` yields it. Nothing checks that, and an
+    /// arbitrary span silently joins unrelated rows into one line.
+    func fillWithASCIILogicalLine(
         firstRow: Int, lastRow: Int,
         text: inout ContiguousArray<UInt8>,
         rows: inout ContiguousArray<Int32>,
@@ -157,7 +163,12 @@ extension Grid {
     /// has the span from `reversedLogicalLineSpans()` and would otherwise
     /// pay `logicalLineRowSpan` a second time to rediscover what it just
     /// walked past.
-    public func logicalLine(firstRow: Int, lastRow: Int) -> LogicalLine {
+    ///
+    /// Internal, and the pair with `fillWithASCIILogicalLine`, because it
+    /// carries `joinedLogicalLine`'s unchecked precondition out of this
+    /// file: the span must already be one wrap chain. `logicalLine(containing:)`
+    /// is the public entry point, which establishes that itself.
+    func logicalLine(firstRow: Int, lastRow: Int) -> LogicalLine {
         joinedLogicalLine(firstRow: firstRow, lastRow: lastRow)
     }
 
@@ -295,24 +306,19 @@ public struct ReversedLogicalLineSequence: Sequence {
 
     public struct Iterator: IteratorProtocol {
         private let grid: Grid
-        /// The bottommost row not yet emitted; the chain containing it is
-        /// next.
-        private var nextRow: Int
-        private let lowerBound: Int
+        /// The same walk, once: this yields the spans and joins each one,
+        /// so a correction to how a wrap chain is found cannot be made in
+        /// one of the two iterators and missed in the other.
+        private var spans: ReversedLogicalLineSpanSequence.Iterator
 
         fileprivate init(grid: Grid) {
             self.grid = grid
-            self.nextRow = grid.rows - 1
-            self.lowerBound = grid.documentRowRange.lowerBound
+            self.spans = grid.reversedLogicalLineSpans().makeIterator()
         }
 
         public mutating func next() -> LogicalLine? {
-            guard nextRow >= lowerBound else { return nil }
-            let last = nextRow
-            var first = last
-            while grid.documentLine(first - 1).wrapped { first -= 1 }
-            nextRow = first - 1
-            return grid.joinedLogicalLine(firstRow: first, lastRow: last)
+            guard let span = spans.next() else { return nil }
+            return grid.joinedLogicalLine(firstRow: span.firstRow, lastRow: span.lastRow)
         }
     }
 }
@@ -320,25 +326,25 @@ public struct ReversedLogicalLineSequence: Sequence {
 
 /// One wrap chain's document rows, as `Grid.reversedLogicalLineSpans()`
 /// yields them.
-public struct LogicalLineSpan: Sendable, Equatable {
-    public let firstRow: Int
-    public let lastRow: Int
+struct LogicalLineSpan: Sendable, Equatable {
+    let firstRow: Int
+    let lastRow: Int
 }
 
 /// Newest-first wrap-chain spans. The same walk
 /// `ReversedLogicalLineSequence` does, stopping before the join.
-public struct ReversedLogicalLineSpanSequence: Sequence {
+struct ReversedLogicalLineSpanSequence: Sequence {
     private let grid: Grid
 
     fileprivate init(grid: Grid) {
         self.grid = grid
     }
 
-    public func makeIterator() -> Iterator {
+    func makeIterator() -> Iterator {
         Iterator(grid: grid)
     }
 
-    public struct Iterator: IteratorProtocol {
+    struct Iterator: IteratorProtocol {
         private let grid: Grid
         private var nextRow: Int
         private let lowerBound: Int
@@ -349,7 +355,7 @@ public struct ReversedLogicalLineSpanSequence: Sequence {
             self.lowerBound = grid.documentRowRange.lowerBound
         }
 
-        public mutating func next() -> LogicalLineSpan? {
+        mutating func next() -> LogicalLineSpan? {
             guard nextRow >= lowerBound else { return nil }
             let last = nextRow
             var first = last

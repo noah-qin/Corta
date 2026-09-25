@@ -28,9 +28,11 @@ what to edit.
   against the grid's cells directly, instead of building a string and a
   per-character position table for every logical line and handing it to
   Foundation. Over a 100k-line scrollback a warm query goes from 399.8 ms
-  to 25.6 ms, which is what the search bar re-runs on every keystroke. A
-  line or a query with anything outside ASCII still takes the old path,
-  unchanged, and is no slower.
+  to 27.6 ms — about fourteen times faster — and that is what the search
+  bar re-runs on every keystroke. A query with anything outside ASCII takes
+  the old path untouched; a *line* with anything outside ASCII also takes
+  it, after the byte walk has tried and rejected that line, which measures
+  about 2% slower on a document where every line is non-ASCII.
 
 ### Fixed
 

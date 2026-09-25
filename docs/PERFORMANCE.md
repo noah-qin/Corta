@@ -307,25 +307,33 @@ CortaTerminal/.build/release/corta-bench
 | keypress → grid latency | 0.009 ms | 0.012 ms | 0.013 ms | 0.020 ms | 2,000 |
 | keypress → grid latency, flooding neighbour | 0.009 ms | 0.012 ms | 0.015 ms | 0.046 ms | 2,000 |
 | snapshot latency under flood | 0.000 ms | 0.000 ms | 0.000 ms | 0.032 ms | 2,000 |
-| search response, 100k-line scrollback (warm) | 25.6 ms | 25.8 ms | 25.9 ms | 25.9 ms | 50 |
-| search response, 100k-line non-ASCII scrollback, ASCII query | 399.6 ms | 412.2 ms | 426.3 ms | 426.3 ms | 20 |
+| search response, 100k-line scrollback (warm) † | 27.6 ms | 29.4 ms | 30.1 ms | 30.1 ms | 50 |
+| search response, 100k-line non-ASCII scrollback, ASCII query † | 455.4 ms | 475.6 ms | 494.7 ms | 494.7 ms | 50 |
 
-**Search, before and after the ASCII path (#115).** The warm figure was
-385.1 ms when this table was first written and 399.8 ms re-measured
-immediately before the change on the machine and toolchain below; matching
-ASCII queries over ASCII lines against the cells, instead of building a
-`String` and a per-character position table for every logical line, takes
-it to 25.6 ms — a factor of 15.6, measured back to back in one session.
+**† Search, before and after the ASCII path (#115).** These two rows were
+taken on 2026-09-25 under Xcode 27.0 / Swift 6.4, not the 2026-09-10 /
+Xcode 26.6 identity §5.2 names for every other row in this table. §5.2's
+rule applies: they are a different measurement, and only the ratios below
+are like-for-like, because each pair was taken back to back in one session
+on one machine.
 
-The second row is the case the fast path cannot take and could have made
-worse: an ASCII query over non-ASCII lines, where the byte walk is
-attempted and rejected on every line before the `String` path runs anyway.
-Three runs each side, p50: 424.1 / 405.3 / 400.5 ms without the fast path,
-399.6 / 395.6 / 408.0 ms with it — overlapping, so no measurable
-regression. Both numbers were taken on Xcode 27.0 (Swift 6.4), not the
-26.6 toolchain §5.2's benchmark identity names; the *ratio* is
-like-for-like because before and after were measured in the same session,
-the absolute figures are not comparable to rows taken under 26.6.
+Matching ASCII queries against the cells, instead of building a `String`
+and a per-character position table for every logical line, takes the warm
+figure from 399.8 ms to 27.6 ms — a factor of about 14. (The 385.1 ms this
+table carried before was the 2026-09-10 measurement; 399.8 ms is the same
+benchmark re-run immediately before the change.)
+
+The second row is the case the fast path cannot take and *does* make
+slightly worse: an ASCII query over non-ASCII lines, where the byte walk
+is attempted and rejected on every line before the `String` path runs
+anyway. The fixture puts the non-ASCII character at the end of the line on
+purpose — a log line terminated by a status glyph — so the walk traverses
+the whole chain before rejecting it and the row is walked twice. Three
+runs each side, p50: 450.7 / 447.0 / 447.7 ms without the fast path,
+447.5 / 455.4 / 469.0 ms with it. That is roughly **2% slower** on the
+searches that cannot use the fast path, for a factor of 14 on the ones
+that can. An earlier fixture with the non-ASCII character near the front
+of the line made this look free, which it is not.
 
 Parser-only throughput 628.3 MiB/s, parser+grid 141.1 MiB/s, core feed
 130.0 MiB/s — all above §1's 100 MB/s target. Scrollback at 100k lines:

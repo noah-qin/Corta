@@ -317,6 +317,15 @@ public enum Search {
         (0x41...0x5A).contains(byte) ? UInt8(byte + 0x20) : UInt8(byte)
     }
 
+    /// The case-*sensitive* counterpart: every byte maps to itself.
+    ///
+    /// A second table rather than a `caseSensitive` test inside the scan.
+    /// The table is chosen once per sweep, so the innermost comparison is
+    /// one indexed load and no branch — and neither table is reached
+    /// through a global accessor per byte, which is the shape `CLAUDE.md`
+    /// records as the M6 render regression.
+    private static let asciiIdentity: [UInt8] = (0...255).map { UInt8($0) }
+
     /// `query` as folded ASCII bytes, or `nil` when it is not ASCII — in
     /// which case every line takes the `String` path.
     private static func asciiNeedle(_ query: String, caseSensitive: Bool) -> [UInt8]? {
@@ -336,7 +345,7 @@ public enum Search {
     /// as across lines.
     private static func lastIndex(
         of needle: [UInt8], in haystack: ContiguousArray<UInt8>, before end: Int,
-        caseSensitive: Bool
+        fold: [UInt8]
     ) -> Int? {
         let count = needle.count
         guard count > 0, end >= count else { return nil }
@@ -344,9 +353,7 @@ public enum Search {
         while true {
             var offset = 0
             while offset < count {
-                let byte = haystack[start + offset]
-                let folded = caseSensitive ? byte : asciiFold[Int(byte)]
-                if folded != needle[offset] { break }
+                if fold[Int(haystack[start + offset])] != needle[offset] { break }
                 offset += 1
             }
             if offset == count { return start }
@@ -391,13 +398,15 @@ public enum Search {
         // own, so the two are never asked to agree about a line only one of
         // them can see.
         let needle = asciiNeedle(query, caseSensitive: caseSensitive)
+        // Resolved once for the whole sweep, not once per byte compared.
+        let fold = caseSensitive ? asciiIdentity : asciiFold
         var haystack = ContiguousArray<UInt8>()
         var haystackRows = ContiguousArray<Int32>()
         var haystackColumns = ContiguousArray<Int32>()
 
         lineLoop: for span in grid.reversedLogicalLineSpans() {
             if let needle,
-                grid.appendASCIILogicalLine(
+                grid.fillWithASCIILogicalLine(
                     firstRow: span.firstRow, lastRow: span.lastRow,
                     text: &haystack, rows: &haystackRows, columns: &haystackColumns)
             {
@@ -406,8 +415,7 @@ public enum Search {
                 var searchEnd = haystack.count
                 while searchEnd >= needle.count,
                     let start = lastIndex(
-                        of: needle, in: haystack, before: searchEnd,
-                        caseSensitive: caseSensitive)
+                        of: needle, in: haystack, before: searchEnd, fold: fold)
                 {
                     let last = start + needle.count - 1
                     results.append(
