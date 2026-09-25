@@ -36,6 +36,13 @@ what to edit.
 
 ### Fixed
 
+- The Quick Terminal no longer stays behind on a display that is gone. Its
+  frame was computed when it was summoned and never revisited, so
+  unplugging a display, changing its resolution or changing which display
+  is the main one while the panel was open could leave it at coordinates
+  no screen contained. It now repositions itself when the display
+  arrangement changes, keeping the screen it is on when that screen still
+  exists.
 - Two races in the SFTP session, found by looping its tests under the
   thread sanitizer on a saturated machine. The in-flight window counted
   requests from the moment they registered a reply waiter rather than

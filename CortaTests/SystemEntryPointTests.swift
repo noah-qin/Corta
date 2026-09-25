@@ -83,6 +83,61 @@ struct QuickTerminalGeometryTests {
         #expect(QuickTerminalController.slideOffset(for: .bottom).height < 0)
         #expect(QuickTerminalController.slideOffset(for: .center).width == 0)
     }
+
+    // MARK: - Display reconfiguration
+
+    private let secondScreen = NSRect(x: 1100, y: 0, width: 1440, height: 900)
+
+    @Test("a hidden panel is left alone: its next summon recomputes the frame anyway")
+    func hiddenPanelIsNotRepositioned() {
+        #expect(
+            QuickTerminalController.frameAfterScreenChange(
+                position: .top, isVisible: false,
+                currentScreenVisibleFrame: visible, fallbackVisibleFrame: secondScreen) == nil)
+    }
+
+    @Test("a visible panel is resized in place when its own screen is still there")
+    func visiblePanelKeepsItsScreen() {
+        let resized = NSRect(x: 100, y: 50, width: 1000, height: 600)
+        let frame = QuickTerminalController.frameAfterScreenChange(
+            position: .top, isVisible: true,
+            currentScreenVisibleFrame: resized, fallbackVisibleFrame: secondScreen)
+        #expect(frame == QuickTerminalController.frame(for: .top, in: resized))
+        // Not the other screen: a resolution change must not move a panel
+        // the user is looking at onto a different display.
+        #expect(frame?.minX == resized.minX)
+    }
+
+    @Test("a visible panel whose screen is gone falls back to the configured rule")
+    func visiblePanelFollowsTheRuleWhenItsScreenDisappears() {
+        let frame = QuickTerminalController.frameAfterScreenChange(
+            position: .center, isVisible: true,
+            currentScreenVisibleFrame: nil, fallbackVisibleFrame: secondScreen)
+        #expect(frame == QuickTerminalController.frame(for: .center, in: secondScreen))
+    }
+
+    /// Every display is gone — a lid closed with nothing else attached.
+    /// There is no frame to compute, and guessing one would put the panel
+    /// at coordinates no screen contains.
+    @Test("no screens at all leaves the panel untouched")
+    func noScreensLeavesThePanelAlone() {
+        #expect(
+            QuickTerminalController.frameAfterScreenChange(
+                position: .bottom, isVisible: true,
+                currentScreenVisibleFrame: nil, fallbackVisibleFrame: nil) == nil)
+    }
+
+    @Test("the repositioned frame always lands inside the screen it was computed for")
+    func repositionedFrameIsOnScreen() {
+        for position in [
+            Configuration.QuickTerminalPosition.top, .bottom, .center,
+        ] {
+            let frame = QuickTerminalController.frameAfterScreenChange(
+                position: position, isVisible: true,
+                currentScreenVisibleFrame: secondScreen, fallbackVisibleFrame: nil)
+            #expect(frame.map(secondScreen.contains) == true)
+        }
+    }
 }
 
 @MainActor

@@ -66,6 +66,12 @@ final class QuickTerminalController {
             ) { [weak self] _ in
                 MainActor.assumeIsolated { self?.hide(returningFocus: false) }
             },
+            center.addObserver(
+                forName: NSApplication.didChangeScreenParametersNotification, object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.screenParametersDidChange() }
+            },
         ]
         applyConfiguration()
     }
@@ -143,6 +149,33 @@ final class QuickTerminalController {
             window.animator().alphaValue = 1
             window.animator().setFrame(frame, display: true)
         }
+    }
+
+    /// A display was added or removed, or one's resolution or arrangement
+    /// changed.
+    ///
+    /// A *hidden* panel needs nothing: `show()` recomputes its frame from
+    /// the current arrangement every time, so its next summon is already
+    /// right. A *visible* one is what breaks — its frame was computed
+    /// against an arrangement that no longer exists, so it can be left on a
+    /// screen that is gone, or at coordinates now outside every screen, and
+    /// nothing else ever revisits it.
+    ///
+    /// Repositioned without animation: a display reconfiguration already
+    /// moves everything on screen at once, and a slide on top of that reads
+    /// as a glitch rather than as motion.
+    private func screenParametersDidChange() {
+        guard let window = controller?.window else { return }
+        let configuration = ConfigurationStore.shared.configuration
+        guard
+            let frame = Self.frameAfterScreenChange(
+                position: configuration.quickTerminalPosition,
+                isVisible: window.isVisible,
+                currentScreenVisibleFrame: window.screen?.visibleFrame,
+                fallbackVisibleFrame: Self.screen(for: configuration.quickTerminalScreen)?
+                    .visibleFrame)
+        else { return }
+        window.setFrame(frame, display: true)
     }
 
     /// Dismisses the panel. `returningFocus` re-activates the application
@@ -266,6 +299,33 @@ final class QuickTerminalController {
                 x: visible.midX - size.width / 2, y: visible.midY - size.height / 2,
                 width: size.width, height: size.height)
         }
+    }
+
+    /// The frame a panel should take after a display change, or `nil` when
+    /// there is nothing to do.
+    ///
+    /// Split out as a function of its inputs because the event itself
+    /// cannot be produced in a test: unplugging a display is changing the
+    /// machine to test it (`docs/DECISIONS.md` D13), and a single-display
+    /// machine cannot produce the arrangement at all. The rule is therefore
+    /// tested here, and the notification is three lines of glue.
+    ///
+    /// **The panel keeps the screen it is on** when that screen still
+    /// exists, and only falls back to the configured rule when it does not.
+    /// A resolution change should resize the panel where the user is
+    /// looking; re-running the rule would move it, and `.mouse` in
+    /// particular chooses a screen from where the pointer happens to be —
+    /// which is an answer to "where should this be summoned", not to "where
+    /// is this now".
+    nonisolated static func frameAfterScreenChange(
+        position: Configuration.QuickTerminalPosition,
+        isVisible: Bool,
+        currentScreenVisibleFrame: NSRect?,
+        fallbackVisibleFrame: NSRect?
+    ) -> NSRect? {
+        guard isVisible else { return nil }
+        guard let visible = currentScreenVisibleFrame ?? fallbackVisibleFrame else { return nil }
+        return frame(for: position, in: visible)
     }
 
     /// The direction the panel comes in from: a band slides from its edge, a
