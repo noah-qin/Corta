@@ -672,6 +672,34 @@ func benchmarkSearchResponseDistribution() {
 
 benchmarkSearchResponseDistribution()
 
+/// The case the ASCII fast path (#115) cannot take, and the one it could
+/// make *worse*: an ASCII query over a document whose lines are not ASCII,
+/// so `appendASCIILogicalLine` is attempted and rejected on every line
+/// before the `String` path runs anyway. If this number moves up, the fast
+/// path is being paid for by the searches that cannot use it.
+func benchmarkNonASCIISearchResponse() {
+    var terminal = Terminal(rows: 50, columns: 120, scrollbackLimit: 100_000)
+    let line = "the quick 棕色 fox jumps over the lazy dog\r\n"
+    let lineBytes = Array(line.utf8)
+    for _ in 0..<100_000 {
+        terminal.feed(lineBytes)
+    }
+
+    var samplesNanoseconds: [UInt64] = []
+    samplesNanoseconds.reserveCapacity(20)
+    for _ in 0..<20 {
+        let start = DispatchTime.now()
+        _ = Search.find("fox", in: terminal.grid)
+        samplesNanoseconds.append(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds)
+    }
+    guard let warmed = LatencyDistribution(samplesNanoseconds: samplesNanoseconds) else { return }
+    print(
+        "search response, 100k-line non-ASCII scrollback, ASCII query: "
+            + warmed.description)
+}
+
+benchmarkNonASCIISearchResponse()
+
 // MARK: - Session spawn decomposition (P09)
 
 /// What "time to first prompt" is made of below the app: (a) the spawn

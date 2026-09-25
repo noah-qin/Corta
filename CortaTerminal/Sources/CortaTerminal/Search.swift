@@ -304,6 +304,57 @@ public enum Search {
         return result
     }
 
+    /// ASCII case folding, `A`–`Z` to lowercase and every other byte
+    /// unchanged. A table rather than `byte | 0x20`, which would also fold
+    /// `[` into `{` and `@` into `` ` ``.
+    ///
+    /// Folding bytes is only equivalent to Foundation's `.caseInsensitive`
+    /// because both sides are known ASCII: the pairs where they disagree
+    /// (`K` and the Kelvin sign, dotted and dotless `i`) are all outside it,
+    /// which is why the fast path refuses a non-ASCII query or line rather
+    /// than folding it itself.
+    private static let asciiFold: [UInt8] = (0...255).map { byte in
+        (0x41...0x5A).contains(byte) ? UInt8(byte + 0x20) : UInt8(byte)
+    }
+
+    /// `query` as folded ASCII bytes, or `nil` when it is not ASCII — in
+    /// which case every line takes the `String` path.
+    private static func asciiNeedle(_ query: String, caseSensitive: Bool) -> [UInt8]? {
+        var bytes: [UInt8] = []
+        bytes.reserveCapacity(query.utf8.count)
+        for byte in query.utf8 {
+            guard byte < 0x80 else { return nil }
+            bytes.append(caseSensitive ? byte : asciiFold[Int(byte)])
+        }
+        return bytes.isEmpty ? nil : bytes
+    }
+
+    /// The last occurrence of `needle` in `haystack[..<end]`, or `nil`.
+    ///
+    /// Right-to-left to match the `String` path, which searches `.backwards`
+    /// so that a capped sweep keeps the newest matches within a line as well
+    /// as across lines.
+    private static func lastIndex(
+        of needle: [UInt8], in haystack: ContiguousArray<UInt8>, before end: Int,
+        caseSensitive: Bool
+    ) -> Int? {
+        let count = needle.count
+        guard count > 0, end >= count else { return nil }
+        var start = end - count
+        while true {
+            var offset = 0
+            while offset < count {
+                let byte = haystack[start + offset]
+                let folded = caseSensitive ? byte : asciiFold[Int(byte)]
+                if folded != needle[offset] { break }
+                offset += 1
+            }
+            if offset == count { return start }
+            if start == 0 { return nil }
+            start -= 1
+        }
+    }
+
     /// Every match of `query` in the document, oldest first. Empty for an
     /// empty query rather than matching every position.
     ///
@@ -331,7 +382,50 @@ public enum Search {
         // non-overlapping packings); only for a self-overlapping query
         // ("aa" in "aaa") does the choice of which occurrence is reported
         // change.
-        lineLoop: for logicalLine in grid.reversedLogicalLines() {
+        // ASCII on both sides is the overwhelmingly common search and the
+        // one the `String` path is worst at: it builds a `String` and a
+        // per-character position table for every logical line, then hands
+        // the line to Foundation. Matching the cells directly needs neither
+        // (#115). A line the byte representation cannot hold — a grapheme
+        // cluster, a scalar outside ASCII — falls back to that path on its
+        // own, so the two are never asked to agree about a line only one of
+        // them can see.
+        let needle = asciiNeedle(query, caseSensitive: caseSensitive)
+        var haystack = ContiguousArray<UInt8>()
+        var haystackRows = ContiguousArray<Int32>()
+        var haystackColumns = ContiguousArray<Int32>()
+
+        lineLoop: for span in grid.reversedLogicalLineSpans() {
+            if let needle,
+                grid.appendASCIILogicalLine(
+                    firstRow: span.firstRow, lastRow: span.lastRow,
+                    text: &haystack, rows: &haystackRows, columns: &haystackColumns)
+            {
+                guard !haystack.isEmpty else { continue }
+                if shouldStop() { break }
+                var searchEnd = haystack.count
+                while searchEnd >= needle.count,
+                    let start = lastIndex(
+                        of: needle, in: haystack, before: searchEnd,
+                        caseSensitive: caseSensitive)
+                {
+                    let last = start + needle.count - 1
+                    results.append(
+                        SelectionRange(
+                            start: SelectionPoint(
+                                row: Int(haystackRows[start]),
+                                column: Int(haystackColumns[start])),
+                            end: SelectionPoint(
+                                row: Int(haystackRows[last]),
+                                column: Int(haystackColumns[last]))))
+                    searchEnd = start
+                    if results.count >= maxMatches || shouldStop() { break lineLoop }
+                }
+                continue
+            }
+
+            let logicalLine = grid.logicalLine(
+                firstRow: span.firstRow, lastRow: span.lastRow)
             let text = logicalLine.text
             guard !text.isEmpty else { continue }
             // Polled per scanned line (empty ones cost nothing) and per

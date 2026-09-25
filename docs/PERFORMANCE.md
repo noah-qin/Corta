@@ -307,7 +307,25 @@ CortaTerminal/.build/release/corta-bench
 | keypress → grid latency | 0.009 ms | 0.012 ms | 0.013 ms | 0.020 ms | 2,000 |
 | keypress → grid latency, flooding neighbour | 0.009 ms | 0.012 ms | 0.015 ms | 0.046 ms | 2,000 |
 | snapshot latency under flood | 0.000 ms | 0.000 ms | 0.000 ms | 0.032 ms | 2,000 |
-| search response, 100k-line scrollback (warm) | 385.1 ms | 410.6 ms | 442.6 ms | 442.6 ms | 50 |
+| search response, 100k-line scrollback (warm) | 25.6 ms | 25.8 ms | 25.9 ms | 25.9 ms | 50 |
+| search response, 100k-line non-ASCII scrollback, ASCII query | 399.6 ms | 412.2 ms | 426.3 ms | 426.3 ms | 20 |
+
+**Search, before and after the ASCII path (#115).** The warm figure was
+385.1 ms when this table was first written and 399.8 ms re-measured
+immediately before the change on the machine and toolchain below; matching
+ASCII queries over ASCII lines against the cells, instead of building a
+`String` and a per-character position table for every logical line, takes
+it to 25.6 ms — a factor of 15.6, measured back to back in one session.
+
+The second row is the case the fast path cannot take and could have made
+worse: an ASCII query over non-ASCII lines, where the byte walk is
+attempted and rejected on every line before the `String` path runs anyway.
+Three runs each side, p50: 424.1 / 405.3 / 400.5 ms without the fast path,
+399.6 / 395.6 / 408.0 ms with it — overlapping, so no measurable
+regression. Both numbers were taken on Xcode 27.0 (Swift 6.4), not the
+26.6 toolchain §5.2's benchmark identity names; the *ratio* is
+like-for-like because before and after were measured in the same session,
+the absolute figures are not comparable to rows taken under 26.6.
 
 Parser-only throughput 628.3 MiB/s, parser+grid 141.1 MiB/s, core feed
 130.0 MiB/s — all above §1's 100 MB/s target. Scrollback at 100k lines:
