@@ -23,6 +23,17 @@ what to edit.
   replaced by the `Corta (Dev)` scheme, and the test suites are selected
   by test plan (`Unit`, `UI`) rather than by `-skip-testing`.
 
+- Scrollback search is an order of magnitude faster. A query and a line
+  that are both ASCII — the overwhelmingly common search — are now matched
+  against the grid's cells directly, instead of building a string and a
+  per-character position table for every logical line and handing it to
+  Foundation. Over a 100k-line scrollback a warm query goes from 399.8 ms
+  to 27.6 ms — about fourteen times faster — and that is what the search
+  bar re-runs on every keystroke. A query with anything outside ASCII takes
+  the old path untouched; a *line* with anything outside ASCII also takes
+  it, after the byte walk has tried and rejected that line, which measures
+  about 2% slower on a document where every line is non-ASCII.
+
 ### Fixed
 
 - Two races in the SFTP session, found by looping its tests under the
