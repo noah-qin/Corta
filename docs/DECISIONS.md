@@ -302,7 +302,7 @@ stay stable once they are quoted.
 
 **Decision.** The Debug configuration builds `CortaDev.app` with the
 bundle identifier `dev.noahqin.Corta.dev`, its own icon and the display
-name "Corta Dev". `AppPaths` gives any bundle whose identifier ends in
+name "Corta Dev" (the menu bar shows the product name, `CortaDev`). `AppPaths` gives any bundle whose identifier ends in
 `.dev` a stage directory — `~/Library/Application Support/Corta Dev/` —
 which holds its config file, its Application Support state and the rc
 file the shell-integration installer writes. The development build never

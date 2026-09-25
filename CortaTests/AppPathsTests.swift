@@ -63,15 +63,17 @@ struct AppPathsTests {
         #expect(AppPaths.stageDirectory(environment: [:], bundleIdentifier: nil) == nil)
     }
 
-    /// Whichever configuration this runs under, the test host must not
-    /// resolve to the developer's own files: under Debug because the host
-    /// *is* the development build, under Release because the test plan
-    /// stages it. The `#require` is the assertion — a host with neither is
-    /// a host that would write into `~/.zshrc`.
+    /// The test host must not resolve to the developer's own files. Under
+    /// Debug it is the development build, so the stage follows from its
+    /// identity; any other configuration has to be given `CORTA_STAGE_DIR`.
+    /// The `#require` is the assertion — a host with neither is a host that
+    /// would read the developer's config and write into their `~/.zshrc`.
     @Test func theTestHostNeverResolvesToTheDevelopersOwnFiles() throws {
         let stage = try #require(
             AppPaths.stageDirectory,
             "the test host must be the development build, or run with CORTA_STAGE_DIR set")
+        let cache = try #require(AppPaths.cacheDirectory)
+        #expect(cache.path.hasPrefix(stage.path + "/"))
         #expect(AppPaths.configFileURL.path.hasPrefix(stage.path + "/"))
         #expect(AppPaths.applicationSupportDirectory.path.hasPrefix(stage.path + "/"))
         for shell in ShellKind.allCases {

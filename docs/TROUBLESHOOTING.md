@@ -53,9 +53,9 @@ in `~/.config/corta/config`.
 
 ### There are two Corta icons in the Dock
 
-One of them is a development build. It is called **Corta Dev**, its icon
-has an orange background rather than a blue one, and its bundle
-identifier is `dev.noahqin.Corta.dev`. It keeps its configuration and its
+One of them is a development build. Finder calls it **Corta Dev**, the
+menu bar calls it **CortaDev**, its icon has an orange background rather
+than a blue one, and its bundle identifier is `dev.noahqin.Corta.dev`. It keeps its configuration and its
 state in `~/Library/Application Support/Corta Dev/`, never in
 `~/.config/corta/config` or `~/Library/Application Support/Corta/`, and it
 has no "Check for Updates…" menu item — so the one with the blue icon is

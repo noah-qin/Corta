@@ -63,7 +63,7 @@ make that safe (`docs/DECISIONS.md` D22):
 
 | | Daily driver | Development build |
 | --- | --- | --- |
-| Bundle | `/Applications/Corta.app` | `CortaDev.app`, from the `Corta (Dev)` scheme |
+| Bundle | `/Applications/Corta.app` | `CortaDev.app` ("Corta Dev" in Finder), from the `Corta (Dev)` scheme |
 | Identifier | `dev.noahqin.Corta` | `dev.noahqin.Corta.dev` |
 | Configuration | `~/.config/corta/config` | `~/Library/Application Support/Corta Dev/config` |
 | State | `~/Library/Application Support/Corta/` | the same stage directory |

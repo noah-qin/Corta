@@ -71,6 +71,27 @@ nonisolated enum AppPaths {
         return systemApplicationSupportDirectory.appendingPathComponent("Corta", isDirectory: true)
     }
 
+    /// `~/Library/Caches/<bundle identifier>`, or the stage's `Caches` —
+    /// disposable, regenerable content the system is free to purge.
+    ///
+    /// Keyed by the bundle identifier rather than by a fixed name because
+    /// `QuadRenderer` prunes every compiled-shader archive in this
+    /// directory that is not its own. With one shared directory the two
+    /// builds delete each other's archive on every launch, and each one
+    /// then recompiles its pipelines from source — a development build
+    /// reaching into the session the developer is working in, which is
+    /// exactly what D22 exists to stop.
+    static var cacheDirectory: URL? {
+        if let stageDirectory {
+            return stageDirectory.appendingPathComponent("Caches", isDirectory: true)
+        }
+        guard let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)
+            .first
+        else { return nil }
+        return caches.appendingPathComponent(
+            Bundle.main.bundleIdentifier ?? "dev.noahqin.Corta", isDirectory: true)
+    }
+
     /// What a `~`-relative path the *user* owns resolves against —
     /// `~/.zshrc` and the rest of `ShellKind.defaultRCFileURL`.
     ///

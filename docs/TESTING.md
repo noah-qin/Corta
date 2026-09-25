@@ -118,18 +118,25 @@ xcodebuild test \
 Use a fresh result-bundle path for each run. Add
 `-only-testing:CortaTests/ConfigurationTests` to focus a suite.
 
-Three test plans under `TestPlans/` say what runs where:
+Two test plans under `TestPlans/` say what runs where:
 
 | Plan | Contains | Run it with |
 | ---- | -------- | ----------- |
-| `Unit` | `CortaTests` | `-scheme Corta -testPlan Unit` — the default, and what CI runs |
+| `Unit` | `CortaTests`; `CortaUITests` listed but disabled | `-scheme Corta -testPlan Unit` — the default, and what CI runs |
 | `UI` | `CortaUITests` | `-scheme Corta -testPlan UI` — an interactive desktop session only |
-| `Release` | the performance suite, built with `-O` | `-scheme 'Corta (Release tests)'` |
 
 `UI` is deliberately not part of the default run: a UI test drives the
 keyboard and the frontmost window, so running it takes the machine away
-from whatever else is happening on it. Neither CI nor an offscreen
-rendering test replaces launching the app.
+from whatever else is happening on it. It stays *listed* in `Unit` with
+`enabled: false` so the target is still built — a compile error in the UI
+tests is caught on every run — without anything being driven. Neither CI
+nor an offscreen rendering test replaces launching the app.
+
+There is no Release plan yet. Building the test bundle against a Release
+app needs `ENABLE_TESTABILITY = YES` in that configuration, because every
+file in `CortaTests` uses `@testable import Corta`; that emits
+`-enable-testing`, which inhibits optimisation and so changes the very
+number a Release measurement is for. Issue #110 settles that trade.
 
 ### The test host cannot reach your own configuration
 

@@ -92,9 +92,11 @@ nonisolated final class QuadRenderer {
     }
 
     /// Where a compiled-pipeline cache from a previous launch is looked for,
-    /// and where this launch's (re)writes it — `~/Library/Caches`, not
-    /// Application Support: this is disposable, regenerable content the
+    /// and where this launch's (re)writes it — `AppPaths.cacheDirectory`,
+    /// not Application Support: this is disposable, regenerable content the
     /// system is free to purge, never something a user's session depends on.
+    /// That directory is per bundle identifier, so the pruning below can
+    /// only ever remove *this* build's older archives (D22).
     ///
     /// Named with `buildFingerprint` — **not** a fixed filename — so a
     /// rebuild's cache is never confused with an older build's: this is a
@@ -105,12 +107,7 @@ nonisolated final class QuadRenderer {
     /// One file for all three pipelines; keyed by nothing beyond its path.
     /// Not `private`: `QuadRendererTests` checks the file this writes.
     static var binaryArchiveURL: URL? {
-        guard
-            let cachesDirectory = FileManager.default.urls(
-                for: .cachesDirectory, in: .userDomainMask
-            ).first
-        else { return nil }
-        let directory = cachesDirectory.appendingPathComponent("dev.noahqin.Corta", isDirectory: true)
+        guard let directory = AppPaths.cacheDirectory else { return nil }
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         pruneStaleBinaryArchives(in: directory)
         return directory.appendingPathComponent("QuadRenderer-\(buildFingerprint).metallib-archive")

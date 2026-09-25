@@ -21,7 +21,7 @@ what to edit.
   build can now run beside one without touching its configuration, its
   global hotkey or its update path. `scripts/build-and-run.sh` is
   replaced by the `Corta (Dev)` scheme, and the test suites are selected
-  by test plan (`Unit`, `UI`, `Release`) rather than by `-skip-testing`.
+  by test plan (`Unit`, `UI`) rather than by `-skip-testing`.
 
 ### Fixed
 

@@ -194,8 +194,7 @@ Layout:
 - `CortaTests/`, `CortaUITests/` — app-hosted test targets
 - `Corta.xcodeproj/` — build settings live in `project.pbxproj`
 - `scripts/` — measurement, packaging and release
-- `TestPlans/` — `Unit` (the default), `UI` (interactive sessions only),
-  `Release` (the performance suite built with `-O`)
+- `TestPlans/` — `Unit` (the default) and `UI` (interactive sessions only)
 - `docs/` — user and design documentation, plus the dated records
 
 Deployment target is macOS 26.0, Swift 6, app sandbox disabled

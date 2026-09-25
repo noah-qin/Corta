@@ -79,9 +79,14 @@ struct ShellIntegrationInstaller {
 
     static let shared = ShellIntegrationInstaller(shell: .loginShell)
 
-    /// `rcFileURL` with the home directory abbreviated to `~`, for status
-    /// copy — `"~/.zshrc"`, not the full path a sandboxed-looking absolute
-    /// path would imply.
+    /// `rcFileURL` with the *user's* home directory abbreviated to `~`, for
+    /// status copy — `"~/.zshrc"`, not the full path a sandboxed-looking
+    /// absolute path would imply.
+    ///
+    /// A staged build's rc file is not under that home, so it is shown in
+    /// full: `~/Library/Application Support/Corta Dev/.zshrc` says plainly
+    /// that this is not the file the machine's shells read, which is the
+    /// one thing the status copy must not get wrong (D22).
     var displayPath: String {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let path = rcFileURL.path
