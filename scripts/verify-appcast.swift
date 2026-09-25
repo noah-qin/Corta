@@ -53,7 +53,17 @@ while let argument = arguments.first {
     case "--archive": archivePath = arguments.isEmpty ? nil : arguments.removeFirst()
     case "--version": archiveVersion = arguments.isEmpty ? nil : arguments.removeFirst()
     case "--download": download = true
-    default: positional.append(argument)
+    default:
+        // Anything unrecognised is an error, never a positional. A typo'd
+        // flag — `--downlaod` — would otherwise be swallowed and the tool
+        // would print "all checks passed" having downloaded and verified
+        // nothing, which is the class of silent pass this whole file
+        // exists to remove.
+        if argument.hasPrefix("-") || positional.count >= 2 {
+            FileHandle.standardError.write(Data("unknown argument: \(argument)\n".utf8))
+            exit(2)
+        }
+        positional.append(argument)
     }
 }
 if positional.count > 0 { appcastPath = positional[0] }
@@ -170,16 +180,25 @@ if !items.isEmpty {
 
 // Sparkle offers whichever item has the highest build number, so a repeat
 // makes one release invisible to everyone on the other.
+// Guarded on a non-empty list: with every item rejected above, both of
+// these are vacuously true and the summary would read as though ordering
+// had been checked.
 let builds = items.map(\.build)
-if Set(builds).count != builds.count {
-    fail("build numbers repeat in the feed: \(builds)")
-} else if !items.isEmpty {
-    pass("build numbers are unique")
-}
-if builds != builds.sorted(by: >) {
-    fail("items are not newest-first by build number: \(builds)")
-} else if !items.isEmpty {
-    pass("items are newest-first by build number")
+if items.isEmpty {
+    if !itemElements.isEmpty {
+        fail("no item in the feed could be read; nothing was checked for order or uniqueness")
+    }
+} else {
+    if Set(builds).count != builds.count {
+        fail("build numbers repeat in the feed: \(builds)")
+    } else {
+        pass("build numbers are unique")
+    }
+    if builds != builds.sorted(by: >) {
+        fail("items are not newest-first by build number: \(builds)")
+    } else {
+        pass("items are newest-first by build number")
+    }
 }
 let shortVersions = items.map(\.shortVersion)
 if Set(shortVersions).count != shortVersions.count {
@@ -203,27 +222,77 @@ func verify(_ item: Item, bytes: Data, source: String) {
 }
 
 if let archivePath, let archiveVersion {
-    guard let item = items.first(where: { $0.shortVersion == archiveVersion }) else {
+    // Recorded and carried on rather than exiting: `--archive` and
+    // `--download` are allowed together, and a run that stops here would
+    // print a summary implying the whole tool had run.
+    if let item = items.first(where: { $0.shortVersion == archiveVersion }) {
+        if let bytes = FileManager.default.contents(atPath: archivePath) {
+            verify(item, bytes: bytes, source: archivePath)
+        } else {
+            fail("cannot read \(archivePath)")
+        }
+    } else {
         fail("the feed has no item for \(archiveVersion)")
-        finish()
     }
-    guard let bytes = FileManager.default.contents(atPath: archivePath) else {
-        fail("cannot read \(archivePath)")
-        finish()
+}
+
+/// One retry, and a deadline, because this runs unattended. The job
+/// exists to detect a corrupted feed; a transient GitHub blip that turns
+/// it red teaches the reader to ignore it, which costs more than the check
+/// is worth.
+func fetch(_ url: URL, attempts: Int = 2, timeout: TimeInterval = 120) -> Result<Data, Error> {
+    var lastError: Error = URLError(.unknown)
+    for attempt in 1...attempts {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForResource = timeout
+        configuration.timeoutIntervalForRequest = timeout
+        let session = URLSession(configuration: configuration)
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: Result<Data, Error>?
+        session.dataTask(with: url) { data, response, error in
+            defer { semaphore.signal() }
+            if let error { result = .failure(error); return }
+            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+                result = .failure(
+                    NSError(
+                        domain: "verify-appcast", code: http.statusCode,
+                        userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode)"]))
+                return
+            }
+            result = .success(data ?? Data())
+        }.resume()
+        semaphore.wait()
+        switch result {
+        case .success(let data): return .success(data)
+        case .failure(let error):
+            lastError = error
+            if attempt < attempts {
+                print("      retrying \(url.lastPathComponent) after \(error.localizedDescription)")
+            }
+        case nil: lastError = URLError(.unknown)
+        }
     }
-    verify(item, bytes: bytes, source: archivePath)
+    return .failure(lastError)
 }
 
 if download {
+    // Every item is held to the *current* SUPublicEDKey. That is right
+    // while the key is the one it has always been; rotating it (the
+    // private half lives in the reviewed `release` environment, D20) would
+    // make every historical entry fail here for ever, since each was
+    // signed with the old key and is only ever offered to clients that
+    // hold it. A rotation therefore means pruning the entries signed with
+    // the retired key, or teaching this loop which key each item belongs
+    // to — not silencing the failure.
     for item in items {
         guard let url = URL(string: item.url) else {
             fail("\(item.shortVersion): enclosure url is not a URL")
             continue
         }
-        do {
-            let bytes = try Data(contentsOf: url)
+        switch fetch(url) {
+        case .success(let bytes):
             verify(item, bytes: bytes, source: item.url)
-        } catch {
+        case .failure(let error):
             fail("\(item.shortVersion): cannot download \(item.url) — \(error.localizedDescription)")
         }
     }

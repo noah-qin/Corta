@@ -192,12 +192,52 @@ if [ -n "$archive" ]; then
   [ -f "$archive" ] && archive_length=$(stat -f %z "$archive")
 fi
 
-# --- Appcast ---------------------------------------------------------------
+# --- Appcast ----------------------------------------------------------------
+
+# The feed's own rules — every enclosure URL matching its version, build
+# numbers unique and newest-first, signatures well-formed — belong to
+# `verify-appcast.swift`, which is also what `ci.yml` and `nightly.yml`
+# run. Duplicating them here is how the two come to disagree, and
+# `CLAUDE.md` says a rule lives in one place.
+#
+# What stays here is the pair only this script can check, because only it
+# has the app and the archive: that the feed's build number is *this app's*
+# build number, and that the enclosure length is *this archive's* size.
+#
+# The signature check runs whenever there is an archive, with or without
+# `--appcast`: `package-release.sh` passes `--archive` alone, and a
+# packaging run that reports "all checks passed" without having verified a
+# signature is exactly the reassurance this was added to stop giving.
+appcast="$repo_root/appcast.xml"
+
+if [ -n "$archive" ]; then
+  # Presence is not validity. A signature made with a private key whose
+  # public half is not the SUPublicEDKey the shipped app carries is
+  # well-formed and rejected by every installed Corta — an update nobody
+  # can install, with every other check green. The sha256 sidecar does not
+  # catch it: it proves the bytes are the published bytes, not that the key
+  # pairs with the app.
+  set +e
+  verify_output=$(swift "$repo_root/scripts/verify-appcast.swift" "$appcast" \
+    "$repo_root/Sparkle-Info.plist" --archive "$archive" \
+    --version "$bundle_version" 2>&1)
+  verify_status=$?
+  set -e
+  echo "$verify_output" | sed 's/^/      /'
+  if [ "$verify_status" -eq 0 ]; then
+    pass "the feed verifies, and $bundle_version's signature verifies under SUPublicEDKey"
+  elif [ "$verify_status" -ge 126 ] || [ "$verify_status" -eq 2 ]; then
+    # 126/127 are "could not execute" and 2 is a usage error. None of them
+    # mean the signature is wrong, and saying so would send a maintainer
+    # after the signing key when `swift` is simply missing.
+    fail "verify-appcast could not run (status $verify_status); the feed was not checked"
+  else
+    fail "verify-appcast reported $verify_status failed check(s) — its output is above"
+  fi
+fi
 
 if $check_appcast; then
-  appcast="$repo_root/appcast.xml"
-  expected_url="https://github.com/noah-qin/Corta/releases/download/v$bundle_version/Corta-$bundle_version.zip"
-  item=$(python3 - "$appcast" "$bundle_version" <<'PY'
+  item=$(python3 - "$appcast" "$bundle_version" <<'PROBE'
 import sys, xml.etree.ElementTree as ET
 ns = {"sparkle": "http://www.andymatuschak.org/xml-namespaces/sparkle"}
 root = ET.parse(sys.argv[1]).getroot()
@@ -207,48 +247,19 @@ for item in root.iter("item"):
         continue
     enclosure = item.find("enclosure")
     print(item.findtext("sparkle:version", default="", namespaces=ns))
-    print(enclosure.get("url", "") if enclosure is not None else "")
     print(enclosure.get("length", "") if enclosure is not None else "")
-    print("signed" if enclosure is not None and enclosure.get("{%s}edSignature" % ns["sparkle"]) else "unsigned")
     break
-PY
+PROBE
   )
   if [ -z "$item" ]; then
     fail "appcast.xml has no item for version $bundle_version"
   else
     appcast_build=$(echo "$item" | sed -n 1p)
-    appcast_url=$(echo "$item" | sed -n 2p)
-    appcast_length=$(echo "$item" | sed -n 3p)
-    appcast_signed=$(echo "$item" | sed -n 4p)
+    appcast_length=$(echo "$item" | sed -n 2p)
     if [ "$appcast_build" = "$bundle_build" ]; then
       pass "appcast item carries build $bundle_build"
     else
       fail "appcast item for $bundle_version carries build '$appcast_build', app has $bundle_build"
-    fi
-    if [ "$appcast_url" = "$expected_url" ]; then
-      pass "appcast enclosure points at the GitHub release archive"
-    else
-      fail "appcast enclosure url is '$appcast_url', expected $expected_url"
-    fi
-    if [ "$appcast_signed" = "signed" ]; then
-      pass "appcast enclosure carries an EdDSA signature"
-    else
-      fail "appcast enclosure has no sparkle:edSignature"
-    fi
-    # Presence is not validity. A signature made with a private key whose
-    # public half is not the SUPublicEDKey the shipped app carries is
-    # well-formed and rejected by every installed Corta — an update nobody
-    # can install, with every check above green. The sha256 sidecar does
-    # not catch it: it proves the bytes are the published bytes, not that
-    # the key pairs with the app.
-    if [ -n "$archive" ]; then
-      if swift "$repo_root/scripts/verify-appcast.swift" "$appcast" \
-        "$repo_root/Sparkle-Info.plist" --archive "$archive" \
-        --version "$bundle_version"; then
-        pass "appcast signature verifies under the app's SUPublicEDKey"
-      else
-        fail "appcast signature does not verify under the app's SUPublicEDKey"
-      fi
     fi
     if [ -n "$archive_length" ]; then
       if [ "$appcast_length" = "$archive_length" ]; then

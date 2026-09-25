@@ -242,7 +242,7 @@ fixtures and clean up the resources you create.
 
 ## The update feed
 
-`appcast.xml` on `main` *is* the live feed — `INFOPLIST_KEY_SUFeedURL`
+`appcast.xml` on `main` *is* the live feed — `Sparkle-Info.plist`'s `SUFeedURL`
 points straight at it, so merging a change to that file publishes it to
 every running Corta. It is held to one invariant: **the feed, the
 signature in it and the archive it points at describe the same bytes, and
@@ -262,9 +262,12 @@ swift scripts/verify-appcast.swift --download            # every item, against t
   base64 64-byte signature; each enclosure URL being exactly the GitHub
   release URL for its own version; build numbers unique and newest-first,
   since Sparkle offers whichever item has the highest one.
-- The **archive** layer is what `scripts/check-release.sh --appcast
-  --archive` adds at release time, offline, against the archive it already
-  holds.
+- The **archive** layer is what `scripts/check-release.sh` adds whenever it
+  is given an `--archive`, offline, against the archive it already holds.
+  It deliberately does *not* require `--appcast`: `package-release.sh`
+  passes `--archive` alone, and a packaging run that reported "all checks
+  passed" without having verified a signature was the reassurance this
+  exists to stop giving.
 - The **`--download`** layer runs nightly and covers *every* item, not
   only the newest — an update nobody can install is equally broken
   whichever release it belongs to, and the older entries are the ones no
