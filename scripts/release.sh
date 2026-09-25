@@ -90,6 +90,6 @@ Done. appcast.xml updated in place at $repo_root/appcast.xml.
 Left to do by hand:
   1. Review the diff: git -C "$repo_root" diff appcast.xml
   2. Commit and push it — that is what makes the update visible to every
-     already-installed Corta (INFOPLIST_KEY_SUFeedURL points straight at
-     this file on the main branch, no separate server).
+     already-installed Corta (Sparkle-Info.plist's SUFeedURL points straight
+     at this file on the main branch, no separate server).
 EOF

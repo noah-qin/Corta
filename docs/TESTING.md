@@ -240,6 +240,48 @@ Never change global hotkeys, secure-input state, shell startup files or
 dependencies and per-process environments. Use temporary directories for
 fixtures and clean up the resources you create.
 
+## The update feed
+
+`appcast.xml` on `main` *is* the live feed — `Sparkle-Info.plist`'s `SUFeedURL`
+points straight at it, so merging a change to that file publishes it to
+every running Corta. It is held to one invariant: **the feed, the
+signature in it and the archive it points at describe the same bytes, and
+that signature verifies under the `SUPublicEDKey` the shipped app
+carries.**
+
+`scripts/verify-appcast.swift` is that check, in three layers:
+
+```sh
+swift scripts/verify-appcast.swift                       # offline: structure, URLs, builds, key
+swift scripts/verify-appcast.swift --archive dist/Corta-1.0.1.zip --version 1.0.1
+swift scripts/verify-appcast.swift --download            # every item, against the published archives
+```
+
+- The **offline** layer runs on every CI run: well-formed XML, every item
+  carrying a version, an integer build, an enclosure, a length and a
+  base64 64-byte signature; each enclosure URL being exactly the GitHub
+  release URL for its own version; build numbers unique and newest-first,
+  since Sparkle offers whichever item has the highest one.
+- The **archive** layer is what `scripts/check-release.sh` adds whenever it
+  is given an `--archive`, offline, against the archive it already holds.
+  It deliberately does *not* require `--appcast`: `package-release.sh`
+  passes `--archive` alone, and a packaging run that reported "all checks
+  passed" without having verified a signature was the reassurance this
+  exists to stop giving.
+- The **`--download`** layer runs nightly and covers *every* item, not
+  only the newest — an update nobody can install is equally broken
+  whichever release it belongs to, and the older entries are the ones no
+  release ever re-checks.
+
+Presence of a signature was never the question. A signature made with a
+private key whose public half is not the app's `SUPublicEDKey` is
+well-formed, and every installed Corta rejects it: an update nobody can
+install, with every other check green. The SHA-256 sidecar does not catch
+that — it proves the bytes are the published bytes, not that the key pairs
+with the app.
+
+Exit status is the number of failed checks, as `check-release.sh` reports.
+
 ## Documentation
 
 ```sh
