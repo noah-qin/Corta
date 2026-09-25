@@ -38,6 +38,17 @@ final class QuickTerminalController {
     private var controller: TerminalWindowController?
     private lazy var hotKey = GlobalHotKey { [weak self] in self?.toggle() }
     private var observers: [NSObjectProtocol] = []
+    /// Whether a slide is in flight. A display change arriving inside one
+    /// is deferred rather than applied: `show()` animates towards a frame
+    /// captured *before* the change, so a reposition during it is
+    /// immediately overwritten by the stale target and nothing revisits it
+    /// — the exact failure this observer exists to remove, narrowed to the
+    /// 160 ms of a summon. `hide()` is the mirror: its completion restores
+    /// the frame by undoing a fixed offset, which is only the right
+    /// arithmetic if nothing else moved the window meanwhile.
+    private var isAnimating = false
+    private var repositionWhenIdle = false
+
     /// The application to return to on dismissal, captured at summon time.
     private var previousApplication: NSRunningApplication?
 
@@ -65,6 +76,12 @@ final class QuickTerminalController {
                 forName: NSApplication.didResignActiveNotification, object: nil, queue: .main
             ) { [weak self] _ in
                 MainActor.assumeIsolated { self?.hide(returningFocus: false) }
+            },
+            center.addObserver(
+                forName: NSApplication.didChangeScreenParametersNotification, object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.screenParametersDidChange() }
             },
         ]
         applyConfiguration()
@@ -145,6 +162,37 @@ final class QuickTerminalController {
         }
     }
 
+    /// A display was added or removed, or one's resolution or arrangement
+    /// changed.
+    ///
+    /// A *hidden* panel needs nothing: `show()` recomputes its frame from
+    /// the current arrangement every time, so its next summon is already
+    /// right. A *visible* one is what breaks — its frame was computed
+    /// against an arrangement that no longer exists, so it can be left on a
+    /// screen that is gone, or at coordinates now outside every screen, and
+    /// nothing else ever revisits it.
+    ///
+    /// Repositioned without animation: a display reconfiguration already
+    /// moves everything on screen at once, and a slide on top of that reads
+    /// as a glitch rather than as motion.
+    private func screenParametersDidChange() {
+        guard !isAnimating else {
+            repositionWhenIdle = true
+            return
+        }
+        guard let window = controller?.window else { return }
+        let configuration = ConfigurationStore.shared.configuration
+        guard
+            let frame = Self.frameAfterScreenChange(
+                position: configuration.quickTerminalPosition,
+                isVisible: window.isVisible,
+                currentScreenVisibleFrame: window.screen?.visibleFrame,
+                fallbackVisibleFrame: Self.screen(for: configuration.quickTerminalScreen)?
+                    .visibleFrame)
+        else { return }
+        window.setFrame(frame, display: true)
+    }
+
     /// Dismisses the panel. `returningFocus` re-activates the application
     /// the hotkey was pressed in; it is false when Corta already lost
     /// activation on its own.
@@ -221,13 +269,26 @@ final class QuickTerminalController {
     }
 
     private func animate(_ changes: @escaping () -> Void, completion: (() -> Void)? = nil) {
+        isAnimating = true
         NSAnimationContext.runAnimationGroup { context in
             context.duration =
                 NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : Self.animationDuration
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             changes()
-        } completionHandler: {
+        } completionHandler: { [weak self] in
             completion?()
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.isAnimating = false
+                // A display change that arrived mid-slide was deferred to
+                // here, where the animation can no longer overwrite it.
+                // `screenParametersDidChange` re-checks visibility itself,
+                // so a dismissal that finished needs no special case.
+                if self.repositionWhenIdle {
+                    self.repositionWhenIdle = false
+                    self.screenParametersDidChange()
+                }
+            }
         }
     }
 
@@ -266,6 +327,41 @@ final class QuickTerminalController {
                 x: visible.midX - size.width / 2, y: visible.midY - size.height / 2,
                 width: size.width, height: size.height)
         }
+    }
+
+    /// The frame a panel should take after a display change, or `nil` when
+    /// there is nothing to do.
+    ///
+    /// Split out as a function of its inputs because the event itself
+    /// cannot be produced in a test: unplugging a display is changing the
+    /// machine to test it (`docs/DECISIONS.md` D13), and a single-display
+    /// machine cannot produce the arrangement at all. The rule is therefore
+    /// tested here, and the notification is three lines of glue.
+    ///
+    /// **The panel keeps the screen it is on** when that screen still
+    /// exists, and only falls back to the configured rule when it does not.
+    /// A resolution change should resize the panel where the user is
+    /// looking; re-running the rule would move it, and `.mouse` in
+    /// particular chooses a screen from where the pointer happens to be —
+    /// which is an answer to "where should this be summoned", not to "where
+    /// is this now".
+    ///
+    /// The fallback is rarer than it looks. Unplugging a display does not
+    /// reach it: the window server relocates windows off a departing screen
+    /// *before* `didChangeScreenParametersNotification` is delivered, so by
+    /// the time this runs the panel already sits on a surviving screen and
+    /// is merely resized to it. What reaches the fallback is a window left
+    /// outside every screen — a desktop that shrank under it — where there
+    /// is no current screen to keep.
+    nonisolated static func frameAfterScreenChange(
+        position: Configuration.QuickTerminalPosition,
+        isVisible: Bool,
+        currentScreenVisibleFrame: NSRect?,
+        fallbackVisibleFrame: NSRect?
+    ) -> NSRect? {
+        guard isVisible else { return nil }
+        guard let visible = currentScreenVisibleFrame ?? fallbackVisibleFrame else { return nil }
+        return frame(for: position, in: visible)
     }
 
     /// The direction the panel comes in from: a band slides from its edge, a
