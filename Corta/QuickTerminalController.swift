@@ -38,6 +38,17 @@ final class QuickTerminalController {
     private var controller: TerminalWindowController?
     private lazy var hotKey = GlobalHotKey { [weak self] in self?.toggle() }
     private var observers: [NSObjectProtocol] = []
+    /// Whether a slide is in flight. A display change arriving inside one
+    /// is deferred rather than applied: `show()` animates towards a frame
+    /// captured *before* the change, so a reposition during it is
+    /// immediately overwritten by the stale target and nothing revisits it
+    /// — the exact failure this observer exists to remove, narrowed to the
+    /// 160 ms of a summon. `hide()` is the mirror: its completion restores
+    /// the frame by undoing a fixed offset, which is only the right
+    /// arithmetic if nothing else moved the window meanwhile.
+    private var isAnimating = false
+    private var repositionWhenIdle = false
+
     /// The application to return to on dismissal, captured at summon time.
     private var previousApplication: NSRunningApplication?
 
@@ -165,6 +176,10 @@ final class QuickTerminalController {
     /// moves everything on screen at once, and a slide on top of that reads
     /// as a glitch rather than as motion.
     private func screenParametersDidChange() {
+        guard !isAnimating else {
+            repositionWhenIdle = true
+            return
+        }
         guard let window = controller?.window else { return }
         let configuration = ConfigurationStore.shared.configuration
         guard
@@ -254,13 +269,26 @@ final class QuickTerminalController {
     }
 
     private func animate(_ changes: @escaping () -> Void, completion: (() -> Void)? = nil) {
+        isAnimating = true
         NSAnimationContext.runAnimationGroup { context in
             context.duration =
                 NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : Self.animationDuration
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             changes()
-        } completionHandler: {
+        } completionHandler: { [weak self] in
             completion?()
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.isAnimating = false
+                // A display change that arrived mid-slide was deferred to
+                // here, where the animation can no longer overwrite it.
+                // `screenParametersDidChange` re-checks visibility itself,
+                // so a dismissal that finished needs no special case.
+                if self.repositionWhenIdle {
+                    self.repositionWhenIdle = false
+                    self.screenParametersDidChange()
+                }
+            }
         }
     }
 
@@ -317,6 +345,14 @@ final class QuickTerminalController {
     /// particular chooses a screen from where the pointer happens to be —
     /// which is an answer to "where should this be summoned", not to "where
     /// is this now".
+    ///
+    /// The fallback is rarer than it looks. Unplugging a display does not
+    /// reach it: the window server relocates windows off a departing screen
+    /// *before* `didChangeScreenParametersNotification` is delivered, so by
+    /// the time this runs the panel already sits on a surviving screen and
+    /// is merely resized to it. What reaches the fallback is a window left
+    /// outside every screen — a desktop that shrank under it — where there
+    /// is no current screen to keep.
     nonisolated static func frameAfterScreenChange(
         position: Configuration.QuickTerminalPosition,
         isVisible: Bool,

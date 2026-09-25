@@ -373,8 +373,15 @@ forward. Multi-display placement (`quick-terminal-screen`) needs two
 displays and is recorded as *not judged* when the machine has one — and
 so does **display reconfiguration while the panel is open**: summon it,
 then unplug the external display, change its resolution, and change which
-display is the main one. The panel must end up inside a screen that
-exists each time, keeping the screen it was on when that screen survives.
+display is the main one. Each time the panel must end up correctly sized
+for a screen that exists — full width of that screen's visible frame for a
+band, centred for the centred position — and it keeps the screen it is on
+rather than jumping to the configured one. Unplugging is *not* expected to
+re-apply `quick-terminal-screen`: the window server relocates windows off
+a departing display before the notification is delivered, so the panel is
+already on a surviving screen by the time Corta sees the change and is
+merely resized to it. Worth repeating during the summon and dismissal
+slides, where the reposition is deferred to the end of the animation.
 `QuickTerminalController.frameAfterScreenChange` is the rule, and
 `QuickTerminalGeometryTests` pins it against synthetic arrangements, but
 the notification reaching it and the window accepting the frame are only
