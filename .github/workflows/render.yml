@@ -26,6 +26,13 @@ on:
 permissions:
   contents: read
 
+env:
+  # Kept aligned with ci.yml and nightly.yml. A self-hosted machine has its
+  # own Xcode wherever its owner installed it, so this is checked by version
+  # rather than by path — the point is that the one run that can exercise
+  # Metal 4 is not quietly produced by a beta compiler CI never uses.
+  XCODE_PIN: "26.6.0"
+
 jobs:
   render:
     name: Render tests on Metal 4 hardware
@@ -34,44 +41,66 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Recorded, not silently accepted. A self-hosted machine has whatever
+      # Xcode its owner installed, and this job is the only place the Metal 4
+      # tests can run — so a pass produced by a toolchain CI never uses is
+      # still worth having, as long as the log says which one produced it.
+      # A mismatch is a warning rather than a failure because bumping
+      # XCODE_PIN changes what every other workflow compiles with, which is
+      # a deliberate decision (ci.yml), not something this job should force.
+      - name: Record the toolchain
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          selected=$(xcodebuild -version | head -1 | awk '{print $2}')
+          pinned=${XCODE_PIN%.0}
+          if [ "$selected" != "$pinned" ] && [ "$selected" != "$XCODE_PIN" ]; then
+            echo "::warning::Xcode $selected, not the pinned $XCODE_PIN. These"\
+                 "results were produced by a toolchain CI does not use. Bump"\
+                 "XCODE_PIN in ci.yml, nightly.yml and render.yml together, or"\
+                 "xcode-select the pinned release before trusting a comparison."
+          fi
+
       # The whole point of this job is the device it runs on, so state it
-      # before anything else. A run whose report says metal4=false has proved
-      # nothing that the hosted runner had not already proved.
-      - name: Report this machine's Metal capability
-        run: |
-          cat > "$RUNNER_TEMP/metal-capability.swift" <<'SWIFT'
-          import Metal
+      # before anything else — and fail here rather than three minutes later
+      # in a suite that would have skipped itself into a green run.
+      - name: Require a Metal 4 device
+        run: swift scripts/metal-capability.swift --require-metal4
 
-          guard let device = MTLCreateSystemDefaultDevice() else {
-              print("metal-capability: device=none metal4=unknown "
-                  + "(MTLCreateSystemDefaultDevice returned nil)")
-              exit(1)
-          }
-          let families: [(String, MTLGPUFamily)] = [
-              ("metal4", .metal4), ("apple9", .apple9), ("apple8", .apple8),
-              ("apple7", .apple7), ("apple5", .apple5),
-          ]
-          let supported = families.filter { device.supportsFamily($0.1) }.map(\.0)
-          print("metal-capability: device=\"\(device.name)\" "
-              + "metal4=\(device.supportsFamily(.metal4)) "
-              + "families=[\(supported.joined(separator: ","))]")
-          exit(device.supportsFamily(.metal4) ? 0 : 1)
-          SWIFT
-          swift "$RUNNER_TEMP/metal-capability.swift"
-
+      # `CORTA_METAL4=1` is what makes `TerminalRenderer.init` actually
+      # select `Metal4Backend` (`Metal4Backend.isOptedIn`). Without it this
+      # job would prove the five direct-construction tests and still never
+      # take the selection path #109 turns into the only path.
+      #
+      # Signing is made local for the same reason ci.yml does it: the tests
+      # host inside the app, and a runner installed as a launchd service has
+      # no unlocked login keychain, so an automatic signature would fail the
+      # job before a single Metal 4 test ran.
       - name: Run the tests
+        id: tests
         run: |
-          xcodebuild test \
+          TEST_RUNNER_CORTA_METAL4=1 xcodebuild test \
             -project Corta.xcodeproj \
             -scheme Corta \
             -testPlan ${{ inputs.test-plan }} \
             -destination 'platform=macOS' \
             -resultBundlePath RenderTests.xcresult \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGNING_REQUIRED=NO \
+            DEVELOPMENT_TEAM="" \
             -quiet
 
+      # Only when the tests actually ran: if the capability gate above failed
+      # there is no bundle, and reporting "corrupted result bundle" on top of
+      # a clear "this machine has no Metal 4" helps nobody.
+      #
+      # `skipped=0` is the expected reading here. Anything else means this
+      # machine is not the hardware the runner was registered to be.
       - name: Summarise the test run
-        if: always()
+        if: always() && steps.tests.conclusion != 'skipped'
         run: |
+          set -o pipefail
           xcrun xcresulttool get test-results summary \
             --path RenderTests.xcresult --format json \
             | jq -r '"tests: total=\(.totalTestCount) passed=\(.passedTests) failed=\(.failedTests) skipped=\(.skippedTests) expected-failures=\(.expectedFailures)"'

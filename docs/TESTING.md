@@ -140,8 +140,15 @@ number a Release measurement is for. Issue #110 settles that trade.
 
 ### Which environments can run the render tests
 
-Measured 2026-09-25 (issue #107), by the "Report the runner's Metal
-capability" step that now runs on every CI run:
+Measured 2026-09-25 (issue #107). `scripts/metal-capability.swift` is the
+one implementation of the question — `ci.yml` prints it on every run,
+`render.yml` requires it, and you can ask it yourself:
+
+```sh
+swift scripts/metal-capability.swift                  # print the families
+swift scripts/metal-capability.swift --require-metal4  # exit 1 without Metal 4
+```
+
 
 | Environment | Device | `MTLGPUFamily.metal4` | Families |
 | ----------- | ------ | --------------------- | -------- |
@@ -167,9 +174,14 @@ and there are two ways to get there:
 - `.github/workflows/render.yml` — the same test plan on a **self-hosted**
   Apple silicon runner. It is `workflow_dispatch` only, on purpose: this
   repository is public, and a `pull_request` trigger would let a stranger's
-  fork run code on the maintainer's machine. Its first step fails the job
-  if the machine it landed on does not report `metal4`.
-- Locally, before a release: `xcodebuild test -scheme Corta -testPlan Unit`
+  fork run code on the maintainer's machine. It fails before the tests if
+  the machine does not report `metal4`, records which Xcode produced the
+  result, and sets `CORTA_METAL4=1` — without that
+  `TerminalRenderer.init` still builds a `QuadRenderer`
+  (`Metal4Backend.isOptedIn`), so the selection path #109 turns into the
+  only path would go untaken even on Metal 4 hardware.
+- Locally, before a release:
+  `TEST_RUNNER_CORTA_METAL4=1 xcodebuild test -scheme Corta -testPlan Unit`
   on an M1 or later, with the result recorded under `docs/test-results/`.
   The five-point launched-app check (`CONFORMANCE.md` §4.4) is done on the
   same machine and carries the rest of the guarantee.

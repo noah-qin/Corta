@@ -109,32 +109,11 @@ jobs:
 
       # Metal 4 is the render backend 1.1.0 makes the only one (#109), and
       # it needs `MTLGPUFamily.metal4`. This runner is a virtual machine on
-      # Apple silicon, so whether its paravirtualised GPU reports that family
-      # is a fact about the runner that nothing else in the log states — and
-      # the Metal 4 tests in `TerminalRenderBackendTests` skip *silently*
-      # when it does not, so a green run would otherwise not distinguish
-      # "passed" from "never ran". Printed before the tests, so the answer is
-      # in the log even when they fail.
+      # Apple silicon, and its paravirtualised GPU reports only `apple5` —
+      # so every Metal 4 suite is skipped here. Printed before the build, so
+      # the value is in the log even when the tests fail.
       - name: Report the runner's Metal capability
-        run: |
-          cat > "$RUNNER_TEMP/metal-capability.swift" <<'SWIFT'
-          import Metal
-
-          guard let device = MTLCreateSystemDefaultDevice() else {
-              print("metal-capability: device=none metal4=unknown "
-                  + "(MTLCreateSystemDefaultDevice returned nil)")
-              exit(0)
-          }
-          let families: [(String, MTLGPUFamily)] = [
-              ("metal4", .metal4), ("apple9", .apple9), ("apple8", .apple8),
-              ("apple7", .apple7), ("apple5", .apple5),
-          ]
-          let supported = families.filter { device.supportsFamily($0.1) }.map(\.0)
-          print("metal-capability: device=\"\(device.name)\" "
-              + "metal4=\(device.supportsFamily(.metal4)) "
-              + "families=[\(supported.joined(separator: ","))]")
-          SWIFT
-          swift "$RUNNER_TEMP/metal-capability.swift"
+        run: swift scripts/metal-capability.swift
 
       # The runner has no signing identity and no access to the maintainer's
       # team, so build ad-hoc signed. The unit tests host inside the app, so
@@ -161,6 +140,12 @@ jobs:
       - name: Summarise the test run
         if: always()
         run: |
+          # Without pipefail the step's status is jq's: xcresulttool failing
+          # (no bundle, a renamed key, a future Xcode) would leave the step
+          # green with no `tests:` line — the one thing keeping "passed" and
+          # "never ran" apart, gone, silently. That is the failure class
+          # this whole gate exists to remove.
+          set -o pipefail
           xcrun xcresulttool get test-results summary \
             --path TestResults.xcresult --format json \
             | jq -r '"tests: total=\(.totalTestCount) passed=\(.passedTests) failed=\(.failedTests) skipped=\(.skippedTests) expected-failures=\(.expectedFailures)"'

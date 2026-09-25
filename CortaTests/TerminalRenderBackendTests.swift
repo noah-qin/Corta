@@ -23,9 +23,10 @@ struct TerminalRenderBackendTests {
         #expect(backend.device === device)
     }
 
-    /// Skipped, not failed, where the runner's GPU has no Metal 4 family
-    /// (CI's virtual machine): construction throwing there is the
-    /// documented fallback, not a defect.
+    /// The trait skips this where the GPU has no Metal 4 family — CI's
+    /// virtual machine — so the body never runs there and nothing is
+    /// constructed. Reported as *skipped, with the reason*, never as a pass
+    /// (#107).
     @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
     func metal4BackendConformsAndForwardsItsDevice() throws {
         let device = try #require(Self.metal4Device())
