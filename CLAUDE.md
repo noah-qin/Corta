@@ -152,7 +152,11 @@ controller afterwards (D16).
 **Packaging has one check.** `scripts/check-release.sh` is the only
 implementation of the release rules; `package-release.sh`, `release.sh`,
 `.github/workflows/release.yml` and `appcast.yml` call it. A new rule goes
-there and nowhere else.
+there and nowhere else. The feed's own invariant — the appcast, its
+signature and the archive it names being the same bytes, verified under
+the app's `SUPublicEDKey` — is `scripts/verify-appcast.swift`, which that
+check calls at release time, `ci.yml` runs offline on every run and
+`nightly.yml` runs against the published archives.
 
 **Measure the frame-CPU baseline after touching the render loop.**
 The M6 render work took it from 2.40 ms to 4.19 ms — a per-cell read of

@@ -105,3 +105,32 @@ jobs:
             /tmp/corta-fuzz-*
           if-no-files-found: ignore
           retention-days: 30
+
+  # The other half of the feed invariant (`ci.yml` runs the offline half on
+  # every pull request). Downloads every enclosure the feed advertises and
+  # holds each one to the signature and the length the feed claims for it,
+  # under the `SUPublicEDKey` the shipped app carries.
+  #
+  # It covers *every* item, not the newest: an update nobody can install is
+  # equally broken whichever release it belongs to, and the older entries
+  # are the ones no release ever re-checks. Nightly rather than per-run
+  # because it grows a download with every release.
+  appcast:
+    name: Update feed, signatures verified against the published archives
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select the pinned stable Xcode
+        run: |
+          pinned="/Applications/Xcode_${XCODE_PIN}.app"
+          if [ ! -d "$pinned" ]; then
+            echo "::error::$pinned is not on this runner image."
+            echo "Update the stable XCODE_PIN in ci.yml and nightly.yml together."
+            exit 1
+          fi
+          sudo xcode-select -s "$pinned"
+
+      - name: Verify every item in the feed
+        run: swift scripts/verify-appcast.swift --download

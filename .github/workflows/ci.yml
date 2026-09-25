@@ -115,6 +115,20 @@ jobs:
       - name: Report the runner's Metal capability
         run: swift scripts/metal-capability.swift
 
+      # `appcast.xml` on `main` *is* the live update feed — `SUFeedURL`
+      # points straight at it — so anything merged here is served to every
+      # running Corta immediately. `check-release.sh --appcast` only ever
+      # ran at release time, against the one version being released; a hand
+      # edit, a bad merge or a corrupted older entry had nothing looking at
+      # it. This is the offline half of that invariant: structure, the
+      # enclosure URL each item must carry for its own version, build
+      # numbers unique and ordered, key and signatures well-formed. No
+      # network, no build, about two seconds — which is why it rides in this
+      # job rather than spinning a runner of its own. The half that needs
+      # the archives themselves runs nightly.
+      - name: Check the update feed (offline)
+        run: swift scripts/verify-appcast.swift
+
       # The runner has no signing identity and no access to the maintainer's
       # team, so build ad-hoc signed. The unit tests host inside the app, so
       # signing cannot be switched off entirely — only made local.

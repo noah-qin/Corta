@@ -235,6 +235,21 @@ PY
     else
       fail "appcast enclosure has no sparkle:edSignature"
     fi
+    # Presence is not validity. A signature made with a private key whose
+    # public half is not the SUPublicEDKey the shipped app carries is
+    # well-formed and rejected by every installed Corta — an update nobody
+    # can install, with every check above green. The sha256 sidecar does
+    # not catch it: it proves the bytes are the published bytes, not that
+    # the key pairs with the app.
+    if [ -n "$archive" ]; then
+      if swift "$repo_root/scripts/verify-appcast.swift" "$appcast" \
+        "$repo_root/Sparkle-Info.plist" --archive "$archive" \
+        --version "$bundle_version"; then
+        pass "appcast signature verifies under the app's SUPublicEDKey"
+      else
+        fail "appcast signature does not verify under the app's SUPublicEDKey"
+      fi
+    fi
     if [ -n "$archive_length" ]; then
       if [ "$appcast_length" = "$archive_length" ]; then
         pass "appcast enclosure length matches the archive ($archive_length bytes)"
