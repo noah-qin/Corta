@@ -138,6 +138,42 @@ file in `CortaTests` uses `@testable import Corta`; that emits
 `-enable-testing`, which inhibits optimisation and so changes the very
 number a Release measurement is for. Issue #110 settles that trade.
 
+### Which environments can run the render tests
+
+Measured 2026-09-25 (issue #107), by the "Report the runner's Metal
+capability" step that now runs on every CI run:
+
+| Environment | Device | `MTLGPUFamily.metal4` | Families |
+| ----------- | ------ | --------------------- | -------- |
+| GitHub hosted `macos-26` | `Apple Paravirtual device` | **no** | `apple5` |
+| Apple silicon hardware (M1 or later) | e.g. `Apple M5` | yes | `metal4`, `apple9`, … |
+
+So the hosted runner runs the ordinary offscreen render tests — it does
+have a Metal device — but **cannot** run the Metal 4 suites. Those carry
+`.enabled(if: MetalRenderTarget.supportsMetal4, …)`, so a run without the
+family reports them as *skipped, with the reason*. Until this was
+measured they returned early instead, which is indistinguishable from
+passing: every Metal 4 test in `TerminalRenderBackendTests` went
+unexecuted on CI for the whole of 1.0 while the job stayed green.
+
+Metal 4 hardware is therefore the only place those tests mean anything,
+and there are two ways to get there:
+
+- `.github/workflows/render.yml` — the same test plan on a **self-hosted**
+  Apple silicon runner. It is `workflow_dispatch` only, on purpose: this
+  repository is public, and a `pull_request` trigger would let a stranger's
+  fork run code on the maintainer's machine. Its first step fails the job
+  if the machine it landed on does not report `metal4`.
+- Locally, before a release: `xcodebuild test -scheme Corta -testPlan Unit`
+  on an M1 or later, with the result recorded under `docs/test-results/`.
+  The five-point launched-app check (`CONFORMANCE.md` §4.4) is done on the
+  same machine and carries the rest of the guarantee.
+
+Once #109 makes Metal 4 the only backend, the hosted runner will not be
+able to construct a renderer at all, and *every* render test moves to
+those two routes. That is the trade #107 measured and #109 accepts; it is
+not a reason to keep a second backend alive.
+
 ### The test host cannot reach your own configuration
 
 The Debug configuration builds a separate application — `CortaDev.app`,

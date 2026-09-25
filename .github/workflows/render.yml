@@ -1,0 +1,79 @@
+name: Render tests (Metal 4 hardware)
+
+# The hosted `macos-26` runner cannot run these. Its GPU is an "Apple
+# Paravirtual device" reporting only `MTLGPUFamily.apple5`, so every Metal 4
+# suite is skipped there (issue #107, measured 2026-09-25) — and once #109
+# makes Metal 4 the only backend, no render test can run on it at all. This
+# workflow is where those tests run instead: a self-hosted Apple silicon
+# machine with a real GPU.
+#
+# **Manual trigger only, deliberately.** Corta is a public repository, and a
+# self-hosted runner executes whatever the workflow's ref contains. A
+# `pull_request` trigger would hand a stranger's fork a shell on the
+# maintainer's machine. `workflow_dispatch` can only be started by someone
+# with write access, and only against a ref that already exists in this
+# repository — a fork's branch cannot reach it. Do not add another trigger
+# here without reopening that reasoning.
+on:
+  workflow_dispatch:
+    inputs:
+      test-plan:
+        description: Test plan to run
+        type: choice
+        options: [Unit, UI]
+        default: Unit
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    name: Render tests on Metal 4 hardware
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      # The whole point of this job is the device it runs on, so state it
+      # before anything else. A run whose report says metal4=false has proved
+      # nothing that the hosted runner had not already proved.
+      - name: Report this machine's Metal capability
+        run: |
+          cat > "$RUNNER_TEMP/metal-capability.swift" <<'SWIFT'
+          import Metal
+
+          guard let device = MTLCreateSystemDefaultDevice() else {
+              print("metal-capability: device=none metal4=unknown "
+                  + "(MTLCreateSystemDefaultDevice returned nil)")
+              exit(1)
+          }
+          let families: [(String, MTLGPUFamily)] = [
+              ("metal4", .metal4), ("apple9", .apple9), ("apple8", .apple8),
+              ("apple7", .apple7), ("apple5", .apple5),
+          ]
+          let supported = families.filter { device.supportsFamily($0.1) }.map(\.0)
+          print("metal-capability: device=\"\(device.name)\" "
+              + "metal4=\(device.supportsFamily(.metal4)) "
+              + "families=[\(supported.joined(separator: ","))]")
+          exit(device.supportsFamily(.metal4) ? 0 : 1)
+          SWIFT
+          swift "$RUNNER_TEMP/metal-capability.swift"
+
+      - name: Run the tests
+        run: |
+          xcodebuild test \
+            -project Corta.xcodeproj \
+            -scheme Corta \
+            -testPlan ${{ inputs.test-plan }} \
+            -destination 'platform=macOS' \
+            -resultBundlePath RenderTests.xcresult \
+            -quiet
+
+      - name: Keep the test results when something fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcresult-render
+          path: RenderTests.xcresult
+          if-no-files-found: ignore
+          retention-days: 14

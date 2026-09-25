@@ -26,8 +26,9 @@ struct TerminalRenderBackendTests {
     /// Skipped, not failed, where the runner's GPU has no Metal 4 family
     /// (CI's virtual machine): construction throwing there is the
     /// documented fallback, not a defect.
-    @Test func metal4BackendConformsAndForwardsItsDevice() throws {
-        guard let device = Self.metal4Device() else { return }
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func metal4BackendConformsAndForwardsItsDevice() throws {
+        let device = try #require(Self.metal4Device())
         let backend = try Metal4Backend(device: device)
         let asProtocol: any TerminalRenderBackend = backend
         #expect(asProtocol.device === device)
@@ -72,9 +73,9 @@ struct TerminalRenderBackendTests {
     private static let drawableSize = CGSize(width: width, height: height)
     private static let clearColor = MTLClearColor(red: 0.1, green: 0.2, blue: 0.3, alpha: 1)
 
-    /// A Metal-4-capable device, or nil — the Metal 4 tests skip silently
-    /// on older hardware: capability is a fact about the runner, not a
-    /// failure.
+    /// A Metal-4-capable device, or nil. The tests that need one are gated
+    /// on `MetalRenderTarget.supportsMetal4`, so nil here means the trait
+    /// and this disagree — a failure, not a skip.
     private static func metal4Device() -> MTLDevice? {
         guard let device = MTLCreateSystemDefaultDevice(), Metal4Backend.isSupported(by: device)
         else { return nil }
@@ -233,8 +234,9 @@ struct TerminalRenderBackendTests {
             sourceLocation: sourceLocation)
     }
 
-    @Test func metal4BackendMatchesQuadRendererPixels() throws {
-        guard let device = Self.metal4Device() else { return }
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func metal4BackendMatchesQuadRendererPixels() throws {
+        let device = try #require(Self.metal4Device())
         let queue = try #require(device.makeCommandQueue())
         let coverage = try #require(Self.makeCoverageTexture(device: device))
         let color = try #require(Self.makeColorTexture(device: device))
@@ -259,8 +261,9 @@ struct TerminalRenderBackendTests {
     /// encoder purely for the `.clear` load action; the MTL4 backend
     /// clears in `beginFrame`. Both must agree, because this is what keeps
     /// an all-blank grid from leaving the previous frame on screen.
-    @Test func metal4BackendClearsAnEmptyFrame() throws {
-        guard let device = Self.metal4Device() else { return }
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func metal4BackendClearsAnEmptyFrame() throws {
+        let device = try #require(Self.metal4Device())
         let queue = try #require(device.makeCommandQueue())
 
         let legacy = try QuadRenderer(device: device)
@@ -295,8 +298,9 @@ struct TerminalRenderBackendTests {
     /// crosses in-flight GPU work exactly as it does on the render loop.
     /// The last frame's opaque quad must win intact: any premature slot
     /// rewrite shows up here as the wrong colour.
-    @Test func metal4BackendReusesRingSlotsAcrossInFlightFrames() throws {
-        guard let device = Self.metal4Device() else { return }
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func metal4BackendReusesRingSlotsAcrossInFlightFrames() throws {
+        let device = try #require(Self.metal4Device())
         let queue = try #require(device.makeCommandQueue())
         let backend = try Metal4Backend(device: device)
         let target = MetalRenderTarget.make(device: device, width: Self.width, height: Self.height)
@@ -333,8 +337,9 @@ struct TerminalRenderBackendTests {
     /// must not crash: the queue, command buffers and residency set keep
     /// the resources alive until completion, and the final frame's
     /// feedback handler — the only thing still reachable — still fires.
-    @Test func metal4BackendDeallocatesWithFramesInFlight() throws {
-        guard let device = Self.metal4Device() else { return }
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func metal4BackendDeallocatesWithFramesInFlight() throws {
+        let device = try #require(Self.metal4Device())
         let completion = DispatchSemaphore(value: 0)
         do {
             let backend = try Metal4Backend(device: device)

@@ -23,6 +23,24 @@ enum MetalRenderTarget {
     /// not a device this project has to accommodate.
     static let maximumDimension = 16384
 
+    /// Whether this machine can run the Metal 4 suites at all.
+    ///
+    /// The hosted `macos-26` runner answers **no**: its GPU is an "Apple
+    /// Paravirtual device" reporting only `MTLGPUFamily.apple5` (issue
+    /// #107, measured 2026-09-25). Metal 4 tests carry
+    /// `.enabled(if: MetalRenderTarget.supportsMetal4, …)` so a run without
+    /// the family reports them as *skipped, with the reason* — an early
+    /// `return` made them indistinguishable from tests that ran and passed,
+    /// which is how they went unexecuted on CI for the whole of 1.0.
+    static let supportsMetal4: Bool = {
+        guard let device = MTLCreateSystemDefaultDevice() else { return false }
+        return Metal4Backend.isSupported(by: device)
+    }()
+
+    /// The reason a skipped Metal 4 test prints.
+    static let metal4Requirement: Comment =
+        "requires a GPU reporting MTLGPUFamily.metal4; see docs/TESTING.md"
+
     /// A colour render target of exactly `width` x `height`, in the format
     /// and storage mode every render suite here uses.
     ///
