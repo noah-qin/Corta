@@ -171,8 +171,19 @@ can never be deleted from. `CONTRIBUTING.md` rule 6.
 
 ## Build and Test
 
-Only stable, released Xcode toolchains are supported. Keep `XCODE_PIN`
-aligned in `.github/workflows/ci.yml` and `.github/workflows/nightly.yml`.
+Only stable, released Xcode toolchains are supported. `XCODE_PIN` is set
+in four workflows — `ci.yml`, `nightly.yml`, `release.yml` and
+`render.yml` — and they move together or not at all.
+
+**The pin governs the artifact; it does not govern the numbers.** The pin
+is what compiles the binary users run. Every measurement in
+`docs/PERFORMANCE.md` comes from the maintainer's machine and whatever
+toolchain that machine has, which is deliberately a different one — CI's
+runner is a virtual machine whose GPU cannot even report Metal 4, so it
+was never going to be where a performance number came from. The rule that
+makes both usable: **a number and the number it is compared against must
+come from the same machine and the same toolchain**, and every quoted
+figure says which. `PERFORMANCE.md` §5.2 carries the detail.
 
 ```sh
 xcodebuild -project Corta.xcodeproj -scheme Corta build

@@ -391,8 +391,28 @@ compatibility results are not new benchmark measurements.
 
 The host runs macOS 27.0 (26A428). Results and diagnostics are recorded in
 the [dated verification record](test-results/2026-09-19-issues-88-90.md).
-Corta supports released Xcode toolchains only. CI and nightly checks use
-the same explicitly pinned stable release; update both pins together.
+
+**The pin and the measurement are deliberately two different toolchains.**
+`XCODE_PIN` — 26.6.0 in `ci.yml`, `nightly.yml`, `release.yml` and
+`render.yml`, which move together — is what compiles the binary users run.
+The numbers in this document come from the machine above and whatever
+toolchain it has, currently Xcode 27.0. There is no standard GitHub-hosted
+runner with Xcode 27 (`macos-27` is not a label; the `xcode-27` image is a
+preview that requires a paid larger runner), and CI was never going to be
+where a performance number came from anyway: its runner is a virtual
+machine whose GPU reports only `MTLGPUFamily.apple5` and cannot construct
+a Metal 4 renderer at all (issue #107).
+
+So the rule that keeps both usable is: **a number and the number it is
+compared against must come from the same machine and the same toolchain**,
+and every quoted figure says which one. That is enough for everything this
+document is for — D17's "re-measure after touching the render loop", a
+before/after on a batch, a regression guard — because all of them are
+differential. What it is *not* enough for is an absolute claim about the
+shipped binary: that binary is compiled by the pinned toolchain, and each
+release records which one in its own notes (`release.yml`). Moving a
+number to a new toolchain means re-recording its baseline on both sides
+once, as a bridge, exactly as a Debug-to-Release move would.
 
 A run quoted without this table is a run from before B01 that predates the
 distinction — not a claim that it used a different toolchain.
