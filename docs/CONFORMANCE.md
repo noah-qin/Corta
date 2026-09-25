@@ -352,6 +352,14 @@ under `Corta/` is therefore verified by launching the app and checking:
 7. in a non-English locale (`-AppleLanguages '(zh-Hans)'` on the launch),
    the *menu bar* is translated, not only the menus beneath it.
 
+The app that gets launched is the development build — the `Corta (Dev)`
+scheme, `CortaDev.app`, bundle identifier `dev.noahqin.Corta.dev` (D22).
+It can run beside an installed Corta, so identify the one under test by
+bundle identifier or by PID; "the frontmost Corta" is ambiguous by
+design, and a check that reads the wrong window is a check that proves
+nothing. To run these against a *Release* build instead, stage it with
+`CORTA_STAGE_DIR`.
+
 **System entry points (B16) are checked by hand, and the record says
 what was and was not.** A hotkey and a floating panel are properties of
 the window server, not of the view hierarchy, so the check is: with

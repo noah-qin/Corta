@@ -67,6 +67,9 @@ line each:
   commit message. **D19** Selection is hand-rolled; TextKit is not
   adopted. **D20** The update feed is signed from CI; the key lives in
   the reviewed `release` environment.
+- **D21** Reserved (Apple silicon only, issue #108). **D22** The Debug
+  build is a separate application — `dev.noahqin.Corta.dev`, its own stage
+  directory, no updater, no move-to-Applications prompt.
 
 ## Working Rules
 
@@ -190,8 +193,8 @@ Layout:
   its own tests, golden fixtures, fuzz corpus and DocC catalog
 - `CortaTests/`, `CortaUITests/` — app-hosted test targets
 - `Corta.xcodeproj/` — build settings live in `project.pbxproj`
-- `scripts/` — measurement, packaging, release and the isolated
-  developer launch (`build-and-run.sh`)
+- `scripts/` — measurement, packaging and release
+- `TestPlans/` — `Unit` (the default) and `UI` (interactive sessions only)
 - `docs/` — user and design documentation, plus the dated records
 
 Deployment target is macOS 26.0, Swift 6, app sandbox disabled

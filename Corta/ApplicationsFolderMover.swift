@@ -14,9 +14,17 @@ import AppKit
 /// from Xcode's `DerivedData` (a developer build has nowhere else to
 /// live), and when the user has already said not to ask again
 /// (`suggest-applications-folder` in the config file).
+///
+/// **Never offered by the development build** (D22). Moving a Debug build
+/// into `/Applications` would put it beside the installed one and relaunch
+/// it from there — two applications with the same name in the one place a
+/// user expects the installed one to be. That is not a default the config
+/// file gets a say in, because a stage directory starts empty and a key
+/// nobody has set yet would leave the prompt on.
 @MainActor
 enum ApplicationsFolderMover {
     static func promptIfNeeded() {
+        guard !AppPaths.isDevelopmentBuild else { return }
         guard ConfigurationStore.shared.configuration.suggestApplicationsFolder else { return }
         let bundleURL = Bundle.main.bundleURL
         guard !isUnderApplications(bundleURL), !isDeveloperBuild(bundleURL) else { return }

@@ -291,3 +291,46 @@ Actions to create and approve pull requests* (Settings › Actions ›
 General › Workflow permissions); 1.0.1's feed had to be merged by hand
 because that switch was off, and it is the one thing the dry run cannot
 exercise.
+
+## D21 — reserved
+
+Reserved for the Apple-silicon-only build (roadmap issue #108), which
+lands after this entry was written. Left in place so decision numbers
+stay stable once they are quoted.
+
+## D22 — The development build is a separate application
+
+**Decision.** The Debug configuration builds `CortaDev.app` with the
+bundle identifier `dev.noahqin.Corta.dev`, its own icon and the display
+name "Corta Dev" (the menu bar shows the product name, `CortaDev`). `AppPaths` gives any bundle whose identifier ends in
+`.dev` a stage directory — `~/Library/Application Support/Corta Dev/` —
+which holds its config file, its Application Support state and the rc
+file the shell-integration installer writes. The development build never
+offers to move itself into `/Applications` and carries no updater. The
+Release configuration is unchanged: same identifier, same icon, same
+product name, same signature.
+
+**Why.** Corta is the terminal its own development happens in. With one
+bundle identifier there is one global hotkey registration, one TCC
+authorisation record, one Sparkle update target and one LaunchServices
+identity, shared between the application being written and the
+application being worked in — so a rebuild, a crash, a test run or an
+update prompt reaches the session the developer is using. Deriving the
+stage from the identifier rather than from `CORTA_STAGE_DIR` is what
+makes the isolation unconditional: an environment variable only protects
+the launches that remembered to set it, and a double-clicked build,
+a test host and an Xcode run are three different launches.
+
+**What it costs.** Two build settings that differ by configuration
+(`CORTA_BUNDLE_SUFFIX`, `CORTA_PRODUCT_NAME`) and a Debug artefact whose
+file name is not the product name, so anything that hard-codes
+`Corta.app` in a Debug path is wrong. `PRODUCT_MODULE_NAME` is pinned to
+`Corta` so `@testable import Corta` means the same thing in both
+configurations. Two applications can be installed at once, which is the
+point, and is worth one line in the troubleshooting guide.
+
+**Consequence.** `CORTA_STAGE_DIR` is no longer how a development build
+is isolated; it is how a *Release* build is staged for a launched-app
+check (`CONFORMANCE.md` §4.4). A new piece of state Corta owns goes under
+`AppPaths`, not under a path derived from the home directory —
+`AppPathsTests` and the release check are what catch the exceptions.
