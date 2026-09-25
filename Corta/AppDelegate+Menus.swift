@@ -321,6 +321,7 @@ extension AppDelegate {
     /// lands next to About even if the app menu template ever grows an
     /// item between them.
     private func installUpdateItem(in mainMenu: NSMenu) {
+        guard UpdateController.isAvailable else { return }
         guard let appMenu = mainMenu.items.first?.submenu,
             let about = appMenu.items.first(where: {
                 $0.action == #selector(showAboutWindow(_:))

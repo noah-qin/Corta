@@ -1,0 +1,31 @@
+{
+  "configurations": [
+    {
+      "id": "B1C0A100-0003-4000-A000-000000000003",
+      "name": "Release",
+      "options": {}
+    }
+  ],
+  "defaultOptions": {
+    "targetForVariableExpansion": {
+      "containerPath": "container:Corta.xcodeproj",
+      "identifier": "4F17769E30465E1F00E8DD20",
+      "name": "Corta"
+    }
+  },
+  "testTargets": [
+    {
+      "selectedTests": [
+        "CortaTests/FrameCPUBaselineTests",
+        "CortaTests/InstanceUploadBenchmarkTests",
+        "CortaTests/RendererConstructionCostTests"
+      ],
+      "target": {
+        "containerPath": "container:Corta.xcodeproj",
+        "identifier": "4F1776AE30465E2000E8DD20",
+        "name": "CortaTests"
+      }
+    }
+  ],
+  "version": 1
+}

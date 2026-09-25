@@ -10,6 +10,7 @@
 		4F2E2B293047183A0037705B /* corta-exec in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000730465E2000E8DD20 /* corta-exec */; };
 		4F9658043049C77E005C56CD /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 4F9658033049C77E005C56CD /* Sparkle */; };
 		A1C0A001030465E2000E8DD20 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = A1C0A000030465E2000E8DD20 /* AppIcon.icon */; };
+		A1C0A003030465E2000E8DD20 /* AppIconDev.icon in Resources */ = {isa = PBXBuildFile; fileRef = A1C0A002030465E2000E8DD20 /* AppIconDev.icon */; };
 		C07A000130465E2000E8DD20 /* CortaTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000530465E2000E8DD20 /* CortaTerminal */; };
 		C07A000230465E2000E8DD20 /* CortaTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000630465E2000E8DD20 /* CortaTerminal */; };
 		C07A000830465E2000E8DD20 /* corta-exec in Embed corta-exec */ = {isa = PBXBuildFile; productRef = C07A000730465E2000E8DD20 /* corta-exec */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
@@ -51,6 +52,7 @@
 		4F1776AF30465E2000E8DD20 /* CortaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CortaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4F1776B930465E2000E8DD20 /* CortaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CortaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1C0A000030465E2000E8DD20 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		A1C0A002030465E2000E8DD20 /* AppIconDev.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIconDev.icon; sourceTree = "<group>"; };
 		E9A0D9C512919DCC5A6DF615 /* Sparkle-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Sparkle-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -105,6 +107,7 @@
 			isa = PBXGroup;
 			children = (
 				A1C0A000030465E2000E8DD20 /* AppIcon.icon */,
+				A1C0A002030465E2000E8DD20 /* AppIconDev.icon */,
 				E9A0D9C512919DCC5A6DF615 /* Sparkle-Info.plist */,
 				4F1776A130465E1F00E8DD20 /* Corta */,
 				4F1776B230465E2000E8DD20 /* CortaTests */,
@@ -261,6 +264,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1C0A001030465E2000E8DD20 /* AppIcon.icon in Resources */,
+				A1C0A003030465E2000E8DD20 /* AppIconDev.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -353,6 +357,8 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				CORTA_BUNDLE_SUFFIX = ".dev";
+				CORTA_PRODUCT_NAME = CortaDev;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 646VSJ9K5F;
@@ -420,6 +426,8 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				CORTA_BUNDLE_SUFFIX = "";
+				CORTA_PRODUCT_NAME = Corta;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 646VSJ9K5F;
@@ -447,7 +455,7 @@
 		4F1776C430465E2000E8DD20 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconDev;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "-";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
@@ -460,6 +468,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Sparkle-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Corta Dev";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Noah Qin. Apache License 2.0.";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
@@ -468,8 +477,9 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.noahqin.Corta;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = "dev.noahqin.Corta$(CORTA_BUNDLE_SUFFIX)";
+				PRODUCT_MODULE_NAME = Corta;
+				PRODUCT_NAME = "$(CORTA_PRODUCT_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -503,8 +513,9 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.noahqin.Corta;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = "dev.noahqin.Corta$(CORTA_BUNDLE_SUFFIX)";
+				PRODUCT_MODULE_NAME = Corta;
+				PRODUCT_NAME = "$(CORTA_PRODUCT_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -535,7 +546,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 6.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Corta.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Corta";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/$(CORTA_PRODUCT_NAME).app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/$(CORTA_PRODUCT_NAME)";
 			};
 			name = Debug;
 		};
@@ -557,7 +568,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 6.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Corta.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Corta";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/$(CORTA_PRODUCT_NAME).app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/$(CORTA_PRODUCT_NAME)";
 			};
 			name = Release;
 		};

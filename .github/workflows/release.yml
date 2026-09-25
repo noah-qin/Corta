@@ -91,7 +91,7 @@ jobs:
             -project Corta.xcodeproj \
             -scheme Corta \
             -destination 'platform=macOS' \
-            -skip-testing:CortaUITests \
+            -testPlan Unit \
             -resultBundlePath test-results.xcresult \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGN_STYLE=Manual \

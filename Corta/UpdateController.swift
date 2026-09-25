@@ -11,14 +11,28 @@ import Sparkle
 /// Created (and its background timer started) at launch rather than
 /// lazily on first use: `SUScheduledCheckInterval` only means what it says
 /// if the controller has been running since launch.
+///
+/// **Not in the development build** (D22). The feed advertises the
+/// published release, so an updater running inside a Debug build would
+/// offer to replace the build under development with the shipped one — and
+/// `AppDelegate+Menus` leaves "Check for Updates…" out rather than
+/// installing a menu item that cannot do anything.
 @MainActor
 final class UpdateController {
     static let shared = UpdateController()
 
-    private let controller = SPUStandardUpdaterController(
-        startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+    /// `nil` in the development build, which is also what makes
+    /// `isAvailable` false.
+    private let controller: SPUStandardUpdaterController?
+
+    static var isAvailable: Bool { !AppPaths.isDevelopmentBuild }
 
     private init() {
+        controller =
+            Self.isAvailable
+            ? SPUStandardUpdaterController(
+                startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+            : nil
         applyAutoCheckSetting()
         NotificationCenter.default.addObserver(
             self, selector: #selector(applyAutoCheckSetting), name: ConfigurationStore.didChange,
@@ -26,7 +40,7 @@ final class UpdateController {
     }
 
     @objc func checkForUpdates(_ sender: Any?) {
-        controller.checkForUpdates(sender)
+        controller?.checkForUpdates(sender)
     }
 
     /// `update-auto-check` (`Configuration.swift`) governs only the
@@ -34,7 +48,7 @@ final class UpdateController {
     /// action and always works, on or off. Read live rather than once at
     /// launch, the same as every other config-file setting.
     @objc private func applyAutoCheckSetting() {
-        controller.updater.automaticallyChecksForUpdates =
+        controller?.updater.automaticallyChecksForUpdates =
             ConfigurationStore.shared.configuration.updateAutoCheck
     }
 }

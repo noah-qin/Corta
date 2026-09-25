@@ -13,8 +13,13 @@ enum ShellKind: String, CaseIterable {
         return name.flatMap(ShellKind.init(rawValue:)) ?? .zsh
     }
 
+    /// The rc file this shell reads, under the home directory
+    /// `AppPaths.userHomeDirectory` names. That is the real home for the
+    /// installed build and the stage directory for a development one, so a
+    /// Debug build can exercise the whole install/diagnose/remove path
+    /// without ever editing the rc file the user's own shells read (D22).
     var defaultRCFileURL: URL {
-        let home = FileManager.default.homeDirectoryForCurrentUser
+        let home = AppPaths.userHomeDirectory
         switch self {
         case .zsh: return home.appendingPathComponent(".zshrc")
         case .bash: return home.appendingPathComponent(".bashrc")

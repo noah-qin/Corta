@@ -147,8 +147,9 @@ swift test --package-path CortaTerminal
 # Build the macOS app.
 xcodebuild -project Corta.xcodeproj -scheme Corta build
 
-# Or build, ad-hoc sign and launch it against a throwaway config.
-scripts/build-and-run.sh
+# Or build the development app — a separate application, with its own
+# configuration and state, that runs beside an installed Corta.
+xcodebuild -project Corta.xcodeproj -scheme 'Corta (Dev)' build
 ```
 
 Start with the [contributor guide](CONTRIBUTING.md) for local signing and

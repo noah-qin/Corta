@@ -116,7 +116,7 @@ jobs:
             -project Corta.xcodeproj \
             -scheme Corta \
             -destination 'platform=macOS' \
-            -skip-testing:CortaUITests \
+            -testPlan Unit \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGNING_REQUIRED=NO \

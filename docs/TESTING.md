@@ -108,49 +108,72 @@ run them without the maintainer's signing identity:
 ```sh
 xcodebuild test \
   -project Corta.xcodeproj -scheme Corta \
+  -testPlan Unit \
   -destination 'platform=macOS' \
-  -skip-testing:CortaUITests \
   CODE_SIGN_IDENTITY="-" CODE_SIGN_STYLE=Manual \
   CODE_SIGNING_REQUIRED=NO DEVELOPMENT_TEAM="" \
   -resultBundlePath /tmp/CortaTests.xcresult
 ```
 
 Use a fresh result-bundle path for each run. Add
-`-only-testing:CortaTests/ConfigurationTests` to focus a suite. To keep the
-test host away from your own configuration, prefix the command with
-`TEST_RUNNER_CORTA_STAGE_DIR=<dir> TEST_RUNNER_SHELL=/bin/sh
-TEST_RUNNER_CORTA_RESTORE_WINDOWS=0`, where `<dir>` already holds a `config`
-with `suggest-applications-folder`, `restore-windows`, `quick-terminal` and
-`secure-keyboard-entry` set to `false` — the same four lines
-`scripts/build-and-run.sh` writes. An empty stage directory leaves the host
-waiting on a first-launch prompt, and `xcodebuild` reports that the test
-runner hung before establishing a connection.
-UI tests require an interactive desktop session: remove `-skip-testing` and
-use `-only-testing:CortaUITests` to run that target. CI skips UI tests, and
-neither CI nor an offscreen rendering test replaces launching the app.
+`-only-testing:CortaTests/ConfigurationTests` to focus a suite.
+
+Three test plans under `TestPlans/` say what runs where:
+
+| Plan | Contains | Run it with |
+| ---- | -------- | ----------- |
+| `Unit` | `CortaTests` | `-scheme Corta -testPlan Unit` — the default, and what CI runs |
+| `UI` | `CortaUITests` | `-scheme Corta -testPlan UI` — an interactive desktop session only |
+| `Release` | the performance suite, built with `-O` | `-scheme 'Corta (Release tests)'` |
+
+`UI` is deliberately not part of the default run: a UI test drives the
+keyboard and the frontmost window, so running it takes the machine away
+from whatever else is happening on it. Neither CI nor an offscreen
+rendering test replaces launching the app.
+
+### The test host cannot reach your own configuration
+
+The Debug configuration builds a separate application — `CortaDev.app`,
+bundle identifier `dev.noahqin.Corta.dev` (D22) — and `AppPaths` gives any
+bundle whose identifier ends in `.dev` a stage directory. So the test host
+reads and writes `~/Library/Application Support/Corta Dev/` and nothing
+else: not `~/.config/corta/config`, not
+`~/Library/Application Support/Corta/`, not `~/.zshrc`. Nothing has to be
+set on the command line for that to hold.
+
+`CORTA_STAGE_DIR` still overrides the choice, which is what stages a
+*Release* build for a launched-app check.
 
 ### Launching the app in isolation
 
 App-layer changes are verified by launching the app (`DECISIONS.md` D14).
-`scripts/build-and-run.sh` builds a Debug app with ad-hoc signing and
-launches it against a staged configuration under `.build/run/` — restore,
-the global hotkey, Secure Keyboard Entry and the Applications-folder prompt
-all off, `/bin/sh` as the shell — so the launch never reads or writes your
-own config, state or shell startup files:
+The `Corta (Dev)` scheme is that launch: ⌘R in Xcode, or
 
 ```sh
-scripts/build-and-run.sh              # build and launch
-scripts/build-and-run.sh --verify     # exit 0 if the app is still alive after 2 s
-scripts/build-and-run.sh --logs       # launch and stream the app's log
-scripts/build-and-run.sh --telemetry  # launch and stream the dev.noahqin.Corta subsystem
-scripts/build-and-run.sh --debug      # launch under lldb
+xcodebuild -project Corta.xcodeproj -scheme 'Corta (Dev)' \
+  -configuration Debug -derivedDataPath .build/run build
+open -n .build/run/Build/Products/Debug/CortaDev.app
 ```
 
-`CORTA_BUILD_DIR` moves the build products elsewhere. The same environment
-variables work for any launch you control: `CORTA_STAGE_DIR` relocates the
-config file and Application Support, `CORTA_RESTORE_WINDOWS=0` skips the
-restore, and `SHELL` names the shell to spawn. Then run the five-point check
-in [conformance §4.4](CONFORMANCE.md#44-app-layer-verification-requires-a-launched-app).
+It runs beside an installed Corta rather than over it — a different
+identity, a different icon, its own configuration — so it can be rebuilt,
+crashed or killed while you keep working in the installed one. The
+development build also never offers to move itself into `/Applications`
+and carries no updater.
+
+Logs and telemetry come from the ordinary tools, since both builds log
+under the same subsystem:
+
+```sh
+log stream --info --predicate 'process == "CortaDev"'
+log stream --info --predicate 'subsystem == "dev.noahqin.Corta"'
+```
+
+`CORTA_RESTORE_WINDOWS=0` (set by the `Corta (Dev)` scheme) skips the
+restore, and `SHELL` names the shell to spawn — pass it in the environment
+of the launch you control, never through `launchctl setenv`. Then run the
+five-point check in
+[conformance §4.4](CONFORMANCE.md#44-app-layer-verification-requires-a-launched-app).
 
 Never change global hotkeys, secure-input state, shell startup files or
 `launchctl` environment variables just to test (D13). Prefer injected

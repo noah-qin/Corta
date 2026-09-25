@@ -10,6 +10,19 @@ what to edit.
 
 ## [Unreleased]
 
+### Changed
+
+- Building Corta from source now produces a separate application: **Corta
+  Dev** (`dev.noahqin.Corta.dev`), with its own icon, its own
+  configuration and state under `~/Library/Application Support/Corta
+  Dev/`, no updater and no offer to move itself into `/Applications`
+  (D22). Nothing about an installed Corta changes — the release build
+  keeps its identifier, icon, name and signature — but a development
+  build can now run beside one without touching its configuration, its
+  global hotkey or its update path. `scripts/build-and-run.sh` is
+  replaced by the `Corta (Dev)` scheme, and the test suites are selected
+  by test plan (`Unit`, `UI`, `Release`) rather than by `-skip-testing`.
+
 ### Fixed
 
 - Two races in the SFTP session, found by looping its tests under the

@@ -56,6 +56,43 @@ Before opening a documentation pull request, run the link check:
 python3 scripts/check-docs.py
 ```
 
+## Developing Corta in Corta
+
+Corta is the terminal its own development happens in. Two applications
+make that safe (`docs/DECISIONS.md` D22):
+
+| | Daily driver | Development build |
+| --- | --- | --- |
+| Bundle | `/Applications/Corta.app` | `CortaDev.app`, from the `Corta (Dev)` scheme |
+| Identifier | `dev.noahqin.Corta` | `dev.noahqin.Corta.dev` |
+| Configuration | `~/.config/corta/config` | `~/Library/Application Support/Corta Dev/config` |
+| State | `~/Library/Application Support/Corta/` | the same stage directory |
+| Updater | Sparkle | none |
+
+The daily driver is the installed, signed and notarised **Release**
+build — never a build from `main` HEAD. A bug written today should not
+be able to eat tomorrow's work, and secure input, the hardened runtime
+and Gatekeeper only behave as they do for a user when the build is the
+one a user would have. Keep the previous release's `.zip` so a bad daily
+driver is one `ditto` away from being rolled back.
+
+Turn *automatic* update installation off on the daily driver. An
+automatic update relaunches the application, which takes the session
+you are working in with it; leave the check on and pick the moment
+yourself.
+
+The fast inner loop is `swift test --package-path CortaTerminal`, which
+launches no application at all. App-hosted tests run under the `Unit`
+test plan and launch the development build, not the daily driver.
+`CortaUITests` — the `UI` test plan — and the flood benchmarks never run
+against the daily driver: a UI test drives the keyboard, and a `yes`
+flood saturates the pane it runs in. `corta-bench` is headless and is
+the right tool for a throughput number.
+
+`SecureInput.disengage()` runs from `applicationWillTerminate`, which a
+crash or `kill -9` skips. If a development build dies with Secure
+Keyboard Entry engaged, that is the explanation.
+
 ## Commit messages
 
 Corta follows [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/).

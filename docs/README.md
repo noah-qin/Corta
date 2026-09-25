@@ -41,7 +41,7 @@ catalog exists so that a contributor can find where a byte goes.
 The scripts a document tells you to run live in [`scripts/`](../scripts/):
 measurement (`measure-*.sh`, `record-signpost-trace.sh`), the real-program
 harness (`u10-real-workflows.py`), the isolated developer launch
-(`build-and-run.sh`), the documentation link check (`check-docs.py`), and
+(the `Corta (Dev)` scheme), the documentation link check (`check-docs.py`), and
 packaging (`check-release.sh`, `package-release.sh`, `release.sh`). Each
 script's header comment says what it changes and what it never touches.
 
