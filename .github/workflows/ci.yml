@@ -61,7 +61,16 @@ jobs:
       - name: Build
         run: swift build --package-path CortaTerminal -c release
 
+      # #129 taught the SFTP rig's deadlines to scale with this, for the
+      # nightly sanitizer lane — and nothing set it here, so on the lane
+      # that actually goes red it stayed 1 and the deadlines were exactly
+      # what they had been before the fix. #128 recurred on an ordinary CI
+      # run for that reason. `swift test` runs in-process, so the variable
+      # reaches the tests directly; the app job needs the TEST_RUNNER_
+      # prefix because its tests live inside a separate host.
       - name: Test
+        env:
+          CORTA_TEST_TIMEOUT_SCALE: "3"
         run: swift test --package-path CortaTerminal
 
       - name: Replay the fuzz corpus
@@ -89,7 +98,15 @@ jobs:
           retention-days: 14
 
   app:
-    name: App and tests (Xcode)
+    # The name covers the update-feed check too, because a required status
+    # check reports under its job's name and nothing else: with the feed
+    # riding in a job called "App and tests", a malformed `appcast.xml`
+    # showed up on a pull request as an app-test failure, which is the
+    # wrong thing to tell someone at the moment they need to know what
+    # broke. Renaming a job renames the required check, so the branch
+    # ruleset has to be updated in the same sitting or every pull request
+    # waits for a check that will never report again.
+    name: App, tests and the update feed
     runs-on: macos-26
     timeout-minutes: 45
     steps:
