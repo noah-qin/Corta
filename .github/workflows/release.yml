@@ -86,6 +86,10 @@ jobs:
 
       - name: Run the tests before shipping anything
         env:
+          # The core suite reads this directly (`swift test` is in-process);
+          # the app suite needs the prefix, which xcodebuild strips on the
+          # way into the test host.
+          CORTA_TEST_TIMEOUT_SCALE: "3"
           TEST_RUNNER_CORTA_TEST_TIMEOUT_SCALE: "3"
         run: |
           swift test --package-path CortaTerminal

@@ -204,8 +204,14 @@ toast and did not get one on a run where nothing was broken.
 ceiling. CI sets `TEST_RUNNER_CORTA_TEST_TIMEOUT_SCALE=3`, which
 `xcodebuild` delivers to the test host as `CORTA_TEST_TIMEOUT_SCALE`;
 nothing else sets it, so a local run keeps the written number and a genuine
-hang still fails quickly. The core package has the same knob under the same
-name for the same reason (#129).
+hang still fails quickly.
+
+The core package has the same knob under the same name (#129) and CI sets
+it there too — as `CORTA_TEST_TIMEOUT_SCALE` directly, because `swift test`
+runs the tests in-process rather than inside a host. It was introduced for
+the nightly sanitizer lane and for a while *only* that lane set it, so on
+ordinary CI the deadlines it was meant to relax were still their original
+length; that is why #128 recurred there.
 
 It scales a *ceiling*, never a sleep: a wait finishes as soon as its
 condition holds, so a larger ceiling costs nothing on a healthy run.
