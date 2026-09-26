@@ -1,6 +1,6 @@
 import Foundation
 
-/// B14 — whole directories, built on the single-file transfers.
+/// Whole directories, built on the single-file transfers.
 ///
 /// A directory transfer is a walk plus one ordinary transfer per regular
 /// file, so every property the file transfers have — the `.corta-part`

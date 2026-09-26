@@ -1,5 +1,4 @@
-/// The Kitty graphics protocol (M10, deferred since M6.4 — `DESIGN.md` §6,
-/// `docs/history/ROADMAP-0.1.md`): inline images, transmitted as APC sequences
+/// The Kitty graphics protocol (`DESIGN.md` §6): inline images, transmitted as APC sequences
 /// (`ESC _ G ... ESC \`) the way <https://sw.kovidgoyal.net/kitty/graphics-protocol/>
 /// specifies. Ghostty, WezTerm, iTerm2 and foot all implement some or all of
 /// the same wire format, which is why this exists — some remote toolchains
@@ -13,10 +12,9 @@
 /// (`Performer+KittyGraphics.swift`'s `respond`). This covers every tool
 /// this project's own research turned up as an actual reason to want the
 /// protocol (`icat`-alikes, plot viewers, file-manager previews), which all
-/// transmit this way — and a real-client verification pass against
-/// `kitten icat` (M10's own done-when) is what found the response was
-/// missing: `icat` sends `a=q` before ever transmitting a real image and
-/// refuses outright when nothing answers it.
+/// transmit this way. The response is not optional: `kitten icat` sends
+/// `a=q` before ever transmitting a real image and refuses outright when
+/// nothing answers it.
 ///
 /// **What is deliberately not implemented**, and why each is a scope
 /// decision rather than an oversight:
@@ -132,9 +130,7 @@ public enum KittyGraphics {
         /// from the header alone, never storing or displaying anything. This
         /// is the support-detection probe real clients send before ever
         /// transmitting a real image — `kitten icat` refuses outright
-        /// without a response to it, which is what a real-client
-        /// verification pass (M10's own done-when) found this
-        /// implementation was silent on.
+        /// without a response to it.
         case query(TransmitHeader)
     }
 

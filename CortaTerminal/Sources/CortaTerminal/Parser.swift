@@ -33,8 +33,8 @@ public struct Parser: Sendable {
         /// SOS and PM strings, consumed and dropped — nothing this project
         /// implements uses either.
         case sosPmString
-        /// An APC string, collected for `apcDispatch` (M10: Kitty graphics is
-        /// the one user of APC).
+        /// An APC string, collected for `apcDispatch`. Kitty graphics is the
+        /// one user of APC.
         case apcString
         /// An APC string that exceeded `maxAPCStringLength`; consumed to its
         /// terminator and never dispatched.
@@ -80,7 +80,7 @@ public struct Parser: Sendable {
     /// benchmark both arrive as `[UInt8]`, so this is the production path;
     /// the generic overload above remains for streaming/test sequences.
     ///
-    /// The run-boundary scan reads through `bytes.span` (B11): `Array`'s
+    /// The run-boundary scan reads through `bytes.span`: `Array`'s
     /// subscript re-checks bounds and the exclusivity/COW flag on every
     /// access, which is pure overhead here since `grow`'s capacity is
     /// already fixed for the duration of the scan. `Span` gives the same
@@ -193,7 +193,7 @@ public struct Parser: Sendable {
             state = .dcsEntry
         case 0x58, 0x5E:  // ESC X / ESC ^ — SOS, PM: consumed and dropped.
             state = .sosPmString
-        case 0x5F:  // ESC _ — APC (M10: Kitty graphics)
+        case 0x5F:  // ESC _ — APC (Kitty graphics)
             stringBuffer.removeAll(keepingCapacity: true)
             state = .apcString
         case 0x5B:  // ESC [ — CSI
@@ -239,8 +239,9 @@ public struct Parser: Sendable {
             parameters.separate()
             state = .csiParam
         case 0x3A:
-            // Sub-parameters (`SGR 38:2::r:g:b`) are P2; ignoring the whole
-            // sequence is the safe reading until M2 implements them.
+            // Sub-parameters (`SGR 38:2::r:g:b`) are not implemented (P2 in
+            // `CONFORMANCE.md`); ignoring the whole sequence is the safe
+            // reading.
             state = .csiIgnore
         case 0x3C...0x3F:
             privateMarker = byte

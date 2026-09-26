@@ -2,7 +2,7 @@ import Darwin
 import Foundation
 import Synchronization
 
-/// B14 — file transfer and directory operations over an `SFTPSession`.
+/// File transfer and directory operations over an `SFTPSession`.
 ///
 /// What the engine guarantees:
 ///
@@ -179,8 +179,8 @@ public final class SFTPTransferEngine: @unchecked Sendable {
 
     /// The partial file's suffix. One fixed name, not one per process: a
     /// resume has to find the partial an *earlier* run left behind, and a
-    /// pid in the name meant nothing survived a relaunch — the old partial
-    /// was neither resumed nor cleaned up, on either side. Two live
+    /// pid in the name would mean nothing survives a relaunch — that partial
+    /// would be neither resumed nor cleaned up, on either side. Two live
     /// transfers to the same destination would be a conflict anyway, so
     /// the pid bought no isolation.
     public static let partialSuffix = ".corta-part"

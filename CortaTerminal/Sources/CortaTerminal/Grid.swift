@@ -64,19 +64,18 @@ public struct Grid: Sendable {
     public var cursorStyle: CursorStyle = .blinkingBlock
 
     /// Grapheme clusters too large for a cell's single scalar
-    /// (`DESIGN.md` §2.3). M2.1 populates it with combining-mark clusters;
-    /// ZWJ sequences arrive with M3.6.
+    /// (`DESIGN.md` §2.3): combining-mark clusters and emoji ZWJ sequences.
     public var graphemes: GraphemeTable
 
-    /// OSC 8 hyperlink targets, keyed by the id a cell carries (M6.8).
+    /// OSC 8 hyperlink targets, keyed by the id a cell carries.
     /// Shared with the alternate screen and never cleared while a link may
     /// still be on screen or in the scrollback — an id in a cell that no
     /// longer resolves would render as a link that goes nowhere. Entries no
     /// holder references are instead swept under capacity pressure
-    /// (`internHyperlink`, P06), which keeps every live id valid.
+    /// (`internHyperlink`), which keeps every live id valid.
     public var hyperlinks: HyperlinkTable
 
-    /// Kitty graphics image placements (M10) — a side table, not a `Cell`
+    /// Kitty graphics image placements — a side table, not a `Cell`
     /// field; see `ImagePlacementTable`'s doc comment. Cleared on a column
     /// resize (`resize(rows:columns:)`), kept across a row-only one.
     public var imagePlacements = ImagePlacementTable()
@@ -94,13 +93,12 @@ public struct Grid: Sendable {
     /// right, rather than overwriting the cell under it; characters pushed
     /// past the last column are lost.
     ///
-    /// Implemented rather than reported: DECRQM used to answer 0 ("not
-    /// recognised") for IRM, and a program that sets a mode the terminal
-    /// silently ignores draws its next screen against a layout that never
+    /// Implemented rather than reported as unrecognised: a program that sets
+    /// a mode the terminal silently ignores draws its next screen against a layout that never
     /// happened. `readline`'s and `ed`'s insert paths both use it.
     public var insertMode: Bool = false
 
-    /// DECRST/DECSET `?45` — reverse-wraparound mode (B06). While set, `BS`
+    /// DECRST/DECSET `?45` — reverse-wraparound mode. While set, `BS`
     /// and `CUB` that would move left of column 0 continue onto the end of
     /// the row above, but only when that row's own `wrapped` flag says the
     /// two are one logical line — undoing exactly the auto-wrap DECAWM
@@ -116,7 +114,7 @@ public struct Grid: Sendable {
     private var savedPen: Pen?
     private var savedPendingWrap: Bool = false
 
-    /// True while the alternate screen is live (roadmap M2.3).
+    /// True while the alternate screen is live.
     public private(set) var isAlternateScreenActive: Bool = false
 
     /// The parked main screen while the alternate screen is live.
@@ -203,7 +201,7 @@ public struct Grid: Sendable {
         // arrives anyway, it is not printable — and a C0/C1 control has
         // display width 0, which would corrupt the combining-mark path.
         guard let value = Unicode.Scalar(scalar), !Self.isControl(value) else { return }
-        // M3.6: a scalar following a ZWJ-terminated cluster continues that
+        // A scalar following a ZWJ-terminated cluster continues that
         // cluster — an emoji ZWJ sequence (👨‍👩‍👧‍👦) is one grapheme and
         // stays one (wide) cell, not one wide pair per emoji. ZWJ itself is
         // zero-width and arrives through `writeZeroWidth` as usual.
@@ -356,7 +354,7 @@ public struct Grid: Sendable {
     }
 
     /// The cell a zero-width scalar — or the continuation of a
-    /// ZWJ-terminated cluster (M3.6) — joins: the previously written cell,
+    /// ZWJ-terminated cluster — joins: the previously written cell,
     /// following wraps and wide pairs. `nil` when there is no previous cell
     /// (start of output, hard newline).
     private func clusterJoinTarget() -> (row: Int, column: Int)? {
@@ -382,7 +380,7 @@ public struct Grid: Sendable {
     }
 
     /// Whether the cell at `target` holds a cluster whose last scalar is
-    /// ZWJ — the join condition for M3.6's ZWJ-continuation in `write`.
+    /// ZWJ — the join condition for the ZWJ continuation in `write`.
     /// Plain cells (`.none` id) answer false without touching the table, so
     /// ordinary CJK output pays a bounds check, not a lookup.
     private func clusterEndsWithZWJ(_ target: (row: Int, column: Int)) -> Bool {
@@ -422,7 +420,7 @@ public struct Grid: Sendable {
         cluster.append(scalar)
         var id = graphemes.intern(cluster)
         if id == nil, graphemes.count >= GraphemeTable.capacity {
-            // Full (P06): sweep entries no cell references, then retry once.
+            // Full: sweep entries no cell references, then retry once.
             // Still nil afterwards means the screen genuinely holds
             // `capacity` distinct clusters — then, as before, the mark is
             // dropped and the base character stays as it was.
@@ -538,7 +536,7 @@ public struct Grid: Sendable {
     /// BS — one column left, stopping at the left margin unless
     /// `reverseWraparoundEnabled` (`?45`) and the row above auto-wrapped
     /// into this one, in which case it continues onto that row's last
-    /// column instead of stopping (B06). A backspace out of the armed wrap
+    /// column instead of stopping. A backspace out of the armed wrap
     /// state disarms it rather than moving, which is what keeps
     /// `printf 'x%80s' ; printf '\b'` from stepping off the row.
     public mutating func backspace() {
@@ -554,8 +552,8 @@ public struct Grid: Sendable {
         }
     }
 
-    /// HT — the next tab stop. Stops are every eight columns; DECST8C and a
-    /// programmable stop table arrive with M2.
+    /// HT — the next tab stop. Stops start every eight columns; HTS and TBC
+    /// change them (`setTabStop`, `clearTabStop`).
     public mutating func tab() {
         tabForward(1)
     }
@@ -584,7 +582,7 @@ public struct Grid: Sendable {
         self = Grid(rows: rows, columns: columns, scrollbackLimit: scrollback.limit)
     }
 
-    /// U11 — "Clear Screen": erase the visible screen and put the cursor
+    /// "Clear Screen": erase the visible screen and put the cursor
     /// home, **without** touching the scrollback.
     ///
     /// Deliberately not `ED 2` alone: `ED 2` erases the screen and leaves the
@@ -601,7 +599,7 @@ public struct Grid: Sendable {
         pendingWrap = false
     }
 
-    /// U11 — "Clear History": discard the scrollback, leaving the visible
+    /// "Clear History": discard the scrollback, leaving the visible
     /// screen and the cursor untouched. The inverse of `clearScreen`, and the
     /// one a person reaches for after pasting a secret into a build log.
     public mutating func clearScrollback() {
@@ -709,7 +707,7 @@ public struct Grid: Sendable {
         // around: the cursor just stops at the last row.
     }
 
-    // MARK: - Side-table reclamation (P06)
+    // MARK: - Side-table reclamation
 
     /// Interns `url` as the current hyperlink target, reclaiming
     /// unreferenced entries first when the table is full: without the sweep
@@ -841,7 +839,7 @@ public struct Grid: Sendable {
     // MARK: - Resizing
 
     /// Changes the visible dimensions. A column change reflows the document
-    /// (`DESIGN.md` §2.1, roadmap M4.2) — except on the alternate screen,
+    /// (`DESIGN.md` §2.1) — except on the alternate screen,
     /// which has no scrollback and is resized, never reflowed, because a
     /// full-screen application redraws itself on `SIGWINCH` and re-wrapping
     /// what it drew would corrupt its own model of the screen. A row-only
@@ -879,7 +877,7 @@ public struct Grid: Sendable {
             // bottom. The bottom is where the cursor and the newest output
             // are; truncating there destroys the most recent lines outright,
             // and silently, since they never reach the history either.
-            // Shrinking a window used to eat the last commands you ran.
+            // Otherwise shrinking a window eats the last commands you ran.
             //
             // Only as many rows as it takes to keep the cursor on screen
             // move up; anything still surplus is below the cursor and blank,
@@ -1037,11 +1035,10 @@ public struct Grid: Sendable {
     /// cursor where it is. Clamped to the right margin; a count of zero
     /// erases one, as xterm does.
     ///
-    /// Missing until B16's test pass: tmux draws its status line as the
-    /// left part, `CSI n X` over the gap, then the right part, and with the
-    /// erase ignored the gap kept whatever the previous screen had there —
-    /// a slice of htop's function-key row, after a window shrink, for the
-    /// life of the session. `CONFORMANCE.md` had listed ECH as passing.
+    /// tmux draws its status line as the left part, `CSI n X` over the gap,
+    /// then the right part; with the erase ignored the gap keeps whatever
+    /// the previous screen had there — a slice of htop's function-key row,
+    /// after a window shrink, for the life of the session.
     public mutating func eraseCharacters(_ count: Int) {
         let start = cursor.column
         guard start < columns else { return }
@@ -1068,7 +1065,7 @@ public struct Grid: Sendable {
 
     /// DECSC — VT510 §DECSC: saves the cursor position, the pen and the
     /// pending-wrap state. The origin-mode and character-set state the full
-    /// spec lists are not implemented (DECOM is out of scope for M2; the
+    /// spec lists are not implemented (DECOM is out of scope; the
     /// parser never selects a character set).
     public mutating func saveCursor() {
         savedCursor = cursor
@@ -1138,7 +1135,7 @@ public struct Grid: Sendable {
         suspendedMain = nil
         var main = suspended.grid
         main.cursorStyle = cursorStyle  // the style is global, not per screen
-        // Ditto reverse-wraparound (B06): a private mode set by the
+        // Ditto reverse-wraparound: a private mode set by the
         // program is terminal-wide state, not part of either screen's own
         // content, and `self = main` below would otherwise silently
         // restore whatever `?45` was set to before the alternate screen

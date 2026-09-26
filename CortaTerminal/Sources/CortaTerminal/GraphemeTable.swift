@@ -20,17 +20,17 @@ public struct GraphemeID: Equatable, Hashable, Sendable {
 /// Clusters are interned, so a screen full of the same emoji costs one entry.
 /// Capacity is capped at `UInt16.max - 1` entries; beyond that `intern`
 /// returns `nil` and the caller keeps the base scalar alone — but `Grid`
-/// first sweeps unreferenced entries (`reclaim(keeping:)`, P06), so a
+/// first sweeps unreferenced entries (`reclaim(keeping:)`), so a
 /// long-lived session recovers instead of degrading permanently. Every
 /// unbounded input needs a cap (`SECURITY.md` §3), and this one is fed
 /// directly by the byte stream.
 ///
-/// M2.1 populates this table as zero-width scalars join the previously
-/// written cell's cluster; ZWJ sequences arrive with M3.6.
+/// Entries are added as zero-width scalars join the previously written
+/// cell's cluster, and as an emoji ZWJ sequence continues one.
 public struct GraphemeTable: Sendable {
     public static let capacity = Int(UInt16.max) - 1
 
-    /// `nil` is a reclaimed slot (P06): its id was referenced nowhere when
+    /// `nil` is a reclaimed slot: its id was referenced nowhere when
     /// `reclaim(keeping:)` ran, and a later `intern` may hand the slot to an
     /// unrelated cluster. Ids are indices into this array, so a *live* entry
     /// never moves — that stability is what makes slot reuse safe.
@@ -73,7 +73,7 @@ public struct GraphemeTable: Sendable {
     /// Drops every entry whose id is not in `live`, freeing its memory and
     /// returning its slot to the pool. Returns how many slots were freed.
     ///
-    /// SAFETY (P06): `live` must contain every id any cell of this grid can
+    /// SAFETY: `live` must contain every id any cell of this grid can
     /// still carry — screen, scrollback, parked alternate screen included.
     /// An id recycled while still referenced would afterwards resolve to an
     /// unrelated cluster: a use-after-free in table form. The caller

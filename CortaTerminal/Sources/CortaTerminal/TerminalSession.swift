@@ -32,9 +32,12 @@ import Synchronization
 /// thread feeds against. This is copy-on-snapshot, not double buffering:
 /// `Grid` is a plain value type over `ContiguousArray`, so the copy itself
 /// is O(1) copy-on-write. The reader thread pays the actual copy cost
-/// lazily, the next time it mutates a row the snapshot still shares; that
-/// cost is bounded by one row, not the whole grid, because rows are the
-/// unit `Line` mutation copies.
+/// lazily, the next time it mutates storage the snapshot still shares. On
+/// the live screen that cost is bounded by one row, because rows are the
+/// unit `Line` mutation copies. Scrollback is not: while a snapshot is
+/// alive, the next `Scrollback.push` copies the batch list and the whole
+/// tail arena (up to its `batchSize` rows) — so a snapshot should
+/// not outlive the frame it was taken for.
 ///
 /// A parse batch *is* fed under that lock — the grid may never be mutated
 /// from two threads, and a resize commit must not interleave with a feed —
@@ -106,7 +109,7 @@ public final class TerminalSession: @unchecked Sendable {
     var resizeWorkGate: (@Sendable () -> Void)?
     private let syncTimeoutQueue = DispatchQueue(label: "dev.corta.terminal-session.sync-timeout")
 
-    /// Pending outbound chunks for the writer queue (P01). A hand-rolled
+    /// Pending outbound chunks for the writer queue. A hand-rolled
     /// FIFO with a head index: popping one chunk at a time keeps `bytes` an
     /// accurate count of the unwritten backlog (the back-pressure cap
     /// applies to it), and the index keeps the pop amortized O(1) where
@@ -160,7 +163,7 @@ public final class TerminalSession: @unchecked Sendable {
     private static let maxPendingWriteBytes = 4 * 1024 * 1024
 
     /// Largest slice of a parse batch fed per lock acquisition — see the
-    /// type's header comment (P02). At the measured worst observed feed rate
+    /// type's header comment. At the measured worst observed feed rate
     /// (a scroll-heavy `yes` flood, ~269 ms per 1 MB batch) one slice holds
     /// the lock ≈ 4 ms; ordinary batches are far below that.
     private static let feedLockSliceSize = 16 * 1024
@@ -336,7 +339,7 @@ public final class TerminalSession: @unchecked Sendable {
                 // there, and a resize commit must not interleave with a
                 // feed — but in slices, releasing the lock between them, so
                 // a `snapshot()` or a queued resize never waits behind a
-                // whole batch (P02). A resize may now commit between two
+                // whole batch. A resize may now commit between two
                 // slices of one batch; that is the same bound the batch cap
                 // already gave (one in-flight batch), just finer-grained.
                 var responses: [UInt8] = []
@@ -375,7 +378,7 @@ public final class TerminalSession: @unchecked Sendable {
                         yieldToStateWaiters()
                     }
                 }
-                // Query responses (M2.2). Fixed-format bytes only — never
+                // Query responses. Fixed-format bytes only — never
                 // attacker-supplied text (`SECURITY.md` §2.1). They take the
                 // same queue as keyboard input so a reply stays ordered with
                 // respect to the input the user typed around it.
@@ -431,7 +434,7 @@ public final class TerminalSession: @unchecked Sendable {
         )
     }
 
-    /// `?2026` recovery (S03): the child promises a DECRST to end each
+    /// `?2026` recovery: the child promises a DECRST to end each
     /// episode; if it never arrives, the shell's present gate would hold
     /// forever. After `synchronizedOutputTimeout` the episode is ended
     /// core-side and output is signalled, so the shell — which latched that
@@ -467,7 +470,7 @@ public final class TerminalSession: @unchecked Sendable {
         registerStateWaiter { state.withLock { $0.terminal.grid } }
     }
 
-    /// U11 — the three terminal-state commands, each with one meaning.
+    /// The three terminal-state commands, each with one meaning.
     ///
     /// They are applied to the grid directly rather than by writing an escape
     /// sequence to the child: writing to the child's *input* is how the shell
@@ -496,11 +499,11 @@ public final class TerminalSession: @unchecked Sendable {
         }
     }
 
-    /// What became of one `write(_:)` call (B03). Silent drops used to be
-    /// indistinguishable from a queued chunk that simply had not drained
-    /// yet — a caller like a large paste could not tell "still coming",
-    /// "the child is not reading and this was dropped", or "the session is
-    /// gone" apart, so it had nothing to react to.
+    /// What became of one `write(_:)` call. A silent drop would be
+    /// indistinguishable from a queued chunk that simply has not drained
+    /// yet; with this, a caller like a large paste can tell "still coming",
+    /// "the child is not reading and this was dropped" and "the session is
+    /// gone" apart, and react to each.
     public enum WriteOutcome: Sendable, Equatable {
         /// Not dropped: pushed onto the writer queue and will reach the
         /// child in FIFO order unless `stop()` runs first, or — for an
@@ -522,7 +525,7 @@ public final class TerminalSession: @unchecked Sendable {
     /// output back into this call (`SECURITY.md` §6) — it is for keyboard
     /// input only.
     ///
-    /// P01: the call only enqueues; a serial writer queue performs the
+    /// The call only enqueues; a serial writer queue performs the
     /// actual `write(2)` in FIFO order, so the caller (a keystroke on the
     /// main thread) never blocks behind a child that has stopped reading —
     /// measured at 43 ms for a single 1 MB write once the pty's input side
@@ -602,7 +605,7 @@ public final class TerminalSession: @unchecked Sendable {
     /// full `snapshot()`. Cheap enough for the app to call every time the
     /// viewport's scroll offset changes and every output batch, to keep a
     /// scrolled-away offset anchored to the same document position rather
-    /// than drifting forward as new output lands (B04).
+    /// than drifting forward as new output lands.
     public var scrollbackTotalPushed: Int {
         state.withLock { $0.terminal.grid.scrollback.totalPushed }
     }
@@ -614,14 +617,15 @@ public final class TerminalSession: @unchecked Sendable {
         state.withLock { $0.terminal.grid.scrollback.count }
     }
 
-    /// Whether the child has enabled bracketed paste (`?2004`, M2.6).
+    /// Whether the child has enabled bracketed paste (`?2004`).
     public var isBracketedPasteEnabled: Bool {
         state.withLock { $0.terminal.isBracketedPasteEnabled }
     }
 
-    /// Whether the child has asked for SGR-encoded mouse reports (`?1006`,
-    /// M2.7).
-    /// Effective SGR tracking subscription, read atomically with its encoding.
+    /// The mouse tracking the child subscribed to, when it also asked for
+    /// SGR-encoded reports (`?1006`); `.off` otherwise. The two are read
+    /// under one lock, so a mode and its encoding never come from different
+    /// moments.
     public var sgrMouseTrackingMode: MouseTrackingMode {
         state.withLock {
             $0.terminal.isSgrMouseEncodingEnabled ? $0.terminal.mouseTrackingMode : .off
@@ -632,7 +636,7 @@ public final class TerminalSession: @unchecked Sendable {
         state.withLock { $0.terminal.isSgrMouseEncodingEnabled }
     }
 
-    /// Whether synchronized output is active (`?2026`, M4.3). While true the
+    /// Whether synchronized output is active (`?2026`). While true the
     /// shell must present no frame; when it goes false, present once. An
     /// episode is bounded by `synchronizedOutputTimeout` and by child exit —
     /// the mode can go false without the child's DECRST.
@@ -641,8 +645,8 @@ public final class TerminalSession: @unchecked Sendable {
         registerStateWaiter { state.withLock { $0.terminal.isSynchronizedOutputEnabled } }
     }
 
-    /// Whether the child has asked to be told about focus changes (`?1004`,
-    /// M6.7).
+    /// Whether the child has asked to be told about focus changes
+    /// (`?1004`).
     public var isFocusReportingEnabled: Bool {
         state.withLock { $0.terminal.isFocusReportingEnabled }
     }
@@ -660,12 +664,12 @@ public final class TerminalSession: @unchecked Sendable {
     }
 
     /// Whether DECKPAM is set (`ESC =`). The numeric keypad sends its SS3
-    /// (application) forms while it is (U04).
+    /// (application) forms while it is.
     public var applicationKeypadEnabled: Bool {
         state.withLock { $0.terminal.applicationKeypadEnabled }
     }
 
-    /// The colours OSC 10/11/12 report and set (M6.6). The app seeds these
+    /// The colours OSC 10/11/12 report and set. The app seeds these
     /// from its palette at startup so a query answers with what is drawn.
     public var dynamicColors: DynamicColors {
         get { state.withLock { $0.terminal.dynamicColors } }
@@ -673,7 +677,7 @@ public final class TerminalSession: @unchecked Sendable {
     }
 
     /// The 256-entry indexed palette OSC 4 reports and sets, and OSC 104
-    /// resets (B06). The app seeds `defaults` from its theme at startup and
+    /// resets. The app seeds `defaults` from its theme at startup and
     /// on every theme change, the same way `dynamicColors` is seeded.
     /// `TerminalColorPalette`/`TerminalRenderer.appendRowInstances`
     /// (`Theme.Variant.resolve(_:indexedOverrides:)`) consult `overrides`
@@ -684,7 +688,7 @@ public final class TerminalSession: @unchecked Sendable {
         set { state.withLock { $0.terminal.indexedPalette = newValue } }
     }
 
-    /// Reseeds `indexedPalette.defaults` for a live theme switch (M6.13)
+    /// Reseeds `indexedPalette.defaults` for a live theme switch
     /// without discarding overrides — under one lock acquisition, not a
     /// read of `indexedPalette` followed by a write of it back. The reader
     /// thread applies OSC 4 under this same lock (`feed`, below); a
@@ -696,30 +700,30 @@ public final class TerminalSession: @unchecked Sendable {
         state.withLock { $0.terminal.indexedPalette.updateDefaults(to: newDefaults) }
     }
 
-    /// The five special colours OSC 5 reports and sets, and OSC 105 resets
-    /// (B06) — see `SpecialColors`'s own doc comment.
+    /// The five special colours OSC 5 reports and sets, and OSC 105 resets;
+    /// see `SpecialColors`'s own doc comment.
     public var specialColors: SpecialColors {
         get { state.withLock { $0.terminal.specialColors } }
         set { state.withLock { $0.terminal.specialColors = newValue } }
     }
 
-    /// The kitty keyboard protocol flags in force (`CSI > flags u`, M6.9).
+    /// The kitty keyboard protocol flags in force (`CSI > flags u`).
     public var keyboardEnhancements: KeyboardEnhancementFlags {
         state.withLock { $0.terminal.keyboardEnhancements }
     }
 
-    /// Consumes a pending BEL (M4.8): true at most once per bell.
+    /// Consumes a pending BEL: true at most once per bell.
     public func takeBell() -> Bool {
         state.withLock { $0.terminal.takeBell() }
     }
 
-    /// The window title set by the child via OSC 0/2 (M2.8). Set-only — the
+    /// The window title set by the child via OSC 0/2. Set-only — the
     /// title query is never answered (`SECURITY.md` §2.2).
     public var windowTitle: String? {
         state.withLock { $0.terminal.windowTitle }
     }
 
-    /// The working directory reported via OSC 7 (M2.8). Reports that name a
+    /// The working directory reported via OSC 7. Reports that name a
     /// remote host (`file://remote/path` from an `ssh` session) are kept
     /// apart in `remoteContext` — see `Performer.setWorkingDirectory` — so
     /// this is always a local path, safe to spawn or restore from.
@@ -727,7 +731,7 @@ public final class TerminalSession: @unchecked Sendable {
         state.withLock { $0.terminal.workingDirectory }
     }
 
-    /// B13 — the remote host and directory this pane's shell most recently
+    /// The remote host and directory this pane's shell most recently
     /// reported, when the report names another machine. Informational only:
     /// for showing the user which host a pane refers to, never for spawning
     /// or restoring a local process (see `RemoteContext`'s doc comment).
@@ -736,8 +740,8 @@ public final class TerminalSession: @unchecked Sendable {
     }
 
     /// Whether a command other than the shell itself is running here — what
-    /// a close confirmation asks before it throws away a half-finished job
-    /// (M7.5). Derived from the pty's foreground process group; see
+    /// a close confirmation asks before it throws away a half-finished job.
+    /// Derived from the pty's foreground process group; see
     /// `PTY.hasForegroundJob`.
     public var hasForegroundJob: Bool { pty.hasForegroundJob }
 
@@ -762,7 +766,7 @@ public final class TerminalSession: @unchecked Sendable {
         state.withLock { $0.terminal.workingDirectory } ?? pty.currentWorkingDirectory
     }
 
-    /// Whether the shell reports a command running via OSC 133 (M7.2).
+    /// Whether the shell reports a command running via OSC 133.
     public var isCommandRunning: Bool {
         state.withLock { $0.terminal.isCommandRunning }
     }
@@ -773,18 +777,18 @@ public final class TerminalSession: @unchecked Sendable {
         state.withLock { $0.terminal.hasShellIntegration }
     }
 
-    /// B08 — see `Terminal.promptEndPosition`.
+    /// See `Terminal.promptEndPosition`.
     public var promptEndPosition: (row: Int, column: Int)? {
         state.withLock { $0.terminal.promptEndPosition }
     }
 
-    /// B07 — this session's bounded command history. A snapshot like
+    /// This session's bounded command history. A snapshot like
     /// `snapshot()`'s grid: the lock is held only to copy it.
     public var commandRecords: CommandRecordStore {
         state.withLock { $0.terminal.commandRecords }
     }
 
-    /// B08 — empties the command history without touching scrollback or the
+    /// Empties the command history without touching scrollback or the
     /// live screen; see `Terminal.clearCommandRecords()`.
     public func clearCommandRecords() {
         state.withLock { $0.terminal.clearCommandRecords() }
@@ -796,18 +800,17 @@ public final class TerminalSession: @unchecked Sendable {
     }
 
     /// Consumes text the child asked to place on the system clipboard via
-    /// OSC 52 (M7.11). Whether it actually reaches the pasteboard is the
+    /// OSC 52. Whether it actually reaches the pasteboard is the
     /// app's decision.
     public func takeClipboardCopy() -> String? {
         state.withLock { $0.terminal.takeClipboardCopy() }
     }
 
-    /// Ordering contract (P03; user-reported corruption: claude/kimi TUIs
-    /// redrew garbled after a window drag): the child must never observe —
+    /// Ordering contract: the child must never observe —
     /// via `TIOCGWINSZ`/`SIGWINCH` — a size the grid has not adopted yet.
     /// Otherwise its new-size redraw is parsed into old-size cells, and the
     /// damage outlives the gap: the alternate screen is resized, never
-    /// reflowed (M4.2), so a mis-parsed full-screen redraw there stays
+    /// reflowed, so a mis-parsed full-screen redraw there stays
     /// garbled until the child happens to repaint those cells. Both halves
     /// therefore run on `resizeQueue`, in order: the grid reflow commits
     /// first — under the same lock the reader thread parses against, so no

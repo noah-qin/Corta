@@ -5,7 +5,7 @@
 //   - UnicodeData-17.0.0.txt      (general categories Mn/Me/Cc/Cf -> 0)
 //   - emoji/emoji-data.txt 17.0.0 (Emoji_Presentation=Yes -> 2)
 //
-// Width rules (locked, docs/history/ROADMAP-0.1.md M2.1): zero-width wins over wide
+// Width rules (locked): zero-width wins over wide
 // (U+3099 is Mn *and* EAW=W -> 0); Ambiguous and unassigned are 1.
 //
 // 502 coalesced ranges (378 zero-width, 124 double-width);

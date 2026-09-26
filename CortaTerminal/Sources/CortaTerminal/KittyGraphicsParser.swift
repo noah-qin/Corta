@@ -60,7 +60,7 @@ enum KittyGraphicsParser {
     /// The protocol's ids are unsigned 32-bit; a negative or overflowing
     /// value cannot name an image or placement under any reading of the
     /// spec, and an unchecked conversion here is a release-build SIGTRAP on
-    /// hostile input (`SECURITY.md` §3 — S01). Callers treat `nil` as
+    /// hostile input (`SECURITY.md` §3). Callers treat `nil` as
     /// "ignore this command", the same as any unrecognised sequence.
     private static func uint32ID(_ value: Int?) -> UInt32? {
         value.flatMap(UInt32.init(exactly:))

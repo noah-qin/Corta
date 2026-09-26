@@ -3,14 +3,13 @@
 /// (`Selection.baseScrollbackTotal`), search (`ViewController+Search`),
 /// the scrolled-away viewport (`ViewController.scrollAnchorTotalPushed`)
 /// and shell-integration prompt-jumping (`ViewController+ShellIntegration`)
-/// before B04's follow-up pass — one shared, tested set of primitives
-/// instead of the same arithmetic re-derived, independently, at each call
-/// site.
+/// all need — one shared, tested set of primitives instead of the same
+/// arithmetic re-derived, independently, at each call site.
 ///
 /// `Scrollback.totalPushed` is the one stable coordinate everything else is
 /// measured against: it only grows, unlike `.count` (saturates at the
 /// ring's limit) or a raw `scrollOffset` (silently means a different row
-/// once the live bottom moves) — see `DESIGN.md` §2.7 and §7 (B04) for the
+/// once the live bottom moves) — see `DESIGN.md` §2.7 and §7 for the
 /// bugs that shape came from.
 ///
 /// **Two sign conventions, both anchored to the same absolute row.** A

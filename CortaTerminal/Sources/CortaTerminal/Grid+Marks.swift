@@ -1,4 +1,4 @@
-/// M7.2 — addressing rows that may be on screen or in history, and the
+/// Addressing rows that may be on screen or in history, and the
 /// shell-integration marks written through that address.
 ///
 /// A command's prompt row is written when the command starts and its exit
@@ -7,7 +7,7 @@
 /// into history by then and its index means something else. An *absolute*
 /// row — `scrollback.totalPushed + screenRow` — never changes for the life of
 /// the line, which is the same reason a selection is anchored against
-/// `totalPushed` (M6.10).
+/// `totalPushed`.
 extension Grid {
     /// The absolute index of a screen row. Stable: output that scrolls the
     /// row into history does not change it.
@@ -42,7 +42,7 @@ extension Grid {
     }
 
     /// Every prompt row whose command finished with a non-zero status,
-    /// oldest first, as absolute indices (U14).
+    /// oldest first, as absolute indices.
     ///
     /// Separate from `promptRows` rather than a filter over it because the
     /// caller wants one or the other, never both, and the walk is the same
@@ -72,7 +72,7 @@ extension Grid {
     }
 
     /// Every row carrying an output-start mark (`OSC 133 ; C`), oldest
-    /// first, as absolute indices (U14).
+    /// first, as absolute indices.
     public var outputStartRows: [Int] {
         promptRows(matching: { $0 == .outputStart })
     }

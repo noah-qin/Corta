@@ -1,7 +1,8 @@
-/// M6.5 and M6.6 — the query class that used to time out.
+/// Queries a program waits on: capability and state probes that must be
+/// answered.
 ///
-/// The 184 esctest failures carried since M2 are dominated by probes that
-/// wait for an answer Corta never sent: DECRQM asking whether a mode is on,
+/// A large share of esctest's probes wait for an answer: DECRQM asking
+/// whether a mode is on,
 /// XTVERSION asking who the terminal is, and the query forms of OSC 10/11/12
 /// asking what the default colours are. A probe that times out is not a
 /// harmless omission — tmux and Neovim fall back to their most conservative
@@ -16,9 +17,8 @@ extension Performer {
     ///
     /// The name is a compile-time constant, so the answer cannot carry
     /// stream-supplied bytes. The version itself comes from `CortaVersion`,
-    /// which is the single place it is written — it used to be spelled out
-    /// here, where a release bump had no reason to look, and the answer went
-    /// stale the moment `MARKETING_VERSION` moved.
+    /// the single place it is written, so the answer cannot go stale when
+    /// `MARKETING_VERSION` moves.
     private static let versionReport = Array(
         "\u{1B}P>|\(CortaVersion.report)\u{1B}\\".utf8)
 
@@ -106,7 +106,7 @@ extension Performer {
     }
 
     /// The query form of OSC 10/11/12 — `OSC Ps ; ? ST`, answered
-    /// `OSC Ps ; rgb:RRRR/GGGG/BBBB ST` (M6.6).
+    /// `OSC Ps ; rgb:RRRR/GGGG/BBBB ST`.
     ///
     /// xterm reports 16 bits per channel. Corta stores 8, so each byte is
     /// doubled — `0x23` becomes `2323` — which is exactly how xterm widens
@@ -206,7 +206,7 @@ extension Performer {
         return (channels[0], channels[1], channels[2])
     }
 
-    // MARK: - OSC 4 / 104 — the indexed palette (B06)
+    // MARK: - OSC 4 / 104 — the indexed palette
 
     /// OSC 4 — `OSC 4 ; c ; spec ; c ; spec ; … ST`. Every `c ; spec` pair is
     /// independent: `spec` of exactly `?` queries index `c`'s current
@@ -277,7 +277,7 @@ extension Performer {
         state.outputBuffer.append(contentsOf: Array("\u{1B}]4;\(index);\(body)\u{1B}\\".utf8))
     }
 
-    // MARK: - OSC 5 / 105 — the special colours (B06)
+    // MARK: - OSC 5 / 105 — the special colours
 
     /// OSC 5 — `OSC 5 ; c ; spec ; c ; spec ; … ST`, the same wire shape as
     /// OSC 4 (`handleIndexedColor`) but addressing `SpecialColors`'
@@ -375,7 +375,7 @@ extension Performer {
         return UInt8((value * 255 + maximum / 2) / maximum)
     }
 
-    // MARK: - Kitty keyboard protocol (M6.9)
+    // MARK: - Kitty keyboard protocol
 
     /// `CSI ? u` — report the flags in force, as `CSI ? flags u`.
     ///

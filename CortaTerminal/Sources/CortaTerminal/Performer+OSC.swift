@@ -1,6 +1,6 @@
 import Foundation
 
-/// OSC string handling — M2.8. Setters only: nothing here ever writes back
+/// OSC string handling. Setters only: nothing here ever writes back
 /// to the child, and the title *query* (`CSI 2 1 t`) is never implemented —
 /// it is a command-injection vector (`SECURITY.md` §2.2).
 ///
@@ -12,7 +12,7 @@ extension Performer {
             // No `;`-separated payload at all. Every code but one needs
             // one to do anything and is unchanged by leaving it alone here;
             // OSC 104/105 with no arguments — "reset the whole indexed
-            // palette / every special colour" (B06) — is the one real use
+            // palette / every special colour" — is the one real use
             // of a bare code, and it is the most common real-world form of
             // the reset (xterm itself sends `OSC 104 ST` with nothing
             // after it).
@@ -43,13 +43,13 @@ extension Performer {
         case 8:
             setHyperlink(payload)
         case 4:
-            // The indexed palette (B06) — set/query, one or more `c ; spec`
+            // The indexed palette — set/query, one or more `c ; spec`
             // pairs.
             handleIndexedColor(payload)
         case 104:
             resetIndexedColors(payload)
         case 5:
-            // The special colours (B06) — same wire shape as OSC 4, over
+            // The special colours — same wire shape as OSC 4, over
             // `SpecialColors`' five fixed slots instead of a 256-entry
             // palette. xterm ctlseqs documents the exact Pc values
             // (0=bold, 1=underline, 2=blink, 3=reverse, 4=italic), unlike
@@ -60,7 +60,7 @@ extension Performer {
         case 105:
             resetSpecialColors(payload)
         case 10, 11, 12:
-            // The dynamic colours (M6.6). A payload of exactly `?` is the
+            // The dynamic colours. A payload of exactly `?` is the
             // query form; anything else is a colour specification to set.
             // Unlike the title, these are numeric state, so reporting them
             // echoes nothing the stream supplied (`SECURITY.md` §2.2).
@@ -92,7 +92,7 @@ extension Performer {
         return code
     }
 
-    /// OSC 8 — `OSC 8 ; params ; URI ST` (M6.8).
+    /// OSC 8 — `OSC 8 ; params ; URI ST`.
     ///
     /// The parameters (`id=…`, and anything a future spec adds) are parsed
     /// and discarded: `id` exists so a terminal can treat two runs of cells
@@ -111,7 +111,7 @@ extension Performer {
         }
         let uri = String(decoding: payload[payload.index(after: separator)...], as: UTF8.self)
         // `Grid.internHyperlink`, not the table directly: a full table gets
-        // a reference-safe sweep and one retry before failing closed (P06).
+        // a reference-safe sweep and one retry before failing closed.
         guard !uri.isEmpty, let id = grid.internHyperlink(uri) else {
             grid.pen.hyperlink = .none
             return
@@ -119,7 +119,7 @@ extension Performer {
         grid.pen.hyperlink = id
     }
 
-    /// OSC 52 — `OSC 52 ; Pc ; Pd ST`, the clipboard (M7.11).
+    /// OSC 52 — `OSC 52 ; Pc ; Pd ST`, the clipboard.
     ///
     /// **Write only.** `Pd` of `?` is the *query* form, which answers with the
     /// clipboard's contents — a remote host reading the local clipboard, which
@@ -233,7 +233,7 @@ extension Performer {
     /// Directory`, which feeds local spawns — new tabs, splits, session
     /// restore — and clears any remote context: the pane is local again.
     /// A remote host (a shell reached over `ssh`, or a pane inside `tmux`
-    /// on one) is recorded in `state.remoteContext` instead (B13): kept so
+    /// on one) is recorded in `state.remoteContext` instead: kept so
     /// the app can show which host and directory the pane refers to, kept
     /// *apart* because the path names a file on another computer and must
     /// never be `chdir`'d on this Mac. A remote report also leaves any
