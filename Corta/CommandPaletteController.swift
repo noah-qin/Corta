@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// M7.12 — the command palette.
+/// The command palette.
 ///
 /// Corta reached about thirty commands spread across five menus, a context
 /// menu and a settings page, and the only way to find one was to already
@@ -9,12 +9,13 @@ import SwiftUI
 /// name, press Return.
 ///
 /// `CommandPaletteModel` owns the filtering and selection; `CommandPaletteView`
-/// (SwiftUI) owns the layout. This class only builds the floating panel — the
-/// glass background is `NSGlassEffectView`, which SwiftUI has no equivalent
-/// for on this deployment target, so the panel's chrome stays AppKit around a
-/// hosted SwiftUI content view, the same shape every other converted window
-/// in this app uses in reverse (an AppKit shell around SwiftUI content,
-/// rather than SwiftUI content that happens to need one AppKit material).
+/// (SwiftUI) owns the layout. This class only builds the floating panel:
+/// AppKit chrome — the panel and its `NSGlassEffectView` background — around
+/// a hosted SwiftUI content view, the same shape as every other SwiftUI
+/// window in this app. SwiftUI's own `glassEffect(_:in:)` would do for the
+/// material, but the panel is an AppKit window either way, and keeping the
+/// glass beside it keeps the Reduce Transparency handling identical to the
+/// search bar's.
 ///
 /// Dispatch goes through `NSApp.sendAction(_:to:from:)` with a `nil` target,
 /// which is the responder chain — exactly what a menu item does. That is
@@ -92,10 +93,10 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
 
     // MARK: - Layout
 
-    /// M9: a floating control over content is exactly where Liquid Glass
-    /// belongs (`ViewController.swift`'s rationale for the search bar,
-    /// `:383-390` — the terminal canvas is content and stays opaque; the
-    /// palette is chrome, like the search bar). One surface, so no
+    /// A floating control over content is exactly where Liquid Glass
+    /// belongs (the search bar's rationale in `ViewController+Search.swift`
+    /// — the terminal canvas is content and stays opaque; the palette is
+    /// chrome, like the search bar). One surface, so no
     /// `NSGlassEffectContainerView` merge to set up — that exists for
     /// *neighbouring* glass elements, and the palette has none.
     private static func buildContentView(model: CommandPaletteModel) -> NSView {

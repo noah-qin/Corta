@@ -18,7 +18,7 @@ struct RowStatus: Equatable {
     var actionTitle: String?
 }
 
-/// M6.1 — the settings page's state, as a `SettingsView` binds to it.
+/// The settings page's state, as a `SettingsView` binds to it.
 ///
 /// Every field is populated from `ConfigurationStore.shared.configuration`
 /// by `refresh()`, and every setter writes back through
@@ -73,7 +73,7 @@ final class SettingsModel {
     var shellIntegrationStatus = RowStatus()
     var directoryHistoryStatus = RowStatus()
     var notificationPermissionNotice = RowStatus()
-    /// B16 — which key summons the Quick Terminal, or why none does.
+    /// Which key summons the Quick Terminal, or why none does.
     var quickTerminalStatus = RowStatus()
 
     private var clearTask: Task<Void, Never>?
@@ -272,7 +272,7 @@ final class SettingsModel {
 
     /// Refused rather than written: the page is a front over the config
     /// file, and writing a template that cannot be launched would make the
-    /// file say something the app will not do (U17).
+    /// file say something the app will not do.
     func setOpenFileCommand(_ value: String) {
         commit { configuration in
             let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -319,7 +319,7 @@ final class SettingsModel {
         }
     }
 
-    // MARK: - System entry points (B16)
+    // MARK: - System entry points
 
     func setQuickTerminal(_ value: Bool) {
         commit { configuration in
@@ -499,7 +499,7 @@ final class SettingsModel {
 
     // MARK: - Font status
 
-    /// B09 — distinguishes a family AppKit knows nothing about from one that
+    /// Distinguishes a family AppKit knows nothing about from one that
     /// exists but fails the grid's uniform-advance check, rather than
     /// leaving both as an unexplained silent substitution.
     private func refreshFontStatus() {
@@ -530,7 +530,7 @@ final class SettingsModel {
 
     // MARK: - Shell integration
 
-    /// B07 — reflects `ShellIntegrationInstaller`'s three states as an icon,
+    /// Reflects `ShellIntegrationInstaller`'s three states as an icon,
     /// a sentence and the one action that changes it. Read from disk on
     /// every refresh rather than cached: unlike every other row on this
     /// page, the ground truth here is `~/.zshrc`, which the user can edit
@@ -585,7 +585,7 @@ final class SettingsModel {
 
     // MARK: - Directory history
 
-    /// B08 — how many directories `DirectoryHistoryStore` currently
+    /// How many directories `DirectoryHistoryStore` currently
     /// remembers, with a Clear action. Re-read on every refresh, same reason
     /// as `refreshShellIntegrationStatus`: this is app-managed state, not
     /// something this window owns a copy of.

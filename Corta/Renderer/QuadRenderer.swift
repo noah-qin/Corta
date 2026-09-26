@@ -14,8 +14,8 @@ enum QuadRendererError: Error {
 /// Every entry point takes a `CGRect` and a `MTLRenderPassDescriptor`; this
 /// type never assumes "the window" (`DESIGN.md` §2.4). Two draw calls cover
 /// a typical frame — one instanced pass for every cell's background, one for
-/// every glyph — which is what "one draw call per screen" in the roadmap is
-/// protecting against: a call per cell or per row, not a call per pipeline.
+/// every glyph — which is what "one draw call per screen" (`CONFORMANCE.md` §2.2)
+/// is protecting against: a call per cell or per row, not a call per pipeline.
 /// A frame with color emoji adds a third (the color-atlas pass), skipped
 /// entirely when no cell produced a color glyph.
 ///
@@ -75,11 +75,11 @@ nonisolated final class QuadRenderer {
     /// use — the pipelines are built against it up front.
     static let pixelFormat: MTLPixelFormat = .bgra8Unorm
 
-    /// The pipelines and sampler come from `QuadPipelineCache` (B12): one
+    /// The pipelines and sampler come from `QuadPipelineCache`: one
     /// compile per device per process, shared by every pane and by
     /// `Metal4Backend`, instead of each pane re-running the compile/archive
-    /// path. The M9 binary-archive warm-up now lives in the cache's
-    /// creation path — it still accelerates the first (cold) creation per
+    /// path. The binary-archive warm-up lives in the cache's creation
+    /// path — it accelerates the first (cold) creation per
     /// launch; the cache shares that result with panes 2...n, which is the
     /// half the archive never covered.
     init(device: MTLDevice) throws {
@@ -133,8 +133,7 @@ nonisolated final class QuadRenderer {
     /// is not this build's own — otherwise each rebuild during development
     /// leaves the last one behind forever, unbounded, since nothing else
     /// ever revisits this directory. Best-effort: a failed removal here is
-    /// not worth surfacing, the file just sits unused like it would have
-    /// before this existed.
+    /// not worth surfacing, the file just sits unused.
     private static func pruneStaleBinaryArchives(in directory: URL) {
         let current = "QuadRenderer-\(buildFingerprint).metallib-archive"
         guard
@@ -195,10 +194,9 @@ nonisolated final class QuadRenderer {
     /// whatever container Xcode's hosted-test launch applies that a plain
     /// launch does not.
     ///
-    /// Disabling the read path unconditionally (an earlier version of this
-    /// fix) traded away a real, working optimisation for real users to
-    /// silence a test-harness-only crash; this only disables it under that
-    /// harness.
+    /// Disabling the read path unconditionally would trade away a real,
+    /// working optimisation for real users to silence a test-harness-only
+    /// crash; this only disables it under that harness.
     private static var isRunningUnderXCTest: Bool {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
@@ -289,8 +287,8 @@ nonisolated final class QuadRenderer {
         // screen. A `.load` pass with zero instances is the opposite case —
         // it draws nothing and preserves nothing — so skipping it outright
         // is pixel-identical and saves the tile load/store round trip an
-        // empty render pass still costs (the glyph pass on a blank screen
-        // used to pay one every frame; B12 audit).
+        // empty render pass still costs (without it, the glyph pass on a
+        // blank screen pays one every frame).
         if instances.isEmpty,
             renderPassDescriptor.colorAttachments[0].loadAction == .load
         {
@@ -299,8 +297,7 @@ nonisolated final class QuadRenderer {
         guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)
         else { return }
         // Correlates an Instruments/Metal System Trace capture with which of
-        // the up-to-three passes a frame took (B12 platform-diagnostics
-        // scope item); purely a label, changes nothing about what draws.
+        // the up-to-three passes a frame took; purely a label, changes nothing about what draws.
         encoder.label = label
         encoder.pushDebugGroup(label)
         defer {

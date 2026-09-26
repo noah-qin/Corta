@@ -1,7 +1,7 @@
 import Cocoa
 import CortaTerminal
 
-/// U17 — following `src/main.rs:42:17` from program output to the file.
+/// Following `src/main.rs:42:17` from program output to the file.
 ///
 /// **The local/remote distinction is the whole safety argument.** A path in a
 /// pane's output names a file on whichever machine produced it. In an `ssh`
@@ -9,7 +9,7 @@ import CortaTerminal
 /// a *different file that happens to share a name* — at best confusing, at
 /// worst editing the wrong thing in the wrong repository. Corta already knows
 /// the difference: `TerminalSession.workingDirectory` is host-filtered
-/// (S05) — an OSC 7 report naming a remote host produces `nil`, not a path —
+/// — an OSC 7 report naming a remote host produces `nil`, not a path —
 /// so a pane with no local working directory has nothing to resolve against
 /// and refuses rather than guessing.
 ///
@@ -139,7 +139,7 @@ extension ViewController {
         }
     }
 
-    /// B07 — the file reference `openFileReferenceInCommand(_:)` opens: the
+    /// The file reference `openFileReferenceInCommand(_:)` opens: the
     /// last one on the last logical line of `record`'s output that has one,
     /// walking backwards. Closest to the end is closest to where a build
     /// tool actually prints "here is the problem," after whatever preamble
@@ -147,8 +147,8 @@ extension ViewController {
     /// frame, a test runner's failure detail.
     ///
     /// Bounded the same way `FileReferenceDetection.reference(at:in:)`
-    /// already is for a single line (P08's "not an unbounded regex pass"
-    /// rule) — here bounded in *rows scanned* instead, since this walks many
+    /// already is for a single line (never an unbounded regex pass) —
+    /// here bounded in *rows scanned* instead, since this walks many
     /// lines rather than hit-testing one: a multi-thousand-line build log
     /// with no reference at all must not turn opening this menu item into a
     /// linear scan of the whole thing on the main thread.
@@ -191,7 +191,7 @@ extension ViewController {
     /// argument rather than two — the split is of the template the user wrote,
     /// never of the value the child produced.
     ///
-    /// Pure and `nonisolated` (B14): the remote-edit flow's tests drive it
+    /// Pure and `nonisolated`: the remote-edit flow's tests drive it
     /// off the main actor, and string substitution needs no queue.
     nonisolated static func openFileArguments(
         template: String, path: String, line: Int, column: Int?

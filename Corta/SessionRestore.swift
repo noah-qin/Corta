@@ -1,6 +1,6 @@
 import AppKit
 
-/// M7.4 — what a window was, in enough detail to open it again.
+/// What a window was, in enough detail to open it again.
 ///
 /// **Not the terminal's contents.** A pane is a live child process; a
 /// scrollback restored without the process that produced it is a screenshot
@@ -9,7 +9,7 @@ import AppKit
 /// were split, how the dividers sat, and which directory each pane was in —
 /// which is the part a person actually rebuilds by hand after a restart.
 nonisolated struct WindowState: Equatable, Sendable {
-    /// B09 — bumped whenever the shape of a saved `WindowState` changes in a
+    /// Bumped whenever the shape of a saved `WindowState` changes in a
     /// way `decodeIfPresent` alone can't paper over. Absent entirely in data
     /// saved before this existed, which is exactly what makes `0` the right
     /// default for it: nothing else about that data needs migrating yet,
@@ -17,14 +17,14 @@ nonisolated struct WindowState: Equatable, Sendable {
     static let currentVersion = 1
 
     var version: Int
-    /// B16 — `TerminalWindowController.windowID`, so the identity an App
+    /// `TerminalWindowController.windowID`, so the identity an App
     /// Intent resolved before a relaunch still names the same window after
     /// it. `nil` for data saved before this existed; the restored window
     /// then mints a fresh one.
     var id: String?
     var frame: Frame
     var layout: PaneLayout
-    /// B09 — `NSWindow.tabbingIdentifier` at save time, so windows that were
+    /// `NSWindow.tabbingIdentifier` at save time, so windows that were
     /// tabbed together can be regrouped on restore instead of each coming
     /// back as its own standalone window. `nil` for a window that was never
     /// tabbed, or for data saved before this existed.
@@ -85,7 +85,7 @@ nonisolated struct WindowState: Equatable, Sendable {
         /// `NaN`, and `NSWindow.setFrame` with any of them produces a window
         /// nothing can recover — `min`/`max` against `NaN` propagate it
         /// silently rather than clamping it away, so the check has to come
-        /// first (U07).
+        /// first.
         static let minimumSize = CGSize(width: 320, height: 200)
         static let defaultSize = CGSize(width: 900, height: 560)
 
@@ -158,10 +158,10 @@ extension NSRect {
 /// a node is exactly two children and a divider.
 nonisolated indirect enum PaneLayout: Equatable, Sendable {
     /// A pane, the working directory it last reported through OSC 7, the
-    /// preset it was launched from (B09; `nil` for an ordinary pane or data
+    /// preset it was launched from (`nil` for an ordinary pane or data
     /// saved before this existed), and whether it held focus at save time.
     /// Reports naming a remote host never reach here — the parser records
-    /// them as remote context (`RemoteContext`, B13) instead — so a
+    /// them as remote context (`RemoteContext`) instead — so a
     /// directory is always a local path.
     case pane(directory: String?, presetName: String? = nil, isFocused: Bool = false)
     /// - Parameter position: the divider as a *fraction* of the node's axis,
@@ -181,7 +181,7 @@ nonisolated indirect enum PaneLayout: Equatable, Sendable {
 
     /// The first pane's preset name, mirroring `firstDirectory` exactly —
     /// `SplitViewController.viewDidLoad()` needs it at the same moment and
-    /// for the same reason it needs the directory (B09).
+    /// for the same reason it needs the directory.
     var firstPresetName: String? {
         switch self {
         case .pane(_, let presetName, _): return presetName
@@ -207,8 +207,8 @@ nonisolated indirect enum PaneLayout: Equatable, Sendable {
     /// split), and nesting past `maximumDepth` collapsed to a single pane.
     ///
     /// A restore reads a file the user can edit and a crash can truncate, so
-    /// "the file said so" is not a reason to build a window nobody can use
-    /// (U07). Repaired rather than rejected: an arrangement with one silly
+    /// "the file said so" is not a reason to build a window nobody can use.
+    /// Repaired rather than rejected: an arrangement with one silly
     /// divider is still the arrangement the person had.
     func validated(depth: Int = 0) -> PaneLayout {
         switch self {
@@ -319,7 +319,7 @@ enum SessionRestore {
 
     /// Where the state and its restore marker live. Overridable so a test
     /// can exercise the crash-marker protocol against a real filesystem
-    /// without writing into the user's own Application Support (U07).
+    /// without writing into the user's own Application Support.
     nonisolated(unsafe) static var directory: URL = AppPaths.applicationSupportDirectory
 
     /// The saved windows, oldest first, or an empty array when there is
@@ -333,10 +333,10 @@ enum SessionRestore {
         guard let data = try? Data(contentsOf: fileURL),
             let states = try? JSONDecoder().decode([WindowState].self, from: data)
         else { return [] }
-        // B09 — a window saved by a *newer* Corta, in a version this build
+        // A window saved by a *newer* Corta, in a version this build
         // does not understand, is skipped rather than guessed at: the same
-        // "degrade, don't vanish" rule applied per-window instead of to the
-        // whole file, now that there is a version to check.
+        // "degrade, don't vanish" rule applied per window instead of to the
+        // whole file.
         return states.filter { $0.version <= WindowState.currentVersion }.map {
             WindowState(
                 frame: $0.frame,
@@ -345,16 +345,16 @@ enum SessionRestore {
         }
     }
 
-    // MARK: - Surviving a crash (U07)
+    // MARK: - Surviving a crash
 
     /// Set while a restore is being applied, cleared once every saved window
     /// is up.
     ///
     /// Without it, "recover the last-known-good layout" and "do not replay a
     /// layout that crashes on restore" are the same file arguing with itself:
-    /// the state used to be deleted at launch so a crash could not loop, and
-    /// that also meant a crash *after* launch lost the arrangement entirely.
-    /// A separate marker separates the two — a crash during restore leaves it
+    /// deleting the state at launch keeps a crash from looping, but then a
+    /// crash *after* launch loses the arrangement entirely. A separate
+    /// marker separates the two — a crash during restore leaves it
     /// behind and the next launch starts fresh; a crash at any other time
     /// does not, and the debounced state file is still there to restore from.
     static var markerURL: URL { directory.appendingPathComponent("restore-in-progress") }
@@ -379,7 +379,7 @@ enum SessionRestore {
     ///
     /// Pulled out of `AppDelegate` so the decision can be staged against a
     /// real state directory — a marker left behind by a launch that died is
-    /// exactly the state to test, and it is a file, not a crash (U07).
+    /// exactly the state to test, and it is a file, not a crash.
     enum RestoreDecision: Equatable {
         /// The previous launch died while applying a restore.
         case skipAfterFailure

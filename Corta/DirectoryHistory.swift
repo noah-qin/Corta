@@ -1,6 +1,6 @@
 import Foundation
 
-/// B08 — ranks the directories a shell has actually visited, so a directory
+/// Ranks the directories a shell has actually visited, so a directory
 /// switcher can offer "where you probably want to go" instead of everything
 /// under `$HOME`. Built from `OSC 7` reports the same way `CommandRecord` is
 /// built from `OSC 133` (`CortaTerminal/CommandRecord.swift`): never guessed
@@ -150,7 +150,7 @@ struct DirectoryHistory: Equatable {
 /// .swift`'s doc comment): this is state Corta maintains from watching
 /// `OSC 7`, not a setting a person edits. `directory-history = false` stops
 /// it being read *or* written, so turning the feature off leaves nothing
-/// behind — B08's "history can be disabled and cleared."
+/// behind: the history can be disabled and cleared.
 ///
 /// Writes are debounced and run off the main thread. `record` is called
 /// from the render path — a command finishing is noticed on the output
@@ -249,7 +249,7 @@ final class DirectoryHistoryStore {
         DispatchQueue.main.asyncAfter(deadline: .now() + saveDelay, execute: item)
     }
 
-    /// B09 — the on-disk shape, versioned so a future incompatible change
+    /// The on-disk shape, versioned so a future incompatible change
     /// can be given real migration code instead of the file just vanishing.
     private nonisolated struct Persisted: Codable {
         static let currentVersion = 1
@@ -268,7 +268,8 @@ final class DirectoryHistoryStore {
             history = DirectoryHistory(entries: persisted.entries)
             return
         }
-        // Pre-B09 files are a bare array with no wrapper at all — read once
+        // Files written before the version wrapper existed are a bare array
+        // with no wrapper at all — read once
         // more under the old shape rather than treating every existing
         // history as gone the moment this key gets added.
         guard let entries = try? JSONDecoder().decode([DirectoryHistory.Entry].self, from: data)

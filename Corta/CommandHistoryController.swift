@@ -1,14 +1,14 @@
 import AppKit
 import SwiftUI
 
-/// B08 — search command records by directory, project and exit status;
-/// separate find/fill/run actions. B13 added the host scope: a command
+/// Search command records by directory, project and exit status;
+/// separate find/fill/run actions. The host scope works because a command
 /// begun while the pane referred to a remote host carries that host
 /// (`CommandRecord.host`), so the filter reads records rather than
 /// guessing which side of an `ssh` a command ran on.
 ///
-/// B10 — this project's first SwiftUI surface: the window and its chrome
-/// are still AppKit (an `NSWindowController` is still what `showWindow`/
+/// A SwiftUI surface: the window and its chrome
+/// are AppKit (an `NSWindowController` is what `showWindow`/
 /// window lifecycle need), but the content is `CommandHistoryView` hosted
 /// through `NSHostingController`, and every piece of state it reads or
 /// writes lives in `CommandHistoryModel` rather than in view objects this

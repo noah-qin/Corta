@@ -1,6 +1,6 @@
 import AppKit
 
-/// B16 — the Quick Terminal: one terminal window summoned and dismissed by
+/// The Quick Terminal: one terminal window summoned and dismissed by
 /// a system-wide hotkey, from whatever application the user is in.
 ///
 /// **It is an ordinary window, dressed differently.** The panel is the

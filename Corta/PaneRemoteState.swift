@@ -1,7 +1,7 @@
 import CortaTerminal
 import Foundation
 
-/// B13 — which machine a pane's terminal is actually talking to, composed
+/// Which machine a pane's terminal is actually talking to, composed
 /// from the independent signals that can answer it, kept as a plain
 /// value so the composition is testable without a pane, a pty or a window.
 ///
@@ -105,7 +105,7 @@ nonisolated enum PaneRemoteState: Equatable {
         return .local
     }
 
-    /// The pane-lifetime half of `resolve` (B13): remembers a report the
+    /// The pane-lifetime half of `resolve`: remembers a report the
     /// pane has since been seen *local* behind, so it is never dressed up
     /// as the next connection's.
     ///
@@ -115,7 +115,7 @@ nonisolated enum PaneRemoteState: Equatable {
     /// (`resolve` says `.local` with no launcher in front), but the next
     /// `ssh B` puts a launcher in the foreground again and, if B never
     /// reports, `resolve` alone would answer `.remote(A)` — a stale host
-    /// shown as certain, and the host B14 would connect to. The tracker
+    /// shown as certain, and the host SFTP would connect to. The tracker
     /// closes that: once a report has been observed with the pane local,
     /// that exact report (`RemoteContext` is `Equatable`, timestamp
     /// included) is superseded and reads as *no* report until the far end

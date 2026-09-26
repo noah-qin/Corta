@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// M7.12 — the command palette's content, in SwiftUI.
+/// The command palette's content, in SwiftUI.
 /// `CommandPaletteModel` owns the state; `CommandPaletteController` only
 /// hosts this view in an `NSHostingView` inside its `NSGlassEffectView`
 /// panel and forwards `show(_:)`.

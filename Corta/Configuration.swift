@@ -2,7 +2,7 @@ import AppKit
 import CortaTerminal
 import Foundation
 
-/// M6.1 — everything the settings page can change, and the text format the
+/// Everything the settings page can change, and the text format the
 /// config file stores it in.
 ///
 /// One file is the source of truth. The settings page edits that file and
@@ -19,11 +19,11 @@ import Foundation
 ///
 /// Three families of key are structured rather than scalar, and all use a
 /// dotted prefix so the flat format does not need nesting: `theme.<name>.…`
-/// defines a colour theme (M7.6), `preset.<name>.…` a shell/directory/
-/// environment preset (U16), and `bind.<command>` rebinds a keyboard
-/// shortcut (M7.7).
+/// defines a colour theme, `preset.<name>.…` a shell/directory/
+/// environment preset, and `bind.<command>` rebinds a keyboard
+/// shortcut.
 nonisolated struct Configuration: Equatable, Sendable {
-    /// Which of a theme's two variants is live (M6.13).
+    /// Which of a theme's two variants is live.
     enum Appearance: String, CaseIterable, Sendable {
         /// Follow macOS, switching live when the system does.
         case auto
@@ -31,7 +31,7 @@ nonisolated struct Configuration: Equatable, Sendable {
         case dark
     }
 
-    /// What it takes to open a link (M7.9).
+    /// What it takes to open a link.
     enum LinkActivation: String, CaseIterable, Sendable {
         /// ⌘-click, the original behaviour: the modifier is the confirmation.
         case command
@@ -41,7 +41,7 @@ nonisolated struct Configuration: Equatable, Sendable {
         case click
     }
 
-    /// B16 — where the Quick Terminal's panel sits on its screen.
+    /// Where the Quick Terminal's panel sits on its screen.
     enum QuickTerminalPosition: String, CaseIterable, Sendable {
         /// A band across the top edge, the width of the screen.
         case top
@@ -51,7 +51,7 @@ nonisolated struct Configuration: Equatable, Sendable {
         case center
     }
 
-    /// B16 — which display the Quick Terminal opens on.
+    /// Which display the Quick Terminal opens on.
     enum QuickTerminalScreen: String, CaseIterable, Sendable {
         /// The screen under the pointer at the moment the hotkey is pressed
         /// — the one the user is looking at, on a multi-display desk.
@@ -66,12 +66,12 @@ nonisolated struct Configuration: Equatable, Sendable {
     var theme: String = Theme.corta.name
     var appearance: Appearance = .auto
     var scrollbackLines: Int = 10_000
-    /// B08 — the bound on `CommandRecordStore`'s per-session history,
+    /// The bound on `CommandRecordStore`'s per-session history,
     /// distinct from `scrollbackLines`: this caps structured command
     /// records (for jumping, copying and the command-history search), not
     /// visible text.
     var commandHistoryLimit: Int = CommandRecordStore.defaultCapacity
-    /// The grid a new window opens with (M7.14). In *cells*, not points: the
+    /// The grid a new window opens with. In *cells*, not points: the
     /// window's pixel size is this grid times the font's cell metrics plus
     /// the pane insets, which is what keeps `columns × rows` meaning the same
     /// thing after a font or size change.
@@ -79,23 +79,22 @@ nonisolated struct Configuration: Equatable, Sendable {
     var rows: Int = 30
     var bell: BellMode = .visual
     /// Whether a command that ran longer than `notificationThreshold` posts
-    /// a notification when it finishes (M6.3).
+    /// a notification when it finishes.
     var notifyOnLongTask: Bool = false
     /// Seconds a command must run before finishing it is worth a
     /// notification. Below this a notification is noise — the user was
     /// watching.
     var notificationThreshold: Double = 30
-    /// M7.10 — a finished selection goes straight to the pasteboard, the way
+    /// A finished selection goes straight to the pasteboard, the way
     /// X11 and every terminal that grew up beside it behave.
     ///
-    /// On by default. It was off because copying silently replaces the
-    /// clipboard and that surprises anyone who did not ask for it — but the
-    /// copy is no longer silent: a confirmation appears in the corner of the
-    /// pane (`TerminalView.showToast`), which is exactly the objection
-    /// answered. What is left is the behaviour most people selecting text in
+    /// On by default. The objection — copying silently replaces the
+    /// clipboard, which surprises anyone who did not ask for it — is
+    /// answered by making it not silent: a confirmation appears in the
+    /// corner of the pane (`TerminalView.showToast`). What is left is the behaviour most people selecting text in
     /// a terminal already expect.
     var copyOnSelect: Bool = true
-    /// M7.9 — see `LinkActivation`.
+    /// See `LinkActivation`.
     var linkActivation: LinkActivation = .command
     enum MouseOverrideModifier: String, CaseIterable, Sendable {
         case option, shift, control
@@ -117,25 +116,25 @@ nonisolated struct Configuration: Equatable, Sendable {
         }
     }
     var mouseOverrideModifier: MouseOverrideModifier = .option
-    /// U05 — ⌥ as Meta: an Option-modified text key sends ESC plus the base
+    /// ⌥ as Meta: an Option-modified text key sends ESC plus the base
     /// character, the way a PC's Alt key reaches readline (`\eb` for
     /// Option+B, and so on). Off by default: on a Mac, Option is how the
     /// layout's alternate characters (é, ø, π) and dead keys are typed, and
     /// taking that away is a choice only the user can make.
     var optionAsMeta: Bool = false
 
-    /// U12 — whether scrollback search distinguishes case. Off by default:
+    /// Whether scrollback search distinguishes case. Off by default:
     /// a person searching a log for `error` wants `Error` and `ERROR` too,
     /// and the toggle in the search bar writes here so the choice survives
     /// closing the bar and restarting the app.
     var searchCaseSensitive: Bool = false
 
-    /// U16 — whether the search field is read as a regular expression. Like
+    /// Whether the search field is read as a regular expression. Like
     /// `search-case-sensitive`, the bar's own toggle writes it, so the mode
     /// survives closing the bar.
     var searchRegex: Bool = false
 
-    /// U17 — the command that opens a `path:line` reference, with `{file}`,
+    /// The command that opens a `path:line` reference, with `{file}`,
     /// `{line}` and `{column}` substituted. Empty means the system default
     /// application, which cannot be told a line number.
     var openFileCommand: String = ""
@@ -174,7 +173,7 @@ nonisolated struct Configuration: Equatable, Sendable {
         }
         return true
     }
-    /// M7.11 — whether OSC 52 may write the system pasteboard.
+    /// Whether OSC 52 may write the system pasteboard.
     ///
     /// Off by default, as `SECURITY.md` §2.6 requires: any output at all
     /// could put `rm -rf ~` or an attacker's wallet address on the clipboard
@@ -184,7 +183,7 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// other route to the local clipboard. The *read* half stays unavailable
     /// under every setting (`SECURITY.md` §6).
     var allowClipboardWrite: Bool = false
-    /// B08 — whether Corta remembers visited directories (`OSC 7`) to rank
+    /// Whether Corta remembers visited directories (`OSC 7`) to rank
     /// for the directory switcher. On by default: unlike clipboard write,
     /// nothing here reaches outside the app, and the data is app-managed
     /// history, not a setting — `DirectoryHistory` persists it to its own
@@ -193,10 +192,10 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// kept at all; clearing what is already kept is a Settings action, not
     /// a config-file key.
     var directoryHistory: Bool = true
-    /// M7.4 — reopen the windows, splits and working directories from the
+    /// Reopen the windows, splits and working directories from the
     /// last run.
     var restoreWindows: Bool = true
-    /// M7.5 — ask before closing a pane whose shell still has a child
+    /// Ask before closing a pane whose shell still has a child
     /// process running.
     var confirmClose: Bool = true
     /// Whether Sparkle checks for updates in the background, on the
@@ -210,7 +209,7 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// either moves it or says not to ask again.
     var suggestApplicationsFolder: Bool = true
 
-    /// B16 — whether a global hotkey summons the Quick Terminal.
+    /// Whether a global hotkey summons the Quick Terminal.
     ///
     /// Off by default. A global hotkey is claimed system-wide, in every
     /// application, and the key a person would want for it is one another
@@ -224,20 +223,20 @@ nonisolated struct Configuration: Equatable, Sendable {
     var quickTerminalKey: Shortcut? = Shortcut.parse(Configuration.defaultQuickTerminalKey)
     var quickTerminalPosition: QuickTerminalPosition = .top
     var quickTerminalScreen: QuickTerminalScreen = .mouse
-    /// B16 — Secure Keyboard Entry: while a Corta window is key, the system
+    /// Secure Keyboard Entry: while a Corta window is key, the system
     /// stops other processes from observing keystrokes (`SecureInput`). Off
     /// by default because it is system-wide — it also blocks the
     /// accessibility tools, macro utilities and text expanders a person
     /// may rely on — so it is a choice only the user can make.
     var secureKeyboardEntry: Bool = false
 
-    /// Themes defined in the config file itself (M7.6), in file order.
+    /// Themes defined in the config file itself, in file order.
     var customThemes: [Theme] = []
 
-    /// U16 — named shell/directory/environment presets, in the order the
+    /// Named shell/directory/environment presets, in the order the
     /// config file lists them, which is the order the menu offers them.
     var presets: [Preset] = []
-    /// Keyboard shortcuts, defaults plus the file's overrides (M7.7).
+    /// Keyboard shortcuts, defaults plus the file's overrides.
     var keybindings = Keybindings()
 
     /// The sentinel meaning "whatever `NSFont.monospacedSystemFont` gives",
@@ -369,7 +368,7 @@ nonisolated struct Configuration: Equatable, Sendable {
             guard let seconds = Double(value) else { return false }
             notificationThreshold = max(1, seconds)
         case "open-file-command":
-            // Validated when it is *set*, not only when it is run (U17). An
+            // Validated when it is *set*, not only when it is run. An
             // executable that is not an absolute path can never be launched
             // — resolving a bare name would mean consulting a `PATH` that the
             // user's shell, not Corta, controls — and finding that out at
@@ -452,7 +451,7 @@ nonisolated struct Configuration: Equatable, Sendable {
         }
     }
 
-    // MARK: - Custom themes (M7.6)
+    // MARK: - Custom themes
 
     /// A theme under construction: `theme.<name>.<variant>.<field>` keys
     /// arrive one at a time, and anything left unset inherits.

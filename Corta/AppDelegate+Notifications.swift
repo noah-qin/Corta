@@ -2,7 +2,7 @@ import Cocoa
 import CortaTerminal
 import UserNotifications
 
-/// B07 — the click half of "connect notifications into the flow": a
+/// The click half of "connect notifications into the flow": a
 /// `TaskNotifier` notification for a command that finished (or failed) tags
 /// itself with the window and the `CommandRecord.id` it was about
 /// (`TaskNotifier.post`); clicking it should land back on exactly that

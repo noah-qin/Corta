@@ -6,9 +6,9 @@ import AppKit
 /// device, a glyph atlas built for the configured font, and a child process
 /// on a PTY. Each of those can fail on a machine Corta is otherwise fine on —
 /// a `$SHELL` pointing at a file that was uninstalled, a restored working
-/// directory on an unmounted volume, a GPU that reports no device — and until
-/// M7 each failure was a `fatalError` or a `try!`, so the answer to "your
-/// login shell moved" was a crash report.
+/// directory on an unmounted volume, a GPU that reports no device. None of
+/// them is a reason to crash: "your login shell moved" deserves a sentence,
+/// not a crash report.
 ///
 /// The view is deliberately plain: an icon, a sentence naming what failed, the
 /// underlying error, and the two actions that can actually help. Failure is
@@ -20,7 +20,7 @@ final class PaneFailureView: NSView {
     /// The pane is being asked to build itself again — the shell was
     /// reinstalled, the volume was remounted.
     var onRetry: (() -> Void)?
-    /// B13 — the pane was reaching for a remote host when it failed.
+    /// The pane was reaching for a remote host when it failed.
     /// Reconnect re-runs that exact command as a new connection; unlike
     /// Try Again it never falls back to a local shell.
     var onReconnect: (() -> Void)?
@@ -35,7 +35,7 @@ final class PaneFailureView: NSView {
     /// `nil` and focus falls back to the window itself: nothing inside the
     /// panel is focused, and a person navigating by keyboard has to find the
     /// button by hand on the one screen where everything else has already
-    /// gone wrong (U09).
+    /// gone wrong.
     private(set) var primaryAction: NSButton?
 
     /// What VoiceOver should hear when the panel replaces the terminal.

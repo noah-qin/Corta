@@ -1,17 +1,16 @@
 import AppKit
 import CortaTerminal
 
-/// U03: the leftover sub-line scroll distance for one view, kept per device
+/// The leftover sub-line scroll distance for one view, kept per device
 /// class. Trackpads report *precise* deltas in points, wheel mice report
 /// lines (usually whole, occasionally fractional); rounding each event on
-/// its own rounded small trackpad deltas away to nothing and dropped a
-/// wheel notch entirely (a 1-line notch is 1/10 of the old per-event
-/// threshold). Accumulating instead keeps the totals faithful in both
+/// its own would round small trackpad deltas away to nothing and could
+/// drop a wheel notch entirely. Accumulating instead keeps the totals faithful in both
 /// units. The two remainders never combine: a trackpad's leftover points
 /// must not make a wheel notch count as more than a notch.
 final class ScrollWheelAccumulator {
-    /// Trackpad points per scrollback line — the constant M1.20 picked so
-    /// momentum scrolling stays proportionate without a config knob.
+    /// Trackpad points per scrollback line — chosen so momentum scrolling
+    /// stays proportionate without a config knob.
     static let pointsPerLine: CGFloat = 10
 
     private var precisePoints: CGFloat = 0
@@ -50,7 +49,7 @@ final class ScrollWheelAccumulator {
 private let scrollWheelAccumulators = NSMapTable<TerminalView, ScrollWheelAccumulator>(
     keyOptions: .weakMemory, valueOptions: .strongMemory)
 
-/// Scrolling (M1.20): the wheel, the page keys and the keystrokes bound to
+/// Scrolling: the wheel, the page keys and the keystrokes bound to
 /// Scroll to Top / Scroll to Bottom resolve to a `ScrollGesture` the shell
 /// applies to the scrollback viewport.
 extension TerminalView {
@@ -89,7 +88,7 @@ extension TerminalView {
     override func scrollPageUp(_ sender: Any?) { onScroll?(.page(up: true)) }
     override func scrollPageDown(_ sender: Any?) { onScroll?(.page(up: false)) }
 
-    /// M9 — reports a trackpad gesture's begin/end to `RenderPolicy`, so
+    /// Reports a trackpad gesture's begin/end to `RenderPolicy`, so
     /// it can lift the frame-rate ceiling for the couple of seconds a
     /// scroll actually lasts. A plain mouse wheel carries no phase
     /// (`event.phase` and `.momentumPhase` are both `[]`) and so never
@@ -120,19 +119,17 @@ extension TerminalView {
     /// The keystrokes bound to Scroll to Top and Scroll to Bottom, checked
     /// before `bytes(for:)` so neither leaks an escape sequence to the child.
     ///
-    /// This used to read ⌘↑ / ⌘↓ literally, from M1.20 — before M7.2 gave
-    /// those two keys to `previous-command` and `next-command` and M7.7 gave
-    /// Scroll to Top and Scroll to Bottom their own bindings (⇧Home / ⇧End).
-    /// The literal outlived both. It was masked in a default install, because
-    /// the Shell menu's Previous Command claims ⌘↑ and AppKit dispatches a
-    /// menu key equivalent before `keyDown` runs, but `bind.previous-command
-    /// =` uncovered it: unbinding one command silently turned on a different,
-    /// undocumented one that Help ▸ Keyboard Shortcuts never listed (U08).
+    /// Read from the bindings, never a literal keystroke. A literal here
+    /// would be a second, invisible binding: masked in a default install
+    /// (AppKit dispatches a menu key equivalent before `keyDown` runs), but
+    /// unbinding the command that owns the key — `bind.previous-command =`
+    /// for ⌘↑ — would silently turn on a different, undocumented one that
+    /// Help ▸ Keyboard Shortcuts never lists.
     ///
     /// The View menu's own items claim these keystrokes first, so this is the
     /// path for a keystroke AppKit did not dispatch — a menu item that failed
     /// validation, or a binding on a key AppKit will not take as a menu key
-    /// equivalent — and it can now only ever answer for a key those two
+    /// equivalent — and it only ever answers for a key those two
     /// commands are actually bound to.
     static func scrollGesture(for event: NSEvent, bindings: Keybindings) -> ScrollGesture? {
         if bindings[.scrollToTop]?.matches(event) == true { return .toTop }

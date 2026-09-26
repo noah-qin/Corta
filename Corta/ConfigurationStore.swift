@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-/// M6.1 — the one place the config file is read, written and watched.
+/// The one place the config file is read, written and watched.
 ///
 /// The file is the source of truth, not a cache of some in-memory model:
 /// changing a setting writes the file and the change is applied from what

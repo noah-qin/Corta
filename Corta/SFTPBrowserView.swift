@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// B14 — the SwiftUI half of the remote-file browser;
+/// The SwiftUI half of the remote-file browser;
 /// `SFTPBrowserModel` owns every piece of state this renders, and
 /// `SFTPBrowserController` hosts it in an `NSHostingController` (the
 /// `CommandHistoryController` pattern).

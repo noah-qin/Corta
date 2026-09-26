@@ -22,7 +22,7 @@ nonisolated struct TerminalSelection: Equatable {
     /// lines into history, shifting every stored row by that much; the
     /// renderer applies the shift when translating to viewport rows.
     ///
-    /// The monotonic counter rather than `scrollback.count` (M6.10): the
+    /// The monotonic counter rather than `scrollback.count`: the
     /// count saturates at the ring's limit, so a flood past capacity evicted
     /// rows without appearing to grow anything, and the highlight drifted
     /// onto whatever text arrived underneath it.
@@ -33,7 +33,7 @@ nonisolated struct TerminalSelection: Equatable {
 /// rectangle — two draw calls (background, glyphs), plus a third for color
 /// emoji when a frame contains any (see `cachedColorGlyphs`).
 ///
-/// **Damage tracking** (`PERFORMANCE.md` §3, roadmap M4.1 and M9): the
+/// **Damage tracking** (`PERFORMANCE.md` §3): the
 /// live screen (`offset == 0`) is diffed at line granularity using
 /// `Grid.lineRevision(_:)` — a stamp `ScreenLines` bumps on every row it
 /// touches (`ScreenLines.swift`), compared as a single `UInt64` rather than
@@ -55,13 +55,13 @@ nonisolated final class TerminalRenderer {
     /// `MTLRenderCommandEncoder`) unless `Metal4Backend.isOptedIn` and
     /// `.isSupported(by:)` both hold, in which case a `Metal4Backend`. The
     /// stored name predates the `TerminalRenderBackend` abstraction
-    /// (M9) and stays for source compatibility with the tests that
+    /// and stays for source compatibility with the tests that
     /// already reach through it (`ShellIntegrationRenderTests` and others);
     /// its declared type is the protocol, not the concrete `QuadRenderer`.
     let quadRenderer: any TerminalRenderBackend
     let glyphAtlas: GlyphAtlas
     private(set) var metrics: CellMetrics
-    /// M10 — Kitty graphics image placements, drawn after everything else
+    /// Kitty graphics image placements, drawn after everything else
     /// each frame (`draw`). Its own small texture cache, not folded into
     /// `glyphAtlas`: an image is not a glyph, has no reason to share an
     /// eviction policy built for many small bitmaps, and is drawn through
@@ -81,10 +81,10 @@ nonisolated final class TerminalRenderer {
     private static let blockCursorAlpha: Float = 0.6
     /// Alpha for the selection highlight, over the cell's own background.
     private static let selectionColor = SIMD4<Float>(0.25, 0.45, 0.85, 0.4)
-    /// M4.4: every search match highlights; the current one differently.
+    /// Every search match highlights; the current one differently.
     private static let searchMatchColor = SIMD4<Float>(0.85, 0.75, 0.2, 0.35)
     private static let currentSearchMatchColor = SIMD4<Float>(0.95, 0.55, 0.15, 0.6)
-    /// M7.9 — the underline under a hovered link.
+    /// The underline under a hovered link.
     private static let linkUnderlineColor = SIMD4<Float>(0.45, 0.7, 1.0, 0.95)
 
     // MARK: - Damage-tracked instance cache
@@ -113,7 +113,7 @@ nonisolated final class TerminalRenderer {
     /// What the cache was built against; a mismatch forces a full rebuild.
     private var cachedColumns = 0
     private var cachedOffset = -1
-    /// `Scrollback.totalPushed`, not `.count` (B04): `.count` saturates at
+    /// `Scrollback.totalPushed`, not `.count`: `.count` saturates at
     /// the ring's limit, so once the ring is full every push evicts a row
     /// while `.count` reports no change — a `.count`-based comparison would
     /// then think nothing scrolled and skip a rebuild the shifted rows
@@ -127,7 +127,7 @@ nonisolated final class TerminalRenderer {
     /// `IndexedPalette.overridesGeneration` when the cache was last built. A
     /// mismatch means an OSC 4 set/reset landed since — invisible to every
     /// other invalidation check above, since it changes what an index
-    /// *resolves to*, not any `Cell`'s own stored value (B06). This session's
+    /// *resolves to*, not any `Cell`'s own stored value. This session's
     /// `overrides` themselves, read fresh every `updateInstances` call
     /// rather than cached, are what `appendRowInstances` actually resolves
     /// against.
@@ -143,12 +143,12 @@ nonisolated final class TerminalRenderer {
     private var cachedCursorStyle: CursorStyle?
     private var cachedCursorVisible = false
     private var cachedSelection: TerminalSelection?
-    /// M4.4 search highlights, in document rows exactly like `TerminalSelection`
+    /// Search highlights, in document rows exactly like `TerminalSelection`
     /// — recomputed fresh from the current grid whenever the query or the
     /// grid changes, so unlike a selection there is no growth to track.
     private var cachedSearchMatches: [TerminalSelection] = []
     private var cachedCurrentSearchMatchIndex: Int?
-    /// The link the pointer is over (M7.9), underlined so the target is
+    /// The link the pointer is over, underlined so the target is
     /// visible before a click can open it.
     private var cachedHoveredLink: TerminalSelection?
     private var needsFullRebuild = true
@@ -204,7 +204,7 @@ nonisolated final class TerminalRenderer {
         } else {
             self.quadRenderer = try QuadRenderer(device: device)
         }
-        // B12 (issue #39) cross-pane evaluation — why the atlas is per-pane
+        // Why the atlas is per-pane
         // while the pipelines moved to `QuadPipelineCache`. Pipeline states
         // are immutable after creation, so sharing them is a dictionary
         // lookup. A `GlyphAtlas` is the opposite: single-threaded *mutable*
@@ -248,8 +248,8 @@ nonisolated final class TerminalRenderer {
     }
 
     /// Marks every row damaged, so the next `updateInstances` rebuilds the
-    /// whole buffer — used by the frame-CPU baseline to keep measuring the
-    /// worst case now that steady-state frames rebuild nothing.
+    /// whole buffer — used by the frame-CPU baseline to measure the worst
+    /// case, since steady-state frames rebuild nothing.
     func invalidate() {
         needsFullRebuild = true
     }
@@ -269,9 +269,8 @@ nonisolated final class TerminalRenderer {
         // `nil`, not an always-passed empty dictionary: passing `nil` per row
         // costs nothing (no object to retain), where an empty `Dictionary`
         // still costs a retain/release pair on every `resolveForeground`/
-        // `resolveBackground` call each cell makes (B06 render-path
-        // integration; measured ~5% on `FrameCPUBaselineTests` before this
-        // was caught).
+        // `resolveBackground` call each cell makes (measured at ~5% on
+        // `FrameCPUBaselineTests`).
         self.indexedOverrides = indexedOverrides.isEmpty ? nil : indexedOverrides
         let offset = min(max(0, scrollOffset), grid.scrollback.count)
         let fullRebuild =
@@ -287,7 +286,7 @@ nonisolated final class TerminalRenderer {
             // small numbers independently of this cache's, so a coincidental
             // match cannot be trusted (`ScreenLines.generation`).
             || (offset == 0 && cachedLinesGeneration != grid.linesGeneration)
-            // An OSC 4 set/reset landed since the cache was built (B06) —
+            // An OSC 4 set/reset landed since the cache was built —
             // see `cachedIndexedOverridesGeneration`'s own doc comment.
             || cachedIndexedOverridesGeneration != indexedOverridesGeneration
 
@@ -332,7 +331,7 @@ nonisolated final class TerminalRenderer {
             cachedLinesGeneration = grid.linesGeneration
             cachedLinesRotated = grid.linesRotated
         }
-        // M10/P05: hand the image renderer the current placement table once
+        // Hand the image renderer the current placement table once
         // per frame. This is where decodes get scheduled (never in `draw`),
         // where stale textures are pruned, and where an image-layer change
         // registers as damage — an image delete changes no cell, so the
@@ -362,13 +361,13 @@ nonisolated final class TerminalRenderer {
     /// shell blink the cursor without touching the grid.
     /// - Parameter scrollOffset: lines of scrollback above the screen to
     ///   show instead of it, clamped to what history actually holds. `0` is
-    ///   the live screen (`M1.20`).
+    ///   the live screen.
     ///
     /// A convenience for callers that have not already diffed this frame —
     /// every test and benchmark in `CortaTests` calls it this way. The
     /// shell's real render loop has usually just called `updateInstances`
     /// itself (as `ViewController.prepareFrame`) and calls `draw(rect:...)`
-    /// directly instead, so the diff does not run twice a frame (M9).
+    /// directly instead, so the diff does not run twice a frame.
     func render(
         grid: Grid,
         scrollOffset: Int = 0,
@@ -398,7 +397,7 @@ nonisolated final class TerminalRenderer {
     /// `render` so a caller that has already called `updateInstances` this
     /// frame (`ViewController.render(into:...)`, fed by `prepareFrame`)
     /// draws the same cached instances without diffing the grid a second
-    /// time (M9) — see the type's doc comment.
+    /// time — see the type's doc comment.
     func draw(
         rect: CGRect, drawableSize: CGSize, renderPassDescriptor: MTLRenderPassDescriptor,
         commandBuffer: MTLCommandBuffer
@@ -423,7 +422,7 @@ nonisolated final class TerminalRenderer {
                 drawableSize: drawableSize, renderPassDescriptor: renderPassDescriptor,
                 commandBuffer: commandBuffer)
         }
-        // M10: Kitty graphics, drawn last (over the text) — see
+        // Kitty graphics, drawn last (over the text) — see
         // `KittyImageRenderer`'s doc comment. Skipped outright when nothing
         // is placed, same as the color pass above.
         if cachedImagePlacements.placementCount > 0 {
@@ -436,8 +435,8 @@ nonisolated final class TerminalRenderer {
         }
     }
 
-    /// The Metal 4 counterpart to `draw(rect:drawableSize:renderPassDescriptor:commandBuffer:)`
-    /// (B12): the backend owns the command buffer, the render pass, the
+    /// The Metal 4 counterpart to `draw(rect:drawableSize:renderPassDescriptor:commandBuffer:)`:
+    /// the backend owns the command buffer, the render pass, the
     /// commit and the drawable presentation (`Metal4FrameBackend`), so this
     /// takes the render target, clear colour and drawable directly rather
     /// than the Metal 3 pass/buffer pair. `ViewController.render(into:...)`
@@ -508,8 +507,8 @@ nonisolated final class TerminalRenderer {
     /// point correct, because every later row sits after it.
     ///
     /// The live screen (`offset == 0`) is checked with `Grid.lineRevision`,
-    /// a single `UInt64` compare, instead of the full `Line` comparison this
-    /// used before M9 — see the type's doc comment and
+    /// a single `UInt64` compare, instead of a full `Line` comparison —
+    /// see the type's doc comment and
     /// `ScreenLines.swift`. Scrolled into history, rows are immutable
     /// scrollback storage with no revision to compare, so that path is
     /// unchanged: `visibleLine` is fetched and compared by value every row,
@@ -533,8 +532,8 @@ nonisolated final class TerminalRenderer {
         }
         for row in 0..<grid.rows {
             let revision = liveScreen ? grid.lineRevision(row) : 0
-            // `!liveScreen` always re-checks by value below, matching the
-            // pre-M9 behaviour exactly for the scrolled-into-history case.
+            // `!liveScreen` always re-checks by value below: history rows
+            // carry no revision to compare.
             let possiblyChanged = !liveScreen || revision != cachedRevisions[row]
             if possiblyChanged {
                 let line = Self.visibleLine(grid: grid, row: row, offset: offset)
@@ -642,8 +641,8 @@ nonisolated final class TerminalRenderer {
                     selection, grid: grid, offset: offset, cellWidth: cellWidth, cellHeight: cellHeight,
                     color: Self.selectionColor))
         }
-        // All matches highlight; the current one highlights differently
-        // (M4.4). Drawn after the selection and before the cursor, so the
+        // All matches highlight; the current one highlights differently.
+        // Drawn after the selection and before the cursor, so the
         // cursor still reads as the topmost quad if they overlap.
         for (index, match) in searchMatches.enumerated() {
             overlayScratch.append(
@@ -651,7 +650,7 @@ nonisolated final class TerminalRenderer {
                     match, grid: grid, offset: offset, cellWidth: cellWidth, cellHeight: cellHeight,
                     color: index == currentSearchMatchIndex ? Self.currentSearchMatchColor : Self.searchMatchColor))
         }
-        // The hovered link's underline (M7.9). A rule rather than a fill:
+        // The hovered link's underline. A rule rather than a fill:
         // a link under the pointer has to read as a link, and filling it
         // would compete with the selection highlight it can overlap.
         if let hoveredLink {
@@ -669,7 +668,7 @@ nonisolated final class TerminalRenderer {
         if cursorVisible {
             let cellOrigin = SIMD2<Float>(
                 Float(grid.cursor.column) * cellWidth, Float(grid.cursor.row) * cellHeight)
-            // DECSCUSR (M2.5/D.4): the core tracks the style, the renderer
+            // DECSCUSR: the core tracks the style, the renderer
             // draws it. Blinking variants render steady — the damage model
             // redraws on change, and a blink timer would force a frame every
             // interval on an otherwise idle screen (`PERFORMANCE.md` §1:
@@ -701,17 +700,16 @@ nonisolated final class TerminalRenderer {
         overlayCount = overlayScratch.count
     }
 
-    /// Every instance one viewport row contributes — the per-cell loop that
-    /// used to run for the whole screen every frame, now run only for rows
-    /// whose line actually changed.
+    /// Every instance one viewport row contributes — the per-cell loop, run
+    /// only for rows whose line actually changed.
     ///
-    /// A wide pair's lead cell draws its glyph across the full two-cell box
-    /// (M3.5), *scaled down to fit* when the fallback font's bitmap is larger
+    /// A wide pair's lead cell draws its glyph across the full two-cell box,
+    /// *scaled down to fit* when the fallback font's bitmap is larger
     /// — the CJK font Core Text falls back to has its own metrics and is
     /// never exactly two primary-font advances wide, and trusting it is what
     /// made CJK spill into the next cell or draw at the wrong width. A cell
-    /// whose grapheme cluster spills to the side table (`DESIGN.md` §2.3,
-    /// M3.6) is shaped as one run and drawn into the same box — one cell, or
+    /// whose grapheme cluster spills to the side table (`DESIGN.md` §2.3)
+    /// is shaped as one run and drawn into the same box — one cell, or
     /// two for a wide cluster such as a ZWJ emoji.
     private func appendRowInstances(
         line: Line, row: Int, graphemes: GraphemeTable,
@@ -725,7 +723,7 @@ nonisolated final class TerminalRenderer {
         // a global and retains the theme's ANSI array every time it is
         // touched, and this loop runs tens of thousands of times a frame.
         let palette = TerminalColorPalette.activeVariant
-        // Shell-integration mark (M7.2): a two-pixel rule down the left edge
+        // Shell-integration mark: a two-pixel rule down the left edge
         // of a prompt row, coloured by how that command ended. It is the only
         // way to see at a glance which of the last twenty commands failed,
         // and it costs one comparison per row rather than per cell. Drawn
@@ -751,7 +749,7 @@ nonisolated final class TerminalRenderer {
             // Resolve each colour in its own role first, `.default` and all,
             // then swap the two resolved values for reverse video. Passing
             // the swapped *raw* colours into `resolveForeground`/
-            // `resolveBackground` instead (as this used to) is wrong for the
+            // `resolveBackground` instead is wrong for the
             // common case: `.default` foreground and `.default` background
             // both re-resolve to the same defaults regardless of which
             // resolver they go through, so a plain reversed cell — a
@@ -761,10 +759,10 @@ nonisolated final class TerminalRenderer {
             let resolvedBg = palette.resolveBackground(cell.background, indexedOverrides: indexedOverrides)
             var fg = reversed ? resolvedBg : resolvedFg
             let bg = reversed ? resolvedFg : resolvedBg
-            // SGR 2 (dim). Parsed since M1 and drawn nowhere until now, so
-            // `git log --oneline`'s hashes, `ls -l`'s metadata and every
-            // spinner's hint line came out at full strength and the
-            // distinction the program was drawing was simply lost.
+            // SGR 2 (dim). Without it, `git log --oneline`'s hashes,
+            // `ls -l`'s metadata and every spinner's hint line come out at
+            // full strength and the distinction the program is drawing is
+            // simply lost.
             //
             // Applied as alpha on the foreground rather than as a blend
             // towards the background: the glyph quads already carry a
@@ -782,7 +780,7 @@ nonisolated final class TerminalRenderer {
             }
 
             // Underline and strikethrough are rules, not glyphs: one quad
-            // each, in the cell's foreground. An OSC 8 hyperlink (M6.8)
+            // each, in the cell's foreground. An OSC 8 hyperlink
             // draws the same underline whether or not the program also set
             // SGR 4 — that rule is what makes it read as a link, and
             // `ls --hyperlink` sets no rendition at all.
@@ -1008,13 +1006,13 @@ nonisolated final class TerminalRenderer {
         color: SIMD4<Float>
     ) -> [QuadInstance] {
         guard selection.start.row <= selection.end.row else { return [] }
-        // `totalPushed`, not `.count` (M6.10, `TerminalSelection`'s own doc
+        // `totalPushed`, not `.count` (`TerminalSelection`'s own doc
         // comment above): once the ring has saturated, `.count` stops
         // growing while eviction keeps shifting what document row -1 means,
         // so a `.count`-based shift here drew the highlight over the wrong
         // text as soon as the ring filled, while the copy path (which
         // already used `totalPushed`) copied the right text — the highlight
-        // and what `⌘C` produced would silently disagree (B04).
+        // and what `⌘C` produced would silently disagree.
         let firstRow =
             ScrollbackCoordinates.reanchoredRow(
                 selection.start.row, from: selection.baseScrollbackTotal,

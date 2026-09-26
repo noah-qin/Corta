@@ -64,7 +64,7 @@ nonisolated struct CellMetrics {
         // match Terminal's column geometry. The glyph ink itself is narrower
         // than the nominal advance, so adjacent cells do not collide.
         self.cellWidth = max(1 / pixels, (advanceWidth * pixels).rounded(.down) / pixels)
-        // Width no longer inflates the row. The height follows the font's
+        // Width does not inflate the row. The height follows the font's
         // own line metrics independently, which is also what lets 120x30
         // match Terminal in both axes.
         // Never zero, like the width: a face whose line metrics come back

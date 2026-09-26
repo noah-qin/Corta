@@ -1,7 +1,7 @@
 import AppIntents
 import AppKit
 
-/// B16 — the App Intents Corta exposes to the Shortcuts app and, through a
+/// The App Intents Corta exposes to the Shortcuts app and, through a
 /// Shortcut built there, to `shortcuts run`.
 ///
 /// **No `AppShortcutsProvider`, deliberately.** A provider gives Siri and

@@ -1,6 +1,6 @@
 import AppKit
 
-/// IME composition (M3.1–M3.4): the `NSTextInputClient` conformance, the
+/// IME composition: the `NSTextInputClient` conformance, the
 /// marked-text (preedit) overlay and the candidate window's placement.
 ///
 /// The split of responsibilities (`DESIGN.md` §7.1):
@@ -16,7 +16,7 @@ import AppKit
 ///   cells starting at the cursor, keeping the underline styling the
 ///   attributed string carries.
 extension TerminalView: NSTextInputClient {
-    // MARK: - Marked text state (M3.1, M3.3)
+    // MARK: - Marked text state
 
     /// Extensions cannot add storage, so the preedit state lives on the
     /// overlay subview itself; a lookup stands in for an ivar.
@@ -31,20 +31,18 @@ extension TerminalView: NSTextInputClient {
         return overlay
     }
 
-    // MARK: - NSTextInputClient (M3.1)
+    // MARK: - NSTextInputClient
 
     /// Committed text is the only IME output that reaches the child: as
     /// UTF-8 bytes through the same `onKeyBytes` path a physical key takes.
     ///
     /// This is the path *ordinary* typing takes, composed or not — Cocoa's
     /// input-context pipeline commits even a plain, uncomposed character
-    /// through here, not through `deliverBytes`. `InputLatencySignposts
-    /// .keyDown` originally only wrapped `deliverBytes`, so a real-client
-    /// trace of a normal typing session (M8.19) showed zero `keyDown`
-    /// events despite real keystrokes reaching the child — the chain's
-    /// first link was silently only covering the control-sequence bypass
-    /// path (`TerminalView+Keyboard.swift`'s doc comment), never the one
-    /// most keystrokes actually take.
+    /// through here, not through `deliverBytes`. So `InputLatencySignposts
+    /// .keyDown` has to be emitted here as well: wrapping `deliverBytes`
+    /// alone covers only the control-sequence bypass path
+    /// (`TerminalView+Keyboard.swift`'s doc comment), and a trace of normal
+    /// typing would show no `keyDown` events at all.
     func insertText(_ string: Any, replacementRange: NSRange) {
         clearMarkedText()
         let text = (string as? NSAttributedString)?.string ?? (string as? String) ?? ""
@@ -105,8 +103,8 @@ extension TerminalView: NSTextInputClient {
         return NSRange(location: 0, length: length)
     }
 
-    /// The terminal has no text backing store the IME may read; selection
-    /// (Track C) is not exposed to input methods.
+    /// The terminal has no text backing store the IME may read; the
+    /// selection is not exposed to input methods.
     func selectedRange() -> NSRange {
         NSRange(location: NSNotFound, length: 0)
     }
@@ -121,7 +119,7 @@ extension TerminalView: NSTextInputClient {
         [.underlineStyle, .underlineColor, .markedClauseSegment, .font, .foregroundColor]
     }
 
-    /// M3.2: the candidate window anchors to the cursor cell, in *screen*
+    /// The candidate window anchors to the cursor cell, in *screen*
     /// coordinates. Computed on demand from `cursorRectProvider`, so it
     /// stays correct after the window moves.
     func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
@@ -136,12 +134,12 @@ extension TerminalView: NSTextInputClient {
     /// Key-bound commands that arrive when the IME consumed an event and
     /// resolved it through the key-binding system instead of inserting
     /// text. Forwarding them keeps Return, Delete, Escape and the arrows
-    /// behaving identically whether or not an IME is selected (M3.4) — an
+    /// behaving identically whether or not an IME is selected — an
     /// IME that answers `handleEvent` with `true` for Return must not eat
     /// the key.
     ///
     /// Signposted the same way `insertText` is, for the same reason: this
-    /// is a real, common part of the keypress-to-pixel chain (M8.19),
+    /// is a real, common part of the keypress-to-pixel chain,
     /// not the control-sequence bypass path.
     override func doCommand(by selector: Selector) {
         let bytes: [UInt8]?
@@ -153,7 +151,7 @@ extension TerminalView: NSTextInputClient {
         case #selector(moveDown(_:)): bytes = Array("\u{1B}[B".utf8)
         case #selector(moveRight(_:)): bytes = Array("\u{1B}[C".utf8)
         case #selector(moveLeft(_:)): bytes = Array("\u{1B}[D".utf8)
-        // B02: a candidate window (a shell completion menu, an IME) can
+        // A candidate window (a shell completion menu, an IME) can
         // resolve Tab/Shift-Tab as a command instead of `insertText`, and
         // without these cases it was silently dropped here — never reaching
         // `bytes(for:)`'s own Tab encoding at all. `doCommand` never sees a
@@ -170,7 +168,7 @@ extension TerminalView: NSTextInputClient {
     }
 }
 
-/// Draws the preedit string over the cells at the cursor (M3.3).
+/// Draws the preedit string over the cells at the cursor.
 ///
 /// An ordinary `NSView` subview, composited above the Metal layer; the grid
 /// itself never sees marked text. There is deliberately no backdrop — the
@@ -189,15 +187,11 @@ final class MarkedTextOverlayView: NSView {
 
     /// What the renderer would draw ordinary text in, read live.
     ///
-    /// This used to be a stored `NSColor(white: 0.96)` with a comment saying
-    /// it was the same light grey the renderer resolves `.default` foreground
-    /// to. That stopped being true the moment the palette started following
-    /// the theme and the system appearance (M6.2, M6.13): in a light
-    /// appearance the terminal draws dark text on a light background and the
-    /// preedit kept drawing near-white, which is invisible. Found by looking
-    /// at it, not by a test — the same way the overlay's stale copy of the
-    /// cell metrics was (U02). A second copy of a value that has an owner is
-    /// a bug waiting for the owner to change.
+    /// Not a stored colour: the palette follows the theme and the system
+    /// appearance, and in a light appearance the terminal draws dark text
+    /// on a light background — a fixed near-white preedit would be
+    /// invisible there. A second copy of a value that has an owner is a bug
+    /// waiting for the owner to change.
     private var textColor: NSColor {
         let color = TerminalColorPalette.defaultForeground
         return NSColor(
