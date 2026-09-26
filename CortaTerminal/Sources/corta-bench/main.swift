@@ -453,7 +453,7 @@ func benchmarkResizeStrategies() {
         report("\(label), 100ms throttle", runSimulatedDrag(session, applied: applied, throttleInterval: 0.1))
     }
 
-    print("resize delivery strategies (P03), scripted drag 120 -> 80 columns:")
+    print("resize delivery strategies, scripted drag 120 -> 80 columns:")
     dragPair("empty scrollback")
 
     // Fill the scrollback to its 100k limit through the real PTY. The lines
