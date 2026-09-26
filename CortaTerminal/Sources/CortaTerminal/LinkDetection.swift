@@ -1,6 +1,6 @@
 import Foundation
 
-/// ⌘-click URL detection (M4.6).
+/// ⌘-click URL detection.
 ///
 /// Detection runs over logical lines (`Grid+Text.swift`), so a URL split by
 /// a soft wrap is still found whole. The scheme allowlist from
@@ -9,7 +9,7 @@ import Foundation
 /// `file://` or custom-scheme string is plain text as far as the shell is
 /// concerned, so no click path can ever carry it to `NSWorkspace`.
 ///
-/// OSC 8 hyperlinks (M6.8) are checked first, because they are the case
+/// OSC 8 hyperlinks are checked first, because they are the case
 /// where the display text and the destination can differ — the whole reason
 /// "show the real target" (§2.4) is a rule. The tooltip on ⌘-hover names the
 /// destination, not the text under the pointer, and the scheme allowlist is
@@ -27,8 +27,8 @@ public enum LinkDetection {
     private static let pattern = try! NSRegularExpression(
         pattern: #"(?:https?://|mailto:)\S+"#, options: [.caseInsensitive])
 
-    /// Pattern detection only scans logical lines up to this many cells
-    /// (P08). `link(at:)` runs on every mouse-moved, so an unbounded
+    /// Pattern detection only scans logical lines up to this many cells.
+    /// `link(at:)` runs on every mouse-moved, so an unbounded
     /// logical line — a megabyte-long minified bundle or base64 dump is
     /// one — would put an unbounded regex pass and text join on the main
     /// thread's hover path. Past the cap the line has no detected links;
@@ -49,7 +49,7 @@ public enum LinkDetection {
     /// be guessing against the answer.
     public static func link(at point: SelectionPoint, in grid: Grid) -> Link? {
         if let explicit = hyperlink(at: point, in: grid) { return explicit }
-        // Bound the scan before paying for the join (P08): a wrap chain
+        // Bound the scan before paying for the join: a wrap chain
         // past the cap is not pattern-detected at all — see
         // `maxPatternScanCells`.
         let span = grid.logicalLineRowSpan(containing: point.row)
@@ -87,7 +87,7 @@ public enum LinkDetection {
         // offsets. The cursors walk both views forward with the matches —
         // O(line) in total. Converting every match from the string's start
         // rescans the prefix per match, quadratic on a link-dense long
-        // line (P08). The two units agree for ASCII, which URLs effectively
+        // line. The two units agree for ASCII, which URLs effectively
         // always are, but a CJK prefix before the URL shifts them apart.
         var utf16Cursor = text.utf16.startIndex
         var utf16CursorOffset = 0

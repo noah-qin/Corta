@@ -16,7 +16,7 @@ public struct PerformerState: Sendable {
     /// after every `feed` and writes it.
     public internal(set) var outputBuffer: [UInt8] = []
 
-    /// `?2004` — bracketed paste (M2.6). Off until the child turns it on.
+    /// `?2004` — bracketed paste. Off until the child turns it on.
     public internal(set) var bracketedPasteEnabled = false
 
     /// Event subscription is independent of the wire encoding. The last
@@ -26,7 +26,7 @@ public struct PerformerState: Sendable {
     /// `?1006` selects SGR encoding; it does not subscribe to events.
     public internal(set) var sgrMouseEncodingEnabled = false
 
-    /// `?2026` — synchronized output (M4.3). While set, the app must present
+    /// `?2026` — synchronized output. While set, the app must present
     /// no frame; the core decides nothing about presentation, only tracks
     /// the mode.
     public internal(set) var synchronizedOutputEnabled = false
@@ -37,31 +37,31 @@ public struct PerformerState: Sendable {
     /// episode from this counter.
     public internal(set) var synchronizedOutputEpisode = 0
 
-    /// Set by a BEL (M4.8, core side). The core decides nothing about
+    /// Set by a BEL. The core decides nothing about
     /// audible, visual or muted — that is the app's business. `Terminal`
     /// exposes this write-only-from-here via `takeBell()`.
     public internal(set) var bellRequested = false
 
-    /// The window title most recently set by OSC 0/2 (M2.8). Never reported
+    /// The window title most recently set by OSC 0/2. Never reported
     /// back to the child — the title query is a command-injection vector
     /// (`SECURITY.md` §2.2) and stays unimplemented.
     public internal(set) var windowTitle: String?
 
-    /// The working directory most recently reported by OSC 7 (M2.8), as a
-    /// path. A hint for new tabs and splits (M5.5), nothing more.
+    /// The working directory most recently reported by OSC 7, as a
+    /// path. A hint for new tabs and splits, nothing more.
     ///
     /// Local-only by construction: a report that names a remote host is
     /// recorded in `remoteContext` instead and never lands here.
     public internal(set) var workingDirectory: String?
 
-    /// B13 — the remote host and directory this pane's shell most recently
+    /// The remote host and directory this pane's shell most recently
     /// reported, when the report names another machine. Informational only:
     /// nothing that spawns a local process may read it (see `RemoteContext`'s
     /// doc comment). A subsequent *local* OSC 7 report clears it — the pane's
     /// context is local again, and a stale remote label would be a lie.
     public internal(set) var remoteContext: RemoteContext?
 
-    /// `?1004` — focus reporting (M6.7). While set, the app sends `CSI I` on
+    /// `?1004` — focus reporting. While set, the app sends `CSI I` on
     /// focus and `CSI O` on blur, which is what Neovim's `autoread` and
     /// tmux's `focus-events` are waiting for.
     public internal(set) var focusReportingEnabled = false
@@ -69,7 +69,7 @@ public struct PerformerState: Sendable {
     /// DECSCL — the announced conformance level (`CSI Ps ; Ps " p`), 61 for
     /// VT100 through 65 for VT500. Corta behaves as a VT500-class terminal
     /// and starts there; what the level actually gates is which sequences
-    /// are allowed to answer, DECRQM being the one that matters (M6.5).
+    /// are allowed to answer, DECRQM being the one that matters.
     public internal(set) var conformanceLevel = 65
 
     /// LNM — ECMA-48 §8.3.106, `CSI 20 h` / `CSI 20 l`. While set, LF, VT and
@@ -83,41 +83,41 @@ public struct PerformerState: Sendable {
     /// anything that trusted the answer.
     public internal(set) var newLineModeEnabled = false
 
-    /// DECCKM — `CSI ? 1 h` / `CSI ? 1 l` (U04). While set, the cursor keys
+    /// DECCKM — `CSI ? 1 h` / `CSI ? 1 l`. While set, the cursor keys
     /// and Home/End send their SS3 (application) forms rather than CSI; the
     /// app encodes keys, so it has to be able to ask.
     public internal(set) var applicationCursorKeysEnabled = false
 
-    /// DECKPAM / DECKPNM — `ESC =` / `ESC >` (U04). While set, the numeric
+    /// DECKPAM / DECKPNM — `ESC =` / `ESC >`. While set, the numeric
     /// keypad sends its `SS3` forms (`ESC O p` … `ESC O y`, `ESC O M` for
     /// Enter) rather than the digits and operators printed on the keys. Like
     /// DECCKM this is the app's to apply, so it has to be able to ask.
     public internal(set) var applicationKeypadEnabled = false
 
-    /// The kitty keyboard protocol's mode stack (M6.9). The app reads
+    /// The kitty keyboard protocol's mode stack. The app reads
     /// `current` to decide how to encode a key press.
     public internal(set) var keyboardProtocol = KeyboardProtocolStack()
 
-    /// The colours OSC 10/11/12 report (M6.6). Seeded by the app from its
+    /// The colours OSC 10/11/12 report. Seeded by the app from its
     /// palette so a query answers with what is actually on screen, and
     /// updated by the set forms.
     public internal(set) var dynamicColors = DynamicColors()
 
     /// The 256-entry indexed palette OSC 4 reports and sets, and OSC 104
-    /// resets (B06). Seeded by the app the same way `dynamicColors` is —
+    /// resets. Seeded by the app the same way `dynamicColors` is —
     /// see `IndexedPalette`'s own doc comment.
     public internal(set) var indexedPalette = IndexedPalette()
 
-    /// The five special colours OSC 5 reports and sets, and OSC 105 resets
-    /// (B06) — see `SpecialColors`'s own doc comment.
+    /// The five special colours OSC 5 reports and sets, and OSC 105 resets;
+    /// see `SpecialColors`'s own doc comment.
     public internal(set) var specialColors = SpecialColors()
 
-    /// OSC 133 shell integration (M7.2). The absolute row of the most
+    /// OSC 133 shell integration. The absolute row of the most
     /// recent prompt, so the exit status can be written back onto it however
     /// far the output has scrolled since.
     public internal(set) var promptRow: Int?
 
-    /// B08 — the cursor column where the prompt text ended (`OSC 133 ; B`),
+    /// The cursor column where the prompt text ended (`OSC 133 ; B`),
     /// on `promptRow`. Answers "has anything been typed since the prompt
     /// finished drawing": immediately after `B` the cursor sits here; if it
     /// still does, the prompt is empty. Used to gate an app-initiated
@@ -127,7 +127,7 @@ public struct PerformerState: Sendable {
     public internal(set) var promptEndColumn: Int?
 
     /// Where the running command's output began (`OSC 133 ; C`), as an
-    /// absolute row (U14). `nil` until a command reports one.
+    /// absolute row. `nil` until a command reports one.
     public internal(set) var outputStartRow: Int?
 
     /// Whether a command is running right now, between `OSC 133 ; C` and
@@ -144,18 +144,18 @@ public struct PerformerState: Sendable {
     /// drained.
     public internal(set) var commandExitStatus: Int?
 
-    /// B07 — the bounded history of commands this session's shell has
+    /// The bounded history of commands this session's shell has
     /// reported, each identified by a stable id rather than a row. See
     /// `CommandRecord`'s own doc comment for why a row is not enough.
     public internal(set) var commandRecords = CommandRecordStore()
 
-    /// OSC 52 (M7.11). Text the child asked to put on the system clipboard,
+    /// OSC 52. Text the child asked to put on the system clipboard,
     /// drained by the app. Never the other direction: the read form of OSC 52
     /// hands clipboard contents to the child, which is a data-exfiltration
     /// primitive, and it stays unimplemented (`SECURITY.md` §6).
     public internal(set) var pendingClipboardCopy: String?
 
-    /// M10 — a Kitty graphics transmission still being assembled across
+    /// A Kitty graphics transmission still being assembled across
     /// `m=1`-chunked APC sequences, or `nil` between transmissions. Purely
     /// parser-transient: unlike `ImagePlacementTable` (on `Grid`, since a
     /// renderer needs to read it), nothing outside `Performer+KittyGraphics`
@@ -177,7 +177,7 @@ struct PendingImageTransmission: Sendable {
 }
 
 /// The three colours the OSC 10/11/12 pair of set and query forms names:
-/// default foreground, default background and the cursor (M6.6).
+/// default foreground, default background and the cursor.
 ///
 /// 8 bits per channel. The report form is xterm's 16-bit `rgb:` notation,
 /// which is produced by doubling each byte — a fixed transformation of
@@ -203,7 +203,7 @@ public struct DynamicColors: Sendable, Equatable {
     }
 }
 
-/// Query responses — M2.2 (`CONFORMANCE.md` §1.2). A program that asks and
+/// Query responses (`CONFORMANCE.md` §1.2). A program that asks and
 /// hears nothing stalls or misdetects: vim hangs at startup without DA1.
 ///
 /// Every response is a fixed byte string or numeric coordinates — no text

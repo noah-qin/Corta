@@ -1,4 +1,4 @@
-/// M6.9 — the kitty keyboard protocol's progressive-enhancement flags.
+/// The kitty keyboard protocol's progressive-enhancement flags.
 ///
 /// The legacy encoding is ambiguous in ways that matter to editors: `Ctrl+I`
 /// and `Tab` are both `0x09`, `Ctrl+M` and `Return` are both `0x0D`, and

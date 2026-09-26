@@ -44,9 +44,9 @@ struct ScreenLines: RandomAccessCollection, MutableCollection, Sendable {
     /// either since they last shared one (a struct copy, e.g. into a
     /// `session.snapshot()`) — it says "unchanged since", not "equal to".
     /// Different stamps do not imply different content (a row erased back
-    /// to the same bytes still gets a fresh stamp) — that is the same
-    /// conservative direction the old `Line`-equality diff already erred
-    /// in, just cheaper to check.
+    /// to the same bytes still gets a fresh stamp) — the conservative
+    /// direction: a false "changed" costs a redundant rebuild, never a stale
+    /// row.
     private var revisions: ContiguousArray<UInt64>
     private var nextRevision: UInt64 = 0
 

@@ -1,13 +1,13 @@
 import Foundation
 
-/// B13 — a directory on *another* machine this pane's shell has reported,
+/// A directory on *another* machine this pane's shell has reported,
 /// kept next to — and never inside — the local-spawn state.
 ///
 /// A shell reached over `ssh` announces its working directory the same way a
 /// local shell does (`OSC 7`, `file://host/path`), except the path names a
-/// file on a different computer. Before B13 the parser dropped those reports
-/// outright, which kept every local-spawn path safe but left the app unable
-/// to say *which* host a pane was actually talking to. Recording the report
+/// file on a different computer. Dropping those reports outright would keep
+/// every local-spawn path safe but leave the app unable to say *which* host
+/// a pane is actually talking to. Recording the report
 /// here — isolated from `Terminal.workingDirectory`, which stays
 /// local-only — gives the app something to display without giving it
 /// anything it could `chdir` into.

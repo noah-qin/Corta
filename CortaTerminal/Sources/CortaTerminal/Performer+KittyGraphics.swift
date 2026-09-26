@@ -1,6 +1,6 @@
 import Foundation
 
-/// M10 — the Kitty graphics protocol's APC dispatch. See `KittyGraphics.swift`
+/// The Kitty graphics protocol's APC dispatch. See `KittyGraphics.swift`
 /// for the wire-format types and what subset of the real protocol this
 /// implements, and `ImagePlacementTable.swift` for where the settled state
 /// (as opposed to this file's in-progress transmission) lives.

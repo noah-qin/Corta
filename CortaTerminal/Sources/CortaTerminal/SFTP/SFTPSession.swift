@@ -3,7 +3,7 @@ import Dispatch
 import Foundation
 import Synchronization
 
-/// B14 — the typed failure surface of the SFTP engine. Every layer below
+/// The typed failure surface of the SFTP engine. Every layer below
 /// the app reports through this one type, so a caller's `catch` never has
 /// to guess which layer spoke.
 public enum SFTPError: Error, Equatable {

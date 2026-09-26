@@ -1,4 +1,4 @@
-/// Reflow (M4.2): re-wrapping the document when the column count changes.
+/// Reflow: re-wrapping the document when the column count changes.
 ///
 /// The `wrapped` flag is the source of truth (`DESIGN.md` §2.1): consecutive
 /// rows joined by it are one logical line, and reflow re-wraps logical

@@ -11,8 +11,8 @@ public struct Performer: ParserPerformer, Sendable {
     /// State that is not the grid: queued query responses, DEC mode flags,
     /// and the OSC-set title and working directory. The handlers live in the
     /// `Performer+Report/Modes/OSC` extensions; keeping the storage in one
-    /// property keeps this struct's declaration — a file shared with other
-    /// M2 tracks — out of their way.
+    /// property keeps this struct's declaration small and out of their
+    /// way.
     public var state = PerformerState()
 
     public init(grid: Grid) {
@@ -40,7 +40,7 @@ public struct Performer: ParserPerformer, Sendable {
             grid.lineFeed()
             if state.newLineModeEnabled { grid.carriageReturn() }
         case 0x0D: grid.carriageReturn()
-        case 0x07: state.bellRequested = true  // BEL (M4.8, core side).
+        case 0x07: state.bellRequested = true  // BEL
         default: break  // The rest have no effect on the grid.
         }
     }
@@ -50,12 +50,12 @@ public struct Performer: ParserPerformer, Sendable {
     public mutating func csiDispatch(_ sequence: CSISequence) {
         // A private marker or an intermediate makes it a different sequence
         // with the same final byte — `CSI ? 25 h` is not `CSI 25 h`, and
-        // `CSI > c` is not `CSI c`. The ones M2 answers route here; every
+        // `CSI > c` is not `CSI c`. The ones Corta answers route here; every
         // other marker or intermediate form is ignored cleanly, which is the
         // correct and safe default (`SECURITY.md` §3).
         if sequence.privateMarker != 0 {
             // DECRQM's private form carries a `$` intermediate: `CSI ? Ps $ p`
-            // is a question about a mode, not a mode change (M6.5).
+            // is a question about a mode, not a mode change.
             if sequence.intermediates.count == 1, sequence.intermediates[0] == 0x24,
                 sequence.final == 0x70, sequence.privateMarker == 0x3F
             {
@@ -66,9 +66,9 @@ public struct Performer: ParserPerformer, Sendable {
             switch (sequence.privateMarker, sequence.final) {
             case (0x3E, 0x63):  // DA2 — CSI > c
                 reportSecondaryDeviceAttributes()
-            case (0x3E, 0x71):  // XTVERSION — CSI > Ps q (M6.5)
+            case (0x3E, 0x71):  // XTVERSION — CSI > Ps q
                 reportVersion(sequence.parameters)
-            // The kitty keyboard protocol (M6.9). Four private markers on
+            // The kitty keyboard protocol. Four private markers on
             // one final byte: `?` queries, `>` pushes, `<` pops, `=` sets.
             case (0x3F, 0x75):
                 reportKeyboardProtocol()
@@ -93,7 +93,7 @@ public struct Performer: ParserPerformer, Sendable {
         }
         // DECSCUSR (`CSI Ps SP q`) and its kin carry an intermediate byte.
         if sequence.intermediates.count > 0 {
-            // DECRQM, ANSI form — `CSI Ps $ p` (M6.5).
+            // DECRQM, ANSI form — `CSI Ps $ p`.
             if sequence.intermediates.count == 1, sequence.intermediates[0] == 0x24,
                 sequence.final == 0x70
             {
@@ -125,8 +125,8 @@ public struct Performer: ParserPerformer, Sendable {
         }
         // SM / RM — `CSI Pm h` / `CSI Pm l`, the ANSI modes. Distinct from
         // DECSET/DECRST above, which carry the `?` marker; `CSI 4 h` (insert
-        // mode) and `CSI ? 4 h` (smooth scroll) are different sequences that
-        // used to both land in the same place — nowhere.
+        // mode) and `CSI ? 4 h` (smooth scroll) are different sequences, and
+        // must not land in the same place.
         if sequence.final == 0x68 {
             applyAnsiModes(parameters, enabled: true)
             return
@@ -210,7 +210,7 @@ public struct Performer: ParserPerformer, Sendable {
     /// returning the colour and how many parameters it spanned.
     ///
     /// The colon-separated form `38:2::r:g:b` needs sub-parameters, which the
-    /// parser sends to the ignore state until M2.
+    /// parser does not implement: it ignores the whole sequence.
     private static func extendedColor(_ parameters: Parameters, at index: Int) -> (Color, Int)? {
         switch parameters[index + 1] {
         case 5 where index + 2 < parameters.count:

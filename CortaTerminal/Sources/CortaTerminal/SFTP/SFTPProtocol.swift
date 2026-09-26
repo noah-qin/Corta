@@ -1,6 +1,6 @@
 import Foundation
 
-/// B14 — the SFTPv3 wire protocol (draft-ietf-secsh-filexfer-02), the
+/// The SFTPv3 wire protocol (draft-ietf-secsh-filexfer-02), the
 /// version every OpenSSH `sftp-server` speaks.
 ///
 /// This file is a pure codec: value types plus the functions that encode

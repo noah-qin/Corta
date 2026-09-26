@@ -1,5 +1,5 @@
 /// The 256-entry indexed palette OSC 4 reports and sets, and OSC 104
-/// resets — the per-session overrides on top of a themed default (B06).
+/// resets — the per-session overrides on top of a themed default.
 /// OSC 5 ("special colours") is a separate interface with its own type,
 /// `SpecialColors`; this type does not carry it despite the similar name.
 ///
@@ -29,7 +29,7 @@ public struct IndexedPalette: Sendable, Equatable {
     /// per-cell content revision a damage check otherwise relies on: an
     /// `OSC 4` override changes what index 1 *resolves to*, not what any
     /// `Cell` stores, so nothing about the grid's own revision tracking
-    /// would ever notice on its own (B06).
+    /// would ever notice on its own.
     public private(set) var overridesGeneration: UInt64 = 0
 
     public init(defaults: [(red: UInt8, green: UInt8, blue: UInt8)] = IndexedPalette.xtermDefaults()) {
@@ -49,7 +49,7 @@ public struct IndexedPalette: Sendable, Equatable {
     }
 
     /// Replaces `defaults` in place, keeping `overrides` untouched — for a
-    /// live theme switch (M6.13), which reseeds what an *unoverridden*
+    /// live theme switch, which reseeds what an *unoverridden*
     /// index answers without discarding OSC 4 state a program already set,
     /// the same way `dynamicColors` reseeding never touches OSC 52 state.
     /// Assigning a whole new `IndexedPalette` (RIS, initial session setup)
