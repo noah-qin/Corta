@@ -73,7 +73,7 @@ struct SessionLifecycleTests {
     private func waitUntilTrue(
         timeout: Duration, _ condition: () -> Bool
     ) async -> Bool {
-        let deadline = ContinuousClock.now + timeout
+        let deadline = ContinuousClock.now + timeout * testTimeoutScale
         while ContinuousClock.now < deadline {
             if condition() { return true }
             try? await Task.sleep(for: .milliseconds(10))

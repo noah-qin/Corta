@@ -122,7 +122,7 @@ struct PaneTeardownTests {
     /// down; on the CI runner that starved every other main-actor test in
     /// the run for half a minute and failed them on their own timeouts.
     private func exited(_ pty: PTY, timeout: Duration = .seconds(10)) async -> Bool {
-        let deadline = ContinuousClock.now + timeout
+        let deadline = ContinuousClock.now + timeout * testTimeoutScale
         while ContinuousClock.now < deadline {
             if pty.waitForExit(timeout: .zero) != nil { return true }
             try? await Task.sleep(for: .milliseconds(10))
@@ -133,7 +133,7 @@ struct PaneTeardownTests {
     private func waitUntilTrue(
         timeout: Duration, _ condition: () -> Bool
     ) async -> Bool {
-        let deadline = ContinuousClock.now + timeout
+        let deadline = ContinuousClock.now + timeout * testTimeoutScale
         while ContinuousClock.now < deadline {
             if condition() { return true }
             try? await Task.sleep(for: .milliseconds(10))

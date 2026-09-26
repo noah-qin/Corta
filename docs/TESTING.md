@@ -191,6 +191,31 @@ able to construct a renderer at all, and *every* render test moves to
 those two routes. That is the trade #107 measured and #109 accepts; it is
 not a reason to keep a second backend alive.
 
+### Waits are ceilings, and CI gets a bigger one
+
+The app suite waits on real child processes printing, a reader loop
+observing an exit, a debounced sweep settling — latencies that belong to
+the machine rather than to the code. Those figures are written so that
+reaching one means something is genuinely wrong, which stops being true on
+a saturated runner: `childExitOnItsOwnShowsAToast` waited ten seconds for a
+toast and did not get one on a run where nothing was broken.
+
+`CortaTests/TestTimeout.swift`'s `testTimeoutScale` multiplies every such
+ceiling. CI sets `TEST_RUNNER_CORTA_TEST_TIMEOUT_SCALE=3`, which
+`xcodebuild` delivers to the test host as `CORTA_TEST_TIMEOUT_SCALE`;
+nothing else sets it, so a local run keeps the written number and a genuine
+hang still fails quickly. The core package has the same knob under the same
+name for the same reason (#129).
+
+It scales a *ceiling*, never a sleep: a wait finishes as soon as its
+condition holds, so a larger ceiling costs nothing on a healthy run.
+
+**It is not a substitute for a test that races.** An assertion that
+something has *not* happened yet, or one that compares against a value
+sampled before the event it is about, gets rarer under a bigger ceiling and
+no more correct. Three of the four flakes fixed alongside this were of that
+kind and were rewritten instead.
+
 ### The test host cannot reach your own configuration
 
 The Debug configuration builds a separate application — `CortaDev.app`,

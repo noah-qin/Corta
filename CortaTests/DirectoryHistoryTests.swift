@@ -164,16 +164,23 @@ struct DirectoryHistoryStoreTests {
         #expect(store.history.entries.isEmpty)
     }
 
+    /// The delay is injected rather than waited out. Both assertions here
+    /// are that something has *not* happened yet, and at the shipped half
+    /// second a machine that descheduled this test between `record()` and
+    /// them made both false — which no margin fixes, because widening the
+    /// window a negative assertion races only makes the race rarer. With a
+    /// delay no stall can reach, "not written yet" is a fact about the
+    /// store, `flush()` drives the write, and the test has no wall clock
+    /// in it at all.
     @Test("recording does not touch the disk on the caller's thread; the write is debounced")
-    func recordingIsDebounced() async throws {
+    func recordingIsDebounced() throws {
         defer { removeDirectory() }
-        let store = DirectoryHistoryStore(fileURL: file)
+        let store = DirectoryHistoryStore(fileURL: file, saveDelay: 3600)
         store.record("/tmp")
         store.record("/var")
         #expect(store.hasPendingSave)
         #expect(!FileManager.default.fileExists(atPath: file.path))
         #expect(store.history.entries.count == 2, "the in-memory history is current at once")
-        try await Task.sleep(for: .seconds(DirectoryHistoryStore.saveDelay + 0.5))
         store.flush()
         #expect(!store.hasPendingSave)
         let reloaded = DirectoryHistoryStore(fileURL: file)
@@ -187,7 +194,7 @@ struct DirectoryHistoryStoreTests {
         store.record("/tmp")
         store.clear()
         #expect(!store.hasPendingSave)
-        try await Task.sleep(for: .seconds(DirectoryHistoryStore.saveDelay + 0.5))
+        try await Task.sleep(for: .seconds(DirectoryHistoryStore.defaultSaveDelay + 0.5))
         #expect(!FileManager.default.fileExists(atPath: file.path))
     }
 

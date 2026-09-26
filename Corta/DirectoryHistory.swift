@@ -171,7 +171,17 @@ final class DirectoryHistoryStore {
 
     /// How long after the last change the file is written. A burst of
     /// commands is one write, not one per command.
-    static let saveDelay: TimeInterval = 0.5
+    static let defaultSaveDelay: TimeInterval = 0.5
+
+    /// This store's delay, injected for the same reason `fileURL` is.
+    ///
+    /// A test that asserts the write has *not* happened yet is racing a
+    /// real timer: at half a second, a machine that descheduled the test
+    /// between `record()` and the assertion made it false, and no margin
+    /// fixes an assertion that something has not happened. A test passes a
+    /// delay no scheduling stall can reach and drives the write with
+    /// `flush()` instead.
+    let saveDelay: TimeInterval
 
     private var pendingSave: DispatchWorkItem?
     /// Serial, so writes land in the order they were scheduled and a clear
@@ -182,8 +192,9 @@ final class DirectoryHistoryStore {
         AppPaths.applicationSupportDirectory.appendingPathComponent("directory-history.json")
     }
 
-    init(fileURL: URL) {
+    init(fileURL: URL, saveDelay: TimeInterval = DirectoryHistoryStore.defaultSaveDelay) {
         self.fileURL = fileURL
+        self.saveDelay = saveDelay
         load()
     }
 
@@ -235,7 +246,7 @@ final class DirectoryHistoryStore {
             self.save()
         }
         pendingSave = item
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.saveDelay, execute: item)
+        DispatchQueue.main.asyncAfter(deadline: .now() + saveDelay, execute: item)
     }
 
     /// B09 — the on-disk shape, versioned so a future incompatible change

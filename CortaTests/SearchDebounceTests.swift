@@ -24,7 +24,7 @@ struct SearchDebounceTests {
 
     @MainActor
     private func waitUpTo(_ seconds: Double, _ condition: @MainActor () -> Bool) async -> Bool {
-        let deadline = ContinuousClock.now + .seconds(seconds)
+        let deadline = ContinuousClock.now + .seconds(seconds * Double(testTimeoutScale))
         while ContinuousClock.now < deadline {
             if condition() { return true }
             try? await Task.sleep(for: .milliseconds(20))
@@ -200,8 +200,18 @@ struct SearchDebounceTests {
             // output has printed — and a pane that had only the command
             // line when the sweep snapshotted its grid found as many
             // case-insensitive matches as the other pane found
-            // case-sensitive ones (the flake this closes).
-            session.write(Array("echo Hello hello; echo SEARCH-READY\n".utf8))
+            // case-sensitive ones.
+            //
+            // The quoting is what makes the sentinel one: written plainly,
+            // `SEARCH-READY` appears in the echoed command line too, so the
+            // wait below was satisfied before any output existed and the
+            // flake it was added to close came straight back — a
+            // case-insensitive pane finding *fewer* matches than the
+            // case-sensitive one, because only the other pane had the
+            // output. `SEARCH''-READY` is `SEARCH-READY` once the shell has
+            // removed the quotes, so the command line and the output no
+            // longer read the same.
+            session.write(Array("echo Hello hello; echo SEARCH''-READY\n".utf8))
             #expect(await waitUpTo(10) { self.gridContains(pane, "SEARCH-READY") })
         }
 
