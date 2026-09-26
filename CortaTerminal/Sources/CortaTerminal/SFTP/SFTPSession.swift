@@ -202,7 +202,15 @@ public final class SFTPSession: @unchecked Sendable {
         /// A value, and tested as one — `SFTPRequestIDLedger`.
         var ids = SFTPRequestIDLedger()
         /// Requests the server still owes a reply, by id.
-        var inFlight: [UInt32: CheckedContinuation<Result<SFTPMessage, SFTPError>, Never>] = [:]
+        /// Keyed by id, because that is all a reply off the wire carries
+        /// — but each entry remembers *which allocation* it is, so a
+        /// cancellation arriving late for a previous holder of the id
+        /// cannot resume this one.
+        var inFlight:
+            [UInt32: (
+                ticket: SFTPRequestIDLedger.Ticket,
+                continuation: CheckedContinuation<Result<SFTPMessage, SFTPError>, Never>
+            )] = [:]
         /// Window slots handed out and not yet given back — one per
         /// admitted sender, from `acquireRequestSlot` until its request is
         /// answered, fails, is cancelled, or turns out not to be sent.
@@ -503,7 +511,7 @@ public final class SFTPSession: @unchecked Sendable {
     private func request(
         _ payload: (UInt32) -> SFTPPayload
     ) async throws(SFTPError) -> SFTPMessage {
-        let requestID = try await acquireRequestSlot()
+        let ticket = try await acquireRequestSlot()
         let result = await withTaskCancellationHandler {
             await withCheckedContinuation {
                 (continuation: CheckedContinuation<Result<SFTPMessage, SFTPError>, Never>) in
@@ -511,8 +519,8 @@ public final class SFTPSession: @unchecked Sendable {
                     if state.closed != nil {
                         return false
                     }
-                    guard state.ids.register(requestID) else { return false }
-                    state.inFlight[requestID] = continuation
+                    guard state.ids.register(ticket) else { return false }
+                    state.inFlight[ticket.id] = (ticket, continuation)
                     return true
                 }
                 guard registered else {
@@ -525,17 +533,17 @@ public final class SFTPSession: @unchecked Sendable {
                     return
                 }
                 let frame = SFTPCodec.encodeFrame(
-                    SFTPMessage(requestID: requestID, request: payload(requestID)))
+                    SFTPMessage(requestID: ticket.id, request: payload(ticket.id)))
                 do {
                     try writeFrame(frame)
                 } catch let error as SFTPError {
-                    failRequest(requestID, with: error)
+                    failRequest(ticket, with: error)
                 } catch {
-                    failRequest(requestID, with: .protocolViolation("\(error)"))
+                    failRequest(ticket, with: .protocolViolation("\(error)"))
                 }
             }
         } onCancel: {
-            cancelRequest(requestID)
+            cancelRequest(ticket)
         }
         return try result.get()
     }
@@ -543,17 +551,17 @@ public final class SFTPSession: @unchecked Sendable {
     /// Suspends until the in-flight window admits another request, then
     /// allocates its id. FIFO: a burst of pipelined READs cannot starve a
     /// CLOSE queued behind them.
-    private func acquireRequestSlot() async throws(SFTPError) -> UInt32 {
+    private func acquireRequestSlot() async throws(SFTPError) -> SFTPRequestIDLedger.Ticket {
         if let closed = state.withLock({ $0.closed }) { throw closed }
         // Fast path: the window has room.
-        let fastID = state.withLock { state -> UInt32? in
+        let fastTicket = state.withLock { state -> SFTPRequestIDLedger.Ticket? in
             guard state.closed == nil,
                 state.windowUsed < configuration.maxInFlightRequests
             else { return nil }
             state.windowUsed += 1
             return state.ids.allocate()
         }
-        if let fastID { return fastID }
+        if let fastTicket { return fastTicket }
 
         let token = state.withLock { state -> UInt64 in
             defer { state.nextWindowToken += 1 }
@@ -591,12 +599,17 @@ public final class SFTPSession: @unchecked Sendable {
     /// The task running `request` was cancelled: resume its waiter with
     /// `.cancelled` and hold the id out of circulation until the server's
     /// late reply arrives (see the type's doc comment).
-    private func cancelRequest(_ requestID: UInt32) {
+    private func cancelRequest(_ ticket: SFTPRequestIDLedger.Ticket) {
         state.withLock { state in
-            if let continuation = state.inFlight.removeValue(forKey: requestID) {
-                state.ids.cancelledWhileInFlight(requestID)
+            // Only if the entry is *this* allocation: with two transfers
+            // sharing a session the id may already belong to someone else,
+            // and resuming their continuation would cancel a request whose
+            // frame is on the wire.
+            if let entry = state.inFlight[ticket.id], entry.ticket == ticket {
+                state.inFlight[ticket.id] = nil
+                state.ids.cancelledWhileInFlight(ticket)
                 releaseWindowSlot(&state)
-                continuation.resume(returning: .failure(.cancelled))
+                entry.continuation.resume(returning: .failure(.cancelled))
             } else {
                 // Either cancelled between slot acquisition and
                 // registration — the registration gives the slot and the
@@ -604,20 +617,20 @@ public final class SFTPSession: @unchecked Sendable {
                 // resolved, which owes nothing. The ledger tells those
                 // apart; this handler cannot, because `inFlight` is empty
                 // in both cases.
-                state.ids.cancelledBeforeRegistration(requestID)
+                state.ids.cancelledBeforeRegistration(ticket)
             }
         }
     }
 
     /// A request failed before its reply could arrive (the write itself
     /// failed): resume its waiter, free the slot and the id.
-    private func failRequest(_ requestID: UInt32, with error: SFTPError) {
+    private func failRequest(_ ticket: SFTPRequestIDLedger.Ticket, with error: SFTPError) {
         state.withLock { state in
-            if let continuation = state.inFlight.removeValue(forKey: requestID) {
-                releaseWindowSlot(&state)
-                state.ids.resolved(requestID)
-                continuation.resume(returning: .failure(error))
-            }
+            guard let entry = state.inFlight[ticket.id], entry.ticket == ticket else { return }
+            state.inFlight[ticket.id] = nil
+            releaseWindowSlot(&state)
+            state.ids.resolved(ticket)
+            entry.continuation.resume(returning: .failure(error))
         }
     }
 
@@ -674,7 +687,7 @@ public final class SFTPSession: @unchecked Sendable {
             state.closed = error
             let handshakes = state.handshake.map { [$0] } ?? []
             state.handshake = nil
-            let requests = Array(state.inFlight.values)
+            let requests = state.inFlight.values.map(\.continuation)
             state.inFlight.removeAll()
             let waiters = state.windowWaiters.map { $0.continuation }
             state.windowWaiters.removeAll()
@@ -761,10 +774,10 @@ public final class SFTPSession: @unchecked Sendable {
             wasCancelled: Bool,
             unknown: Bool
         ) in
-            if let continuation = state.inFlight.removeValue(forKey: message.requestID) {
+            if let entry = state.inFlight.removeValue(forKey: message.requestID) {
                 releaseWindowSlot(&state)
-                state.ids.resolved(message.requestID)
-                return (continuation, false, false)
+                state.ids.resolved(entry.ticket)
+                return (entry.continuation, false, false)
             }
             if state.ids.acceptLateReply(message.requestID) {
                 // The late reply to a cancelled request: swallow it, and
