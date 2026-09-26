@@ -239,32 +239,46 @@ struct ScrollIndicatorIntegrationTests {
         let totalBefore = session.scrollbackTotalPushed
 
         session.write(Array("printf 'more %s\\n' $(seq 1 20)\n".utf8))
-        // Wait for the output to *settle*, not merely to start: the child
-        // keeps printing after the first batch lands, and sampling the
-        // total mid-stream made the expected shift smaller than the one
-        // `prepareFrame` correctly applied for everything that had arrived
-        // by then (a race a slow CI runner lost reliably).
+        // Wait only for output to *arrive*. Waiting for it to stop is what
+        // made this flake twice: the child keeps printing — the prompt, a
+        // late flush — and a quiet half second is not proof the stream has
+        // ended on a loaded machine. A total sampled before the frame was
+        // then smaller than the shift `prepareFrame` correctly applied for
+        // everything that had arrived by the time it ran, and the run that
+        // caught this reported 95 against an expected 33.
         let deadline = Date().addingTimeInterval(15)
-        var totalAfter = session.scrollbackTotalPushed
-        var settledSince = Date()
-        while Date() < deadline {
+        while Date() < deadline, session.scrollbackTotalPushed == totalBefore {
             RunLoop.current.run(until: Date().addingTimeInterval(0.02))
-            let now = session.scrollbackTotalPushed
-            if now != totalAfter {
-                totalAfter = now
-                settledSince = Date()
-            } else if totalAfter > totalBefore, Date().timeIntervalSince(settledSince) > 0.5 {
+        }
+        try #require(
+            session.scrollbackTotalPushed > totalBefore, "the child produced no further output")
+
+        // What `prepareFrame` guarantees is that the offset keeps pointing
+        // at the same absolute document row — `scrollbackTotalPushed -
+        // scrollOffset` — however much arrived, which is the assertion
+        // below rearranged so that it no longer depends on knowing when the
+        // child stopped. Read the total either side of the frame and retry
+        // if the child printed across it; then the offset is the shift for
+        // exactly that total.
+        //
+        // `shouldRenderFrame` stands in for a vsync tick: nothing here is
+        // attached to a live display link, so `prepareFrame` (where the
+        // shift happens) needs the direct call `FrameScheduler` would
+        // otherwise make.
+        var anchorAfter: Int?
+        for _ in 0..<200 {
+            let total = session.scrollbackTotalPushed
+            _ = pane.terminalView?.shouldRenderFrame?()
+            let offset = pane.scrollOffset
+            if session.scrollbackTotalPushed == total {
+                anchorAfter = total - offset
                 break
             }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
         }
-        try #require(totalAfter > totalBefore, "the child produced no further output")
-
-        // Stands in for a vsync tick: nothing here is attached to a live
-        // display link, so `prepareFrame` (where the shift happens) needs a
-        // direct call the way `FrameScheduler` would otherwise make it.
-        _ = pane.terminalView?.shouldRenderFrame?()
-
-        #expect(pane.scrollOffset == offsetBefore + (totalAfter - totalBefore))
+        let anchor = try #require(
+            anchorAfter, "the child never paused long enough to read a total and an offset together")
+        #expect(anchor == totalBefore - offsetBefore)
     }
 
     /// **The defect this closes (B04).** Typing while scrolled away from the
