@@ -1,6 +1,6 @@
 import AppKit
 
-/// U12 — where you are in the history, and one click back to the bottom.
+/// Where you are in the history, and one click back to the bottom.
 ///
 /// **The problem.** A terminal scrolled up looks exactly like a terminal that
 /// has stopped producing output. There is no scroll bar — the pane is a

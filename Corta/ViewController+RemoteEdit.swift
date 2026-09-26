@@ -1,13 +1,13 @@
 import Cocoa
 import CortaTerminal
 
-/// B14 — following `path:line[:column]` references in a *remote* pane.
+/// Following `path:line[:column]` references in a *remote* pane.
 ///
-/// B13's rule was refusal: `workingDirectory` is nil for a remote pane
+/// The local rule is refusal: `workingDirectory` is nil for a remote pane
 /// precisely so a remote path can never be opened as a local file. Remote
 /// editing turns the refusal into a redirection: a reference in a `.remote`
 /// pane resolves against the pane's *remote* directory (the OSC 7 report's
-/// own answer, the same honesty bar as everything else in B13), the remote
+/// own answer, the same honesty bar as everything else remote), the remote
 /// file is downloaded to its managed local copy (`RemoteEditStore`/
 /// `RemoteEditCoordinator`), and the editor opens on the copy with the
 /// reference's line and column. Editing the copy and what goes back to the
@@ -16,8 +16,7 @@ import CortaTerminal
 ///
 /// What is still refused: `.remoteUnknown` (no host to download from),
 /// `.unknown`, and `~`-relative paths (the remote account's home is not
-/// knowable from here, and guessing it would be the old bug wearing a new
-/// feature).
+/// knowable from here, and guessing it would open the wrong file).
 extension ViewController {
     /// A reference resolved to a remote host and path — the remote
     /// counterpart of `ResolvedFileReference`.

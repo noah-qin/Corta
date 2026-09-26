@@ -138,13 +138,12 @@ nonisolated struct Shortcut: Equatable, Sendable {
 }
 
 /// Everything Corta can be asked to do that is worth a key, a menu item, or a
-/// row in the command palette (M7.8).
+/// row in the command palette.
 ///
-/// One table, three consumers. Before this, a shortcut lived in the
-/// storyboard, its action lived in whichever controller implemented it, and
-/// nothing could enumerate the set — which is why the shortcuts could not be
-/// rebound and why there was nothing for a palette to list. The table is the
-/// single place all three read from, so a command added here appears in the
+/// One table, three consumers. A shortcut in the storyboard and an action
+/// in whichever controller implements it cannot be enumerated — nothing
+/// could rebind them and a palette would have nothing to list. The table
+/// is the single place all three read from, so a command added here appears in the
 /// menus, in the palette and in the config file at once.
 nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     case newWindow = "new-window"
@@ -578,10 +577,10 @@ nonisolated extension Shortcut {
     ///
     /// AppKit matches key equivalents for *menu items* only. The few places
     /// `TerminalView.keyDown` still has to recognise a shortcut itself —
-    /// paste, the search bar, the scrollback jumps — used to compare against
-    /// a literal instead, which made every one of them a second, invisible
-    /// binding: rebinding the command left the literal working, and unbinding
-    /// it did not stop the literal at all (U08). They ask this instead.
+    /// paste, the search bar, the scrollback jumps — ask this rather than
+    /// compare against a literal, which would make every one of them a
+    /// second, invisible binding: rebinding the command would leave the
+    /// literal working, and unbinding it would not stop the literal at all.
     ///
     /// The key comes from `charactersIgnoringModifiers`, so a shifted letter
     /// arrives uppercase and folds back through `lowercased()`. A key whose

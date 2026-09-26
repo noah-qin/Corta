@@ -1,8 +1,8 @@
 import Cocoa
 import CortaTerminal
 
-/// Pane geometry from the keyboard (M7.8) and the "something is still
-/// running" close confirmation (M7.5).
+/// Pane geometry from the keyboard and the "something is still
+/// running" close confirmation.
 ///
 /// Both are window-level, so they live beside the split tree rather than in a
 /// pane: a resize moves a divider that two panes share, and a close has to
@@ -20,7 +20,7 @@ extension SplitViewController {
     /// Whole cells, not points: the grid is the unit the user is actually
     /// adjusting, and a point-sized step would spend most presses inside one
     /// column and then jump. It is also what makes a press always change
-    /// something — the divider constraints (M5.4) clamp the result, so a pane
+    /// something — the divider constraints clamp the result, so a pane
     /// already at its minimum simply stops.
     ///
     /// - Parameter vertical: whether to move a *vertical* divider, i.e.
@@ -79,7 +79,7 @@ extension SplitViewController {
         }
     }
 
-    // MARK: - Closing with something still running (M7.5)
+    // MARK: - Closing with something still running
 
     /// Every pane in the window whose shell has a foreground job.
     var panesWithRunningJobs: [ViewController] {

@@ -3,8 +3,8 @@ import Foundation
 
 /// Coalesces resize events so a live window drag does not hammer the child
 /// with `TIOCSWINSZ` — and the resulting `SIGWINCH` — at every mouse motion
-/// (history/ROADMAP-0.1.md M2.9, CONFORMANCE.md §2.3). Events within the debounce window
-/// collapse to the latest size; the final size is always delivered, either
+/// (`CONFORMANCE.md` §2.3). Events within the debounce window collapse to
+/// the latest size; the final size is always delivered, either
 /// when the window goes quiet or immediately via `flush()` at the end of the
 /// drag.
 ///

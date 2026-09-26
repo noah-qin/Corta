@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// M6.1 — the settings window.
+/// The settings window.
 ///
 /// A thin AppKit shell hosting `SettingsView` (SwiftUI), which owns the
 /// three-tab layout and every control; `SettingsModel` owns the state. See

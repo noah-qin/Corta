@@ -1,7 +1,7 @@
 import AppKit
 import CortaTerminal
 
-/// U12 — installing and updating the scroll-position pill.
+/// Installing and updating the scroll-position pill.
 ///
 /// Kept out of `ViewController+Selection.swift` (which owns the scroll
 /// *gesture*) and out of `ViewController.swift` (which is already the largest

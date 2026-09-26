@@ -1,8 +1,8 @@
 import Cocoa
 import CortaTerminal
 
-/// B14 — Shell ▸ Browse Remote Files…: opens the SFTP browser for the host
-/// this pane's terminal is actually talking to (`PaneRemoteState`, B13).
+/// Shell ▸ Browse Remote Files…: opens the SFTP browser for the host
+/// this pane's terminal is actually talking to (`PaneRemoteState`).
 ///
 /// The gate is the pane state and nothing else: `.remote` knows the host
 /// (the remote shell's own OSC 7 report), `.remoteUnknown` knows the pane

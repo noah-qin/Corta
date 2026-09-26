@@ -1,6 +1,6 @@
 import Observation
 
-/// M7.12 — the command palette's state and filtering, as `CommandPaletteView`
+/// The command palette's state and filtering, as `CommandPaletteView`
 /// binds to it.
 ///
 /// It owns no command list of its own — it filters `TerminalCommand

@@ -1,7 +1,7 @@
 import AppKit
 import CortaTerminal
 
-/// U15 — reopening the arrangement of a pane that was closed.
+/// Reopening the arrangement of a pane that was closed.
 ///
 /// **What this restores, and what it does not.** The *arrangement*: a pane
 /// back in the position it occupied, split the way it was split, at the

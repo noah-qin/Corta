@@ -1,14 +1,13 @@
 import Foundation
 
-/// M4.8, app side — what a BEL does. The core only reports that a bell
+/// What a BEL does. The core only reports that a bell
 /// happened (`Terminal.takeBell()`); this is the app's decision.
 ///
 /// The value lives in the config file like every other setting, and nowhere
-/// else. It used to be read from `UserDefaults` — written before the settings
-/// page existed — and when the page arrived it wrote the config file while
-/// the bell kept reading the defaults key, so changing Bell in Settings did
-/// exactly nothing. Two stores for one setting is the failure mode
-/// `docs/DECISIONS.md` D10 exists to prevent, and this is what it looks like.
+/// else. A second store — a `UserDefaults` key the bell read while the
+/// settings page wrote the file — would make changing Bell in Settings do
+/// exactly nothing: the failure mode `docs/DECISIONS.md` D10 exists to
+/// prevent.
 nonisolated enum BellMode: String, CaseIterable, Sendable {
     /// `NSSound.beep()`. Not the default: an audible bell in a terminal that
     /// runs training jobs is hostile.
@@ -18,8 +17,7 @@ nonisolated enum BellMode: String, CaseIterable, Sendable {
     case visual
     case muted
 
-    /// The picker's label — localised, not the config-file word capitalised,
-    /// which is what the Settings page showed in every language until the
-    /// B16 test pass read it in Chinese.
+    /// The picker's label — localised, not the config-file word
+    /// capitalised, which would read as English in every language.
     var displayName: String { L10n.text("bell.\(rawValue)") }
 }

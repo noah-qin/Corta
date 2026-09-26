@@ -16,13 +16,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// nothing else retains a window controller, and a deallocated
     /// controller takes its window (and its session) down with it.
     private var windowControllers: [NSWindowController] = []
-    /// B16 — the windows an App Intent may name: every ordinary terminal
+    /// The windows an App Intent may name: every ordinary terminal
     /// window, in the order they were opened. The Quick Terminal is left
     /// out — it has its own intent and is not a window a person arranges.
     var terminalWindowControllers: [TerminalWindowController] {
         windowControllers.compactMap { $0 as? TerminalWindowController }.filter { !$0.isQuickTerminal }
     }
-    /// The debounced arrangement write (U07); see `noteLayoutChanged`.
+    /// The debounced arrangement write; see `noteLayoutChanged`.
     var pendingLayoutSave: DispatchWorkItem?
     /// Set as the app starts quitting, so the windows closing on the way out
     /// do not each schedule a save that would end up writing an empty
@@ -38,7 +38,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         openWindow(workingDirectory: nil)
     }
 
-    /// B16 — the one route every "open a window" caller takes: ⌘N, the Dock
+    /// The one route every "open a window" caller takes: ⌘N, the Dock
     /// click, and the App Intent. `workingDirectory` is where the first pane
     /// spawns, or `nil` for the home directory; it is a *path*, handed to the
     /// spawn as its cwd and never written to the child's stdin.
@@ -65,7 +65,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return controller
     }
 
-    /// B16 — brings one window forward by identity, for the App Intent. The
+    /// Brings one window forward by identity, for the App Intent. The
     /// window is made key and its tab selected; the app is activated so the
     /// window actually reaches the front rather than ordering front inside
     /// a background app. Returns false when no window has that id anymore.
@@ -79,7 +79,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return true
     }
 
-    /// File > New Tab (⌘T, M4.7): native window tabbing. The new session is
+    /// File > New Tab (⌘T): native window tabbing. The new session is
     /// a full window of its own, added to the key window's tab group — so a
     /// tab can always be dragged out into a standalone window again, and
     /// ⌘N keeps meaning "new window".
@@ -145,7 +145,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         NotificationCenter.default.addObserver(
             self, selector: #selector(windowWillClose(_:)),
             name: NSWindow.willCloseNotification, object: controller.window)
-        // A moved or resized window is a changed arrangement (U07). Both
+        // A moved or resized window is a changed arrangement. Both
         // notifications are per-window and coalesce into one debounced write.
         for name in [NSWindow.didResizeNotification, NSWindow.didMoveNotification] {
             NotificationCenter.default.addObserver(
@@ -160,7 +160,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // A window close (red button, tab close) never reaches
         // `SplitViewController.closePane`, so this is where the window's
         // sessions, search monitors and observers are torn down — before
-        // the controller is dropped (E01).
+        // the controller is dropped.
         if let controller = windowControllers.first(where: { $0.window === window }) {
             (controller.contentViewController as? SplitViewController)?.teardown()
         }
@@ -177,19 +177,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         if !isTerminating { noteLayoutChanged() }
     }
 
-    // MARK: - Settings (M6.1)
+    // MARK: - Settings
 
     /// ⌘, from the app menu, and the Settings menu's own item.
     @objc func showSettings(_ sender: Any?) {
         SettingsWindowController.shared.show(sender)
     }
 
-    /// M7.12 — the command palette (⇧⌘P by default).
+    /// The command palette (⇧⌘P by default).
     @objc func showCommandPalette(_ sender: Any?) {
         CommandPaletteController.shared.show(sender)
     }
 
-    // MARK: - System entry points (B16)
+    // MARK: - System entry points
 
     /// View ▸ Quick Terminal, the palette, and the App Intent. The hotkey
     /// reaches `QuickTerminalController.toggle` directly.
@@ -253,7 +253,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         _ = ConfigurationStore.shared
         _ = UpdateController.shared
         AppearanceController.shared.start()
-        // B16 — both follow the config file from here on. Before any window:
+        // Both follow the config file from here on. Before any window:
         // the hotkey has to be held the moment the app is up, and Secure
         // Keyboard Entry has to see the first window become key.
         SecureInput.shared.start()
@@ -274,12 +274,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             }
         }
         restoreWindowsIfConfigured()
-        // B07 — so a click on a `TaskNotifier` notification can jump back to
+        // So a click on a `TaskNotifier` notification can jump back to
         // the command it was about (`AppDelegate+Notifications.swift`).
         UNUserNotificationCenter.current().delegate = self
     }
 
-    // MARK: - Reopening (M7.3)
+    // MARK: - Reopening
 
     /// Clicking the Dock icon with no window open.
     ///
@@ -297,7 +297,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return false
     }
 
-    // MARK: - Restoring the arrangement (M7.4)
+    // MARK: - Restoring the arrangement
 
     /// The setting, plus an environment escape hatch for the UI tests.
     ///
@@ -325,7 +325,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         case .skipAfterFailure:
             // A restore that crashed last time is not tried again: the marker
             // outlives only a launch that died mid-restore, so the saved
-            // layout is what killed it (U07). Dropped rather than repaired —
+            // layout is what killed it. Dropped rather than repaired —
             // the arrangement is the suspect, and a fresh window always works.
             SessionRestore.clear()
             SessionRestore.endRestore()
@@ -339,7 +339,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // Cleared once every window is up. The state file itself is *kept*:
         // it is rewritten by `noteLayoutChanged` as the arrangement changes,
         // so a later crash still has a last-known-good layout to come back
-        // to — which deleting it here used to make impossible.
+        // to; deleting it here would make that impossible.
         defer { SessionRestore.endRestore() }
 
         // The storyboard's window is already on screen, which means its root
@@ -347,7 +347,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // nothing had told it otherwise yet. That is the one thing a restore
         // cannot repair afterwards: setting the pane's directory now would
         // relabel it while leaving the child process where it started, so the
-        // first restored window used to be the only one that came back in the
+        // first restored window would be the only one that came back in the
         // wrong place. Every saved state therefore gets a window built from
         // scratch, with `pendingRestore` in place before `viewDidLoad`, and
         // the pre-opened one is closed once at least one replacement is up.
@@ -359,12 +359,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         var restored: [(state: WindowState, controller: NSWindowController)] = []
         for state in states {
             // Staged before the view loads: the root pane needs its working
-            // directory (and, B09, its preset) at spawn time.
+            // directory (and its preset) at spawn time.
             guard
                 let controller = instantiateWindowController(
                     setup: SplitViewController.Setup(restore: state))
             else { continue }
-            // B16 — the saved identity, so an intent resolved against last
+            // The saved identity, so an intent resolved against last
             // run's window still names this one.
             if let id = state.id, let terminal = controller as? TerminalWindowController {
                 terminal.windowID = id
@@ -381,7 +381,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         regroupRestoredTabs(restored)
     }
 
-    /// B09 — windows that were tabbed together come back that way, in the
+    /// Windows that were tabbed together come back that way, in the
     /// order they were saved, with whichever was frontmost selected again —
     /// instead of every restore turning previously-tabbed windows back into
     /// standalone ones. Grouped by `tabGroupID`; a group of one (or a `nil`
@@ -401,7 +401,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             // adding every tab after the first put the third tab between
             // the first and the second — and, since the selected tab was
             // the last one saved, "selected" landed in the middle of the
-            // bar (B16 test pass).
+            // bar.
             for member in ordered.dropFirst() {
                 guard let window = member.controller.window else { continue }
                 previous.addTabbedWindow(window, ordered: .above)
@@ -429,7 +429,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             windowControllers.compactMap { ($0 as? TerminalWindowController)?.restorableState })
     }
 
-    // MARK: - Keeping the arrangement current (U07)
+    // MARK: - Keeping the arrangement current
 
     /// How long the layout has to stop changing before it is written.
     ///
@@ -445,7 +445,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     ///
     /// Saving only at `applicationWillTerminate` meant a crash — the case a
     /// restore exists for — lost the arrangement entirely, because the one
-    /// moment the file was written was the one that never came (U07).
+    /// moment the file was written was the one that never came.
     @objc func noteLayoutChanged() {
         guard Self.isRestoreEnabled else { return }
         pendingLayoutSave?.cancel()
@@ -468,7 +468,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     /// ⌘Q with something still running. `windowShouldClose` covers closing a
     /// window; quitting bypasses it entirely, and losing a build to a
-    /// mistyped ⌘Q is exactly the case the confirmation exists for (M7.5).
+    /// mistyped ⌘Q is exactly the case the confirmation exists for.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let running = windowControllers.compactMap {
             ($0.contentViewController as? SplitViewController)
@@ -483,7 +483,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         isTerminating = true
         flushLayoutSave()
         DirectoryHistoryStore.shared.flush()
-        // B16 — the secure-input counter must be back at zero before the
+        // The secure-input counter must be back at zero before the
         // process ends; no notification will arrive to do it afterwards.
         SecureInput.shared.disengage()
         QuickTerminalController.shared.teardown()

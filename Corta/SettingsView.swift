@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// M6.1 — the settings page, in SwiftUI.
+/// The settings page, in SwiftUI.
 ///
 /// **Shape.** A native `TabView`, the way macOS's own preference windows are
 /// built when they are not hand-rolling a toolbar. `Form`/`LabeledContent`
@@ -10,9 +10,9 @@ import SwiftUI
 /// explicit constraints have no such thing built in.
 ///
 /// **Form style.** Grouped, the System Settings look. A row is as tall as
-/// its control plus the style's own inset — the text-field rows used to be
-/// 11pt taller than that because an empty `TextField` title still laid out
-/// as a blank second line (`numberField`).
+/// its control plus the style's own inset; an empty `TextField` title
+/// still lays out as a blank second line, 11pt taller, which is why
+/// `numberField` hides it.
 ///
 /// Every control writes through `SettingsModel`'s setters, which write the
 /// config file and re-read it. Nothing here holds state of its own — the

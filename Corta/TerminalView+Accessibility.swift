@@ -77,10 +77,10 @@ extension TerminalView {
 
     /// The attributed form of a range (`AXAttributedStringForRange`), which
     /// `NSTextView` answers and VoiceOver asks for when it *speaks* a range
-    /// rather than navigates it. A screen reader with a correct
-    /// `AXSelectedTextRange` in hand still said "No selection." over a
-    /// six-line mouse selection until this existed (2026-09-19; TextEdit,
-    /// asked the same way, read its selection). The terminal has no text
+    /// rather than navigates it. Without it, a screen reader with a correct
+    /// `AXSelectedTextRange` in hand says "No selection." over a six-line
+    /// mouse selection (TextEdit, asked the same way, reads its selection).
+    /// The terminal has no text
     /// attributes worth speaking — colour and bold are not semantics — so
     /// the answer is the plain substring, attributed.
     override func accessibilityAttributedString(for range: NSRange) -> NSAttributedString? {
@@ -147,7 +147,7 @@ extension TerminalView {
     /// The *visible* line the cursor is on. `cursorRow` is a document row,
     /// and the two differ by the scroll offset — scrolled into the history,
     /// the cursor's line number was being reported as if the live screen were
-    /// still on top of the viewport (U01).
+    /// still on top of the viewport.
     override func accessibilityInsertionPointLineNumber() -> Int {
         guard let snapshot = accessibilitySnapshot() else { return 0 }
         return min(max(0, snapshot.cursorRow + snapshot.scrollOffset), max(0, snapshot.rows - 1))
@@ -181,7 +181,7 @@ extension TerminalView {
     /// The character under a point, which the protocol gives in **screen**
     /// coordinates.
     ///
-    /// Two conversions were wrong here (U01). `convert(_:from: nil)` converts
+    /// Two conversions were wrong here. `convert(_:from: nil)` converts
     /// from *window* coordinates, not screen, so every answer was off by the
     /// window's origin — the further from the bottom-left of the display the
     /// window sat, the further Voice Control's click landed from the cell the
@@ -212,7 +212,7 @@ extension TerminalView {
     /// lands on the text it is reading rather than around the whole pane.
     ///
     /// The columns come from the snapshot's boundary table, not from
-    /// `offset - lineStart` (U01): on a row of CJK that subtraction is half
+    /// `offset - lineStart`: on a row of CJK that subtraction is half
     /// the true column, and the outline lands on the wrong half of the line.
     /// The range's last *character* is what bounds the rectangle, so a
     /// zero-length range still outlines one cell.
@@ -223,9 +223,8 @@ extension TerminalView {
         let start = snapshot.cell(forOffset: range.location)
         // The *last column of* the last character, not its first: a range
         // ending on a wide character whose rectangle stops at that
-        // character's first column clips half of it. A live accessibility
-        // probe outlined three CJK characters as five cells instead of six
-        // before this (U01).
+        // character's first column clips half of it — three CJK characters
+        // would be outlined as five cells instead of six.
         let end = snapshot.cellSpan(forOffset: range.location + max(0, range.length - 1))
         let first = cellFrame(start.row, start.column)
         let last = cellFrame(end.row, end.column + end.columns - 1)
@@ -269,12 +268,10 @@ extension TerminalView {
         let now = CACurrentMediaTime()
         let elapsed = now - lastAccessibilityPost
         guard elapsed >= Self.accessibilityPostInterval else {
-            // Inside the interval the change used to be dropped outright —
-            // which for a burst of output meant the *last* change, the one
-            // that leaves the screen in its final state, was the one never
-            // announced, and VoiceOver went on reading the state before it
-            // (B16 test pass: "what I hear is not what is on screen").
-            // Trail instead: one post when the interval ends, carrying
+            // Inside the interval the change is not dropped: for a burst of
+            // output that would mean the *last* change, the one that leaves
+            // the screen in its final state, is the one never announced, and
+            // VoiceOver goes on reading the state before it. Trail instead: one post when the interval ends, carrying
             // every change since.
             guard pendingAccessibilityPost == nil else { return }
             let item = DispatchWorkItem { [weak self] in

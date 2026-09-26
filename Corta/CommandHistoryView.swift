@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// B10 — the SwiftUI half of the app's first SwiftUI surface;
+/// The SwiftUI half of the command history window;
 /// `CommandHistoryModel` is the other half, and `CommandHistoryController`
 /// only hosts this view in an `NSHostingController` and forwards `show(for:)`.
 struct CommandHistoryView: View {
@@ -41,7 +41,7 @@ struct CommandHistoryView: View {
             }
             .labelsHidden()
             .frame(width: 140)
-            // B13 — "which machine did it run on", alongside the existing
+            // "Which machine did it run on", alongside the existing
             // where-did-it-run filters. The hosts on offer are the ones this
             // pane's records actually name (`CommandHistoryModel.knownHosts`).
             Picker("", selection: $model.hostScope) {

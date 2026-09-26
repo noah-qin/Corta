@@ -1,7 +1,7 @@
 import Cocoa
 import CortaTerminal
 
-/// B08 — the Finder/output-path half of "focused Finder, drag/drop and
+/// The Finder/output-path half of "focused Finder, drag/drop and
 /// output-path actions for current/new pane and parent/project-root
 /// navigation." Outbound drag-and-drop is deliberately not part of this:
 /// there is no `NSDraggingSource` precedent anywhere in the app, and
@@ -44,11 +44,11 @@ extension ViewController {
         terminalView?.showToast(L10n.text("toast.copiedWorkingDirectory"))
     }
 
-    /// `cd ..`, through the same safety-gated primitive B08's PR #60 built
-    /// (`ViewController+DirectoryNavigation.swift`) — no new gate, just a
+    /// `cd ..`, through the same safety-gated primitive every directory
+    /// change uses (`ViewController+DirectoryNavigation.swift`) — no new gate, just a
     /// new source for the path.
     ///
-    /// B13 — reads `shellDirectory`, not `session.workingDirectory`, so a
+    /// Reads `shellDirectory`, not `session.workingDirectory`, so a
     /// remote pane can walk its *own* remote directories too: the `cd` is
     /// delivered to the pane's shell, which is the machine the path belongs
     /// to. The spawn actions below stay on `session.workingDirectory`

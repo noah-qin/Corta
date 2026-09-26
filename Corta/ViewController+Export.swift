@@ -2,7 +2,7 @@ import AppKit
 import CortaTerminal
 import UniformTypeIdentifiers
 
-/// U15 — writing what is in the pane to a file.
+/// Writing what is in the pane to a file.
 ///
 /// **Why a file and not just the clipboard.** ⌘C already exists, and for a
 /// line or two it is the right tool. A hundred thousand lines of build output
@@ -17,7 +17,7 @@ import UniformTypeIdentifiers
 /// Copy already follows one level down, and it means the command needs no
 /// second name and no submenu: what you have selected is what you get.
 extension ViewController {
-    /// B05: building the text is O(scrollback) — the same cost class
+    /// Building the text is O(scrollback) — the same cost class
     /// `PERFORMANCE.md` §5.2 measures a full-document search sweep at
     /// hundreds of ms for a 100k-line history — so it runs off the main
     /// thread rather than stalling the interaction path. The build runs
@@ -46,7 +46,7 @@ extension ViewController {
             filename: Self.exportFilename(hasSelection: hasSelection))
     }
 
-    /// B07 — the same export, scoped to `effectiveCommand`'s output rather
+    /// The same export, scoped to `effectiveCommand`'s output rather
     /// than the current selection: the identity-based counterpart to
     /// `copyLastCommandOutput`, for a build log too long to want on the
     /// clipboard but still worth attaching to a bug report.
@@ -186,7 +186,7 @@ extension ViewController {
 
     /// The write itself, separated from the panel so the bytes that land on
     /// disk are testable — the panel is AppKit's and is not in doubt, the
-    /// encoding and the trailing newline are ours (U15).
+    /// encoding and the trailing newline are ours.
     ///
     /// UTF-8, and a trailing newline when the text does not already end in
     /// one: the file is going to be read by `grep`, `less` and a diff, and

@@ -50,7 +50,7 @@ final class SFTPBrowserModel {
 
     nonisolated enum ConnectionState: Equatable {
         /// Launched from a `.remoteUnknown` pane: the pane is remote, but
-        /// no honest source names the host (the B13 rule — never the
+        /// no honest source names the host (the rule — never the
         /// launcher's argv, never the screen). The user types it.
         case needsHost
         case connecting
@@ -138,7 +138,7 @@ final class SFTPBrowserModel {
     /// panel and starts nothing.
     var pickUploadFiles: (() async -> [URL])?
     var pickDownloadDestination: (([Entry]) async -> DownloadDestination?)?
-    /// B14 remote editing — opens a file row in the editor, on a managed
+    /// Remote editing — opens a file row in the editor, on a managed
     /// local copy (`RemoteEditCoordinator` owns download, watch and the
     /// upload-back decision). Set by the controller; any error wording is
     /// handed back for the listing's error line.

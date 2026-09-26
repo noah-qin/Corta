@@ -9,9 +9,8 @@ import QuartzCore
 ///
 /// This file owns the layer and the drawable size; the display link and the
 /// frame callback live in `FrameScheduler`. Input lives in extensions by
-/// concern: `TerminalView+Keyboard.swift`, `TerminalView+IME.swift`
-/// (Track A), `TerminalView+Mouse.swift` and `TerminalView+Scroll.swift`
-/// (Track C).
+/// concern: `TerminalView+Keyboard.swift`, `TerminalView+IME.swift`,
+/// `TerminalView+Mouse.swift` and `TerminalView+Scroll.swift`.
 final class TerminalView: NSView, CALayerDelegate {
     private let metalLayer = CAMetalLayer()
     private lazy var frameScheduler = FrameScheduler(metalLayer: metalLayer)
@@ -25,7 +24,7 @@ final class TerminalView: NSView, CALayerDelegate {
     var renderPolicy: RenderPolicy?
     /// Pauses rendering while the window is occluded; replaced when changing windows.
     private var occlusionObserver: NSObjectProtocol?
-    /// Mouse-moved tracking for ⌘-hover link feedback (M4.6); `.inVisibleRect`
+    /// Mouse-moved tracking for ⌘-hover link feedback; `.inVisibleRect`
     /// keeps it glued to the visible area across resizes.
     private var mouseTrackingArea: NSTrackingArea?
     /// The transient confirmation in the pane's bottom-right corner
@@ -64,8 +63,8 @@ final class TerminalView: NSView, CALayerDelegate {
 
     /// Run once per accepted frame to do the prepare/diff work and report
     /// whether anything is still pending; forwarded to `frameScheduler`.
-    /// `false` no longer skips the drawable itself (there is none left to
-    /// skip ahead of) — it only decides whether the scheduler pauses again
+    /// `false` does not skip the drawable itself (there is none to skip
+    /// ahead of) — it only decides whether the scheduler pauses again
     /// right after, which is what keeps a static screen from paying for
     /// vsync wakeups (`PERFORMANCE.md` §3: idle CPU ~0%). See
     /// `FrameScheduler` for the full reasoning.
@@ -78,7 +77,7 @@ final class TerminalView: NSView, CALayerDelegate {
     var onKeyBytes: (([UInt8]) -> Void)?
 
     /// Called for a scroll gesture, a page key, or a key bound to Scroll to
-    /// Top / Scroll to Bottom (`M1.20`).
+    /// Top / Scroll to Bottom.
     var onScroll: ((ScrollGesture) -> Void)?
 
     /// Called for a paste request — the key bound to Paste, or the Edit
@@ -87,7 +86,7 @@ final class TerminalView: NSView, CALayerDelegate {
     /// (`SECURITY.md` §2.3).
     var onPaste: (() -> Void)?
 
-    /// M4.4 search shortcuts and Escape-while-searching, offered before
+    /// Search shortcuts and Escape-while-searching, offered before
     /// anything else in `keyDown`: Esc must dismiss the search bar rather
     /// than send a raw ESC byte to the child while it's open, and ⌘F/⌘G/
     /// ⇧⌘G must not fall through to `deliverBytes`. Returns whether the
@@ -97,12 +96,12 @@ final class TerminalView: NSView, CALayerDelegate {
     var onSearchKey: ((NSEvent) -> Bool)?
 
     /// Called when a live window resize ends, so the shell can deliver the
-    /// final size to the child without waiting out the debounce (M2.9).
+    /// final size to the child without waiting out the debounce.
     var onLiveResizeEnded: (() -> Void)?
 
     /// Called when the view becomes first responder — click-to-focus, the
     /// ⌘⌥ focus-move shortcuts, a split, a close all arrive here — so the
-    /// split controller can track which pane owns input (M5.2).
+    /// split controller can track which pane owns input.
     var onFocus: (() -> Void)?
 
     /// LNM (`CSI 20 h`) — while set, Return sends CR LF. Read per key event
@@ -110,7 +109,7 @@ final class TerminalView: NSView, CALayerDelegate {
     /// at any point and the next keystroke has to honour the new value.
     var isNewLineMode: (() -> Bool)?
 
-    /// M6.9 — the kitty keyboard protocol flags the child has asked for.
+    /// The kitty keyboard protocol flags the child has asked for.
     /// Read per key event rather than cached: a program can change them at
     /// any point, and the next keystroke has to honour the new value.
     var keyboardEnhancements: (() -> KeyboardEnhancementFlags)?
@@ -119,24 +118,24 @@ final class TerminalView: NSView, CALayerDelegate {
     /// (application) forms. Read per key event, like the kitty flags.
     var applicationCursorKeys: (() -> Bool)?
 
-    /// U04 — DECKPAM (`ESC =`). While set, the numeric keypad sends its SS3
+    /// DECKPAM (`ESC =`). While set, the numeric keypad sends its SS3
     /// forms. Read per key event, like the other mode closures: a program
     /// turns it on and off around its own input loop.
     var applicationKeypad: (() -> Bool)?
 
-    /// U05 — whether ⌥ acts as Meta (ESC prefix) rather than composing the
+    /// Whether ⌥ acts as Meta (ESC prefix) rather than composing the
     /// layout's alternate characters. Read per key event so an edit to the
     /// config file takes effect on the next keystroke.
     var optionAsMeta: (() -> Bool)?
 
-    /// U08 — the shortcut table in force. Read per key event, like the mode
+    /// The shortcut table in force. Read per key event, like the mode
     /// closures above, so a rebind or unbind in the config file takes effect
     /// on the next keystroke. The keys `keyDown` still recognises itself
     /// (paste, the scrollback jumps) are matched against this rather than
     /// against a literal, so they cannot outlive the binding they belong to.
     var keybindings: (() -> Keybindings)?
 
-    /// M6.15 — file paths dropped on the pane, already resolved to
+    /// File paths dropped on the pane, already resolved to
     /// filesystem paths. The controller sanitises, quotes and sends them.
     var onDropPaths: (([String]) -> Void)?
     /// The word under a force touch and where to anchor the dictionary
@@ -149,7 +148,7 @@ final class TerminalView: NSView, CALayerDelegate {
     /// sanitised and newline-warned exactly as a ⌘V paste is.
     var onServicesInsert: ((String) -> Void)?
 
-    /// M6.14 — the trackpad magnification gesture. The controller spends it
+    /// The trackpad magnification gesture. The controller spends it
     /// in whole font-size steps; the view only forwards it, like every other
     /// input here.
     var onMagnify: ((CGFloat) -> Void)?
@@ -203,8 +202,8 @@ final class TerminalView: NSView, CALayerDelegate {
     var cellSize: CGSize = .zero
 
     /// The cursor cell's rect in this view's coordinates, answered by the
-    /// shell (it owns the session, the insets and the metrics). Track A's
-    /// IME layer (`TerminalView+IME.swift`) positions the candidate window
+    /// shell (it owns the session, the insets and the metrics). The IME
+    /// layer (`TerminalView+IME.swift`) positions the candidate window
     /// and the preedit overlay from it; nil means the cursor is not
     /// currently knowable or visible.
     var cursorRectProvider: (() -> CGRect?)?
@@ -263,7 +262,7 @@ final class TerminalView: NSView, CALayerDelegate {
         // it is a question to measure rather than a value to pick.
         //
         // Corta ships the default (3) because that is what has been measured
-        // (M6.12: 45.5 ms). This variable exists so the comparison can be run
+        // (`PERFORMANCE.md` §5.7). This variable exists so the comparison can be run
         // as two launches of the same binary rather than as a code change —
         // an A/B where the only difference is the flag. Pair it with an
         // `os_signpost` trace (`InputLatencySignposts`): if double buffering
@@ -289,7 +288,7 @@ final class TerminalView: NSView, CALayerDelegate {
         // a pane that actually touches a top corner may round it: the same
         // mask on an interior pane cuts a visible notch out of the divider
         // junction. `layout()` recomputes the mask from the pane's position
-        // in the window (M5).
+        // in the window.
         metalLayer.cornerRadius = 10
         metalLayer.maskedCorners = []
         metalLayer.masksToBounds = true
@@ -462,7 +461,7 @@ final class TerminalView: NSView, CALayerDelegate {
         frameScheduler.requestFirstPresent()
     }
 
-    /// The default visual bell (M4.8): a brief flash of the terminal
+    /// The default visual bell: a brief flash of the terminal
     /// surface. A transient screen effect, not a persistent panel, so it
     /// draws directly on the Metal layer rather than adding a glass surface.
     func flashBell() {

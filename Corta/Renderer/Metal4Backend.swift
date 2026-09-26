@@ -41,7 +41,7 @@ nonisolated enum Metal4Diagnostics {
 /// submission API — `MTL4CommandQueue`, `MTL4CommandBuffer`,
 /// `MTL4CommandAllocator`, `MTL4RenderCommandEncoder` and argument tables
 /// (`MTL4ArgumentTable`) — rather than the `MTLCommandQueue`/
-/// `MTLRenderCommandEncoder` path `QuadRenderer` uses (B12, issue #39).
+/// `MTLRenderCommandEncoder` path `QuadRenderer` uses.
 ///
 /// **What is MTL4 here, and what is not.** Every frame is encoded into an
 /// `MTL4CommandBuffer` (a persistent object, re-`begin`n each frame — MTL4
@@ -54,12 +54,11 @@ nonisolated enum Metal4Diagnostics {
 /// state objects are the classic `MTLRenderPipelineState` — that is not a
 /// gap: `MTL4RenderCommandEncoder.setRenderPipelineState` takes exactly that
 /// type, and MTL4's own compiler (`MTL4Compiler.newRenderPipelineState`)
-/// returns it too. They come from `QuadPipelineCache` (B12), shared with
+/// returns it too. They come from `QuadPipelineCache`, shared with
 /// `QuadRenderer`, so construction here costs a dictionary lookup once any
-/// pane has run, and the M9 `MTLBinaryArchive` warm-up (which lives in the
-/// cache's creation path) covers this backend too — an
-/// `MTL4Compiler`/`MTL4Archive`-specific cache is no longer a distinct
-/// follow-up of its own. The blend state, pixel format, scissor math,
+/// pane has run, and the `MTLBinaryArchive` warm-up (which lives in the
+/// cache's creation path) covers this backend too — no
+/// `MTL4Compiler`/`MTL4Archive`-specific cache is needed. The blend state, pixel format, scissor math,
 /// viewport and draw parameters replicate `QuadRenderer.draw` exactly — the
 /// pixel-equivalence tests in `TerminalRenderBackendTests` enforce that the
 /// two stay in lockstep.
@@ -83,8 +82,8 @@ nonisolated enum Metal4Diagnostics {
 /// way MTL3's object bindings are, so freeing the backend — its command
 /// buffer, allocators, ring buffers, residency set — while a committed
 /// frame is still executing is a driver-level `Invalid Resource` fault
-/// (caught by `metal4BackendDeallocatesWithFramesInFlight` during B12
-/// development). `deinit` therefore drains: it waits, bounded, for the
+/// (`metal4BackendDeallocatesWithFramesInFlight` holds this). `deinit`
+/// therefore drains: it waits, bounded, for the
 /// last committed frame before anything it owns is released.
 ///
 /// **Residency.** The ring buffers sit in an `MTLResidencySet` attached to
@@ -142,7 +141,7 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
     /// queue-level event was observed never to advance against a live
     /// `CAMetalDisplayLink` drawable stream — every `beginFrame` past the
     /// ring depth then waited out its full timeout and the window rendered
-    /// ~1 frame/second (B12 live-run debugging).
+    /// ~1 frame/second.
     private let completion = FrameCompletion()
 
     /// The one piece of state the commit-feedback thread touches: the
@@ -214,7 +213,7 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
     /// behaviour then is a one-second stall plus fresh allocator, command
     /// buffer and ring buffers on *every* frame — the "renders nothing at
     /// 1 fps while leaking" failure observed live when the drawable path
-    /// faulted at launch (B12). Past `completionTimeoutLimit` the queue is
+    /// faulted at launch. Past `completionTimeoutLimit` the queue is
     /// treated as dead: frames stop encoding entirely (`beginFrame`
     /// returns encoder-less, `endFrame` still presents the drawable and
     /// records the frame complete), which is cheap, bounded, and logged —
@@ -225,7 +224,7 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
     /// Per-frame state, valid between `beginFrame` and `endFrame`. The
     /// render thread is the only caller, as with `QuadRenderer`.
     private var encoder: (any MTL4RenderCommandEncoder)?
-    /// What the open encoder was last told (B12 audit): one encoder serves
+    /// What the open encoder was last told: one encoder serves
     /// every draw of the frame and all draws share the pane's rect, so
     /// re-setting identical scissor, viewport or pipeline state per draw is
     /// a redundant state change. Reset in `beginFrame` — the MTL3 path has
@@ -386,10 +385,10 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         queue.addResidencySet(residencySet)
 
         // The pipelines and sampler are shared with `QuadRenderer` through
-        // `QuadPipelineCache` (B12) — same shaders, pixel format and blend
+        // `QuadPipelineCache` — same shaders, pixel format and blend
         // state, so the two backends produce identical pixels for identical
         // instances, and a pane pays the compile at most once per process
-        // whichever backend it gets. The M9 `MTLBinaryArchive` warm-up
+        // whichever backend it gets. The `MTLBinaryArchive` warm-up
         // covers this backend too: it lives in the cache's creation path,
         // and the pipelines are classic `MTLRenderPipelineState`s whichever
         // submission API encodes them — no MTL4Archive/MTL4Compiler port

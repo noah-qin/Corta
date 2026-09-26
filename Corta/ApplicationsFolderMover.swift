@@ -2,7 +2,7 @@ import AppKit
 
 /// Offers to move Corta into `/Applications` on launch when it is running
 /// from anywhere else — Downloads, wherever a `.zip` happened to be
-/// extracted, the Desktop. Direct-download distribution (M6.16) ships a
+/// extracted, the Desktop. Direct-download distribution ships a
 /// plain archive with no drag-to-install step a `.dmg` would give a user;
 /// without this, a person who never drags the app anywhere keeps running
 /// it from wherever it landed. That matters beyond tidiness: Sparkle's

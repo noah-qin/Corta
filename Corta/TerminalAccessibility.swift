@@ -19,7 +19,7 @@ import CortaTerminal
 /// reached by scrolling, exactly as a sighted user reaches it. "Visible"
 /// means visible: the snapshot is taken at the current `scrollOffset`, so a
 /// reader scrolled into the history hears the history rather than the live
-/// screen behind it (U01).
+/// screen behind it.
 struct TerminalAccessibilitySnapshot {
     /// The visible rows, newline-joined, trailing blanks trimmed per row.
     let text: String

@@ -3,7 +3,7 @@ import CortaTerminal
 
 /// Keyboard input: one key event to the bytes a real terminal would send.
 ///
-/// Routing (M3.4): an event carrying ⌘ or ⌃ bypasses the IME entirely —
+/// Routing: an event carrying ⌘ or ⌃ bypasses the IME entirely —
 /// control sequences are the terminal's own and must never reach an input
 /// method. Every other event is offered to the input context first
 /// (`inputContext.handleEvent(_:)`); only an event the IME does not consume
@@ -14,7 +14,7 @@ import CortaTerminal
 /// called; it would swallow control keys the shell needs verbatim.)
 extension TerminalView {
     override func keyDown(with event: NSEvent) {
-        // U08: the shortcuts this method recognises itself come from the
+        // The shortcuts this method recognises itself come from the
         // binding table, never from a literal. AppKit dispatches a bound
         // keystroke through its menu item before `keyDown` ever runs, so
         // these branches normally do not fire at all — but a literal here
@@ -32,7 +32,7 @@ extension TerminalView {
             onPaste?()
             return
         }
-        // M3.4: offer the event to the IME first. A consumed event ends
+        // Offer the event to the IME first. A consumed event ends
         // here — the IME answers through `insertText`/`setMarkedText`.
         if Self.routesEventThroughIME(event, optionAsMeta: optionAsMeta?() ?? false),
             inputContext?.handleEvent(event) == true
@@ -77,13 +77,12 @@ extension TerminalView {
         InputLatencySignposts.measure(.keyDown) { onKeyBytes?(bytes) }
     }
 
-    /// M3.4: ⌘/⌃ events bypass the IME entirely — and so does ⌥ once the
+    /// ⌘/⌃ events bypass the IME entirely — and so does ⌥ once the
     /// user has said ⌥ is Meta. Kept a pure function of the event so the
     /// bypass decision is testable without a window server.
     ///
-    /// U05's encoder handled `option-as-meta` correctly from the day it
-    /// landed and the setting still did nothing, because the event never
-    /// reached it: an ⌥-only press carries neither ⌘ nor ⌃, so it was
+    /// The ⌥ bypass is what makes `option-as-meta` work at all — the
+    /// encoder handles it, but only an event that reaches the encoder: an ⌥-only press carries neither ⌘ nor ⌃, so it was
     /// offered to the input context first, macOS composed it into the
     /// layout's alternate character, and it came back through `insertText`.
     /// ⌥F arrived as `ƒ`. The encoder was tested in isolation and the
@@ -100,7 +99,7 @@ extension TerminalView {
     /// The keystroke bound to Paste — checked before `bytes(for:)`, which
     /// would otherwise deliver a bare "v" to the child.
     ///
-    /// Read from the bindings rather than written in as ⌘V (U08). The literal
+    /// Read from the bindings rather than written in as ⌘V. The literal
     /// matched *any* combination containing ⌘ and "v", so `bind.paste =
     /// cmd+shift+v` left ⌘V pasting as well, and `bind.paste =` — an unbind,
     /// whose whole point is handing the key to the child — did not stop ⌘V
@@ -125,13 +124,13 @@ extension TerminalView {
     /// and Home/End to their SS3 (application) forms.
     ///
     /// - Parameter enhancements: the kitty keyboard protocol flags the child
-    ///   has asked for (M6.9). With `disambiguate` set, the keys the legacy
+    ///   has asked for. With `disambiguate` set, the keys the legacy
     ///   encoding collides are sent as `CSI code ; modifiers u` instead.
-    /// - Parameter applicationKeypad: U04. DECKPAM (`ESC =`). When true the
+    /// - Parameter applicationKeypad: DECKPAM (`ESC =`). When true the
     ///   numeric keypad sends its SS3 forms — `ESC O p`…`ESC O y` for the
     ///   digits, `ESC O M` for Enter — which is what a program that sent
     ///   `smkx` is waiting for.
-    /// - Parameter optionAsMeta: U05. When true, ⌥ on a text or control key
+    /// - Parameter optionAsMeta: When true, ⌥ on a text or control key
     ///   sends an ESC prefix instead of the layout's alternate character —
     ///   what a PC keyboard's Alt does. Special keys are unaffected either
     ///   way: ⌥ already reaches the child there as the modifier parameter.
@@ -212,13 +211,13 @@ extension TerminalView {
                 : Array("\u{1B}[1;\(modifiers)Z".utf8)
         }
 
-        // U05 — ⌥ as Meta. ⌘ still belongs to the app, so it disqualifies
+        // ⌥ as Meta. ⌘ still belongs to the app, so it disqualifies
         // the combination; a special key never lands here (⌥ reaches the
         // child as the modifier parameter above).
         let meta: [UInt8] =
             optionAsMeta && flags.contains(.option) && !flags.contains(.command) ? [0x1B] : []
 
-        // U04 — DECKPAM. The keypad's own SS3 forms, which only the keyCode
+        // DECKPAM. The keypad's own SS3 forms, which only the keyCode
         // can identify: ⌤ reports "\u{3}" (indistinguishable from Ctrl+C at
         // that point) and every digit key reports the same character its
         // main-keyboard twin does. Modified keypad presses fall through to
@@ -267,7 +266,7 @@ extension TerminalView {
     }
 
     /// The SS3 final byte for a keypad key under DECKPAM, by macOS virtual
-    /// keycode (U04).
+    /// keycode.
     ///
     /// The mapping is xterm's, which is the one `xterm-256color` promises:
     /// digits 0–9 are `p`…`y` in order, and the operators are the finals
@@ -299,7 +298,7 @@ extension TerminalView {
     }
 
     /// The kitty encoding, applied only to the keys the legacy one cannot
-    /// tell apart (M6.9). Everything else keeps its legacy bytes: the
+    /// tell apart. Everything else keeps its legacy bytes: the
     /// `disambiguate` flag asks a terminal to stop colliding keys, not to
     /// re-encode the whole keyboard — that is what `reportAllKeysAsEscapeCodes`
     /// is for, and Corta does not claim it.

@@ -1,20 +1,20 @@
 import Cocoa
 import CortaTerminal
 
-/// M5 — the window's content controller: owns the split layout tree
+/// The window's content controller: owns the split layout tree
 /// (`SplitTree`), the panes (one `ViewController` — one `TerminalSession` —
 /// per leaf, `DESIGN.md` §2.4) and the focus that routes input to one of
-/// them (M5.2). Window-level setup the single-pane `ViewController` used
+/// them. Window-level setup the single-pane `ViewController` used
 /// to do itself (chrome, content size, first responder) lives here now:
 /// with N panes there is still exactly one window.
 ///
 /// Composition, not new mechanism: a pane renders its session into its own
-/// drawable in one pass exactly as before (M5.3), and a pane view resizing
+/// drawable in one pass exactly as before, and a pane view resizing
 /// — divider drag or window resize — flows through the pane's existing
-/// `resizeSessionToFitView` path to its own PTY (M5.4).
+/// `resizeSessionToFitView` path to its own PTY.
 final class SplitViewController: NSViewController {
     private var tree: SplitTree!
-    /// The pane keyboard and mouse input belong to (M5.2). Set by
+    /// The pane keyboard and mouse input belong to. Set by
     /// `noteFocus` from `TerminalView.becomeFirstResponder`, so every route
     /// to focus — click, ⌘⌥ arrows, a split, a close — funnels through one
     /// place.
@@ -65,19 +65,19 @@ final class SplitViewController: NSViewController {
     struct Setup {
         var restore: WindowState?
         var preset: Preset?
-        /// B16 — where the root pane spawns when an App Intent asks for a
+        /// Where the root pane spawns when an App Intent asks for a
         /// directory; ignored when `restore` or `preset` already names one.
         var workingDirectory: String?
     }
     static var pendingSetup: Setup?
 
-    /// The layout this window is being restored into (M7.4): taken from
+    /// The layout this window is being restored into: taken from
     /// `pendingSetup` in `viewDidLoad`, where the root pane needs its working
     /// directory at spawn time, and consumed by `viewWillAppear`, where the
     /// splits need the window's final frame.
     var pendingRestore: WindowState?
 
-    /// U16 — the preset this window's first pane spawned from, from
+    /// The preset this window's first pane spawned from, from
     /// `pendingSetup` for the same reason.
     var pendingPreset: Preset?
 
@@ -89,7 +89,7 @@ final class SplitViewController: NSViewController {
         // before its view loads (tests do this) is kept.
         if let restore = setup?.restore { pendingRestore = restore }
         if let preset = setup?.preset { pendingPreset = preset }
-        // B09 — the root pane's own preset, resolved by name against the
+        // The root pane's own preset, resolved by name against the
         // *current* config file: a restored window that was launched from a
         // preset gets its shell/env back too, not just its directory, and a
         // preset renamed or deleted since degrades to directory-only exactly
@@ -118,7 +118,7 @@ final class SplitViewController: NSViewController {
             return
         }
         window.title = "Corta"
-        // Tabs (M4.7) are native window tabbing: `.automatic` here, and File >
+        // Tabs are native window tabbing: `.automatic` here, and File >
         // New Tab joins the key window's tab group. The tab label follows
         // `window.title`, which the OSC 0/2 title update keeps current.
         window.tabbingMode = .automatic
@@ -326,11 +326,11 @@ final class SplitViewController: NSViewController {
         workingDirectory: String?, initialGridSize: TerminalSize?, preset: Preset? = nil
     ) -> ViewController {
         let pane = ViewController()
-        // U16 — set before `pane.view` loads: the preset supplies the shell,
+        // Set before `pane.view` loads: the preset supplies the shell,
         // the directory and the environment at spawn time.
         pane.preset = preset
-        // M5.5: a split pane opens where the focused pane is, via OSC 7
-        // (M2.8); nil (no report yet) falls back to the home directory.
+        // A split pane opens where the focused pane is, via OSC 7;
+        // nil (no report yet) falls back to the home directory.
         // `TerminalSession.workingDirectory` is already host-filtered, so a
         // pane ssh'd into a remote machine never hands its remote path to a
         // local spawn.
@@ -350,7 +350,7 @@ final class SplitViewController: NSViewController {
     /// The root changes identity when the first split replaces the single
     /// pane and when the last split collapses back into one.
     private func installRoot() {
-        // U13 — while a pane is zoomed, *it* is what fills the controller's
+        // While a pane is zoomed, *it* is what fills the controller's
         // view; the split tree is still intact underneath, just not in the
         // hierarchy.
         let root = zoomedPane?.view ?? tree.root
@@ -366,7 +366,7 @@ final class SplitViewController: NSViewController {
         ])
     }
 
-    /// U07 — the arrangement changed, so the saved copy is stale. The write
+    /// The arrangement changed, so the saved copy is stale. The write
     /// itself is debounced in `AppDelegate`; this only says that something
     /// moved. A divider drag arrives through the window's own resize
     /// notification, so only the structural changes are reported here.
@@ -374,7 +374,7 @@ final class SplitViewController: NSViewController {
         (NSApp.delegate as? AppDelegate)?.noteLayoutChanged()
     }
 
-    // MARK: - Zoom (U13)
+    // MARK: - Zoom
 
     /// The pane filling the window on its own, or `nil` when the split tree
     /// is on screen.
@@ -394,13 +394,14 @@ final class SplitViewController: NSViewController {
     /// The arrangement as it was when the zoom began.
     ///
     /// Two jobs, both because the tree is not whole while a pane is zoomed:
-    /// it is what `windowState` reports (so U07 never writes "one pane" over
+    /// it is what `windowState` reports (so the arrangement write never
+    /// saves "one pane" over
     /// a split), and it is what the dividers are restored from on the way
     /// out — AppKit re-halves a split that loses a subview, so putting the
     /// view back is not the same as putting the layout back.
     private(set) var layoutBeforeZoom: PaneLayout?
 
-    /// U15 — where the last closed pane was, so it can be reopened there.
+    /// Where the last closed pane was, so it can be reopened there.
     /// One deep; see `SplitViewController+Reopen.swift` for why.
     var lastClosedPane: ClosedPane?
 
@@ -582,7 +583,7 @@ final class SplitViewController: NSViewController {
         defer { noteLayoutChanged() }
         unzoomIfNeeded(closing: pane)
         // Recorded before the tree changes: afterwards the split it sat in no
-        // longer exists (U15).
+        // longer exists.
         noteClosing(pane)
         pane.teardown()
         let survivingSubtree = tree.close(leaf: pane.view)
@@ -602,7 +603,7 @@ final class SplitViewController: NSViewController {
         for pane in panes { pane.invalidateDisplay() }
     }
 
-    /// Whole-window teardown (E01) for the close paths that never reach
+    /// Whole-window teardown for the close paths that never reach
     /// `closePane` — the red button, a tab's close, ⌘Q. Idempotent through
     /// each pane's own guard, so a pane closed earlier in the same window
     /// is simply skipped.
@@ -624,7 +625,7 @@ final class SplitViewController: NSViewController {
         return pane.gridSize(fitting: target)
     }
 
-    // MARK: - Focus (M5.2)
+    // MARK: - Focus
 
     /// Recorded from `TerminalView.becomeFirstResponder`: whichever route
     /// took focus, the focused pane is the one holding it.
@@ -641,7 +642,7 @@ final class SplitViewController: NSViewController {
         applyWindowTitle()
     }
 
-    /// The window's title is the focused pane's (M2.8, M5.2) — what is
+    /// The window's title is the focused pane's — what is
     /// running, where, and the grid size (`ViewController.applyWindowTitle`).
     /// A title arriving in an unfocused pane waits for focus.
     func applyWindowTitle() {
@@ -677,7 +678,7 @@ final class SplitViewController: NSViewController {
         case #selector(reopenClosedPane(_:)):
             return canReopenClosedPane
         case #selector(toggleZoomPane(_:)):
-            // U13 — one command, two names. A checkmark would say the pane is
+            // One command, two names. A checkmark would say the pane is
             // zoomed but not what the item now does; the title says both, and
             // there is only one gesture to learn either way. Disabled in a
             // single-pane window, which has nothing to zoom *from*.
@@ -690,7 +691,7 @@ final class SplitViewController: NSViewController {
         }
     }
 
-    // MARK: - Font size (Track D, broadcast across the tree)
+    // MARK: - Font size (broadcast across the tree)
 
     /// ⌘= / ⌘- / ⌘0 apply to every pane in the window: the panes share the
     /// window's resize increments and minimum size, which are single values
@@ -698,7 +699,7 @@ final class SplitViewController: NSViewController {
     func setFontSizeForAllPanes(_ size: CGFloat, isZoomed: Bool) {
         for pane in panes {
             pane.setFontSize(size)
-            // B09 — set together with the size, on every pane, so
+            // Set together with the size, on every pane, so
             // `configurationChanged` (which runs per pane) agrees about
             // whether this window is zoomed no matter which pane it asks.
             pane.isFontSizeZoomed = isZoomed
@@ -713,7 +714,7 @@ final class SplitViewController: NSViewController {
         updateWindowMinSize()
     }
 
-    // MARK: - Minimum sizes (M5.4)
+    // MARK: - Minimum sizes
 
     /// The window's minimum content size is the tree's minimum plus the
     /// chrome; the divider constraints below are what keep a drag from

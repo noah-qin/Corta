@@ -32,7 +32,7 @@ nonisolated enum TerminalFont {
     /// `.regular` rasterises roughly a quarter lighter through the grayscale
     /// Metal atlas and reads soft even when its quads are pixel-aligned.
     ///
-    /// - Parameter family: a font family from the settings page (M6.1), or
+    /// - Parameter family: a font family from the settings page, or
     ///   `nil` for System Monospaced. A family that is not installed, or that
     ///   `MonospacedFontCatalog` will not vouch for, falls back to the system
     ///   font rather than laying an uneven face out on a grid — the same
@@ -56,7 +56,7 @@ nonisolated enum TerminalFont {
         return NSFont(descriptor: descriptor, size: size)
     }
 
-    /// B09 — why a requested family did or didn't resolve, for the settings
+    /// Why a requested family did or didn't resolve, for the settings
     /// page to say something more specific than `primary(ofSize:family:)`'s
     /// silent fallback. Not a change to that function or its signature —
     /// this is a separate, pure query the render hot path never calls.
@@ -86,11 +86,10 @@ nonisolated enum TerminalFont {
     /// and bold-italic cells with, alongside whether the bold half had to be
     /// faked.
     ///
-    /// Neither style is allowed to silently disappear. A family with no bold
-    /// face used to fall back to the regular one, so `SGR 1` content simply
-    /// stopped being bold; a family with no italic face had nothing to fall
-    /// back *to*, because italics were never rendered at all. Both are now
-    /// synthesised when the real face is missing:
+    /// Neither style is allowed to silently disappear: falling back to the
+    /// regular face would make `SGR 1` content simply stop being bold, and
+    /// a family with no italic face has nothing else to fall back *to*.
+    /// Both are synthesised when the real face is missing:
     ///
     /// - **Italic** by an oblique shear on the font matrix, which is what a
     ///   text system does for a missing italic and what keeps the advance

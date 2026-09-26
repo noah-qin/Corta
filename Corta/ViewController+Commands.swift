@@ -2,13 +2,13 @@ import Cocoa
 import CoreText
 import CortaTerminal
 
-/// Menu and keyboard-shortcut actions (Track D): font sizing. New-window
+/// Menu and keyboard-shortcut actions: font sizing. New-window
 /// (⌘N) is app-level and lives in `AppDelegate.newDocument(_:)`.
 extension ViewController {
     // MARK: - Context menu
 
     /// The pane's right-click menu: the editing actions that already exist,
-    /// plus the split actions (M5). Targets are set explicitly rather than
+    /// plus the split actions. Targets are set explicitly rather than
     /// left to the responder chain — a context menu's chain starts at the
     /// view the click landed on, which is exactly right, but explicit
     /// targets make the menu work the same when shown programmatically.
@@ -46,7 +46,7 @@ extension ViewController {
         zoomFontSizeForAllPanes(to: fontSize - 1)
     }
 
-    /// B09 — ends this window's zoom and returns to whatever the config
+    /// Ends this window's zoom and returns to whatever the config
     /// file currently says, not a hardcoded constant: a default changed in
     /// Settings while this window was zoomed must be what ⌘0 lands on, the
     /// same value a brand-new window would have opened at.
@@ -55,7 +55,7 @@ extension ViewController {
         applyFontSizeForAllPanes(configured, isZoomed: false)
     }
 
-    /// M6.14 — the trackpad magnification gesture, driving the same scale
+    /// The trackpad magnification gesture, driving the same scale
     /// path as ⌘+/⌘−.
     ///
     /// A pinch is continuous and the font size is not: the atlas is
@@ -107,18 +107,16 @@ extension ViewController {
         pinchAccumulator = 0
     }
 
-    /// B09 — a temporary, per-window font size that never touches the
+    /// A temporary, per-window font size that never touches the
     /// config file.
     ///
-    /// This used to write every ⌘+/⌘−/pinch step straight into
-    /// `Configuration.fontSize` — the *global* default — on the reasoning
-    /// that a size living nowhere else would not survive a relaunch or a
-    /// theme change. It worked, and it also meant zooming one window
-    /// changed every other open window's size the moment any of them next
-    /// ran `configurationChanged` (picking a theme, editing the file in
-    /// `$EDITOR`, anything), and changed what a brand-new window opened at.
-    /// `isFontSizeZoomed` is the fix: `configurationChanged` skips the size
-    /// line while it is set (see that method), so a zoom rides out a config
+    /// Not written into `Configuration.fontSize` — the *global* default:
+    /// zooming one window would then change every other open window's
+    /// size the moment any of them next ran `configurationChanged`
+    /// (picking a theme, editing the file in `$EDITOR`, anything), and
+    /// change what a brand-new window opens at. Instead
+    /// `configurationChanged` skips the size line while `isFontSizeZoomed`
+    /// is set (see that method), so a zoom rides out a config
     /// change instead of being silently overwritten *or* silently leaking —
     /// and `resetFontSize` is what ends it.
     ///

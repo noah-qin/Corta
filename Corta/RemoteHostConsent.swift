@@ -1,12 +1,13 @@
 import Foundation
 
-/// B14 — which hosts the user has explicitly agreed to let Corta connect
+/// Which hosts the user has explicitly agreed to let Corta connect
 /// to over SFTP in this run of the app.
 ///
 /// The host a remote pane names comes from the remote shell's own `OSC 7`
 /// report (`RemoteContext`), and that is child output: anything the far
 /// end prints — a `cat` of a hostile file included — can name whatever
-/// host it likes. `SECURITY.md` S09 records the rule: the name is
+/// host it likes. `SECURITY.md` §7 (remote OSC 7 reports) records the
+/// rule: the name is
 /// displayed, never used as a host to connect to "without the user's own
 /// command doing the connecting". So a reported host is only ever a
 /// *suggestion*: the first SFTP connection to it — from the browser or

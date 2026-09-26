@@ -1,7 +1,7 @@
 import Cocoa
 import CortaTerminal
 
-/// M7.2, app side: the three things OSC 133 marks make possible.
+/// The three things OSC 133 marks make possible.
 ///
 /// Jumping between commands and the keyboard scroll actions are here because
 /// both are viewport moves expressed in document rows; the clipboard drain is
@@ -23,12 +23,12 @@ extension ViewController: NSMenuItemValidation {
     /// Scrolls so the nearest prompt in `backwards`'s direction sits at the
     /// top of the viewport, and makes that command `effectiveCommand` for
     /// every identity-based action (copy/snapshot/export/open-reference) —
-    /// the single place navigation and "which command" agree (B07).
+    /// the single place navigation and "which command" agree.
     ///
     /// Walks `CommandRecordStore.records` rather than `Grid.promptRows`/
-    /// `failedPromptRows`: both used to do this same "nearest prompt at or
-    /// before/after a row" search independently, and this is the one that
-    /// also carries an id to select. Prompts are addressed by absolute row
+    /// `failedPromptRows`: one "nearest prompt at or before/after a row"
+    /// search, not one per caller, and the records also carry an id to
+    /// select. Prompts are addressed by absolute row
     /// (`Grid.absoluteRow`), which is what makes this work across the
     /// scrollback boundary without a special case: the same arithmetic finds
     /// a prompt fifty thousand lines back and one still on screen.
@@ -55,7 +55,7 @@ extension ViewController: NSMenuItemValidation {
 
     /// Scrolls so `record`'s prompt sits at the top of the viewport and
     /// selects it — the landing half of `jumpToCommand`, shared with
-    /// `focusCommand(id:)` (B07) so a notification's click and the keyboard
+    /// `focusCommand(id:)` so a notification's click and the keyboard
     /// jump can never disagree about what "landing on a command" means.
     private func land(on record: CommandRecord, in grid: Grid) {
         scrollOffset = min(
@@ -68,7 +68,7 @@ extension ViewController: NSMenuItemValidation {
         invalidateDisplay()
     }
 
-    /// B07 — the notification-click half of the flow: `TaskNotifier` tags a
+    /// The notification-click half of the flow: `TaskNotifier` tags a
     /// finished command's notification with its id
     /// (`AppDelegate+Notifications.swift` reads it back), and this is where
     /// that id becomes a landed, selected command again. Returns whether the
@@ -83,7 +83,7 @@ extension ViewController: NSMenuItemValidation {
         return true
     }
 
-    // MARK: - Failed commands (U14)
+    // MARK: - Failed commands
 
     @objc func jumpToPreviousFailedCommand(_ sender: Any?) {
         jumpToCommand(backwards: true, failedOnly: true)
@@ -101,13 +101,13 @@ extension ViewController: NSMenuItemValidation {
         return session.commandRecords.records.contains { $0.didFail }
     }
 
-    // MARK: - The last command's output (U14)
+    // MARK: - The last command's output
 
     /// Copies `effectiveCommand`'s output to the clipboard.
     ///
     /// The thing this replaces is selecting it by hand: a long build log's
     /// output starts several screens up, and dragging to it means scrolling
-    /// while dragging, which is the gesture U19 had to make work at all. The
+    /// while dragging — the hardest gesture there is to get right. The
     /// marks already say where the command started and where the next prompt
     /// is; the range between them is the answer, and nothing has to be
     /// guessed from the text.
@@ -132,7 +132,7 @@ extension ViewController: NSMenuItemValidation {
         terminalView?.showToast(L10n.text("toast.copiedCommandOutput"))
     }
 
-    /// B07 — opens the first `path:line[:column]` reference found in
+    /// Opens the first `path:line[:column]` reference found in
     /// `effectiveCommand`'s output, without hunting through a scrollback
     /// full of it by eye first. `fileReferenceInCommand`
     /// (`ViewController+FileReferences.swift`) finds the reference; `open`
@@ -145,7 +145,7 @@ extension ViewController: NSMenuItemValidation {
             open(reference)
             return
         }
-        // B14 — a remote pane's reference opens the managed local copy of
+        // A remote pane's reference opens the managed local copy of
         // the remote file (downloaded on demand), at the same line.
         if let remote = remoteFileReferenceInCommand(effectiveCommand) {
             openRemote(remote)
@@ -154,7 +154,7 @@ extension ViewController: NSMenuItemValidation {
         terminalView?.showToast(L10n.text("toast.noFileReferenceInCommand"), kind: .warning)
     }
 
-    /// B08 — opens `CommandHistoryController`, the search/find/fill/run
+    /// Opens `CommandHistoryController`, the search/find/fill/run
     /// surface for this pane's command records.
     @objc func searchCommandHistory(_ sender: Any?) {
         guard isOperable else { return }
@@ -174,8 +174,7 @@ extension ViewController: NSMenuItemValidation {
     /// Falls back to one row past the prompt when the shell's integration
     /// emits `A` and `D` but not `C` — right for a one-line prompt with the
     /// command typed on it, one row too much for a two-line prompt or a
-    /// continued command, same trade `Grid+Marks.swift`'s row-based version
-    /// of this used to make before `CommandRecord` replaced it (B07).
+    /// continued command.
     nonisolated static func commandOutputText(grid: Grid, record: CommandRecord?) -> String? {
         guard let range = commandOutputRange(grid: grid, record: record) else { return nil }
         let text = Selection.text(of: range, in: grid)
@@ -200,12 +199,12 @@ extension ViewController: NSMenuItemValidation {
                 column: grid.columns - 1))
     }
 
-    // MARK: - Command history: find/fill/run (B08)
+    // MARK: - Command history: find/fill/run
 
     /// The literal text of a historic command, read back from the grid
     /// rather than stored anywhere — `CommandRecord` never captured it, only
-    /// row markers (B07's doc comment on why a row is not enough applies
-    /// here too: the text itself is even less worth duplicating). `nil`
+    /// row markers (`CommandRecord`'s doc comment on why a row is not
+    /// enough applies here too: the text itself is even less worth duplicating). `nil`
     /// covers every honest reason it cannot be recovered: no `B` mark ever
     /// landed on the prompt's own row (`record.promptEndColumn`), or the row
     /// has since scrolled out of the bounded scrollback — `CommandHistory
@@ -261,11 +260,9 @@ extension ViewController: NSMenuItemValidation {
     /// moment `OSC 133 ; A` draws it (`Performer+ShellIntegration.swift`) —
     /// so at the ordinary "scrolled to the bottom, idle" bound (`.max`), the
     /// *nearest* record is always that fresh, running, empty one, never the
-    /// command that actually just finished. The old row-based
-    /// `Grid.commandOutputRows(before:)` this replaced sidestepped the same
-    /// trap by construction, always keying off a *pair* of consecutive
-    /// prompts — this reaches the identical answer by requiring the record
-    /// itself to be finished.
+    /// command that actually just finished. Requiring the record itself to
+    /// be finished avoids that — the same answer a *pair* of consecutive
+    /// prompts gives.
     nonisolated static func viewportCommand(
         in records: CommandRecordStore, grid: Grid, scrollOffset: Int
     ) -> CommandRecord? {
@@ -292,7 +289,7 @@ extension ViewController: NSMenuItemValidation {
         session?.hasShellIntegration == true
     }
 
-    // MARK: - Command identity (B07)
+    // MARK: - Command identity
 
     /// The command every identity-based action (copy, snapshot, export, open
     /// file reference) targets: whatever jump navigation last selected —
@@ -321,8 +318,8 @@ extension ViewController: NSMenuItemValidation {
     }
 
     /// The most recently *completed* command, regardless of where the
-    /// viewport is scrolled — distinct from `viewportCommand` on purpose
-    /// (B07): scrolled up to read an old failure, "copy the last command's
+    /// viewport is scrolled — distinct from `viewportCommand` on purpose:
+    /// scrolled up to read an old failure, "copy the last command's
     /// output" from a menu with no row context should still mean the one
     /// that just finished, not the one currently in view.
     var latestCompletedCommand: CommandRecord? {
@@ -330,7 +327,7 @@ extension ViewController: NSMenuItemValidation {
         return session.commandRecords.lastCompleted
     }
 
-    /// B07 — takes a marked, timestamped snapshot of a still-running
+    /// Takes a marked, timestamped snapshot of a still-running
     /// command's output so far. `copyLastCommandOutput` only ever finds a
     /// *completed* command (`commandOutputRows` requires a following
     /// prompt); this is the answer for "it's still building, but I want
@@ -381,8 +378,8 @@ extension ViewController: NSMenuItemValidation {
     /// Greys out the items that depend on shell integration, or on a
     /// terminal existing at all, rather than leaving them live and silent.
     ///
-    /// A command jump with no marks used to beep, which says "not now"
-    /// without saying why; a disabled item with a shell-integration section
+    /// A beep for a command jump with no marks would say "not now" without
+    /// saying why; a disabled item with a shell-integration section
     /// in `CONFIGURATION.md` behind it says which. The failed-command items
     /// go further and require a failure to actually exist — an enabled "Next
     /// Failed Command" in a session where nothing failed is an invitation to
@@ -409,12 +406,12 @@ extension ViewController: NSMenuItemValidation {
             #selector(resetTerminal(_:)):
             return validateTerminalStateItem(menuItem)
         case #selector(reconnectRemote(_:)):
-            // B13 — only a pane whose session *was* a remote launcher, and
+            // Only a pane whose session *was* a remote launcher, and
             // whose child is now gone, has anything to reconnect. For every
             // other pane the item is greyed rather than live and silent.
             return canReconnectRemote
         case #selector(browseRemoteFiles(_:)):
-            // B14 — a remote pane has a host to browse (or, when the host
+            // A remote pane has a host to browse (or, when the host
             // is genuinely unknown, a window that asks for it). A local or
             // uncertain pane has neither, and the item is greyed.
             return canBrowseRemoteFiles
@@ -424,7 +421,7 @@ extension ViewController: NSMenuItemValidation {
             #selector(openParentDirectoryInNewPane(_:)):
             return hasKnownWorkingDirectory
         case #selector(changeDirectoryToParent(_:)):
-            // B13 — `shellDirectory`, so a remote pane can walk its own
+            // `shellDirectory`, so a remote pane can walk its own
             // remote directories; it is nil exactly when no honest answer
             // exists (remote without a report, or behind a multiplexer).
             return shellDirectory != nil && canChangeDirectorySafely
@@ -439,7 +436,7 @@ extension ViewController: NSMenuItemValidation {
         }
     }
 
-    // MARK: - OSC 52 (M7.11)
+    // MARK: - OSC 52
 
     /// Puts text the child asked to copy onto the pasteboard, if the user
     /// allows it.

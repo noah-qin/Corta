@@ -1,7 +1,7 @@
 import AppKit
 import Carbon.HIToolbox
 
-/// B16 — one system-wide hotkey, registered through Carbon's
+/// One system-wide hotkey, registered through Carbon's
 /// `RegisterEventHotKey`.
 ///
 /// **Why Carbon and not an `NSEvent` global monitor.** A global monitor

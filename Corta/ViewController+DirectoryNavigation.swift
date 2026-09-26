@@ -1,7 +1,7 @@
 import Cocoa
 import CortaTerminal
 
-/// B08 — changing directory through shell integration, and the safety gate
+/// Changing directory through shell integration, and the safety gate
 /// that keeps an app-initiated `cd` from landing somewhere the user did not
 /// ask for.
 extension ViewController {
@@ -12,7 +12,7 @@ extension ViewController {
     ///
     /// - **Pane identity**: the pane still exists and has a live session
     ///   (`isOperable`) — a closed pane has nothing to write to.
-    /// - **Remote context** (B13): the `cd` goes to the pane's own shell,
+    /// - **Remote context**: the `cd` goes to the pane's own shell,
     ///   so a *remote* directory is safe to send when the pane is remote —
     ///   the shell receiving it runs on the machine the path belongs to.
     ///   What must never happen is a remote path reaching a *local* spawn
@@ -40,7 +40,7 @@ extension ViewController {
         return grid.cursor.row == screenRow && grid.cursor.column == end.column
     }
 
-    /// B13 — the directory this pane's shell is actually sitting in,
+    /// The directory this pane's shell is actually sitting in,
     /// whichever machine that shell runs on: the local report/fallback when
     /// the pane is local, the pane's own reported remote directory when it
     /// is remote (with the host attached, so a caller can say whose path it
@@ -70,7 +70,7 @@ extension ViewController {
     /// `canChangeDirectorySafely` holds — returns whether it did.
     ///
     /// Every `path` here began as an `OSC 7` report — the local shell's by
-    /// way of `DirectoryHistory`, or (B13) the pane's own remote report —
+    /// way of `DirectoryHistory`, or the pane's own remote report —
     /// which is text a child sent, the thing `SECURITY.md` §6 says never
     /// to write back to a child. It goes back anyway, under three
     /// conditions that together are what make it the user's command

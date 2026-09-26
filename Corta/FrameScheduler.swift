@@ -2,35 +2,33 @@ import AppKit
 import Metal
 import QuartzCore
 
-/// Owns the vsync-to-drawable pipeline for one `TerminalView`'s Metal layer:
-/// `CAMetalDisplayLink` in place of the old `CADisplayLink` +
-/// `metalLayer.nextDrawable()` split.
+/// Owns the vsync-to-drawable pipeline for one `TerminalView`'s Metal layer,
+/// through `CAMetalDisplayLink`.
 ///
-/// **Why the old ordering doesn't carry over.** `CADisplayLink` only signals
-/// vsync; a drawable is acquired separately, so the old code asked
-/// `shouldRenderFrame` *before* calling `nextDrawable()` — deliberately, an
-/// acquired-but-unpresented drawable is not recycled, so acquiring one per
-/// skipped frame would exhaust the pool. `CAMetalDisplayLink` folds vsync and
-/// drawable acquisition into one delegate callback that already carries the
+/// **Why nothing is asked before the drawable.** With a `CADisplayLink`,
+/// vsync and drawable acquisition are separate, and the "should I draw?"
+/// check has to run *before* `nextDrawable()` — an acquired-but-unpresented
+/// drawable is not recycled, so acquiring one per skipped frame would
+/// exhaust the pool. `CAMetalDisplayLink` folds vsync and drawable
+/// acquisition into one delegate callback that already carries the
 /// resolved drawable (`CAMetalDisplayLink.Update.drawable`) — there is no
-/// separate acquire step left to skip ahead of.
+/// separate acquire step to skip ahead of.
 ///
-/// **The replacement rule.** `isPaused` is the only gate. While paused, the
+/// **The rule instead.** `isPaused` is the only gate. While paused, the
 /// link never fires, so nothing is ever asked and no drawable is ever
-/// resolved — this is what keeps idle CPU at ~0% (`PERFORMANCE.md` §3), same
-/// as before. A caller wakes the scheduler only when there is a concrete
+/// resolved — this is what keeps idle CPU at ~0% (`PERFORMANCE.md` §3). A
+/// caller wakes the scheduler only when there is a concrete
 /// reason to draw (`resume()`); every callback that *does* fire is treated
 /// as accepted — its drawable is always rendered and presented, never
 /// discarded — and the scheduler pauses itself again the moment a frame
 /// finds nothing further pending. This trades a rare, harmless
 /// re-presentation of unchanged pixels (a spurious wake with nothing new by
 /// the time the callback runs) for never leaving a resolved drawable
-/// unpresented, which is the failure mode the old ordering was guarding
-/// against in the first place.
+/// unpresented, which is what would exhaust the pool.
 final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
     /// Called once per accepted frame, on the main thread, with the
-    /// already-resolved drawable and its render pass descriptor. Unlike the
-    /// old `TerminalView.onRenderFrame`, there is no `nil`-drawable case —
+    /// already-resolved drawable and its render pass descriptor. There is
+    /// no `nil`-drawable case —
     /// the delegate only fires when `CAMetalDisplayLink` already has one.
     var onRenderFrame: ((MTLRenderPassDescriptor, CGSize, CAMetalDrawable) -> Void)?
 
@@ -39,8 +37,7 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
     /// whether anything is still pending. A resolved drawable is rendered
     /// and presented either way; the return value only decides whether the
     /// scheduler pauses itself right after — `false` means "nothing left to
-    /// draw," matching the old `shouldRenderFrame`'s meaning even though it
-    /// can no longer skip the drawable itself.
+    /// draw," though it cannot skip the drawable itself.
     var shouldRenderFrame: (() -> Bool)?
 
     private let metalLayer: CAMetalLayer
@@ -61,8 +58,8 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
     }
 
     /// (Re)creates the display link against the given window, invalidating
-    /// any previous one. Mirrors the old `TerminalView.viewDidMoveToWindow`
-    /// lifecycle: `nil` window tears the link down.
+    /// any previous one. Follows `TerminalView.viewDidMoveToWindow`: a `nil`
+    /// window tears the link down.
     func attach(to window: NSWindow?) {
         link?.invalidate()
         guard window != nil else {
@@ -75,10 +72,9 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         newLink.isPaused = true
         newLink.preferredFrameRateRange = desiredFrameRateRange
         // Measurement hook, same class as `CORTA_MAX_DRAWABLES`
-        // (`TerminalView.commonInit`): `preferredFrameLatency` is a bare
-        // `Float` with no documented units or default (`RenderPolicy`'s doc
-        // comment), so it is a value to pick from an A/B measurement, not a
-        // guess — an environment variable, not a config key, and never read
+        // (`TerminalView.commonInit`): `preferredFrameLatency`, in frames,
+        // is a value to pick from an A/B measurement, not a guess
+        // (`RenderPolicy`'s doc comment) — an environment variable, not a config key, and never read
         // outside one. `RenderPolicy` manages only `preferredFrameRateRange`,
         // so nothing fights this once set at attach.
         if let raw = ProcessInfo.processInfo.environment["CORTA_FRAME_LATENCY"],
@@ -118,7 +114,7 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
     /// change. It never pumps the main run loop to wait for a frame: a
     /// synchronous wait here is reentrant, and every timer, delegate and
     /// second `drawNow` the loop services runs nested inside what looks
-    /// like a leaf call (E05).
+    /// like a leaf call.
     ///
     /// So this is an explicit state transition, not a wait. The
     /// window needs no pixel-perfect first frame, only a guarantee it never
@@ -221,7 +217,7 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
     }
 }
 
-/// The flash-guard state machine (E05) — see `FrameScheduler.requestFirstPresent`.
+/// The flash-guard state machine — see `FrameScheduler.requestFirstPresent`.
 enum FirstPresentState: Equatable {
     /// Nothing outstanding; the layer shows whatever was last presented.
     case idle

@@ -1,7 +1,7 @@
 import Cocoa
 import CortaTerminal
 
-/// M6.15, controller side: what the pane does with a dropped file, a force
+/// What the pane does with a dropped file, a force
 /// touch and a Services request.
 extension ViewController {
     /// Wired in `viewDidLoad`.
@@ -82,7 +82,7 @@ extension ViewController {
             alert.addButton(withTitle: L10n.text("common.cancel"))
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
-        // B04: a dropped file and a Services-menu paste are both a paste in
+        // A dropped file and a Services-menu paste are both a paste in
         // every way that matters here — `pasteFromClipboard` already
         // returns to the bottom for the ⌘V path, and this one write path
         // backs both, so it needs the same call rather than a second copy

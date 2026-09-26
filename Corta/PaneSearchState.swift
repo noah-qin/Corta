@@ -41,7 +41,7 @@ final class PaneSearchState {
             /// The pattern does not compile.
             case invalidPattern
             /// The pattern's shape makes a backtracking engine take
-            /// exponential time, so it was refused before it ran (U16).
+            /// exponential time, so it was refused before it ran.
             case patternTooSlow
         }
     }
