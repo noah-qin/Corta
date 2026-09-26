@@ -287,6 +287,13 @@ jobs:
             fi
             echo "\`\`\`"
             echo "SHA-256  $sha"
+            # Which compiler produced *this* binary. The numbers in
+            # docs/PERFORMANCE.md come from the maintainer's machine and
+            # its own toolchain, which is deliberately not this one
+            # (PERFORMANCE.md §5.2), so "which toolchain built the thing
+            # users run" has to be answerable per release rather than
+            # inferred from a pin that moves.
+            echo "Built with $(xcodebuild -version | tr '\n' ' ' | sed 's/Build version /(/;s/ *$/)/')"
             echo "\`\`\`"
           } > release-notes.md
 
