@@ -43,6 +43,15 @@ what to edit.
   no screen contained. It now repositions itself when the display
   arrangement changes, keeping the screen it is on when that screen still
   exists.
+- A cancelled SFTP download sometimes left the server's file handle open.
+  The CLOSE it owed was allocated a request id that a finished request's
+  cancellation handler had already marked as refused, so the session
+  resolved it as cancelled without ever putting it on the wire and nothing
+  recorded that it had been dropped. Request ids now identify one
+  allocation rather than a number that is handed out again and again, so a
+  cancellation arriving late — for a request that has finished, or for an
+  id since reissued to another transfer — can no longer speak for whoever
+  holds it now.
 - Two races in the SFTP session, found by looping its tests under the
   thread sanitizer on a saturated machine. The in-flight window counted
   requests from the moment they registered a reply waiter rather than
