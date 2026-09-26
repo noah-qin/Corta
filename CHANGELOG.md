@@ -23,6 +23,11 @@ what to edit.
   replaced by the `Corta (Dev)` scheme, and the test suites are selected
   by test plan (`Unit`, `UI`) rather than by `-skip-testing`.
 
+- The configuration file Corta writes no longer labels its Quick Terminal
+  and Presets sections with internal work-item codes (`(B16)`, `(U16)`).
+  An existing file still loads unchanged; the new wording replaces the
+  old the next time Corta saves it.
+
 - Scrollback search is an order of magnitude faster. A query and a line
   that are both ASCII — the overwhelmingly common search — are now matched
   against the grid's cells directly, instead of building a string and a

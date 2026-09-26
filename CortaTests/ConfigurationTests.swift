@@ -149,6 +149,22 @@ struct ConfigurationTests {
         #expect(parsed.fontSize == 64)
         #expect(unknown.isEmpty)
     }
+
+    /// The written file is read by the person who owns it. Its section
+    /// comments name what a key does, never the internal work item that
+    /// added it.
+    @Test("the written file's comments carry no internal work-item identifiers")
+    func writtenCommentsCarryNoWorkItemIdentifiers() throws {
+        let (configuration, _) = Configuration.parse("preset.api.shell = /bin/bash")
+        let comments = configuration.serialized()
+            .split(separator: "\n")
+            .filter { $0.hasPrefix("#") }
+        #expect(!comments.isEmpty)
+        let identifier = try Regex(#"\b[BMPSUE][0-9]{1,2}(\.[0-9]+)?\b"#)
+        for comment in comments {
+            #expect(!comment.contains(identifier), "\(comment)")
+        }
+    }
 }
 
 /// M6.2 and M6.13 — the theme tables themselves.
