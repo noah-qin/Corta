@@ -85,6 +85,8 @@ jobs:
           fi
 
       - name: Run the tests before shipping anything
+        env:
+          TEST_RUNNER_CORTA_TEST_TIMEOUT_SCALE: "3"
         run: |
           swift test --package-path CortaTerminal
           xcodebuild test \

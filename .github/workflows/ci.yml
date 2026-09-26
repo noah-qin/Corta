@@ -132,7 +132,16 @@ jobs:
       # The runner has no signing identity and no access to the maintainer's
       # team, so build ad-hoc signed. The unit tests host inside the app, so
       # signing cannot be switched off entirely — only made local.
+      # Reaches the test host as CORTA_TEST_TIMEOUT_SCALE (xcodebuild strips
+      # the prefix). The app suite waits on real child processes, a reader
+      # loop observing an exit, a debounced sweep settling — latencies that
+      # belong to the machine. Their ceilings are written so that reaching
+      # one means something is wrong, which stops being true on a saturated
+      # runner. A ceiling only costs time when it is reached, so a healthy
+      # run is no slower, and a local run keeps the written number.
       - name: Build and test
+        env:
+          TEST_RUNNER_CORTA_TEST_TIMEOUT_SCALE: "3"
         run: |
           xcodebuild test \
             -project Corta.xcodeproj \
