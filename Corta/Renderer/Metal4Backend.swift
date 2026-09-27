@@ -24,16 +24,13 @@ enum Metal4BackendError: Error {
     case commandAllocatorUnavailable
 }
 
-/// Where Metal 4 backend faults are reported. A faulted commit or a queue
-/// whose work never completes must be loud in the log — the silent
-/// failure mode is a window that renders nothing (`Metal4Backend`'s
-/// completion gate documents the degradation path).
+/// Where Metal 4 backend faults are logged; the silent failure mode would
+/// be a window that renders nothing.
 nonisolated enum Metal4Diagnostics {
     static let log = OSLog(subsystem: "dev.noahqin.Corta", category: "render")
 
     private static let lock = NSLock()
-    /// Bounded: a persistently faulting queue would otherwise log one
-    /// error per frame forever.
+    /// Bounded, or a faulting queue logs once per frame forever.
     nonisolated(unsafe) private static var reportedFaults = 0
 
     static func reportCommitFault(_ error: any Error) {
@@ -53,118 +50,65 @@ nonisolated enum Metal4Diagnostics {
     }
 }
 
-/// A `TerminalRenderBackend` that submits through the Metal 4 command
-/// submission API — `MTL4CommandQueue`, `MTL4CommandBuffer`,
-/// `MTL4CommandAllocator`, `MTL4RenderCommandEncoder` and argument tables
-/// (`MTL4ArgumentTable`) — rather than the `MTLCommandQueue`/
-/// `MTLRenderCommandEncoder` path `QuadRenderer` uses.
+/// A `TerminalRenderBackend` that submits through the Metal 4 API
+/// (`MTL4CommandQueue`, `MTL4CommandBuffer`, `MTL4CommandAllocator`,
+/// `MTL4RenderCommandEncoder`, one reused `MTL4ArgumentTable`) instead of
+/// `QuadRenderer`'s `MTLCommandQueue` path.
 ///
-/// **What is MTL4 here, and what is not.** Every frame is encoded into an
-/// `MTL4CommandBuffer` (a persistent object, re-`begin`n each frame — MTL4
-/// command buffers are reusable, unlike `MTL3`'s per-frame ones) through a real
-/// `MTL4RenderCommandEncoder`, bound by address through one reused argument
-/// table (`setAddress`/`setTexture`/`setSamplerState` — MTL4 has no
-/// `setVertexBytes`, so uniforms live in the ring buffers alongside the
-/// instances), committed to an `MTL4CommandQueue`, with drawable presentation
-/// via `signalDrawable` + `MTLDrawable.present`. The pipeline state objects are
-/// the classic `MTLRenderPipelineState` — that is not a gap:
-/// `MTL4RenderCommandEncoder.setRenderPipelineState` takes exactly that type,
-/// and MTL4's own compiler (`MTL4Compiler.newRenderPipelineState`) returns it
-/// too. They come from `QuadPipelineCache`, shared with `QuadRenderer`, so
-/// construction here costs a dictionary lookup once any pane has run, and the
-/// `MTLBinaryArchive` warm-up (which lives in the cache's creation path) covers
-/// this backend too — no `MTL4Compiler`/`MTL4Archive`-specific cache is needed.
-/// The blend state, pixel format, scissor math, viewport and draw parameters
-/// replicate `QuadRenderer.draw` exactly — the pixel-equivalence tests in
-/// `TerminalRenderBackendTests` enforce that the two stay in lockstep.
+/// Draws bind by address through the argument table (MTL4 has no
+/// `setVertexBytes`, so uniforms ride in the ring buffers), and the
+/// drawable is presented via `signalDrawable`. Pipelines are classic
+/// `MTLRenderPipelineState`s, which MTL4 encoders take, shared with
+/// `QuadRenderer` through `QuadPipelineCache`. Blend, scissor, viewport
+/// and draw parameters replicate `QuadRenderer.draw`;
+/// `TerminalRenderBackendTests` holds the two pixel-equivalent.
 ///
-/// **Resource lifetime (the part MTL4 makes explicit).** Ring-slot reuse is
-/// gated on GPU completion: each commit's feedback handler records the
-/// frame number into `completedFrame`, and `beginFrame` for frame *N* waits
-/// — non-blocking check first — for frame *N − frameSlotCount* before
-/// touching the allocator and ring slots that frame used. A frame's draws *append* to that frame's
-/// ring slot rather than rotating slots per draw call (Kitty image draws
-/// can exceed the slot count within one frame, which a per-call rotation
-/// would alias); a slot that outgrows its buffer mid-frame allocates a
-/// larger one and retires the old — retired buffers are dropped only after
-/// the current frame completes on the GPU. If the completion wait ever
-/// times out (a full second: a GPU hang, not slow frames), the frame
-/// allocates fresh buffers and a fresh allocator instead of overwriting
-/// memory the GPU may still be reading.
+/// **Resource lifetime.** Ring-slot reuse is gated on GPU completion:
+/// commit feedback records each frame into `completion`, and `beginFrame`
+/// for frame *N* waits for *N − frameSlotCount* before reusing its
+/// allocator and slots. A frame's draws append to its slot (Kitty draws can
+/// outnumber slots); a slot that outgrows its buffer retires the old one
+/// until the frame completes. A wait that times out (a second: a hung GPU)
+/// allocates fresh resources instead of overwriting in-flight memory.
+/// Address bindings aren't retained by the command buffer, so `deinit`
+/// drains the last committed frame before releasing anything
+/// (`metal4BackendDeallocatesWithFramesInFlight`).
 ///
-/// Deallocation is the other half of that contract: address- and
-/// resource-ID-based bindings are not retained by the command buffer the
-/// way MTL3's object bindings are, so freeing the backend — its command
-/// buffer, allocators, ring buffers, residency set — while a committed
-/// frame is still executing is a driver-level `Invalid Resource` fault
-/// (`metal4BackendDeallocatesWithFramesInFlight` holds this). `deinit`
-/// therefore drains: it waits, bounded, for the
-/// last committed frame before anything it owns is released.
+/// **Residency.** Ring buffers and every texture bound by resource ID
+/// (`boundTextures`) live in the queue's `MTLResidencySet`: MTL4 neither
+/// retains nor keeps resident a texture bound by `gpuResourceID`, and a
+/// non-resident one page-faults at read time.
 ///
-/// **Residency.** The ring buffers sit in an `MTLResidencySet` attached to
-/// the queue — and so does every texture ever bound by resource ID
-/// (`boundTextures`): MTL4 neither retains nor implicitly keeps resident a
-/// texture bound by `gpuResourceID`, and one that is not resident faults at
-/// read time — `.managed` storage included; MTL3's automatic residency does
-/// not apply to argument-table bindings (the launch-time
-/// `kIOGPUCommandBufferCallbackErrorPageFault` of the first live run). The
-/// drawable is Core Animation's and is sequenced by
-/// `waitForDrawable`/`signalDrawable` instead.
+/// **Selection.** Opt-in (`CORTA_METAL4=1`) and gated on
+/// `supportsFamily(.metal4)` by `TerminalRenderer.init`, which falls back
+/// to `QuadRenderer` if `init` throws. Measure with
+/// `CORTA_RENDER_METRICS=1`.
 ///
-/// **Selection.** Still opt-in (`CORTA_METAL4=1`) and capability-gated
-/// (`supportsFamily(.metal4)`), selected by `TerminalRenderer.init`; a
-/// throwing `init` there falls back to `QuadRenderer`, which remains the
-/// default and is untouched. Whether MTL4 command submission helps Corta's
-/// two-to-three-draws-a-frame workload at all is a measurement question —
-/// the backend exists so that question can be answered with real numbers
-/// rather than assumed (`RenderMetrics`, `CORTA_RENDER_METRICS=1`).
-///
-/// Threading: same contract as `QuadRenderer` — every method is called from
-/// the render thread; the only cross-thread activity is the commit feedback
-/// handler, which touches none of this type's state.
+/// Every method runs on the render thread; only the commit feedback
+/// handler runs elsewhere, and it touches only `completion`.
 nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend {
     let device: MTLDevice
 
     private let queue: any MTL4CommandQueue
-    /// MTL4 command buffers are persistent, reusable objects (begin →
-    /// encode → end → commit, then begin again), unlike MTL3's per-frame
-    /// `MTLCommandBuffer`s — but re-beginning one while its previous commit
-    /// is still executing faults intermittently at the driver level
-    /// (`IOGPUMetalError`, observed on the very first frames of an app
-    /// launch), so there is one per in-flight frame slot, rotated with the
-    /// allocators: the frame-completion gate in `beginFrame` guarantees a
-    /// slot's command buffer is quiescent before it is begun again.
+    /// One per in-flight slot: re-beginning a command buffer whose previous
+    /// commit is still executing faults intermittently (`IOGPUMetalError` on
+    /// launch), and the completion gate keeps a slot's buffer quiescent.
     private var commandBuffers: [any MTL4CommandBuffer]
-    /// One allocator per in-flight frame slot: an allocator may be
-    /// `reset()` only once every command buffer encoded with it has
-    /// completed on the GPU, which the same gate guarantees.
+    /// One per slot: an allocator may be reset only after its work completes.
     private var allocators: [any MTL4CommandAllocator]
-    /// Bindings for the one argument table every draw uses. Snapshot
-    /// semantics ("Metal takes a snapshot of the resources in the argument
-    /// table when you encode a draw") make rebinding between draws of one
-    /// frame — and between frames while an earlier frame is in flight —
-    /// safe.
+    /// Metal snapshots the table at each draw, so rebinding between draws and
+    /// frames is safe.
     private let argumentTable: any MTL4ArgumentTable
     private let residencySet: any MTLResidencySet
-    /// Signalled with the frame number after each frame's commit;
-    /// `beginFrame` consults it before reusing anything frame
-    /// *N − frameSlotCount* wrote (see the type's doc comment).
-    ///
-    /// Implemented on commit-feedback handlers, not a queue-signalled
-    /// `MTLSharedEvent`: the feedback handler demonstrably fires for every
-    /// commit (it is also where commit faults arrive), while the
-    /// queue-level event was observed never to advance against a live
-    /// `CAMetalDisplayLink` drawable stream — every `beginFrame` past the
-    /// ring depth then waited out its full timeout and the window rendered
-    /// ~1 frame/second.
+    /// Fed from commit-feedback handlers, not a queue-signalled
+    /// `MTLSharedEvent`: feedback fires for every commit, while the event was
+    /// observed never to advance against a live `CAMetalDisplayLink` stream,
+    /// capping the window at about 1 frame/second.
     private let completion = FrameCompletion()
 
-    /// The one piece of state the commit-feedback thread touches: the
-    /// highest frame number whose feedback has arrived, behind its own
-    /// condition. Boxed separately from the backend so the `@Sendable`
-    /// feedback handler captures exactly this and never `self` — the
-    /// backend's other state is render-thread-only and not `Sendable`,
-    /// and the compiler was right to say so.
+    /// The highest completed frame, behind its own condition. Boxed so the
+    /// `@Sendable` feedback handler captures this, never the non-`Sendable`
+    /// backend.
     private final class FrameCompletion: @unchecked Sendable {
         private let lock = NSCondition()
         private var completedFrame: UInt64 = 0
@@ -175,7 +119,6 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
             return completedFrame
         }
 
-        /// Records a frame's completion and wakes any waiter.
         func note(_ frame: UInt64) {
             lock.lock()
             if frame > completedFrame { completedFrame = frame }
@@ -183,8 +126,7 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
             lock.unlock()
         }
 
-        /// Blocks until `frame` has completed or `deadline` passes;
-        /// returns whether it completed.
+        /// Blocks until `frame` completes or `deadline` passes; true if it did.
         func wait(for frame: UInt64, until deadline: Date) -> Bool {
             lock.lock()
             defer { lock.unlock() }
@@ -197,112 +139,68 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
 
     private let solidPipeline: MTLRenderPipelineState
     private let glyphPipeline: MTLRenderPipelineState
-    /// The color-atlas variant of the glyph pipeline — premultiplied-source
-    /// blending, mirroring `QuadRenderer.colorGlyphPipeline` exactly.
+    /// Premultiplied-source blending, as `QuadRenderer.colorGlyphPipeline`.
     private let colorGlyphPipeline: MTLRenderPipelineState
     private let sampler: MTLSamplerState
 
-    /// The render pass descriptor, created once and re-pointed at each
-    /// frame's target — the MTL3 path likewise builds one descriptor per
-    /// frame (`FrameScheduler.clearPass`), and reusing it here removes the
-    /// last per-frame object allocation from the backend itself.
+    /// Created once and re-pointed each frame: no per-frame allocation.
     private let renderPassDescriptor = MTL4RenderPassDescriptor()
 
-    /// How many frames may be in flight — the depth of the allocator ring
-    /// and of every `InstanceBufferRing` slot array.
+    /// Frames in flight: the depth of every per-slot ring.
     private static let frameSlotCount = 3
 
-    /// 1-based count of frames begun so far. Also the value a frame's
-    /// commit-feedback handler records into `completedFrame`.
+    /// 1-based count of frames begun; what a frame's feedback records.
     private var frameNumber: UInt64 = 0
-    /// Ring slot the current frame writes — `(frameNumber - 1) %
-    /// frameSlotCount`, computed in `beginFrame`.
     private var currentSlot = 0
-    /// Set when the completion wait in `beginFrame` times out: this frame
-    /// must not overwrite anything a still-in-flight frame may be reading,
-    /// so ring writes allocate fresh buffers instead (see the type comment).
+    /// The completion wait timed out: this frame allocates fresh buffers.
     private var forceFreshResources = false
 
-    /// Consecutive `beginFrame` completion-wait timeouts. A queue whose
-    /// commits fault never delivers completion feedback, and the naive
-    /// behaviour then is a one-second stall plus fresh allocator, command
-    /// buffer and ring buffers on *every* frame — the "renders nothing at
-    /// 1 fps while leaking" failure observed live when the drawable path
-    /// faulted at launch. Past `completionTimeoutLimit` the queue is
-    /// treated as dead: frames stop encoding entirely (`beginFrame`
-    /// returns encoder-less, `endFrame` still presents the drawable and
-    /// records the frame complete), which is cheap, bounded, and logged —
-    /// and recovers by itself if feedback ever does arrive again.
+    /// Consecutive completion-wait timeouts. A faulting queue never delivers
+    /// feedback, and every frame would stall a second and allocate fresh
+    /// resources (observed live). Past `completionTimeoutLimit` frames stop
+    /// encoding but still present and record completion — cheap, bounded and
+    /// logged — and encoding resumes if feedback returns.
     private var consecutiveCompletionTimeouts = 0
     private static let completionTimeoutLimit = 3
 
-    /// Per-frame state, valid between `beginFrame` and `endFrame`. The
-    /// render thread is the only caller, as with `QuadRenderer`.
+    /// Valid between `beginFrame` and `endFrame`.
     private var encoder: (any MTL4RenderCommandEncoder)?
-    /// What the open encoder was last told: one encoder serves
-    /// every draw of the frame and all draws share the pane's rect, so
-    /// re-setting identical scissor, viewport or pipeline state per draw is
-    /// a redundant state change. Reset in `beginFrame` — the MTL3 path has
-    /// no equivalent to dedupe because each of its draws opens a fresh
-    /// encoder and must set everything.
+    /// The encoder's last state, so draws sharing one encoder skip redundant
+    /// changes. Reset in `beginFrame`.
     private var lastScissor: MTLScissorRect?
     private var lastViewport: MTLViewport?
     private var lastPipeline: (any MTLRenderPipelineState)?
 
-    /// Textures ever bound by resource ID, with the last frame that bound
-    /// them. MTL4 does not retain or implicitly keep resident a texture
-    /// bound by `gpuResourceID` the way MTL3's object bindings did: a bound
-    /// texture that is not in the queue's residency set faults at read time
-    /// (the launch-time `kIOGPUCommandBufferCallbackErrorPageFault` this
-    /// table fixes), and a texture freed while a frame that references it
-    /// is in flight faults the same way — so entries here retain the
-    /// texture, and `dropRetired` releases both the retention and the
-    /// residency only once the last binding frame has completed on the GPU
-    /// plus `textureRetentionFrames` more (see that constant for why not
-    /// immediately).
+    /// Textures bound by resource ID, with their last binding frame. Retained
+    /// and resident, since MTL4 does neither for `gpuResourceID` bindings;
+    /// `dropRetired` releases them `textureRetentionFrames` after that frame
+    /// completes.
     private var boundTextures: [ObjectIdentifier: (texture: MTLTexture, lastFrame: UInt64)] = [:]
-    /// How many completed frames a bound texture stays resident past its
-    /// last binding frame. Zero would be correct but churns: with the GPU
-    /// keeping up, the atlas bound by frame *N* is already complete when
-    /// frame *N + 1* begins, so it would leave the residency set in
-    /// `dropRetired` and re-enter it in `makeResident` — two
-    /// `MTLResidencySet.commit()`s per frame, per texture, for a texture
-    /// that is bound every frame. The grace keeps the atlas (and a Kitty
-    /// placement's texture) resident across the frames that reuse it; a
-    /// texture the renderer has actually dropped is released once this
-    /// many further frames have completed — bounded by frames, so an idle
-    /// pane holds it no longer than its next second of drawing.
+    /// Grace frames before an unbound texture leaves the residency set. Zero
+    /// would be correct but would commit the residency set twice a frame for
+    /// an atlas bound every frame.
     private static let textureRetentionFrames: UInt64 = 60
 
-    /// Buffers/allocators replaced mid-life (a grown ring slot, the
-    /// timeout path) whose last reader may still be in flight, tagged with
-    /// the frame that retired them. Dropped — and removed from the
-    /// residency set — once the GPU has completed that frame.
+    /// Buffers replaced mid-life (a grown slot, the timeout path), tagged
+    /// with the retiring frame; dropped once the GPU completes it.
     private var retiredBuffers: [(frame: UInt64, buffer: MTLBuffer)] = []
     private var retiredAllocators: [(frame: UInt64, allocator: any MTL4CommandAllocator)] = []
     private var retiredCommandBuffers: [(frame: UInt64, commandBuffer: any MTL4CommandBuffer)] = []
 
-    /// Instance storage for one pipeline kind. One buffer per frame slot;
-    /// every draw call of the kind within a frame *appends* its instances
-    /// (plus that draw's uniforms) to the frame's slot rather than rotating
-    /// slots per call, so a slot is written at most once per frame and the
-    /// frame-level completion gate covers every write. Grows, never
-    /// shrinks — the steady state allocates nothing (`PERFORMANCE.md` §3).
+    /// Instance storage for one pipeline kind, one buffer per slot. Draws
+    /// append (instances plus uniforms) to the frame's slot, so the frame-level
+    /// gate covers every write. Grows, never shrinks (`PERFORMANCE.md` §3).
     private final class InstanceBufferRing {
         private var buffers: [MTLBuffer?] = [nil, nil, nil]
-        /// Bytes appended to the current frame's slot so far.
         private var used = 0
 
         func beginFrame() {
             used = 0
         }
 
-        /// Appends `instanceByteCount` bytes of instances plus `uniforms`
-        /// to `slot`, returning their GPU addresses. `forceFresh` (the
-        /// completion-timeout path) replaces the slot's buffer outright
-        /// rather than copying into memory an in-flight frame may still
-        /// be reading; growth does the same, since earlier draws this
-        /// frame recorded the old buffer's addresses and keep reading it.
+        /// Appends instances plus uniforms to `slot`, returning GPU addresses.
+        /// `forceFresh` and growth replace the buffer rather than write memory an
+        /// in-flight frame, or an earlier draw of this one, still reads.
         func append(
             instances: UnsafeRawPointer, instanceByteCount: Int, uniforms: QuadUniforms,
             slot: Int, device: MTLDevice, forceFresh: Bool,
@@ -317,10 +215,8 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
                     let fresh = device.makeBuffer(length: newLength, options: .storageModeShared)
                 else { return nil }
                 if let old = buffers[slot] {
-                    // Retired but kept in the residency set until the GPU
-                    // completes this frame (`dropRetired`): earlier draws
-                    // of this frame recorded its addresses and still read
-                    // it once committed.
+                    // Stays resident until this frame completes: earlier draws
+                    // recorded its addresses.
                     retire(old)
                 }
                 buffers[slot] = fresh
@@ -341,9 +237,7 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         }
 
         private static func align(_ offset: Int) -> Int {
-            // `QuadInstance`/`QuadUniforms` contain SIMD vectors (alignment
-            // 16); every offset into the buffer keeps that alignment so the
-            // constant address space reads stay legal.
+            // SIMD members need 16-byte alignment in the constant address space.
             (offset + 15) & ~15
         }
     }
@@ -352,14 +246,11 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
     private let glyphRing = InstanceBufferRing()
     private let colorGlyphRing = InstanceBufferRing()
 
-    /// Whether `device` reports the Metal 4 GPU family. A capability fact
-    /// only — selection additionally requires the `CORTA_METAL4` opt-in.
+    /// The capability alone; selection also needs `isOptedIn`.
     static func isSupported(by device: MTLDevice) -> Bool {
         device.supportsFamily(.metal4)
     }
 
-    /// Opt-in, consulted alongside `isSupported(by:)` — see the type's doc
-    /// comment for why this is not on by default for every capable device.
     static var isOptedIn: Bool {
         ProcessInfo.processInfo.environment["CORTA_METAL4"] == "1"
     }
@@ -386,7 +277,7 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
 
         let tableDescriptor = MTL4ArgumentTableDescriptor()
         // buffer(0) instances, buffer(1) uniforms, texture(0) atlas,
-        // sampler(0) — the same indices `Shaders.metal` declares.
+        // sampler(0) — as `Shaders.metal` declares.
         tableDescriptor.maxBufferBindCount = 2
         tableDescriptor.maxTextureBindCount = 1
         tableDescriptor.maxSamplerStateBindCount = 1
@@ -399,15 +290,8 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         self.residencySet = try device.makeResidencySet(descriptor: residencyDescriptor)
         queue.addResidencySet(residencySet)
 
-        // The pipelines and sampler are shared with `QuadRenderer` through
-        // `QuadPipelineCache` — same shaders, pixel format and blend
-        // state, so the two backends produce identical pixels for identical
-        // instances, and a pane pays the compile at most once per process
-        // whichever backend it gets. The `MTLBinaryArchive` warm-up
-        // covers this backend too: it lives in the cache's creation path,
-        // and the pipelines are classic `MTLRenderPipelineState`s whichever
-        // submission API encodes them — no MTL4Archive/MTL4Compiler port
-        // is needed for the warm-up to apply here.
+        // Shared with `QuadRenderer`: identical pixels, one compile per process,
+        // and the `MTLBinaryArchive` warm-up applies to both.
         let pipelines = try QuadPipelineCache.entry(for: device)
         self.solidPipeline = pipelines.solidPipeline
         self.glyphPipeline = pipelines.glyphPipeline
@@ -415,14 +299,8 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         self.sampler = pipelines.sampler
     }
 
-    /// Waits for the last committed frame before anything this backend owns
-    /// — the reusable command buffer, the allocators, the ring buffers, the
-    /// residency set — is released: MTL4's address-based bindings are not
-    /// retained by the command buffer the way MTL3's object bindings were,
-    /// so releasing them mid-execution is a driver-level `Invalid Resource`
-    /// fault. The wait is bounded: frames complete within a vsync or two in
-    /// any live render loop, and past a second the GPU is hung and no wait
-    /// would save the process anyway.
+    /// Waits, bounded to a second, for the last committed frame: releasing
+    /// address-bound resources mid-execution is an `Invalid Resource` fault.
     deinit {
         if frameNumber > 0 {
             _ = completion.wait(for: frameNumber, until: Date().addingTimeInterval(1))
@@ -432,9 +310,8 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
     // MARK: - Metal4FrameBackend
 
     func beginFrame(target: MTLTexture, clearColor: MTLClearColor, label: String) {
-        // A draw call outside a frame is a programming error in the one
-        // driver (`TerminalRenderer.draw(through:)`); close whatever is
-        // open rather than trapping or corrupting it.
+        // A frame left open is a bug in `TerminalRenderer.draw(through:)`;
+        // close it rather than trap.
         if encoder != nil { endFrame(presenting: nil, onCompleted: nil) }
         frameNumber += 1
         currentSlot = Int((frameNumber - 1) % UInt64(Self.frameSlotCount))
@@ -442,9 +319,7 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         let completed = completion.completed
         dropRetired(through: completed)
 
-        // The slot this frame reuses was last written by frame
-        // `frameNumber - frameSlotCount`; the GPU must be done with it
-        // before the allocator is reset or a ring slot is rewritten.
+        // Frame `frameNumber - frameSlotCount` last wrote this slot.
         if frameNumber > UInt64(Self.frameSlotCount) {
             let predecessor = frameNumber - UInt64(Self.frameSlotCount)
             var caughtUp = completed >= predecessor
@@ -453,9 +328,7 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
                     for: predecessor, until: Date().addingTimeInterval(1))
             }
             if !caughtUp {
-                // A second behind is not a slow frame, it is a hung GPU.
-                // Allocate fresh resources for this frame rather than
-                // overwrite memory in-flight work may still read.
+                // A second behind is a hung GPU, not a slow frame.
                 forceFreshResources = true
                 consecutiveCompletionTimeouts += 1
                 if consecutiveCompletionTimeouts == Self.completionTimeoutLimit {
@@ -467,13 +340,8 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         }
 
         if consecutiveCompletionTimeouts >= Self.completionTimeoutLimit {
-            // The queue is dead (a faulting commit never signals the
-            // completion event): stop encoding — one second of stall and a
-            // full set of fresh resources per frame is the failure this
-            // caps. `endFrame` still presents the drawable and signals the
-            // event number, so the scheduler and later waits are undisturbed;
-            // if the event ever advances again the timeout counter resets
-            // above and encoding resumes.
+            // The queue is dead (see `consecutiveCompletionTimeouts`): stop
+            // encoding. `endFrame` still presents and records completion.
             forceFreshResources = false
             return
         }
@@ -481,18 +349,14 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         if forceFreshResources {
             let retired = allocators[currentSlot]
             retiredAllocators.append((frame: frameNumber, allocator: retired))
-            // The slot's command buffer may equally still be executing —
-            // the wait that failed was precisely the guarantee that it is
-            // not — so it is retired and replaced along with the allocator.
+            // The slot's command buffer may still be executing too.
             retiredCommandBuffers.append(
                 (frame: frameNumber, commandBuffer: commandBuffers[currentSlot]))
             guard let freshAllocator: any MTL4CommandAllocator = device.makeCommandAllocator(),
                 let freshCommandBuffer: any MTL4CommandBuffer = device.makeCommandBuffer()
             else {
-                // Nothing to encode into: the frame is skipped, but
-                // `endFrame` still runs and still presents the drawable —
-                // an unpresented drawable is never recycled
-                // (`FrameScheduler`'s replacement rule).
+                // Skipped, but `endFrame` still presents: an unpresented drawable is
+                // never recycled (`FrameScheduler`).
                 forceFreshResources = false
                 return
             }
@@ -514,8 +378,6 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
             commandBuffer.endCommandBuffer()
             return
         }
-        // Correlates a capture with which of the up-to-three passes a frame
-        // took, same as the MTL3 path's per-encoder labels.
         encoder.label = label
         self.encoder = encoder
         lastScissor = nil
@@ -553,12 +415,8 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
     ) {
         forceFreshResources = false
         guard encoder != nil else {
-            // `beginFrame` failed to open the frame (allocator creation
-            // under the timeout path, or encoder creation failed): there is
-            // nothing to commit, but a drawable must still be presented —
-            // see `FrameScheduler`'s replacement rule. The frame is still
-            // recorded complete so a later frame's completion wait never
-            // blocks on a frame number nothing will ever commit.
+            // Nothing to commit, but the drawable must still be presented, and the
+            // frame recorded complete so no later wait blocks on it.
             completion.note(frameNumber)
             drawable?.present()
             onCompleted?(nil)
@@ -569,22 +427,15 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         let commandBuffer = commandBuffers[currentSlot]
         commandBuffer.endCommandBuffer()
 
-        // `waitForDrawable` before committing work that targets the
-        // drawable, per `MTL4CommandQueue`'s contract; CAMetalDisplayLink
-        // has already resolved it, so this is a queue-side ordering, not a
-        // CPU block.
+        // `MTL4CommandQueue`'s contract; a queue-side ordering, not a CPU block.
         if let drawable {
             queue.waitForDrawable(drawable)
         }
-        // The feedback handler is the completion gate (`completedFrame`) as
-        // well as the caller's metrics hook — always attached: it is the
-        // one commit-lifecycle callback MTL4 reliably delivers here.
+        // Always attached: it is the completion gate as well as the metrics hook.
         let options = MTL4CommitOptions()
         let frame = frameNumber
         let completion = completion
         options.addFeedbackHandler { feedback in
-            // A faulted commit is loud, once per fault, bounded — the
-            // alternative is a window that silently renders nothing.
             if let error = feedback.error {
                 Metal4Diagnostics.reportCommitFault(error)
             }
@@ -593,8 +444,7 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         }
         queue.commit([commandBuffer], options: options)
         if let drawable {
-            // After committing everything that targets the drawable, before
-            // presenting it — `MTL4CommandQueue.signalDrawable`'s contract.
+            // After the commits targeting it, before presenting (MTL4 contract).
             queue.signalDrawable(drawable)
             RenderMetrics.notePresent(of: drawable)
             drawable.present()
@@ -603,12 +453,9 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
 
     // MARK: - TerminalRenderBackend (the Metal-3-shaped base protocol)
 
-    /// The base protocol predates the frame seam and is Metal-3-shaped —
-    /// an MTL4 backend cannot accept a caller's `MTLCommandBuffer`. Nothing
-    /// on the Metal 4 path reaches these (`ViewController.render(into:...)`
-    /// branches on `Metal4FrameBackend` first); they forward to a
-    /// lazily-built `QuadRenderer` so a stray caller through the base
-    /// protocol still gets correct output rather than a dropped frame.
+    /// The base protocol is Metal-3-shaped and can't take a caller's
+    /// `MTLCommandBuffer`. Nothing on the MTL4 path calls it; a stray caller
+    /// gets a lazily built `QuadRenderer` rather than a dropped frame.
     private lazy var legacy: QuadRenderer? = try? QuadRenderer(device: device)
 
     func drawSolidQuads(
@@ -640,9 +487,7 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
 
     // MARK: - Encoding
 
-    /// The MTL4 counterpart of `QuadRenderer.draw` — same scissor, viewport,
-    /// uniforms and draw parameters, bound through the argument table
-    /// instead of `setVertexBuffer`/`setVertexBytes`.
+    /// `QuadRenderer.draw`, bound through the argument table.
     private func draw(
         _ instances: [QuadInstance],
         ring: InstanceBufferRing,
@@ -652,13 +497,10 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         drawableSize: CGSize,
         label: String
     ) {
-        // The clear already happens at `beginFrame` — the render pass is
-        // open regardless of instance count, exactly like the MTL3 path
-        // running its first encoder for the `.clear` load action alone.
+        // The pass (and its clear) opened in `beginFrame`.
         guard let encoder, !instances.isEmpty else { return }
 
-        // Clipping to `rect` via the scissor — identical math to
-        // `QuadRenderer.draw`, which the pixel-equivalence tests hold equal.
+        // Same scissor math as `QuadRenderer.draw`.
         let x = max(0, Int(rect.minX.rounded(.down)))
         let y = max(0, Int(rect.minY.rounded(.down)))
         let maxWidth = max(0, Int(drawableSize.width) - x)
@@ -729,8 +571,7 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         encoder.popDebugGroup()
     }
 
-    /// Keeps a bound texture alive and in the residency set until every
-    /// frame that has bound it has completed — see `boundTextures`.
+    /// See `boundTextures`.
     private func makeResident(_ texture: MTLTexture) {
         let id = ObjectIdentifier(texture)
         if boundTextures[id] == nil {
@@ -740,9 +581,7 @@ nonisolated final class Metal4Backend: TerminalRenderBackend, Metal4FrameBackend
         boundTextures[id] = (texture: texture, lastFrame: frameNumber)
     }
 
-    /// Releases retired buffers/allocators whose retiring frame the GPU has
-    /// completed. Called from `beginFrame` with the last-known completed
-    /// frame number.
+    /// Releases retired resources whose retiring frame has completed.
     private func dropRetired(through completed: UInt64) {
         var keptBuffers: [(frame: UInt64, buffer: MTLBuffer)] = []
         var removedAny = false

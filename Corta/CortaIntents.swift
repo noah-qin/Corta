@@ -17,52 +17,33 @@
 import AppIntents
 import AppKit
 
-/// The App Intents Corta exposes to the Shortcuts app and, through a
-/// Shortcut built there, to `shortcuts run`.
+/// The App Intents Corta exposes to Shortcuts (and `shortcuts run`).
 ///
-/// **No `AppShortcutsProvider`, deliberately.** A provider gives Siri and
-/// Spotlight phrases for free, and it also makes the framework register
-/// those phrases with the system at every launch. With one in the bundle
-/// the test host's main thread stalled for about forty seconds at launch
-/// on the hosted CI runner — no user session behind it — and every
-/// main-actor suite in the run timed out; without it the run is clean.
-/// The intents themselves need no launch-time work: the Shortcuts app
-/// reads them from the bundle's metadata.
+/// **No `AppShortcutsProvider`.** It registers phrases at every launch,
+/// and on the hosted CI runner that stalled the test host's main thread
+/// ~40 s. Shortcuts reads intents from bundle metadata without it.
 ///
-/// **Three verbs, all about surfaces, none about text.** Open a window,
-/// focus a window, toggle the Quick Terminal. There is deliberately no
-/// "run this command" intent and no parameter that reaches a child's stdin:
-/// an automation is an *external* input, and `SECURITY.md` §2 draws one
-/// trust boundary around everything that arrives from outside a Corta
-/// window — a Shortcut assembled from a web page or a shared file is no
-/// more trusted than escape sequences off the PTY. A window's working
-/// directory is the one parameter accepted, because it is a path handed
-/// to `spawn` as its cwd, checked to exist, and never typed.
+/// **Surfaces, never text.** Open, focus, toggle the Quick Terminal; no
+/// "run a command", nothing that reaches a child's stdin. Automation is
+/// external input (`SECURITY.md` §2). The one parameter is a working
+/// directory: a path handed to `spawn`, checked, never typed.
 ///
-/// **Windows are named by identity, not by title.** `TerminalWindowEntity`
-/// carries `TerminalWindowController.windowID`, minted when the window is
-/// created and saved with the arrangement, so a Shortcut that focuses "the
-/// build window" resolves to the same window after a relaunch restores it
-/// — and to *nothing*, with an error, once that window is gone, rather than
-/// to whichever window has a similar title now. Titles are written by the
-/// child process and change with every `cd`; nothing resolved by title
-/// would stay stable for a minute.
+/// **Windows by identity.** `TerminalWindowController.windowID` survives a
+/// relaunch; a gone window is an error, never a title match — titles are
+/// the child's and change on every `cd`.
 ///
-/// Everything here runs on the main actor: intents arrive on an arbitrary
-/// queue, and every effect is a window operation.
+/// Everything runs on the main actor.
 struct TerminalWindowEntity: AppEntity {
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Corta Window")
     static let defaultQuery = TerminalWindowQuery()
 
     /// `TerminalWindowController.windowID`.
     let id: String
-    /// The window's title at the time the entity was built — display only.
+    /// Display only.
     let title: String
 
     var displayRepresentation: DisplayRepresentation {
-        // A window's title is the child's text, not a string to localise;
-        // a `LocalizedStringResource` interpolation here was extracted into
-        // the catalog as a bare `%@` key.
+        // The child's text, not a localisation key.
         DisplayRepresentation(title: LocalizedStringResource(stringLiteral: title))
     }
 
@@ -81,8 +62,7 @@ struct TerminalWindowQuery: EntityQuery {
         return identifiers.compactMap { id in open.first { $0.id == id } }
     }
 
-    /// What the Shortcuts editor offers in its picker: every open window,
-    /// in the order they were opened.
+    /// Every open window, in opening order.
     @MainActor
     func suggestedEntities() async throws -> [TerminalWindowEntity] {
         Self.openWindows()
@@ -95,7 +75,6 @@ struct TerminalWindowQuery: EntityQuery {
     }
 }
 
-/// What an intent reports when it cannot do the one thing it is for.
 enum CortaIntentError: Error, CustomLocalizedStringResourceConvertible {
     case windowNotFound
     case directoryNotFound(String)
@@ -113,7 +92,6 @@ enum CortaIntentError: Error, CustomLocalizedStringResourceConvertible {
     }
 }
 
-/// Opens a new terminal window, optionally in a directory.
 struct OpenTerminalWindowIntent: AppIntent {
     static let title: LocalizedStringResource = "Open Corta Window"
     static let description = IntentDescription(
@@ -138,10 +116,8 @@ struct OpenTerminalWindowIntent: AppIntent {
         return .result(value: TerminalWindowEntity(controller: controller))
     }
 
-    /// A file URL naming an existing directory, as a path — or `nil` for
-    /// "the home directory". A URL that is not a directory is refused here,
-    /// with a message, rather than handed to `spawn` to fail silently into
-    /// a home-directory shell the user did not ask for.
+    /// An existing directory's path, or nil for home. Anything else is
+    /// refused with a message rather than silently opening home.
     nonisolated static func validatedDirectory(_ url: URL?) throws -> String? {
         guard let url else { return nil }
         let path = url.standardizedFileURL.path
@@ -153,7 +129,6 @@ struct OpenTerminalWindowIntent: AppIntent {
     }
 }
 
-/// Brings an existing window to the front.
 struct FocusTerminalWindowIntent: AppIntent {
     static let title: LocalizedStringResource = "Focus Corta Window"
     static let description = IntentDescription(
@@ -175,9 +150,7 @@ struct FocusTerminalWindowIntent: AppIntent {
     }
 }
 
-/// Shows or hides the Quick Terminal — the same toggle the hotkey performs,
-/// for people who would rather bind it in Shortcuts, Raycast or a Stream
-/// Deck than have Corta hold a key system-wide.
+/// The hotkey's toggle, for binding outside Corta.
 struct ToggleQuickTerminalIntent: AppIntent {
     static let title: LocalizedStringResource = "Toggle Quick Terminal"
     static let description = IntentDescription(

@@ -17,23 +17,11 @@
 import AppKit
 import SwiftUI
 
-/// Search command records by directory, project and exit status;
-/// separate find/fill/run actions. The host scope works because a command
-/// begun while the pane referred to a remote host carries that host
-/// (`CommandRecord.host`), so the filter reads records rather than
-/// guessing which side of an `ssh` a command ran on.
-///
-/// A SwiftUI surface: the window and its chrome
-/// are AppKit (an `NSWindowController` is what `showWindow`/
-/// window lifecycle need), but the content is `CommandHistoryView` hosted
-/// through `NSHostingController`, and every piece of state it reads or
-/// writes lives in `CommandHistoryModel` rather than in view objects this
-/// controller would otherwise have to build and rebuild by hand.
-///
-/// A single shared window, re-targeted at whichever pane opened it —
-/// `ShortcutsWindowController`'s pattern, not a fresh window per pane, since
-/// only one can be meaningfully in front at a time and the history it shows
-/// is only ever "this pane's".
+/// Searches command records by directory, project, exit status and host
+/// (`CommandRecord.host`, recorded while the pane was remote), with find,
+/// fill and run. An AppKit window hosting SwiftUI `CommandHistoryView`,
+/// state in `CommandHistoryModel`. One shared window, re-targeted at the
+/// opening pane, as `ShortcutsWindowController` does.
 @MainActor
 final class CommandHistoryController: NSWindowController, NSWindowDelegate {
     static let shared = CommandHistoryController()

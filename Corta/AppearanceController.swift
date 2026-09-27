@@ -16,26 +16,15 @@
 
 import AppKit
 
-/// Resolves the configured theme and appearance into the
-/// one live colour variant, and keeps it live.
-///
-/// Two inputs decide the answer: which theme the config names, and whether
-/// the terminal should be dark. The second is either forced by the config or
-/// follows macOS, and when it follows macOS it has to change *while running*
-/// — the user toggling Dark Mode re-themes every open window with no
-/// restart, which is the whole point of the item.
-///
-/// The observation is KVO on `NSApp.effectiveAppearance` rather than the
-/// distributed `AppleInterfaceThemeChanged` notification: the distributed
-/// one fires before AppKit has updated the app, so reading the appearance
-/// from its handler gives the value that is about to be replaced.
+/// Resolves the theme and appearance into the live colour variant, and
+/// follows Dark Mode while running. KVO on `NSApp.effectiveAppearance`,
+/// not `AppleInterfaceThemeChanged`, which fires before AppKit updates.
 @MainActor
 final class AppearanceController: NSObject {
     static let shared = AppearanceController()
 
-    /// Posted after the live variant changes, so panes redraw. Separate from
-    /// `ConfigurationStore.didChange` because the system appearance can
-    /// change this without the configuration changing at all.
+    /// Posted when the variant changes; the system can change it with no
+    /// config change.
     static let didChange = Notification.Name("dev.noahqin.Corta.appearanceDidChange")
 
     private var appearanceObservation: NSKeyValueObservation?
@@ -47,8 +36,7 @@ final class AppearanceController: NSObject {
             name: ConfigurationStore.didChange, object: nil)
     }
 
-    /// Called once from `applicationDidFinishLaunching`, after `NSApp`
-    /// exists — `effectiveAppearance` has no meaning before then.
+    /// Once `NSApp` exists, from `applicationDidFinishLaunching`.
     func start() {
         appearanceObservation = NSApp.observe(\.effectiveAppearance) { [weak self] _, _ in
             MainActor.assumeIsolated { self?.apply() }
@@ -56,16 +44,13 @@ final class AppearanceController: NSObject {
         apply()
     }
 
-    /// The live theme: a built-in, or one the config file defines.
-    /// An unknown name falls back to the default rather than failing — the
-    /// file is hand-edited, and a typo must not black out the terminal.
+    /// Built-in or custom; an unknown name falls back to the default.
     var theme: Theme {
         let configuration = ConfigurationStore.shared.configuration
         return Theme.named(configuration.theme, in: configuration) ?? .corta
     }
 
-    /// Whether the dark variant is live. `auto` asks AppKit, which is also
-    /// what makes the answer change when the user toggles Dark Mode.
+    /// `auto` asks AppKit, so it follows Dark Mode.
     var isDark: Bool {
         switch ConfigurationStore.shared.configuration.appearance {
         case .light: return false
@@ -76,9 +61,8 @@ final class AppearanceController: NSObject {
     }
 
     func apply() {
-        // An explicit choice overrides the system for the whole app, so the
-        // titlebar and the settings page match the terminal surface rather
-        // than contradicting it. `nil` hands the decision back to macOS.
+        // An explicit choice applies app-wide so the chrome matches; nil
+        // follows macOS.
         let forced: NSAppearance?
         switch ConfigurationStore.shared.configuration.appearance {
         case .auto: forced = nil

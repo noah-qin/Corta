@@ -18,39 +18,15 @@ import AppKit
 import CortaTerminal
 import UniformTypeIdentifiers
 
-/// Writing what is in the pane to a file.
-///
-/// **Why a file and not just the clipboard.** ⌘C already exists, and for a
-/// line or two it is the right tool. A hundred thousand lines of build output
-/// is not something anybody wants on the pasteboard on the way to a bug
-/// report: it has to survive the next copy, be attachable, and be greppable.
-/// This is the same text the clipboard would get — `Selection.text` over the
-/// same range, so a soft-wrapped line exports as one line exactly as it
-/// copies as one — written where the user says.
-///
-/// **What gets written.** The selection if there is one, the whole document
-/// (scrollback plus screen) if there is not. That is the rule the Edit menu's
-/// Copy already follows one level down, and it means the command needs no
-/// second name and no submenu: what you have selected is what you get.
+/// Writing the pane to a file, for output too large for the pasteboard.
+/// The text is `Selection.text`, exactly what a copy gets: the selection if
+/// there is one, else the whole document.
 extension ViewController {
-    /// Building the text is O(scrollback) — the same cost class
-    /// `PERFORMANCE.md` §5.2 measures a full-document search sweep at
-    /// hundreds of ms for a 100k-line history — so it runs off the main
-    /// thread rather than stalling the interaction path. The build runs
-    /// *before* the save panel appears — trading the earlier "overlap the
-    /// build with panel navigation time" version's speed for two things
-    /// that version broke: an empty document or selection now skips the
-    /// panel entirely again (present a save dialog, only to say "nothing to
-    /// export," is worse than a moment's wait first), and there is no build
-    /// left running unobserved once the panel is up for the user to answer.
-    /// `largeTextTask` is cancelled by a superseded export (a second ⌘⇧S
-    /// before the first panel closed) and by `teardown()` — but, like
-    /// `copy(_:)`, only ever to stop a *result* from being applied.
-    /// `exportableText`/`Selection.text` poll no cancellation flag
-    /// internally, so a row walk already in progress when cancellation
-    /// arrives runs to completion regardless; what stops there is the
-    /// panel that would follow it, and the write/toast/alert that would
-    /// follow that.
+    /// The build is O(scrollback) — hundreds of ms for 100k lines
+    /// (`PERFORMANCE.md` §5.2) — so it runs off the main thread, before the
+    /// save panel, so empty text skips the panel. `largeTextTask` is cancelled
+    /// by a newer export or `teardown()`, which stops the panel and write
+    /// that follow; a row walk in progress still finishes.
     @objc func exportText(_ sender: Any?) {
         guard isOperable, let window = view.window, session != nil else { return }
         let grid = session.snapshot()
@@ -62,10 +38,7 @@ extension ViewController {
             filename: Self.exportFilename(hasSelection: hasSelection))
     }
 
-    /// The same export, scoped to `effectiveCommand`'s output rather
-    /// than the current selection: the identity-based counterpart to
-    /// `copyLastCommandOutput`, for a build log too long to want on the
-    /// clipboard but still worth attaching to a bug report.
+    /// The same export for `effectiveCommand`'s output.
     @objc func exportCommandOutput(_ sender: Any?) {
         guard isOperable, let window = view.window, session != nil else { return }
         let grid = session.snapshot()
@@ -78,22 +51,15 @@ extension ViewController {
             filename: Self.exportFilename(kind: "Command Output"))
     }
 
-    /// The save-panel/write flow both `exportText` and `exportCommandOutput`
-    /// share — see `exportText`'s doc comment above for why the build runs
-    /// off the main thread and why cancellation is generation-guarded rather
-    /// than relied on to always land before a result is applied.
+    /// The flow both exports share (see `exportText`).
     private func performExport(
         window: NSWindow, grid: Grid, range: SelectionRange?, messageKey: String, filename: String
     ) {
         largeTextTask?.cancel()
         largeTextTaskGeneration &+= 1
         let generation = largeTextTaskGeneration
-        // `Task.detached`, not a plain `Task {}` — see `copy(_:)`'s identical
-        // reasoning: this method is `@MainActor`, and relying on a
-        // nonisolated callee to implicitly escape an inherited actor is the
-        // fragile inference Copilot's review flagged. Every AppKit call
-        // below (`NSSavePanel`, `NSAlert`) is explicitly hopped back to
-        // `MainActor` rather than assumed to still be there.
+        // Detached, as in `copy(_:)`; AppKit calls hop back to the main actor
+        // explicitly.
         largeTextTask = Task.detached(priority: .userInitiated) { [weak self] in
             let text = Self.exportableText(grid: grid, selection: range)
 
@@ -109,14 +75,8 @@ extension ViewController {
             } else if text.isEmpty {
                 outcome = .empty
             } else {
-                // A live handle to the presented panel, so cancellation —
-                // teardown, or a superseded export — can dismiss it and
-                // resume the continuation immediately instead of leaving
-                // this task (and the build it already finished) suspended
-                // until whenever the user happens to answer the sheet.
-                // `withCheckedContinuation` itself has no cancellation
-                // awareness; `withTaskCancellationHandler` is what supplies
-                // it, wrapping the same continuation.
+                // Lets cancellation dismiss the panel and resume at once; the
+                // continuation alone has no cancellation awareness.
                 let panelBox = PresentedPanelBox()
                 let url: URL? = await withTaskCancellationHandler {
                     await withCheckedContinuation { continuation in
@@ -140,20 +100,9 @@ extension ViewController {
                         }
                     }
                 } onCancel: {
-                    // Known, accepted narrow race: `onCancel` can run
-                    // before the presentation `Task` above has reached
-                    // `panelBox.panel = panel` — both the guard and that
-                    // assignment happen without an `await` between them,
-                    // but they are still two separate MainActor hops, and
-                    // nothing serializes which one this runs relative to.
-                    // In that exact window `panelBox.panel` reads `nil`
-                    // and there is nothing to dismiss yet; the presentation
-                    // continues (its own generation/`didTeardown` guard
-                    // already passed) and shows a panel this cancellation
-                    // cannot then retract. Closing that gap needs an
-                    // atomic handoff between the two, which is more
-                    // machinery than a window measured in a handful of
-                    // synchronous instructions has earned here.
+                    // Accepted race: `onCancel` can run before the panel is
+                    // stored, and then the panel still shows. Closing it needs an
+                    // atomic handoff not worth it for a window this small.
                     Task { @MainActor in
                         guard let panel = panelBox.panel else { return }
                         window.endSheet(panel, returnCode: .cancel)
@@ -166,11 +115,8 @@ extension ViewController {
                         try Self.write(text, to: url)
                         outcome = .wrote
                     } catch {
-                        // The panel already granted access, so a failure
-                        // here is a full disk or a read-only volume — worth
-                        // an alert rather than a toast, because the file the
-                        // user asked for does not exist and nothing else
-                        // would say so.
+                        // Access was granted, so this is a full disk or read-only
+                        // volume: alert, since the file doesn't exist.
                         outcome = .failed(error)
                     }
                 } else {
@@ -178,10 +124,7 @@ extension ViewController {
                 }
             }
 
-            // One exit point: clears the handle (generation-guarded, same
-            // reasoning as `copy(_:)`) and applies the outcome together,
-            // rather than an early `return` per case that each had to
-            // remember to clear it too.
+            // One exit: clear the handle (generation-guarded) and apply.
             await MainActor.run {
                 guard let self, !self.didTeardown, self.largeTextTaskGeneration == generation else { return }
                 self.largeTextTask = nil
@@ -200,36 +143,23 @@ extension ViewController {
         }
     }
 
-    /// The write itself, separated from the panel so the bytes that land on
-    /// disk are testable — the panel is AppKit's and is not in doubt, the
-    /// encoding and the trailing newline are ours.
-    ///
-    /// UTF-8, and a trailing newline when the text does not already end in
-    /// one: the file is going to be read by `grep`, `less` and a diff, and
-    /// every one of them treats a file without a final newline as malformed.
+    /// The write, testable apart from the panel: UTF-8 with a trailing
+    /// newline, which grep, less and diff expect.
     nonisolated static func write(_ text: String, to url: URL) throws {
         let payload = text.hasSuffix("\n") ? text : text + "\n"
         try Data(payload.utf8).write(to: url, options: .atomic)
     }
 
-    /// The text a save would write: the selection, or the whole document.
-    ///
-    /// Static and pure so the range arithmetic is testable without a window
-    /// or a save panel — the part that can be wrong is which rows are chosen,
-    /// not that `NSSavePanel` works.
+    /// The selection or the whole document; pure, for tests.
     nonisolated static func exportableText(grid: Grid, selection: SelectionRange?) -> String {
         if let selection { return Selection.text(of: selection, in: grid) }
-        // The whole document, the same range ⌘A builds: the scrollback
-        // counts backwards from the live screen, so its first row is
-        // `-scrollback.count`.
+        // As ⌘A: the scrollback's first row is `-scrollback.count`.
         let whole = SelectionRange(
             anchor: SelectionPoint(row: -grid.scrollback.count, column: 0),
             head: SelectionPoint(row: grid.rows - 1, column: grid.columns - 1))
         return Selection.text(of: whole, in: grid)
     }
 
-    /// A name that says what the file is and when it was taken, so a folder
-    /// of them is still readable a week later.
     static func exportFilename(hasSelection: Bool, date: Date = Date()) -> String {
         exportFilename(kind: hasSelection ? "Selection" : "History", date: date)
     }
@@ -242,12 +172,8 @@ extension ViewController {
     }
 }
 
-/// A mutable box for the `NSSavePanel` `exportText(_:)` is currently
-/// presenting, so `withTaskCancellationHandler`'s `onCancel` — which can run
-/// on any thread, concurrently with the operation still setting the box —
-/// has something to dismiss. `@unchecked Sendable`: every read and write is
-/// on the main actor (the panel itself is MainActor-affine), `onCancel` only
-/// ever reads it from inside its own `Task { @MainActor in }` hop.
+/// The presented panel, for `onCancel` to dismiss. `@unchecked Sendable`:
+/// every access is on the main actor, `onCancel` included via its hop.
 private final class PresentedPanelBox: @unchecked Sendable {
     var panel: NSSavePanel?
 }

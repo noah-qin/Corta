@@ -17,72 +17,42 @@
 import AppKit
 import CortaTerminal
 
-/// A flattened copy of what one pane is showing, in the shape the AppKit
-/// accessibility protocols ask for: one string, plus enough index to answer
-/// "which line is offset 4102 on" — and, in both directions, "which cell is
-/// that character in" — without rebuilding anything.
+/// A flattened copy of what a pane shows, indexed for AppKit's
+/// accessibility questions in both directions (offset ↔ cell).
 ///
-/// **Why a snapshot and not live queries.** `NSAccessibility` asks a dozen
-/// questions per VoiceOver step, each of which would otherwise take the
-/// terminal's lock and walk the grid. One copy per burst answers all of them
-/// consistently — a value read half-way through a parse batch would have a
-/// selection range that does not match the text it indexes.
-///
-/// **Why the viewport and not the scrollback.** The exposed value is the
-/// visible rows only. A 100k-line scrollback is a ~10 MB string that would be
-/// rebuilt on every notification, and — the actual reason — an assistive
-/// technology's idea of "the text area" is what is on screen; history is
-/// reached by scrolling, exactly as a sighted user reaches it. "Visible"
-/// means visible: the snapshot is taken at the current `scrollOffset`, so a
-/// reader scrolled into the history hears the history rather than the live
-/// screen behind it.
+/// A snapshot, because VoiceOver asks a dozen questions per step: one copy
+/// answers them consistently, never half-way through a parse batch.
+/// The viewport only, at the current `scrollOffset`: an assistive
+/// technology's text area is what is on screen, and history is reached by
+/// scrolling, as for a sighted user.
 struct TerminalAccessibilitySnapshot {
-    /// The visible rows, newline-joined, trailing blanks trimmed per row.
     let text: String
-    /// `lineStarts[i]` is the UTF-16 offset in `text` at which visible row
-    /// `i` begins. One entry per row, always — a blank row still has a
-    /// position.
+    /// The UTF-16 offset where each visible row begins, blank rows included.
     let lineStarts: [Int]
-    /// Grid geometry, spoken as part of the element's description: a terminal
-    /// without its row and column count is missing the one fact that explains
-    /// why a program's output is laid out the way it is.
+    /// Grid geometry, spoken in the element's help.
     let rows: Int
     let columns: Int
-    /// Where the cursor is, in grid coordinates.
     let cursorRow: Int
     let cursorColumn: Int
-    /// The cursor as a UTF-16 offset in `text` — the insertion point.
+    /// The insertion point.
     let cursorOffset: Int
-    /// The selection, as a range in `text`, clipped to the viewport. Empty at
-    /// the insertion point when there is no selection, which is what a text
-    /// area is expected to report.
+    /// The selection clipped to the viewport; empty at the insertion point
+    /// when none.
     let selectedRange: NSRange
-    /// How far the viewport is scrolled back, in rows. Document row `r` is
-    /// visible row `r + scrollOffset`.
+    /// Document row `r` is visible row `r + scrollOffset`.
     let scrollOffset: Int
 
-    /// Per visible row, the character boundaries as (UTF-16 offset within the
-    /// row, grid column) in ascending order.
+    /// Per visible row, character boundaries as (UTF-16 offset, column).
     ///
-    /// **This is the whole point of the type.** `NSRange` counts UTF-16 code
-    /// units and the grid counts columns, and the two coincide only for
-    /// ASCII: a CJK character is one column pair and one UTF-16 unit, an
-    /// astral emoji is two columns and *two* UTF-16 units, and a combining
-    /// mark is zero extra columns and one or more extra units. Anything that
-    /// converts between the two by treating them as equal is wrong the moment
-    /// a person types 中文 — which is exactly the content a screen-reader
-    /// user is most likely to be navigating by cell.
+    /// The point of the type: UTF-16 units and columns agree only for ASCII.
+    /// CJK is two columns and one unit, astral emoji two and two, combining
+    /// marks zero columns and one or more units.
     private let rowBoundaries: [[(offset: Int, column: Int)]]
-    /// The UTF-16 length of each visible row's text, for clamping past the
-    /// trimmed tail.
+    /// Each row's UTF-16 length, for clamping past the trimmed tail.
     private let rowLengths: [Int]
 
-    /// Builds the snapshot from a grid copy.
-    ///
-    /// - Parameter scrollOffset: rows scrolled back from the live screen;
-    ///   `0` is the bottom. Rows are read as *document* rows so the snapshot
-    ///   is what is on screen, and `selection` — which is document-anchored
-    ///   (`DESIGN.md` §3.1) — indexes into it without a second convention.
+    /// - Parameter scrollOffset: rows scrolled back; rows are read as document
+    ///   rows, so the document-anchored `selection` indexes directly.
     init(grid: Grid, selection: SelectionRange?, scrollOffset: Int = 0) {
         var text = ""
         var lineStarts: [Int] = []
@@ -94,8 +64,6 @@ struct TerminalAccessibilitySnapshot {
 
         for row in 0..<grid.rows {
             lineStarts.append(text.utf16.count)
-            // A document row: the live screen is 0..<rows, the scrollback
-            // counts backwards from it.
             let (rowText, columns) = grid.rowTextWithColumns(row - scrollOffset)
             var boundaries: [(offset: Int, column: Int)] = []
             boundaries.reserveCapacity(columns.count)
@@ -120,10 +88,7 @@ struct TerminalAccessibilitySnapshot {
         self.rowBoundaries = rowBoundaries
         self.rowLengths = rowLengths
 
-        // A method cannot be called before every stored property is
-        // initialised, so the rule itself lives in one static place and both
-        // the initialiser and `offset(documentRow:column:)` call it — a
-        // second copy inline here is a second copy to keep in step.
+        // Stored properties aren't all set yet, so this calls the static rule.
         func offset(documentRow: Int, column: Int) -> Int {
             Self.offset(
                 documentRow: documentRow, column: column, lineStarts: lineStarts,
@@ -141,10 +106,8 @@ struct TerminalAccessibilitySnapshot {
         }
     }
 
-    /// Rows outside the viewport clamp to its ends: a selection that started
-    /// in the scrollback is still reported, as the part of it that is on
-    /// screen. A column past the row's trimmed tail clamps to the row rather
-    /// than running into the next line.
+    /// Clamps to the viewport's ends and the row's trimmed tail, so an
+    /// off-screen selection reports its visible part.
     private static func offset(
         documentRow: Int, column: Int, lineStarts: [Int],
         rowBoundaries: [[(offset: Int, column: Int)]], rowLengths: [Int],
@@ -162,8 +125,6 @@ struct TerminalAccessibilitySnapshot {
 
     // MARK: - The two conversions
 
-    /// The UTF-16 offset in `text` of the character in document row
-    /// `documentRow`, column `column`.
     func offset(documentRow: Int, column: Int) -> Int {
         Self.offset(
             documentRow: documentRow, column: column, lineStarts: lineStarts,
@@ -171,22 +132,9 @@ struct TerminalAccessibilitySnapshot {
             textLength: text.utf16.count, scrollOffset: scrollOffset)
     }
 
-    /// The inverse: the visible row and grid column a UTF-16 offset falls in.
-    ///
-    /// An offset inside a multi-unit character answers with that character's
-    /// cell rather than splitting it, and an offset past a row's trimmed tail
-    /// answers with the column the tail would have been at — VoiceOver asks
-    /// for the frame of a range it was given, and "no such cell" is not an
-    /// answer it can draw.
-    /// The cell a UTF-16 offset falls in, **and how many columns that
-    /// character occupies** — one for ASCII, two for a wide character, and
-    /// one for a combining sequence, which adds units without adding columns.
-    ///
-    /// The width is what a caller drawing a rectangle needs and what
-    /// `cell(forOffset:)` alone cannot give: a range ending on 测 whose
-    /// rectangle stops at that character's *first* column clips half of it,
-    /// which is what a live accessibility probe showed (3 CJK characters
-    /// outlined as 5 cells instead of 6).
+    /// The cell an offset falls in and its width in columns: one for ASCII
+    /// and combining sequences, two for wide characters. Drawing a range
+    /// needs the width, or it clips half a CJK character.
     func cellSpan(forOffset offset: Int) -> (row: Int, column: Int, columns: Int) {
         let cell = cell(forOffset: offset)
         guard row(cell.row) else { return (cell.row, cell.column, 1) }
@@ -194,15 +142,15 @@ struct TerminalAccessibilitySnapshot {
         guard let index = boundaries.lastIndex(where: { $0.column <= cell.column })
         else { return (cell.row, cell.column, 1) }
         let next = index + 1 < boundaries.count ? boundaries[index + 1].column : nil
-        // The distance to the next character's column is this one's width;
-        // at the end of the row there is nothing to measure against, and a
-        // single column is the safe answer.
+        // Width is the gap to the next character; one at the row's end.
         let width = next.map { max(1, $0 - boundaries[index].column) } ?? 1
         return (cell.row, cell.column, width)
     }
 
     private func row(_ index: Int) -> Bool { index >= 0 && index < rowBoundaries.count }
 
+    /// The visible row and column an offset falls in, never splitting a
+    /// character; past a trimmed tail, the column the tail would reach.
     func cell(forOffset offset: Int) -> (row: Int, column: Int) {
         guard !lineStarts.isEmpty else { return (0, 0) }
         let clamped = min(max(0, offset), text.utf16.count)
@@ -212,8 +160,7 @@ struct TerminalAccessibilitySnapshot {
         guard let boundary = rowBoundaries[row].last(where: { $0.offset <= within }) else {
             return (row, within)
         }
-        // Past the last character on the row: keep counting in columns from
-        // the last one, so the trimmed blank tail still maps somewhere.
+        // Past the tail: keep counting columns, so blanks still map.
         if within > rowLengths[row] - 1, within >= rowLengths[row] {
             return (row, boundary.column + (within - boundary.offset))
         }

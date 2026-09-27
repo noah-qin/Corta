@@ -16,27 +16,14 @@
 
 import AppKit
 
-/// Offers to move Corta into `/Applications` on launch when it is running
-/// from anywhere else — Downloads, wherever a `.zip` happened to be
-/// extracted, the Desktop. Direct-download distribution ships a
-/// plain archive with no drag-to-install step a `.dmg` would give a user;
-/// without this, a person who never drags the app anywhere keeps running
-/// it from wherever it landed. That matters beyond tidiness: Sparkle's
-/// update path (`UpdateController`) and Spotlight/Launchpad's assumptions
-/// about where an "installed" app lives both expect `/Applications`.
+/// Offers to move Corta into `/Applications` when run from elsewhere: a
+/// zip has no drag-to-install step, and Sparkle and Spotlight expect
+/// `/Applications`. Skipped under `/Applications` or `~/Applications`, from
+/// `DerivedData`, or after `suggest-applications-folder = false`.
 ///
-/// Skipped when already under `/Applications` or `~/Applications` — the
-/// common case after the first launch, or a manual drag — when running
-/// from Xcode's `DerivedData` (a developer build has nowhere else to
-/// live), and when the user has already said not to ask again
-/// (`suggest-applications-folder` in the config file).
-///
-/// **Never offered by the development build** (D22). Moving a Debug build
-/// into `/Applications` would put it beside the installed one and relaunch
-/// it from there — two applications with the same name in the one place a
-/// user expects the installed one to be. That is not a default the config
-/// file gets a say in, because a stage directory starts empty and a key
-/// nobody has set yet would leave the prompt on.
+/// Never for the development build (D22), which would land beside the
+/// installed app under the same name — not left to a config key a fresh
+/// stage wouldn't have.
 @MainActor
 enum ApplicationsFolderMover {
     static func promptIfNeeded() {
@@ -70,12 +57,8 @@ enum ApplicationsFolderMover {
         url.path.contains("/Xcode/DerivedData/")
     }
 
-    /// `replaceItemAt` rather than a copy-then-trash pair: one atomic
-    /// operation that leaves exactly one copy on disk — the source is
-    /// consumed as part of the replace, not left behind as a duplicate in
-    /// Downloads — and an existing `/Applications/Corta.app` (a manual
-    /// re-download over a previous install) is swapped for the new one
-    /// rather than requiring its own separate "already exists" prompt.
+    /// `replaceItemAt`: one atomic move leaving one copy, and it replaces an
+    /// existing install without a second prompt.
     private static func move(_ source: URL) {
         guard
             let applicationsURL = FileManager.default.urls(

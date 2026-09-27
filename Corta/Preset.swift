@@ -16,69 +16,41 @@
 
 import Foundation
 
-/// A named way to open a terminal: a shell, a directory, and a few
-/// environment variables.
+/// A named way to open a terminal: a shell, a directory, arguments and
+/// environment variables, as `preset.<name>.…` keys. Applied at spawn only,
+/// so a preset pane is an ordinary pane afterwards. Not a profile: colours,
+/// fonts and keybindings stay app-wide (`DESIGN.md` §6), or this would be a
+/// second settings store.
 ///
-/// **The problem.** Corta opens one kind of terminal: `$SHELL`, in the
-/// directory the pane was split from. A person who keeps a project checkout,
-/// a staging box's `ssh` and a `python` REPL open all day rebuilds those three
-/// by hand every launch — `cd`, export, run — and the terminal has all three
-/// pieces of information already.
-///
-/// **The shape.** A preset is data in the config file, not a stored session:
-/// `preset.<name>.shell`, `.directory`, `.arguments`, and `.env.<KEY>`. It is
-/// applied at spawn time and never afterwards, so a pane opened from a preset
-/// is an ordinary pane — there is nothing to "leave", nothing to sync, and
-/// closing it loses nothing a preset could have kept.
-///
-/// **What it deliberately is not.** Not a profile system: no colours, no
-/// fonts, no per-preset keybindings. Those are window-wide or app-wide in
-/// Corta by design (`DESIGN.md` §6), and a preset that changed them would be
-/// a second settings store fighting the first.
-///
-/// **The ssh preset is a first-class case**. `shell = /usr/bin/ssh`
-/// with `arguments = user@host` — the *system* OpenSSH, deliberately, so the
-/// user's agent, `~/.ssh/config`, `ControlMaster` settings and known-hosts
-/// all apply untouched — opens a pane whose child is the connection itself.
-/// Such a pane is recognised as remote from the spawn record
-/// (`PaneRemoteState`), upgraded to host and directory when the far shell
-/// reports `OSC 7`, and when the connection dies the pane offers Reconnect:
-/// the same command line, re-run as a *new* connection — never a claim that
-/// the dead session's state survived. The `directory` key still means a
-/// *local* working directory for the launcher process; the remote side's
-/// directory is the far shell's business.
+/// **ssh presets** (`shell = /usr/bin/ssh`, `arguments = user@host`) use
+/// the system OpenSSH, so the user's agent and `~/.ssh/config` apply. The
+/// pane is remote from its spawn record (`PaneRemoteState`), and when the
+/// connection dies Reconnect re-runs the same command as a new connection.
+/// `directory` is still the launcher's local directory.
 nonisolated struct Preset: Equatable, Sendable {
-    /// The key it is written under, and the name shown in the menu.
+    /// The key name, shown in the menu.
     var name: String
-    /// An absolute path to a shell. `nil` inherits `$SHELL`, which is what
-    /// a preset that only sets a directory wants.
+    /// An absolute shell path; nil inherits `$SHELL`.
     var shell: String?
-    /// Arguments for that shell. Empty inherits the login-shell default.
+    /// Empty inherits the login-shell default.
     var arguments: [String] = []
-    /// An absolute path. `nil` inherits the usual rule — the directory the
-    /// pane was split from, or home.
+    /// An absolute path; nil inherits the split-from directory, or home.
     var directory: String?
-    /// Variables added to the child's environment, on top of the sanitised
-    /// inherited one (`SECURITY.md` §4.3). A preset can add and override; it
-    /// cannot remove, because a preset is a convenience and unsetting
-    /// `PATH` is not one.
+    /// Added over the sanitised environment (`SECURITY.md` §4.3); a preset
+    /// can add and override, never remove.
     var environment: [String: String] = [:]
 
     init(name: String) {
         self.name = name
     }
 
-    /// Whether the preset says anything at all. A name with no settings is a
-    /// typo, and offering it in a menu would be offering "open a terminal
-    /// exactly like the default one".
+    /// A name with no settings is a typo, not a menu item.
     var isEmpty: Bool {
         shell == nil && directory == nil && arguments.isEmpty && environment.isEmpty
     }
 
-    /// A shell path has to be absolute — the same rule `Spawn` enforces —
-    /// and a directory has to be absolute for the same reason: a relative
-    /// one would resolve against whatever Corta was launched from, which on
-    /// a Finder launch is `/`.
+    /// Shell and directory must be absolute: a relative directory resolves
+    /// against Corta's own, `/` from Finder.
     var isUsable: Bool {
         guard !isEmpty else { return false }
         if let shell, !shell.hasPrefix("/") { return false }
@@ -86,15 +58,11 @@ nonisolated struct Preset: Equatable, Sendable {
         return true
     }
 
-    /// Applies one `preset.<name>.<field>` key. Returns whether it was
-    /// recognised, so an unrecognised one is preserved as an unknown key
-    /// rather than dropped.
+    /// Applies one `preset.<name>.<field>`; false keeps it as an unknown key.
     mutating func apply(field: String, value: String) -> Bool {
         if field.hasPrefix("env.") {
             let variable = String(field.dropFirst("env.".count))
-            // A name with `=` or NUL in it cannot be put in an environment
-            // at all; refusing it here is clearer than letting `execve`
-            // decide.
+            // `=` or NUL can't be in an environment name.
             guard !variable.isEmpty, !variable.contains("="), !variable.contains("\0")
             else { return false }
             environment[variable] = value
@@ -106,9 +74,7 @@ nonisolated struct Preset: Equatable, Sendable {
         case "directory":
             directory = value.isEmpty ? nil : (value as NSString).expandingTildeInPath
         case "arguments":
-            // Space separated, which is all a shell invocation needs here;
-            // anything requiring quoting belongs in a script the preset
-            // points at.
+            // Space-separated; anything needing quotes belongs in a script.
             arguments = value.split(separator: " ").map(String.init)
         default:
             return false
@@ -116,7 +82,6 @@ nonisolated struct Preset: Equatable, Sendable {
         return true
     }
 
-    /// The config-file lines that reproduce this preset.
     var serializedLines: [String] {
         var lines: [String] = []
         if let shell { lines.append("preset.\(name).shell = \(shell)") }

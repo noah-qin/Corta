@@ -17,8 +17,7 @@
 import Cocoa
 import CortaTerminal
 
-/// Text input into the PTY: paste. IME-committed text reaches the PTY
-/// through `TerminalView+IME.swift`'s `insertText`, the path a key takes.
+/// Paste. IME commits arrive via `TerminalView+IME.swift`'s `insertText`.
 extension ViewController {
     // MARK: - Paste
 
@@ -37,40 +36,28 @@ extension ViewController {
         }
         returnToBottomOnInput()
         let payload = Paste.bytes(for: sanitized, bracketedPasteEnabled: bracketedPasteEnabled())
-        // Bounded chunks, not one arbitrarily large enqueue — a
-        // multi-megabyte paste sent as a single `write` would occupy the
-        // one FIFO the writer queue shares with keyboard input for the
-        // whole write, so a keystroke typed mid-paste would wait behind all
-        // of it rather than behind one chunk.
+        // Chunks, so a keystroke mid-paste waits behind one, not all of it.
         for chunk in Paste.chunked(payload) {
             switch session.write(chunk) {
             case .accepted:
                 continue
             case .backpressured:
-                // The child has stopped reading; the remaining chunks could
-                // only be dropped too, so stop feeding them rather than
-                // churn the queue for nothing, and say why the paste came up
-                // short.
+                // The child stopped reading; stop feeding and say why.
                 terminalView?.showToast(L10n.text("toast.pasteStopped"), kind: .warning)
                 return
             case .stopped:
-                // The session is already gone (the pane is tearing down) —
-                // nothing is reading this toast either, and "the shell isn't
-                // reading input" would be a misleading thing to say about a
-                // session that no longer exists at all.
+                // The session is gone; nobody would read the toast.
                 return
             }
         }
     }
 
-    /// The Edit menu's Paste lands on `TerminalView.paste(_:)`; the context
-    /// menu targets the pane controller directly, which is what this is for.
+    /// For the context menu, which targets the controller.
     @objc func paste(_ sender: Any?) {
         pasteFromClipboard()
     }
 
-    /// The core's ?2004 bracketed-paste flag. When on, pastes are
-    /// wrapped in `ESC[200~`…`ESC[201~` and the newline warning is skipped.
+    /// ?2004: wrap pastes in `ESC[200~`…`ESC[201~`, skip the newline warning.
     func bracketedPasteEnabled() -> Bool {
         session.isBracketedPasteEnabled
     }

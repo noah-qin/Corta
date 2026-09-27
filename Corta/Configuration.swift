@@ -18,26 +18,18 @@ import AppKit
 import CortaTerminal
 import Foundation
 
-/// Everything the settings page can change, and the text format the
-/// config file stores it in.
+/// Everything the settings page can change, and the file format it is
+/// stored in.
 ///
-/// One file is the source of truth. The settings page edits that file and
-/// reads it back; there is no second store to drift out of sync, and a
-/// hand-edit in `$EDITOR` is as valid an input as a click. That constraint
-/// is why this type owns both the values and their serialisation.
+/// One file is the source of truth (D10): the settings page edits and
+/// re-reads it, and a hand-edit is as valid as a click, which is why this
+/// type owns both values and serialisation.
 ///
-/// The format is `key = value`, one per line, `#` to end of line for
-/// comments — chosen because it needs no third-party parser and stays
-/// readable when hand-edited. A `#` that opens a *value* is not a comment:
-/// that is how a colour is written. An unknown key is preserved on write rather
-/// than dropped: a config written by a newer Corta must survive a round trip
-/// through an older one.
-///
-/// Three families of key are structured rather than scalar, and all use a
-/// dotted prefix so the flat format does not need nesting: `theme.<name>.…`
-/// defines a colour theme, `preset.<name>.…` a shell/directory/
-/// environment preset, and `bind.<command>` rebinds a keyboard
-/// shortcut.
+/// `key = value` per line, `#` to end of line for comments — except a `#`
+/// opening a value, which is a colour. Unknown keys survive a write, so a
+/// newer Corta's file round-trips through an older one. Structured keys use
+/// dotted prefixes: `theme.<name>.…`, `preset.<name>.…` and
+/// `bind.<command>`.
 nonisolated struct Configuration: Equatable, Sendable {
     /// Which of a theme's two variants is live.
     enum Appearance: String, CaseIterable, Sendable {
@@ -49,11 +41,10 @@ nonisolated struct Configuration: Equatable, Sendable {
 
     /// What it takes to open a link.
     enum LinkActivation: String, CaseIterable, Sendable {
-        /// ⌘-click, the original behaviour: the modifier is the confirmation.
+        /// ⌘-click: the modifier is the confirmation.
         case command
-        /// A plain click on a link opens it, and hovering one underlines it
-        /// so the target is visible before the click. Selection still wins
-        /// the moment the mouse moves, so dragging across a URL selects it.
+        /// A plain click opens it and hovering underlines it; a drag still
+        /// selects.
         case click
     }
 
@@ -61,19 +52,16 @@ nonisolated struct Configuration: Equatable, Sendable {
     enum QuickTerminalPosition: String, CaseIterable, Sendable {
         /// A band across the top edge, the width of the screen.
         case top
-        /// The same band along the bottom edge.
         case bottom
-        /// A window centred on the screen, smaller than either band.
+        /// A centred window, smaller than either band.
         case center
     }
 
     /// Which display the Quick Terminal opens on.
     enum QuickTerminalScreen: String, CaseIterable, Sendable {
-        /// The screen under the pointer at the moment the hotkey is pressed
-        /// — the one the user is looking at, on a multi-display desk.
+        /// The screen under the pointer when the hotkey is pressed.
         case mouse
-        /// `NSScreen.main`: the screen holding the key window, or the primary
-        /// display when nothing is key.
+        /// `NSScreen.main`: the key window's screen, else the primary.
         case main
     }
 
@@ -82,33 +70,20 @@ nonisolated struct Configuration: Equatable, Sendable {
     var theme: String = Theme.corta.name
     var appearance: Appearance = .auto
     var scrollbackLines: Int = 10_000
-    /// The bound on `CommandRecordStore`'s per-session history,
-    /// distinct from `scrollbackLines`: this caps structured command
-    /// records (for jumping, copying and the command-history search), not
-    /// visible text.
+    /// Caps `CommandRecordStore`'s structured command records per session,
+    /// separately from `scrollbackLines`.
     var commandHistoryLimit: Int = CommandRecordStore.defaultCapacity
-    /// The grid a new window opens with. In *cells*, not points: the
-    /// window's pixel size is this grid times the font's cell metrics plus
-    /// the pane insets, which is what keeps `columns × rows` meaning the same
-    /// thing after a font or size change.
+    /// The grid a new window opens with, in cells, so it holds across font
+    /// changes.
     var columns: Int = 120
     var rows: Int = 30
     var bell: BellMode = .visual
-    /// Whether a command that ran longer than `notificationThreshold` posts
-    /// a notification when it finishes.
     var notifyOnLongTask: Bool = false
-    /// Seconds a command must run before finishing it is worth a
-    /// notification. Below this a notification is noise — the user was
-    /// watching.
+    /// Seconds a command must run before its finish is worth a notification.
     var notificationThreshold: Double = 30
-    /// A finished selection goes straight to the pasteboard, the way
-    /// X11 and every terminal that grew up beside it behave.
-    ///
-    /// On by default. The objection — copying silently replaces the clipboard,
-    /// which surprises anyone who did not ask for it — is answered by making it
-    /// not silent: a confirmation appears in the corner of the pane
-    /// (`TerminalView.showToast`). What is left is the behaviour most people
-    /// selecting text in a terminal already expect.
+    /// A finished selection goes straight to the pasteboard, as on X11. On by
+    /// default because it is not silent: the pane shows a toast
+    /// (`TerminalView.showToast`).
     var copyOnSelect: Bool = true
     /// See `LinkActivation`.
     var linkActivation: LinkActivation = .command
@@ -132,48 +107,28 @@ nonisolated struct Configuration: Equatable, Sendable {
         }
     }
     var mouseOverrideModifier: MouseOverrideModifier = .option
-    /// ⌥ as Meta: an Option-modified text key sends ESC plus the base
-    /// character, the way a PC's Alt key reaches readline (`\eb` for
-    /// Option+B, and so on). Off by default: on a Mac, Option is how the
-    /// layout's alternate characters (é, ø, π) and dead keys are typed, and
-    /// taking that away is a choice only the user can make.
+    /// ⌥ sends ESC plus the base character, as readline expects. Off by
+    /// default: on a Mac, Option types é, ø and dead keys.
     var optionAsMeta: Bool = false
 
-    /// Whether scrollback search distinguishes case. Off by default:
-    /// a person searching a log for `error` wants `Error` and `ERROR` too,
-    /// and the toggle in the search bar writes here so the choice survives
-    /// closing the bar and restarting the app.
+    /// Case-sensitive search. The search bar's toggle writes it, so the choice
+    /// survives a restart.
     var searchCaseSensitive: Bool = false
 
-    /// Whether the search field is read as a regular expression. Like
-    /// `search-case-sensitive`, the bar's own toggle writes it, so the mode
-    /// survives closing the bar.
+    /// Regex search; the bar's toggle writes it too.
     var searchRegex: Bool = false
 
-    /// The command that opens a `path:line` reference, with `{file}`,
-    /// `{line}` and `{column}` substituted. Empty means the system default
-    /// application, which cannot be told a line number.
+    /// Opens a `path:line` reference, substituting `{file}`, `{line}` and
+    /// `{column}`. Empty means the default application, which takes no line.
     var openFileCommand: String = ""
 
-    /// Whether an `open-file-command` template could actually be run: empty
-    /// (meaning the system default application), or a command whose first
-    /// word is an absolute path. A template that names no `{file}` is
-    /// allowed — an editor that takes the path last is a real shape — but
-    /// one that names an unknown placeholder is not, because the placeholder
-    /// would be passed through as a literal argument.
-    ///
-    /// Split on *any* whitespace, which is what `openFileArguments` does when
-    /// it launches the thing. Splitting on the space alone let a tab or a
-    /// newline inside the template pass this check and then fail at
-    /// `Process.run` — a value the file says is configured and the app will
-    /// never execute, which is precisely what refusing it here is for.
+    /// Whether an `open-file-command` template can run: empty, or an absolute
+    /// executable path with only known placeholders (unknown ones would pass
+    /// through literally). Splits on any whitespace, as `openFileArguments`
+    /// does, so a tab can't pass here and fail at `Process.run`.
     static func isUsableOpenFileCommand(_ template: String) -> Bool {
-        // A line break inside the template is refused rather than tolerated.
-        // `serialized()` interpolates this value straight into
-        // `open-file-command = …`, and the config file is read a line at a
-        // time, so storing one would write a second line the parser reads as
-        // a stray key — a value that corrupts the file it is written to.
-        // Trimming the ends is not enough: the settings field takes a paste.
+        // A newline would serialise as a second config line — a stray key. The
+        // settings field takes pastes, so trimming isn't enough.
         guard !template.contains(where: \.isNewline) else { return false }
         let parts = template.split(whereSeparator: \.isWhitespace).map(String.init)
         guard let executable = parts.first else { return true }
@@ -189,112 +144,72 @@ nonisolated struct Configuration: Equatable, Sendable {
         }
         return true
     }
-    /// Whether OSC 52 may write the system pasteboard.
-    ///
-    /// Off by default, as `SECURITY.md` §2.6 requires: any output at all
-    /// could put `rm -rf ~` or an attacker's wallet address on the clipboard
-    /// for the user to paste later, and that is not a risk to take on
-    /// somebody's behalf. Turning it on is one switch in Settings, which is
-    /// what the feature is for — inside `tmux` or over `ssh` there is no
-    /// other route to the local clipboard. The *read* half stays unavailable
-    /// under every setting (`SECURITY.md` §6).
+    /// Whether OSC 52 may write the pasteboard. Off by default
+    /// (`SECURITY.md` §2.6): any output could plant `rm -rf ~` for a later
+    /// paste. It is the only clipboard route inside tmux or ssh; reading stays
+    /// unavailable under every setting (§6).
     var allowClipboardWrite: Bool = false
-    /// Whether Corta remembers visited directories (`OSC 7`) to rank
-    /// for the directory switcher. On by default: unlike clipboard write,
-    /// nothing here reaches outside the app, and the data is app-managed
-    /// history, not a setting — `DirectoryHistory` persists it to its own
-    /// file, not this one, the same split `ConfigurationStore` draws
-    /// between preference and state. This key only gates whether it is
-    /// kept at all; clearing what is already kept is a Settings action, not
-    /// a config-file key.
+    /// Whether visited directories (OSC 7) are kept for the directory
+    /// switcher. On by default: nothing leaves the app. The history lives in
+    /// `DirectoryHistory`'s own file; clearing it is a Settings action.
     var directoryHistory: Bool = true
-    /// Reopen the windows, splits and working directories from the
-    /// last run.
+    /// Reopen last run's windows, splits and directories.
     var restoreWindows: Bool = true
-    /// Ask before closing a pane whose shell still has a child
-    /// process running.
+    /// Ask before closing a pane with a running child process.
     var confirmClose: Bool = true
-    /// Whether Sparkle checks for updates in the background, on the
-    /// interval `SUScheduledCheckInterval` sets (`Sparkle-Info.plist`).
-    /// Check for Updates… (`AppDelegate+Menus`, `UpdateController`) always
-    /// works, on or off — this only gates the unattended check nobody
-    /// asked for.
+    /// Sparkle's background check (`SUScheduledCheckInterval`); Check for
+    /// Updates… works either way.
     var updateAutoCheck: Bool = true
-    /// Offer to move Corta into /Applications on launch when it is not
-    /// already there (`ApplicationsFolderMover`). Off after the user
-    /// either moves it or says not to ask again.
+    /// Offer to move Corta into /Applications (`ApplicationsFolderMover`);
+    /// off once the user moves it or declines.
     var suggestApplicationsFolder: Bool = true
 
-    /// Whether a global hotkey summons the Quick Terminal.
-    ///
-    /// Off by default. A global hotkey is claimed system-wide, in every
-    /// application, and the key a person would want for it is one another
-    /// tool on their machine may already own; nothing is taken from the
-    /// rest of the desktop until the user asks in this file.
+    /// Whether a global hotkey summons the Quick Terminal. Off by default: the
+    /// key is claimed system-wide, and another tool may own it.
     var quickTerminal: Bool = false
-    /// The hotkey, in `bind.*` notation. Matched by *key position* on the
-    /// ANSI layout (`GlobalHotKey`), the way every Carbon hotkey is — the
-    /// letter names the key cap, not the character it types under the
-    /// current input source.
+    /// The hotkey in `bind.*` notation, matched by ANSI key position
+    /// (`GlobalHotKey`), not by the character typed.
     var quickTerminalKey: Shortcut? = Shortcut.parse(Configuration.defaultQuickTerminalKey)
     var quickTerminalPosition: QuickTerminalPosition = .top
     var quickTerminalScreen: QuickTerminalScreen = .mouse
-    /// Secure Keyboard Entry: while a Corta window is key, the system
-    /// stops other processes from observing keystrokes (`SecureInput`). Off
-    /// by default because it is system-wide — it also blocks the
-    /// accessibility tools, macro utilities and text expanders a person
-    /// may rely on — so it is a choice only the user can make.
+    /// Secure Keyboard Entry while a Corta window is key (`SecureInput`). Off
+    /// by default: it also blocks accessibility tools and text expanders.
     var secureKeyboardEntry: Bool = false
 
     /// Themes defined in the config file itself, in file order.
     var customThemes: [Theme] = []
 
-    /// Named shell/directory/environment presets, in the order the
-    /// config file lists them, which is the order the menu offers them.
+    /// Presets, in file order, which is menu order.
     var presets: [Preset] = []
-    /// Keyboard shortcuts, defaults plus the file's overrides.
     var keybindings = Keybindings()
 
-    /// The sentinel meaning "whatever `NSFont.monospacedSystemFont` gives",
-    /// which is the default and tracks the OS rather than pinning a face.
+    /// Means `NSFont.monospacedSystemFont`, tracking the OS.
     static let systemFontFamily = "system"
 
-    /// The hotkey a fresh `quick-terminal = true` gets. ⌥Space is the key
-    /// launchers and quick-access panels on the Mac have settled on; a user
-    /// whose launcher already holds it changes `quick-terminal-key`.
+    /// The default hotkey: ⌥Space, the Mac's usual launcher key.
     static let defaultQuickTerminalKey = "alt+space"
 
     init() {}
 
     // MARK: - Parsing
 
-    /// Parses a config file. Unparseable lines are skipped, not fatal: a
-    /// typo in one setting must not cost the user every other setting, and
-    /// the terminal has to start.
-    ///
-    /// Returns the parsed configuration and the keys it did not recognise,
-    /// so `serialized(preserving:)` can write them back untouched. A
-    /// recognised key whose value cannot be parsed at all (`font-size =
-    /// banana`) is unrecognised too: the value falls back to the default and
-    /// the line is preserved rather than rewritten.
+    /// Parses a config file. Bad lines are skipped, never fatal. Returns the
+    /// keys it did not recognise, including recognised keys with unparseable
+    /// values (`font-size = banana`), so `serialized(preserving:)` writes them
+    /// back untouched.
     static func parse(_ text: String) -> (configuration: Configuration, unknown: [(String, String)]) {
         var configuration = Configuration()
         var unknown: [(String, String)] = []
-        // Theme keys arrive one colour at a time and in any order, so they
-        // accumulate into drafts and are resolved once the whole file is
-        // read — a theme that inherits from another has to be able to name
-        // one defined further down.
+        // Theme keys accumulate into drafts resolved after the whole file, so a
+        // theme can inherit from one defined further down.
         var themeDrafts: [String: ThemeDraft] = [:]
         var themeOrder: [String] = []
         var presetDrafts: [String: Preset] = [:]
         var presetOrder: [String] = []
         for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
             let line = rawLine.trimmingCharacters(in: .whitespaces)
-            // A `#` opens a comment — except as the first character of a
-            // *value*, where it is a colour (`background = #101018`). Splitting
-            // the key from the value before stripping comments is what makes
-            // both readings possible; stripping first ate every theme colour
-            // in the file and left the key with an empty value.
+            // Split key from value before stripping comments, so a value's leading
+            // `#` stays a colour (`background = #101018`).
             guard !line.isEmpty, !line.hasPrefix("#"), let separator = line.firstIndex(of: "=")
             else { continue }
             let key = line[..<separator].trimmingCharacters(in: .whitespaces)
@@ -316,8 +231,7 @@ nonisolated struct Configuration: Equatable, Sendable {
                 unknown.append((key, value))
             } else if key.hasPrefix("bind.") {
                 if let command = TerminalCommand(rawValue: String(key.dropFirst("bind.".count))) {
-                    // An empty value unbinds; a malformed one is left alone
-                    // rather than silently reverting to the default.
+                    // Empty unbinds; malformed keeps the default rather than guess.
                     configuration.keybindings[command] =
                         value.isEmpty ? nil : (Shortcut.parse(value) ?? command.defaultShortcut)
                     continue
@@ -328,47 +242,38 @@ nonisolated struct Configuration: Equatable, Sendable {
             }
         }
         configuration.customThemes = themeOrder.compactMap { themeDrafts[$0]?.resolved() }
-        // A preset that names nothing, or names a relative shell or
-        // directory, is a typo — kept out of the menu rather than offered as
-        // something that will fail at spawn time.
+        // An empty preset, or one with a relative shell or directory, is a typo
+        // that would fail at spawn.
         configuration.presets = presetOrder.compactMap { presetDrafts[$0] }.filter(\.isUsable)
         return (configuration, unknown)
     }
 
-    /// Applies one key. Returns false when the key is not one of ours — or
-    /// when it is ours but the value cannot be parsed at all, so the line
-    /// lands in `unknown` and survives the next write verbatim: a typo the
-    /// user can see and fix, not one silently replaced by the default. An
-    /// out-of-range value that *does* parse is clamped, not rejected, so the
-    /// key still counts as recognised and is rewritten in canonical form.
+    /// Applies one key; false when it isn't ours or its value doesn't parse,
+    /// so the line survives verbatim for the user to fix. A parseable
+    /// out-of-range value is clamped and rewritten canonically.
     private mutating func apply(key: String, value: String) -> Bool {
         switch key {
         case "font-family":
             fontFamily = value.isEmpty ? Self.systemFontFamily : value
         case "font-size":
-            // The same clamp the ⌘+/⌘− path uses: below ~8pt the metrics
-            // round to a degenerate cell.
+            // The ⌘+/⌘− clamp: below ~8pt the cell degenerates.
             guard let size = Double(value) else { return false }
             fontSize = min(64, max(8, size))
         case "theme":
-            // Not validated here: a custom theme may be defined further down
-            // the same file, and the name is resolved when it is used.
+            // Resolved at use: a custom theme may be defined further down.
             theme = value.isEmpty ? Theme.corta.name : value
         case "appearance":
             guard let parsed = Appearance(rawValue: value) else { return false }
             appearance = parsed
         case "columns":
-            // Clamped to what a window can actually show: below the minimum
-            // grid the window cannot be built, and an absurd value would open
-            // a window larger than every display.
+            // Clamped between the minimum grid and a sane maximum.
             guard let value = Int(value) else { return false }
             columns = min(500, max(20, value))
         case "rows":
             guard let value = Int(value) else { return false }
             rows = min(300, max(5, value))
         case "scrollback-lines":
-            // Capped: scrollback is unbounded input and every unbounded
-            // input needs a cap (`SECURITY.md` §3).
+            // Every unbounded input needs a cap (`SECURITY.md` §3).
             guard let lines = Int(value) else { return false }
             scrollbackLines = min(1_000_000, max(0, lines))
         case "command-history-limit":
@@ -384,13 +289,8 @@ nonisolated struct Configuration: Equatable, Sendable {
             guard let seconds = Double(value) else { return false }
             notificationThreshold = max(1, seconds)
         case "open-file-command":
-            // Validated when it is *set*, not only when it is run. An
-            // executable that is not an absolute path can never be launched
-            // — resolving a bare name would mean consulting a `PATH` that the
-            // user's shell, not Corta, controls — and finding that out at
-            // click time, as a toast, is finding it out in the wrong place.
-            // Malformed means the line is preserved and the default applies,
-            // the same as every other unparseable value.
+            // Validated when set, not at click time. A bare name would resolve
+            // through a `PATH` the user's shell controls, not Corta.
             guard Self.isUsableOpenFileCommand(value) else { return false }
             openFileCommand = value
         case "search-regex":
@@ -433,10 +333,8 @@ nonisolated struct Configuration: Equatable, Sendable {
             guard let parsed = Self.parseBool(value) else { return false }
             quickTerminal = parsed
         case "quick-terminal-key":
-            // An empty value means "no hotkey": the Quick Terminal is then
-            // reachable from the menu and the palette only. A shortcut with
-            // no modifier at all is refused — a bare `space` claimed
-            // system-wide would swallow the key in every application.
+            // Empty means no hotkey (menu and palette only). A shortcut with no
+            // modifier is refused: it would swallow the key system-wide.
             if value.isEmpty {
                 quickTerminalKey = nil
             } else {
@@ -469,13 +367,11 @@ nonisolated struct Configuration: Equatable, Sendable {
 
     // MARK: - Custom themes
 
-    /// A theme under construction: `theme.<name>.<variant>.<field>` keys
-    /// arrive one at a time, and anything left unset inherits.
+    /// A theme under construction; unset fields inherit.
     private struct ThemeDraft {
         var name: String
         var displayName: String?
-        /// The built-in this theme starts from, so a two-line theme is a
-        /// legal theme. `theme.<name>.inherit = solarized`.
+        /// The built-in to start from: `theme.<name>.inherit = solarized`.
         var inherit: String?
         var dark = VariantDraft()
         var light = VariantDraft()
@@ -484,7 +380,7 @@ nonisolated struct Configuration: Equatable, Sendable {
             var foreground: SIMD4<Float>?
             var background: SIMD4<Float>?
             var cursor: SIMD4<Float>?
-            /// Sparse: a theme may override one ANSI slot and leave fifteen.
+            /// Sparse: a theme may override one slot.
             var ansi: [Int: SIMD4<Float>] = [:]
         }
 
@@ -510,12 +406,8 @@ nonisolated struct Configuration: Equatable, Sendable {
         }
     }
 
-    /// `theme.<name>.<field>` and `theme.<name>.<dark|light>.<field>`.
-    /// Returns false for a shape this does not recognise, so it lands in
-    /// `unknown` and survives the round trip.
-    /// `preset.<name>.<field>`. Unknown fields fall through to the unknown
-    /// list, so a key from a newer version survives a write by this one — the
-    /// same rule the theme keys follow.
+    /// `preset.<name>.<field>`. Unknown fields are returned false and
+    /// survive the write, as theme keys do.
     private static func applyPresetKey(
         _ key: String, value: String, drafts: inout [String: Preset], order: inout [String]
     ) -> Bool {
@@ -531,6 +423,8 @@ nonisolated struct Configuration: Equatable, Sendable {
         return drafts[name]!.apply(field: field, value: value)
     }
 
+    /// `theme.<name>.<field>` and `theme.<name>.<dark|light>.<field>`;
+    /// false for an unknown shape, which survives the round trip.
     private static func applyThemeKey(
         _ key: String, value: String, drafts: inout [String: ThemeDraft], order: inout [String]
     ) -> Bool {
@@ -543,7 +437,6 @@ nonisolated struct Configuration: Equatable, Sendable {
             order.append(name)
         }
 
-        // `theme.<name>.name` and `theme.<name>.inherit` are theme-level.
         if parts.count == 3 {
             switch parts[2] {
             case "name":
@@ -578,8 +471,7 @@ nonisolated struct Configuration: Equatable, Sendable {
         _ field: String, value: String, into draft: inout ThemeDraft.VariantDraft
     ) -> Bool {
         if field == "ansi" {
-            // The whole table on one line, comma-separated. Shorter lists are
-            // taken as a prefix, so `ansi = #000, #f00` overrides two slots.
+            // Comma-separated; a shorter list is a prefix (`ansi = #000, #f00`).
             let colors = value.split(separator: ",").compactMap { Theme.color(String($0)) }
             guard !colors.isEmpty else { return false }
             for (index, color) in colors.enumerated() { draft.ansi[index] = color }
@@ -602,10 +494,8 @@ nonisolated struct Configuration: Equatable, Sendable {
 
     // MARK: - Writing
 
-    /// The file this configuration would be written as, with a header
-    /// explaining that hand-edits are picked up — because they are, and a
-    /// config file that does not say so invites the user to look for a
-    /// hidden second store.
+    /// The file text, with a header saying hand-edits are picked up, so no
+    /// one looks for a hidden second store.
     func serialized(preserving unknown: [(String, String)] = []) -> String {
         var lines = [
             "# Corta configuration.",
@@ -677,9 +567,8 @@ nonisolated struct Configuration: Equatable, Sendable {
         return lines.joined(separator: "\n") + "\n"
     }
 
-    /// One theme's block. Written in full rather than as a diff against what
-    /// it inherits: a theme read back has already been resolved, and
-    /// reconstructing the original sparse form would be guesswork.
+    /// One theme, written in full: the sparse original can't be recovered
+    /// after resolution.
     private static func themeLines(_ theme: Theme) -> [String] {
         var lines = ["", "theme.\(theme.name).name = \(theme.displayName)"]
         for (label, variant) in [("dark", theme.dark), ("light", theme.light)] {
@@ -692,7 +581,6 @@ nonisolated struct Configuration: Equatable, Sendable {
         return lines
     }
 
-    /// Trims a trailing `.0` so a whole number reads as one.
     private static func number(_ value: Double) -> String {
         value == value.rounded() ? String(Int(value)) : String(value)
     }

@@ -18,18 +18,11 @@ import Cocoa
 import CortaTerminal
 import UserNotifications
 
-/// The click half of "connect notifications into the flow": a
-/// `TaskNotifier` notification for a command that finished (or failed) tags
-/// itself with the window and the `CommandRecord.id` it was about
-/// (`TaskNotifier.post`); clicking it should land back on exactly that
-/// command, not just bring some window forward.
+/// Clicking a `TaskNotifier` notification lands on its command, via the
+/// window and `CommandRecord.id` it carries.
 extension AppDelegate: UNUserNotificationCenterDelegate {
-    /// Shown even while Corta is the foreground app — the default is to
-    /// suppress a banner then, and a long build finishing while the user is
-    /// looking at a different pane in the same app is exactly the case this
-    /// feature exists for. Still no sound: `TaskNotifier.post` already
-    /// leaves `content.sound` `nil` (`SECURITY.md` §5's "no command text"
-    /// design extends to "no sound" too, and this must not override it).
+    /// Show banners while Corta is frontmost: the build may be in another
+    /// pane. Still no sound (`TaskNotifier.post`).
     func userNotificationCenter(
         _ center: UNUserNotificationCenter, willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) ->
@@ -38,12 +31,8 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         completionHandler([.banner])
     }
 
-    /// Brings the originating window forward and lands on the command that
-    /// finished. Both pieces of `userInfo` are optional and independent: a
-    /// window that has since closed still gets no crash, just nothing to
-    /// focus, and a command id past `CommandRecordStore`'s bound (512
-    /// entries) still brings the window forward even though there is
-    /// nothing left to land on.
+    /// Brings the window forward and lands on the command; either may be
+    /// gone (closed window, record past the store's bound), harmlessly.
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,

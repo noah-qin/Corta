@@ -17,18 +17,11 @@
 import Cocoa
 import CortaTerminal
 
-/// Following the config file while running.
-///
-/// A pane pulls rather than being pushed to — it reads the store when it
-/// loads and re-reads it on a change — so a pane created at any point in the
-/// app's life is already correct and nothing has to keep a registry of panes
-/// to notify.
-///
-/// Two notifications, not one, because they answer different questions.
-/// `ConfigurationStore.didChange` means the file changed: the font or the
-/// scrollback may be different. `AppearanceController.didChange` means the
-/// live colour variant changed, which also happens when macOS toggles Dark
-/// Mode without the file changing at all.
+/// Following the config file while running. Panes pull, reading the store
+/// at load and on change, so no registry is needed. Two notifications:
+/// `ConfigurationStore.didChange` (the file changed) and
+/// `AppearanceController.didChange` (the live variant changed, e.g. Dark
+/// Mode, with no file change).
 extension ViewController {
     func observeConfiguration() {
         NotificationCenter.default.addObserver(
@@ -42,11 +35,8 @@ extension ViewController {
     @objc func configurationChanged() {
         let configuration = ConfigurationStore.shared.configuration
         terminalView?.mouseOverrideModifier = configuration.mouseOverrideModifier
-        // The font size goes through `setFontSize`, which is the same path
-        // ⌘+/⌘− takes: it rebuilds the atlas, re-derives the cell box and
-        // re-fits the window. A family change has to force that work even
-        // when the size did not move, so the family is applied first and the
-        // size is re-applied through a nudge when it is unchanged.
+        // A family change forces `setFontSize` (the ⌘+/⌘− path) even at the
+        // same size.
         if configuration.fontFamily != fontFamily {
             fontFamily = configuration.fontFamily
             let scale = view.window?.backingScaleFactor ?? terminalRenderer.scale
@@ -59,9 +49,7 @@ extension ViewController {
                 width: metrics.cellWidth, height: metrics.cellHeight)
             resizeSessionToFitView()
         }
-        // A zoomed window rides out a config change rather than being
-        // silently snapped back to the default; `resetFontSize` is the
-        // explicit way out of a zoom, not a side effect of picking a theme.
+        // A zoom survives config changes; `resetFontSize` ends it.
         if !isFontSizeZoomed {
             setFontSize(min(64, max(8, configuration.fontSize)))
         }
@@ -69,27 +57,17 @@ extension ViewController {
     }
 
     @objc func appearanceChanged() {
-        // The OSC 10/11/12 answer has to track the switch too — a program
-        // that queried the background before this point chose its palette
-        // for the variant that was live then, and a live theme swap
-        // means the screen underneath it just changed colour.
+        // OSC 10/11/12 answers follow the live variant.
         session?.dynamicColors =
             AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)
             .dynamicColors
-        // `updateIndexedPaletteDefaults`, not a get-then-set of
-        // `indexedPalette`: an index a program has already OSC 4'd is
-        // terminal state, not theme state, and a live theme swap must not
-        // silently revert it — nor race the reader thread applying an OSC 4
-        // between a separate get and set.
+        // Only the defaults: an OSC 4'd index is terminal state, and a
+        // get-then-set would race the reader thread.
         session?.updateIndexedPaletteDefaults(
             to: AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)
                 .indexedPaletteDefaults.defaults)
-        // Every cell's colours are resolved into the instance buffer when its
-        // row is built, so a theme change invalidates the whole buffer — the
-        // clear colour alone is read fresh each frame. Forcing a frame
-        // without also forcing a rebuild redrew the new background behind the
-        // old theme's glyph colours, which on a dark-to-light-to-dark round
-        // trip left dark text on a dark ground: the terminal looked empty.
+        // Colours are baked into the instance buffer, so rebuild it all; a
+        // forced frame alone kept the old glyph colours (dark on dark).
         terminalRenderer.invalidate()
         terminalView.layer?.backgroundColor = nil
         invalidateDisplay()

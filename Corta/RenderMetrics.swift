@@ -18,31 +18,21 @@ import Foundation
 import Metal
 import OSLog
 
-/// Aggregates per-frame render timing into fixed-size ring buffers so a
-/// before/after comparison across a render-pipeline change is a log line,
-/// not an Instruments session.
+/// Per-frame render timing in fixed-size buffers, summarised as
+/// percentiles, so a before/after comparison is a log line. Pairs with
+/// `InputLatencySignposts`: this says *that* something got slower, a trace
+/// says *where*.
 ///
-/// This is not a replacement for `InputLatencySignposts` — that is the
-/// "emit" layer (one atomic load when disabled, Instruments-only). This is
-/// the "collect and summarise" layer: a handful of doubles per metric,
-/// dumped as percentiles once the buffer fills. The two are meant to be
-/// read together — a `RenderMetrics` regression says *that* something got
-/// slower; a signpost trace of the same run says *where*.
-///
-/// Gated by `CORTA_RENDER_METRICS` — a measurement harness like
-/// `CORTA_MAX_DRAWABLES` (`TerminalView.swift`), not a config key nobody
-/// should be setting (`docs/DECISIONS.md` D10). `isEnabled` is read once at process
-/// start; every call site below checks the cached value, so a normal run
-/// pays one Bool comparison per call and nothing else.
+/// Gated by `CORTA_RENDER_METRICS`, a measurement harness rather than a
+/// config key (D10), read once at start: disabled, each call costs one
+/// Bool check.
 nonisolated enum RenderMetrics {
     enum Metric: String, CaseIterable {
         case drawableWait
         case cpuFrame
         case gpu
-        /// Key event (its HID timestamp) → the first frame carrying the
-        /// child's echo *on the glass* (`MTLDrawable.presentedTime`). The
-        /// end-to-end number the README quotes, measured from inside the
-        /// process — see `noteKeystroke`.
+        /// HID timestamp → the first frame with the echo on the glass
+        /// (`MTLDrawable.presentedTime`); see `noteKeystroke`.
         case keypressToPresent
     }
 
@@ -50,13 +40,10 @@ nonisolated enum RenderMetrics {
 
     private static let log = OSLog(subsystem: "dev.noahqin.Corta", category: "render-metrics")
 
-    /// How many samples to keep per metric before summarising and starting
-    /// over — 600 is ~10 s of frames at 60 Hz, long enough to smooth out one
-    /// keystroke burst without holding an unbounded array.
+    /// Samples per summary: ~10 s at 60 Hz.
     private static let capacity = 600
-    /// Keystrokes arrive at typing speed, not frame rate: 200 is the sample
-    /// size the earlier end-to-end runs used, and a person types it in a minute.
-    /// `CORTA_RENDER_METRICS_KEYSTROKES=<n>` overrides it for a shorter run.
+    /// 200 keystrokes, as earlier runs used; override with
+    /// `CORTA_RENDER_METRICS_KEYSTROKES=<n>`.
     private static let keystrokeCapacity: Int = {
         let raw = ProcessInfo.processInfo.environment["CORTA_RENDER_METRICS_KEYSTROKES"] ?? ""
         if let n = Int(raw), n > 0 { return n }
@@ -64,15 +51,12 @@ nonisolated enum RenderMetrics {
     }()
 
     private static let lock = NSLock()
-    // Mutated only under `lock`; Swift's static-isolation checker cannot see
-    // that, so it is told explicitly rather than moved to an actor — an
-    // actor would make every render-path call site `async`.
+    // Mutated only under `lock`; an actor would make render-path calls
+    // `async`.
     nonisolated(unsafe) private static var samples: [Metric: [Double]] = [:]
 
-    /// Records one timing sample in milliseconds. Dumps and clears that
-    /// metric's buffer once it reaches `capacity`, so a long-running session
-    /// prints a rolling series of summaries instead of one enormous one at
-    /// exit (which a force-quit would lose entirely).
+    /// Records a sample; a full buffer is dumped and cleared, so a force-quit
+    /// loses at most one window.
     static func record(_ metric: Metric, milliseconds: Double) {
         guard isEnabled else { return }
         lock.lock()
@@ -88,9 +72,7 @@ nonisolated enum RenderMetrics {
         if full { dump(metric: metric, values: values) }
     }
 
-    /// Elapsed wall-clock time for `body`, recorded under `metric` if
-    /// enabled. `body` still runs when disabled — only the timing call is
-    /// skipped — so this is safe to wrap around code that must always run.
+    /// Times `body` when enabled; `body` always runs.
     @inline(__always)
     static func measure<T>(_ metric: Metric, _ body: () -> T) -> T {
         guard isEnabled else { return body() }
@@ -116,10 +98,8 @@ nonisolated enum RenderMetrics {
 
     // MARK: - Keypress → glass
 
-    /// One keystroke in flight: its HID timestamp, and whether the child's
-    /// echo has landed on the grid yet. A newer keystroke replaces an older
-    /// one that never produced output (a modifier, a key the child
-    /// swallowed) — the sample is dropped, never guessed.
+    /// One keystroke in flight. A newer one replaces one that never echoed;
+    /// that sample is dropped, never guessed.
     private struct PendingKeystroke {
         var timestamp: TimeInterval
         var outputLanded = false
@@ -127,13 +107,9 @@ nonisolated enum RenderMetrics {
 
     nonisolated(unsafe) private static var pending: PendingKeystroke?
 
-    /// Called where a key event turns into bytes for the child
-    /// (`TerminalView`'s three delivery sites). `timestamp` is
-    /// `NSEvent.timestamp` — seconds since boot, the same clock
-    /// `MTLDrawable.presentedTime` reports on, so the two subtract. A
-    /// synthetic event (`CGEventPost`, System Events) carries a timestamp
-    /// too, but one minted at posting, so the HID stage is missing from a
-    /// scripted run; `PERFORMANCE.md` §5.7 says which kind a number is.
+    /// Called at `TerminalView`'s three delivery sites. `NSEvent.timestamp`
+    /// shares `presentedTime`'s clock. Synthetic events are stamped at
+    /// posting, missing the HID stage (`PERFORMANCE.md` §5.7).
     static func noteKeystroke(at timestamp: TimeInterval) {
         guard isEnabled else { return }
         lock.lock()
@@ -141,11 +117,8 @@ nonisolated enum RenderMetrics {
         lock.unlock()
     }
 
-    /// Called from the reader thread when a parse batch lands on the grid.
-    /// The first output after a keystroke is taken to be its echo — the
-    /// same assumption a screen-capture tool makes ("the pixels changed
-    /// after the key"); output that arrives with no keystroke pending is
-    /// not a sample.
+    /// A parse batch landed (reader thread); the first after a keystroke is
+    /// taken as its echo.
     static func noteOutputForKeystroke() {
         guard isEnabled else { return }
         lock.lock()
@@ -153,10 +126,8 @@ nonisolated enum RenderMetrics {
         lock.unlock()
     }
 
-    /// Called just before a drawable is presented. If a keystroke's echo is
-    /// on the grid, this frame is the one that shows it: the drawable's
-    /// presented handler — which fires when the frame is actually on
-    /// screen, not when it was scheduled — closes the sample.
+    /// Before presenting: if an echo is on the grid, this drawable's presented
+    /// handler closes the sample when it is actually on screen.
     static func notePresent(of drawable: MTLDrawable) {
         guard isEnabled else { return }
         lock.lock()
@@ -167,13 +138,8 @@ nonisolated enum RenderMetrics {
         pending = nil
         lock.unlock()
         drawable.addPresentedHandler { presented in
-            // `presentedTime` is 0 when this drawable never reached the
-            // glass — the compositor replaced it with the next one, which
-            // happens for about half the frames a keystroke burst
-            // produces. The echo is then shown by the *next* presented
-            // drawable, so the keystroke goes back to pending rather than
-            // being dropped: dropping it would keep only the frames that
-            // were shown on the first try and flatter the number.
+            // Zero when the compositor replaced this drawable (about half a burst's
+            // frames); re-pend rather than drop, which would flatter the number.
             guard presented.presentedTime > 0 else {
                 lock.lock()
                 if pending == nil { pending = keystroke }

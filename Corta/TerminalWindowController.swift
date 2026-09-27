@@ -16,39 +16,24 @@
 
 import Cocoa
 
-/// The window controller behind every terminal window.
-///
-/// It exists for one reason: `windowShouldClose`. The red button and ⌘W both
-/// end at the window's delegate, and the delegate is the window controller —
-/// so a "something is still running" confirmation has nowhere else to
-/// live. Putting `SplitViewController` in the delegate slot instead would
-/// take over every other delegate message `NSWindowController` answers, which
-/// is a much larger change for the same one hook.
+/// The window controller behind every terminal window, chiefly for
+/// `windowShouldClose`: the red button and ⌘W end at the window's delegate,
+/// and this is where the "still running" confirmation lives.
 final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     private var splitController: SplitViewController? {
         contentViewController as? SplitViewController
     }
 
-    /// The identity an App Intent names this window by
-    /// (`TerminalWindowEntity`). Minted when the controller is created and
-    /// carried through `WindowState`, so a Shortcut that focuses "the build
-    /// window" still resolves after a relaunch restores it. Never derived
-    /// from the title: titles are written by the child process and change
-    /// with every `cd`.
+    /// The App Intent identity (`TerminalWindowEntity`), carried through
+    /// `WindowState` so it survives a relaunch. Never the title, which the
+    /// child writes.
     var windowID: String = UUID().uuidString
 
-    /// Set for the Quick Terminal's window, which is summoned by a
-    /// hotkey rather than opened by the user and is therefore neither
-    /// saved into the arrangement nor listed as an ordinary window.
+    /// The Quick Terminal's window: not saved or listed as an ordinary one.
     var isQuickTerminal = false
 
-    /// The lock in the titlebar while Secure Keyboard Entry is
-    /// actually engaged for this window. Visible state is the point of the
-    /// feature: the effect itself is invisible (keystrokes simply stop
-    /// reaching other processes), so without an indicator a user cannot tell
-    /// whether the password they are about to type is covered. It follows
-    /// `SecureInput.engaged`, not the setting — the lock is open the moment
-    /// another app is frontmost, and the titlebar says so.
+    /// A titlebar lock while Secure Keyboard Entry is engaged — the effect is
+    /// invisible otherwise. Follows `SecureInput.engaged`, not the setting.
     private var secureInputIndicator: NSTitlebarAccessoryViewController?
     private var secureInputObserver: NSObjectProtocol?
 
@@ -57,29 +42,18 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         installSecureInputIndicator()
     }
 
-    /// Swaps the storyboard's `NSWindow` for a non-activating
-    /// `NSPanel` carrying the same content, before the window is shown.
+    /// Swaps the storyboard's `NSWindow` for a non-activating `NSPanel` with
+    /// the same content, before it is shown.
     ///
-    /// **Why a panel.** An ordinary window ordered front by an application
-    /// that is not active never reaches the screen while another
-    /// application is full-screen: the window server keeps it on the
-    /// desktop Space, `.canJoinAllSpaces` and `.fullScreenAuxiliary`
-    /// notwithstanding, and `NSApp.activate()` is either refused (the
-    /// hotkey is not an interaction the system credits to Corta) or, when
-    /// it is honoured, drags the user out of the full-screen Space to
-    /// wherever Corta's other windows are. Measured on macOS 27 with
-    /// TextEdit full-screen: `kCGWindowIsOnscreen` stayed false for every
-    /// `NSWindow` variant and became true for a `.nonactivatingPanel`,
-    /// which can be key without the application being active. This is the
-    /// panel class Spotlight-style overlays are made of, and the reason
-    /// every terminal with a hotkey window uses one.
+    /// An inactive app's window never reaches a full-screen Space, whatever
+    /// its collection behaviour, and `NSApp.activate()` is refused or drags
+    /// the user out of the Space. Measured on macOS 27 over full-screen
+    /// TextEdit: `kCGWindowIsOnscreen` stayed false for every `NSWindow`
+    /// variant and became true for a `.nonactivatingPanel`.
     ///
-    /// The swap happens here, on the controller, because it is the one
-    /// place that knows what `windowDidLoad` put on the old window (the
-    /// secure-input lock) and has to put on the new one. Everything
-    /// `SplitViewController.viewWillAppear` does — style flags, sizing,
-    /// first responder — runs later against the panel, exactly as it
-    /// would against the window.
+    /// Done here because this controller knows what `windowDidLoad` put on the
+    /// old window (the lock); `viewWillAppear` then runs against the panel as
+    /// usual.
     func adoptNonactivatingPanel() {
         guard let old = window, !(old is NSPanel) else { return }
         let panel = NSPanel(
@@ -87,9 +61,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
             styleMask: old.styleMask.union(.nonactivatingPanel),
             backing: .buffered, defer: false)
         panel.isReleasedWhenClosed = false
-        // NSPanel hides itself when the application deactivates;
-        // `QuickTerminalController` animates that dismissal and decides
-        // whether focus goes back to the previous application.
+        // `QuickTerminalController` owns dismissal and focus return.
         panel.hidesOnDeactivate = false
         panel.title = old.title
         let content = old.contentViewController
@@ -103,9 +75,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
 
     private func installSecureInputIndicator() {
         guard let window else { return }
-        // Called once per window this controller has owned
-        // (`adoptNonactivatingPanel`): the previous window's observer must
-        // not keep updating an accessory on a window that is gone.
+        // Once per window owned: drop the previous window's observer.
         if let secureInputObserver { NotificationCenter.default.removeObserver(secureInputObserver) }
         let image = NSImageView(
             image: NSImage(systemSymbolName: "lock.fill", accessibilityDescription: nil)
@@ -114,14 +84,8 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         image.toolTip = L10n.text("secureInput.indicator.tooltip")
         image.setAccessibilityLabel(L10n.text("secureInput.indicator.tooltip"))
         image.translatesAutoresizingMaskIntoConstraints = false
-        // Sized by frame, not by constraints: AppKit places an accessory
-        // view with autoresizing constraints of its own (a fixed 32pt
-        // container height, a pinned origin), and a width/height
-        // constraint on top of those was unsatisfiable — logged as
-        // "Conflicting constraints detected" on every window until the
-        // 2026-09-17 pass read the console. The frame is what the
-        // titlebar reads for the accessory's width; the height follows
-        // the titlebar.
+        // Sized by frame: AppKit's own accessory constraints conflicted with
+        // width/height constraints on every window.
         let container = NSView(frame: NSRect(x: 0, y: 0, width: 28, height: 22))
         container.addSubview(image)
         NSLayoutConstraint.activate([
@@ -153,8 +117,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         return splitController.confirmClose(of: running, scope: L10n.text("close.scope.window"))
     }
 
-    /// The layout this window would be restored as. Read at quit and
-    /// whenever a window closes, so state survives both routes.
+    /// Read at quit and on every window close.
     var restorableState: WindowState? {
         guard let window, let splitController, !isQuickTerminal else { return nil }
         var state = splitController.windowState(frame: window.frame)

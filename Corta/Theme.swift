@@ -18,34 +18,22 @@ import AppKit
 import CortaTerminal
 import simd
 
-/// A colour theme: the sixteen ANSI colours plus the three the
-/// terminal itself owns (default foreground, default background, cursor).
-///
-/// A value, not a namespace. Themes are chosen from the settings page and
-/// swapped at runtime, and every pane in every window has to follow the swap
-/// — which a `static let` table cannot do. The 6x6x6 cube and the greyscale
-/// ramp are *not* part of a theme: xterm defines them numerically, and a
-/// program asking for colour 137 means one specific colour, not "whatever
-/// this theme thinks".
-///
-/// A theme carries a light and a dark variant. macOS switching
-/// appearance switches which one is live, in every open window, without a
-/// restart.
+/// A colour theme: the sixteen ANSI colours plus default foreground,
+/// background and cursor, in a light and a dark variant that follow the
+/// system appearance live. A value, so every pane can follow a swap. The
+/// 256-colour cube and grey ramp are xterm's fixed numbers, not themed.
 nonisolated struct Theme: Equatable, Sendable {
-    /// The name the config file and the settings page use.
+    /// The name in the config file.
     let name: String
-    /// The name shown in the settings page's list.
     let displayName: String
     let dark: Variant
     let light: Variant
 
-    /// One appearance's worth of colour.
     struct Variant: Equatable, Sendable {
         var foreground: SIMD4<Float>
         var background: SIMD4<Float>
         var cursor: SIMD4<Float>
-        /// The sixteen ANSI colours, in the usual order: black, red, green,
-        /// yellow, blue, magenta, cyan, white, then the eight bright ones.
+        /// Black, red, green, yellow, blue, magenta, cyan, white, then bright.
         var ansi: [SIMD4<Float>]
     }
 
@@ -53,10 +41,7 @@ nonisolated struct Theme: Equatable, Sendable {
 }
 
 nonisolated extension Theme.Variant {
-    /// This variant's three colours in OSC 10/11/12's terms, so a query
-    /// answers with what is actually painted on screen — a program
-    /// that asks before choosing its own palette must not be told the dark
-    /// theme's background while the light theme is live, or vice versa.
+    /// OSC 10/11/12 answers from the live variant, not the other one.
     var dynamicColors: DynamicColors {
         func byte(_ component: Float) -> UInt8 { UInt8((component * 255).rounded()) }
         func triple(_ color: SIMD4<Float>) -> (red: UInt8, green: UInt8, blue: UInt8) {
@@ -67,18 +52,9 @@ nonisolated extension Theme.Variant {
             cursor: triple(cursor))
     }
 
-    /// This variant's sixteen ANSI colours as `IndexedPalette` defaults for
-    /// indices 0–15, so an OSC 4 query for an index nothing has overridden
-    /// answers what is actually on screen — the same reasoning as
-    /// `dynamicColors` above. Indices 16–255 come from
-    /// `IndexedPalette.xtermDefaults()`, xterm's fixed, non-themed 6×6×6
-    /// cube and greyscale ramp — the identical formula
-    /// `TerminalColorPalette.swift`'s `resolve(_:)` uses to render them, so
-    /// a query for an *untouched* index answers what is drawn. An index
-    /// OSC 4 has since overridden is now painted that colour too
-    /// (`TerminalRenderer.appendRowInstances` passes the session's
-    /// `overrides` into `resolve(_:indexedOverrides:)`), so query and
-    /// paint agree everywhere.
+    /// OSC 4 defaults: indices 0–15 from this variant, 16–255 from
+    /// `IndexedPalette.xtermDefaults()` — the formula `resolve(_:)` renders
+    /// with. Overrides are painted too, so query and paint always agree.
     var indexedPaletteDefaults: IndexedPalette {
         func byte(_ component: Float) -> UInt8 { UInt8((component * 255).rounded()) }
         func triple(_ color: SIMD4<Float>) -> (red: UInt8, green: UInt8, blue: UInt8) {
@@ -92,20 +68,15 @@ nonisolated extension Theme.Variant {
     }
 }
 
-/// A colour literal for the theme tables: 8-bit sRGB, opaque.
+/// 8-bit sRGB, opaque.
 private nonisolated func rgb(_ r: UInt8, _ g: UInt8, _ b: UInt8) -> SIMD4<Float> {
     SIMD4<Float>(Float(r) / 255, Float(g) / 255, Float(b) / 255, 1)
 }
 
 extension Theme {
-    /// The default. Terminal.app's "Basic" sixteen — vivid on purpose,
-    /// because the reference this terminal gets compared against is the one
-    /// macOS ships — over a dark blue surface at Terminal's own luminance.
-    ///
-    /// The light variant is not the dark one inverted: inverting a saturated
-    /// dark palette gives pastels with no contrast on white. The bright half
-    /// is darkened instead, which is what a light terminal theme actually
-    /// needs.
+    /// The default: Terminal.app's "Basic" sixteen over a dark blue surface.
+    /// The light variant darkens the bright half rather than inverting, which
+    /// gives pastels with no contrast on white.
     nonisolated static let corta = Theme(
         name: "corta",
         displayName: "Corta",
@@ -130,7 +101,7 @@ extension Theme {
                 rgb(52, 78, 220), rgb(190, 50, 190), rgb(28, 152, 166), rgb(30, 32, 34),
             ]))
 
-    /// The classic, both halves as Ethan Schoonover published them.
+    /// As Ethan Schoonover published it.
     nonisolated static let solarized = Theme(
         name: "solarized",
         displayName: "Solarized",
@@ -155,8 +126,7 @@ extension Theme {
                 rgb(101, 123, 131), rgb(108, 113, 196), rgb(88, 110, 117), rgb(0, 43, 54),
             ]))
 
-    /// Neutral greys — for anyone who finds the default's blue surface and
-    /// vivid ANSI set too much.
+    /// Neutral greys.
     nonisolated static let mono = Theme(
         name: "mono",
         displayName: "Mono",
@@ -181,46 +151,26 @@ extension Theme {
                 rgb(60, 95, 175), rgb(150, 75, 160), rgb(50, 140, 150), rgb(10, 10, 10),
             ]))
 
-    /// The theme Corta *offers*: one, listed in the settings page and the
-    /// View menu.
-    ///
-    /// Shipping three meant shipping two that had never been looked at in
-    /// anger — a theme is nineteen colours in two variants, and "it parses"
-    /// is not the same as "it reads well at 12pt on a laptop panel for eight
-    /// hours". One theme that is right is a better first release than three
-    /// of which two are guesses.
-    ///
-    /// This is a presentation decision, not a deletion: `solarized` and
-    /// `mono` stay defined and stay resolvable by name below, so a config
-    /// file that already says `theme = solarized` keeps working and
-    /// `theme.<name>.inherit = solarized` still has something to inherit
-    /// from. Promoting one back into the offered list is one entry
-    /// here.
+    /// The one theme Corta offers (D11): one theme that is right beats two
+    /// that were never lived with. `solarized` and `mono` stay resolvable, so
+    /// existing configs and `inherit` keep working.
     nonisolated static let builtIn: [Theme] = [.corta]
 
-    /// Every theme this binary can resolve by name, offered or not. Wider
-    /// than `builtIn` on purpose — see the note there.
+    /// Every theme resolvable by name, offered or not.
     nonisolated static let known: [Theme] = [.corta, .solarized, .mono]
 
     nonisolated static func named(_ name: String) -> Theme? {
         known.first { $0.name == name }
     }
 
-    /// A built-in *or* user-defined theme. Custom themes win on a
-    /// name collision: a user who names their theme `corta` has said what
-    /// they want, and silently ignoring it would be the more surprising rule.
+    /// Built-in or user-defined; a custom theme wins a name collision.
     nonisolated static func named(_ name: String, in configuration: Configuration) -> Theme? {
         configuration.customThemes.first { $0.name == name } ?? named(name)
     }
 
-    /// Every theme available under `configuration`, in list order: the
-    /// offered built-ins first, then the user's own.
-    ///
-    /// The theme the file currently selects is always in the list, even when
-    /// it is one of the unoffered built-ins. Otherwise a config that says
-    /// `theme = solarized` would leave the settings popup with nothing
-    /// selected, and the next click on any control in the page would write
-    /// the first item back over the user's choice.
+    /// Offered built-ins, then the user's. The selected theme is always
+    /// included, or the settings popup would show nothing and the next click
+    /// would overwrite the user's choice.
     nonisolated static func all(in configuration: Configuration) -> [Theme] {
         let custom = configuration.customThemes
         let customNames = Set(custom.map(\.name))
@@ -237,24 +187,15 @@ extension Theme {
 // MARK: - User-defined themes
 
 extension Theme {
-    /// A theme built from config-file keys, with anything unspecified taken
-    /// from `base`.
-    ///
-    /// Inheriting rather than requiring all nineteen colours is what makes
-    /// the feature usable: overriding a background and a cursor is the common
-    /// case, and demanding a full ANSI table for it would mean nobody does
-    /// it. It also means a half-written theme still renders — a config file
-    /// is hand-edited, and a partially-typed one must not black out the
-    /// terminal.
+    /// A theme from config keys, inheriting the rest from `base`: overriding
+    /// two colours is the common case, and a half-typed theme still renders.
     nonisolated static func custom(
         name: String, displayName: String, base: Theme, dark: Variant, light: Variant
     ) -> Theme {
         Theme(name: name, displayName: displayName, dark: dark, light: light)
     }
 
-    /// `#rgb` or `#rrggbb`, the two notations a person actually types. Also
-    /// accepts them without the `#`, because half the palettes on the web are
-    /// written that way.
+    /// `#rgb` or `#rrggbb`, with or without the `#`.
     nonisolated static func color(_ text: String) -> SIMD4<Float>? {
         var digits = Substring(text.trimmingCharacters(in: .whitespaces))
         if digits.hasPrefix("#") { digits = digits.dropFirst() }
@@ -281,7 +222,6 @@ extension Theme {
         }
     }
 
-    /// The `#rrggbb` a colour serialises back as.
     nonisolated static func hex(_ color: SIMD4<Float>) -> String {
         func byte(_ value: Float) -> Int { Int((min(1, max(0, value)) * 255).rounded()) }
         return String(format: "#%02x%02x%02x", byte(color.x), byte(color.y), byte(color.z))

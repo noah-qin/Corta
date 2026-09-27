@@ -17,31 +17,21 @@
 import AppKit
 import Carbon.HIToolbox
 
-/// Secure Keyboard Entry, the switch Terminal.app and iTerm2 both
-/// carry under the same name.
+/// Secure Keyboard Entry, as in Terminal.app and iTerm2: while engaged no
+/// event tap, keylogger or accessibility client sees keystrokes. It is
+/// system-wide, silencing wanted tools too, hence a setting
+/// (`SECURITY.md` §4).
 ///
-/// While it is engaged the window server stops delivering keystrokes to
-/// anything but the focused application: no event tap, keylogger, macro
-/// tool or accessibility client sees what is typed at a `sudo` or `ssh`
-/// password prompt. `docs/SECURITY.md` §4 has the trade-off — it is
-/// system-wide, so it also silences the tools a person may want, which is
-/// why it is a setting rather than a default.
-///
-/// **Balanced by construction.** `EnableSecureEventInput` is a counter, not
-/// a flag: every call has to be matched by `DisableSecureEventInput` or the
-/// machine is left in secure mode after Corta quits, with nothing a user can
-/// click to get out of it. This type is the only caller of either, holds
-/// one bit of state (`engaged`), and computes what that bit should be from
-/// three facts — the setting, whether Corta is the active application, and
-/// whether a terminal window is key — every time any of them changes. The
-/// counter therefore never goes above one, and `disengage()` at quit brings
-/// it back to zero whatever else happened on the way out.
+/// **Balanced by construction.** `EnableSecureEventInput` is a counter;
+/// an unmatched call leaves the machine in secure mode after quit. This
+/// type is the only caller, holds one bit (`engaged`) computed from the
+/// setting, app activation and a key terminal window on every change, so
+/// the counter never exceeds one, and `disengage()` zeroes it at quit.
 @MainActor
 final class SecureInput {
     static let shared = SecureInput()
 
-    /// The system calls, injectable so the state machine is testable
-    /// without flipping the real machine's input mode in a test host.
+    /// Injectable, so tests never flip the machine's input mode.
     struct System {
         var enable: () -> Void
         var disable: () -> Void
@@ -54,27 +44,21 @@ final class SecureInput {
     private let system: System
     private var observers: [NSObjectProtocol] = []
 
-    /// The three inputs, kept so a change to one recomputes against the
-    /// current values of the other two.
+    /// The three inputs, so one change recomputes against the others.
     private(set) var wanted = false
     private(set) var applicationIsActive = false
     private(set) var terminalWindowIsKey = false
 
-    /// Whether the counter is currently at one.
     private(set) var engaged = false
 
-    /// Posted on the main queue whenever `engaged` changes, so the menu
-    /// checkmark and the titlebar indicator follow the *actual* state, not
-    /// the setting — a setting that is on while Corta is in the background
-    /// is a lock that is, at that moment, open.
+    /// Posted when `engaged` changes, so the menu and titlebar show the
+    /// actual state, not the setting.
     static let didChange = Notification.Name("SecureInput.didChange")
 
     init(system: System = .live) {
         self.system = system
     }
 
-    /// Starts following the app's activation and key-window changes, and
-    /// applies the setting from the config file.
     func start() {
         let center = NotificationCenter.default
         observers = [
@@ -100,9 +84,7 @@ final class SecureInput {
             center.addObserver(
                 forName: NSWindow.didResignKeyNotification, object: nil, queue: .main
             ) { [weak self] note in
-                // Only a terminal window resigning matters; a sheet or the
-                // settings window resigning does not change whether a
-                // terminal is key.
+                // Only a terminal window resigning changes whether one is key.
                 guard Self.isTerminalWindow(note.object) else { return }
                 MainActor.assumeIsolated {
                     self?.terminalWindowIsKey = false
@@ -120,13 +102,10 @@ final class SecureInput {
         applySetting()
     }
 
-    /// The keyboard reaches a terminal only through a terminal window;
-    /// Settings, the About panel and the SFTP browser hold text fields whose
-    /// contents are not passwords typed at a prompt.
+    /// Settings, About and the SFTP browser don't hold prompt passwords.
     nonisolated private static func isTerminalWindow(_ object: Any?) -> Bool {
         guard let window = object as? NSWindow else { return false }
-        // Window notifications are posted on the main thread, which is
-        // where `windowController` may be read.
+        // Window notifications arrive on the main thread.
         return MainActor.assumeIsolated { window.windowController is TerminalWindowController }
     }
 
@@ -134,15 +113,14 @@ final class SecureInput {
         update(wanted: ConfigurationStore.shared.configuration.secureKeyboardEntry)
     }
 
-    /// The setting, as the config file has it. The menu item writes the file
-    /// (`AppDelegate.toggleSecureKeyboardEntry`) and the file change lands
-    /// here, so a hand edit and the menu are one path.
+    /// The config file's setting; the menu writes the file, so both are one
+    /// path.
     func update(wanted: Bool) {
         self.wanted = wanted
         reconcile()
     }
 
-    /// Test seam for the two facts that otherwise arrive by notification.
+    /// Test seam.
     func update(applicationIsActive: Bool, terminalWindowIsKey: Bool) {
         self.applicationIsActive = applicationIsActive
         self.terminalWindowIsKey = terminalWindowIsKey
@@ -159,8 +137,7 @@ final class SecureInput {
         NotificationCenter.default.post(name: Self.didChange, object: self)
     }
 
-    /// Releases the counter unconditionally — for `applicationWillTerminate`,
-    /// where no further notification will arrive to do it.
+    /// Releases unconditionally, for `applicationWillTerminate`.
     func disengage() {
         guard engaged else { return }
         system.disable()

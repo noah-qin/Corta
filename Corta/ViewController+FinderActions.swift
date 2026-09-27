@@ -17,28 +17,16 @@
 import Cocoa
 import CortaTerminal
 
-/// The Finder/output-path half of "focused Finder, drag/drop and
-/// output-path actions for current/new pane and parent/project-root
-/// navigation." Outbound drag-and-drop is deliberately not part of this:
-/// there is no `NSDraggingSource` precedent anywhere in the app, and
-/// building one means a new mouse-drag-threshold gesture living alongside
-/// `TerminalView+Mouse.swift`'s existing selection-drag handling — real
-/// regression risk for one word in a four-part bullet. Revealing the
-/// directory in Finder and copying its path cover the same need through
-/// existing, safe APIs.
+/// Finder and working-directory actions. No outbound drag: it would need a
+/// new drag gesture beside selection dragging; Reveal and Copy Path cover
+/// the need with existing APIs.
 extension ViewController {
-    /// Whether any of these actions can do something — `session
-    /// .workingDirectory` is already host-filtered to `nil` for a remote or
-    /// not-yet-reported directory (`Performer+OSC.swift`'s
-    /// `setWorkingDirectory`), the same guarantee `ViewController
-    /// +FileReferences.swift` leans on.
+    /// `session.workingDirectory` is nil when remote or unreported
+    /// (`Performer+OSC.swift`).
     var hasKnownWorkingDirectory: Bool {
         isOperable && session.workingDirectory != nil
     }
 
-    /// Reveals the pane's working directory in Finder — the same call
-    /// `SettingsWindowController.revealConfigFile()` already makes for the
-    /// config file.
     @objc func revealWorkingDirectoryInFinder(_ sender: Any?) {
         guard let directory = hasKnownWorkingDirectory ? session.workingDirectory : nil else {
             return
@@ -46,9 +34,7 @@ extension ViewController {
         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: directory)])
     }
 
-    /// The "output-path action": puts the working directory on the
-    /// clipboard, the same shape `copyLastCommandOutput` already reports
-    /// through a toast either way.
+    /// Copies the path, confirmed by toast.
     @objc func copyWorkingDirectoryPath(_ sender: Any?) {
         guard let directory = hasKnownWorkingDirectory ? session.workingDirectory : nil else {
             terminalView?.showToast(L10n.text("toast.noWorkingDirectory"), kind: .warning)
@@ -60,18 +46,9 @@ extension ViewController {
         terminalView?.showToast(L10n.text("toast.copiedWorkingDirectory"))
     }
 
-    /// `cd ..`, through the same safety-gated primitive every directory change
-    /// uses (`ViewController+DirectoryNavigation.swift`) — no new gate, just a
-    /// new source for the path.
-    ///
-    /// Reads `shellDirectory`, not `session.workingDirectory`, so a
-    /// remote pane can walk its *own* remote directories too: the `cd` is
-    /// delivered to the pane's shell, which is the machine the path belongs
-    /// to. The spawn actions below stay on `session.workingDirectory`
-    /// (local-only by construction) for the mirror-image reason — a new
-    /// local pane must never be rooted at a path that lives on another
-    /// computer, and neither may `changeDirectoryToProjectRoot`, whose
-    /// `.git` search runs against *this* machine's filesystem.
+    /// `cd ..` through the gated `changeDirectory(to:)`. Reads
+    /// `shellDirectory`, so a remote pane walks its own directories; spawns and
+    /// the project-root search use the local-only `session.workingDirectory`.
     @objc func changeDirectoryToParent(_ sender: Any?) {
         guard let directory = shellDirectory?.path else { return }
         let parent = (directory as NSString).deletingLastPathComponent
@@ -79,11 +56,8 @@ extension ViewController {
         changeDirectory(to: parent)
     }
 
-    /// `cd` to the nearest `.git` ancestor (`DirectoryHistory.projectRoot`),
-    /// same gate. A directory with no such ancestor is reported rather than
-    /// silently doing nothing — `DirectoryHistory.projectRoot(for:)`'s own
-    /// doc comment is explicit that a wrong guess here would be worse than
-    /// admitting there is no project root to find.
+    /// `cd` to the nearest `.git` ancestor, same gate; no ancestor is
+    /// reported, never guessed.
     @objc func changeDirectoryToProjectRoot(_ sender: Any?) {
         guard let directory = hasKnownWorkingDirectory ? session.workingDirectory : nil else {
             return
@@ -95,9 +69,7 @@ extension ViewController {
         changeDirectory(to: root)
     }
 
-    /// Splits the focused pane with a new one rooted at the parent
-    /// directory — `SplitViewController.splitFocusedPane(workingDirectory:)`
-    /// already accepts an explicit directory; this only supplies which one.
+    /// Splits with a new pane rooted at the parent directory.
     @objc func openParentDirectoryInNewPane(_ sender: Any?) {
         guard let directory = hasKnownWorkingDirectory ? session.workingDirectory : nil else {
             return

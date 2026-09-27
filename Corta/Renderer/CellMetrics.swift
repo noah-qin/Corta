@@ -17,21 +17,16 @@
 import CoreGraphics
 import CoreText
 
-/// The pixel geometry a monospaced font imposes on the grid: how wide and
-/// tall one cell is, and where the baseline sits inside it.
-///
-/// Derived once per font, not per frame or per glyph — every cell in the
-/// grid uses the same box, which is the entire point of a monospaced
-/// terminal font.
+/// The cell box and baseline a monospaced font imposes, derived once per
+/// font.
 nonisolated struct CellMetrics {
     var cellWidth: CGFloat
     var cellHeight: CGFloat
-    /// Distance from a cell's top edge down to the baseline.
+    /// From the cell's top down to the baseline.
     var baselineOffset: CGFloat
 
-    /// The same box in device pixels. Derived by multiplying rather than by
-    /// re-measuring a larger font, so a pixel cell is always exactly `scale`
-    /// point cells and the grid never drifts out of alignment.
+    /// The box in device pixels, by multiplication, so it never drifts from
+    /// the point grid.
     func scaled(by scale: CGFloat) -> CellMetrics {
         var copy = self
         copy.cellWidth *= scale
@@ -40,22 +35,12 @@ nonisolated struct CellMetrics {
         return copy
     }
 
-    /// - Parameter scale: the backing scale the cell will be rasterised at.
-    ///   The box is snapped to whole *device pixels*, not whole points, so
-    ///   `scaled(by: scale)` still lands on integers — glyphs stay on the
-    ///   pixel grid — without the point box jumping a whole point at a time.
-    ///
-    ///   Whole-point snapping is what made the font-size shortcuts change
-    ///   the window's aspect ratio unevenly. SF Mono's advance is 0.6 x the
-    ///   size, so ceil() gave 9pt for both 14pt and 15pt text while the line
-    ///   height went 17 to 18:
-    ///   one press grew the window in both axes, the next only in height,
-    ///   and the cell's own proportions swung ~7% either side of the font's
-    ///   with it. At 2x the same rounding costs at most half a point.
+    /// - Parameter scale: the backing scale. The box snaps to whole device
+    ///   pixels, not points: point snapping (SF Mono's 0.6 advance gave 9pt at
+    ///   both 14pt and 15pt) made font steps change the window's aspect
+    ///   unevenly.
     init(font: CTFont, scale: CGFloat = 1) {
-        // 'M' is representative of a monospaced font's advance; every glyph
-        // in a true monospace font has the same one, but asking rather than
-        // assuming avoids surprises with fonts that are only "mostly" fixed.
+        // Ask the font rather than assume: some are only mostly fixed.
         var glyph: CGGlyph = 0
         var mChar: UniChar = UniChar(UnicodeScalar("M").value)
         CTFontGetGlyphsForCharacters(font, &mChar, &glyph, 1)
@@ -73,24 +58,15 @@ nonisolated struct CellMetrics {
         let advanceWidth = advance.width > 0 ? advance.width : CTFontGetSize(font) * 0.6
         let lineHeight = ascent + descent + leading
 
-        // Terminal.app fits SF Mono 12 into a 7pt column on a Retina display.
-        // Its nominal advance is 7.418pt; rounding that up to 7.5pt makes a
-        // 120-column window 60pt wider and stretches cell-built artwork such
-        // as Claude Code's logo. Snap down by at most one device pixel to
-        // match Terminal's column geometry. The glyph ink itself is narrower
-        // than the nominal advance, so adjacent cells do not collide.
+        // Snap down by at most a device pixel, matching Terminal.app's 7pt
+        // column for SF Mono 12 (nominal 7.418pt); rounding up widened 120
+        // columns by 60pt and stretched cell-built artwork. The ink is
+        // narrower than the advance, so cells don't collide.
         self.cellWidth = max(1 / pixels, (advanceWidth * pixels).rounded(.down) / pixels)
-        // Width does not inflate the row. The height follows the font's
-        // own line metrics independently, which is also what lets 120x30
-        // match Terminal in both axes.
-        // Never zero, like the width: a face whose line metrics come back
-        // empty (seen once, under a parallel test run, as a `UInt16(inf)`
-        // trap in `ViewController.gridSize(fitting:)` dividing by this)
-        // gets a one-pixel row rather than an infinite grid.
+        // Height follows the font's line metrics, independent of width. Never
+        // zero: empty metrics once trapped `gridSize(fitting:)` with `inf`.
         self.cellHeight = max(1 / pixels, snapUp(lineHeight))
-        // The baseline moves with the row: the extra height is leading, and
-        // splitting it evenly keeps the glyph centred rather than letting it
-        // ride the top of a taller cell.
+        // Split the leading evenly, keeping the glyph centred.
         self.baselineOffset = snapNearest(ascent + (cellHeight - lineHeight) / 2)
     }
 }

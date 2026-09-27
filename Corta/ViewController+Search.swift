@@ -17,46 +17,30 @@
 import Cocoa
 import CortaTerminal
 
-/// Scrollback search: the glass bar, its key routing, and the match
-/// model the renderer highlights.
+/// Scrollback search: the glass bar, its key routing, and the matches the
+/// renderer highlights. Matching is the core's (`Search.find`, over logical
+/// lines, so wrapped matches are whole).
 ///
-/// Matching lives in the core (`Search.find`) over logical lines, so a match
-/// spanning a soft wrap is found and highlighted whole. Everything here is
-/// shell: a query string in, `[SelectionRange]` out, plus the scroll offset
-/// that brings the current match on screen.
-///
-/// Key routing has two fronts. The Find menu's items (⌘F, ⌘G, ⇧⌘G) target
-/// First Responder with `performFindPanelAction:` and land here from
-/// anywhere in this window's responder chain. `TerminalView.keyDown` also
-/// offers keys to `onSearchKey` first: the menu claims the ⌘ equivalents,
-/// but Esc has no menu item — and while the bar is open a raw ESC byte must
-/// never reach the child.
+/// Keys arrive two ways: the Find menu (⌘F, ⌘G, ⇧⌘G) through the responder
+/// chain, and `TerminalView.onSearchKey` for Esc, which has no menu item
+/// and must never reach the child while the bar is open.
 extension ViewController {
-    /// Keystroke debounce before a query starts its sweep: long
-    /// enough that a typing burst becomes one scan, short enough that a
-    /// deliberate pause reads as instant. Compare `NSSearchField`'s own
-    /// debounce, which `sendsSearchStringImmediately` disables — the field
-    /// reports every keystroke and the coalescing lives here instead, where
-    /// it also cancels the superseded sweep.
+    /// Debounce before a sweep: a typing burst becomes one scan. The field
+    /// reports every keystroke (`sendsSearchStringImmediately`) so the
+    /// coalescing, and the cancelling, happens here.
     private static let searchDebounceMilliseconds = 150
 
     // MARK: - Key routing
 
-    /// `TerminalView.onSearchKey`: the bar's keys when the terminal view —
-    /// not the search field — is first responder. Returns whether the event
-    /// was consumed; `false` continues the normal key routing.
+    /// The bar's keys while the terminal view is first responder; returns
+    /// whether the event was consumed.
     func handleSearchKey(_ event: NSEvent) -> Bool {
-        // Esc closes the bar rather than sending a raw ESC to the child.
         if event.keyCode == 53 /* kVK_Escape */, search.bar != nil {
             closeSearchBar()
             return true
         }
-        // Find comes from the binding table, not from a literal ⌘F: with the
-        // literal here, `bind.find = cmd+e` left ⌘F opening the bar too and
-        // `bind.find =` did not close that door at all. Find Next and
-        // Find Previous are the storyboard's own items and carry no `bind.`
-        // key, so ⌘G / ⇧⌘G stay written in — there is no binding for them to
-        // disagree with.
+        // Find comes from the bindings, so a rebind or unbind really removes ⌘F.
+        // ⌘G / ⇧⌘G are storyboard items with no `bind.` key.
         let bindings = ConfigurationStore.shared.configuration.keybindings
         if bindings[.find]?.matches(event) == true {
             showSearchBar()
@@ -70,21 +54,10 @@ extension ViewController {
         return true
     }
 
-    /// Esc closes the bar from anywhere *in this pane's own window* — see
-    /// `search.keyMonitor`'s comment for why a delegate method is not enough.
-    /// `addLocalMonitorForEvents` fires app-wide, not per-window, so without
-    /// the window check here an Esc typed into any other window (a second
-    /// split pane's search bar, a second Corta window) closed every open bar
-    /// at once and swallowed the key from all of them — a pane's
-    /// monitor must yield to the window that actually owns the key event.
-    ///
-    /// The window check alone is not enough once a *split* puts two panes,
-    /// each with its own open bar, in the same window: both panes'
-    /// monitors would see `event.window === view.window` and both would
-    /// close, only one of which the key was actually meant for.
-    /// `isSearchBarResponderActive` tells them apart.
-    /// Returns the event unmodified to let it continue to other monitors and
-    /// the responder chain when it isn't this pane's to consume.
+    /// Esc closes the bar from anywhere in this pane's window. The local
+    /// monitor fires app-wide, so the window check keeps other windows' Esc
+    /// alone, and `isSearchBarResponderActive` picks the right pane when a
+    /// split has two open bars. Returns the event when it isn't ours.
     func handleGlobalSearchEscape(_ event: NSEvent) -> NSEvent? {
         guard event.keyCode == 53 /* kVK_Escape */, event.window === view.window,
             isSearchBarResponderActive
@@ -95,21 +68,9 @@ extension ViewController {
         return nil
     }
 
-    /// Whether the window's current first responder belongs to *this*
-    /// pane's search bar — the split-pane half of `handleGlobalSearchEscape`'s
-    /// ownership check (the window check is the other half).
-    ///
-    /// Two shapes, because a search bar's first responder takes two shapes:
-    /// the shared field editor while the query field is being typed into
-    /// (its `delegate` is forwarded to the `NSSearchField` it edits on
-    /// behalf of — `showSearchBar`'s `field.delegate = self` applies to the
-    /// field, but the editing session's `NSText` reports the field itself as
-    /// its delegate — so comparing that against *this* pane's `search.field`
-    /// is what a field-editor responder needs), or one of the bar's own
-    /// controls (the case/regex/prev/next/close buttons) when Full Keyboard
-    /// Access has tabbed focus there instead — an ordinary view in this
-    /// pane's `search.bar` hierarchy, checked by ancestry rather than
-    /// identity since there is no single control to name in advance.
+    /// Whether the first responder belongs to this pane's search bar: either
+    /// the field editor, whose delegate is our `search.field`, or a bar
+    /// control focused by Full Keyboard Access, found by ancestry.
     private var isSearchBarResponderActive: Bool {
         guard let responder = view.window?.firstResponder else { return false }
         if let text = responder as? NSText, text.delegate === search.field { return true }
@@ -119,9 +80,8 @@ extension ViewController {
         return false
     }
 
-    /// The Find menu's items land here, tagged in the storyboard: 1 show,
-    /// 2 next, 3 previous, 7 use-selection-for-find. Find and Replace and
-    /// friends are ignored — a terminal has nothing to replace.
+    /// Storyboard tags: 1 show, 2 next, 3 previous, 7 use selection. Replace
+    /// actions are ignored.
     @objc func performFindPanelAction(_ sender: Any?) {
         switch (sender as? NSMenuItem)?.tag {
         case 1: showSearchBar()
@@ -134,29 +94,22 @@ extension ViewController {
 
     // MARK: - The bar
 
-    /// Shows the bar, or refocuses its field if it is already open. The
-    /// scroll position is remembered so closing the bar puts the viewport
-    /// back where the user left it.
+    /// Shows the bar or refocuses its field, remembering the scroll position
+    /// for close.
     func showSearchBar() {
         if let searchField = search.field {
             view.window?.makeFirstResponder(searchField)
             return
         }
-        // `totalPushed` first: `session.snapshot()` can briefly wait on the
-        // reader thread's own lock, and output landing in that gap must not
-        // be excluded from the anchor either read captures — capturing
-        // `scrollOffset` (pure main-thread state, no such wait) second
-        // keeps the pair at least as fresh as the snapshot, never staler.
+        // `totalPushed` first: the snapshot can wait on the reader's lock, and
+        // reading `scrollOffset` second keeps the pair no staler than it.
         search.previousTotalPushed = session?.snapshot().scrollback.totalPushed
         search.previousScrollOffset = scrollOffset
-        // Seeded from the global default, then local to this pane —
-        // see `search.caseSensitive`'s doc comment.
+        // Seeded from the global default, then local to this pane.
         search.caseSensitive = ConfigurationStore.shared.configuration.searchCaseSensitive
         search.regex = ConfigurationStore.shared.configuration.searchRegex
 
-        // Symbols, not text, and all at one weight and point size so the
-        // three of them read as a set rather than as three separate
-        // controls. `.small` scale keeps them subordinate to the query.
+        // One weight and size so the symbols read as a set.
         let symbols = NSImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
             .applying(.init(scale: .small))
 
@@ -170,10 +123,8 @@ extension ViewController {
         field.sendsWholeSearchString = false
         field.sendsSearchStringImmediately = true
         field.delegate = self
-        // The glass pill *is* the container. Left bezelled, the field drew a
-        // second rounded rect (and its own focus ring) inside the first —
-        // and its own magnifying glass and cancel button, which is why the
-        // search-button cell is emptied here in favour of the one above.
+        // The glass pill is the container; a bezel would draw a second rounded
+        // rect, focus ring and magnifying glass inside it.
         field.isBezeled = false
         field.drawsBackground = false
         field.focusRingType = .none
@@ -183,8 +134,7 @@ extension ViewController {
         field.translatesAutoresizingMaskIntoConstraints = false
         field.widthAnchor.constraint(equalToConstant: 180).isActive = true
 
-        // Monospaced digits: without them "9/10" is narrower than "8/12" and
-        // the buttons to its right twitch sideways as the user types.
+        // Monospaced digits, so the buttons don't twitch as the count changes.
         let countLabel = NSTextField(labelWithString: "")
         countLabel.font = .monospacedDigitSystemFont(
             ofSize: NSFont.smallSystemFontSize, weight: .regular)
@@ -194,8 +144,6 @@ extension ViewController {
         countLabel.translatesAutoresizingMaskIntoConstraints = false
         countLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
 
-        // A hairline, so the query and the controls that act on it are
-        // visibly two groups inside one pill.
         let separator = NSBox()
         separator.boxType = .separator
         separator.translatesAutoresizingMaskIntoConstraints = false
@@ -209,22 +157,15 @@ extension ViewController {
             button.symbolConfiguration = symbols
             button.contentTintColor = SystemAccessibility.secondaryLabelColor
             button.translatesAutoresizingMaskIntoConstraints = false
-            // Square, so the two chevrons and the close mark sit on an even
-            // rhythm instead of each hugging its own glyph's width.
             button.widthAnchor.constraint(equalToConstant: 22).isActive = true
             button.heightAnchor.constraint(equalToConstant: 22).isActive = true
             return button
         }
 
-        // Case sensitivity, as a toggle rather than a hidden default.
-        // `textformat` is the symbol macOS itself uses for "how the text is
-        // matched"; on/off is carried by the tint *and* by the accessibility
-        // value, never by the tint alone.
+        // On/off shows in the tint and the accessibility value, never tint alone.
         let caseButton = button(
             "textformat", L10n.text("search.caseSensitive"), #selector(toggleSearchCase(_:)))
         updateCaseButton(caseButton)
-        // Regular expressions, behind the same kind of toggle. `.*` is
-        // what every editor's find bar puts on this button.
         let regexButton = button(
             "asterisk", L10n.text("search.regex"), #selector(toggleSearchRegex(_:)))
         updateRegexButton(regexButton)
@@ -238,8 +179,6 @@ extension ViewController {
         stack.orientation = .horizontal
         stack.alignment = .centerY
         stack.spacing = 6
-        // Tighter around the buttons than around the query: the buttons
-        // already carry 22pt of their own box.
         stack.setCustomSpacing(8, after: glass)
         stack.setCustomSpacing(10, after: countLabel)
         stack.setCustomSpacing(10, after: separator)
@@ -250,23 +189,12 @@ extension ViewController {
         stack.edgeInsets = NSEdgeInsets(top: 7, left: 12, bottom: 7, right: 8)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
-        // The search bar is where Liquid Glass belongs: a control floating
-        // over content, refracting the terminal underneath it. The container
-        // merges neighbouring glass surfaces and renders them as one batch
-        // rather than a pass each, which is what it is for — the header calls
-        // that out explicitly. One surface today; splits and any later
-        // floating control join the same container.
+        // The container merges neighbouring glass into one render batch.
         let container = NSGlassEffectContainerView()
         let bar = NSGlassEffectView()
         bar.style = .regular
-        // The glass sits over arbitrary terminal output — a screen of
-        // bright text on a light background, or the reverse — and an
-        // untinted material let that output compete with the query being
-        // typed. A theme-following tint keeps the pill readable in both
-        // appearances. Reduce Transparency is not "less translucent", it is
-        // "background content must not show through" — so there the tint
-        // becomes fully opaque rather than merely lowered in alpha. The bar
-        // keeps its shape and its position either way.
+        // A theme tint keeps the pill readable over any output. Reduce
+        // Transparency means nothing shows through, so the tint goes opaque.
         bar.tintColor =
             SystemAccessibility.reduceTransparency
             ? .windowBackgroundColor
@@ -281,10 +209,8 @@ extension ViewController {
         ])
         bar.contentView = content
         bar.translatesAutoresizingMaskIntoConstraints = false
-        // The container merges *descendants* of its `contentView` — the
-        // header is explicit about that — so the glass goes inside a plain
-        // wrapper, not into `contentView` itself. Assigning the glass there
-        // directly left it with nothing to elevate and no merge to perform.
+        // The container merges descendants of `contentView`, so the glass goes in
+        // a wrapper; placed in `contentView` directly it merged nothing.
         let wrapper = NSView()
         wrapper.addSubview(bar)
         NSLayoutConstraint.activate([
@@ -298,21 +224,15 @@ extension ViewController {
         view.addSubview(container)
         NSLayoutConstraint.activate([
             container.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -14),
-            // `topInset`, not `windowChrome`: in a split tree only a pane
-            // touching the window's top edge sits under the chrome — the
-            // bar hugs its own pane's top, not the window's.
+            // `topInset`, not `windowChrome`: only a top pane sits under the chrome.
             container.topAnchor.constraint(
                 equalTo: view.topAnchor, constant: topInset + 2),
         ])
-        // A pill: half the bar's own height, resolved after layout rather
-        // than guessed. A fixed 12 on a 36pt bar is a rounded rectangle, and
-        // next to the window's own curvature it read as neither.
+        // A pill: half the laid-out height.
         view.layoutSubtreeIfNeeded()
         bar.cornerRadius = bar.bounds.height / 2
 
-        // Under Increase Contrast — or once the material is opaque and has no
-        // edge of its own left to read — the pill needs a drawn outline, or it
-        // has no boundary against the terminal behind it.
+        // An opaque or high-contrast pill needs a drawn edge.
         if SystemAccessibility.increaseContrast || SystemAccessibility.reduceTransparency {
             let border = SystemAccessibility.panelBorder
             wrapper.wantsLayer = true
@@ -321,10 +241,7 @@ extension ViewController {
             wrapper.layer?.borderWidth = border.width
         }
 
-        // Ease in. Appearing instantly at full size over a screen of text
-        // reads as a glitch; the glass wants to look like it rose out of the
-        // content — unless the user has asked for no motion, in which case the
-        // duration collapses to zero and it simply is there.
+        // Ease in, or appear at once under Reduce Motion.
         container.alphaValue = 0
         NSAnimationContext.runAnimationGroup { context in
             context.duration = SystemAccessibility.duration(0.18)
@@ -341,11 +258,8 @@ extension ViewController {
         view.window?.makeFirstResponder(field)
     }
 
-    /// Dismisses the bar, clears the highlights and puts the viewport back
-    /// where it was before the search opened.
+    /// Dismisses the bar and restores the viewport.
     func closeSearchBar() {
-        // The container is what sits in the view hierarchy; removing only
-        // the glass would leave it behind empty.
         search.container?.removeFromSuperview()
         search.container = nil
         search.bar = nil
@@ -357,29 +271,19 @@ extension ViewController {
         search.matches = []
         search.matchesTruncated = false
         search.currentMatchIndex = nil
-        // A sweep still in flight is cancelled, not just discarded:
-        // `Search.find` polls `Task.isCancelled` between and within lines,
-        // so a dead search stops burning CPU instead of finishing into the
-        // void. The generation bump keeps a result that was already past
-        // the cancellation check from being applied.
+        // Cancel, so `Search.find` stops burning CPU; the generation bump drops a
+        // result already past its cancellation checks.
         search.task?.cancel()
         search.task = nil
         search.needsRefresh = false
         search.generation &+= 1
         if let beforeSearch = search.previousScrollOffset {
             if beforeSearch == 0 {
-                // Zero is not a document position that drifts with output —
-                // it *is* "follow the live bottom." A user who opened
-                // search already at the bottom expects to still be at the
-                // bottom on close, not scrolled up into history by however
-                // much arrived while the bar was open.
+                // Zero means "follow the live bottom", so it stays zero.
                 scrollOffset = 0
             } else {
-                // Shift by the growth since capture, exactly like a
-                // selection's `baseScrollbackTotal` — restoring the raw
-                // offset alone would land on different text if output
-                // arrived while the bar was open
-                // (`search.previousTotalPushed`'s doc comment).
+                // Shift by scrollback growth since capture, like a selection's
+                // `baseScrollbackTotal`, so it lands on the same text.
                 let scrollback = session?.snapshot().scrollback
                 let reanchored = ScrollbackCoordinates.reanchoredOffset(
                     beforeSearch, from: search.previousTotalPushed ?? 0, to: scrollback?.totalPushed ?? 0)
@@ -394,21 +298,13 @@ extension ViewController {
 
     // MARK: - Matching
 
-    /// Re-runs the query, off the main thread. Called on every
-    /// keystroke and by `useSelectionForFind` — matches are recomputed,
-    /// never incrementally patched (the core's logical-line pass over a
-    /// full scrollback is one lazy sweep, `Search.swift`). `scrollsToMatch`
-    /// distinguishes a fresh query, which jumps to the newest match — the
-    /// one a shell user just watched print — from a background refresh,
-    /// which keeps the user's place.
+    /// Re-runs the query off the main thread, recomputing rather than patching.
+    /// `scrollsToMatch` jumps a fresh query to the newest match; a refresh
+    /// keeps the user's place.
     ///
-    /// The sweep runs on the cooperative pool, not the main actor (A03): a
-    /// detached task holds the debounce sleep and the scan, and both are
-    /// cancellable — a new keystroke cancels the old task (`Task.sleep`
-    /// throws, `Search.find` polls `shouldStop` per line and per match), so
-    /// fast typing only ever pays for the newest query. The generation
-    /// counter is the second guard: a result that was already past the
-    /// cancellation checks when the cancel landed is discarded on apply.
+    /// A detached task holds the debounce and the scan, both cancellable, so
+    /// fast typing pays only for the newest query; the generation counter
+    /// discards a result that slipped past cancellation.
     func updateSearchResults(scrollsToMatch: Bool) {
         guard search.bar != nil, let searchField = search.field, session != nil else { return }
         search.generation &+= 1
@@ -416,37 +312,26 @@ extension ViewController {
         search.task?.cancel()
         search.task = nil
         let query = searchField.stringValue
-        // An empty query needs no sweep — clear synchronously, so the
-        // highlights vanish with the last character, not a debounce later.
+        // Clear synchronously, so highlights vanish with the last character.
         guard !query.isEmpty else {
             search.matches = []
             search.matchesTruncated = false
             search.currentMatchIndex = nil
-            // A pending output-triggered refresh (`search.needsRefresh`) is
-            // moot once there is no query to refresh — cleared here too, or
-            // the next output would run a pointless empty-query sweep and
-            // `applySearchResults` would then schedule a further one from
-            // that.
+            // Moot without a query; left set, output would trigger empty sweeps.
             search.needsRefresh = false
             updateSearchCountLabel()
             invalidateDisplay()
             return
         }
-        // This pane's own local copy, not the live global default —
-        // see `search.caseSensitive`'s doc comment.
         let caseSensitive = search.caseSensitive
         let regex = search.regex
-        // Snapshotted on the main thread, but a Grid is copy-on-write — a
-        // handful of retains, not a copy.
+        // Copy-on-write: a few retains, not a copy.
         let grid = session.snapshot()
         let totalPushed = grid.scrollback.totalPushed
-        // A fresh, explicitly-requested sweep supersedes any pending
-        // output-driven follow-up — it already reads the current grid.
+        // This sweep already reads the current grid.
         search.needsRefresh = false
         search.task = Task.detached(priority: .userInitiated) { [weak self] in
-            // Debounce: a keystroke burst becomes one sweep, started once
-            // the burst pauses. A cancelled sleep throws — a superseded
-            // query never scans at all.
+            // A cancelled sleep throws, so a superseded query never scans.
             do {
                 try await Task.sleep(for: .milliseconds(Self.searchDebounceMilliseconds))
             } catch { return }
@@ -460,23 +345,12 @@ extension ViewController {
         }
     }
 
-    /// PTY-output-triggered refresh, off the render path — see the
-    /// call site in `ViewController.prepareFrame`. Unlike
-    /// `updateSearchResults`, this never scrolls to the current match: an
-    /// output-driven refresh must not yank the viewport out from under a
-    /// user who is reading a match higher up, which is exactly the
-    /// "keeps the user's place" behaviour `updateSearchResults`'s
-    /// `scrollsToMatch: false` path already had — this preserves it, just
-    /// off the main thread for the sweep itself.
+    /// Output-triggered refresh from `prepareFrame`. Never scrolls, so the
+    /// viewport stays on the match the user is reading.
     ///
-    /// At most one sweep is ever in flight: an output batch that arrives
-    /// while the previous recompute is still running does not start a
-    /// second one — but it is not dropped either. It sets
-    /// `search.needsRefresh`, which `applySearchResults` checks once the
-    /// in-flight sweep lands; without that, output arriving after the last
-    /// sweep that actually ran left the results stale with nothing left to
-    /// nudge them, since the render loop stops calling this at all once the
-    /// grid stops changing.
+    /// One sweep at most in flight. Output arriving meanwhile sets
+    /// `search.needsRefresh`, which `applySearchResults` honours; otherwise
+    /// the last output could leave results stale once the grid goes quiet.
     func scheduleBackgroundSearchRefresh() {
         guard search.bar != nil, let searchField = search.field, let session else { return }
         guard search.task == nil else {
@@ -488,8 +362,6 @@ extension ViewController {
         let query = searchField.stringValue
         let grid = session.snapshot()
         let totalPushed = grid.scrollback.totalPushed
-        // This pane's own local copy — see `search.caseSensitive`'s doc
-        // comment.
         let caseSensitive = search.caseSensitive
         let regex = search.regex
         let gate = search.sweepGate
@@ -505,13 +377,8 @@ extension ViewController {
         }
     }
 
-    /// The one place a search sweep's result touches state, and only after
-    /// confirming it is still current: superseded by a newer query or
-    /// refresh, or the bar closed while it was in flight — either way
-    /// `session`/`search.field` may already be gone.
-    /// One sweep, whichever mode the bar is in. Pure and `nonisolated` so
-    /// both detached tasks call the same thing and the mode decision lives in
-    /// one place rather than being duplicated per call site.
+    /// One sweep in either mode, pure and `nonisolated` so both detached
+    /// tasks share it.
     nonisolated static func sweep(
         _ query: String, in grid: Grid, caseSensitive: Bool, regex: Bool
     ) -> SweepOutcome {
@@ -523,12 +390,8 @@ extension ViewController {
                 matches: matches,
                 status: matches.count >= Search.defaultMatchLimit ? .incomplete : .complete)
         }
-        // Three states, not two. A half-typed pattern is the normal state of
-        // one being typed and "no results" would send the user looking for
-        // missing text instead of a missing bracket; a pattern whose shape
-        // makes a backtracking engine take exponential time is refused
-        // before it runs, and saying "no results" there would be a lie about
-        // a search that never happened.
+        // An invalid or catastrophic-backtracking pattern is its own state, not
+        // "no results": the search never ran.
         guard Search.isValidRegex(query, caseSensitive: caseSensitive) else {
             return SweepOutcome(matches: [], status: .invalidPattern)
         }
@@ -543,19 +406,18 @@ extension ViewController {
             status: result.isIncomplete ? .incomplete : .complete)
     }
 
-    /// What one sweep produced, plus the things a plain match list cannot
-    /// say — which are the difference between a count the user can trust and
-    /// one they cannot.
+    /// A sweep's matches plus whether the count can be trusted.
     typealias SweepOutcome = PaneSearchState.SweepOutcome
 
+    /// Applies a sweep only if it is still current; a newer query or a
+    /// closed bar may have made `session` or `search.field` stale.
     private func applySearchResults(
         _ outcome: SweepOutcome, generation: Int, scrollsToMatch: Bool, totalPushed: Int
     ) {
         let matches = outcome.matches
         search.status = outcome.status
         guard generation == search.generation, search.bar != nil else { return }
-        // A generation match means this was the last sweep scheduled, so
-        // `search.task` is this (now finished) task.
+        // The generation matched, so `search.task` is this finished task.
         search.task = nil
         search.matches = matches
         search.matchesTruncated = matches.count >= Search.defaultMatchLimit
@@ -567,31 +429,23 @@ extension ViewController {
             noteCurrentMatchAnchor(totalPushed: totalPushed)
             scrollToCurrentMatch()
         } else {
-            // The current match keeps its *text*, not its index. Output
-            // arriving under an open search bar recomputes the list, and the
-            // match that was "7 of 12" is 6 of 13 the moment a line scrolls;
-            // keeping the number moved the highlight and the viewport to a
-            // different piece of text every time the child printed.
+            // Keep the current match's text, not its index: output shifts indices,
+            // and following the number jumped to different text on every print.
             search.currentMatchIndex = Self.index(
                 closestTo: search.currentMatchAnchor, in: search.matches, totalPushed: totalPushed)
             noteCurrentMatchAnchor(totalPushed: totalPushed)
         }
         updateSearchCountLabel()
         invalidateDisplay()
-        // Output that arrived while this sweep was running is caught
-        // up on now, rather than staying stale until something unrelated
-        // (a keystroke, a scroll) happened to trigger the next sweep.
+        // Catch up on output that arrived during this sweep.
         if search.needsRefresh {
             search.needsRefresh = false
             scheduleBackgroundSearchRefresh()
         }
     }
 
-    /// The match nearest a remembered absolute row. Nearest rather than
-    /// exact: the line the anchor named may have been evicted from the
-    /// scrollback or rewritten by the program, and landing on its neighbour
-    /// is what a person reading down a log expects — losing the place
-    /// entirely is not.
+    /// The match nearest a remembered absolute row: the exact line may be
+    /// evicted or rewritten, and a neighbour beats losing the place.
     static func index(
         closestTo anchor: Int?, in matches: [SelectionRange], totalPushed: Int
     ) -> Int? {
@@ -651,9 +505,8 @@ extension ViewController {
         invalidateDisplay()
     }
 
-    /// Centres the current match vertically. Document row `r` appears at
-    /// viewport row `r + scrollOffset`, so the offset that centres it is
-    /// `rows/2 - r`; a live-screen match needs no scrolling at all.
+    /// Centres the current match: row `r` shows at `r + scrollOffset`, so the
+    /// offset is `rows/2 - r`. Live-screen matches don't scroll.
     private func scrollToCurrentMatch() {
         guard let index = search.currentMatchIndex, search.matches.indices.contains(index),
             session != nil
@@ -667,62 +520,46 @@ extension ViewController {
     }
 
     private func updateSearchCountLabel() {
-        // The label is the stack view's second arranged view; rebuilding the
-        // bar keeps it that way — find it by type, not a stored reference,
-        // so the bar's construction stays in one place.
+        // Found by type so the bar's construction stays in one place.
         let label = search.bar?.contentView?.subviews
             .compactMap { $0 as? NSStackView }.first?
             .arrangedSubviews.compactMap { $0 as? NSTextField }
             .first { !($0 is NSSearchField) }
         guard let label else { return }
         if search.status == .invalidPattern {
-            // Not "No Results": the pattern never ran, and saying it found
-            // nothing would send the user looking for the missing text
-            // instead of the missing bracket.
             label.stringValue = L10n.text("search.invalidPattern")
         } else if search.status == .patternTooSlow {
             label.stringValue = L10n.text("search.patternTooSlow")
         } else if search.matches.isEmpty {
             label.stringValue = search.field?.stringValue.isEmpty == false ? "No Results" : ""
         } else if let current = search.currentMatchIndex {
-            // "+" when the sweep stopped at the match cap: the document may
-            // hold more matches than were kept (`Search.defaultMatchLimit`).
-            // "+" when the sweep stopped early — the match cap, a line too
-            // long to run a pattern against, or the time budget. Either way
-            // the document may hold matches that were never counted.
+            // "+" when the sweep stopped early (the match cap, an over-long line, or
+            // the time budget): there may be uncounted matches.
             label.stringValue =
                 "\(current + 1)/\(search.matches.count)"
                 + (search.status == .incomplete ? "+" : "")
         }
     }
 
-    /// Flips this pane's local case-sensitivity and persists it
-    /// to the config file as the new default for bars opened after this
-    /// one; an already-open bar in another pane keeps its own local value
-    /// and button state until *it* is next opened fresh.
+    /// Flips this pane's case sensitivity and saves it as the default for
+    /// bars opened later; other open bars keep theirs.
     @objc private func toggleSearchCase(_ sender: Any?) {
         search.caseSensitive.toggle()
         if !ConfigurationStore.shared.update({ $0.searchCaseSensitive = self.search.caseSensitive }) {
-            // `update` rolls its own copy back on a failed write (a
-            // read-only or full config path) — this pane's local flag
-            // must match that truth too, or the active bar would keep
-            // showing a mode no persisted default, and no later bar,
-            // agrees with.
+            // A failed write rolls the config back; match it.
             search.caseSensitive = ConfigurationStore.shared.configuration.searchCaseSensitive
         }
         if let button = sender as? NSButton { updateCaseButton(button) }
-        // The match list changes, so the place is re-found rather than kept:
-        // a case-sensitive sweep may not contain the match the user was on.
+        // The list changes; re-find the place rather than keep it.
         search.currentMatchAnchor = nil
         updateSearchResults(scrollsToMatch: true)
     }
 
-    /// Flips this pane's local regex mode and persists it as
-    /// the new default; see `toggleSearchCase`.
+    /// As `toggleSearchCase`, for regex mode.
     @objc private func toggleSearchRegex(_ sender: Any?) {
         search.regex.toggle()
         if !ConfigurationStore.shared.update({ $0.searchRegex = self.search.regex }) {
-            // See `toggleSearchCase`'s identical reasoning.
+            // See `toggleSearchCase`.
             search.regex = ConfigurationStore.shared.configuration.searchRegex
         }
         if let button = sender as? NSButton { updateRegexButton(button) }
@@ -737,8 +574,7 @@ extension ViewController {
         button.toolTip = L10n.text("search.regex")
     }
 
-    /// State on a borderless icon button has to be legible without colour —
-    /// the tint says it at a glance, the accessibility value says it at all.
+    /// Tint for a glance; the accessibility value states it outright.
     private func updateCaseButton(_ button: NSButton) {
         let on = search.caseSensitive
         button.contentTintColor = on ? .controlAccentColor : SystemAccessibility.secondaryLabelColor
@@ -759,15 +595,13 @@ extension ViewController {
     }
 }
 
-/// The search field's live updates and its editor's special keys.
 extension ViewController: NSSearchFieldDelegate {
     func controlTextDidChange(_ notification: Notification) {
         guard (notification.object as? NSTextField) === search.field else { return }
         updateSearchResults(scrollsToMatch: true)
     }
 
-    /// Return is "next match", Esc closes the bar (the field editor turns it
-    /// into `cancelOperation:`, which never reaches `keyDown`).
+    /// Return is next match; Esc (sent as `cancelOperation:`) closes the bar.
     func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector)
         -> Bool
     {

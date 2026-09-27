@@ -21,89 +21,45 @@ import ImageIO
 import Metal
 import simd
 
-/// Decodes Kitty graphics image data (`KittyGraphics.ImageData`) into
-/// textures and draws each live placement as one instanced quad through
-/// `QuadRenderer`'s existing color pipeline — the same one color emoji
-/// draws through, since both are "sample a premultiplied bgra texture
-/// verbatim" (`Shaders.metal`'s `quad_fragment_color`). No new pipeline, no
-/// mesh shader: a placed image is geometrically nothing but a rect, and the
-/// instanced-quad path already does exactly that — mesh shaders solve GPU-
-/// side geometry generation for large primitive counts, and one quad per
-/// placement is not that (`PERFORMANCE.md`'s reasoning against a third
-/// pipeline for the ordinary text/background path applies here too: this
-/// is not the bottleneck to build novel infrastructure for).
+/// Decodes Kitty graphics images into textures and draws each placement as
+/// one instanced quad through `QuadRenderer`'s color pipeline, the one
+/// color emoji use (`quad_fragment_color`). A placement is just a rect, so
+/// no new pipeline.
 ///
-/// **Decoding.** RGB/RGBA are already pixels — reordered to
-/// premultiplied bgra by hand. PNG is decoded via `CGImageSource` into a
-/// premultiplied bgra `CGContext`, the same technique
-/// `GlyphAtlas.rasterizeColor` already uses for color emoji, reused here
-/// rather than reinvented. PNG *dimensions* are read off the header
-/// (`CGImageSourceCopyPropertiesAtIndex`) and checked against
-/// `KittyGraphics.maximumImageDimension`/`maximumImagePixels` before any
-/// decoding happens — a header claiming a 100000×100000 image is a
-/// few dozen bytes on the wire but a 40GB decode, so the size is validated
-/// before the work, not after.
+/// **Decoding.** RGB/RGBA are reordered to premultiplied bgra by hand; PNG
+/// goes through `CGImageSource` into a bgra `CGContext`. PNG dimensions
+/// are read off the header and checked against
+/// `KittyGraphics.maximumImageDimension`/`maximumImagePixels` before
+/// decoding: a few header bytes can claim a 40 GB decode.
 ///
-/// None of that runs on the frame path. `TerminalRenderer.updateInstances`
-/// calls `update(table:...)` once per frame, which only *schedules* decodes
-/// for images that are new, newly visible, or superseded; the decode itself
-/// — plus the texture allocation and upload that follow it — runs on
-/// `decodeScheduler` (a background queue in production, synchronous in
-/// tests), and `draw`/`texture(for:)` are pure cache lookups. A placement
-/// whose decode is in flight simply draws nothing that frame; the
-/// completion fires `onImagesReady`, which the shell wires to a redraw
-/// request, so the image appears as soon as it exists rather than whenever
-/// unrelated output happens to schedule a frame. Decodes for placements
-/// provably outside the viewport are not scheduled at all — scrolling the
-/// image back into view schedules it then. (A placement with no explicit
-/// `c=`/`r=` and no transmitted dimensions — a bare PNG — has no knowable
-/// cell extent before decoding, so it decodes eagerly rather than never.)
+/// **Off the frame path.** `update(table:...)` (from
+/// `TerminalRenderer.updateInstances`) only schedules decodes, which run on
+/// `decodeScheduler` with the texture upload; `draw` and `texture(for:)` are
+/// cache lookups. A placement still decoding draws nothing, and
+/// `onImagesReady` asks for a frame when it lands. Placements provably
+/// offscreen aren't decoded until they scroll in; a bare PNG with no known
+/// cell extent decodes eagerly.
 ///
-/// **Caching.** One texture per image id, decoded once and kept until that
-/// id is no longer placed at all. Pruning runs in `update`, unconditionally
-/// — including when the *last* placement disappears, which the old
-/// draw-side prune never reached (it bailed out early on an empty table,
-/// leaking the final image's texture and budget). A re-transmission that
-/// reuses an id invalidates the old texture: `ImagePlacementTable` bumps a
-/// per-image generation on every `store`, and a cached entry whose
-/// generation no longer matches is dropped and re-decoded.
+/// **Caching.** One texture per image id, pruned in `update` once nothing
+/// places it (including the last placement). A re-transmission bumps the
+/// table's per-image store generation, invalidating the cached texture.
 ///
-/// **Memory budgets.** Cached textures are bounded per pane
-/// (`textureByteBudget`, defaulting to `KittyGraphics.maximumPaneTextureBytes`)
-/// and application-wide (`GlobalTextureBudget`, up to
-/// `KittyGraphics.maximumGlobalTextureBytes` across every pane). Over the
-/// per-pane budget, the least-recently-used texture is evicted to make
-/// room; an image larger than the whole budget is never cached. Over the
-/// *global* budget the image is skipped but not failed permanently — it is
-/// retried once the budget's generation moves (any release by any pane),
-/// without paying a re-decode every frame while the budget stays full. A
-/// texture allocation that fails outright is remembered like a
-/// decode failure, and the placement simply draws nothing: the terminal
-/// stays usable, the image does not appear. Failures and blocks are
-/// recorded per store generation, so a re-transmission of the same id gets
-/// a fresh attempt.
+/// **Budgets.** Per pane (`textureByteBudget`, evicting least-recently
+/// used; an image over the whole budget is never cached) and app-wide
+/// (`GlobalTextureBudget`: skipped, retried when its generation moves).
+/// Decode and allocation failures draw nothing and are remembered per store
+/// generation, so a re-transmission retries.
 ///
 /// **Threading.** `update`, `draw` and the test seam run on the main
-/// thread; decode completions install on a background queue. Every piece of
-/// mutable cache state is guarded by `lock`, which is held only for
-/// dictionary operations — never across a decode or an allocation.
-/// `onImagesReady` fires on whatever thread installed the texture; the
-/// shell's wiring hops to the main queue.
+/// thread; decodes install from the scheduler's queue. All mutable state is
+/// behind `lock`, held only for dictionary work, never across a decode or
+/// an allocation — hence `@unchecked Sendable`. `onImagesReady` fires on
+/// the installing thread.
 ///
-/// **Test seam.** `makeTexture` injects an allocation hook, `decodeImage`
-/// a decode hook (a counting one proves the frame path never decodes), and
-/// `decodeScheduler` a synchronous or queue-capturing scheduler.
-/// `texture(for:data:)` drives the whole pipeline synchronously;
+/// **Test seam.** `makeTexture`, `decodeImage` and `decodeScheduler` are
+/// injectable; `texture(for:data:)` runs the pipeline synchronously, and
 /// `texture(for:)`, `cachedTextureBytes` and `textureCount` are internal
-/// rather than private so `CortaTests` can inspect the cache directly
-/// without a render pass.
-///
-/// `@unchecked Sendable` because it genuinely is used from two threads —
-/// the render thread and whatever `decodeScheduler` runs on — and every
-/// piece of mutable state is behind `lock` (the decode result is installed
-/// under it, `deinit` reads under it). The conformance is what lets the
-/// scheduled decode be a `@Sendable` closure without a warning standing in
-/// for a fact the type already has to uphold.
+/// for inspection.
 nonisolated final class KittyImageRenderer: @unchecked Sendable {
     private let makeTextureImpl: (MTLTextureDescriptor) -> MTLTexture?
     private let decodeImageImpl: (KittyGraphics.ImageData) -> DecodedImage?
@@ -111,43 +67,30 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     private let textureByteBudget: Int
     private let globalBudget: GlobalTextureBudget
 
-    /// Fires when a background decode installed a texture — a placement
-    /// that drew nothing can now draw, so the shell should schedule a
-    /// frame. Called on the installing thread; hop to the main queue before
-    /// touching view state.
+    /// A background decode installed a texture; schedule a frame. Called on
+    /// the installing thread.
     var onImagesReady: (() -> Void)?
 
     private let lock = NSLock()
     private var textures: [KittyGraphics.ImageID: MTLTexture] = [:]
-    /// Cached texture sizes (`width * height * 4`), kept beside `textures`
-    /// so eviction and pruning can account without re-deriving anything.
+    /// Cached texture sizes (`width * height * 4`).
     private var textureBytes: [KittyGraphics.ImageID: Int] = [:]
-    /// Cache order, least-recently-used first — the eviction order when the
-    /// per-pane budget needs room.
+    /// Least-recently-used first: the eviction order.
     private var textureAccessOrder: [KittyGraphics.ImageID] = []
-    /// Sum of `textureBytes`, also this renderer's outstanding reservation
-    /// against the global budget (released in `deinit`).
+    /// Sum of `textureBytes`: this renderer's global-budget reservation.
     private var textureBytesCached = 0
-    /// The `ImagePlacementTable.storeGeneration` each cached texture was
-    /// decoded from. A mismatch means the id was re-transmitted and the
-    /// cached texture is stale. The synchronous test seam records
-    /// generation 0; real transmissions start at 1.
+    /// The store generation each texture was decoded from; a mismatch means a
+    /// re-transmission. The test seam uses 0, real transmissions start at 1.
     private var textureGenerations: [KittyGraphics.ImageID: UInt64] = [:]
-    /// Images that failed to decode (corrupt PNG, an implausible pixel
-    /// count) or to allocate — remembered per store generation so a
-    /// permanently-broken transmission does not retry the decode every
-    /// frame, while a re-transmission of the same id gets a fresh attempt.
+    /// Decode or allocation failures by store generation, so a broken image
+    /// isn't retried every frame but a re-transmission is.
     private var failedGenerations: [KittyGraphics.ImageID: UInt64] = [:]
-    /// Images skipped because the *global* texture budget was full —
-    /// transient, unlike `failedGenerations`, so they retry once the
-    /// budget's generation moves (anything freed by any pane). The budget
-    /// generation is recorded per image because the release may come from
-    /// another renderer, which this pane cannot observe directly.
+    /// Images skipped for a full global budget, with the budget generation
+    /// seen; retried once it moves, since another pane's release is otherwise
+    /// invisible here.
     private var budgetBlocked: [KittyGraphics.ImageID: (storeGeneration: UInt64, budgetGeneration: Int)] = [:]
-    /// Decodes currently running on `decodeScheduler`, with the store
-    /// generation they are decoding. A completion whose generation is no
-    /// longer current discards its result — the id was re-transmitted (or
-    /// deleted) while the decode ran.
+    /// Running decodes and their store generation; a stale completion
+    /// discards its result.
     private var inFlight: [KittyGraphics.ImageID: UInt64] = [:]
 
     var textureCount: Int {
@@ -168,8 +111,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         globalBudget: GlobalTextureBudget = .shared,
         decodeImage: ((KittyGraphics.ImageData) -> DecodedImage?)? = nil,
         decodeScheduler: ((@escaping @Sendable () -> Void) -> Void)? = nil,
-        // Last so an unlabeled trailing closure binds here, as it did before
-        // `decodeImage`/`decodeScheduler` existed.
+        // Last, so a trailing closure binds here.
         makeTexture: ((MTLTextureDescriptor) -> MTLTexture?)? = nil
     ) {
         self.textureByteBudget = textureByteBudget
@@ -188,12 +130,9 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         globalBudget.release(bytes)
     }
 
-    /// The per-frame entry point, called from `TerminalRenderer.updateInstances`
-    /// — *not* from `draw`: nothing here may decode synchronously.
-    /// Prunes textures no placement references anymore (including the
-    /// empty-table case), invalidates textures whose id was re-transmitted,
-    /// and schedules background decodes for placements that are new or newly
-    /// visible.
+    /// The per-frame entry point (never from `draw`, and never decodes
+    /// inline): prunes unreferenced textures, drops re-transmitted ones, and
+    /// schedules decodes for new or newly visible placements.
     func update(
         table: ImagePlacementTable, rows: Int, offset: Int, scrollbackTotalPushed: Int,
         cellWidth: Float, cellHeight: Float
@@ -206,13 +145,10 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         for id in textures.keys where !liveIDs.contains(id) {
             releaseTextureLocked(id)
         }
-        // Bookkeeping for images nothing references anymore can go too; a
-        // later re-placement re-decodes from the table, which still holds
-        // the bytes until the image itself is deleted.
+        // The table keeps the bytes, so a later re-placement re-decodes.
         failedGenerations = failedGenerations.filter { liveIDs.contains($0.key) }
         budgetBlocked = budgetBlocked.filter { liveIDs.contains($0.key) }
         for id in inFlight.keys where !liveIDs.contains(id) {
-            // Orphaned: the completion will find no entry and discard.
             inFlight[id] = nil
         }
 
@@ -223,19 +159,16 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
             else { continue }
             if textureGenerations[id] == generation, textures[id] != nil { continue }
             if textureGenerations[id] != generation, textures[id] != nil {
-                // Same id, new transmission: the old texture is stale.
                 releaseTextureLocked(id)
             }
             guard failedGenerations[id] != generation else { continue }
             if let inFlightGeneration = inFlight[id] {
                 if inFlightGeneration == generation { continue }
-                // Superseded mid-decode: orphan the old completion and
-                // schedule the current bytes instead.
+                // Superseded mid-decode: orphan the old completion.
                 inFlight[id] = nil
             }
             if let blocked = budgetBlocked[id], blocked.storeGeneration == generation {
                 guard blocked.budgetGeneration != globalBudget.generation else { continue }
-                // Space was freed somewhere since the skip — retry once.
                 budgetBlocked[id] = nil
             }
             guard Self.isPotentiallyVisible(
@@ -254,13 +187,9 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         }
     }
 
-    /// Conservative viewport check for *scheduling*: a placement
-    /// provably above or below the viewport is not decoded until it scrolls
-    /// into view. A placement whose cell extent cannot be known before
-    /// decoding — a PNG transmitted without `c=`/`r=`, whose `s=`/`v=` are
-    /// placeholders — answers true, since culling it would mean never
-    /// decoding it at all. `draw` re-checks visibility exactly; this check
-    /// only avoids paying decodes for offscreen images.
+    /// Conservative check for scheduling only: provably offscreen placements
+    /// wait. A PNG without `c=`/`r=` has no known extent and answers true, or
+    /// it would never decode. `draw` checks exactly.
     private static func isPotentiallyVisible(
         _ placement: KittyGraphics.Placement, data: KittyGraphics.ImageData,
         rows: Int, offset: Int, scrollbackTotalPushed: Int, cellHeight: Float
@@ -274,16 +203,15 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
             placementRows = nil
         }
         guard let placementRows else { return true }
-        // `totalPushed`, not `.count` — see `TerminalRenderer.selectionQuads`.
+        // `totalPushed`, not `.count` (`TerminalRenderer.selectionQuads`).
         let viewportRow =
             ScrollbackCoordinates.reanchoredRow(
                 placement.row, from: placement.baseScrollbackTotal, to: scrollbackTotalPushed) + offset
         return viewportRow + placementRows > 0 && viewportRow < rows
     }
 
-    /// Runs on `decodeScheduler`: the decode, texture allocation and upload
-    /// — everything too expensive for the frame path. Shared with the
-    /// synchronous test seam (`texture(for:data:)`), which calls it inline.
+    /// The decode, allocation and upload, on `decodeScheduler` (or inline for
+    /// the test seam).
     private func decodeAndInstall(
         id: KittyGraphics.ImageID, generation: UInt64, data: KittyGraphics.ImageData
     ) {
@@ -291,24 +219,19 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         var installed = false
         lock.lock()
         if generation == 0 {
-            // The synchronous test seam has no `inFlight` bookkeeping.
             installed = installLocked(id: id, generation: generation, decoded: decoded)
         } else if inFlight[id] == generation {
             inFlight[id] = nil
             installed = installLocked(id: id, generation: generation, decoded: decoded)
         }
-        // Otherwise the placement (or this decode's generation of it) went
-        // away while decoding — discard the result rather than caching
-        // bytes nobody references. Removing `inFlight[id]` is safe only in
-        // the matching branch above: a stale completion must not clear the
-        // entry of a newer decode scheduled for the same id.
+        // Otherwise this generation went away mid-decode; discard. Only the
+        // matching branch may clear `inFlight`, or a stale completion would
+        // clear a newer decode's entry.
         lock.unlock()
         if installed { onImagesReady?() }
     }
 
-    /// The cache-miss half of `update`'s bookkeeping, shared by the
-    /// background completion and the synchronous test seam. Caller holds
-    /// `lock`. Returns whether a texture was installed.
+    /// Installs a decoded image; caller holds `lock`. Returns whether it did.
     private func installLocked(
         id: KittyGraphics.ImageID, generation: UInt64, decoded: DecodedImage?
     ) -> Bool {
@@ -317,8 +240,8 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
             return false
         }
         let bytes = decoded.width * decoded.height * 4
-        // Larger than this pane's whole budget: it can never be cached, so
-        // fail it permanently rather than evicting everything every frame.
+        // Over the whole pane budget: fail permanently rather than evict
+        // everything every frame.
         guard bytes <= textureByteBudget else {
             failedGenerations[id] = generation
             return false
@@ -327,9 +250,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
             releaseTextureLocked(oldest)
         }
         guard globalBudget.tryReserve(bytes) else {
-            // Other panes hold the rest of the app-wide budget — transient,
-            // so retry once the budget's generation moves instead of failing
-            // this id permanently.
+            // The global budget is transient: retry when its generation moves.
             budgetBlocked[id] = (generation, globalBudget.generation)
             return false
         }
@@ -347,8 +268,8 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         return true
     }
 
-    /// Drops one cached texture, returning its bytes to both budgets.
-    /// Caller holds `lock`.
+    /// Drops one texture, returning its bytes to both budgets; caller holds
+    /// `lock`.
     private func releaseTextureLocked(_ id: KittyGraphics.ImageID) {
         guard textures.removeValue(forKey: id) != nil, let bytes = textureBytes.removeValue(forKey: id)
         else { return }
@@ -358,15 +279,9 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         globalBudget.release(bytes)
     }
 
-    /// Draws every live placement in `table` that is visible somewhere in
-    /// `rect`, in z-index then transmission order — the same layering rule
-    /// every reference client documents. `offset`/`scrollbackTotalPushed` place a
-    /// placement's document row in the viewport exactly like
-    /// `TerminalRenderer.selectionQuads` does for a selection.
-    ///
-    /// Pure cache reads: a placement whose texture is not cached yet —
-    /// decode in flight, culled as offscreen, failed — draws nothing this
-    /// frame.
+    /// Draws visible placements in z-index then transmission order, placed
+    /// like `TerminalRenderer.selectionQuads`. Cache reads only: an uncached
+    /// placement draws nothing this frame.
     func draw(
         table: ImagePlacementTable, cellWidth: Float, cellHeight: Float, rows: Int,
         offset: Int, scrollbackTotalPushed: Int, rect: CGRect, drawableSize: CGSize,
@@ -380,18 +295,12 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
             quadRenderer.drawColorQuads(
                 [instance], atlas: texture, rect: rect, drawableSize: drawableSize,
                 renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
-            // The glyph/color passes never clear (`TerminalRenderer.draw`'s
-            // comment on why) — each placement's draw call has to keep that
-            // true for the next one, the same way the glyph pass already
-            // does for the pass after it.
+            // Passes after the first never clear (`TerminalRenderer.draw`).
             renderPassDescriptor.colorAttachments[0].loadAction = .load
         }
     }
 
-    /// The Metal 4 half of `draw`: the same placements in the same
-    /// order, encoded into the frame the backend currently has open
-    /// (`Metal4FrameBackend.beginFrame`), so there is no render pass
-    /// descriptor to thread through and no load action to flip.
+    /// The Metal 4 `draw`, into the backend's open frame.
     func draw(
         table: ImagePlacementTable, cellWidth: Float, cellHeight: Float, rows: Int,
         offset: Int, scrollbackTotalPushed: Int, rect: CGRect, drawableSize: CGSize,
@@ -406,10 +315,8 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         }
     }
 
-    /// The placement walk both `draw` paths share: computes each visible,
-    /// already-cached placement's quad in z-index then transmission order
-    /// and yields it with its texture. The culling math lives exactly once
-    /// so the two paths can never disagree about *what* draws.
+    /// The culling and quad math both `draw` paths share, so they never
+    /// disagree about what draws.
     private func forEachVisiblePlacement(
         table: ImagePlacementTable, cellWidth: Float, cellHeight: Float, rows: Int,
         offset: Int, scrollbackTotalPushed: Int,
@@ -421,16 +328,13 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         for placement in placements {
             guard let texture = texture(for: placement.imageID) else { continue }
 
-            // `totalPushed`, not `.count` — see
-            // `TerminalRenderer.selectionQuads`.
+            // `totalPushed`, not `.count` (`TerminalRenderer.selectionQuads`).
             let viewportRow =
                 ScrollbackCoordinates.reanchoredRow(
                     placement.row, from: placement.baseScrollbackTotal, to: scrollbackTotalPushed) + offset
             let columns = placement.columns ?? max(1, Int((Float(texture.width) / cellWidth).rounded(.up)))
             let placementRows =
                 placement.rows ?? max(1, Int((Float(texture.height) / cellHeight).rounded(.up)))
-            // Entirely above or below the viewport: skip drawing it, same
-            // as `selectionQuads` skipping an out-of-view selection.
             guard viewportRow + placementRows > 0, viewportRow < rows else { continue }
 
             let instance = QuadInstance(
@@ -441,9 +345,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         }
     }
 
-    /// The cached texture for `id`, or nil if it is not (yet) cached. This
-    /// is all the frame path is allowed to do: no decode, no
-    /// allocation, no scheduling.
+    /// The cached texture, or nil: no decode, allocation or scheduling.
     func texture(for id: KittyGraphics.ImageID) -> MTLTexture? {
         lock.lock()
         defer { lock.unlock() }
@@ -453,11 +355,8 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         return texture
     }
 
-    /// Synchronous test seam: runs the whole decode-and-install pipeline
-    /// inline, on the caller, for an image with no table behind it
-    /// (recorded as generation 0 — real transmissions start at 1, so the
-    /// two never collide). The frame path never calls this; `update` is the
-    /// production entry point.
+    /// Test seam: decodes and installs inline at generation 0. Production
+    /// uses `update`.
     func texture(for id: KittyGraphics.ImageID, data: KittyGraphics.ImageData) -> MTLTexture? {
         lock.lock()
         if let texture = textures[id], textureGenerations[id] == 0 {
@@ -482,10 +381,8 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         return texture(for: id)
     }
 
-    /// Premultiplied bgra pixels plus their real dimensions — for PNG,
-    /// decoded dimensions can differ from whatever `s=`/`v=` claimed
-    /// (typically nothing, since real clients omit them for PNG). Internal,
-    /// not private, so tests can build one for the `decodeImage` hook.
+    /// Premultiplied bgra plus real dimensions, which for PNG may differ from
+    /// `s=`/`v=`. Internal for the `decodeImage` hook.
     struct DecodedImage {
         var width: Int
         var height: Int
@@ -514,9 +411,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
                     let d = pixel * 4
                     let r = source[s], g = source[s + 1], b = source[s + 2]
                     let a = bytesPerPixel == 4 ? source[s + 3] : 255
-                    // Premultiplied, matching what `quad_fragment_color`
-                    // expects (`Shaders.metal`) — a no-op for opaque RGB
-                    // (`a` is always 255 there), real for RGBA.
+                    // Premultiplied for `quad_fragment_color`; a no-op for RGB.
                     let alpha = Float(a) / 255
                     destination[d] = UInt8((Float(b) * alpha).rounded())
                     destination[d + 1] = UInt8((Float(g) * alpha).rounded())
@@ -530,11 +425,8 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
 
     private static func decodePNG(_ bytes: [UInt8]) -> DecodedImage? {
         guard let source = CGImageSourceCreateWithData(Data(bytes) as CFData, nil) else { return nil }
-        // Dimensions come off the header *before* `CreateImageAtIndex`
-        // decodes anything: a corrupt or hostile stream can declare
-        // dimensions whose decode cost dwarfs its byte count, and the caps
-        // below are what keep that declared work from ever starting. A
-        // header ImageIO cannot parse properties from is rejected here too.
+        // Dimensions come off the header before anything decodes, so the caps
+        // stop a hostile declaration before the work starts.
         guard let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
             let width = properties[kCGImagePropertyPixelWidth] as? Int,
             let height = properties[kCGImagePropertyPixelHeight] as? Int,
@@ -552,10 +444,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
                 bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
                     | CGBitmapInfo.byteOrder32Little.rawValue)
         else { return nil }
-        // No CTM flip: `GlyphAtlas.rasterizeColor` explains why a top-down
-        // pixel buffer against Core Graphics' y-up drawing space already
-        // cancels out — the same reasoning applies to any image drawn into
-        // a freshly created bitmap context here.
+        // No CTM flip, as in `GlyphAtlas.rasterizeColor`.
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         return DecodedImage(width: width, height: height, bgra: bgra)
     }
@@ -567,8 +456,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         descriptor.storageMode = .managed
         guard let texture = makeTextureImpl(descriptor) else { return nil }
         decoded.bgra.withUnsafeBytes { raw in
-            // Non-empty by construction (`decode` rejects zero dimensions);
-            // guarded anyway because a trap here is never justified.
+            // Non-empty (`decode` rejects zero), but never trap.
             guard let baseAddress = raw.baseAddress else { return }
             texture.replace(
                 region: MTLRegionMake2D(0, 0, decoded.width, decoded.height), mipmapLevel: 0,
@@ -578,12 +466,9 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     }
 }
 
-/// The application-wide half of the image texture budget: decoded
-/// image bytes are GPU-resident, VRAM is shared across the whole process,
-/// and a per-pane cap alone does not stop N panes from collectively
-/// exhausting it. Each `KittyImageRenderer` reserves what it caches and
-/// releases on eviction, prune and `deinit`. Lock-guarded because nothing
-/// about the type otherwise constrains it to one thread.
+/// The app-wide image texture budget: VRAM is shared, and per-pane caps
+/// don't stop N panes exhausting it. Renderers reserve on cache and
+/// release on eviction, prune and `deinit`.
 nonisolated final class GlobalTextureBudget: @unchecked Sendable {
     static let shared = GlobalTextureBudget(limit: KittyGraphics.maximumGlobalTextureBytes)
 
@@ -592,11 +477,8 @@ nonisolated final class GlobalTextureBudget: @unchecked Sendable {
     private var reserved = 0
     private var releaseCount = 0
 
-    /// Bumped on every release. A renderer that skipped an image while the
-    /// budget was full compares this cheaply to learn that space may exist
-    /// again — another pane's eviction is otherwise invisible to it, and
-    /// re-decoding the skipped image every frame to find out would waste the
-    /// decode.
+    /// Bumped on every release, so a renderer that skipped an image learns
+    /// cheaply that space may exist.
     var generation: Int {
         lock.lock()
         defer { lock.unlock() }

@@ -18,54 +18,32 @@ import AppKit
 import Metal
 import QuartzCore
 
-/// Owns the vsync-to-drawable pipeline for one `TerminalView`'s Metal layer,
-/// through `CAMetalDisplayLink`.
+/// Owns one `TerminalView`'s vsync-to-drawable pipeline through
+/// `CAMetalDisplayLink`, whose callback already carries a resolved
+/// drawable — there is no acquire step to gate.
 ///
-/// **Why nothing is asked before the drawable.** With a `CADisplayLink`,
-/// vsync and drawable acquisition are separate, and the "should I draw?"
-/// check has to run *before* `nextDrawable()` — an acquired-but-unpresented
-/// drawable is not recycled, so acquiring one per skipped frame would
-/// exhaust the pool. `CAMetalDisplayLink` folds vsync and drawable
-/// acquisition into one delegate callback that already carries the
-/// resolved drawable (`CAMetalDisplayLink.Update.drawable`) — there is no
-/// separate acquire step to skip ahead of.
-///
-/// **The rule instead.** `isPaused` is the only gate. While paused, the
-/// link never fires, so nothing is ever asked and no drawable is ever
-/// resolved — this is what keeps idle CPU at ~0% (`PERFORMANCE.md` §3). A
-/// caller wakes the scheduler only when there is a concrete
-/// reason to draw (`resume()`); every callback that *does* fire is treated
-/// as accepted — its drawable is always rendered and presented, never
-/// discarded — and the scheduler pauses itself again the moment a frame
-/// finds nothing further pending. This trades a rare, harmless
-/// re-presentation of unchanged pixels (a spurious wake with nothing new by
-/// the time the callback runs) for never leaving a resolved drawable
-/// unpresented, which is what would exhaust the pool.
+/// **The rule.** `isPaused` is the only gate: paused, nothing fires, which
+/// keeps idle CPU near 0% (`PERFORMANCE.md` §3). `resume()` wakes it for a
+/// concrete reason; every callback that fires renders and presents its
+/// drawable, never discards it (an unpresented drawable is never recycled),
+/// and the scheduler pauses once nothing is pending. A spurious wake costs
+/// at most one re-presentation of unchanged pixels.
 final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
-    /// Called once per accepted frame, on the main thread, with the
-    /// already-resolved drawable and its render pass descriptor. There is
-    /// no `nil`-drawable case —
-    /// the delegate only fires when `CAMetalDisplayLink` already has one.
+    /// Called per accepted frame on the main thread with the resolved
+    /// drawable.
     var onRenderFrame: ((MTLRenderPassDescriptor, CGSize, CAMetalDrawable) -> Void)?
 
-    /// Run once per accepted frame, before rendering, to do the prepare/diff
-    /// work (grid snapshot, damage check, and their side effects) and report
-    /// whether anything is still pending. A resolved drawable is rendered
-    /// and presented either way; the return value only decides whether the
-    /// scheduler pauses itself right after — `false` means "nothing left to
-    /// draw," though it cannot skip the drawable itself.
+    /// The per-frame prepare/diff work; returns whether anything is still
+    /// pending. The drawable is presented either way; `false` only pauses.
     var shouldRenderFrame: (() -> Bool)?
 
     private let metalLayer: CAMetalLayer
     private var link: CAMetalDisplayLink?
-    /// Survives `attach(to:)` recreating `link` (a window change) — without
-    /// this, moving a tab to a new window would silently drop back to the
-    /// full, unrestricted rate regardless of what `RenderPolicy` had set.
+    /// Survives `attach(to:)` recreating the link, or a tab moving windows
+    /// would lose `RenderPolicy`'s rate.
     private var desiredFrameRateRange = CAFrameRateRange.default
-    /// Where the flash-guard request (`requestFirstPresent`) stands.
-    /// Stored, not derived: the stand-in `backgroundColor` must stay on the
-    /// layer until a frame has actually been presented, however the window
-    /// is closed, re-shown or resized in between.
+    /// The flash guard's state; stored, since the stand-in must stay until a
+    /// frame is actually presented.
     private(set) var firstPresentState: FirstPresentState = .idle
 
     init(metalLayer: CAMetalLayer) {
@@ -73,9 +51,7 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         super.init()
     }
 
-    /// (Re)creates the display link against the given window, invalidating
-    /// any previous one. Follows `TerminalView.viewDidMoveToWindow`: a `nil`
-    /// window tears the link down.
+    /// Recreates the link for `window`; nil tears it down.
     func attach(to window: NSWindow?) {
         link?.invalidate()
         guard window != nil else {
@@ -87,12 +63,8 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         newLink.add(to: .main, forMode: .common)
         newLink.isPaused = true
         newLink.preferredFrameRateRange = desiredFrameRateRange
-        // Measurement hook, same class as `CORTA_MAX_DRAWABLES`
-        // (`TerminalView.commonInit`): `preferredFrameLatency`, in frames, is a
-        // value to pick from an A/B measurement, not a guess (`RenderPolicy`'s
-        // doc comment) — an environment variable, not a config key, and never
-        // read outside one. `RenderPolicy` manages only
-        // `preferredFrameRateRange`, so nothing fights this once set at attach.
+        // A measurement hook like `CORTA_MAX_DRAWABLES`, not a config key.
+        // `RenderPolicy` manages only the rate range, so nothing overrides it.
         if let raw = ProcessInfo.processInfo.environment["CORTA_FRAME_LATENCY"],
             let latency = Float(raw), latency >= 1
         {
@@ -101,8 +73,7 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         link = newLink
     }
 
-    /// Wakes the scheduler so the next vsync's callback actually renders.
-    /// Idempotent, main-thread only, like everything else here.
+    /// Wakes the scheduler for the next vsync. Idempotent, main thread.
     func resume() {
         link?.isPaused = false
     }
@@ -112,11 +83,9 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         set { link?.isPaused = newValue }
     }
 
-    /// The vsync rate ceiling, adapted by `RenderPolicy` to window focus,
-    /// Low Power Mode, thermal pressure and active scrolling. Lowering it
-    /// only widens the gap between wakeups on a link that is already
-    /// running — it has no effect on `isPaused`, which is what actually
-    /// decides whether the link fires at all (`PERFORMANCE.md` §3).
+    /// The rate ceiling, adapted by `RenderPolicy` (focus, Low Power Mode,
+    /// thermal, scrolling). It spaces wakeups; `isPaused` decides whether any
+    /// happen.
     var preferredFrameRateRange: CAFrameRateRange {
         get { desiredFrameRateRange }
         set {
@@ -125,21 +94,11 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         }
     }
 
-    /// Arms the first-present flash guard and returns immediately — used to
-    /// paint before the window is ordered on screen, and after a live theme
-    /// change. It never pumps the main run loop to wait for a frame: a
-    /// synchronous wait here is reentrant, and every timer, delegate and
-    /// second `drawNow` the loop services runs nested inside what looks
-    /// like a leaf call.
-    ///
-    /// So this is an explicit state transition, not a wait. The
-    /// window needs no pixel-perfect first frame, only a guarantee it never
-    /// shows what is behind it: the layer's `backgroundColor` is set to the
-    /// theme's clear colour — exactly what the first frame's render pass
-    /// clears to — and the link is resumed so the real frame lands at the
-    /// next vsync. `notePresentedFrame` then retires the stand-in. `nil`
-    /// link (view not yet in a window) just means the state outlives the
-    /// attach; the first frame after the next `attach(to:)` completes it.
+    /// Arms the flash guard and returns; used before a window is shown and
+    /// after a theme change. Never pumps the run loop, which would nest
+    /// timers and delegates inside what looks like a leaf call. The layer's
+    /// `backgroundColor` stands in as the theme's clear colour until the real
+    /// frame lands; with no link yet, the next `attach(to:)` completes it.
     func requestFirstPresent() {
         let bg = TerminalColorPalette.clearColor
         metalLayer.backgroundColor = CGColor(
@@ -149,28 +108,16 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         link?.isPaused = false
     }
 
-    /// The first frame's command buffer has been committed and its drawable
-    /// scheduled for presentation — which is not the same as the frame
-    /// being on the glass. The GPU still has to run it and the compositor
-    /// still has to pick it up, and stripping the stand-in in the same
-    /// transaction left one compositor frame with a layer that had neither
-    /// a background nor contents: a transparent window, the desktop showing
-    /// through for a sixtieth of a second, on every reopen (found on a
-    /// screen recording of the Dock-click path, frame by frame). So the
-    /// stand-in stays up for one more display-link tick, and the *next*
-    /// callback — by which time the first drawable has been on screen for
-    /// a whole frame — retires it.
+    /// The first frame is committed but not yet on the glass; stripping the
+    /// stand-in now showed the desktop for one compositor frame on reopen. It
+    /// is retired on the next tick instead.
     func noteFrameSubmitted() {
         guard firstPresentState == .awaitingFrame else { return }
         firstPresentState = .submitted
     }
 
-    /// The transition to `.idle`, run once the first frame is actually on
-    /// the glass. Called from `metalDisplayLink(_:needsUpdate:)` on the tick
-    /// after the one that submitted the frame — and directly by tests,
-    /// since driving a real `CAMetalDisplayLink` needs a visible window and
-    /// a turning run loop. A no-op in `.idle`, so a stray callback can never
-    /// strip a stand-in a *newer* request just armed.
+    /// Back to `.idle`, on the tick after submission (tests call it directly).
+    /// A no-op when idle, so a stray call never strips a newer stand-in.
     func notePresentedFrame() {
         guard firstPresentState != .idle else { return }
         firstPresentState = .idle
@@ -191,19 +138,14 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
                 RenderMetrics.record(.cpuFrame, milliseconds: ms)
             }
         }
-        // There is no explicit acquire call left to time (the drawable
-        // above is already resolved), so the closest available signal for
-        // "how late did this frame run" is how far past its own target
-        // timestamp `CAMetalDisplayLink` actually invoked us — the same
-        // stalling `PERFORMANCE.md` §5.3/§5.4 measured via
-        // `CAMetalLayer.Stalls` would show up here as a growing gap.
+        // With no acquire to time, lateness past the target timestamp is the
+        // stall signal (`PERFORMANCE.md` §5.3/§5.4).
         if RenderMetrics.isEnabled {
             let latenessMS = (CACurrentMediaTime() - update.targetTimestamp) * 1000
             RenderMetrics.record(.drawableWait, milliseconds: max(0, latenessMS))
         }
         let stillPending = shouldRenderFrame?() ?? true
-        // The frame submitted on the previous tick is on the glass now;
-        // the stand-in behind it can go (`noteFrameSubmitted`).
+        // Last tick's frame is on the glass; retire the stand-in.
         let retiringStandIn = firstPresentState == .submitted
         if retiringStandIn { notePresentedFrame() }
         let drawable = update.drawable
@@ -211,16 +153,12 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
             onRenderFrame(FrameScheduler.clearPass(for: drawable), metalLayer.drawableSize, drawable)
             noteFrameSubmitted()
         }
-        // One more tick is owed while a stand-in is still up, even with
-        // nothing else to draw: pausing here would leave it in place until
-        // the next unrelated frame — harmless, but then the retirement
-        // would ride on output rather than on time.
+        // Owe one more tick while a stand-in is up, so it retires on time.
         if !stillPending && firstPresentState != .submitted {
             link.isPaused = true
         }
     }
 
-    /// A render pass that clears to the theme's background colour.
     private static func clearPass(for drawable: CAMetalDrawable) -> MTLRenderPassDescriptor {
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = drawable.texture
@@ -233,16 +171,11 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
     }
 }
 
-/// The flash-guard state machine — see `FrameScheduler.requestFirstPresent`.
+/// The flash guard (`FrameScheduler.requestFirstPresent`).
 enum FirstPresentState: Equatable {
-    /// Nothing outstanding; the layer shows whatever was last presented.
     case idle
-    /// A first frame was requested but not yet presented; until it is, the
-    /// layer's `backgroundColor` (the theme's clear colour) stands in so the
-    /// transparent window can never show what is behind it.
+    /// Requested; the layer's `backgroundColor` stands in.
     case awaitingFrame
-    /// The first frame's drawable has been scheduled but has not had a
-    /// display-link tick to reach the glass; the stand-in stays up until the
-    /// next tick (`FrameScheduler.noteFrameSubmitted`).
+    /// Scheduled; the stand-in stays until the next tick.
     case submitted
 }

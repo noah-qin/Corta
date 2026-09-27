@@ -16,29 +16,18 @@
 
 import Foundation
 
-/// Writes to a file the user owns — a shell rc file, the config file —
-/// without changing what that path *is*.
-///
-/// `String.write(to:atomically:)` replaces the file at the path it is
-/// given. When that path is a symbolic link, the link itself is replaced
-/// by a plain file and the file it pointed at is left untouched: a
-/// `~/.zshrc` kept in a dotfiles repository silently stops being the
-/// repository's copy the first time Corta installs its shell integration.
-/// The atomic write also creates the replacement with default permissions,
-/// so a file the user had made private stops being private.
-///
-/// `write(_:to:)` follows the link chain to the real file, writes there —
-/// still atomically, so a crash mid-write can never leave a truncated rc
-/// file — and puts the target's permission bits back afterwards.
+/// Writes a user-owned file (rc file, config) without changing what the
+/// path is. `String.write(to:atomically:)` replaces a symlink with a plain
+/// file — a dotfiles `~/.zshrc` stops being the repository's — and resets
+/// permissions. This follows the link, writes atomically there, and
+/// restores the permission bits.
 nonisolated enum UserFile {
-    /// The most links a path is followed through before it is treated as
-    /// a loop and written where it stands.
+    /// Beyond this a chain counts as a loop and is written in place.
     private static let maximumLinkDepth = 32
 
-    /// Writes `text` to the file `url` ultimately names, creating the
-    /// parent directory when needed, atomically, keeping the file's
-    /// permissions. A dangling link is followed too: the missing file is
-    /// created at its destination and the link stays a link.
+    /// Writes atomically to the final target, creating its directory and
+    /// keeping permissions. A dangling link's target is created, and the link
+    /// stays.
     static func write(_ text: String, to url: URL) throws {
         let target = resolvingLinks(url)
         let manager = FileManager.default
@@ -51,11 +40,9 @@ nonisolated enum UserFile {
         }
     }
 
-    /// Follows symbolic links from `url` until a path that is not a link.
-    /// Relative link destinations resolve against the link's own directory,
-    /// as the kernel resolves them. Unlike `URL.resolvingSymlinksInPath()`
-    /// this also follows a link whose destination does not exist yet, so
-    /// the file is created where the link points rather than over the link.
+    /// Follows links, resolving relative targets against the link's
+    /// directory; unlike `resolvingSymlinksInPath()` it follows a link to a
+    /// missing file.
     static func resolvingLinks(_ url: URL) -> URL {
         var current = url.standardizedFileURL
         let manager = FileManager.default

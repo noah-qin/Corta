@@ -16,26 +16,14 @@
 
 import AppKit
 
-/// IME composition: the `NSTextInputClient` conformance, the
-/// marked-text (preedit) overlay and the candidate window's placement.
-///
-/// The split of responsibilities (`DESIGN.md` §7.1):
-///
-/// - Key *routing* lives in `TerminalView+Keyboard.swift`: ⌘/⌃ events never
-///   reach an input method; everything else is offered to
-///   `inputContext.handleEvent(_:)` first.
-/// - *Committed* text arrives through `insertText(_:replacementRange:)` and
-///   is written to the PTY there, as UTF-8 bytes via `onKeyBytes` — never
-///   from `keyDown`.
-/// - *Marked* text lives in the app layer only. It is never written to the
-///   grid and never to the PTY; `MarkedTextOverlayView` draws it over the
-///   cells starting at the cursor, keeping the underline styling the
-///   attributed string carries.
+/// IME composition (`DESIGN.md` §7.1). Routing is in
+/// `TerminalView+Keyboard.swift`; committed text reaches the PTY only via
+/// `insertText`; marked text never touches the grid or the PTY —
+/// `MarkedTextOverlayView` draws it at the cursor.
 extension TerminalView: NSTextInputClient {
     // MARK: - Marked text state
 
-    /// Extensions cannot add storage, so the preedit state lives on the
-    /// overlay subview itself; a lookup stands in for an ivar.
+    /// The preedit state lives on the overlay: extensions have no storage.
     private var existingMarkedTextOverlay: MarkedTextOverlayView? {
         subviews.first(where: { $0 is MarkedTextOverlayView }) as? MarkedTextOverlayView
     }
@@ -49,16 +37,9 @@ extension TerminalView: NSTextInputClient {
 
     // MARK: - NSTextInputClient
 
-    /// Committed text is the only IME output that reaches the child: as
-    /// UTF-8 bytes through the same `onKeyBytes` path a physical key takes.
-    ///
-    /// This is the path *ordinary* typing takes, composed or not — Cocoa's
-    /// input-context pipeline commits even a plain, uncomposed character
-    /// through here, not through `deliverBytes`. So `InputLatencySignposts
-    /// .keyDown` has to be emitted here as well: wrapping `deliverBytes`
-    /// alone covers only the control-sequence bypass path
-    /// (`TerminalView+Keyboard.swift`'s doc comment), and a trace of normal
-    /// typing would show no `keyDown` events at all.
+    /// Committed text, the only IME output that reaches the child, via
+    /// `onKeyBytes`. Plain typing commits through here too, not through
+    /// `deliverBytes`, so the `keyDown` signpost is emitted here as well.
     func insertText(_ string: Any, replacementRange: NSRange) {
         clearMarkedText()
         let text = (string as? NSAttributedString)?.string ?? (string as? String) ?? ""
@@ -67,9 +48,7 @@ extension TerminalView: NSTextInputClient {
         InputLatencySignposts.measure(.keyDown) { onKeyBytes?(Array(text.utf8)) }
     }
 
-    /// Preedit updates reposition the overlay at the cursor and redraw it;
-    /// nothing here touches the grid or the PTY. An empty string is the
-    /// IME cancelling the composition, which is an unmark.
+    /// Repositions and redraws the overlay; an empty string cancels.
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
         let attributed: NSAttributedString =
             switch string {
@@ -82,9 +61,7 @@ extension TerminalView: NSTextInputClient {
             return
         }
         let overlay = markedTextOverlay
-        // Re-read on every show: the shell's provider answers with the
-        // renderer's font at the *current* size, so ⌘=/⌘- mid-composition
-        // is picked up on the next preedit update.
+        // Re-read each time, so ⌘= / ⌘- mid-composition takes effect.
         if let font = preeditFontProvider?() { overlay.font = font }
         overlay.show(attributed, at: cursorRectProvider?() ?? .zero)
     }
@@ -93,12 +70,8 @@ extension TerminalView: NSTextInputClient {
         clearMarkedText()
     }
 
-    /// A pane losing the keyboard mid-composition (click into a sibling
-    /// pane, a ⌘⌥ focus move, a tab switch) drops the preedit here: once
-    /// this view's input context deactivates the composition is over as far
-    /// as the IME is concerned, and a stale overlay would sit on a pane the
-    /// user is no longer typing into. Discarded, never committed —
-    /// half-composed input must not reach the PTY.
+    /// Losing focus mid-composition discards the preedit — never commits
+    /// half-composed input to the PTY.
     override func resignFirstResponder() -> Bool {
         clearMarkedText()
         return super.resignFirstResponder()
@@ -119,8 +92,7 @@ extension TerminalView: NSTextInputClient {
         return NSRange(location: 0, length: length)
     }
 
-    /// The terminal has no text backing store the IME may read; the
-    /// selection is not exposed to input methods.
+    /// No backing store is exposed to input methods.
     func selectedRange() -> NSRange {
         NSRange(location: NSNotFound, length: 0)
     }
@@ -135,9 +107,8 @@ extension TerminalView: NSTextInputClient {
         [.underlineStyle, .underlineColor, .markedClauseSegment, .font, .foregroundColor]
     }
 
-    /// The candidate window anchors to the cursor cell, in *screen*
-    /// coordinates. Computed on demand from `cursorRectProvider`, so it
-    /// stays correct after the window moves.
+    /// The cursor cell in screen coordinates, computed on demand so it
+    /// follows window moves.
     func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
         guard let cell = cursorRectProvider?(), let window else { return .zero }
         return window.convertToScreen(convert(cell, to: nil))
@@ -147,16 +118,9 @@ extension TerminalView: NSTextInputClient {
         NSNotFound
     }
 
-    /// Key-bound commands that arrive when the IME consumed an event and
-    /// resolved it through the key-binding system instead of inserting
-    /// text. Forwarding them keeps Return, Delete, Escape and the arrows
-    /// behaving identically whether or not an IME is selected — an
-    /// IME that answers `handleEvent` with `true` for Return must not eat
-    /// the key.
-    ///
-    /// Signposted the same way `insertText` is, for the same reason: this
-    /// is a real, common part of the keypress-to-pixel chain,
-    /// not the control-sequence bypass path.
+    /// Commands an IME resolved instead of inserting text; forwarded so
+    /// Return, Delete, Escape and arrows behave the same with any IME.
+    /// Signposted like `insertText`.
     override func doCommand(by selector: Selector) {
         let bytes: [UInt8]?
         switch selector {
@@ -167,12 +131,8 @@ extension TerminalView: NSTextInputClient {
         case #selector(moveDown(_:)): bytes = Array("\u{1B}[B".utf8)
         case #selector(moveRight(_:)): bytes = Array("\u{1B}[C".utf8)
         case #selector(moveLeft(_:)): bytes = Array("\u{1B}[D".utf8)
-        // A candidate window (a shell completion menu, an IME) can
-        // resolve Tab/Shift-Tab as a command instead of `insertText`, and
-        // without these cases it was silently dropped here — never reaching
-        // `bytes(for:)`'s own Tab encoding at all. `doCommand` never sees a
-        // modifier beyond Shift (⌘/⌃ never reach the input context, per
-        // `routesEventThroughIME`), so this always matches the unmodified
+        // A candidate window can resolve Tab and Shift-Tab as commands. Only
+        // Shift reaches here (⌘/⌃ bypass the IME), matching the unmodified
         // Shift-Tab case in `TerminalView+Keyboard.swift`.
         case #selector(insertTab(_:)): bytes = [0x09]
         case #selector(insertBacktab(_:)): bytes = Array("\u{1B}[Z".utf8)
@@ -184,30 +144,19 @@ extension TerminalView: NSTextInputClient {
     }
 }
 
-/// Draws the preedit string over the cells at the cursor.
-///
-/// An ordinary `NSView` subview, composited above the Metal layer; the grid
-/// itself never sees marked text. There is deliberately no backdrop — the
-/// underlined text reads directly over the cells, as in Terminal.app. The
-/// view never accepts events (`hitTest` returns nil).
+/// Draws the preedit over the cursor cells, above the Metal layer, with no
+/// backdrop (as Terminal.app). Never takes events.
 final class MarkedTextOverlayView: NSView {
-    /// The preedit as last handed to `setMarkedText`, with the IME's
-    /// underline/clause attributes intact; nil while hidden.
+    /// The preedit with the IME's attributes; nil while hidden.
     private(set) var markedText: NSAttributedString?
 
-    /// The renderer's primary font (SF Mono) at the default size; the shell
-    /// re-points this at the current size on every `show` via
-    /// `TerminalView.preeditFontProvider`, so ⌘=/⌘- resizes marked text too.
+    /// Re-pointed at the current size on each `show`
+    /// (`TerminalView.preeditFontProvider`).
     var font = NSFont.monospacedSystemFont(
         ofSize: ViewController.defaultFontSize, weight: .medium)
 
-    /// What the renderer would draw ordinary text in, read live.
-    ///
-    /// Not a stored colour: the palette follows the theme and the system
-    /// appearance, and in a light appearance the terminal draws dark text
-    /// on a light background — a fixed near-white preedit would be
-    /// invisible there. A second copy of a value that has an owner is a bug
-    /// waiting for the owner to change.
+    /// The renderer's text colour, read live so it follows theme and
+    /// appearance.
     private var textColor: NSColor {
         let color = TerminalColorPalette.defaultForeground
         return NSColor(
@@ -220,9 +169,8 @@ final class MarkedTextOverlayView: NSView {
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        // The terminal view is layer-HOSTING (its layer is the CAMetalLayer);
-        // a subview without its own backing layer never composites on top of
-        // it and the preedit stays invisible.
+        // Without its own layer it can't composite over the hosting view's
+        // Metal layer.
         wantsLayer = true
         isHidden = true
     }
@@ -233,14 +181,9 @@ final class MarkedTextOverlayView: NSView {
         isHidden = true
     }
 
-    /// Shows the preedit at `cell` (the cursor cell's rect in the superview's
-    /// coordinates, at the *current* font size — so ⌘=/⌘- mid-composition
-    /// arrives as a taller `cell` on the next update, and there is no second
-    /// copy of the cell metrics here to fall out of step with it),
-    /// wide enough for the text but never narrower than a cell
-    /// and never wider than what is left of the pane: AppKit does not clip
-    /// subviews to their superview, so an unclamped preedit at the last
-    /// column would paint over the divider and the sibling pane in a split.
+    /// Shows the preedit at `cell` (current size, from the provider), at
+    /// least a cell wide and clamped to the pane: AppKit doesn't clip
+    /// subviews, so it would paint over a split's divider.
     func show(_ attributed: NSAttributedString, at cell: CGRect) {
         let display = displayString(for: attributed)
         markedText = display
@@ -260,13 +203,10 @@ final class MarkedTextOverlayView: NSView {
         isHidden = true
     }
 
-    /// The IME's attributes win; font and colour are filled in only where
-    /// the attributed string carries none, so the underline styling and any
-    /// clause highlighting survive untouched.
+    /// Fills in font and colour only where the IME set none.
     private func displayString(for attributed: NSAttributedString) -> NSAttributedString {
         let text = NSMutableAttributedString(attributedString: attributed)
-        // Collect first: mutating an attributed string mid-enumeration is
-        // not safe.
+        // Collect first: no mutation mid-enumeration.
         var additions: [(NSRange, [NSAttributedString.Key: Any])] = []
         text.enumerateAttributes(in: NSRange(location: 0, length: text.length)) { attributes, range, _ in
             var defaults: [NSAttributedString.Key: Any] = [:]
@@ -282,8 +222,7 @@ final class MarkedTextOverlayView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         guard let markedText else { return }
-        // Centre vertically within the cell; the underline the attributed
-        // string carries is drawn by AppKit along the text's baseline.
+        // Centred in the cell; AppKit draws the underline.
         let y = max(0, (bounds.height - markedText.size().height) / 2)
         markedText.draw(at: NSPoint(x: 0, y: y))
     }

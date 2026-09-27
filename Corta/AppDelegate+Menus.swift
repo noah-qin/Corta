@@ -16,24 +16,16 @@
 
 import Cocoa
 
-/// The menu bar: the items the storyboard cannot carry, and the keyboard
-/// shortcuts every item's key equivalent is read from.
-///
-/// **Why the shortcuts live here and not in the storyboard.** A key
-/// equivalent baked into a nib cannot be changed by a config file, which is
-/// what made every shortcut in Corta unrebindable. Menu items are still the
-/// dispatch mechanism — that is what makes ⌘D reach the right window's split
-/// controller through the responder chain — but their key equivalents are now
-/// *applied* from `Keybindings` after the menu exists, and re-applied
-/// whenever the config file changes. Nothing intercepts keys behind AppKit's
-/// back, and the menus keep showing the shortcut that actually works.
+/// The menu bar: items the storyboard can't carry, and every key
+/// equivalent. Shortcuts are applied from `Keybindings` after the menu
+/// exists and on every config change, because a nib's key equivalent can't
+/// be rebound. Menu items still dispatch through the responder chain, and
+/// the menus show the shortcut that actually works.
 extension AppDelegate {
-    /// The Edit menu, so `menuNeedsUpdate` can tell it from the theme menu
-    /// without matching on a localized title. Weak: the menu bar owns it.
+    /// Lets `menuNeedsUpdate` tell Edit from the theme menu without a
+    /// localized title.
     fileprivate static weak var editMenu: NSMenu?
 
-    /// Builds the items the storyboard has no place for, then applies the
-    /// keyboard shortcuts to every item in the bar.
     func installMenus() {
         guard let mainMenu = NSApp.mainMenu else { return }
         installAboutItem(in: mainMenu)
@@ -44,12 +36,8 @@ extension AppDelegate {
         installViewMenuItems(in: mainMenu)
         installHelpMenuItems(in: mainMenu)
         pruneInapplicableEditItems(in: mainMenu)
-        // `pruneInjectedEditItems` otherwise runs only from `menuNeedsUpdate`,
-        // which fires when the Edit menu is opened — never, in a test host
-        // that reads `NSApp.mainMenu` without interacting with it. Called
-        // here too so the items AppKit injects at launch are deduplicated
-        // deterministically rather than only when and if a human opens the
-        // menu first.
+        // Also here, not only in `menuNeedsUpdate`: a test host reading
+        // `NSApp.mainMenu` never opens the menu.
         if let edit = AppDelegate.editMenu { pruneInjectedEditItems(edit) }
         localizeStoryboardMenuTitles(in: mainMenu)
         applyKeybindings()
@@ -58,19 +46,14 @@ extension AppDelegate {
             object: nil)
     }
 
-    /// Storyboard menu items are intentionally kept in the base storyboard so
-    /// AppKit can wire their responder-chain actions. Their visible titles are
-    /// localized after the menu is loaded, which also keeps the menu in sync
-    /// with the String Catalog without maintaining nine storyboard copies.
+    /// Storyboard items stay in the base storyboard for their responder-chain
+    /// wiring; titles are localized here from the String Catalog.
     private func localizeStoryboardMenuTitles(in menu: NSMenu) {
         let titles: [String: String] = [
             "Corta": "menu.corta", "About Corta": "menu.aboutCorta", "Settings…": "command.settings",
             "Services": "menu.services", "Hide Corta": "menu.hideCorta", "Hide Others": "menu.hideOthers",
             "Show All": "menu.showAll", "Quit Corta": "menu.quitCorta", "File": "menu.file",
-            // File's "New" is a new window, and it says so — the palette and
-            // the shortcuts sheet already call the same command by
-            // `command.newWindow`, and three names for one action is how a
-            // user ends up unsure whether File's "New" opens a tab.
+            // "New" says New Window, as the palette and shortcuts sheet do.
             "New": "command.newWindow", "New Tab": "command.newTab", "Close": "command.close",
             "Shell": "menu.shell", "Split Pane Right": "command.splitRight", "Split Pane Down": "command.splitDown",
             "Move Focus Left": "command.focusLeft", "Move Focus Right": "command.focusRight",
@@ -98,30 +81,20 @@ extension AppDelegate {
         for item in menu.items {
             if let key = titles[item.title] { item.title = L10n.text(key) }
             if let submenu = item.submenu {
-                // The menu *bar* shows a top-level item by its submenu's
-                // title, not the item's — so with only the item localised
-                // the bar still read File / Shell / Edit / View / Window /
-                // Help in every language while the menus beneath it were
-                // translated. Same table, both.
+                // The bar shows a submenu's title, not its item's; localize both.
                 if let key = titles[submenu.title] { submenu.title = L10n.text(key) }
                 localizeStoryboardMenuTitles(in: submenu)
             }
         }
     }
 
-    /// Help > Keyboard Shortcuts (⌘/) — the discoverability surface for
-    /// everything that is only reachable by knowing a key or a menu
-    /// (`ShortcutsWindowController`). Under Help because that is where a
-    /// person looks for "what can this do", and ⌘/ because that is the key
-    /// every other app with a shortcut sheet uses.
+    /// Help > Keyboard Shortcuts (⌘/, as elsewhere) opens
+    /// `ShortcutsWindowController`.
     private func installHelpMenuItems(in mainMenu: NSMenu) {
         guard let help = mainMenu.items.first(where: { $0.title == "Help" })?.submenu
         else { return }
-        // The storyboard template wired "Corta Help" to `NSApplication.showHelp`,
-        // which opens Help Viewer against a help book Corta has never shipped —
-        // the menu made a promise nothing kept. Retarget it at the
-        // documentation. Matched by action, not by title, so the lookup is
-        // independent of localization.
+        // The template's "Corta Help" opens a help book Corta never shipped;
+        // retarget it at the documentation, matched by action.
         if let cortaHelp = help.items.first(where: {
             $0.action == #selector(NSApplication.showHelp(_:))
         }) {
@@ -137,10 +110,7 @@ extension AppDelegate {
         help.addItem(item)
     }
 
-    /// "Corta Help" (⌘?) opens the README — install, configuration and usage
-    /// all live there and it links on to `docs/`. There is no in-app help
-    /// book to register with Help Viewer; the repository's documentation is
-    /// the help.
+    /// "Corta Help" (⌘?) opens the README, which links on to `docs/`.
     @objc func showHelpDocumentation(_ sender: Any?) {
         NSWorkspace.shared.open(Self.helpURL)
     }
@@ -151,36 +121,18 @@ extension AppDelegate {
         ShortcutsWindowController.shared.show(sender)
     }
 
-    /// Removes the Edit-menu items the storyboard template ships that a
-    /// self-drawn terminal cannot honour.
+    /// Removes template Edit items only an `NSTextView` can honour: Spelling
+    /// and Grammar, Substitutions, Transformations, Speech, Paste and Match
+    /// Style, and Find and Replace. The child owns every byte on screen, so
+    /// these were greyed out or silently did nothing
+    /// (`ViewController.performFindPanelAction` handles only tags 1, 2, 3, 7).
     ///
-    /// AppKit's Edit menu is written for `NSTextView`: Spelling and Grammar,
-    /// Substitutions (smart quotes, smart dashes, text replacement),
-    /// Transformations (upper case, lower case, capitalize), Speech, Paste and
-    /// Match Style, and Find and Replace all send actions that only a Cocoa
-    /// text view implements. Corta's terminal view is a `CAMetalLayer` with a
-    /// VT parser behind it: it has no editable text object, no attributed
-    /// string, and no notion of replacing a range — the child process owns
-    /// every byte on screen. So every one of those items was permanently
-    /// greyed out at best, and at worst *not* greyed out and promising an
-    /// operation that silently did nothing.
-    ///
-    /// Find and Replace is the clearest case. `performFindPanelAction:` with
-    /// the replace tags reaches `ViewController.performFindPanelAction`, which
-    /// handles tags 1, 2, 3 and 7 and drops everything else on the floor — so
-    /// the menu made a promise the code had already decided not to keep. A
-    /// terminal has nothing to replace: the text is a transcript of output
-    /// that has already happened. The item goes rather than gaining a
-    /// do-nothing implementation or an alert explaining itself.
-    ///
-    /// Removed by *action*, not by title, so a localized menu prunes the same
-    /// items — and by submenu identity for the three template submenus, whose
-    /// parent item carries no action of its own.
+    /// Removed by action (or, for the three template submenus, by their
+    /// children's actions), so localized menus prune the same items.
     private func pruneInapplicableEditItems(in mainMenu: NSMenu) {
         guard let edit = mainMenu.items.first(where: { $0.title == "Edit" })?.submenu
         else { return }
 
-        // The submenu groups, matched by the actions their children send:
         // Spelling and Grammar, Substitutions, Transformations, Speech.
         let templateActions: Set<Selector> = [
             #selector(NSText.showGuessPanel(_:)),
@@ -200,14 +152,11 @@ extension AppDelegate {
             }
         }
 
-        // Paste and Match Style: pasting into a terminal is bytes on a PTY;
-        // there is no style to match or to discard.
+        // Paste and Match Style: a PTY has no style.
         let removableActions: Set<Selector> = [
             #selector(NSTextView.pasteAsPlainText(_:))
         ]
-        // The Find submenu keeps Find…, Find Next, Find Previous and Use
-        // Selection for Find (tags 1, 2, 3 and 7 — see
-        // `ViewController.performFindPanelAction`) and loses the rest.
+        // Find, Next, Previous, Use Selection (`performFindPanelAction`).
         let keptFindTags: Set<Int> = [1, 2, 3, 7]
 
         for item in edit.items.reversed() {
@@ -231,27 +180,16 @@ extension AppDelegate {
                 find.removeItem(candidate)
             }
         }
-        // Removing items can leave a separator at an end or two in a row.
         tidySeparators(in: edit)
-        // AppKit injects AutoFill and Start Dictation into the Edit menu
-        // *after* this runs, and re-injects them, so they cannot be removed
-        // here — see `menuNeedsUpdate`.
+        // AppKit injects AutoFill and Dictation later, and again; see
+        // `menuNeedsUpdate`.
         edit.delegate = self
         AppDelegate.editMenu = edit
     }
 
-    /// AutoFill and Start Dictation, dropped as the Edit menu opens.
-    ///
-    /// AppKit adds these itself, after `installMenus` and again whenever it
-    /// feels like it, so a one-time removal does not hold. Both target a
-    /// Cocoa text field: AutoFill fills credentials into one, and Dictation
-    /// inserts recognised speech into the first responder's text storage —
-    /// of which a `CAMetalLayer` has none. Neither has ever done anything in
-    /// Corta.
-    ///
-    /// Emoji & Symbols stays. That one does work: `TerminalView` implements
-    /// `NSTextInputClient` for the IME (`TerminalView+IME.swift`), so the
-    /// character picker's insertion lands on the grid like any other input.
+    /// Drops AutoFill and Start Dictation as the Edit menu opens; AppKit
+    /// re-injects them, and both need a Cocoa text object Corta lacks. Emoji &
+    /// Symbols stays: `TerminalView`'s `NSTextInputClient` takes its input.
     func pruneInjectedEditItems(_ menu: NSMenu) {
         let injected: Set<Selector> = [
             Selector(("_autoFillMenu:")),
@@ -267,17 +205,10 @@ extension AppDelegate {
         tidySeparators(in: menu)
     }
 
-    /// AppKit's own injection of Emoji & Symbols is not tied to a selector
-    /// this file names (unlike AutoFill/Dictation above) — it is entirely
-    /// system-controlled, and the check AppKit normally uses to avoid
-    /// injecting it twice appears to be window-server-dependent: a hosted
-    /// CI runner, with no interactive session behind the menu, produced two
-    /// "Edit > Emoji & Symbols" entries sharing one key equivalent
-    /// (`MenuShortcutTests.noKeystrokeIsClaimedByTwoMenuItems`, never once
-    /// reproduced on a normal Mac with a real session). Rather than key off
-    /// AppKit's exact injection mechanism — which this app does not
-    /// control and which may change — remove same-title, same-keystroke
-    /// duplicates generically, keeping the first.
+    /// Removes same-title, same-keystroke duplicates, keeping the first. A CI
+    /// runner with no interactive session got two Emoji & Symbols items
+    /// (`MenuShortcutTests.noKeystrokeIsClaimedByTwoMenuItems`); AppKit's
+    /// injection isn't ours to key off.
     private func deduplicateInjectedItems(_ menu: NSMenu) {
         var seen: Set<String> = []
         for item in menu.items.reversed() {
@@ -291,8 +222,7 @@ extension AppDelegate {
         }
     }
 
-    /// Drops leading, trailing and doubled separators — what is left after
-    /// items are removed from between them.
+    /// Drops leading, trailing and doubled separators.
     private func tidySeparators(in menu: NSMenu) {
         var index = menu.items.count - 1
         while index >= 0 {
@@ -307,16 +237,9 @@ extension AppDelegate {
         }
     }
 
-    /// Points "About Corta" at Corta's own About window.
-    ///
-    /// Retargeted here rather than rewired in the storyboard, for the same
-    /// reason the shortcuts are applied here: the storyboard's version of an
-    /// item is a starting point, and the app menu's About item is the one
-    /// item a storyboard cannot express — it is created by AppKit's template
-    /// with `orderFrontStandardAboutPanel:` already attached.
-    ///
-    /// Matched by action, not by title: the title is localised by AppKit and
-    /// "About Corta" is only what it happens to say in English.
+    /// Points "About Corta" at Corta's About window. AppKit's template
+    /// attaches `orderFrontStandardAboutPanel:`; matched by that action, since
+    /// the title is localized.
     private func installAboutItem(in mainMenu: NSMenu) {
         guard let appMenu = mainMenu.items.first?.submenu,
             let about = appMenu.items.first(where: {
@@ -331,11 +254,8 @@ extension AppDelegate {
         AboutWindowController.shared.show(sender)
     }
 
-    /// "Check for Updates…", directly under About — the position every
-    /// Sparkle-using Mac app puts it in, found by habit rather than by
-    /// reading the menu. Inserted by index rather than appended, so it
-    /// lands next to About even if the app menu template ever grows an
-    /// item between them.
+    /// "Check for Updates…", inserted directly under About, where Sparkle apps
+    /// put it.
     private func installUpdateItem(in mainMenu: NSMenu) {
         guard UpdateController.isAvailable else { return }
         guard let appMenu = mainMenu.items.first?.submenu,
@@ -353,15 +273,8 @@ extension AppDelegate {
         appMenu.insertItem(item, at: aboutIndex + 1)
     }
 
-    /// Pane geometry and command-to-command jumping, under
-    /// Shell where the other pane commands already live.
-    ///
-    /// The menu reads as three groups: create (the storyboard's splits),
-    /// move (its focus moves, then the command jumps — both answer "go
-    /// somewhere else"), and resize (the grow/shrink pairs by axis, then
-    /// Equalize). Command jumping sits with the focus moves rather than
-    /// after resize, so no geometry group splits the two navigation
-    /// families apart.
+    /// Shell menu groups: create (the storyboard's splits), move (focus, then
+    /// command jumps), resize (grow/shrink by axis, then Equalize).
     private func installShellMenuItems(in mainMenu: NSMenu) {
         guard let shell = mainMenu.items.first(where: { $0.title == "Shell" })?.submenu
         else { return }
@@ -373,11 +286,7 @@ extension AppDelegate {
         ] {
             shell.addItem(item(for: command))
         }
-        // Directory navigation: reveal/copy first (reads only), then
-        // the two things a `cd` primitive with real callers looks like.
-        // Browse Remote Files comes last: directory navigation too, but of
-        // the host the pane is talking to rather than this one, and enabled
-        // only for panes that are remote.
+        // Directory navigation; Browse Remote Files last, for remote panes.
         shell.addItem(.separator())
         for command in [
             TerminalCommand.revealWorkingDirectory, .copyWorkingDirectoryPath,
@@ -387,11 +296,8 @@ extension AppDelegate {
         ] {
             shell.addItem(item(for: command))
         }
-        // The three state commands, together and in the order of how
-        // much each throws away, so the menu itself is the explanation.
-        // Reconnect ends the group: it throws away the
-        // most (the whole session and its connection) and is enabled only
-        // where that is the way back — a dead remote launcher.
+        // State commands, ordered by how much each throws away; Reconnect
+        // (whole session, dead remote launchers only) last.
         shell.addItem(.separator())
         for command in [
             TerminalCommand.clearScreen, .clearHistory, .resetTerminal, .reconnectRemote,
@@ -405,18 +311,14 @@ extension AppDelegate {
         ] {
             shell.addItem(item(for: command))
         }
-        // Secure Keyboard Entry, last and alone: it is the one item in
-        // this menu that changes the *machine's* input mode rather than a
-        // pane, and Terminal.app's own Shell menu puts it in the same place.
-        // Checkmarked from the config file (`validateMenuItem`).
+        // Secure Keyboard Entry alone: it changes the machine's input mode, not a
+        // pane (as in Terminal.app).
         shell.addItem(.separator())
         shell.addItem(item(for: .secureKeyboardEntry))
     }
 
-    /// Export Text…, under File — where a Mac app puts "write what is here
-    /// to a file", next to the window commands rather than among the editing
-    /// ones. (`TerminalCommand.exportText` groups with Edit in the *palette*,
-    /// which lists by what a command does, not by which menu holds it.)
+    /// Export Text…, under File. (The palette groups it with Edit by what it
+    /// does.)
     private func installFileMenuItems(in mainMenu: NSMenu) {
         guard let file = mainMenu.items.first(where: { $0.title == "File" })?.submenu
         else { return }
@@ -424,19 +326,9 @@ extension AppDelegate {
         file.addItem(item(for: .exportText))
     }
 
-    /// Theme, appearance, scrolling and the command palette, under View.
-    ///
-    /// The theme and appearance lists belong in View: they are what the
-    /// window looks like, which is what View is for. A top-level "Settings"
-    /// menu of their own would put a second Settings entry beside the one
-    /// macOS puts in the app menu at ⌘, — two entries for one window.
-    ///
-    /// Theme and appearance are one submenu, not two: light-or-dark *is* the
-    /// theme choice a user makes daily, and two neighbouring submenus each
-    /// holding a single-choice list made one decision look like two. The
-    /// appearance choices head the list, the themes follow below a separator;
-    /// each row is a plain checkmarked choice rather than a control of its
-    /// own.
+    /// Theme, appearance, scrolling and the palette, under View. Theme and
+    /// appearance share one submenu — they are one daily choice — and a
+    /// separate Settings menu would duplicate the app menu's ⌘,.
     private func installViewMenuItems(in mainMenu: NSMenu) {
         guard let view = mainMenu.items.first(where: { $0.title == "View" })?.submenu
         else { return }
@@ -448,11 +340,8 @@ extension AppDelegate {
         }
         view.addItem(.separator())
         view.addItem(item(for: .commandPalette))
-        // The Quick Terminal, beside the palette: both are "bring a
-        // surface to me" rather than a change to the window in front. Its
-        // key equivalent stays empty by design: the system-wide hotkey is
-        // `quick-terminal-key`, held by `GlobalHotKey`, and Settings ▸
-        // General shows which key that is.
+        // No key equivalent: the system-wide hotkey is `quick-terminal-key`,
+        // held by `GlobalHotKey`.
         view.addItem(item(for: .quickTerminal))
         view.addItem(.separator())
 
@@ -461,11 +350,8 @@ extension AppDelegate {
         view.addItem(themeItem)
     }
 
-    /// The theme and appearance list, rebuilt from the configuration each
-    /// time the menu is about to open — the config file can define a theme
-    /// while the app is running, and a menu built once at launch
-    /// would never show it. Rebuilding whole also keeps the appearance rows
-    /// in place without a second delegate path.
+    /// Rebuilt from the configuration as the menu opens, so a theme defined
+    /// at runtime appears.
     private var themeMenu: NSMenu {
         let menu = NSMenu(title: L10n.text("settings.label.theme"))
         menu.delegate = self
@@ -494,14 +380,12 @@ extension AppDelegate {
     }
 
     private func item(for command: TerminalCommand) -> NSMenuItem {
-        // No target: the responder chain resolves it, which is what lets one
-        // menu item act on whichever window and pane has focus.
+        // No target: the responder chain picks the focused window and pane.
         NSMenuItem(title: command.title, action: command.action, keyEquivalent: "")
     }
 
-    /// Writes every command's shortcut onto whichever menu items carry its
-    /// action. Called at launch and on every config change, so unbinding a
-    /// key in the file clears it from the menu too.
+    /// Applies every command's shortcut to its menu items, at launch and on
+    /// each config change, so an unbind clears the menu too.
     @objc func applyKeybindings() {
         guard let mainMenu = NSApp.mainMenu else { return }
         let bindings = ConfigurationStore.shared.configuration.keybindings
@@ -515,8 +399,7 @@ extension AppDelegate {
         for item in menu.items {
             if let submenu = item.submenu { apply(shortcut, to: command, in: submenu) }
             guard item.action == command.action else { continue }
-            // `performFindPanelAction:` is shared by five Find items, told
-            // apart by tag; only the one this command means may be rebound.
+            // Five Find items share `performFindPanelAction:`; match the tag.
             if let tag = command.menuTag, item.tag != tag { continue }
             item.keyEquivalent = shortcut?.menuKeyEquivalent ?? ""
             item.keyEquivalentModifierMask = shortcut?.menuModifierMask ?? []
@@ -525,8 +408,6 @@ extension AppDelegate {
 }
 
 extension AppDelegate: NSMenuDelegate {
-    /// The theme/appearance list is data that can change while the app runs,
-    /// so it is rebuilt as the menu opens rather than at launch.
     public func menuNeedsUpdate(_ menu: NSMenu) {
         if menu === AppDelegate.editMenu {
             pruneInjectedEditItems(menu)
