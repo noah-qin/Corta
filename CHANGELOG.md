@@ -18,6 +18,8 @@ what to edit.
 
 ### Changed
 
+- The bundled updater is Sparkle 2.10.0 (was 2.9.6).
+
 - Building Corta from source now produces a separate application: **Corta
   Dev** (`dev.noahqin.Corta.dev`), with its own icon, its own
   configuration and state under `~/Library/Application Support/Corta
