@@ -1,7 +1,7 @@
 import Foundation
 
-/// A single shell command, identified by a stable id rather than a row
-/// (B07). A row is a document position — selection, scrollback and reflow
+/// A single shell command, identified by a stable id rather than a row.
+/// A row is a document position — selection, scrollback and reflow
 /// already speak in it — and it drifts: eviction renumbers scrollback, and a
 /// resize can reflow a wrapped line onto a different one. An id does not, so
 /// the app can tell "the command I copied a moment ago" apart from
@@ -30,23 +30,23 @@ public struct CommandRecord: Sendable, Equatable, Identifiable {
     /// `nil` until `OSC 133 ; D` arrives.
     public var exitStatus: Int?
     /// `OSC 7`'s value at the moment the prompt started, when the shell
-    /// reports one (M2.8). Not re-read at command end: a command that itself
+    /// reports one. Not re-read at command end: a command that itself
     /// changed directory should still be found under where it was launched.
     ///
     /// Local-only by construction, like `PerformerState.workingDirectory`;
     /// a command begun under a remote report carries `host` instead.
     public var workingDirectory: String?
-    /// B13 — the remote host this pane referred to when the command began
+    /// The remote host this pane referred to when the command began
     /// (`RemoteContext.host` at that moment). `nil` for a local command.
     /// Informational only, like the context it came from: a value here
     /// means `workingDirectory` describes a *local* directory the pane was
     /// in before going remote, not one this command ran in.
     public var host: String?
     /// The column the cursor sat at when `OSC 133 ; B` landed on this same
-    /// row (M2.8's `promptEndColumn`, kept per-record here) — where the
+    /// row (`promptEndColumn`, kept per-record here) — where the
     /// command the user typed starts. `nil` for a multi-line prompt whose
     /// `B` landed on a later row, or a shell that never reaches `B` at all;
-    /// either way `ViewController.commandLineText(grid:record:)` (B08) has
+    /// either way `ViewController.commandLineText(grid:record:)` has
     /// no honest place to start reading from and returns `nil` rather than
     /// guessing where a prompt string ends.
     public var promptEndColumn: Int?
@@ -63,14 +63,14 @@ public struct CommandRecordStore: Sendable, Equatable {
     /// The bound a store gets when nothing more specific is asked for —
     /// generous for jumping and inspecting *recent* commands, not an audit
     /// log, and small enough that a linear walk over it costs nothing per
-    /// frame. `Configuration.commandHistoryLimit` (B08) overrides this the
+    /// frame. `Configuration.commandHistoryLimit` overrides this the
     /// same way `Configuration.scrollbackLines` already overrides
     /// `Scrollback.defaultLimit`.
     public static let defaultCapacity = 512
 
     /// Bounded for the reason scrollback is bounded: a session left running
     /// for days must not grow this without limit (`SECURITY.md`'s resource
-    /// caps). Per-instance rather than a fixed constant (B08) so a session
+    /// caps). Per-instance rather than a fixed constant so a session
     /// can be given a smaller or larger bound without CortaTerminal knowing
     /// anything about where that number came from.
     public let capacity: Int
@@ -118,7 +118,7 @@ public struct CommandRecordStore: Sendable, Equatable {
 
     /// The command whose output covers `absoluteRow` — the most recent one
     /// whose prompt is at or before it, whether it has finished or is still
-    /// running. `ViewController.viewportCommand` (B07) is the one place that
+    /// running. `ViewController.viewportCommand` is the one place that
     /// additionally cares whether it finished.
     public func record(before absoluteRow: Int) -> CommandRecord? {
         records.last { $0.promptRow <= absoluteRow }
@@ -131,9 +131,9 @@ public struct CommandRecordStore: Sendable, Equatable {
         records.last { !$0.isRunning }
     }
 
-    /// B08 — records filtered by directory, time range, exit status and/or
+    /// Records filtered by directory, time range, exit status and/or
     /// host, most recent first. Every filter is independent and optional;
-    /// passing none returns every record. The `host` filter (B13) matches
+    /// passing none returns every record. The `host` filter matches
     /// the remote host recorded on each command; `workingDirectory` stays
     /// local-only by construction (`Performer+OSC.swift`'s
     /// `setWorkingDirectory`), so the two never disagree about which side
@@ -155,7 +155,7 @@ public struct CommandRecordStore: Sendable, Equatable {
         }
     }
 
-    /// B13 — the commands begun while the pane referred to `host`, most
+    /// The commands begun while the pane referred to `host`, most
     /// recent first. The single-filter spelling of `records(host:)` for the
     /// app, whose question is "what did this pane run on that machine?".
     public func records(onHost host: String) -> [CommandRecord] {

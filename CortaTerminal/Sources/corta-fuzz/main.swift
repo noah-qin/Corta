@@ -1,7 +1,7 @@
 import CortaTerminal
 import Foundation
 
-/// M6.11 — the libFuzzer harness `CONFORMANCE.md` §4.3 promised.
+/// The fuzz harness for the feed path (`CONFORMANCE.md` §4.3).
 ///
 /// Every byte from the PTY is hostile (`SECURITY.md` §1), and the feed path
 /// is where hostile bytes land first. This target exists to run that path

@@ -4,7 +4,7 @@
 /// `ContiguousArray<Cell>` arena that its rows are appended into once and
 /// never mutated again. This is not the obvious design — the obvious one is
 /// one array per row — and the reason is measured, not guessed
-/// (`PERFORMANCE.md` §4, M4 footprint step): at 100k 120-column lines, a
+/// (`PERFORMANCE.md` §4): at 100k 120-column lines, a
 /// `ContiguousArray<Cell>` grown one column at a time (matching how a shell
 /// actually writes a line, one `write(_:)` call per character) lands at
 /// capacity 158 for 120 cells used — roughly 57 MB of pure growth headroom
@@ -16,9 +16,8 @@
 /// known), and one arena serves up to `batchSize` rows instead of one each.
 ///
 /// This is safe here specifically because scrollback rows are immutable
-/// once pushed — "held for a long time and never edited again," as this
-/// file's own comment said before batching existed. The live screen
-/// (`Grid.lines`) is not batched: those rows are actively written to,
+/// once pushed — held for a long time and never edited again. The live
+/// screen (`Grid.lines`) is not batched: those rows are actively written to,
 /// column by column, and batching would force exactly the repacking-per-edit
 /// cost this design avoids.
 ///
@@ -47,7 +46,7 @@ public struct Scrollback: Sendable {
         var start: Int32
         var length: Int32
         var wrapped: Bool
-        /// The shell-integration mark (M7.2). Free: the span already had a
+        /// The shell-integration mark. Free: the span already had a
         /// padding byte after `wrapped`.
         var mark: LineMark = .none
     }
@@ -71,7 +70,7 @@ public struct Scrollback: Sendable {
     public private(set) var count = 0
 
     /// Every line ever pushed, never decremented — the anchor a selection
-    /// tracks its text by (M6.10).
+    /// tracks its text by.
     ///
     /// `count` cannot do that job: it stops at `limit`, so once the ring is
     /// full it reports no growth while rows are still being evicted one per
@@ -103,7 +102,7 @@ public struct Scrollback: Sendable {
         return Line(wrapped: span.wrapped, mark: span.mark, cells: batch.arena[start..<end])
     }
 
-    /// Re-marks a row already in history (M7.2). A command's exit status
+    /// Re-marks a row already in history. A command's exit status
     /// arrives long after its prompt row was written, and for anything that
     /// took more than a screenful of output that row is in history by then —
     /// so the mark has to be reachable here, or a slow command could never be

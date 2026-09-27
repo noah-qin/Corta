@@ -7,7 +7,7 @@
 /// misaligned `|`. Styles go in a parallel layer with a legend rather than
 /// inline, so the character layer stays readable.
 ///
-/// Wide pairs (M2.1) occupy two dump columns exactly as they occupy two grid
+/// Wide pairs occupy two dump columns exactly as they occupy two grid
 /// columns: the lead cell shows its scalar and the spacer cell shows a
 /// space. A cell carrying a grapheme cluster shows only its base scalar —
 /// the dump is about column accounting, not shaping. The style layer masks

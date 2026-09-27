@@ -47,7 +47,7 @@ extension Performer {
             grid.tabForward(parameters.value(0, default: 1))
         case 0x5A:  // CBT — backward horizontal tabulation
             grid.tabBackward(parameters.value(0, default: 1))
-        // SCOSC / SCORC (ANSI.SYS; B06) — bare `CSI s` / `CSI u`, no private
+        // SCOSC / SCORC (ANSI.SYS) — bare `CSI s` / `CSI u`, no private
         // marker, no intermediate, and — checked here — no parameters.
         // xterm treats the unmarked, unparameterized form as an alias for
         // DECSC/DECRC (`ESC 7`/`ESC 8`) unless DECLRMM (left/right margin

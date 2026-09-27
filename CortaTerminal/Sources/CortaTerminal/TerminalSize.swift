@@ -6,7 +6,7 @@ import Darwin
 /// programs use them for sixel and image protocols. The app layer
 /// (`ViewController.pixelSize(columns:rows:metrics:)`) fills these in from
 /// the real device-pixel cell metrics before a size reaches the pty — a
-/// Kitty-graphics client such as `kitten icat` (M10) refuses outright
+/// Kitty-graphics client such as `kitten icat` refuses outright
 /// without them. The zero default here stays truthful for callers with no
 /// renderer to measure from (`corta-bench`, the core's own tests).
 public struct TerminalSize: Equatable, Sendable {

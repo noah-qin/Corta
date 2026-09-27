@@ -5,8 +5,7 @@ import Foundation
 import Synchronization
 
 /// `corta-bench` — measures the numbers `docs/PERFORMANCE.md` §1 sets
-/// targets for and `docs/history/ROADMAP-0.1.md` M1.21 asks to be recorded, not
-/// estimated. Run release for real numbers:
+/// targets for, so they are recorded, not estimated. Run release for real numbers:
 ///
 ///     swift run -c release corta-bench
 
@@ -143,7 +142,7 @@ func benchmarkScrollbackMemory() {
     )
 }
 
-// MARK: - Keypress -> grid latency (M4, PERFORMANCE.md §1)
+// MARK: - Keypress -> grid latency (PERFORMANCE.md §1)
 
 /// The software round-trip a keypress causes before there is anything new
 /// for the renderer to draw: write to the PTY, the byte comes back, the
@@ -187,7 +186,7 @@ func benchmarkKeypressLatency() {
     var consecutiveTimeouts = 0
     var aborted = false
 
-    // Request/completion correlation (E06). `onOutput` carries no payload,
+    // Request/completion correlation. `onOutput` carries no payload,
     // so a semaphore signal alone cannot say *which* write produced it: a
     // signal from a timed-out write arriving late would be consumed by the
     // next write's wait and recorded as that write's near-zero "latency".
@@ -274,7 +273,7 @@ benchmarkParseThroughput()
 benchmarkScrollbackMemory()
 benchmarkKeypressLatency()
 
-// MARK: - Where the 100k-line memory actually goes (M4 Step 4 footprint)
+// MARK: - Where the 100k-line memory actually goes
 
 func diagnoseScrollbackFootprint() {
     var probe = ContiguousArray<Cell>()
@@ -294,13 +293,13 @@ func diagnoseScrollbackFootprint() {
 
 diagnoseScrollbackFootprint()
 
-// MARK: - Reflow cost on a full scrollback (M4.2)
+// MARK: - Reflow cost on a full scrollback
 
 /// `ResizeDebouncer` is trailing-only: a drag in continuous motion delivers
 /// nothing until the stream pauses for 100ms or ends, so "stays smooth"
 /// means one reflow after the gesture, not one inside a frame budget. The
 /// throttle alternative is measured head-to-head in
-/// `benchmarkResizeStrategies` below (P03).
+/// `benchmarkResizeStrategies` below.
 func benchmarkReflowCost() {
     var terminal = Terminal(rows: 50, columns: 120, scrollbackLimit: 100_000)
     let line = String(repeating: "the quick brown fox jumps over ", count: 4) + "\r\n"  // wraps at 120
@@ -320,10 +319,10 @@ func benchmarkReflowCost() {
 
 benchmarkReflowCost()
 
-// MARK: - Resize delivery strategies (P03)
+// MARK: - Resize delivery strategies
 
-/// What a live window drag costs the core under the two delivery policies
-/// P03 compares, run against a real session — real PTY, real `resizeQueue`
+/// What a live window drag costs the core under the two resize delivery
+/// policies, run against a real session — real PTY, real `resizeQueue`
 /// coalescing, real reflow — with a scripted drag: distinct column sizes
 /// 120 -> 80, three 8 ms mouse-motion events each (consecutive duplicates
 /// are dropped at the source, the same dedup `resizeSessionToFitView`
@@ -479,7 +478,7 @@ func benchmarkResizeStrategies() {
 
 benchmarkResizeStrategies()
 
-// MARK: - Search cost over a full scrollback (M4.4)
+// MARK: - Search cost over a full scrollback
 
 func benchmarkSearchCost() {
     var terminal = Terminal(rows: 50, columns: 120, scrollbackLimit: 100_000)
@@ -502,7 +501,7 @@ func benchmarkSearchCost() {
 
 benchmarkSearchCost()
 
-// MARK: - Snapshot latency under an output flood (P02)
+// MARK: - Snapshot latency under an output flood
 
 /// What the render thread experiences when it asks for a grid while the
 /// reader thread is feeding a flood: `snapshot()` must wait for the session
@@ -583,7 +582,7 @@ func benchmarkSnapshotLatencyUnderFlood() {
 
 benchmarkSnapshotLatencyUnderFlood()
 
-// MARK: - Write-path backpressure (P01)
+// MARK: - Write-path backpressure
 
 /// What the caller of `session.write` pays while the child never reads its
 /// stdin (`sleep`). On Darwin a pty's input side absorbs on the order of a
@@ -707,7 +706,7 @@ func benchmarkNonASCIISearchResponse() {
 
 benchmarkNonASCIISearchResponse()
 
-// MARK: - Session spawn decomposition (P09)
+// MARK: - Session spawn decomposition
 
 /// What "time to first prompt" is made of below the app: (a) the spawn
 /// handshake alone (the `TerminalSession` initialiser returns once
@@ -716,9 +715,8 @@ benchmarkNonASCIISearchResponse()
 /// startup with no rc files, and (d) `/bin/zsh -l`, the login shell the app
 /// actually spawns (`ViewController` passes `-l`), so (d) minus (c) is the
 /// user's rc files, which Corta cannot improve but the user pays at every
-/// launch. (`/bin/true` no longer exists as a binary on macOS 26 — only the
-/// `/usr/bin/true` path works, which is why an earlier draft of this
-/// benchmark reported ENOENT.) Events are awaited on a semaphore signalled
+/// launch. (`/bin/true` is not a binary on macOS 26 — only `/usr/bin/true`
+/// exists; spawning the former fails with ENOENT.) Events are awaited on a semaphore signalled
 /// by the callback itself, so the numbers carry no polling quantisation.
 func benchmarkSessionSpawnDecomposition() {
     let iterations = 30
@@ -794,7 +792,7 @@ func benchmarkSessionSpawnDecomposition() {
 
 benchmarkSessionSpawnDecomposition()
 
-// MARK: - Multi-pane fixed cost (P07)
+// MARK: - Multi-pane fixed cost
 
 func currentThreadCount() -> Int {
     var threads: thread_act_array_t?
@@ -846,13 +844,13 @@ func benchmarkMultiPaneFixedCost() {
 
 benchmarkMultiPaneFixedCost()
 
-// MARK: - Typing fairness with a flooding neighbour (P09)
+// MARK: - Typing fairness with a flooding neighbour
 
 /// The same round trip as `benchmarkKeypressLatency` — with the same
 /// completion-counter attribution, so a late signal can never stand in for a
 /// request's own echo — but measured on a `/bin/cat` session while a second
-/// session runs `/usr/bin/yes` flat out next to it. P09's fairness question:
-/// does one flooding pane starve another pane's echo?
+/// session runs `/usr/bin/yes` flat out next to it. The question is
+/// fairness: does one flooding pane starve another pane's echo?
 func benchmarkKeypressFairnessUnderFlood() {
     guard let typing = try? TerminalSession(executable: "/bin/cat", size: TerminalSize(rows: 24, columns: 80)),
           let flood = try? TerminalSession(executable: "/usr/bin/yes", size: TerminalSize(rows: 50, columns: 200))

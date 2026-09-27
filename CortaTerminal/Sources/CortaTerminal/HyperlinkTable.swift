@@ -1,4 +1,4 @@
-/// Identifies an OSC 8 hyperlink held in a `HyperlinkTable` (M6.8).
+/// Identifies an OSC 8 hyperlink held in a `HyperlinkTable`.
 ///
 /// Zero means "this cell is not part of a hyperlink", which is the
 /// overwhelmingly common case and costs nothing to test for — the same shape
@@ -22,7 +22,7 @@ public struct HyperlinkID: Equatable, Hashable, Sendable {
 ///
 /// Capacity is capped at what a cell's 11 spare bits can address; beyond
 /// that `intern` returns `nil` and the cell simply carries no link — but
-/// `Grid` first sweeps unreferenced entries (`reclaim(keeping:)`, P06), so
+/// `Grid` first sweeps unreferenced entries (`reclaim(keeping:)`), so
 /// a long `ls --hyperlink` session recovers instead of never linking again.
 /// Every unbounded input needs a cap (`SECURITY.md` §3), and this one is fed
 /// directly by the byte stream — a program that emits a fresh URL per cell
@@ -38,7 +38,7 @@ public struct HyperlinkTable: Sendable {
     /// table's memory grow per link.
     static let maximumURLLength = 2048
 
-    /// `nil` is a reclaimed slot (P06), exactly as in `GraphemeTable`: a
+    /// `nil` is a reclaimed slot, exactly as in `GraphemeTable`: a
     /// live entry's id (its index) never moves, which is what makes
     /// recycling the dead ones safe.
     private var urls: ContiguousArray<String?> = []
@@ -81,7 +81,7 @@ public struct HyperlinkTable: Sendable {
     /// Drops every entry whose id is not in `live`, freeing its string and
     /// returning its slot to the pool. Returns how many slots were freed.
     ///
-    /// SAFETY (P06): `live` must contain every id any cell or pen of this
+    /// SAFETY: `live` must contain every id any cell or pen of this
     /// grid can still carry — a recycled id resolves to an *unrelated* URL
     /// for a stale holder, which for a hyperlink is a destination-spoofing
     /// bug, not a cosmetic one. The caller (`Grid.liveHyperlinkIDs`)

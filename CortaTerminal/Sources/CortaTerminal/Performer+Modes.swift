@@ -6,25 +6,25 @@ extension Performer {
         var index = 0
         while index < parameters.count {
             switch parameters[index] {
-            case 1:  // DECCKM — application cursor keys (U04)
+            case 1:  // DECCKM — application cursor keys
                 state.applicationCursorKeysEnabled = enabled
-            case 2004:  // bracketed paste (M2.6)
+            case 2004:  // bracketed paste
                 state.bracketedPasteEnabled = enabled
             case 1000, 1002, 1003:
                 if let mode = MouseTrackingMode(rawValue: Int(parameters[index])) {
                     if enabled { state.mouseTrackingMode = mode }
                     else if state.mouseTrackingMode == mode { state.mouseTrackingMode = .off }
                 }
-            case 1006:  // SGR mouse reporting (M2.7)
+            case 1006:  // SGR mouse reporting
                 state.sgrMouseEncodingEnabled = enabled
-            case 2026:  // synchronized output (M4.3)
+            case 2026:  // synchronized output
                 if enabled, !state.synchronizedOutputEnabled {
                     state.synchronizedOutputEpisode &+= 1
                 }
                 state.synchronizedOutputEnabled = enabled
-            case 1004:  // focus reporting (M6.7)
+            case 1004:  // focus reporting
                 state.focusReportingEnabled = enabled
-            case 45:  // reverse-wraparound mode — not DECBKM, which is ?67 (B06)
+            case 45:  // reverse-wraparound mode — not DECBKM, which is ?67
                 grid.reverseWraparoundEnabled = enabled
             default:
                 break

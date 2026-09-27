@@ -11,7 +11,7 @@
 /// the next row records that here. Reflow, selection across a soft wrap, and
 /// search across a wrap boundary all depend on it, and adding it later means
 /// rewriting the grid (`DESIGN.md` §2.1).
-/// What a row means to the shell, when the shell says (OSC 133, M7.2).
+/// What a row means to the shell, when the shell says (OSC 133).
 ///
 /// Without shell integration a terminal cannot see command boundaries at all
 /// — it sees keystrokes going out and bytes coming back. A shell that emits
@@ -38,7 +38,7 @@ public enum LineMark: UInt8, Sendable {
     /// the text it printed starts. Without it, "the last command's output"
     /// has to be guessed as "one row after the prompt", which is right for a
     /// one-line prompt with the command typed on it and one row too much for
-    /// a two-line prompt or a command continued across lines (U14).
+    /// a two-line prompt or a command continued across lines.
     case outputStart = 4
 
     /// Whether this row starts a command — what command-to-command jumping
@@ -64,7 +64,7 @@ public struct Line: Equatable, Sendable {
     /// the right margin — not because the program printed a newline.
     public var wrapped: Bool
 
-    /// The shell-integration mark on this row (M7.2). `.none` for the
+    /// The shell-integration mark on this row. `.none` for the
     /// overwhelming majority of rows.
     public var mark: LineMark = .none
 
@@ -110,7 +110,7 @@ public struct Line: Equatable, Sendable {
     /// overwritten range; everything inside is replaced. This avoids the
     /// per-cell read/check/grow sequence used by scalar writes.
     ///
-    /// The inner loop writes through `withUnsafeMutableBufferPointer` (B11):
+    /// The inner loop writes through `withUnsafeMutableBufferPointer`:
     /// `grow(to:)` above already fixes `cells`' length for the rest of this
     /// call, so the per-element bounds/exclusivity check `ContiguousArray`'s
     /// subscript would otherwise repeat on every byte is redundant here.
