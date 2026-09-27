@@ -3,10 +3,10 @@
 A native macOS terminal emulator in pure Swift. Metal rendering, Core
 Text shaping, AppKit shell, a hand-written VT parser.
 
-**Status (2026-09-19): 1.0.0 is tagged from `main` as `v1.0.0`; publishing
-the draft release and signing `appcast.xml` are the maintainer's last two
-steps in `CHANGELOG.md` › Release checklist.**
-Every batch of the v1.0.0 roadmap (`B01`–`B16`) is on `main`.
+**Status (2026-09-27): 1.0.1 is the current release; 1.1.0 is in
+progress, and its GitHub milestone is the working list.** A release is a
+tag, a reviewed draft and a publish; CI then signs `appcast.xml` (D20) —
+`docs/RELEASING.md` has the steps.
 `CHANGELOG.md`'s `[Unreleased]` section is the record of what lands
 after it. Compatibility with AI command-line tools
 is terminal correctness; built-in AI is a non-goal. A roadmap issue is
@@ -38,6 +38,7 @@ source of truth; this file is an index. `docs/README.md` is the fuller one.
 | `docs/SECURITY.md`         | Threat model, escape-sequence injection, resource caps, process safety, the three trust boundaries |
 | `docs/TROUBLESHOOTING.md`  | What a user sees when something fails, and the fix          |
 | `docs/TESTING.md`          | Which check each kind of change needs, and how to run it   |
+| `docs/RELEASING.md`        | The release checklist, from `[Unreleased]` to a signed feed |
 | `docs/history/`            | The M1–M10 roadmap and the 0.1.1 audit notes — the record, never edited except to fix a link |
 | `CONTRIBUTING.md`          | Commit convention, branches, pull requests                 |
 

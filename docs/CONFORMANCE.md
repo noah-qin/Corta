@@ -424,7 +424,30 @@ duration and restores the previous input source afterwards — a CJK
 input method would otherwise compose every typed line into candidates
 instead of delivering it to the terminal.
 
-### 4.4.2 Real-program verification (P0, M8.20)
+### 4.4.1 IME verification
+
+IME behaviour additionally requires driving a *real* input method in the
+launched app; no offscreen or in-suite test can do it (`DESIGN.md` §7.1 —
+synthetic events with baked characters bypass composition). Procedure used
+at M3:
+
+1. Launch the app with a wrapper `$SHELL` that records `stty size` and
+   ends with `exec cat > capture-file` (a *backgrounded* reader is stopped
+   by `SIGTTIN`; the capture must own the terminal).
+2. Select an enabled Chinese input source for the session via TIS
+   (`TISSelectInputSource`, e.g. `com.apple.inputmethod.SCIM.ITABC`) and
+   restore the previous source afterwards.
+3. Inject key events at HID level (`CGEvent.post(tap: .cghidEventTap)`)
+   with **key codes only** — setting a unicode string on the event makes
+   the IME treat it as plain text. Requires the injecting process to be
+   accessibility-trusted; without that grant this is a manual test.
+4. Verify: typing pinyin opens a composition (marked text overlay at the
+   cursor, underlined; nothing reaches the child), the candidate window
+   appears under the cursor cell, selecting a candidate writes it to the
+   child as UTF-8, and ⌃C / ⌃D / ⌃Z and the arrows behave identically
+   with and without the IME selected.
+
+### 4.4.2 Real-program verification (P0)
 
 Render tests and golden-file grid tests both assert that a byte stream
 produces a grid. Neither can tell you that `vim` is usable. The five P0
@@ -451,29 +474,6 @@ An earlier run of this table recorded `less`'s search-match highlight
 isolated. The 2026-09-17 pass (G29) could not reproduce it: the highlight
 was visible on the same command. It is not tracked as open; a fresh
 reproduction with a grid dump of what `less` sends would reopen it.
-
-### 4.4.1 IME verification (M3.1–M3.4)
-
-IME behaviour additionally requires driving a *real* input method in the
-launched app; no offscreen or in-suite test can do it (`DESIGN.md` §7.1 —
-synthetic events with baked characters bypass composition). Procedure used
-at M3:
-
-1. Launch the app with a wrapper `$SHELL` that records `stty size` and
-   ends with `exec cat > capture-file` (a *backgrounded* reader is stopped
-   by `SIGTTIN`; the capture must own the terminal).
-2. Select an enabled Chinese input source for the session via TIS
-   (`TISSelectInputSource`, e.g. `com.apple.inputmethod.SCIM.ITABC`) and
-   restore the previous source afterwards.
-3. Inject key events at HID level (`CGEvent.post(tap: .cghidEventTap)`)
-   with **key codes only** — setting a unicode string on the event makes
-   the IME treat it as plain text. Requires the injecting process to be
-   accessibility-trusted; without that grant this is a manual test.
-4. Verify: typing pinyin opens a composition (marked text overlay at the
-   cursor, underlined; nothing reaches the child), the candidate window
-   appears under the cursor cell, selecting a candidate writes it to the
-   child as UTF-8, and ⌃C / ⌃D / ⌃Z and the arrows behave identically
-   with and without the IME selected.
 
 ### 4.5 Test fixtures must not outlive the test
 

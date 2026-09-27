@@ -296,10 +296,8 @@ manual edit; it is not a separate settings store.
   hooks are implemented. Bundled bash and fish hooks remain unavailable.
 - **Kitty keyboard:** implemented; see [Conformance](CONFORMANCE.md).
 
-#### M6.4 — the reassessment
-
-The original ordering decision is recorded in [the roadmap](history/ROADMAP-0.1.md).
-The resulting graphics implementation uses `ImagePlacementTable` and the
+The original ordering decision for Kitty graphics is recorded in
+[the roadmap](history/ROADMAP-0.1.md). The implementation uses `ImagePlacementTable` and the
 existing colour-quad pipeline. Column resize discards live image placements
 rather than reflowing image geometry; clients can place retained images again.
 
@@ -401,216 +399,85 @@ since Mojave. Naively alpha-blending grayscale-AA glyphs makes light
 text on a dark background look visibly thinner than Terminal.app.
 Gamma-corrected blending or stem darkening is needed to match.
 
-### 7.6 Ownership and synchronization audit (B03)
+### 7.6 Ownership and synchronization
 
-Every mutable-state
-owner on the input/output path, and what makes each one safe to touch
-from more than one thread:
+Every mutable-state owner on the input/output path, and what makes each
+one safe to touch from more than one thread:
 
 | Owner | Isolation | Mechanism |
 |---|---|---|
 | `Parser`, `Performer`, `Grid`, `Scrollback` | `nonisolated` | Pure value types / state machines; mutated only while `TerminalSession.state`'s lock is held. |
-| `TerminalSession` | `nonisolated`, `@unchecked Sendable` | `Synchronization.Mutex` around every mutable field (`State`, `Callbacks`, `PendingWrites`, `stopped`, `started`, `requestedResize`). Verified case by case (`docs/history/V0.1.1-ENGINEERING-AUDIT.md` A02); no `@unchecked` is load-bearing on its own. |
-| `PTY` | `nonisolated`, `@unchecked Sendable` | Same pattern: a `Mutex<State>` around the exit/reaping/closed flags a descriptor's use depends on (S08). |
+| `TerminalSession` | `nonisolated`, `@unchecked Sendable` | `Synchronization.Mutex` around every mutable field (`State`, `Callbacks`, `PendingWrites`, `stopped`, `started`, `requestedResize`); no `@unchecked` is load-bearing on its own. |
+| `PTY` | `nonisolated`, `@unchecked Sendable` | A `Mutex<State>` around the exit/reaping/closed flags a descriptor's use depends on. |
 | AppKit shell (`ViewController`, `SplitViewController`, `AppDelegate`, `TaskNotifier`) | `@MainActor` (project default) | The Xcode target's `SWIFT_DEFAULT_ACTOR_ISOLATION`; see §2.2 for why the core opts out instead. |
 
-The PTY reader is a dedicated `Thread`, not a `Task` (§2.2, §2.6): it
-calls `onOutput`/`onChildExit` directly from that thread, and the shell
-is responsible for hopping to `@MainActor` — never the other way
-around. Every such hop needs to know two things a bare `[weak self]`
-does not tell it: whether the controller is still alive (`weak` answers
-that) and whether it is still the controller *for this session*
-(`sessionGeneration`, `ViewController.swift`, answers that). A pane can
-in principle run `setUpPane()` twice on the same, still-alive instance
-(a retry after a failure); `sessionGeneration` is bumped each time and
-captured by that session's callbacks at install time, so a callback
-from a session a later `setUpPane()` has since replaced is a no-op
-instead of mutating state that belongs to a different session. The one
-precedent this generalises is older and narrower:
-`ViewController+Search`'s `searchRefreshGeneration` guards a detached
-background sweep's result the same way, scoped to search alone.
+The PTY reader is a dedicated `Thread`, not a `Task` (§2.2, §2.6). It
+calls `onOutput`/`onChildExit` directly, and the shell hops to
+`@MainActor` — never the other way around. Each hop checks two things:
+that the controller is still alive (`[weak self]`) and that it is still
+the controller *for this session* (`sessionGeneration`, bumped by every
+`setUpPane()`), so a callback from a replaced session is a no-op.
+`onChildExit` is installed, so a child that exits on its own gets the
+same reaction as a close; `didTeardown` tells the two apart.
 
-`onChildExit` (`TerminalSession`) is fully built — replay-safe if
-installed after the child already exited — but was never installed by
-the app before B03, so a child that exited on its own (`exit`, a crash,
-`kill`) produced no reaction; `teardown()`'s own `SIGHUP`-driven exit
-goes through the identical callback, and `didTeardown` (already the
-guard against a second `teardown()`) is what tells the two apart —
-`sessionGeneration` alone would not, since a user-initiated close never
-installs a new session to bump it for.
+The record of the audit that established this table is
+[history/2026-09-10-B03-OWNERSHIP-AUDIT.md](history/2026-09-10-B03-OWNERSHIP-AUDIT.md).
 
-### 7.7 Search state that looked pane-local was not, all the way (B05)
+### 7.7 Search state is pane-local, all the way
 
-`ViewController+Search.swift`'s query, match list, current-match index
-and anchor were already stored per pane — but `search-case-sensitive`
-and `search-regex` were read live from `ConfigurationStore` on every
-sweep, so toggling either in one pane silently changed what a second,
-already-open pane's *next* sweep matched, without that pane's own button
-ever updating to say so. Fixed by seeding `searchCaseSensitive`/
-`searchRegex` from the config default when a bar opens, using only that
-local copy for sweeps and for the button tint, and writing back to
-`ConfigurationStore` only as the default for bars opened after this one.
+Two panes searching at once must not affect each other, and an app-wide
+event monitor makes that easy to get wrong:
 
-A related gap one level up: `NSEvent.addLocalMonitorForEvents` fires
-app-wide, and B02 scoped its Esc handler to the event's own *window* —
-but a split puts two panes, each with an open bar, in one window, where
-the window check alone can't tell them apart. Fixed by additionally
-comparing the window's field-editor delegate against this pane's own
-`searchField`.
+- **Per-pane flags.** `search-case-sensitive` and `search-regex` seed a
+  bar's own copy when it opens; sweeps and the button tint use only that
+  copy, and the config file only supplies the default for the next bar.
+- **Esc belongs to one bar.** `NSEvent.addLocalMonitorForEvents` fires
+  app-wide, so the handler checks the event's window *and* that the
+  window's field-editor delegate is this pane's own `searchField` — a
+  split puts two bars in one window.
+- **No refresh is lost.** An output-triggered refresh that arrives while
+  a sweep is in flight sets `search.needsRefresh` instead of being
+  dropped; the tail of a burst is searched once the sweep lands.
+- **Closing restores the text, not the row count.**
+  `scrollOffsetBeforeSearch` is shifted by the growth in
+  `Scrollback.totalPushed` since the bar opened (§2.7).
+- **Large copy and export leave the main actor.** `Selection.text` is
+  O(the range) and export is O(scrollback), so both build on
+  `Task.detached`, under a generation-guarded `largeTextTask`. Cancelling
+  discards a build's result; it does not stop the row walk. The file
+  write is atomic (`Data.write(options: .atomic)`).
 
-`scheduleBackgroundSearchRefresh` (M9) drops an output-triggered refresh
-request outright when a sweep is already in flight, on the reasoning
-that "the next output frame starts a fresh sweep as soon as this one
-lands" — true only while output keeps arriving. At the tail of a burst,
-nothing else re-triggers a sweep once the render loop pauses, so the
-last few lines of a flood could go unsearched until an unrelated
-keystroke or scroll happened to nudge it. Fixed with a `searchNeedsRefresh`
-flag, set instead of dropped, consumed once the in-flight sweep lands.
+The record: [history/2026-09-11-B05-SEARCH-STATE.md](history/2026-09-11-B05-SEARCH-STATE.md).
 
-`scrollOffsetBeforeSearch`, restored verbatim on close, has the same
-drift problem §2.7 documents for a selection: a raw offset does not
-track output that arrived while the bar was open. Fixed the one
-instance of it (not the general `scrollOffset` anchoring problem, still
-open — see B04's item above) by shifting the restore by the growth in
-`Scrollback.totalPushed` since the bar opened, the same pattern a
-selection's `baseScrollbackTotal` already uses.
+### 7.8 Colour and cursor conformance that has to reach the renderer
 
-Large copy (⌘C/⌘A) and export (⇧⌘S) built their text — `Selection.text`,
-O(the range, which for the whole document is O(scrollback)) —
-synchronously on the *main actor*, which is the interaction path in this
-app (§2.2). Both now run that build on `Task.detached`, a compiler-level
-guarantee of leaving the main actor rather than an inference — a plain
-`Task {}` created from `@MainActor` code inherits that isolation for its
-body, so relying on a nonisolated callee to implicitly escape it again
-would be exactly the fragile assumption this fix replaces. A shared
-`largeTextTask` handle, generation-guarded together with `didTeardown`,
-keeps a superseded build's completion — or the pane's own, from
-`teardown()` — from touching state that no longer belongs to it.
-`Task.cancel()` here only ever discards a build's result, though: neither
-`Selection.text` nor `exportableText` polls cancellation internally (M9's
-`Search.find` does), so an in-flight row walk runs to completion off the
-main actor regardless of whether it is later applied — see
-`ViewController.swift`'s own doc comment on `largeTextTask` for the exact
-line this was found and fixed to state accurately, after an earlier draft
-of this paragraph overclaimed it. `Data.write(options: .atomic)` already
-made the file write itself atomic (`ViewController+Export.swift`, tested
-by `ExportWriteTests`) — that half of the issue needed no change.
+- **SCOSC / SCORC.** Bare `CSI s` / `CSI u` alias DECSC/DECRC, as xterm
+  treats them without DECLRMM. The kitty keyboard protocol's `CSI u`
+  forms are dispatched earlier and never reach the alias.
+- **OSC 4 / 104.** `IndexedPalette` holds themed `defaults` (ANSI 0–15
+  from the active theme, then xterm's 6×6×6 cube and greyscale ramp) and
+  sparse `overrides`. An override changes what an index *resolves to*,
+  not what any `Cell` stores, so the per-row revision check cannot see
+  it: `IndexedPalette.overridesGeneration` invalidates the render cache
+  instead. The renderer receives `IndexedColorOverrides?` — `nil` when a
+  session has none, because passing even an empty `Dictionary` costs a
+  retain/release per call, measured at ~5% of frame CPU.
+- **OSC 5 / 105.** `SpecialColors` holds the five special colours
+  (xterm's `ctlseqs.txt` `Pc` values); a query of an unset slot answers
+  black. They are query/set state only — they do not yet change how bold,
+  underline, blink, reverse or italic text paints.
+- **Reverse wraparound (`?45`).** Off by default, as in xterm (not DECBKM,
+  which is `?67`). When on, `BS`/`CUB` continue onto the previous row's
+  last column only across a `wrapped` boundary (§2.1), never across a
+  hard newline.
+- **Private modes survive the alternate screen.** Leaving it restores
+  the parked main screen wholesale, so terminal-wide modes
+  (`cursorStyle`, `reverseWraparoundEnabled`) are carried across
+  explicitly.
 
-### 7.8 Three conformance gaps closed, two more scoped and declined (B06)
+The record: [history/2026-09-11-B06-CONFORMANCE-GAPS.md](history/2026-09-11-B06-CONFORMANCE-GAPS.md).
 
-`CSI s` / `CSI u` (SCOSC/SCORC) were not dispatched at all — a program
-that saved and restored the cursor with the CSI form rather than
-DECSC/DECRC (`ESC 7`/`ESC 8`) got nothing back. Corta has no DECLRMM
-(left/right margins), so xterm's own behaviour without that mode is to
-treat both forms as unconditional aliases; fixed by routing `0x73`/
-`0x75` in `Performer+Cursor.performCursorControl` to the existing
-`grid.saveCursor()`/`restoreCursor()`. The kitty keyboard protocol's
-marker-based `CSI u` forms are intercepted earlier in `csiDispatch` and
-never reach this switch, so the alias cannot shadow them —
-`SaveRestoreCursorTests.bareCSIuDoesNotTouchKittyProtocol` asserts that
-directly rather than by inspection.
-
-OSC 4 (indexed-palette set/query) and OSC 104 (reset) were entirely
-unimplemented — a program picking colour 137 by number, or resetting
-its overrides on exit, got silence for the query and a no-op for the
-set. Added `IndexedPalette` (mirrors `DynamicColors`'s shape: `defaults`
-seeded once, a sparse `overrides` dictionary OSC 4 writes into and OSC
-104 clears), wired through `PerformerState`/`Terminal`/
-`TerminalSession` the same way `dynamicColors` already was, and seeded
-`defaults` from `Theme.Variant.indexedPaletteDefaults` — ANSI 0–15 from
-the active theme (so index 1 answers with *this* theme's red, not a
-generic one), 16–255 from xterm's fixed 6×6×6 cube and 24-step
-greyscale ramp, matching `TerminalColorPalette.swift`'s independent
-render-side copy of the same formula. `oscDispatch` gained a
-`parseOSCCode` helper because OSC 104 is the one code with a real
-no-semicolon form (`OSC 104 ST`, which is what xterm itself sends) —
-every other code needs a payload and was already unreachable without
-one.
-
-**OSC 5** ("special colours" — bold, underline, blink, reverse, italic
-default colours) was implemented in a follow-up pass, once the exact
-semantics were pinned down from xterm's own `ctlseqs.txt` (the
-`Pc` values — 0 bold, 1 underline, 2 blink, 3 reverse, 4 italic — and
-the OSC 105 reset pairing) rather than guessed: an *independently
-documented* specification is what B06's original pass lacked access
-to, not esctest specifically, and the two turned out not to be the
-same requirement. Added `SpecialColors` — five fixed slots, no themed
-default to seed (unlike `IndexedPalette`, an unset slot means Corta's
-ordinary SGR-attribute rendering applies, not a placeholder colour),
-with the query form answering black for an unset slot rather than
-silence, matching OSC 4's own precedent for "always some numeric
-answer." Its own render-path integration — a special colour actually
-changing how bold/underline/blink/reverse/italic text paints — was
-not attempted in that pass and remains open.
-
-**OSC 4's render-path integration — done in a follow-up pass, measured
-before and after.** `Theme.Variant.resolve(_:indexedOverrides:)` now checks a
-session's OSC 4 overrides before falling through to the existing
-ansi/cube/ramp arithmetic; `TerminalRenderer` carries the overrides and
-an `overridesGeneration` counter (`IndexedPalette`'s own new field,
-the identical shape `GlyphAtlas.generation`/`ScreenLines.generation`
-already use) so a set/reset invalidates the render cache even for a
-cell whose *content* never changed — an OSC 4 override is invisible to
-the ordinary per-cell revision check, since it changes what an index
-resolves to, not what any `Cell` stores. Verified with offscreen
-pixel-sampled tests (`IndexedPaletteRenderTests.swift`), including the
-specific case that proves the cache invalidation actually matters: a
-cell painted before the override, then repainted with no content
-change in between.
-
-`CLAUDE.md`'s own rule ("measure the frame-CPU baseline after touching
-the render loop") was followed with `CortaTests/FrameCPUBaselineTests`
-— the same headless, scriptable tool the M6 render-loop regression
-this rule itself documents was found and fixed with, not the
-screen-capture/live-signpost route the first attempt at this pass assumed
-was the only option (that route needs a real, focused GUI session;
-this one does not). The first implementation *did* measure a real,
-reproducible regression — about 5%, ~0.1 ms, isolated by A/B runs
-against 11 samples per side after system-load noise alone had first
-produced a misleading 21% swing between two same-code runs. The cause:
-`indexedOverrides` was an always-passed, defaulted-to-empty
-`Dictionary` parameter, and passing a `Dictionary` — even an empty one
-— costs a retain/release pair Swift cannot elide across the call
-boundary, paid twice a cell (foreground and background) across ~4800
-cells a frame. Switched the parameter to `IndexedColorOverrides?`
-(`nil` when a session has no overrides, computed once a frame rather
-than re-checked per cell) — passing `nil` retains nothing — which
-closed the gap back into noise (~1.6 ms both sides, matched runs
-immediately before and after the fix). The regression-and-fix, not
-just the final number, is the artifact worth keeping: it is a second,
-independent instance of the exact failure mode this file's frame-CPU
-rule was written to catch.
-
-`BS`/`CUB` also did not reverse-wrap — a program editing at a wrap
-boundary (`readline`'s own line editing among them) that expected
-backspace to walk back onto the previous row instead saw the cursor
-stick at column 0. The quality-plan record that first found this
-named the blocker as needing "a behavioural decision" about which
-reverse-wrap semantics to implement; xterm's own answer, `?45`
-(reverse-wraparound mode, off by default — not DECBKM, which is the
-separate `?67` backarrow-key mode) is the one every other terminal a
-comparison would be made against also implements, so it is the one
-Corta implements too rather than inventing a bespoke variant. Added
-`Grid.reverseWraparoundEnabled` (mirrors `insertMode`'s
-pattern: a Grid-owned flag a private-mode DECSET/DECRST toggles, with
-a DECRQM case reporting it), and taught `moveCursorLeft`/`backspace`
-to continue onto the row above's last column when the mode is on and
-that row's own `wrapped` flag says the two rows are one logical line
-— never across a hard newline, since `wrapped` is set only where
-DECAWM's own auto-wrap actually happened (§2.1). `CUB`'s repeat count
-can cross more than one wrapped row in a single call; `BS` is always
-one step, matching its existing pending-wrap-disarm behaviour.
-
-`exitAlternateScreen` restores the parked main screen wholesale
-(`self = main`), the same mechanism `cursorStyle` already has to be
-explicitly carried across for the identical reason: a private mode a
-program set is terminal-wide state, not part of either screen's own
-content, so the parked copy's stale value would otherwise silently
-win. `reverseWraparoundEnabled` is now carried across the same way
-`cursorStyle` already was — a real gap a review round caught, not
-something reasoned out in advance.
-
-### 7.9 SFTP without an SSH library (B14)
+### 7.9 SFTP without an SSH library
 
 A file-transfer feature wants
 libssh2 or a Swift SSH stack; Corta has neither and adds no dependency.
@@ -619,7 +486,7 @@ The engine speaks the SFTPv3 wire protocol itself
 simply the system's `ssh -s -- <host> sftp` subprocess with **plain
 pipes** — a PTY would corrupt binary frames — so authentication, host
 keys, `ProxyJump` and every `~/.ssh/config` behavior stay with OpenSSH,
-where they belong (B13's rule). Two consequences are owned rather than
+where they belong. Two consequences are owned rather than
 hidden. The channel has no terminal (it is spawned into its own
 session), so ssh can prompt for nothing: password, passphrase and
 host-key questions fail as their own typed errors whose wording says

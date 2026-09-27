@@ -29,6 +29,7 @@ document is right and the record is a record.
 | [Conformance](CONFORMANCE.md) | Feature priorities (P0/P1/P2), the daily-driver checklist, the test strategy — esctest, the fuzz harness, and the five-point manual check every app-layer change gets. |
 | [Performance](PERFORMANCE.md) | Targets, the hot-path rules, how each number is measured, and the numbers. |
 | [Security](SECURITY.md) | The threat model, escape-sequence injection, resource caps, process safety, the three trust boundaries, and a change log of every security-relevant change. |
+| [Releasing](RELEASING.md) | The maintainer's release checklist: versions, tag, draft, publish, and the signed update feed. |
 
 The public core API is documented in place:
 [`CortaTerminal.docc`](../CortaTerminal/Sources/CortaTerminal/CortaTerminal.docc/CortaTerminal.md)
@@ -47,16 +48,26 @@ script's header comment says what it changes and what it never touches.
 
 ## The record
 
-| Document | What it is |
-| :--- | :--- |
-| [0.1 roadmap](history/ROADMAP-0.1.md) | The M1–M10 step-by-step plan that produced 0.1.0, with every box ticked and every measurement recorded where it was taken. |
-| [0.1.1 quality plan](history/V0.1.1-QUALITY-PLAN.md) | The 0.1.1 quality release's working notes: every finding, what was done about it, and what was left. |
-| [0.1.1 engineering audit](history/V0.1.1-ENGINEERING-AUDIT.md) | The engineering audit that fed the quality plan. |
-| [0.1.1 manual verification](history/V0.1.1-MANUAL-VERIFICATION.md) | What a person checked by hand for 0.1.1, and what was marked *not judged*. |
-| [0.1.1 UI walkthrough](history/V0.1.1-UI-WALKTHROUGH.md) | The native-behaviour walkthrough. |
-| [Technology direction](history/TECHNOLOGY-DIRECTION.md) | The technology candidates considered between 0.1.1 and the v1 roadmap; the ones adopted are B-series issues. |
-| [esctest results](esctest/) | esctest result files per release. |
-| [Interactive test records](test-results/) | Dated records of interactive test passes — what a person checked, what passed, what failed and what was skipped. The findings are worked off in the CHANGELOG; the record stays as written. |
+Dated, and not edited except to fix a link.
+
+- [0.1 roadmap](history/ROADMAP-0.1.md) — the M1–M10 plan that produced 0.1.0, with its measurements.
+- [0.1.1 quality plan](history/V0.1.1-QUALITY-PLAN.md) — the 0.1.1 findings and what was done about each.
+- [0.1.1 engineering audit](history/V0.1.1-ENGINEERING-AUDIT.md) — the audit that fed the quality plan.
+- [0.1.1 manual verification](history/V0.1.1-MANUAL-VERIFICATION.md) — what a person checked by hand for 0.1.1.
+- [0.1.1 UI walkthrough](history/V0.1.1-UI-WALKTHROUGH.md) — the native-behaviour walkthrough.
+- [Technology direction](history/TECHNOLOGY-DIRECTION.md) — candidates considered before the v1 roadmap.
+- [Keypress latency before 1.0.0](history/2026-09-09-LATENCY-BEFORE-1.0.md) — the screen-capture figures and why they do not compare.
+- [B01 headless sample, 2026-09-10](history/2026-09-10-B01-HEADLESS-SAMPLE.md) — the first percentile-shaped core numbers.
+- [B03 ownership audit, 2026-09-10](history/2026-09-10-B03-OWNERSHIP-AUDIT.md) — how the synchronization table in `DESIGN.md` §7.6 was established.
+- [B05 search state, 2026-09-11](history/2026-09-11-B05-SEARCH-STATE.md) — the pane-local search fixes behind `DESIGN.md` §7.7.
+- [B06 conformance gaps, 2026-09-11](history/2026-09-11-B06-CONFORMANCE-GAPS.md) — SCOSC/SCORC, OSC 4/5, reverse wraparound, and the measured regression.
+- [B11 hot-path pass, 2026-09-13](history/2026-09-13-B11-HOT-PATH-PASS.md) — CPU, locking and memory.
+- [B12 render diagnostics, 2026-09-13](history/2026-09-13-B12-RENDER-DIAGNOSTICS.md) — diagnostics and a rejected prewarm.
+- [B12 Metal 4 backend, 2026-09-15](history/2026-09-15-B12-METAL4-BACKEND.md) — measured against the MTL3 path.
+- [1.0.0 benchmark run, 2026-09-18](history/2026-09-18-V1.0.0-BENCHMARK-RUN.md) — every scenario, including energy.
+- [1.0.1 benchmark run, 2026-09-21](history/2026-09-21-V1.0.1-BENCHMARK-RUN.md) — the patch release's re-measurement.
+- [esctest results](esctest/) — result files per release.
+- [Interactive test records](test-results/) — dated passes by a person; findings are worked off in the changelog.
 
 The completed v1 implementation plan is recorded in the
 [v1.0.0 milestone](https://github.com/noah-qin/Corta/milestone/1).
