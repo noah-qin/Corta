@@ -128,7 +128,7 @@ jobs:
       # went wrong, since the run stops here.
       - name: Keep the test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: xcresult-release-${{ steps.version.outputs.tag }}
           path: test-results.xcresult

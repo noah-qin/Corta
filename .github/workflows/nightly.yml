@@ -113,7 +113,7 @@ jobs:
 
       - name: Keep the corpus and the seed when the fuzzer finds something
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fuzz-failure-seed-${{ steps.fuzz.outputs.seed }}
           path: |
