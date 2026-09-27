@@ -17,49 +17,29 @@
 import CortaTerminal
 import simd
 
-/// Maps a `CortaTerminal.Color` to sRGB-encoded RGBA floats for the quad
-/// pipeline: the 16 indexed colours from the active theme, and the 6×6×6
-/// colour cube and 24-step greyscale ramp that `Color.indexed` describes.
-///
-/// The cube and the ramp are deliberately *not* themed. xterm defines them
-/// numerically, so a program asking for colour 137 means one specific
-/// colour; only the low 16 and the terminal's own three (foreground,
-/// background, cursor) are a matter of taste. Colours a program sends as
-/// 24-bit values do not come through here at all.
-///
-/// The values are sRGB, and the drawable is tagged sRGB in `TerminalView`;
-/// untagged, they were interpreted in the display's own space and rendered
-/// oversaturated on a P3 screen.
+/// Maps a `CortaTerminal.Color` to sRGB RGBA floats: the low 16 from the
+/// theme, the 6×6×6 cube and grey ramp from xterm's numbers (never themed:
+/// colour 137 means one colour). 24-bit colours bypass this. The drawable
+/// is tagged sRGB in `TerminalView`, or P3 screens oversaturate.
 nonisolated enum TerminalColorPalette {
-    /// The live variant — the chosen theme resolved for the current
-    /// appearance. `nonisolated(unsafe)` because this is read from
-    /// the renderer, which is nonisolated by design; every write goes
-    /// through `apply(_:)` on the main thread, and every read happens on the
-    /// main thread too (the render loop runs off the display link). It is a
-    /// plain value with no interior mutability, so a read can never see a
-    /// half-written theme.
+    /// The live variant. Written by `apply(_:)` and read by the renderer, both
+    /// on the main thread; `nonisolated(unsafe)` because the renderer is
+    /// nonisolated. A plain value, so no read sees half a theme.
     private nonisolated(unsafe) static var active: Theme.Variant = Theme.corta.dark
 
-    /// Swaps the live variant. Called when the theme or the system
-    /// appearance changes; the panes redraw themselves afterwards.
+    /// On a theme or appearance change; panes then redraw.
     static func apply(_ variant: Theme.Variant) { active = variant }
 
-    /// The live variant, for a caller that resolves many cells: reading the
-    /// global once per frame and indexing a local is measurably cheaper than
-    /// going through the static accessor per cell, which the renderer does
-    /// tens of thousands of times.
+    /// For per-frame callers: one global read, then a local, is measurably
+    /// cheaper across tens of thousands of cells.
     static var activeVariant: Theme.Variant { active }
 
     static var defaultForeground: SIMD4<Float> { active.foreground }
     static var defaultBackground: SIMD4<Float> { active.background }
     static var cursorColor: SIMD4<Float> { active.cursor }
 
-    /// Opaque. The terminal canvas is the *content* layer, not a glass
-    /// surface — see the structure note in `ViewController`. Content that is
-    /// translucent over glass pays for it in contrast: at 0.72 every colour
-    /// lost a fifth of its ratio against the background, which reads as the
-    /// whole screen being washed out. Lowering this is all it takes to bring
-    /// translucency back; the window and layer already permit it.
+    /// Opaque: the canvas is content, not glass. At 0.72 every colour lost a
+    /// fifth of its contrast. The window and layer still permit lowering it.
     static let backgroundOpacity: Float = 1.0
 
     static var clearColor: SIMD4<Float> {
@@ -69,8 +49,7 @@ nonisolated enum TerminalColorPalette {
             backgroundOpacity)
     }
 
-    /// The colour a cell would show if it *is* the foreground, i.e. resolves
-    /// `.default` to `defaultForeground` rather than `defaultBackground`.
+    /// Resolves `.default` to the foreground rather than the background.
     static func resolveForeground(_ color: Color) -> SIMD4<Float> {
         active.resolveForeground(color)
     }
@@ -80,27 +59,16 @@ nonisolated enum TerminalColorPalette {
     }
 }
 
-/// A session's OSC 4 overrides on top of the numeric cube/ramp — the raw
-/// dictionary rather than a whole `IndexedPalette`, since the palette's own
-/// `defaults` duplicate exactly what `Theme.Variant.resolve` already
-/// computes inline below; passing only what changes keeps the default path
-/// (no overrides set, by far the common case) byte-identical to a palette
-/// with no override support at all (`docs/DESIGN.md` §7).
+/// OSC 4 overrides as a raw dictionary, so the common no-override path
+/// stays as cheap as having no override support (`DESIGN.md` §7).
 public typealias IndexedColorOverrides = [UInt8: (red: UInt8, green: UInt8, blue: UInt8)]
 
 nonisolated extension Theme.Variant {
-    /// Resolution against one variant. On the variant rather than on
-    /// `TerminalColorPalette` so the render loop can hold it in a local: the
-    /// static accessors go through a global and retain the ANSI array on
-    /// every cell, and there are tens of thousands of cells per frame.
-    ///
-    /// `indexedOverrides` is an *optional* dictionary, not a defaulted empty
-    /// one: passing `nil` costs nothing (no object to retain), while an
-    /// always-passed empty `Dictionary` still costs a retain/release pair
-    /// per call — measured at ~5% on `FrameCPUBaselineTests`.
-    /// `TerminalRenderer.appendRowInstances` passes `nil`
-    /// outright when the session has no overrides, once per row rather than
-    /// re-deriving it per cell.
+    /// On the variant so the render loop can hold it locally; the static path
+    /// retains the ANSI array per cell. `indexedOverrides` is optional because
+    /// an empty dictionary still costs a retain/release per call (~5% on
+    /// `FrameCPUBaselineTests`); `TerminalRenderer.appendRowInstances` passes
+    /// nil per row when there are none.
     @inline(__always)
     func resolveForeground(
         _ color: Color, indexedOverrides: IndexedColorOverrides? = nil
@@ -129,8 +97,7 @@ nonisolated extension Theme.Variant {
                 Float(overridden.blue) / 255, 1)
         }
         if index < 16 { return ansi[Int(index)] }
-        // The 6x6x6 cube and the 24-step ramp are xterm's, defined
-        // numerically and the same under every theme.
+        // xterm's cube and ramp, the same under every theme.
         if index < 232 {
             let i = Int(index) - 16
             let levels: [Float] = [0, 95 / 255, 135 / 255, 175 / 255, 215 / 255, 1]

@@ -21,324 +21,179 @@ import Metal
 import QuartzCore
 import Synchronization
 
-/// Owns one `TerminalSession` and the `TerminalRenderer`/`TerminalView` that
-/// draw it — the pane. A window composes panes through
-/// `SplitViewController` and its `SplitTree`; nothing here knows about
-/// sibling panes beyond the `splitController` back-reference (D07 in
-/// `DECISIONS.md`).
-///
-/// This file owns lifecycle, the session and the render loop. Behaviour
-/// lives in `ViewController+<concern>.swift` extensions, one concern per
-/// file — input, selection, commands, search, shell integration and so on.
+/// One pane: a `TerminalSession` and the renderer and view that draw it.
+/// Knows no sibling panes beyond `splitController` (D07). This file owns
+/// lifecycle, the session and the render loop; behaviour lives in the
+/// `ViewController+<concern>.swift` extensions.
 class ViewController: NSViewController {
-    // Not `private`: the `ViewController+…` extension files reach these, and
-    // extensions cannot add their own storage.
+    // Not `private`: extensions reach these and cannot add storage.
     var terminalView: TerminalView!
     var terminalRenderer: TerminalRenderer!
     var session: TerminalSession!
-    /// Bumped every time `setUpPane()` installs a new `session`, and
-    /// captured by that session's `onOutput`/`onChildExit` closures at
-    /// install time. Those closures fire from the reader thread and hop to
-    /// the main actor to touch `self`; the generation they captured is
-    /// compared against this property's *current* value once there, so a
-    /// callback from a session `setUpPane()` has since replaced (a retry
-    /// after failure reusing this same, still-alive `ViewController`) is a
-    /// no-op instead of mutating state that belongs to a different session.
-    /// `[weak self]` alone only tells the callback the controller is still
-    /// alive, not that it is still the right session's controller.
+    /// Captured by each session's callbacks, so one from a session a retry has
+    /// since replaced is a no-op — `[weak self]` only says the controller is
+    /// alive, not that it is still this session's.
     private var sessionGeneration = 0
     private var commandQueue: MTLCommandQueue!
-    /// Kept so `ViewController+Commands` can rebuild the renderer (with a new
-    /// font size) without going through `MTLCreateSystemDefaultDevice` again.
+    /// Kept so a font change can rebuild the renderer.
     var device: MTLDevice!
-    /// The font's point size; ⌘+/⌘−/⌘0 change it (`ViewController+Commands`).
-    /// The atlas is rasterised for one size, so a change rebuilds the
-    /// renderer — see `setFontSize`.
+    /// A change rebuilds the renderer: the atlas is rasterised for one size.
     var fontSize: CGFloat = ViewController.defaultFontSize
-    /// Whether `fontSize` is a temporary zoom (⌘+/⌘−/pinch) rather
-    /// than the config file's `font-size`. While true, `configurationChanged`
-    /// leaves this pane's size alone; `resetFontSize` is what clears it.
+    /// A temporary zoom, which `configurationChanged` leaves alone until
+    /// `resetFontSize`.
     var isFontSizeZoomed = false
-    /// The font family in use, from the settings page. The sentinel
-    /// `Configuration.systemFontFamily` means System Monospaced. Kept so a
-    /// config change can tell a family swap from a size change — they need
-    /// the same rebuild, but a size change has its own path (`setFontSize`)
-    /// that short-circuits when the size is unchanged.
+    /// `Configuration.systemFontFamily` means System Monospaced. Kept to tell a
+    /// family swap from a size change.
     var fontFamily: String = Configuration.systemFontFamily
-    /// Unspent trackpad magnification. Storage lives here because
-    /// the gesture handling is in `ViewController+Commands`, an extension.
     var pinchAccumulator: CGFloat = 0
-    /// The long-task heuristic for this pane.
     let taskNotifier = TaskNotifier()
-    /// Matches the stock 120x30 Terminal profile on this Mac. Keeping the
-    /// terminal's default here (rather than compensating with narrower cell
-    /// geometry) preserves the font's real advance and makes TUIs such as
-    /// Claude Code occupy the same physical proportions in both apps.
+    /// Terminal.app's stock profile, so TUIs keep the same proportions in both.
     static let defaultFontSize: CGFloat = 12
-    /// Set before the view loads when the pane is created by a split:
-    /// the focused pane's OSC 7 directory, and the grid size the new
-    /// pane will actually hold, so the shell's first output is laid out
-    /// against the right width rather than the default and then reflowed.
+    /// Set before the view loads for a split, so the shell's first output is
+    /// laid out at the right width, not reflowed.
     var inheritedWorkingDirectory: String?
     var initialGridSize: TerminalSize?
 
-    /// The preset this pane was opened from, applied once at spawn
-    /// time. Set before the view loads, like `inheritedWorkingDirectory`.
+    /// Applied once at spawn; set before the view loads.
     var preset: Preset?
-    /// The command the current session was actually spawned with: the
-    /// ladder rung that succeeded, which after a fallback is `/bin/zsh`
-    /// rather than what was asked for. Read by the remote-state composition
-    /// (a pane whose child *is* `ssh` shows no foreground job) and by
-    /// Reconnect, which re-runs exactly this.
+    /// What actually spawned — after a fallback, not what was asked for. The
+    /// remote-state composition and Reconnect read it.
     private(set) var launchedCommand: (executable: String, arguments: [String])?
-    /// The command jump navigation last landed on; `nil` once the
-    /// viewport has moved away from it (`scrollOffset`'s `didSet` below), so
-    /// `effectiveCommand` never targets a command that has scrolled out of
-    /// the picture. Set by `jumpToCommand` right after it sets `scrollOffset`
-    /// itself, which fires this same `didSet` and clears it first — the
-    /// jump's own selection is always the last word.
+    /// Cleared when the viewport moves (`scrollOffset`'s `didSet`), so
+    /// `effectiveCommand` never targets a command scrolled out of view.
+    /// `jumpToCommand` sets it after its own scroll.
     var selectedCommandID: Int?
 
     var scrollOffset = 0 {
         didSet {
             guard scrollOffset != oldValue else { return }
             selectedCommandID = nil
-            // Back at the bottom means there is nothing below to be told
-            // about; the "new output" state starts again from here.
             if scrollOffset == 0 {
                 sawOutputWhileScrolled = false
                 scrollAnchorTotalPushed = nil
             } else {
-                // Recorded on every change, including the anchor shift
-                // `prepareFrame` itself makes below — so after that shift
-                // this always reads the *post*-shift total, and the next
-                // batch's growth is measured from there, not from
-                // wherever scrolling started.
+                // Including `prepareFrame`'s own shift, so the next batch's growth is
+                // measured from there.
                 scrollAnchorTotalPushed = session?.scrollbackTotalPushed
             }
             updateScrollPositionIndicator()
         }
     }
 
-    /// `scrollbackTotalPushed` as of the last time `scrollOffset` changed,
-    /// while off the bottom — `nil` at the bottom, where there is nothing to
-    /// anchor. `prepareFrame` uses the gap between this and the current
-    /// total to keep the *document position* the viewport shows fixed while
-    /// scrolled away, rather than the row count "N lines above the bottom,"
-    /// which drifts forward as the live bottom moves. The same
-    /// `totalPushed`-delta pattern `search.previousScrollOffset` and
-    /// `Selection.baseScrollbackTotal` already use elsewhere.
+    /// The total the offset was set against; `nil` at the bottom.
+    /// `prepareFrame` keeps the viewport on the same document row with it.
     var scrollAnchorTotalPushed: Int?
 
-    /// The pill in the corner while the viewport is off the bottom.
     var scrollPositionIndicator: ScrollPositionIndicator?
 
-    /// Whether the child has printed since the viewport left the bottom. The
-    /// fact a person scrolled up to wait for.
+    /// The fact a person scrolled up to wait for.
     var sawOutputWhileScrolled = false
-    /// True while the pointing-hand cursor is up for a ⌘-hovered link.
-    /// Cursor changes happen on transitions only — setting the
-    /// arrow on every mouse-moved fights the split view's resize cursor
-    /// near a divider and makes the pointer flicker there.
+    /// Cursor changes on transitions only: resetting the arrow every move
+    /// fights the divider's resize cursor.
     var hoveringLink = false
-    /// The link range under the pointer, underlined by the renderer
-    /// so the target is visible before a click can open it. Storage lives
-    /// here because `ViewController+Links` is an extension.
+    /// Underlined, so the target shows before a click opens it.
     var hoveredLink: TerminalSelection?
-    /// The current text selection, owned by `ViewController+Selection.swift`
-    /// and read by the render loop. Stored here because extensions
-    /// cannot add storage.
     var selection: TerminalSelection?
-    /// The unfocused-pane dim: a translucent wash over the pane, so
-    /// which pane owns the keyboard is visible at a glance — the hidden
-    /// cursor alone was too subtle. Above the terminal canvas, below the
-    /// search bar's glass; it never intercepts input (`PassthroughView`).
+    /// Dims unfocused panes; never intercepts input (`PassthroughView`).
     var focusDimView: NSView?
-    /// A very light accent wash over the pane that actually holds the
-    /// keyboard right now — `hasUserFocus`, not merely `isFocusedPane` — so
-    /// the split still reads correctly with the ring itself turned down to
-    /// a hairline. Hidden the moment the window resigns key, same as the
-    /// ring: neither is a claim about which pane the keyboard *would* go to,
-    /// only about where it goes this instant.
+    /// On `hasUserFocus`, not `isFocusedPane`: hidden when the window resigns
+    /// key, like the ring — neither claims where the keyboard *would* go.
     var focusHighlightView: NSView?
-    /// The accent ring around the pane that owns the keyboard — the
-    /// positive half of the focus signal, so an unfocused pane does not
-    /// have to be dimmed to the point of looking disabled.
+    /// The positive focus signal, so unfocused panes need not look disabled.
     var focusRingView: NSView?
-    /// The ring's top constraint, re-tensioned on every layout: chrome
-    /// overlap (titlebar, and the tab bar when tabbed) changes when a tab
-    /// bar shows, hides or is dragged out, and a top pane's ring must clear
-    /// it or the tab bar paints over the ring's top edge (see
-    /// `updateFocusRingLayout`).
+    /// Re-tensioned every layout, so a top pane's ring clears a tab bar that
+    /// appears, hides or is dragged out.
     private var focusRingTopConstraint: NSLayoutConstraint?
-    /// Shown instead of a terminal when this pane could not be built —
-    /// no Metal device, no glyph atlas, or no child process (`PaneFailureView`).
-    /// Non-nil is the one state in which `isOperable` is false.
+    /// Non-nil exactly when `isOperable` is false.
     var failureView: PaneFailureView?
-    /// A one-line report that the session started, but not the way it was
-    /// asked to (a fallback shell or directory). Shown once the view is on
-    /// screen, where the toast can actually be seen.
+    /// A fallback shell or directory, reported once the toast can be seen.
     private var pendingSessionNotice: String?
-    /// Notification observers are process-lifetime and `setUpPane` can run
-    /// twice (a retry after a failure); registering again would double every
-    /// config change.
+    /// `setUpPane` can run twice (a retry); observers must not.
     private var didInstallObservers = false
-    /// The focus state last reported to the child (`?1004`). `nil`
-    /// until the first report, so the first one always goes out. Storage
-    /// lives here because `ViewController+Focus` is an extension.
+    /// `nil` until the first `?1004` report, so it always goes out.
     var lastReportedFocus: Bool?
-    /// Set by `SplitViewController` once the window's style mask and content
-    /// size are final — the gate that keeps transient startup layouts from
-    /// reaching the child (see `resizeSessionToFitView`).
+    /// Keeps transient startup layouts from reaching the child
+    /// (`resizeSessionToFitView`).
     var didSizeWindow = false
-    /// Set by layout changes the damage diff cannot see (drawable size,
-    /// backing scale) and by local actions that change what is drawn without
-    /// touching the grid (scrolling); consumed by `updateDamage`.
+    /// For changes the damage diff cannot see: drawable size, scale, scrolling.
     private var needsRedraw = true
-    /// True while a synchronized-output batch (`?2026`) has withheld a
-    /// frame that would otherwise have been presented; forces the next
-    /// non-synchronized `updateDamage` to present once, even if the diff
-    /// alone finds nothing new since the mode ended.
+    /// `?2026` withheld a frame, so the next one presents even if the diff
+    /// finds nothing.
     private var wasSynchronizedOutputActive = false
-    /// Set from the reader thread's `onOutput` (every parse batch); the
-    /// vsync gate checks this one flag and only snapshots and diffs the grid
-    /// when it is set, so a truly idle frame costs a boolean check rather
-    /// than a line-by-line comparison.
+    /// An idle frame costs this one check, not a diff.
     private let outputPending = Mutex(false)
-    /// Built by `prepareFrame()` and consumed once by `render(into:...)`,
-    /// which always runs immediately after it in the same
-    /// `FrameScheduler.metalDisplayLink` callback — the two `session.
-    /// snapshot()` calls (one per method) this replaced could see different
-    /// grid states a PTY-heavy frame apart; sharing one avoids that as well
-    /// as the redundant work. `nil` only before the first frame.
+    /// One snapshot shared by `prepareFrame` and `render`, which run in the same
+    /// callback — two snapshots could see different grids.
     private var pendingFrameContext: FrameContext?
-    /// Coalesces `session.resize` during a live drag; the last size
-    /// actually requested, so no-op layouts don't re-send the same winsize.
     private var resizeDebouncer: ResizeDebouncer!
-    /// Backing store for `refreshProcessFactsIfStale`.
     private var cachedProcessName: String?
     private var cachedDirectory: String?
     private var cachedRemoteState: PaneRemoteState = .local
-    /// Masks a remote report the pane has since been seen local
-    /// behind (`PaneRemoteState.ReportTracker`). Shared by the cached and
-    /// the fresh reader so both supersede the same report; reset with the
-    /// session.
+    /// Shared by both readers so they supersede the same report.
     private var remoteReportTracker = PaneRemoteState.ReportTracker()
     private var lastProcessFactsRefresh: CFTimeInterval = 0
-    /// True for a moment after a resize, while the title carries the grid
-    /// size (see `composedWindowTitle`).
     private var isShowingTransientSize = false
     private var transientSizeReset: DispatchWorkItem?
 
-    /// The last grid size sent (or about to be sent) to the child; ⌘+/⌘−
-    /// re-fit the window to keep this grid size at the new cell metrics.
+    /// ⌘+/⌘− re-fit the window to keep this grid size.
     var lastRequestedSize: TerminalSize?
 
     let search = PaneSearchState()
 
-    /// The in-flight large copy/export text build, if any — building a
-    /// potentially whole-scrollback string is O(scrollback), so it runs off
-    /// the interaction path (`ViewController+Export.swift`, `copy(_:)`).
-    /// Cancelling a superseded build (a second export before the first
-    /// panel closed) or the pane's own is what this handle is for; it does
-    /// not otherwise carry a value. Cleared back to `nil` on completion,
-    /// guarded by `largeTextTaskGeneration` so a superseded build finishing
-    /// late can never clear the *new* build's handle out from under it.
-    /// `Selection.text`/`exportableText` poll no cancellation flag
-    /// internally (unlike `Search.find`), so cancelling this only stops the
-    /// result from being applied — the build itself, if already running,
-    /// still runs to completion off the main thread.
+    /// An O(scrollback) copy/export build, off the interaction path. Cancelling
+    /// only stops its result being applied — the build runs to completion — and
+    /// `largeTextTaskGeneration` keeps a late one from clearing its successor.
     var largeTextTask: Task<Void, Never>?
-    /// Bumped every time `largeTextTask` is replaced; see its doc comment.
     var largeTextTaskGeneration = 0
-    /// Test hook: the pasteboard `copy(_:)` writes to; `nil` (production
-    /// default) uses `.general`, the real system clipboard. Tests assign
-    /// `NSPasteboard.withUniqueName()` instead, so exercising copy never
-    /// touches — and cannot be raced by, or clobber — the developer's own
-    /// clipboard contents.
+    /// Test hook: a private pasteboard, so tests never touch the real one.
     var pasteboardForTesting: NSPasteboard?
-    /// Test hook: run at the start of `copy(_:)`'s detached build, before
-    /// `Selection.text`, matching `search.sweepGate`'s purpose — `nil` in
-    /// production. `Task.detached` gives no scheduling barrier, so without
-    /// this a test asserting "the build hasn't landed yet" immediately
-    /// after `copy(_:)` returns can pass or fail depending on how fast the
-    /// scheduler happens to run it for a given grid, rather than on
-    /// whether the implementation is actually asynchronous.
+    /// Test hook: holds the detached build, which has no scheduling barrier —
+    /// otherwise "not landed yet" depends on the scheduler.
     var largeTextBuildGateForTesting: (@Sendable () -> Void)?
-    /// The drag is over — the child should see the final size now, not after
-    /// the debounce window expires. Wired to `TerminalView`'s
-    /// `viewDidEndLiveResize` (live-resize notifications live on the view).
+    /// The child sees the final size now, not after the debounce.
     func endLiveResize() {
         resizeDebouncer?.flush()
     }
 
-    /// The grid a new window opens with, from the config file. The
-    /// window's content size is derived from this and the font's cell
-    /// metrics, never from hardcoded points, so it follows a font or size
-    /// change — and `columns × rows` keeps meaning cells rather than pixels.
-    ///
-    /// Read per pane rather than cached at launch: a change to the file
-    /// applies to the next window opened, which is the only moment an initial
-    /// size can apply at all.
+    /// Read per pane, not at launch: a config change applies to the next
+    /// window, the only moment an initial size can apply.
     private var configuredGridSize: TerminalSize {
         let configuration = ConfigurationStore.shared.configuration
         return TerminalSize(
             rows: UInt16(configuration.rows), columns: UInt16(configuration.columns))
     }
-    /// Titlebar plus, when the window is tabbed, the tab bar. AppKit
-    /// reports the pair as the difference between the frame and the content
-    /// layout rect, which is the only value that follows a tab bar
-    /// appearing. Before the window exists, the titlebar alone is the best
-    /// estimate.
+    /// Frame minus content layout rect — the only measure that follows a tab
+    /// bar appearing. Before the window exists, the titlebar alone.
     var windowChrome: CGFloat {
         guard let window = view.window else { return TerminalLayout.titlebarHeight }
         return max(0, window.frame.height - window.contentLayoutRect.height)
     }
-    /// Distance from the top of the drawable to the first row. Per pane:
-    /// only a pane touching the window's top edge sits under the chrome
-    /// (titlebar, traffic lights), so each pane pays the chrome share that
-    /// actually overlaps it and just its own inset otherwise (a
-    /// bottom-row pane has no titlebar above it).
+    /// Only a pane touching the window's top sits under the chrome.
     var topInset: CGFloat {
         guard view.window != nil else {
             return TerminalLayout.titlebarHeight + TerminalLayout.insets.top
         }
         return TerminalLayout.insets.top + chromeOverlap
     }
-    /// The chrome (titlebar, and the tab bar when tabbed) that overlaps this
-    /// pane specifically — zero for a pane that does not touch the window's
-    /// top edge. `topInset` is this plus the grid's own breathing room; the
-    /// focus ring (`updateFocusRingLayout`) wants only this part, since it is
-    /// drawn flush to the pane's edge already.
+    /// The chrome share alone — what the focus ring, drawn flush, needs.
     private var chromeOverlap: CGFloat {
         guard let window = view.window else { return 0 }
         let distanceFromTop = window.frame.height - view.convert(view.bounds, to: nil).maxY
         return TerminalLayout.chromeOverlap(
             windowChrome: windowChrome, paneDistanceFromTop: distanceFromTop)
     }
-    /// Total vertical space the grid does not get.
     var verticalInsets: CGFloat { topInset + TerminalLayout.insets.bottom }
 
-    /// The window-level split controller owning this pane. Panes are
-    /// always its children in the app; nil only for a detached controller.
     var splitController: SplitViewController? { parent as? SplitViewController }
-    /// Keyboard input, the window title and the cursor belong to the
-    /// focused pane alone; the unfocused panes draw without a
-    /// cursor, which doubles as the focus indicator.
+    /// Only the focused pane draws a cursor — part of the focus indicator.
     var isFocusedPane: Bool { splitController?.focusedPane === self }
 
-    /// Whether this pane has a terminal at all. False means `setUpPane`
-    /// failed and `failureView` is showing: there is nothing to render, no
-    /// child to write to, and no cell metrics measured from a real atlas.
-    /// Everything the window and the split tree call into has to survive
-    /// that state rather than trap on an implicitly-unwrapped nil.
+    /// False when `setUpPane` failed: everything the window and split tree call
+    /// must survive that rather than trap on an implicitly unwrapped nil.
     var isOperable: Bool { terminalRenderer != nil && session != nil }
 
-    /// The cell metrics geometry is measured from, or an estimate from the
-    /// system face when the renderer could not be built. A broken pane still
-    /// has to answer the split tree's minimum-size walk and the window's
-    /// initial sizing; answering with an estimate keeps it from taking the
-    /// whole window's layout down with it.
+    /// An estimate when the renderer failed, so a broken pane cannot take the
+    /// window's layout down.
     private var cellMetrics: (cellWidth: CGFloat, cellHeight: CGFloat) {
         if let terminalRenderer {
             let metrics = terminalRenderer.pointMetrics
@@ -351,13 +206,8 @@ class ViewController: NSViewController {
         )
     }
 
-    /// `ws_xpixel`/`ws_ypixel` for `TIOCSWINSZ` — real device pixels, not
-    /// points, at a given grid size. A Kitty-graphics client that asks
-    /// "how many pixels is a cell" needs this to size an image correctly,
-    /// and `kitten icat` refuses to run at all without it: it was the first
-    /// thing a real client verification found, since `TerminalSize`'s zero
-    /// default (truthful before any image protocol existed) had never been
-    /// overridden by either call site that actually reaches `TIOCSWINSZ`.
+    /// Device pixels for `TIOCSWINSZ`: image clients size cells from them, and
+    /// `kitten icat` refuses to run without.
     private func pixelSize(columns: Int, rows: Int, metrics: CellMetrics) -> (
         width: UInt16, height: UInt16
     ) {
@@ -372,8 +222,6 @@ class ViewController: NSViewController {
     let minimumColumns = 20
     let minimumRows = 5
 
-    /// The smallest pixel area the pane tolerates, at the current cell
-    /// metrics — the leaf value of the split tree's minimum-size walk.
     var minimumContentSize: CGSize {
         let metrics = cellMetrics
         return CGSize(
@@ -381,9 +229,7 @@ class ViewController: NSViewController {
             height: CGFloat(minimumRows) * metrics.cellHeight + TerminalLayout.insetHeight)
     }
 
-    /// The grid size that fits a pixel area, using the current cell metrics
-    /// and this pane's insets — how a split predicts the new pane's winsize
-    /// before layout settles it exactly.
+    /// How a split predicts the new pane's winsize before layout settles it.
     func gridSize(fitting size: CGSize) -> TerminalSize {
         let metrics = cellMetrics
         return TerminalSize(
@@ -391,26 +237,17 @@ class ViewController: NSViewController {
             columns: Self.cellCount((size.width - TerminalLayout.insetWidth) / metrics.cellWidth))
     }
 
-    /// A cell count from a pixel-over-metric quotient, clamped into what a
-    /// `TerminalSize` field holds. A zero cell metric (a pane whose atlas
-    /// could not measure a face) makes the quotient infinite, and
-    /// `UInt16(.infinity)` is a trap — seen once as a full-suite crash in
-    /// `PaneZoomTests` — so the bounds are applied before the conversion,
-    /// and a non-finite quotient reads as the one-cell minimum.
+    /// Clamped before converting: a zero metric makes the quotient infinite,
+    /// and `UInt16(.infinity)` traps.
     nonisolated static func cellCount(_ quotient: CGFloat) -> UInt16 {
         guard quotient.isFinite else { return 1 }
         return UInt16(min(max(1, quotient), CGFloat(UInt16.max)))
     }
 
-    /// The window size that fits the initial grid exactly. With
-    /// `.fullSizeContentView` the pane area spans the whole frame — and
-    /// `setContentSize` sizes the frame on this OS — so this is the *frame*
-    /// size: grid cells plus this pane's insets and the measured chrome.
-    /// The first pane's pre-layout frame and the window's initial sizing
-    /// both derive from it, so the session is born at its final size. Use
-    /// the whole window chrome here, not `topInset`: before the root pane's
-    /// constraints settle, its temporary position can make it look as if it
-    /// does not touch the top of the window and omit the titlebar entirely.
+    /// The *frame* size (`setContentSize` sizes the frame here) for the initial
+    /// grid, so the session is born at its final size. Whole chrome, not
+    /// `topInset`: before constraints settle, the root pane can look as if it
+    /// does not touch the top.
     var initialWindowContentSize: NSSize {
         let metrics = cellMetrics
         let grid = initialGridSize ?? configuredGridSize
@@ -704,27 +541,14 @@ class ViewController: NSViewController {
 
     // MARK: - Teardown
 
-    /// Guards `teardown`: a pane can be reached by two close paths at once
-    /// (its own `closePane` and its window's close), and none of the steps
-    /// may run twice. Not `private`: `ViewController+Export.swift` and
-    /// `ViewController+Selection.swift` check it before a large
-    /// copy/export build's completion touches a pane that has since been
-    /// torn down — the generation guard alone catches a *newer* build
-    /// superseding it, not a teardown that never installs one.
+    /// Two close paths can reach one pane. Also checked by copy/export
+    /// completions — the generation guard catches a newer build, not a
+    /// teardown.
     var didTeardown = false
 
-    /// Explicit, idempotent teardown — the single place every close path
-    /// (pane, tab, window, quit) funnels through. It cannot wait for
-    /// `deinit`: the reader thread retains its `TerminalSession` until the
-    /// loop exits, so without this a closed window's shell keeps running as
-    /// an orphan, holding its PTY and its thread.
-    ///
-    /// The steps: the search bar (its Esc key monitor; a sweep in flight
-    /// is cancelled by `closeSearchBar`), an in-flight large copy/export
-    /// text build, the
-    /// task notifier's idle timer, this pane's notification observers, and
-    /// the session itself (SIGHUP to the child's process group, PTY
-    /// closed, reader thread exits).
+    /// The one place every close path (pane, tab, window, quit) funnels. Not
+    /// `deinit`: the reader thread retains the session, so a closed window's
+    /// shell would run on as an orphan.
     func teardown() {
         guard !didTeardown else { return }
         didTeardown = true
@@ -738,30 +562,21 @@ class ViewController: NSViewController {
 
     override func viewDidLayout() {
         super.viewDidLayout()
-        // Layout can change the drawable's size or backing scale without any
-        // grid change the damage diff would notice — force one frame.
+        // Size or scale can change with no grid change the diff would see.
         invalidateDisplay()
         resizeSessionToFitView()
         updateFocusRingLayout()
     }
 
-    /// Keeps the focus ring inside the pane's actually-visible area and its
-    /// rounded corners on only the corners that are also the window's.
-    /// Chrome overlap changes whenever the tab bar appears, hides or is
-    /// dragged out into its own window — all three are layout passes
-    /// on this window, so this needs no observer beyond `viewDidLayout`.
+    /// Tab bar changes are all layout passes, so `viewDidLayout` suffices.
     private func updateFocusRingLayout() {
         guard focusRingView != nil else { return }
         focusRingTopConstraint?.constant = chromeOverlap + Self.focusRingWidth / 2
         updateFocusRingCornerMask()
     }
 
-    /// Rounds only the ring's corners that are also the window's rounded top
-    /// corners — the same rule `TerminalView.updateExteriorCornerMask` applies
-    /// to the drawable, so an interior or edge pane's ring reads as a clean
-    /// rectangle instead of curving away from a divider it should butt flush
-    /// against. Unlike that view, `self.view` is not flipped, so here `MaxY`
-    /// is the top of the layer, not `MinY`.
+    /// Only corners that are the window's, as `TerminalView` does for the
+    /// drawable; this view is not flipped, so `MaxY` is the top.
     private func updateFocusRingCornerMask() {
         guard let window = view.window, let ring = focusRingView else { return }
         let edges = TerminalLayout.exteriorEdges(
@@ -772,14 +587,9 @@ class ViewController: NSViewController {
         ring.layer?.maskedCorners = mask
     }
 
-    /// Runs once per accepted vsync, before the frame is built. Cheap path:
-    /// nothing arrived and nothing local changed, so no snapshot, no diff —
-    /// and this reports "nothing pending," which is what lets
-    /// `FrameScheduler` pause itself again and a static screen idle at ~0%
-    /// CPU (`PERFORMANCE.md` §3). When output did arrive, the snapshot is
-    /// diffed against the renderer's line-granular cache, the result is
-    /// cached in `pendingFrameContext` for `render(into:...)` to draw
-    /// without diffing again, and the frame happens only on damage.
+    /// Per vsync. With nothing new it reports nothing pending, which lets the
+    /// scheduler pause (idle ~0% CPU, `PERFORMANCE.md` §3); otherwise the diff is
+    /// cached for `render` and a frame happens only on damage.
     private func prepareFrame() -> Bool {
         guard let session, terminalRenderer != nil else { return false }
         if session.takeBell() {
@@ -791,28 +601,15 @@ class ViewController: NSViewController {
             return was
         }
         guard needsRedraw || hasOutput else { return false }
-        // The title's ingredients — the OSC 0/2 title, the OSC 7
-        // working directory and the foreground process — all arrive as
-        // output, so applying it here keeps the window and, with native
-        // tabbing, the tab label current without a timer. The
-        // window's title is the focused pane's; an unfocused pane's
-        // title applies when it takes focus
-        // (`SplitViewController.noteFocus`).
+        // Title, directory and process all arrive as output, so this keeps the
+        // window and tab title current without a timer. An unfocused pane's
+        // applies on focus.
         if hasOutput, isFocusedPane {
             applyWindowTitle()
         }
-        // While the search bar is open, output shifts what matches — but
-        // recomputing them is a full-scrollback sweep (`Search.swift`), and
-        // running it synchronously, here, on every output batch put it on
-        // the render path: a flood with the bar open competed with the
-        // frame budget for no reason a background thread couldn't do
-        // instead. `scheduleBackgroundSearchRefresh` hands the
-        // recompute to a detached task and applies the result once it
-        // lands, whenever that is — this frame does not wait on it.
+        // Search refresh is a full-scrollback sweep; off the render path.
         if hasOutput, scrollOffset > 0, !sawOutputWhileScrolled {
-            // The pane is showing history and the child has printed.
-            // Nothing else on screen says so: there is no scroll bar, and the
-            // live screen is not visible.
+            // Nothing else says so: no scroll bar, and the live screen is off view.
             sawOutputWhileScrolled = true
             updateScrollPositionIndicator()
         }
@@ -820,14 +617,8 @@ class ViewController: NSViewController {
             scheduleBackgroundSearchRefresh()
         }
         if hasOutput {
-            // A screen reader following a build log has to hear the new lines,
-            // not the ones from when it last asked. Rate-limited and gated on
-            // VoiceOver actually running, inside the call.
+            // Rate-limited and gated on VoiceOver inside the call.
             terminalView?.noteAccessibilityValueChanged()
-            // Two things the child asked for, drained on the same batch
-            // boundary every other "the child told us something" hand-off
-            // uses: a clipboard write (OSC 52) and the command
-            // boundaries a shell with integration reports (OSC 133).
             drainClipboardRequests()
             let finished = session.takeFinishedCommand()
             if session.hasShellIntegration {
@@ -835,19 +626,14 @@ class ViewController: NSViewController {
                     session.isCommandRunning, exitStatus: finished,
                     commandID: finished != nil ? session.commandRecords.lastCompleted?.id : nil,
                     in: view.window)
-                // A directory is worth ranking once a command has
-                // actually run there, not on every OSC 7 report a `cd` with
-                // no command after it would also produce.
+                // Ranked once a command ran there, not on every `cd`.
                 if finished != nil, let directory = session.currentDirectory {
                     DirectoryHistoryStore.shared.record(directory)
                 }
             }
         }
         if session.isSynchronizedOutputEnabled {
-            // A frame drawn mid-batch would show a torn intermediate state.
-            // Remember that a present is owed and wait for the matching
-            // DECRST, which arrives as its own output batch and forces one
-            // frame then (`?2026`).
+            // Owe a present until the DECRST, or a torn state shows.
             wasSynchronizedOutputActive = true
             return false
         }
@@ -856,24 +642,10 @@ class ViewController: NSViewController {
         wasSynchronizedOutputActive = false
         let grid = session.snapshot()
         if hasOutput, scrollOffset > 0, let anchor = scrollAnchorTotalPushed {
-            // Keep the viewport pointed at the same document position while
-            // scrolled away from the bottom: without this, "N lines above
-            // the bottom" silently means something further along every time
-            // the live bottom moves, and text the user is mid-read on slides
-            // out from under them a line at a time. Ring eviction
-            // (ordinary growth past `scrollbackLimit`) clamps the same way
-            // any other over-large offset does, in the renderer.
-            //
-            // Shifted from this frame's own `grid` snapshot, not a separate
-            // `scrollbackTotalPushed` read taken earlier — the reader
-            // thread can push more rows in the gap between two lock
-            // acquisitions, which would shift by less than this frame's
-            // `grid` actually grew and render one batch behind. The anchor
-            // is then pinned to that exact same total (bypassing
-            // `scrollOffset`'s `didSet`, which would otherwise re-read the
-            // counter a second time and could observe still more growth
-            // that happened in between) so next frame's shift starts from
-            // precisely what this one accounted for.
+            // Keep the viewport on the same document row while scrolled away.
+            // From this frame's own snapshot — a separate read could see more rows
+            // and render a batch behind — and pinned to that total directly, since
+            // the `didSet` would re-read the counter.
             if grid.scrollback.totalPushed > anchor {
                 scrollOffset = ScrollbackCoordinates.reanchoredOffset(
                     scrollOffset, from: anchor, to: grid.scrollback.totalPushed)
@@ -897,8 +669,6 @@ class ViewController: NSViewController {
         return forced || damaged
     }
 
-    /// Dispatches on the configured bell mode. The core
-    /// decided nothing beyond "a bell happened" (`Terminal.takeBell()`).
     private func handleBell() {
         switch ConfigurationStore.shared.configuration.bell {
         case .audible:
@@ -910,25 +680,15 @@ class ViewController: NSViewController {
         }
     }
 
-    /// Called from the reader thread after each parse batch: record that the
-    /// grid may have changed and wake the (possibly parked) display link.
-    /// `generation` is `sessionGeneration` at the moment the calling
-    /// session's `onOutput` was installed — see `sessionGeneration`'s doc.
+    /// On the reader thread; `generation` guards against a replaced session.
     nonisolated private func noteOutput(generation: Int) {
-        // A parse batch has landed on the grid. Emitted from the reader
-        // thread, so it is a point rather than an interval — the interval it
-        // would close began in `keyDown` on another thread
-        // (`InputLatencySignposts`).
+        // A point, not an interval: the interval began on another thread.
         InputLatencySignposts.emit(.output)
         RenderMetrics.noteOutputForKeystroke()
         outputPending.withLock { $0 = true }
-        // The MainActor hop, measured separately: this is the stage a busy
-        // main thread lengthens, and the one an end-to-end number cannot
-        // tell apart from a slow parse.
+        // Measured apart: a busy main thread lengthens this stage.
         let wake = InputLatencySignposts.begin(.wake)
-        // `.userInitiated`: this hop is on the output → wake → frame chain
-        // the keypress-to-pixel budget is measured against, not background
-        // bookkeeping — the default task priority gives it no such claim.
+        // On the keypress-to-pixel chain; the default priority has no claim.
         Task(priority: .userInitiated) { @MainActor [weak self] in
             InputLatencySignposts.end(.wake, wake)
             guard let self, self.sessionGeneration == generation else { return }
@@ -937,25 +697,17 @@ class ViewController: NSViewController {
         }
     }
 
-    /// Reacts to a child that exited on its own — as opposed to the
-    /// user closing the pane, which already went through `teardown()` and
-    /// set `didTeardown` before `session.stop()` ever made the reader loop
-    /// observe an exit. That ordering is exactly what tells the two apart:
-    /// a teardown-initiated stop must never surface a toast for a pane that
-    /// is already gone, and a generation check alone would not catch it
-    /// (`didTeardown` does not bump `sessionGeneration` — there is no new
-    /// session installed to bump it for).
+    /// A child that exited on its own. A user's close set `didTeardown` before
+    /// stopping the session, and must not toast; a generation check alone
+    /// would miss it.
     @MainActor
     private func noteChildExit(_: ChildExit, generation: Int) {
         guard !didTeardown, sessionGeneration == generation else { return }
-        // The title is rebuilt on output, and a dead child produces none:
-        // without this, a remote launcher's `⟂ host` badge outlived the
-        // connection it described (seen live in `RemoteWorkflowUITests`).
+        // A dead child produces no output to rebuild the title; the `⟂ host`
+        // badge would outlive its connection.
         invalidateProcessFacts()
         applyWindowTitle()
-        // A dead remote launcher gets the honest version of the news: the
-        // *connection* ended, and the way back is a new one — Reconnect —
-        // not anything that would pretend the old session survived.
+        // A remote launcher: the connection ended, and the way back is a new one.
         if let launchedCommand,
             PaneRemoteState.isRemoteLauncher(executable: launchedCommand.executable)
         {
@@ -965,33 +717,18 @@ class ViewController: NSViewController {
         }
     }
 
-    /// Marks the display dirty and wakes the display link — for local changes
-    /// (layout, scrolling) that produce no PTY output.
+    /// For local changes that produce no output.
     func invalidateDisplay() {
         needsRedraw = true
         terminalView?.setNeedsRedraw()
     }
 
     func resizeSessionToFitView() {
-        // Nothing reaches the child until `SplitViewController` has made the
-        // window's style mask final (`.fullSizeContentView` decides how tall
-        // the content view is) and pinned the content size — before that,
-        // layouts run at transient sizes the child's early output would be
-        // laid out against (D.1: a 28-row transient followed by the real 30
-        // stranded two blank rows under the prompt). The session is
-        // constructed at the target size already, so skipping early layouts
-        // loses nothing.
-        //
-        // The style-mask insertion lands one layout pass late: the first
-        // layout after `setContentSize` still runs at the content-rect
-        // height (frame minus titlebar — observed 522pt against the final
-        // 554pt), and delivering that size shrinks the grid and strands
-        // content exactly as above. That check runs one level up now
-        // (`SplitViewController.sizeSettled`): a pane in a split tree
-        // legitimately does not fill its window's frame, so it cannot run
-        // the check against its own bounds — the content view always fills
-        // the frame, split or not — and the one-time frame correction
-        // for the `setContentSize` chrome mismeasurement must have run too.
+        // Nothing reaches the child before `sizeSettled`: earlier layouts run at
+        // transient sizes (the first after `setContentSize` is one titlebar short)
+        // and would strand blank rows under the prompt. The session is born at the
+        // target size, so nothing is lost. The check is the split controller's —
+        // a pane in a split never fills the frame.
         guard didSizeWindow, session != nil, let terminalRenderer, view.window != nil,
             let splitController, splitController.sizeSettled
         else { return }
@@ -1004,32 +741,18 @@ class ViewController: NSViewController {
         let size = TerminalSize(
             rows: rows, columns: columns, pixelWidth: pixels.width, pixelHeight: pixels.height)
         guard size != lastRequestedSize else { return }
-        // DESIGN.md §3.1: only a column change reflows — `Grid.resize`
-        // rebuilds `Scrollback` from scratch when columns change (never for
-        // a row-only change, which just pushes/pops whole lines) — and
-        // reflow rewrites every document row wholesale. A selection or
-        // scroll offset recorded against the old layout no longer
-        // identifies the same text once that lands, so invalidate rather
-        // than let them silently point at the wrong rows (or, for
-        // `scrollOffset`, at content shifted by the `Scrollback.totalPushed`
-        // reset `Grid+Reflow.swift` documents). A row-only change is exactly
-        // the ordinary-growth case the `baseScrollbackTotal` shift already
-        // handles correctly, so it is deliberately left alone here.
+        // A column change reflows every row (DESIGN.md §3.1), so a stored
+        // selection or offset would name the wrong text. A row-only change is
+        // ordinary growth, already handled.
         if lastRequestedSize.map({ $0.columns != size.columns }) ?? false {
             selection = nil
             scrollOffset = 0
         }
         lastRequestedSize = size
-        // Always coalesced to the trailing edge of a resize stream: window
-        // drags, divider drags and the zoom animation all fire per-frame
-        // layouts, and each immediate delivery would rewrap the grid
-        // mid-gesture — the visible "text jumps". The initial
-        // size needs no delivery at all: the session is born at it and the
-        // startup gate (`sizeSettled`) holds back the transient frames.
+        // Trailing edge only: drags and the zoom animation lay out per frame,
+        // and rewrapping mid-gesture is the visible "text jumps".
         resizeDebouncer.resize(to: size, coalesce: true)
-        // The title carries the grid size, so it changes with the drag —
-        // which is what makes the live size visible while resizing, the way
-        // Terminal.app shows it.
+        // The title shows the live size, as Terminal.app does.
         if isFocusedPane {
             invalidateProcessFacts()
             noteTransientSizeChange()
@@ -1039,26 +762,11 @@ class ViewController: NSViewController {
 
     // MARK: - Window title
 
-    /// What the title bar says for this pane: what is running, where, and
-    /// how big the grid is — the same three facts Terminal.app shows, for
-    /// the same reason. "Corta" alone answered none of the questions asked
-    /// of a title bar with four windows open.
-    ///
-    /// `<title or directory> — <process> — <columns>×<rows>`, with any part
-    /// that is unknown left out rather than filled with a placeholder, and a
-    /// leading `⟂ …` badge when the pane refers to another machine
-    /// (`PaneRemoteState`): the badge goes first because it answers the
-    /// question the rest of the title cannot — *which computer* the title's
-    /// directory and process are on. The first part prefers the OSC 0/2
-    /// title, because a program that sets one
-    /// (an editor, `claude`, a long build) is saying something more useful
-    /// than its own name; a shell that sets none falls back to the working
-    /// directory, abbreviated with `~`.
-    ///
-    /// Every ingredient except the size comes from the child, which is
-    /// hostile input (`SECURITY.md` §2). Each is capped and stripped of
-    /// control characters: a title is drawn by AppKit, not by the terminal,
-    /// and an unbounded one is an unbounded allocation per output batch.
+    /// `⟂ host — <title or directory> — <process> — <columns>×<rows>`, as
+    /// Terminal.app shows; unknown parts are left out. The host badge leads — it
+    /// answers which computer the rest is on. An OSC 0/2 title beats the
+    /// directory. Every part but the size is child input: capped and stripped of
+    /// controls (`SECURITY.md` §2).
     var composedWindowTitle: String {
         guard session != nil else { return "Corta" }
         refreshProcessFactsIfStale()
@@ -1175,18 +883,15 @@ class ViewController: NSViewController {
             childIsRemoteLauncher: childIsLiveRemoteLauncher)
     }
 
-    /// Forces the next title to re-read them — for the moments where waiting
-    /// out the interval would show something stale to the user: taking focus,
-    /// and a command boundary the shell reported.
+    /// On focus and command boundaries, where waiting out the interval would
+    /// show something stale.
     func invalidateProcessFacts() {
         lastProcessFactsRefresh = 0
     }
 
     private static let processFactsInterval: CFTimeInterval = 0.4
 
-    /// Trims a child-supplied component to something a title bar can hold:
-    /// control characters out (a newline in a title truncates it visually and
-    /// a private-use scalar can be unrenderable), and a hard length cap.
+    /// No controls (a newline truncates a title) and a hard length cap.
     private static func sanitizedTitleComponent(_ text: String?) -> String? {
         guard let text else { return nil }
         let cleaned =
@@ -1200,9 +905,8 @@ class ViewController: NSViewController {
 
     private static let titleComponentLimit = 80
 
-    /// `/Users/noah/Developer` → `~/Developer`, and a bare directory name for
-    /// anything deeper — the whole path in a title bar is noise, and the
-    /// proxy icon carries it for anyone who wants it.
+    /// `~/Developer`, or just the last name deeper down; the proxy icon has the
+    /// full path.
     private static func abbreviated(_ path: String) -> String {
         let home = NSHomeDirectory()
         if path == home { return "~" }
@@ -1210,28 +914,15 @@ class ViewController: NSViewController {
         return name.isEmpty ? path : name
     }
 
-    /// Runs at vsync, on the main thread, immediately after `prepareFrame()`
-    /// in the same `FrameScheduler` callback — reads the latest grid without
-    /// ever blocking the reader thread (`PERFORMANCE.md` §2.1).
-    ///
-    /// Draws `pendingFrameContext` rather than snapshotting and diffing the
-    /// grid again: `prepareFrame()` already did both, moments ago in the
-    /// same callback, and doing it twice was the whole cache rebuilt and
-    /// diffed a second time on every drawn frame for no reason. The
-    /// fallback snapshot below is defensive only — the real call path
-    /// (`FrameScheduler.metalDisplayLink`) always runs `shouldRenderFrame`
-    /// (`prepareFrame`) first.
+    /// Right after `prepareFrame()` in the same callback, drawing its cached
+    /// context; never blocks the reader (`PERFORMANCE.md` §2.1).
     private func render(
         into renderPassDescriptor: MTLRenderPassDescriptor, drawableSize: CGSize, drawable: CAMetalDrawable
     ) {
         guard let session, let terminalRenderer else { return }
-        // A GPU-frame-capture/Instruments label, not behavior: lets a Metal
-        // System Trace correlate a captured command buffer back to the pane
-        // that submitted it.
+        // For Metal System Trace: ties a command buffer to its pane.
         let frameLabel = "Corta.frame.\(ObjectIdentifier(self).hashValue)"
-        // A Metal 4 backend owns command submission end to end — there
-        // is no `MTLCommandBuffer` here to make or to present on — so the
-        // whole frame goes through `Metal4FrameBackend` instead.
+        // Metal 4 owns submission end to end.
         if let metal4 = terminalRenderer.quadRenderer as? any Metal4FrameBackend {
             renderThroughMetal4(
                 metal4, session: session, renderer: terminalRenderer,
@@ -1243,9 +934,7 @@ class ViewController: NSViewController {
         else { return }
         commandBuffer.label = frameLabel
         guard let context = pendingFrameContext else {
-            // Should not happen on any real call path — see the doc comment
-            // above — but if it ever does, snapshot, diff and draw here
-            // rather than draw whatever the cache happens to hold.
+            // Defensive only: the scheduler always prepares first.
             let grid = session.snapshot()
             terminalRenderer.render(
                 grid: grid, scrollOffset: scrollOffset,
@@ -1271,12 +960,7 @@ class ViewController: NSViewController {
         presentAndCommit(commandBuffer: commandBuffer, drawable: drawable)
     }
 
-    /// The Metal 4 frame path — what `render(into:...)` runs when the
-    /// pane's backend is a `Metal4FrameBackend`. Mirrors the MTL3 path's
-    /// shape exactly: the same defensive diff when `prepareFrame` left no
-    /// context, the same `contentRect`, and the same `.gpu`/`.commit`
-    /// signposts and `RenderMetrics` records — only the command submission
-    /// itself moves into the backend (`Metal4FrameBackend.endFrame`).
+    /// Mirrors the MTL3 path; only submission moves into the backend.
     private func renderThroughMetal4(
         _ backend: any Metal4FrameBackend, session: TerminalSession, renderer: TerminalRenderer,
         renderPassDescriptor: MTLRenderPassDescriptor, drawableSize: CGSize,
@@ -1286,9 +970,7 @@ class ViewController: NSViewController {
         if let context = pendingFrameContext {
             gridRows = context.grid.rows
         } else {
-            // Should not happen on any real call path — the MTL3 path's doc
-            // comment above has the details. Diff first, then draw what was
-            // cached, rather than drawing whatever the cache happens to hold.
+            // Defensive only, as above.
             let grid = session.snapshot()
             renderer.updateInstances(
                 grid: grid, scrollOffset: scrollOffset,
@@ -1325,11 +1007,8 @@ class ViewController: NSViewController {
         InputLatencySignposts.end(.commit, commit)
     }
 
-    /// `commit` covers encode-and-submit; `gpu` runs from submission to the
-    /// completion handler, which is the only place the GPU's own time — and
-    /// any wait for a drawable to be recycled — becomes visible. Shared by
-    /// `render(into:...)`'s normal path and its defensive
-    /// `pendingFrameContext == nil` fallback.
+    /// `gpu` spans submission to completion — the only place GPU time and a
+    /// drawable wait become visible.
     private func presentAndCommit(commandBuffer: MTLCommandBuffer, drawable: CAMetalDrawable) {
         let gpu = InputLatencySignposts.begin(.gpu)
         let gpuStart = RenderMetrics.isEnabled ? DispatchTime.now() : nil
@@ -1351,16 +1030,9 @@ class ViewController: NSViewController {
         InputLatencySignposts.end(.commit, commit)
     }
 
-    /// The grid's rectangle inside the drawable, in pixels.
-    ///
-    /// Pixel space has its origin at the drawable's top-left
-    /// (`Shaders.metal`). When the grid fits, it anchors to the *top*: the
-    /// rounding remainder of the view height over whole cells then sits at
-    /// the bottom edge, not as a visible band under the titlebar. When the
-    /// grid is momentarily taller than the drawable — mid-drag, before the
-    /// debounced winsize lands — it anchors to the *bottom* instead,
-    /// so the live edge (the prompt) stays put and the top clips; pinning
-    /// the top in that case was the visible "text jumps" of a divider drag.
+    /// Top-anchored when the grid fits, so the rounding remainder sits at the
+    /// bottom, not under the titlebar; bottom-anchored when mid-drag the grid is
+    /// taller, so the prompt stays put (top-pinning was the "text jumps").
     static func contentRect(
         in drawableSize: CGSize, scale: CGFloat, gridHeight: CGFloat, topInset: CGFloat
     ) -> CGRect {
@@ -1375,16 +1047,9 @@ class ViewController: NSViewController {
 
     // MARK: - Failure paths
 
-    /// The atlas for the configured face, falling back to the system face at
-    /// the default size.
-    ///
-    /// `MonospacedFontCatalog` verifies a family before Corta offers it, but a
-    /// family named in the config file only has to pass that check — the atlas
-    /// can still fail to build for a face it vouched for, or for a size at
-    /// which the metrics degenerate. The system monospaced face at the default
-    /// size is the one combination Corta stands behind (`docs/DECISIONS.md`
-    /// D11), so it is
-    /// the fallback rather than a failure.
+    /// A configured face can pass the catalog and still fail to build; the
+    /// system face at the default size is the fallback Corta stands behind
+    /// (D11).
     private func makeRenderer(device: MTLDevice, scale: CGFloat) throws -> TerminalRenderer {
         let renderer: TerminalRenderer
         do {
@@ -1398,10 +1063,8 @@ class ViewController: NSViewController {
                 device: device,
                 font: TerminalFont.primary(ofSize: fontSize, family: fontFamily), scale: scale)
         }
-        // Image decodes finish off the frame path: without this, an
-        // image whose decode was in flight would surface only whenever
-        // unrelated output happened to schedule a frame. The callback fires
-        // on the decode queue, hence the main-queue hop.
+        // A finished decode schedules a frame; otherwise it waits for unrelated
+        // output.
         renderer.kittyImageRenderer.onImagesReady = { [weak self] in
             DispatchQueue.main.async { self?.invalidateDisplay() }
         }
@@ -1410,56 +1073,33 @@ class ViewController: NSViewController {
 
     struct StartedSession {
         let session: TerminalSession
-        /// Set when a fallback was used, so the pane can say it is running
-        /// something other than what was asked for instead of leaving the
-        /// user to wonder why their prompt looks wrong.
+        /// A fallback was used, and the pane says so.
         let notice: String?
-        /// The command that actually spawned — the rung of the ladder that
-        /// succeeded, not necessarily the one that was asked for. The pane
-        /// keeps it so "which machine is this?" can answer for a pane whose
-        /// child *is* `ssh` (`PaneRemoteState`), and so Reconnect can re-run
-        /// exactly it rather than a paraphrase.
+        /// The rung that succeeded, for `PaneRemoteState` and Reconnect.
         let executable: String
         let arguments: [String]
     }
 
-    /// Starts the child, degrading rather than failing whenever only *part* of
-    /// the request is impossible.
-    ///
-    /// Two ingredients come from outside Corta and can both be stale: `$SHELL`
-    /// (a shell that was uninstalled, a Homebrew prefix that moved) and the
-    /// working directory (a restored session's directory on a volume that is
-    /// no longer mounted, or one that has been deleted). Neither alone may
-    /// abort the entire pane. The chain drops the failing ingredient first and
-    /// only then the other, so a bad directory still gets you your shell and a
-    /// bad shell still gets you your directory. `/bin/sh` in `/` is the last
-    /// rung because POSIX guarantees both exist.
-    /// - Parameter configuredShell: the ladder's first rung. Defaults to
-    ///   `$SHELL`, and is a parameter so the ladder can be staged with a
-    ///   shell that does not exist without setting `$SHELL` for anything
-    ///   else — the project's rule is that a test never changes the machine.
+    /// Degrades rather than fails: `$SHELL` and the directory can each be stale
+    /// (uninstalled shell, unmounted volume), and neither alone may abort the
+    /// pane. Each is dropped in turn; `/bin/sh` in `/` is guaranteed by POSIX.
+    /// - Parameter configuredShell: a parameter so tests can stage a missing
+    ///   shell without setting `$SHELL` for anything else.
     static func startSession(
         size: TerminalSize, directory: String?, scrollbackLimit: Int,
         commandHistoryLimit: Int = CommandRecordStore.defaultCapacity, preset: Preset? = nil,
         configuredShell: String? = nil
     ) throws(PTYError) -> StartedSession {
-        // A preset supplies the first rung's shell and directory; every
-        // rung below it is the ordinary ladder, so a preset naming a shell
-        // that has been uninstalled degrades to a working terminal instead of
-        // to a failure panel.
+        // An uninstalled preset shell degrades to a working terminal.
         let configured =
             preset?.shell ?? configuredShell
             ?? ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         let arguments = preset.map { $0.arguments.isEmpty ? ["-l"] : $0.arguments } ?? ["-l"]
-        // Added on top of the sanitised inherited environment
-        // (`SECURITY.md` §4.3): a preset can add and override, never remove.
+        // A preset adds and overrides, never removes (`SECURITY.md` §4.3).
         var environment = ChildEnvironment.default()
         for (key, value) in preset?.environment ?? [:] { environment[key] = value }
         let home = NSHomeDirectory()
-        // Launched from Finder the app inherits "/" as its working directory,
-        // so the shell opened in the filesystem root. A terminal should start
-        // where a login shell would — and a split pane starts where the pane
-        // it was split from is.
+        // From Finder the app's cwd is "/"; start where a login shell would.
         let preferred = preset?.directory ?? directory ?? home
         let attempts: [(shell: String, directory: String, notice: String?)] = [
             (configured, preferred, nil),
@@ -1471,23 +1111,17 @@ class ViewController: NSViewController {
         var attempted = Set<String>()
         var lastError = PTYError.spawnFailed(code: ENOENT)
         for attempt in attempts {
-            // With no `$SHELL` and no inherited directory several rungs are
-            // the same command; re-running a spawn that just failed only
-            // delays the failure view.
+            // Identical rungs only delay the failure view.
             guard attempted.insert("\(attempt.shell)\u{0}\(attempt.directory)").inserted
             else { continue }
             do {
                 let session = try TerminalSession(
                     executable: attempt.shell,
-                    // Preset arguments apply only to the preset's own shell;
-                    // a fallback rung is `/bin/zsh` or `/bin/sh`, which may
-                    // not understand them at all.
+                    // Only for the preset's own shell; a fallback may not understand them.
                     arguments: attempt.shell == configured ? arguments : ["-l"],
                     environment: environment, size: size,
                     workingDirectory: attempt.directory,
-                    // Per session: a running child's history cannot be
-                    // re-limited without discarding lines, so a change
-                    // applies to sessions opened after it.
+                    // Applies to new sessions: shrinking a live one would drop lines.
                     scrollbackLimit: scrollbackLimit, commandHistoryLimit: commandHistoryLimit)
                 return StartedSession(
                     session: session, notice: attempt.notice,
@@ -1500,23 +1134,15 @@ class ViewController: NSViewController {
         throw lastError
     }
 
-    /// The reconnect spawn: the recorded command, exactly — no
-    /// fallback ladder, because a fallback here would silently turn a
-    /// remote pane into a local shell while the user asked for the host.
-    /// Succeeds as the same command, or fails as itself and lets the
-    /// failure view say so.
+    /// The recorded command, exactly — a fallback would silently turn a remote
+    /// pane into a local shell.
     private func respawn(
         _ command: (executable: String, arguments: [String]),
         size: TerminalSize, configuration: Configuration
     ) throws(PTYError) -> TerminalSession {
-        // The environment is rebuilt rather than remembered: what the first
-        // spawn inherited may be stale, and building it again is what the
-        // first spawn did (`SECURITY.md` §4.3 applies either way).
         var environment = ChildEnvironment.default()
         for (key, value) in preset?.environment ?? [:] { environment[key] = value }
-        // The working directory is a *local* cwd for the launcher process;
-        // the remote side lands wherever the connection and the far shell
-        // put it. A preset directory is honoured as it was at first spawn.
+        // A local cwd for the launcher; the remote side lands where it lands.
         return try TerminalSession(
             executable: command.executable, arguments: command.arguments,
             environment: environment, size: size,
@@ -1525,29 +1151,14 @@ class ViewController: NSViewController {
             commandHistoryLimit: configuration.commandHistoryLimit)
     }
 
-    /// One line a person can act on. `PTYError` writes its description for
-    /// exactly this purpose; anything else falls back to Foundation's.
-    ///
-    /// Cast to the concrete `PTYError` type, not the `CustomStringConvertible`
-    /// protocol: recent Swift gives every `Error` a synthesized
-    /// `CustomStringConvertible` conformance, so `error as? CustomStringConvertible`
-    /// always succeeds and the `localizedDescription` fallback below it never
-    /// runs — a non-`PTYError` (an `NSError` from a system API, say) would
-    /// print its raw synthesized description instead of the friendly
-    /// Foundation-provided one.
+    /// Casts to `PTYError`, not `CustomStringConvertible`: every `Error` now
+    /// conforms to that, so the `localizedDescription` fallback would never run.
     private static func describe(_ error: Error) -> String {
         (error as? PTYError)?.description ?? error.localizedDescription
     }
 
-    /// Replaces the pane's content with an explanation and the two actions
-    /// that can help. The terminal view is never built in this state, so
-    /// `isOperable` is false and every geometry and render entry point
-    /// short-circuits.
-    ///
-    /// `canReconnect` adds a third action when what failed was a remote
-    /// launcher's spawn: Reconnect re-runs that exact command rather
-    /// than the fallback ladder, and the detail says plainly that it is a
-    /// new connection, not a restored one.
+    /// With `isOperable` false every geometry and render entry short-circuits.
+    /// `canReconnect` adds Reconnect, described as a new connection.
     private func presentFailure(
         title: String, detail: String, canRetry: Bool, canReconnect: Bool = false
     ) {
@@ -1566,9 +1177,7 @@ class ViewController: NSViewController {
             failure.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
         failureView = failure
-        // The terminal view is gone (or was never built), so nothing in the
-        // pane is focused and nothing tells an assistive technology that the
-        // content changed — the pane would simply go quiet.
+        // Or nothing is focused and assistive technology hears nothing.
         view.window?.makeFirstResponder(failure.primaryAction)
         NSAccessibility.post(element: failure, notification: .layoutChanged)
         if NSWorkspace.shared.isVoiceOverEnabled {
@@ -1585,13 +1194,7 @@ class ViewController: NSViewController {
         rebuildPane(strictRespawn: false)
     }
 
-    /// The shared teardown-and-rebuild behind Try Again and Reconnect: the
-    /// failure view, the dead terminal view and the dim come down, and
-    /// `setUpPane` builds the pane again — through the fallback ladder for
-    /// a retry, or as the exact recorded command for a reconnect.
-    ///
-    /// Not `private`: the reconnect entry point lives in
-    /// `ViewController+RemoteContext.swift`, an extension.
+    /// Behind Try Again (the ladder) and Reconnect (the exact command).
     func rebuildPane(strictRespawn: Bool) {
         failureView?.removeFromSuperview()
         failureView = nil
@@ -1601,72 +1204,47 @@ class ViewController: NSViewController {
         focusDimView = nil
         setUpPane(strictRespawn: strictRespawn)
         guard isOperable, let terminalView else { return }
-        // The window settled long before this retry, so the startup gate that
-        // holds back transient layouts has nothing left to protect against —
-        // and the pane needs a winsize measured at real cell metrics, which it
-        // did not have while the failure view was up.
+        // The window settled long ago; this pane needs a real winsize now.
         didSizeWindow = true
         view.window?.makeFirstResponder(terminalView)
         resizeSessionToFitView()
         invalidateDisplay()
         if strictRespawn {
-            // Said out loud, every time: this is a new connection. The dead
-            // session's scrollback is gone with its process, and the copy
-            // must not let "reconnect" read as "restored".
+            // Every time: a new connection; the old scrollback is gone.
             terminalView.showToast(reconnectNotice)
         }
     }
 
     override func viewDidAppear() {
         super.viewDidAppear()
-        // Reported here rather than at construction: a toast needs a view on
-        // screen to appear over.
         if let notice = pendingSessionNotice {
             pendingSessionNotice = nil
             terminalView?.showToast(notice, kind: .warning)
         }
     }
 
-    /// The dim wash over unfocused panes. Called by
-    /// `SplitViewController.noteFocus` for both the old and the new focused
-    /// pane.
     func applyFocusAppearance() {
-        // A single pane needs neither: there is nothing to distinguish it
-        // from, and a ring around the only pane is decoration.
+        // One pane needs neither.
         let inSplit = splitController?.hasMultiplePanes == true
-        // The dim is structural — which pane owns the keyboard in this
-        // window — and stays lit even while the app is not frontmost. The
-        // ring and the highlight are a claim about where keys go *right
-        // now*: `hasUserFocus`, not `isFocusedPane`, so cmd-tabbing away
-        // does not leave a ring around a pane that is not actually receiving
-        // anything.
+        // The dim is structural and stays while the app is inactive; ring and
+        // highlight follow `hasUserFocus`, so cmd-tab leaves no false ring.
         focusDimView?.isHidden = isFocusedPane || !inSplit
         let highlighted = hasUserFocus && inSplit
         focusRingView?.isHidden = !highlighted
         focusHighlightView?.isHidden = !highlighted
-        // The accent colour is the user's and can change while the app runs;
-        // Increase Contrast also needs a heavier ring than a tinted hairline.
+        // The accent can change at runtime; Increase Contrast wants more.
         focusRingView?.layer?.borderColor = Self.focusRingColor.cgColor
         focusRingView?.layer?.borderWidth =
             SystemAccessibility.increaseContrast ? Self.focusRingWidth + 1 : Self.focusRingWidth
         reportFocusIfNeeded()
     }
 
-    /// 8% rather than 22%: enough to tell two panes apart at a glance
-    /// alongside the ring, little enough that the unfocused pane's text is
-    /// still text you can read.
+    /// Enough to tell panes apart, little enough to read through.
     static let unfocusedDim: CGFloat = 0.08
-    /// A hairline: heavy enough to find at a glance, light enough that it
-    /// does not compete with the terminal content for attention, especially
-    /// in a small window where a 2pt border read as most of the signal on
-    /// screen.
+    /// A hairline; 2pt dominated small windows.
     static let focusRingWidth: CGFloat = 1
-    /// The ring's colour: the user's accent, pulled back to half strength so
-    /// it marks the pane without outlining it in full-strength blue — a
-    /// full-alpha accent border around the pane being typed in read as the
-    /// loudest element on screen, louder than the text it framed. Under
-    /// Increase Contrast the full colour returns, where a faint ring would
-    /// stop being visible at all.
+    /// Half-strength accent — full alpha was louder than the text it framed;
+    /// full again under Increase Contrast.
     static var focusRingColor: NSColor {
         let accent = NSColor.controlAccentColor
         return SystemAccessibility.increaseContrast
@@ -1674,13 +1252,11 @@ class ViewController: NSViewController {
     }
 
     static let focusRingAlpha: CGFloat = 0.5
-    /// Deliberately faint — an elevation cue alongside the ring, not a
-    /// second copy of it. Anything stronger recoloured the text underneath.
+    /// Stronger recoloured the text underneath.
     static let focusHighlightAlpha: CGFloat = 0.05
 }
 
-/// Covers a pane to dim it without intercepting input — clicks, scrolls
-/// and hovers fall through to the terminal view beneath.
+/// Input falls through to the terminal view.
 private final class PassthroughView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }

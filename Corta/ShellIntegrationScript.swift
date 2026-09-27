@@ -14,16 +14,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-/// The snippets `ShellIntegrationInstaller` writes into a shell's rc
-/// file, one per supported shell.
-///
-/// A Swift string constant rather than a bundled resource file: this is
-/// generated content the app owns end to end (nothing else reads it, and it
-/// is never edited by hand), so the single source of truth is the same file
-/// that writes and removes it — one thing to keep in sync, not two.
+/// The snippets `ShellIntegrationInstaller` writes, one per shell. String
+/// constants, not resources: the file that writes and removes them is
+/// their single source of truth.
 enum ShellIntegrationScript {
-    /// The snippet for `shell`, all emitting the same FinalTerm A/B/C/D
-    /// sequence plus OSC 7, translated to each shell's own hook mechanism.
+    /// Each emits FinalTerm A/B/C/D plus OSC 7 through the shell's own hooks.
     static func script(for shell: ShellKind) -> String {
         switch shell {
         case .zsh: return zsh
@@ -31,27 +26,11 @@ enum ShellIntegrationScript {
         case .fish: return fish
         }
     }
-    /// FinalTerm's four states (`Performer+ShellIntegration.swift` has the
-    /// full account) plus OSC 7 for the working directory, wired to zsh's
-    /// `preexec`/`precmd` hooks:
-    ///
-    /// - `preexec` fires once the user has pressed Return, right before the
-    ///   command runs — exactly where `C` belongs.
-    /// - `precmd` fires after the command exits and before the next prompt is
-    ///   drawn — `D` (with the exit status `precmd` sees first, before
-    ///   anything else can clobber `$?`) followed by `A` for the prompt about
-    ///   to be shown.
-    /// - `B` (prompt text ends, command line begins) has no hook of its own:
-    ///   it is appended to `$PS1` once, so it fires exactly when the prompt
-    ///   finishes drawing, however many lines that prompt is.
-    ///
-    /// Guarded by `CORTA_SHELL_INTEGRATION_ACTIVE` so sourcing this twice —
-    /// a `.zshrc` that itself sources other files, one of which happens to
-    /// source this one again — registers each hook once.
-    ///
-    /// A raw string literal (`#"""`): the zsh below is full of its own
-    /// backslash escapes (`\e`, `\a`), and doubling every one of them to
-    /// satisfy Swift's would make this unreadable and easy to get wrong.
+    /// zsh (states per `Performer+ShellIntegration.swift`): `preexec` emits
+    /// `C`; `precmd` emits `D` with `$?` read first, then `A`; `B` is appended
+    /// to `$PS1`, so it fires where the prompt ends, however many lines.
+    /// `CORTA_SHELL_INTEGRATION_ACTIVE` keeps a double source from doubling
+    /// hooks. A raw literal, so zsh's `\e` and `\a` aren't doubled.
     static let zsh = #"""
         if [[ -n "$ZSH_VERSION" && -z "$CORTA_SHELL_INTEGRATION_ACTIVE" ]]; then
           CORTA_SHELL_INTEGRATION_ACTIVE=1
@@ -77,12 +56,8 @@ enum ShellIntegrationScript {
         fi
         """#
 
-    /// bash has no `preexec`/`precmd` hooks of its own: `DEBUG` trap and
-    /// `PROMPT_COMMAND` are its nearest equivalents. The trap fires before
-    /// *every* simple command, including ones `PROMPT_COMMAND` itself runs —
-    /// the `$BASH_COMMAND == $PROMPT_COMMAND` guard is what keeps `C` from
-    /// firing a second time for the prompt machinery rather than the command
-    /// the user typed.
+    /// bash: a `DEBUG` trap and `PROMPT_COMMAND`. The trap fires for
+    /// `PROMPT_COMMAND` too; the `$BASH_COMMAND` guard stops a second `C`.
     static let bash = #"""
         if [[ -n "$BASH_VERSION" && -z "$CORTA_SHELL_INTEGRATION_ACTIVE" ]]; then
           CORTA_SHELL_INTEGRATION_ACTIVE=1
@@ -109,12 +84,9 @@ enum ShellIntegrationScript {
         fi
         """#
 
-    /// fish has first-class prompt events, but no hook that fires *after*
-    /// the user's own prompt text is drawn — `B` needs to sit there, so this
-    /// renames the user's `fish_prompt` to `__corta_original_fish_prompt`
-    /// (once, guarded the same way as the other two shells) and replaces it
-    /// with a wrapper that reads `$status` before anything can clobber it,
-    /// emits `A`, calls through to the original, then emits `B`.
+    /// fish: nothing fires after the prompt draws, so the user's
+    /// `fish_prompt` is renamed (once) and wrapped: read `$status`, emit `A`,
+    /// call the original, emit `B`.
     static let fish = #"""
         if status is-interactive; and not set -q CORTA_SHELL_INTEGRATION_ACTIVE
           set -gx CORTA_SHELL_INTEGRATION_ACTIVE 1

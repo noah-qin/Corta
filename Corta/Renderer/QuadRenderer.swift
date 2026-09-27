@@ -24,50 +24,33 @@ enum QuadRendererError: Error {
     case samplerUnavailable
 }
 
-/// Draws instanced quads — solid backgrounds, or glyphs sampled from an
-/// atlas — into a caller-given rectangle of a caller-given render target.
+/// Draws instanced quads — solid backgrounds or atlas glyphs — into a
+/// caller-given rect of a caller-given target, never "the window" (D07).
+/// A typical frame is two draw calls (backgrounds, glyphs), plus a third
+/// for color glyphs when any exist; "one draw call per screen"
+/// (`CONFORMANCE.md` §2.2) forbids a call per cell or row.
 ///
-/// Every entry point takes a `CGRect` and a `MTLRenderPassDescriptor`; this
-/// type never assumes "the window" (`DECISIONS.md` D07). Two draw calls cover a
-/// typical frame — one instanced pass for every cell's background, one for
-/// every glyph — which is what "one draw call per screen" (`CONFORMANCE.md`
-/// §2.2) is protecting against: a call per cell or per row, not a call per
-/// pipeline. A frame with color emoji adds a third (the color-atlas pass),
-/// skipped entirely when no cell produced a color glyph.
-///
-/// **Colour space.** Cell colours and the glyph atlas both hold sRGB-encoded
-/// values, and blending (glyph alpha over a cell's background) happens
-/// directly in that encoded space — the render target is `.bgra8Unorm`, not
-/// `.bgra8Unorm_srgb`, so no implicit linearisation happens on read or
-/// write. This matches how xterm, Alacritty and Ghostty composite text and
-/// is the simpler, faster choice; a fully linear-light blend is deferred
-/// until stem darkening is tackled (`DESIGN.md` §7, known hard part 5).
+/// **Colour space.** Colours and the atlas are sRGB-encoded and blend in
+/// that space: the target is `.bgra8Unorm`, not `_srgb`, as in xterm,
+/// Alacritty and Ghostty. Linear blending waits on stem darkening
+/// (`DESIGN.md` §7, hard part 5).
 nonisolated final class QuadRenderer {
     let device: MTLDevice
     private let solidPipeline: MTLRenderPipelineState
     private let glyphPipeline: MTLRenderPipelineState
-    /// The color-atlas variant of the glyph pipeline: its fragment returns
-    /// the texture sample (premultiplied bgra) directly instead of tinting
-    /// coverage, so it blends premultiplied-over rather than re-multiplying
-    /// the source rgb by alpha.
+    /// Returns the premultiplied sample untinted and blends
+    /// premultiplied-over.
     private let colorGlyphPipeline: MTLRenderPipelineState
     private let sampler: MTLSamplerState
 
-    /// A small ring of GPU-visible instance buffers per pipeline kind
-    /// (`PERFORMANCE.md` §3: "triple-buffer the Metal instance buffer,
-    /// avoids a CPU/GPU stall waiting on the previous frame"). Each call to
-    /// `drawSolidQuads`/`drawGlyphQuads` writes into the next slot in its
-    /// own ring rather than the last one a command buffer may still be
-    /// reading from.
+    /// A ring of instance buffers per pipeline kind, so a draw never writes
+    /// the buffer an in-flight command buffer reads (`PERFORMANCE.md` §3).
     private final class InstanceBufferRing {
         private var buffers: [MTLBuffer?] = [nil, nil, nil]
         private var next = 0
 
-        /// A buffer sized for `byteCount`, with `bytes` already written to
-        /// it. Grows a ring slot (never shrinks) rather than allocating a
-        /// fresh buffer whenever the previous one is already big enough —
-        /// the steady state for an unchanging window size is zero
-        /// allocation per frame (`PERFORMANCE.md` §3).
+        /// The next slot holding `bytes`, grown but never shrunk: no steady-state
+        /// allocation (`PERFORMANCE.md` §3).
         func buffer(bytes: UnsafeRawPointer, byteCount: Int, device: MTLDevice) -> MTLBuffer? {
             guard byteCount > 0 else { return nil }
             let slot = next
@@ -87,17 +70,11 @@ nonisolated final class QuadRenderer {
     private let glyphBufferRing = InstanceBufferRing()
     private let colorGlyphBufferRing = InstanceBufferRing()
 
-    /// The pixel format every render target passed to this renderer must
-    /// use — the pipelines are built against it up front.
+    /// Every render target's format; the pipelines are built against it.
     static let pixelFormat: MTLPixelFormat = .bgra8Unorm
 
-    /// The pipelines and sampler come from `QuadPipelineCache`: one
-    /// compile per device per process, shared by every pane and by
-    /// `Metal4Backend`, instead of each pane re-running the compile/archive
-    /// path. The binary-archive warm-up lives in the cache's creation
-    /// path — it accelerates the first (cold) creation per
-    /// launch; the cache shares that result with panes 2...n, which is the
-    /// half the archive never covered.
+    /// Pipelines and sampler come from `QuadPipelineCache`: one compile per
+    /// device per process, shared by every pane and `Metal4Backend`.
     init(device: MTLDevice) throws {
         self.device = device
         let entry = try QuadPipelineCache.entry(for: device)
@@ -107,21 +84,10 @@ nonisolated final class QuadRenderer {
         self.sampler = entry.sampler
     }
 
-    /// Where a compiled-pipeline cache from a previous launch is looked for,
-    /// and where this launch's (re)writes it — `AppPaths.cacheDirectory`,
-    /// not Application Support: this is disposable, regenerable content the
-    /// system is free to purge, never something a user's session depends on.
-    /// That directory is per bundle identifier, so the pruning below can
-    /// only ever remove *this* build's older archives (D22).
-    ///
-    /// Named with `buildFingerprint` — **not** a fixed filename — so a
-    /// rebuild's cache is never confused with an older build's: this is a
-    /// belt-and-braces measure alongside `isRunningUnderXCTest` below, not
-    /// the fix for what that guards (see its doc comment for the actual
-    /// crash this file's history is about).
-    ///
-    /// One file for all three pipelines; keyed by nothing beyond its path.
-    /// Not `private`: `QuadRendererTests` checks the file this writes.
+    /// The compiled-pipeline archive, in `AppPaths.cacheDirectory`: purgeable
+    /// and per bundle id, so pruning only touches this build's archives (D22).
+    /// Named by `buildFingerprint`, so a rebuild never reads an older build's
+    /// cache. Internal for `QuadRendererTests`.
     static var binaryArchiveURL: URL? {
         guard let directory = AppPaths.cacheDirectory else { return nil }
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -129,14 +95,8 @@ nonisolated final class QuadRenderer {
         return directory.appendingPathComponent("QuadRenderer-\(buildFingerprint).metallib-archive")
     }
 
-    /// The running executable's modification time, as a filename-safe
-    /// integer — changes on every rebuild (a fresh compile writes a new
-    /// binary), which is exactly the granularity a Metal-compiled-shader
-    /// cache needs to invalidate at. `"unknown"` only if the executable's
-    /// own attributes cannot be read, which never happens for a running
-    /// process's own binary in practice; a shared, stable "unknown" still
-    /// behaves correctly (one cache file, reused within that condition)
-    /// rather than crashing or refusing to cache at all.
+    /// The executable's modification time, which changes on every rebuild.
+    /// A stable `"unknown"` if unreadable still caches correctly.
     private static var buildFingerprint: String {
         guard let url = Bundle.main.executableURL,
             let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
@@ -145,11 +105,8 @@ nonisolated final class QuadRenderer {
         return String(Int(modified.timeIntervalSince1970))
     }
 
-    /// Removes every `QuadRenderer-*.metallib-archive` in `directory` that
-    /// is not this build's own — otherwise each rebuild during development
-    /// leaves the last one behind forever, unbounded, since nothing else
-    /// ever revisits this directory. Best-effort: a failed removal here is
-    /// not worth surfacing, the file just sits unused.
+    /// Removes other builds' archives, which would otherwise pile up.
+    /// Best-effort.
     private static func pruneStaleBinaryArchives(in directory: URL) {
         let current = "QuadRenderer-\(buildFingerprint).metallib-archive"
         guard
@@ -164,13 +121,8 @@ nonisolated final class QuadRenderer {
         }
     }
 
-    /// Writes `archive` to `url` without ever exposing a partially-written
-    /// file at that path: serializes to a uniquely-named temp file in the
-    /// same directory first, then atomically replaces `url` with it
-    /// (`FileManager.replaceItemAt`, a single `rename(2)` on the same
-    /// volume) — so a reader can never open a half-written file, only the
-    /// old complete one or the new complete one. Not `private`: called from
-    /// `QuadPipelineCache.makeEntry`, where the archive path now lives.
+    /// Writes via a temp file and an atomic `replaceItemAt`, so a reader never
+    /// sees a half-written archive. Called from `QuadPipelineCache.makeEntry`.
     static func serialize(_ archive: any MTLBinaryArchive, to url: URL) {
         let temporaryURL =
             url.deletingLastPathComponent()
@@ -186,48 +138,20 @@ nonisolated final class QuadRenderer {
         }
     }
 
-    /// `true` while running as (or hosted inside) an XCTest bundle —
-    /// `XCTestConfigurationFilePath` is the standard, Apple-set environment
-    /// variable for this, present whether the test is unit (`CortaTests`,
-    /// which `TEST_HOST`s directly into `Corta` — this process *is* the
-    /// test) or UI-driven.
-    ///
-    /// Exists for exactly one reason: `loadOrCreateBinaryArchive` reading a
-    /// previous archive back segfaulted — `-[_MTLDevice
-    /// recordBinaryArchiveUsage:]`, a null C-string reaching `strlen`,
-    /// inside Metal's own framework code — reproducibly under `CortaTests`.
-    /// A standalone command-line reproduction of the identical write-then-
-    /// load round trip (same archive, same device, no app, no test
-    /// infrastructure) did **not** crash, and neither did two real,
-    /// consecutive, bare `Corta.app` launches sharing a cache file (the
-    /// scenario this feature exists for) — which points at the *hosted
-    /// test* launch path specifically, not the load itself: `CortaTests`
-    /// runs injected into `Corta` via `TEST_HOST`, a fundamentally
-    /// different launch mechanism from opening the app, and a filed
-    /// upstream report of the same crash signature attributes it to
-    /// `MTLGetShaderCachePath()` returning nil when something denies
-    /// Metal's own internal shader-cache directory — plausible for
-    /// whatever container Xcode's hosted-test launch applies that a plain
-    /// launch does not.
-    ///
-    /// Disabling the read path unconditionally would trade away a real,
-    /// working optimisation for real users to silence a test-harness-only
-    /// crash; this only disables it under that harness.
+    /// True under XCTest (`XCTestConfigurationFilePath`), where reading an
+    /// archive back segfaults inside Metal
+    /// (`-[_MTLDevice recordBinaryArchiveUsage:]`, a null C string reaching
+    /// `strlen`). Neither a standalone repro nor two real launches crash, and
+    /// an upstream report ties the signature to `MTLGetShaderCachePath()`
+    /// returning nil — plausibly the hosted-test launch. Only that harness
+    /// skips the read.
     private static var isRunningUnderXCTest: Bool {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
 
-    /// Opens the cached archive from a previous launch if one exists at
-    /// `binaryArchiveURL` — unless `isRunningUnderXCTest`, in which case a
-    /// fresh, empty archive is created instead and the file is never read
-    /// (its doc comment has the full account of why). Either way, the caller
-    /// (`QuadPipelineCache.makeEntry`, the one place the archive path runs
-    /// now) adds this launch's three pipeline descriptors to it and
-    /// re-serialises it, so a first-ever launch — or every hosted-test
-    /// launch — seeds or refreshes the cache a later real launch benefits
-    /// from. `nil` on any failure (no archive support, no writable cache
-    /// directory): callers fall back to an ordinary synchronous compile,
-    /// unconditionally correct either way.
+    /// Opens the previous launch's archive, or a fresh one under XCTest;
+    /// `QuadPipelineCache.makeEntry` adds this launch's pipelines and
+    /// re-serialises it. Nil on failure, falling back to a plain compile.
     static func loadOrCreateBinaryArchive(device: MTLDevice) -> (any MTLBinaryArchive)? {
         let descriptor = MTLBinaryArchiveDescriptor()
         if !isRunningUnderXCTest, let url = binaryArchiveURL,
@@ -238,8 +162,7 @@ nonisolated final class QuadRenderer {
         return try? device.makeBinaryArchive(descriptor: descriptor)
     }
 
-    /// Draws solid-colour `instances` into `rect` (pixels, relative to the
-    /// render target's origin) of `renderPassDescriptor`.
+    /// Draws solid `instances` into `rect`, in target pixels.
     func drawSolidQuads(
         _ instances: [QuadInstance],
         rect: CGRect,
@@ -253,7 +176,6 @@ nonisolated final class QuadRenderer {
             commandBuffer: commandBuffer, label: "Corta.solid")
     }
 
-    /// Draws `instances` sampled from `atlas` into `rect`.
     func drawGlyphQuads(
         _ instances: [QuadInstance],
         atlas: MTLTexture,
@@ -268,10 +190,8 @@ nonisolated final class QuadRenderer {
             commandBuffer: commandBuffer, label: "Corta.glyph")
     }
 
-    /// Draws `instances` sampled from the *color* atlas into `rect`. Same
-    /// quad math as `drawGlyphQuads`; the difference is entirely in the
-    /// fragment (sample verbatim, no tint) and the blend (premultiplied
-    /// source) — see `colorGlyphPipeline`.
+    /// Draws from the color atlas: same quads, untinted premultiplied
+    /// fragment and blend (`colorGlyphPipeline`).
     func drawColorQuads(
         _ instances: [QuadInstance],
         atlas: MTLTexture,
@@ -297,14 +217,9 @@ nonisolated final class QuadRenderer {
         commandBuffer: MTLCommandBuffer,
         label: String
     ) {
-        // Even with zero instances, a `.clear` pass still has to run: the
-        // load action must happen so a frame that draws nothing (an all-
-        // default-colour blank grid) doesn't leave the previous frame on
-        // screen. A `.load` pass with zero instances is the opposite case —
-        // it draws nothing and preserves nothing — so skipping it outright
-        // is pixel-identical and saves the tile load/store round trip an
-        // empty render pass still costs (without it, the glyph pass on a
-        // blank screen pays one every frame).
+        // An empty `.clear` pass still runs, or a blank frame keeps the last one
+        // on screen. An empty `.load` pass changes nothing, so skip its tile
+        // load/store round trip.
         if instances.isEmpty,
             renderPassDescriptor.colorAttachments[0].loadAction == .load
         {
@@ -312,9 +227,6 @@ nonisolated final class QuadRenderer {
         }
         guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)
         else { return }
-        // Correlates an Instruments/Metal System Trace capture with which of
-        // the up-to-three passes a frame took; purely a label, changes nothing
-        // about what draws.
         encoder.label = label
         encoder.pushDebugGroup(label)
         defer {
@@ -323,9 +235,7 @@ nonisolated final class QuadRenderer {
         }
         guard !instances.isEmpty else { return }
 
-        // Clipping to `rect` via the scissor is what makes "renders into a
-        // rect, not the window" true rather than aspirational: nothing an
-        // instance does can paint outside it.
+        // The scissor keeps every instance inside `rect`.
         let x = max(0, Int(rect.minX.rounded(.down)))
         let y = max(0, Int(rect.minY.rounded(.down)))
         let maxWidth = max(0, Int(drawableSize.width) - x)
@@ -347,10 +257,8 @@ nonisolated final class QuadRenderer {
             rectSize: SIMD2<Float>(Float(rect.width), Float(rect.height)),
             drawableSize: SIMD2<Float>(Float(drawableSize.width), Float(drawableSize.height))
         )
-        // `setVertexBytes` is documented for small, transient data only —
-        // Metal enforces a 4 KB cap, and a full screen of instances (up to
-        // ~200×64 cells × 48 bytes) is routinely 20-40x that. A real
-        // `MTLBuffer` has no such limit.
+        // Not `setVertexBytes`: its 4 KB cap is far below a screen of
+        // instances.
         let instanceByteCount = MemoryLayout<QuadInstance>.stride * instances.count
         guard
             let instanceBuffer = instances.withUnsafeBytes({ raw -> MTLBuffer? in

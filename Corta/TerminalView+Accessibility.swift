@@ -17,36 +17,19 @@
 import AppKit
 import OSLog
 
-/// VoiceOver, Switch Control, Voice Control and every other assistive
-/// technology, for a view that draws its text with Metal.
+/// Assistive technology support for a view that draws its text with Metal,
+/// which gives AppKit nothing to derive an accessibility tree from.
 ///
-/// **The problem this closes.** A `CAMetalLayer` is pixels. AppKit derives an
-/// accessibility tree from views and their text, and a view that renders its
-/// own glyphs into a drawable has none to derive — so the entire terminal was
-/// one unlabelled rectangle, and the app's most important content was the only
-/// content no screen reader could reach. Nothing about that is visible in a
-/// render test: the pixels were right the whole time.
-///
-/// **The shape of the fix.** A terminal *is* a text area — a fixed grid of
-/// characters with an insertion point and a selection — so it implements the
-/// text-area protocol rather than inventing a role. The text, the cursor and
-/// the selection come from `accessibilitySnapshotProvider`, installed by the
-/// pane: this view knows nothing about `Grid`, the same way it knows nothing
-/// about the session for keys or the renderer for metrics (`ViewController`
-/// owns every closure hook here).
-///
-/// The snapshot is rebuilt at most once per burst of questions, because
-/// AppKit asks a dozen of them per VoiceOver step and each would otherwise
-/// take the terminal's lock and walk the grid.
+/// The view implements the text-area protocol: a fixed grid of characters
+/// with an insertion point and a selection. Text, cursor and selection come
+/// from `accessibilitySnapshotProvider`, installed by the pane, so this
+/// view knows nothing about `Grid`. The snapshot is rebuilt at most once per
+/// burst, since AppKit asks a dozen questions per VoiceOver step.
 extension TerminalView {
-    /// What an assistive technology asked and what it was told, on the
-    /// unified log (`log show --last 5m --predicate 'subsystem ==
-    /// "dev.noahqin.Corta" and category == "accessibility"'`). Notice
-    /// level, not debug, so it is there after the fact; nothing but an
-    /// assistive client makes these calls, so it is silent otherwise. VoiceOver
-    /// cannot be run by a test and reports only what it concluded, never
-    /// which attribute it read — "No selection." over a selection the API
-    /// reported correctly (2026-09-18) is exactly the case this exists for.
+    /// What an assistive client asked and was told, at notice level so it is
+    /// there afterwards (`log show --predicate 'subsystem ==
+    /// "dev.noahqin.Corta" and category == "accessibility"'`). VoiceOver
+    /// can't run in a test and never says which attribute it read; this does.
     private static let trace = Logger(subsystem: "dev.noahqin.Corta", category: "accessibility")
 
     // MARK: - Element identity
@@ -57,9 +40,7 @@ extension TerminalView {
 
     override func accessibilityLabel() -> String? { L10n.text("a11y.terminal.label") }
 
-    /// The grid's size — the fact that explains why a program's output is
-    /// wrapped where it is, and the one thing a person who cannot see the
-    /// window has no other way to learn.
+    /// The grid size, which explains where output wraps.
     override func accessibilityHelp() -> String? {
         guard let snapshot = accessibilitySnapshot() else { return nil }
         return L10n.format(
@@ -87,27 +68,21 @@ extension TerminalView {
     }
 
     override func accessibilityVisibleCharacterRange() -> NSRange {
-        // The exposed value *is* the viewport, so all of it is visible.
+        // The value is the viewport, so all of it is visible.
         NSRange(location: 0, length: accessibilitySnapshot()?.text.utf16.count ?? 0)
     }
 
-    /// The attributed form of a range (`AXAttributedStringForRange`), which
-    /// `NSTextView` answers and VoiceOver asks for when it *speaks* a range
-    /// rather than navigates it. Without it, a screen reader with a correct
-    /// `AXSelectedTextRange` in hand says "No selection." over a six-line
-    /// mouse selection (TextEdit, asked the same way, reads its selection).
-    /// The terminal has no text
-    /// attributes worth speaking — colour and bold are not semantics — so
-    /// the answer is the plain substring, attributed.
+    /// `AXAttributedStringForRange`, which VoiceOver asks when speaking a
+    /// range; without it, it said "No selection." over a real selection.
+    /// Plain text: colour and bold aren't semantics.
     override func accessibilityAttributedString(for range: NSRange) -> NSAttributedString? {
         Self.trace.notice("attributedString(for:) \(range.location, privacy: .public)+\(range.length, privacy: .public)")
         guard let text = accessibilityString(for: range) else { return nil }
         return NSAttributedString(string: text)
     }
 
-    /// The character range containing a UTF-16 index (`AXRangeForIndex`):
-    /// the whole grapheme, so a client never lands between the units of an
-    /// astral emoji or splits a combining sequence.
+    /// `AXRangeForIndex`: the whole grapheme, never half an emoji or
+    /// combining sequence.
     override func accessibilityRange(for index: Int) -> NSRange {
         guard let snapshot = accessibilitySnapshot() else { return NSRange(location: 0, length: 0) }
         let full = snapshot.text as NSString
@@ -117,10 +92,7 @@ extension TerminalView {
         return full.rangeOfComposedCharacterSequence(at: index)
     }
 
-    /// The run of uniform style around an index (`AXStyleRangeForIndex`).
-    /// The exposed text carries no attributes, so the whole line is one
-    /// run — a client stepping by style steps by line, which is what a
-    /// terminal's rows are.
+    /// `AXStyleRangeForIndex`: the text has no attributes, so a line.
     override func accessibilityStyleRange(for index: Int) -> NSRange {
         accessibilityRange(forLine: accessibilityLine(for: index))
     }
@@ -144,12 +116,8 @@ extension TerminalView {
         return text
     }
 
-    /// The plural form (`AXSelectedTextRanges`), which `NSTextView` answers
-    /// alongside the singular and which a screen reader may ask for first.
-    /// A terminal has one selection, so the list is that one range — or
-    /// empty when there is nothing selected, rather than a zero-length
-    /// range at the insertion point, which is what "selected ranges" would
-    /// take to mean "one empty selection".
+    /// `AXSelectedTextRanges`: the one selection, or empty — not a
+    /// zero-length range, which would mean one empty selection.
     override func accessibilitySelectedTextRanges() -> [NSValue]? {
         guard let snapshot = accessibilitySnapshot(), snapshot.selectedRange.length > 0
         else {
@@ -160,10 +128,8 @@ extension TerminalView {
         return [NSValue(range: snapshot.selectedRange)]
     }
 
-    /// The *visible* line the cursor is on. `cursorRow` is a document row,
-    /// and the two differ by the scroll offset — scrolled into the history,
-    /// the cursor's line number was being reported as if the live screen were
-    /// still on top of the viewport.
+    /// The visible line: `cursorRow` is a document row, off by the scroll
+    /// offset.
     override func accessibilityInsertionPointLineNumber() -> Int {
         guard let snapshot = accessibilitySnapshot() else { return 0 }
         return min(max(0, snapshot.cursorRow + snapshot.scrollOffset), max(0, snapshot.rows - 1))
@@ -173,9 +139,7 @@ extension TerminalView {
 
     override func accessibilityLine(for index: Int) -> Int {
         guard let snapshot = accessibilitySnapshot() else { return 0 }
-        // The last row whose start is at or before the offset. Rows are few
-        // (tens) and the answer is asked for per VoiceOver step, so a scan
-        // beats maintaining a second index.
+        // Rows are few; a scan beats a second index.
         var line = 0
         for (row, start) in snapshot.lineStarts.enumerated() where start <= index { line = row }
         return line
@@ -188,33 +152,24 @@ extension TerminalView {
         let start = snapshot.lineStarts[line]
         let end =
             line + 1 < snapshot.lineStarts.count
-            // Minus the newline: the range is the line, not the separator.
+            // Minus the newline.
             ? max(start, snapshot.lineStarts[line + 1] - 1)
             : snapshot.text.utf16.count
         return NSRange(location: start, length: end - start)
     }
 
-    /// The character under a point, which the protocol gives in **screen**
-    /// coordinates.
-    ///
-    /// Two conversions were wrong here. `convert(_:from: nil)` converts
-    /// from *window* coordinates, not screen, so every answer was off by the
-    /// window's origin — the further from the bottom-left of the display the
-    /// window sat, the further Voice Control's click landed from the cell the
-    /// user named. And the offset was `line.location + cell.column`, which
-    /// treats a UTF-16 offset and a grid column as the same number; they are
-    /// the same number only for ASCII.
+    /// The character under a point, given in screen coordinates. Converted
+    /// screen → window → view (`convert(_:from: nil)` alone is window
+    /// coordinates), and mapped column to UTF-16 offset through the snapshot,
+    /// since they match only for ASCII.
     override func accessibilityRange(for point: NSPoint) -> NSRange {
         guard let snapshot = accessibilitySnapshot(), let cellAtPoint else {
             return NSRange(location: 0, length: 0)
         }
-        // Screen -> window -> view. Without a window there is no screen
-        // space to come from, so the point cannot be resolved at all.
         guard let window else { return NSRange(location: 0, length: 0) }
         let local = convert(window.convertPoint(fromScreen: point), from: nil)
-        // `cellAtPoint` answers in viewport rows (it is shared with mouse
-        // reporting, which names on-screen cells); the snapshot indexes by
-        // document row, so the scroll offset comes back off here.
+        // `cellAtPoint` answers in viewport rows; the snapshot wants document
+        // rows.
         let cell = cellAtPoint(local)
         guard cell.row >= 0, cell.row < snapshot.lineStarts.count else {
             return NSRange(location: 0, length: 0)
@@ -224,23 +179,16 @@ extension TerminalView {
             location: snapshot.offset(documentRow: documentRow, column: cell.column), length: 0)
     }
 
-    /// Where a character range is on screen, so VoiceOver's cursor outline
-    /// lands on the text it is reading rather than around the whole pane.
-    ///
-    /// The columns come from the snapshot's boundary table, not from
-    /// `offset - lineStart`: on a row of CJK that subtraction is half
-    /// the true column, and the outline lands on the wrong half of the line.
-    /// The range's last *character* is what bounds the rectangle, so a
-    /// zero-length range still outlines one cell.
+    /// A range's screen rect, for VoiceOver's outline. Columns come from the
+    /// snapshot's boundary table (subtraction halves CJK); a zero-length range
+    /// still outlines one cell.
     override func accessibilityFrame(for range: NSRange) -> NSRect {
         guard let cellFrame = accessibilityCellFrameProvider,
             let snapshot = accessibilitySnapshot()
         else { return .zero }
         let start = snapshot.cell(forOffset: range.location)
-        // The *last column of* the last character, not its first: a range
-        // ending on a wide character whose rectangle stops at that
-        // character's first column clips half of it — three CJK characters
-        // would be outlined as five cells instead of six.
+        // The last character's last column, or a wide character is half
+        // outlined.
         let end = snapshot.cellSpan(forOffset: range.location + max(0, range.length - 1))
         let first = cellFrame(start.row, start.column)
         let last = cellFrame(end.row, end.column + end.columns - 1)
@@ -250,10 +198,8 @@ extension TerminalView {
 
     // MARK: - Snapshot caching
 
-    /// Rebuilds at most once per `snapshotLifetime`. AppKit asks its dozen
-    /// questions back to back, so one copy answers a whole VoiceOver step
-    /// consistently; the cache is dropped by `noteAccessibilityValueChanged`
-    /// the moment the grid moves on.
+    /// Rebuilds at most once per `snapshotLifetime`, so a VoiceOver step is
+    /// answered consistently; `noteAccessibilityValueChanged` drops it.
     private func accessibilitySnapshot() -> TerminalAccessibilitySnapshot? {
         if let cached = cachedAccessibilitySnapshot,
             CACurrentMediaTime() - cachedAccessibilitySnapshotTime < Self.snapshotLifetime
@@ -268,27 +214,17 @@ extension TerminalView {
 
     static let snapshotLifetime: CFTimeInterval = 0.2
 
-    /// Called by the pane when the grid changed. Drops the cache and tells
-    /// AppKit, so a screen reader following a build log hears the new lines
-    /// instead of the ones from when it last asked.
-    ///
-    /// Rate-limited and gated on VoiceOver actually running: posting per frame
-    /// would put string building on the render path, which is the one place
-    /// the project's performance rules forbid it (`PERFORMANCE.md` §2).
+    /// The grid changed: drop the cache and notify, so VoiceOver hears new
+    /// output. Rate-limited and only while VoiceOver runs, keeping string
+    /// building off the render path (`PERFORMANCE.md` §2).
     func noteAccessibilityValueChanged() {
         guard NSWorkspace.shared.isVoiceOverEnabled else { return }
-        // The grid moved on, whatever happens to the notification: a
-        // snapshot built before this change must not answer the next
-        // question.
+        // Whatever happens to the notification, the old snapshot is stale.
         cachedAccessibilitySnapshot = nil
         let now = CACurrentMediaTime()
         let elapsed = now - lastAccessibilityPost
         guard elapsed >= Self.accessibilityPostInterval else {
-            // Inside the interval the change is not dropped: for a burst of
-            // output that would mean the *last* change, the one that leaves the
-            // screen in its final state, is the one never announced, and
-            // VoiceOver goes on reading the state before it. Trail instead: one
-            // post when the interval ends, carrying every change since.
+            // Trail rather than drop, or a burst's final state is never announced.
             guard pendingAccessibilityPost == nil else { return }
             let item = DispatchWorkItem { [weak self] in
                 guard let self else { return }
@@ -306,8 +242,7 @@ extension TerminalView {
         NSAccessibility.post(element: self, notification: .valueChanged)
     }
 
-    /// The selection changed by a local action (a drag, Select All), which is
-    /// a separate notification from the value changing.
+    /// A local selection change: its own notification, separate from value.
     func noteAccessibilitySelectionChanged() {
         guard NSWorkspace.shared.isVoiceOverEnabled else { return }
         cachedAccessibilitySnapshot = nil

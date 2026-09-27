@@ -17,16 +17,11 @@
 import AppKit
 import CortaTerminal
 
-/// The leftover sub-line scroll distance for one view, kept per device class.
-/// Trackpads report *precise* deltas in points, wheel mice report lines
-/// (usually whole, occasionally fractional); rounding each event on its own
-/// would round small trackpad deltas away to nothing and could drop a wheel
-/// notch entirely. Accumulating instead keeps the totals faithful in both
-/// units. The two remainders never combine: a trackpad's leftover points must
-/// not make a wheel notch count as more than a notch.
+/// Sub-line scroll remainders for one view, per device: trackpads report
+/// points, wheels lines, and rounding per event would lose small deltas.
+/// The two never combine.
 final class ScrollWheelAccumulator {
-    /// Trackpad points per scrollback line — chosen so momentum scrolling
-    /// stays proportionate without a config knob.
+    /// Trackpad points per line.
     static let pointsPerLine: CGFloat = 10
 
     private var precisePoints: CGFloat = 0
@@ -38,9 +33,8 @@ final class ScrollWheelAccumulator {
             : lines(discreteLines: event.scrollingDeltaY)
     }
 
-    /// Truncating (not rounding) division keeps the signed remainder, so
-    /// sub-line deltas sum across events, and a reverse flick cancels what
-    /// it undid instead of emitting a phantom line.
+    /// Truncating keeps the signed remainder, so a reverse flick cancels
+    /// rather than emitting a phantom line.
     func lines(precisePoints delta: CGFloat) -> Int {
         let total = precisePoints + delta
         let lines = Int(total / Self.pointsPerLine)
@@ -48,8 +42,7 @@ final class ScrollWheelAccumulator {
         return lines
     }
 
-    /// Wheel deltas are already in lines, so they pass through 1:1; the
-    /// remainder handling only matters for the rare fractional step.
+    /// Wheel deltas are lines already.
     func lines(discreteLines delta: CGFloat) -> Int {
         let total = discreteLines + delta
         let lines = Int(total)
@@ -58,22 +51,17 @@ final class ScrollWheelAccumulator {
     }
 }
 
-/// Extensions can't add stored properties, and two side-by-side panes must
-/// not share leftovers, so each view's accumulator hangs off this
-/// weak-keyed table. `scrollWheel` is an AppKit responder callback and
-/// only ever runs on the main thread, so the table needs no locking.
+/// Per-view accumulators (extensions have no storage); main thread only.
 private let scrollWheelAccumulators = NSMapTable<TerminalView, ScrollWheelAccumulator>(
     keyOptions: .weakMemory, valueOptions: .strongMemory)
 
-/// Scrolling: the wheel, the page keys and the keystrokes bound to
-/// Scroll to Top / Scroll to Bottom resolve to a `ScrollGesture` the shell
-/// applies to the scrollback viewport.
+/// Scrolling: wheel, page keys and the Scroll to Top/Bottom bindings, as
+/// a `ScrollGesture`.
 extension TerminalView {
     override func scrollWheel(with event: NSEvent) {
         noteScrollGesturePhase(event)
         guard event.scrollingDeltaY != 0 else { return }
-        // With mouse reporting on, the wheel belongs to the child (SGR 64/65
-        // per notch), not to the scrollback.
+        // With mouse reporting on, the wheel goes to the child (SGR 64/65).
         if effectiveMouseTrackingMode != .off, !overridesMouseReporting(event), cellSize.width > 0, cellSize.height > 0 {
             let (column, row) = cellUnder(event)
             onMouseBytes?(
@@ -82,13 +70,9 @@ extension TerminalView {
                     modifiers: Self.mouseModifiers(of: event)))
             return
         }
-        // Two fingers down reveals older lines, which is what every other
-        // terminal does. AppKit has already applied the user's natural-
-        // scrolling preference to `scrollingDeltaY`, so the raw sign is the
-        // one to follow — negating it here inverted the gesture for everyone.
-        // Momentum deltas arrive through the same accumulator: each event is
-        // consumed exactly once, so the deceleration tail sums to whole
-        // lines rather than freezing at the first sub-line event.
+        // Follow the raw sign: AppKit already applied natural scrolling, and
+        // negating it inverted the gesture. Momentum sums through the same
+        // accumulator.
         let lines = scrollWheelAccumulator.lines(for: event)
         guard lines != 0 else { return }
         onScroll?(.lines(lines))
@@ -104,27 +88,16 @@ extension TerminalView {
     override func scrollPageUp(_ sender: Any?) { onScroll?(.page(up: true)) }
     override func scrollPageDown(_ sender: Any?) { onScroll?(.page(up: false)) }
 
-    /// Reports a trackpad gesture's begin/end to `RenderPolicy`, so
-    /// it can lift the frame-rate ceiling for the couple of seconds a
-    /// scroll actually lasts. A plain mouse wheel carries no phase
-    /// (`event.phase` and `.momentumPhase` are both `[]`) and so never
-    /// calls this at all — see `RenderPolicy.scrollingStateChanged`'s doc
-    /// comment on why that is a missed enhancement for that device, not a
-    /// correctness gap.
+    /// Reports trackpad phases so `RenderPolicy` lifts the rate ceiling while
+    /// scrolling. Wheels have no phase (`RenderPolicy.scrollingStateChanged`).
     private func noteScrollGesturePhase(_ event: NSEvent) {
-        // `.contains`, not `==`: both `phase` and `momentumPhase` are
-        // option sets, and Apple's own guidance checks membership rather
-        // than exact equality even though a single event's phase is
-        // ordinarily just one bit in practice.
+        // Option sets: test membership.
         if event.phase.contains(.began) {
             renderPolicy?.scrollingStateChanged(true)
         } else if event.phase.contains(.ended) || event.phase.contains(.cancelled) {
             renderPolicy?.scrollingStateChanged(false)
         }
-        // Momentum (the deceleration after fingers lift) is its own phase
-        // sequence, disjoint from `event.phase` above — without this, the
-        // rate would drop back down the instant fingers lift even though
-        // the scroll is visibly still moving.
+        // Momentum is its own phase, or the rate drops as fingers lift.
         if event.momentumPhase.contains(.began) {
             renderPolicy?.scrollingStateChanged(true)
         } else if event.momentumPhase.contains(.ended) || event.momentumPhase.contains(.cancelled) {
@@ -132,21 +105,9 @@ extension TerminalView {
         }
     }
 
-    /// The keystrokes bound to Scroll to Top and Scroll to Bottom, checked
-    /// before `bytes(for:)` so neither leaks an escape sequence to the child.
-    ///
-    /// Read from the bindings, never a literal keystroke. A literal here
-    /// would be a second, invisible binding: masked in a default install
-    /// (AppKit dispatches a menu key equivalent before `keyDown` runs), but
-    /// unbinding the command that owns the key — `bind.previous-command =`
-    /// for ⌘↑ — would silently turn on a different, undocumented one that
-    /// Help ▸ Keyboard Shortcuts never lists.
-    ///
-    /// The View menu's own items claim these keystrokes first, so this is the
-    /// path for a keystroke AppKit did not dispatch — a menu item that failed
-    /// validation, or a binding on a key AppKit will not take as a menu key
-    /// equivalent — and it only ever answers for a key those two
-    /// commands are actually bound to.
+    /// The Scroll to Top/Bottom bindings, checked before `bytes(for:)`, for
+    /// keys AppKit didn't dispatch through the menu. From the bindings, never
+    /// a literal, which would be an invisible second binding.
     static func scrollGesture(for event: NSEvent, bindings: Keybindings) -> ScrollGesture? {
         if bindings[.scrollToTop]?.matches(event) == true { return .toTop }
         if bindings[.scrollToBottom]?.matches(event) == true { return .toBottom }

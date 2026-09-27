@@ -17,35 +17,21 @@
 import AppKit
 import SwiftUI
 
-/// The command palette.
+/// The command palette: type part of a name, press Return.
 ///
-/// Corta reached about thirty commands spread across five menus, a context
-/// menu and a settings page, and the only way to find one was to already
-/// know which menu it was under. A palette is the cheap fix: type part of a
-/// name, press Return.
+/// `CommandPaletteModel` filters and selects; `CommandPaletteView` lays
+/// out. This builds the AppKit panel and its `NSGlassEffectView`, keeping
+/// Reduce Transparency handling identical to the search bar's.
 ///
-/// `CommandPaletteModel` owns the filtering and selection; `CommandPaletteView`
-/// (SwiftUI) owns the layout. This class only builds the floating panel: AppKit
-/// chrome — the panel and its `NSGlassEffectView` background — around a hosted
-/// SwiftUI content view, the same shape as every other SwiftUI window in this
-/// app. SwiftUI's own `glassEffect(_:in:)` would do for the material, but the
-/// panel is an AppKit window either way, and keeping the glass beside it keeps
-/// the Reduce Transparency handling identical to the search bar's.
-///
-/// Dispatch goes through `NSApp.sendAction(_:to:from:)` with a `nil` target,
-/// which is the responder chain — exactly what a menu item does. That is
-/// what makes "Split Pane Right" from the palette land on the right window's
-/// split controller without the palette knowing any of them exist. The
-/// panel is closed *before* the action is sent, because while it is key the
-/// chain starts at the palette and every terminal command would find no
-/// handler.
+/// Commands go through `NSApp.sendAction(_:to:from:)` with a nil target —
+/// the responder chain, as a menu item does. The panel closes first, since
+/// while it is key the chain would start at the palette.
 @MainActor
 final class CommandPaletteController: NSWindowController, NSWindowDelegate {
     static let shared = CommandPaletteController()
 
     let model = CommandPaletteModel()
-    /// The window the palette was opened over. Commands act on the key
-    /// window, and the palette itself becomes key while it is up.
+    /// The window it opened over; the palette is key while up.
     private weak var invokingWindow: NSWindow?
 
     private init() {
@@ -64,8 +50,7 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
         panel.contentView = Self.buildContentView(model: model)
         model.onRun = { [weak self] command in
             self?.close()
-            // After the palette is gone and the terminal window is key
-            // again, so the responder chain is the one the command expects.
+            // Once the terminal window is key again.
             DispatchQueue.main.async {
                 NSApp.sendAction(command.action, to: nil, from: nil)
             }
@@ -82,8 +67,7 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
         invokingWindow = NSApp.keyWindow
         model.reset()
         if let host = invokingWindow {
-            // Centred over the window it was invoked from, a third of the way
-            // down — where a palette is looked for, and clear of the prompt.
+            // Centred, a third of the way down, clear of the prompt.
             let frame = window.frame
             window.setFrameOrigin(
                 NSPoint(
@@ -102,29 +86,20 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
     }
 
     func windowDidResignKey(_ notification: Notification) {
-        // Clicking away dismisses, like every other palette.
         close()
     }
 
     // MARK: - Layout
 
-    /// A floating control over content is exactly where Liquid Glass
-    /// belongs (the search bar's rationale in `ViewController+Search.swift`
-    /// — the terminal canvas is content and stays opaque; the palette is
-    /// chrome, like the search bar). One surface, so no
-    /// `NSGlassEffectContainerView` merge to set up — that exists for
-    /// *neighbouring* glass elements, and the palette has none.
+    /// Glass for floating chrome, like the search bar; one surface, so no
+    /// container.
     private static func buildContentView(model: CommandPaletteModel) -> NSView {
         let hosting = NSHostingView(rootView: CommandPaletteView(model: model))
         hosting.translatesAutoresizingMaskIntoConstraints = false
 
         let content = NSGlassEffectView()
         content.style = .regular
-        // Reduce Transparency means background content must not show
-        // through, so the glass gets an opaque tint rather than a lowered
-        // alpha — same as the search bar — and the panel then needs a
-        // drawn border, because the material edge that separated it from
-        // the desktop is gone with it.
+        // Reduce Transparency: opaque tint and a drawn border, as the search bar.
         if SystemAccessibility.reduceTransparency {
             content.tintColor = .windowBackgroundColor
         }
@@ -143,13 +118,8 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
             hosting.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor),
         ])
         content.contentView = wrapper
-        // The panel's own contentRect is fixed at construction (`init`,
-        // `NSRect(x: 0, y: 0, width: 520, height: 360)`), unlike the search
-        // bar's — which waits on live layout — so the radius is knowable
-        // immediately. Matches the window-corner radius used elsewhere
-        // (`TerminalView.swift`'s `metalLayer.cornerRadius = 10`) rather
-        // than the search bar's full pill: a whole panel reads as a window,
-        // not a control.
+        // The window-corner radius (as `TerminalView`), not a pill: a panel
+        // reads as a window.
         content.cornerRadius = 10
         return content
     }

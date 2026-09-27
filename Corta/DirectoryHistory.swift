@@ -16,18 +16,10 @@
 
 import Foundation
 
-/// Ranks the directories a shell has actually visited, so a directory
-/// switcher can offer "where you probably want to go" instead of everything
-/// under `$HOME`. Built from `OSC 7` reports the same way `CommandRecord` is
-/// built from `OSC 133` (`CortaTerminal/CommandRecord.swift`): never guessed
-/// from the grid's text, only from what the shell told Corta — and, like
-/// that report, already local-host-filtered before it ever reaches here
-/// (`Performer+OSC.swift`'s `setWorkingDirectory`), so a directory recorded
-/// from a remote session's `OSC 7` never enters this history at all.
-///
-/// A plain value type, not an actor or a store: `DirectoryHistoryStore` owns
-/// the one instance that matters and the file it persists to; this is the
-/// ranking and matching logic, testable with no disk and no app around it.
+/// Ranks directories the shell actually visited, for the directory
+/// switcher. Built only from OSC 7 reports, already host-filtered
+/// (`Performer+OSC.swift`), so remote directories never enter it. A plain
+/// value: `DirectoryHistoryStore` owns the instance and the file.
 struct DirectoryHistory: Equatable {
     struct Entry: Equatable, Codable {
         var path: String
@@ -43,12 +35,8 @@ struct DirectoryHistory: Equatable {
         for entry in entries { self.entries[entry.path] = entry }
     }
 
-    /// Ranked: favorites first, then by frecency — visit count that fades
-    /// with time, so a directory visited fifty times last year does not
-    /// outrank one visited three times this morning. Deterministic: two
-    /// calls with the same entries and the same `now` return the same
-    /// order, tie-broken by path so the result never depends on
-    /// `Dictionary`'s iteration order.
+    /// Favorites first, then frecency (visits fading with time); ties broken
+    /// by path, so the order is deterministic.
     func ranked(now: Date = Date()) -> [Entry] {
         entries.values.sorted { a, b in
             if a.isFavorite != b.isFavorite { return a.isFavorite }
@@ -59,11 +47,8 @@ struct DirectoryHistory: Equatable {
         }
     }
 
-    /// How long it takes a visit's weight to halve. Three days, not thirty:
-    /// the switcher exists to answer "where was I working this week", and a
-    /// project abandoned a month ago should stop crowding out this
-    /// afternoon's directories well before it falls out of the list
-    /// entirely.
+    /// A visit's weight halves in three days: the switcher answers "where was
+    /// I this week".
     private static let halfLife: TimeInterval = 3 * 24 * 3600
 
     private static func frecency(_ entry: Entry, now: Date) -> Double {
@@ -71,10 +56,7 @@ struct DirectoryHistory: Equatable {
         return Double(entry.visitCount) * pow(0.5, age / halfLife)
     }
 
-    /// Records a visit. Empty paths are not a directory — `OSC 7` should
-    /// never produce one (`setWorkingDirectory` already rejects an empty
-    /// path), but this is cheap insurance against a history entry nothing
-    /// could ever show a name for.
+    /// Records a visit; ignores an empty path.
     mutating func record(_ path: String, at date: Date = Date()) {
         guard !path.isEmpty else { return }
         if var entry = entries[path] {
@@ -86,10 +68,7 @@ struct DirectoryHistory: Equatable {
         }
     }
 
-    /// Pins or unpins a path. Pinning a path with no recorded visits (typed
-    /// or dragged in directly) creates an entry for it at zero frecency —
-    /// favorites sort first regardless, so the zero score never matters
-    /// until it is unpinned.
+    /// Pins or unpins; pinning an unvisited path creates a zero-score entry.
     mutating func setFavorite(_ isFavorite: Bool, for path: String) {
         if var entry = entries[path] {
             entry.isFavorite = isFavorite
@@ -101,10 +80,8 @@ struct DirectoryHistory: Equatable {
 
     mutating func clear() { entries.removeAll() }
 
-    /// A fuzzy subsequence filter over `ranked(now:)`, highest match first.
-    /// Empty query returns the base ranking unfiltered — the two are meant
-    /// to be the same list before and after the first keystroke, not two
-    /// different views.
+    /// Fuzzy subsequence filter over `ranked(now:)`; an empty query is the
+    /// same list unfiltered.
     func matching(_ query: String, now: Date = Date()) -> [Entry] {
         guard !query.isEmpty else { return ranked(now: now) }
         let needle = query.lowercased()
@@ -119,12 +96,8 @@ struct DirectoryHistory: Equatable {
             .map(\.0)
     }
 
-    /// Every character of `needle` must appear in `haystack` in order, not
-    /// necessarily contiguous — the standard fuzzy-filename match. Higher
-    /// scores a tighter match: consecutive characters and an early,
-    /// low-gap match both add more than a distant one, the two signals any
-    /// fuzzy file matcher uses to prefer `Projects/corta` over
-    /// `Projects/some/other/corta-adjacent/thing` for the query `corta`.
+    /// In-order subsequence match, scoring consecutive and early matches
+    /// higher.
     private static func fuzzyScore(needle: String, haystack: String) -> Int? {
         guard !needle.isEmpty else { return 0 }
         var score = 0
@@ -142,11 +115,8 @@ struct DirectoryHistory: Equatable {
         return score
     }
 
-    /// The nearest ancestor of `path` that looks like a project root — the
-    /// first one, walking up, containing `.git`. Narrow on purpose: this
-    /// exists to jump to project roots reliably, not to guess at every build
-    /// system's own marker file, and a wrong guess sends a directory change
-    /// somewhere the user did not ask for.
+    /// The nearest ancestor containing `.git`; deliberately narrow, since a
+    /// wrong guess moves the user somewhere unasked.
     nonisolated static func projectRoot(for path: String, fileManager: FileManager = .default) -> String? {
         var url = URL(fileURLWithPath: path)
         while url.pathComponents.count > 1 {
@@ -161,47 +131,30 @@ struct DirectoryHistory: Equatable {
     }
 }
 
-/// Reads and writes `DirectoryHistory` to disk — Application Support, not
-/// the config file, for the reason `SessionRestore` is (`SessionRestore
-/// .swift`'s doc comment): this is state Corta maintains from watching
-/// `OSC 7`, not a setting a person edits. `directory-history = false` stops
-/// it being read *or* written, so turning the feature off leaves nothing
-/// behind: the history can be disabled and cleared.
+/// Persists `DirectoryHistory` in Application Support: state, not a
+/// setting (as `SessionRestore`). `directory-history = false` stops reads
+/// and writes.
 ///
-/// Writes are debounced and run off the main thread. `record` is called
-/// from the render path — a command finishing is noticed on the output
-/// batch the frame is built from — and encoding the history and writing
-/// it there put a JSON encode and an atomic file write inside the vsync
-/// callback for every command that ran. The in-memory history is always
-/// current; the file catches up once things go quiet, and `flush()` at
-/// quit writes whatever is still pending, the same shape as the window
-/// arrangement's save (`AppDelegate.noteLayoutChanged`).
+/// Writes are debounced and off the main thread: `record` runs from the
+/// render path, and a JSON encode plus atomic write in the vsync callback
+/// per command was too much. `flush()` writes what's pending at quit.
 @MainActor
 final class DirectoryHistoryStore {
     static let shared = DirectoryHistoryStore(fileURL: DirectoryHistoryStore.defaultFileURL)
 
     private(set) var history = DirectoryHistory()
-    /// Injected so a test can point at a temporary file instead of the
-    /// user's real Application Support directory.
+    /// Injected so tests use a temporary file.
     let fileURL: URL
 
-    /// How long after the last change the file is written. A burst of
-    /// commands is one write, not one per command.
+    /// A burst of commands is one write.
     static let defaultSaveDelay: TimeInterval = 0.5
 
-    /// This store's delay, injected for the same reason `fileURL` is.
-    ///
-    /// A test that asserts the write has *not* happened yet is racing a
-    /// real timer: at half a second, a machine that descheduled the test
-    /// between `record()` and the assertion made it false, and no margin
-    /// fixes an assertion that something has not happened. A test passes a
-    /// delay no scheduling stall can reach and drives the write with
-    /// `flush()` instead.
+    /// Injected: a test asserting the write hasn't happened yet can't race a
+    /// real timer, so it passes an unreachable delay and calls `flush()`.
     let saveDelay: TimeInterval
 
     private var pendingSave: DispatchWorkItem?
-    /// Serial, so writes land in the order they were scheduled and a clear
-    /// cannot be undone by a write that was already in flight.
+    /// Serial, so an in-flight write can't undo a clear.
     private let writeQueue = DispatchQueue(label: "Corta.DirectoryHistoryStore", qos: .utility)
 
     static var defaultFileURL: URL {
@@ -214,8 +167,7 @@ final class DirectoryHistoryStore {
         load()
     }
 
-    /// Records a visit and schedules a save, unless the setting is off — in
-    /// which case this is a no-op rather than a write nobody asked for.
+    /// Records and schedules a save; a no-op when the setting is off.
     func record(_ path: String) {
         guard ConfigurationStore.shared.configuration.directoryHistory else { return }
         history.record(path)
@@ -227,10 +179,7 @@ final class DirectoryHistoryStore {
         scheduleSave()
     }
 
-    /// Wipes the in-memory history and the file behind it — not just an
-    /// empty write, so nothing is left to reappear if the setting is turned
-    /// back on later. Waits for a write already in flight, so the removal
-    /// is the last word.
+    /// Removes the history and its file, after any in-flight write.
     func clear() {
         pendingSave?.cancel()
         pendingSave = nil
@@ -241,8 +190,7 @@ final class DirectoryHistoryStore {
         }
     }
 
-    /// Writes a pending save now, and waits for it — for quit, where the
-    /// debounce would otherwise never fire.
+    /// Writes a pending save now and waits, for quit.
     func flush() {
         guard pendingSave != nil else { return }
         pendingSave?.cancel()
@@ -251,7 +199,7 @@ final class DirectoryHistoryStore {
         writeQueue.sync {}
     }
 
-    /// Whether a save is scheduled and not yet written. Test hook.
+    /// Test hook.
     var hasPendingSave: Bool { pendingSave != nil }
 
     private func scheduleSave() {
@@ -265,8 +213,7 @@ final class DirectoryHistoryStore {
         DispatchQueue.main.asyncAfter(deadline: .now() + saveDelay, execute: item)
     }
 
-    /// The on-disk shape, versioned so a future incompatible change
-    /// can be given real migration code instead of the file just vanishing.
+    /// Versioned, so a future change can migrate instead of losing the file.
     private nonisolated struct Persisted: Codable {
         static let currentVersion = 1
         var version: Int
@@ -276,26 +223,18 @@ final class DirectoryHistoryStore {
     private func load() {
         guard let data = try? Data(contentsOf: fileURL) else { return }
         if let persisted = try? JSONDecoder().decode(Persisted.self, from: data) {
-            // A future version this build does not understand degrades to
-            // "nothing to load," the same rule `SessionRestore` applies per
-            // window — not a guess at a format that might have changed
-            // underneath these fields.
+            // An unknown newer version loads nothing rather than guess.
             guard persisted.version <= Persisted.currentVersion else { return }
             history = DirectoryHistory(entries: persisted.entries)
             return
         }
-        // Files written before the version wrapper existed are a bare array
-        // with no wrapper at all — read once
-        // more under the old shape rather than treating every existing
-        // history as gone the moment this key gets added.
+        // Files from before the wrapper are a bare array.
         guard let entries = try? JSONDecoder().decode([DirectoryHistory.Entry].self, from: data)
         else { return }
         history = DirectoryHistory(entries: entries)
     }
 
-    /// Snapshots the entries on the main actor and encodes and writes them
-    /// on `writeQueue`; nothing here touches the disk on the caller's
-    /// thread.
+    /// Snapshots on the main actor; encodes and writes on `writeQueue`.
     private func save() {
         let persisted = Persisted(
             version: Persisted.currentVersion, entries: Array(history.entries.values))

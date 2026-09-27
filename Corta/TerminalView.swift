@@ -19,172 +19,121 @@ import CortaTerminal
 import Metal
 import QuartzCore
 
-/// An `NSView` backed by a `CAMetalLayer`, driven by a `CAMetalDisplayLink`
-/// (owned by `FrameScheduler`) rather than `CADisplayLink` +
-/// `nextDrawable()`.
-///
-/// This file owns the layer and the drawable size; the display link and the
-/// frame callback live in `FrameScheduler`. Input lives in extensions by
-/// concern: `TerminalView+Keyboard.swift`, `TerminalView+IME.swift`,
-/// `TerminalView+Mouse.swift` and `TerminalView+Scroll.swift`.
+/// An `NSView` hosting a `CAMetalLayer`. This file owns the layer and the
+/// drawable size; `FrameScheduler` owns the display link, and input lives
+/// in the `TerminalView+Keyboard/IME/Mouse/Scroll` extensions.
 final class TerminalView: NSView, CALayerDelegate {
     private let metalLayer = CAMetalLayer()
     private lazy var frameScheduler = FrameScheduler(metalLayer: metalLayer)
-    /// Recreated alongside `frameScheduler` each time the view moves to a
-    /// new window (`viewDidMoveToWindow`) — it observes that specific
-    /// window's key/resign state, so a stale instance watching the wrong
-    /// window would silently stop tracking focus after a tab is dragged
-    /// into a different one. Not `private`: `TerminalView+Scroll.swift`
-    /// reports scroll-gesture phase changes to it, and extensions cannot
-    /// add their own storage.
+    /// Recreated with `frameScheduler` on each `viewDidMoveToWindow`: it
+    /// observes one window's key state, so a stale instance would stop
+    /// tracking focus after a tab moves windows. Not `private` because
+    /// `TerminalView+Scroll.swift` reports gesture phases to it.
     var renderPolicy: RenderPolicy?
     /// Pauses rendering while the window is occluded; replaced when changing windows.
     private var occlusionObserver: NSObjectProtocol?
     /// Mouse-moved tracking for ⌘-hover link feedback; `.inVisibleRect`
     /// keeps it glued to the visible area across resizes.
     private var mouseTrackingArea: NSTrackingArea?
-    /// The transient confirmation in the pane's bottom-right corner
-    /// (`showToast`), and the work item that takes it away again. Stored so a
-    /// second toast replaces the first instead of stacking on top of it —
-    /// copy-on-select fires once per drag, and a user selecting three things
-    /// in a row must not end up with three overlapping labels.
+    /// The toast (`showToast`) and its dismissal; stored so a second toast
+    /// replaces the first rather than stacking.
     private var toastLayer: CALayer?
     private var toastDismissal: DispatchWorkItem?
 
-    // Accessibility (`TerminalView+Accessibility.swift`). Storage lives here
-    // because extensions cannot add their own.
+    // Accessibility (`TerminalView+Accessibility.swift`); extensions cannot
+    // add storage.
 
-    /// The pane's answer to "what does this terminal say" — text, cursor and
-    /// selection, flattened. Installed by `ViewController`, like every other
-    /// closure hook here, so the view needs no knowledge of `Grid`.
+    /// Text, cursor and selection, flattened; installed by `ViewController` so
+    /// the view needs no knowledge of `Grid`.
     var accessibilitySnapshotProvider: (() -> TerminalAccessibilitySnapshot?)?
-    /// One cell's rect in this view's coordinates, so VoiceOver's cursor can
-    /// be drawn around the characters it is reading.
+    /// One cell's rect in view coordinates, for VoiceOver's cursor.
     var accessibilityCellFrameProvider: ((_ row: Int, _ column: Int) -> CGRect)?
     var cachedAccessibilitySnapshot: TerminalAccessibilitySnapshot?
     var cachedAccessibilitySnapshotTime: CFTimeInterval = 0
     var lastAccessibilityPost: CFTimeInterval = 0
-    /// The trailing `valueChanged` post owed for changes that arrived inside
-    /// the rate-limit interval (`noteAccessibilityValueChanged`).
+    /// The trailing `valueChanged` post owed inside the rate-limit interval.
     var pendingAccessibilityPost: DispatchWorkItem?
 
-    /// Called once per accepted frame, on the main thread, with the
-    /// drawable's render pass descriptor and pixel size. Forwarded to
-    /// `frameScheduler`, which owns the actual `CAMetalDisplayLink` — see
-    /// `FrameScheduler` for why there is no `nil`-drawable case anymore.
+    /// Called once per accepted frame on the main thread; forwarded to
+    /// `frameScheduler`.
     var onRenderFrame: ((MTLRenderPassDescriptor, CGSize, CAMetalDrawable) -> Void)? {
         get { frameScheduler.onRenderFrame }
         set { frameScheduler.onRenderFrame = newValue }
     }
 
-    /// Run once per accepted frame to do the prepare/diff work and report
-    /// whether anything is still pending; forwarded to `frameScheduler`.
-    /// `false` does not skip the drawable itself (there is none to skip
-    /// ahead of) — it only decides whether the scheduler pauses again
-    /// right after, which is what keeps a static screen from paying for
-    /// vsync wakeups (`PERFORMANCE.md` §3: idle CPU ~0%). See
-    /// `FrameScheduler` for the full reasoning.
+    /// Does the per-frame prepare/diff work and reports whether anything is
+    /// still pending; `false` lets the scheduler pause, keeping idle CPU near
+    /// zero (`PERFORMANCE.md` §3). Forwarded to `frameScheduler`.
     var shouldRenderFrame: (() -> Bool)? {
         get { frameScheduler.shouldRenderFrame }
         set { frameScheduler.shouldRenderFrame = newValue }
     }
 
-    /// Called with raw bytes to write to the PTY for one key event.
     var onKeyBytes: (([UInt8]) -> Void)?
 
-    /// Called for a scroll gesture, a page key, or a key bound to Scroll to
-    /// Top / Scroll to Bottom.
     var onScroll: ((ScrollGesture) -> Void)?
 
-    /// Called for a paste request — the key bound to Paste, or the Edit
-    /// menu's Paste item. Reading the
-    /// pasteboard, sanitising and warning is the shell's job
-    /// (`SECURITY.md` §2.3).
+    /// A paste request; reading, sanitising and warning is the controller's
+    /// job (`SECURITY.md` §2.3).
     var onPaste: (() -> Void)?
 
-    /// Search shortcuts and Escape-while-searching, offered before
-    /// anything else in `keyDown`: Esc must dismiss the search bar rather
-    /// than send a raw ESC byte to the child while it's open, and ⌘F/⌘G/
-    /// ⇧⌘G must not fall through to `deliverBytes`. Returns whether the
-    /// event was handled; `false` (or `nil`) continues the normal routing.
-    /// The Find key is read from the bindings; ⌘G / ⇧⌘G are the storyboard's
-    /// own Find Next / Find Previous items and carry no `bind.` key.
+    /// Search shortcuts, offered first in `keyDown`: while the bar is open Esc
+    /// must dismiss it rather than reach the child. Returns whether the event
+    /// was handled. ⌘G / ⇧⌘G are storyboard items with no `bind.` key.
     var onSearchKey: ((NSEvent) -> Bool)?
 
-    /// Called when a live window resize ends, so the shell can deliver the
-    /// final size to the child without waiting out the debounce.
+    /// A live resize ended; deliver the final size without the debounce.
     var onLiveResizeEnded: (() -> Void)?
 
-    /// Called when the view becomes first responder — click-to-focus, the
-    /// ⌘⌥ focus-move shortcuts, a split, a close all arrive here — so the
-    /// split controller can track which pane owns input.
+    /// The view became first responder, by any route; the split controller
+    /// tracks the focused pane from this.
     var onFocus: (() -> Void)?
 
-    /// LNM (`CSI 20 h`) — while set, Return sends CR LF. Read per key event
-    /// for the same reason as the kitty flags below: a program can change it
-    /// at any point and the next keystroke has to honour the new value.
+    // Mode and config closures below are read per key event: a program or a
+    // config edit can change them at any point, and the next keystroke must
+    // honour it.
+
+    /// LNM (`CSI 20 h`): Return sends CR LF.
     var isNewLineMode: (() -> Bool)?
 
-    /// The kitty keyboard protocol flags the child has asked for.
-    /// Read per key event rather than cached: a program can change them at
-    /// any point, and the next keystroke has to honour the new value.
     var keyboardEnhancements: (() -> KeyboardEnhancementFlags)?
 
-    /// DECCKM (`CSI ? 1 h`) — while set, cursor keys send their SS3
-    /// (application) forms. Read per key event, like the kitty flags.
+    /// DECCKM (`CSI ? 1 h`): cursor keys send SS3 forms.
     var applicationCursorKeys: (() -> Bool)?
 
-    /// DECKPAM (`ESC =`). While set, the numeric keypad sends its SS3
-    /// forms. Read per key event, like the other mode closures: a program
-    /// turns it on and off around its own input loop.
+    /// DECKPAM (`ESC =`): the keypad sends SS3 forms.
     var applicationKeypad: (() -> Bool)?
 
-    /// Whether ⌥ acts as Meta (ESC prefix) rather than composing the
-    /// layout's alternate characters. Read per key event so an edit to the
-    /// config file takes effect on the next keystroke.
+    /// ⌥ as Meta (ESC prefix) rather than composing.
     var optionAsMeta: (() -> Bool)?
 
-    /// The shortcut table in force. Read per key event, like the mode
-    /// closures above, so a rebind or unbind in the config file takes effect
-    /// on the next keystroke. The keys `keyDown` still recognises itself
-    /// (paste, the scrollback jumps) are matched against this rather than
-    /// against a literal, so they cannot outlive the binding they belong to.
+    /// The shortcut table in force. Keys `keyDown` handles itself (paste,
+    /// scrollback jumps) match against it, never a literal.
     var keybindings: (() -> Keybindings)?
 
-    /// File paths dropped on the pane, already resolved to
-    /// filesystem paths. The controller sanitises, quotes and sends them.
+    /// Dropped file paths; the controller sanitises, quotes and sends them.
     var onDropPaths: (([String]) -> Void)?
-    /// The word under a force touch and where to anchor the dictionary
-    /// popover, in this view's coordinates.
+    /// The word under a force touch and the popover anchor.
     var onLookUp: ((CGPoint) -> (String, CGPoint)?)?
-    /// The current selection as text, for the Services menu, or nil when
-    /// nothing is selected.
+    /// The selection as text for the Services menu.
     var onServicesSelection: (() -> String?)?
-    /// Text a service returned, to be sent to the child like a paste —
-    /// sanitised and newline-warned exactly as a ⌘V paste is.
+    /// Text a service returned, sent like a sanitised paste.
     var onServicesInsert: ((String) -> Void)?
 
-    /// The trackpad magnification gesture. The controller spends it
-    /// in whole font-size steps; the view only forwards it, like every other
-    /// input here.
+    /// Pinch deltas; the controller spends them in whole font-size steps.
     var onMagnify: ((CGFloat) -> Void)?
-    /// The magnification gesture ended, so the unspent remainder is dropped.
+    /// The pinch ended; the unspent remainder is dropped.
     var onMagnifyEnded: (() -> Void)?
 
-    /// The window's backing scale factor changed — the view moved to a
-    /// display with a different pixel density. The renderer's glyph atlas is
-    /// rasterised per scale and has to be rebuilt.
+    /// The backing scale changed; the glyph atlas must be re-rasterised.
     var onBackingScaleChange: ((CGFloat) -> Void)?
 
-    /// The drawable changed size, so what was presented no longer matches the
-    /// layer it is being shown in. The damage diff cannot see this — the grid
-    /// is identical — so the frame has to be forced from here.
+    /// The drawable resized; the damage diff can't see that (the grid is
+    /// unchanged), so the frame is forced from here.
     var onDrawableSizeChange: (() -> Void)?
 
-    /// The pane's controller, found by walking the responder chain (the view
-    /// → its controller → the split controller). With splits the pane is no
-    /// longer the window's content view controller, so `contentViewController`
-    /// cannot find it anymore.
+    /// The pane's controller, via the responder chain — with splits it is not
+    /// the window's `contentViewController`.
     var paneController: ViewController? {
         sequence(first: self as NSResponder, next: { $0.nextResponder })
             .first { $0 is ViewController } as? ViewController
@@ -196,13 +145,10 @@ final class TerminalView: NSView, CALayerDelegate {
         return accepted
     }
 
-    // Stored state for the extension files — extensions cannot add storage.
-    // The methods using these live in `TerminalView+Mouse.swift` and
-    // `TerminalView+Scroll.swift`.
+    // Storage for `TerminalView+Mouse.swift` and `TerminalView+Scroll.swift`.
 
-    /// Whether the child application has asked for mouse reports; the shell
-    /// answers from the core's mode flags. When off, mouse events keep their
-    /// normal meaning (scrolling the scrollback).
+    /// Whether the child asked for mouse reports; when off, the mouse scrolls
+    /// the scrollback.
     var isMouseReportingEnabled: (() -> Bool)?
     var mouseTrackingMode: (() -> MouseTrackingMode)?
     var mouseOverrideModifier: Configuration.MouseOverrideModifier = .option
@@ -210,29 +156,21 @@ final class TerminalView: NSView, CALayerDelegate {
     var lastMouseReportCell: (column: Int, row: Int)?
     var didShowMouseOverrideHint = false
 
-    /// Called with the SGR report bytes for one mouse event.
     var onMouseBytes: (([UInt8]) -> Void)?
 
-    /// Set by the shell from the renderer's metrics; needed to turn a view
-    /// point into a cell.
+    /// From the renderer's metrics.
     var cellSize: CGSize = .zero
 
-    /// The cursor cell's rect in this view's coordinates, answered by the
-    /// shell (it owns the session, the insets and the metrics). The IME
-    /// layer (`TerminalView+IME.swift`) positions the candidate window
-    /// and the preedit overlay from it; nil means the cursor is not
-    /// currently knowable or visible.
+    /// The cursor cell's rect in view coordinates, for the IME candidate
+    /// window and preedit overlay; nil when not visible.
     var cursorRectProvider: (() -> CGRect?)?
 
-    /// The font the preedit overlay draws marked text with, answered by the
-    /// shell so it tracks the renderer's font stack and current size
-    /// (⌘=/⌘-). Nil leaves the overlay on its default.
+    /// The preedit font, tracking the renderer's font and ⌘= size.
     var preeditFontProvider: (() -> NSFont)?
 
-    /// The point→cell mapping SGR mouse reports use, answered by the shell —
-    /// it owns the content insets, the bottom-anchored grid origin and the
-    /// grid size. A raw divide of the view point by the cell size is off by
-    /// the insets (roughly one column and two rows at the defaults).
+    /// Point to cell for SGR mouse reports. The shell owns the insets and the
+    /// bottom-anchored origin; a raw divide is off by about a column and two
+    /// rows.
     var cellAtPoint: ((CGPoint) -> (column: Int, row: Int))?
 
     override var isFlipped: Bool { true }
@@ -249,46 +187,24 @@ final class TerminalView: NSView, CALayerDelegate {
     }
 
     private func commonInit() {
-        // Order matters, and getting it wrong is silent. A layer-HOSTING view
-        // is made by assigning `layer` first and only then setting
-        // `wantsLayer`. The other order makes the view layer-BACKED: AppKit
-        // creates and owns a backing layer, and the CAMetalLayer assigned
-        // afterwards never joins the compositing tree.
+        // Order matters, silently: assigning `layer` before `wantsLayer` makes a
+        // layer-hosting view. The reverse makes it layer-backed, and the
+        // CAMetalLayer never joins the compositing tree.
         layer = metalLayer
         wantsLayer = true
         metalLayer.delegate = self
         metalLayer.device = MTLCreateSystemDefaultDevice()
         metalLayer.pixelFormat = QuadRenderer.pixelFormat
-        // Tag the drawable sRGB. Untagged, its contents are interpreted in
-        // the display's own space — Display P3 on this hardware — so every
-        // sRGB value the palette and the escape sequences specify rendered
-        // oversaturated, and nothing matched what Terminal.app drew from the
-        // same bytes. The pixel format stays `.bgra8Unorm` rather than
-        // `_srgb` so no implicit linearisation happens on write; the values
+        // Tag the drawable sRGB; untagged it is read as Display P3 and every
+        // colour renders oversaturated. `.bgra8Unorm`, not `_srgb`: the values
         // are already sRGB-encoded (see `QuadRenderer`).
         metalLayer.framebufferOnly = true
-        // Double buffering, opt-in for measurement.
-        //
-        // `maximumDrawableCount = 2` is often cited as removing a frame of
-        // latency: with three drawables in flight a present can sit behind
-        // two others, and with two it cannot. It can equally *add* latency,
-        // because `nextDrawable()` then blocks the main thread more often
-        // waiting for one to be recycled — and which of the two happens
-        // depends on how long a frame takes on the machine in question, so
-        // it is a question to measure rather than a value to pick.
-        //
-        // Corta ships the default (3) because that is what has been measured
-        // (`PERFORMANCE.md` §5.7). This variable exists so the comparison can
-        // be run as two launches of the same binary rather than as a code
-        // change — an A/B where the only difference is the flag. Pair it with
-        // an `os_signpost` trace (`InputLatencySignposts`): if double buffering
-        // is costing rather than saving, it shows up as the `frame` interval
-        // growing at its front, where `nextDrawable` waits.
-        //
-        // An environment variable and not a config key: this is a measurement
-        // harness, not a setting anybody should be tuning, and a key nobody
-        // should set is a row `docs/CONFIGURATION.md` should not have to
-        // carry (`docs/DECISIONS.md` D10). Same reasoning as `CORTA_RESTORE_WINDOWS`.
+        // Double buffering, opt-in for measurement. Two drawables can save a
+        // frame of latency or add it (`nextDrawable` blocks more), depending on
+        // the machine; the default 3 is what was measured (`PERFORMANCE.md`
+        // §5.7). This lets the A/B be two launches of one binary, traced with
+        // `InputLatencySignposts`. An environment variable, not a config key:
+        // nobody should tune it (D10).
         if let raw = ProcessInfo.processInfo.environment["CORTA_MAX_DRAWABLES"],
             let count = Int(raw), (2...3).contains(count)
         {
@@ -296,59 +212,26 @@ final class TerminalView: NSView, CALayerDelegate {
         }
         metalLayer.colorspace = CGColorSpace(name: CGColorSpace.sRGB)
         metalLayer.isOpaque = false
-        // A layer-hosting view is not clipped by the window's rounded
-        // corners, so the drawable paints square corners past the frame.
-        // Because the view is flipped, the hosted layer's MinY corners are
-        // its *top* corners — the mask rounds the window's two top corners
-        // and the window itself rounds the bottom. In a split, though, only
-        // a pane that actually touches a top corner may round it: the same
-        // mask on an interior pane cuts a visible notch out of the divider
-        // junction. `layout()` recomputes the mask from the pane's position
-        // in the window.
+        // A hosted layer isn't clipped by the window's rounded corners. The view
+        // is flipped, so MinY corners are the top ones; `layout()` rounds only the
+        // corners this pane touches, or an interior pane notches the divider.
         metalLayer.cornerRadius = 10
         metalLayer.maskedCorners = []
         metalLayer.masksToBounds = true
-        // The canvas must never animate its own geometry, and must never
-        // stretch what it is holding.
-        //
-        // Core Animation implicitly animates a layer's bounds and position,
-        // and scales the contents to fit while it does. On a window zoom or
-        // a fullscreen transition that means the *previous* frame — a whole
-        // screen of text — is drawn magnified for the length of the
-        // animation and snaps back to its real size when a new frame lands.
-        // The text visibly grows and then shrinks, which is what it looks
-        // like when a terminal resizes its font, and it is not something
-        // asking for a frame can fix: the frame arrives into a layer whose
-        // bounds are still mid-animation.
-        //
-        // `NSNull` on each geometric key removes the implicit animation, so
-        // the bounds take their new value at once. What the layer does with
-        // the frame it is still holding in the gap before the next one is
-        // presented is decided by `layerContentsPlacement` below, which
-        // AppKit owns for a layer-hosting view — not by anything set on the
-        // layer here.
+        // No implicit geometry animations: on a zoom or fullscreen transition
+        // Core Animation would scale the previous frame with the bounds, and the
+        // text visibly grows then snaps back. What the layer shows until the
+        // next frame is `layerContentsPlacement`'s job, below.
         metalLayer.actions = [
             "bounds": NSNull(), "position": NSNull(), "contents": NSNull(),
             "contentsScale": NSNull(), "cornerRadius": NSNull(),
         ]
-        // Set through AppKit, not on the layer: for a layer-hosting view
-        // AppKit *owns* `contentsGravity` and derives it from
-        // `layerContentsPlacement`, overwriting anything set directly —
-        // measured, not assumed (asking for `.topLeft` here leaves the layer
-        // reporting `bottomLeft`, which is the same corner once the view's
-        // flippedness is accounted for). Setting the CALayer property alone
-        // therefore did nothing, which is why the first two attempts at this
-        // did not work.
-        //
-        // The default placement is `.scaleAxesIndependently`: "stretch what
-        // you are holding to whatever size you have just been given". That
-        // is what made the text grow for the length of a window zoom — the
-        // last frame, a whole screen of text, scaled up to the new bounds
-        // until a new frame was presented. `.topLeft` pins it at its true
-        // size in the corner terminal text starts from instead.
+        // Through AppKit, not the layer: AppKit owns `contentsGravity` for a
+        // layer-hosting view and overwrites it (measured). The default
+        // `.scaleAxesIndependently` stretched the last frame during a zoom;
+        // `.topLeft` holds it at true size.
         layerContentsPlacement = .topLeft
-        // The view draws nothing itself — the drawable is the content — so
-        // AppKit has no reason to ask it to redraw mid-resize.
+        // The drawable is the content; the view never redraws itself.
         layerContentsRedrawPolicy = .onSetNeedsDisplay
         registerForFileDrags()
     }
@@ -364,18 +247,11 @@ final class TerminalView: NSView, CALayerDelegate {
         guard let window else { return }
         updateDrawableSize()
         renderPolicy = RenderPolicy(scheduler: frameScheduler, window: window)
-        // Vsync alone doesn't know the window isn't visible — an occluded,
-        // minimized, or off-screen window would otherwise keep resolving
-        // drawables it never shows. This never touches the PTY reader: it
-        // keeps draining regardless (`TerminalSession.runReaderLoop`,
-        // `PERFORMANCE.md` §2.1), so a hidden pane's output is waiting, not
-        // lost, when the window is shown again.
+        // Pause rendering while occluded. The PTY reader keeps draining
+        // (`PERFORMANCE.md` §2.1), so a hidden pane's output waits, not lost.
         occlusionObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main
         ) { [weak self] _ in
-            // `queue: .main` above guarantees this runs on the main thread;
-            // `MainActor.assumeIsolated` tells the type system what the
-            // queue already promises at runtime.
             MainActor.assumeIsolated { self?.updateOcclusionState() }
         }
         updateOcclusionState()
@@ -403,36 +279,29 @@ final class TerminalView: NSView, CALayerDelegate {
         positionToast()
     }
 
-    /// Moving between displays of different backing scales — Retina to an
-    /// external 1x panel and back — changes the drawable's pixel density.
-    /// The glyph atlas is rasterised for one scale (`TerminalRenderer.init`),
-    /// so without this the glyphs keep the old density and the text goes
-    /// soft on the new display.
-    /// AppKit delivers a pinch as a stream of `magnify:` events carrying
-    /// the *delta* since the last one, then a phase-ended event. Both halves
-    /// matter: without the end, the next pinch inherits this one's unspent
-    /// remainder and jumps.
+    /// A pinch arrives as deltas, then a phase end; without the end, the next
+    /// pinch inherits this one's remainder and jumps.
     override func magnify(with event: NSEvent) {
         onMagnify?(event.magnification)
         if event.phase == .ended || event.phase == .cancelled { onMagnifyEnded?() }
     }
 
+    /// A display with another backing scale needs the glyph atlas
+    /// re-rasterised, or the text goes soft.
     override func viewDidChangeBackingProperties() {
         super.viewDidChangeBackingProperties()
         updateDrawableSize()
         if let window { onBackingScaleChange?(window.backingScaleFactor) }
     }
 
-    /// Rounds only the window's top corners this pane actually touches (see
-    /// `commonInit`); interior panes get no mask, so divider junctions stay
-    /// square.
+    /// Rounds only the window top corners this pane touches (see
+    /// `commonInit`).
     private func updateExteriorCornerMask() {
         guard let window else {
             metalLayer.maskedCorners = []
             return
         }
-        // Window base coordinates are y-up; with `.fullSizeContentView` the
-        // content spans the whole frame, so the window's top is its height.
+        // Window coordinates are y-up and the content spans the frame.
         let edges = TerminalLayout.exteriorEdges(
             paneFrameInWindow: convert(bounds, to: nil), windowSize: window.frame.size)
         var mask: CACornerMask = []
@@ -458,34 +327,24 @@ final class TerminalView: NSView, CALayerDelegate {
         mouseTrackingArea = area
     }
 
-    /// Wakes the parked scheduler; the next vsync asks `shouldRenderFrame`.
-    /// Main thread only, like everything on a view.
+    /// Wakes the parked scheduler; main thread only.
     func setNeedsRedraw() {
         frameScheduler.resume()
     }
 
-    /// Arms the first-present flash guard: the layer shows the theme's
-    /// background colour until the real first frame is presented at the next
-    /// vsync. Used before the window is ordered on screen and after a live
-    /// theme change — the window's background is transparent until the Metal
-    /// layer has presented, so without this every new window and every new
-    /// tab flashes whatever is behind it for a frame or two. Returns
-    /// immediately; see `FrameScheduler.requestFirstPresent` for why this is
-    /// a state transition and not a synchronous render.
+    /// Arms the first-present guard: the layer shows the theme background
+    /// until the first real frame, so a new window, tab or theme change never
+    /// flashes what is behind it. Returns immediately
+    /// (`FrameScheduler.requestFirstPresent`).
     func drawNow() {
         updateDrawableSize()
         frameScheduler.requestFirstPresent()
     }
 
-    /// The default visual bell: a brief flash of the terminal
-    /// surface. A transient screen effect, not a persistent panel, so it
-    /// draws directly on the Metal layer rather than adding a glass surface.
+    /// The visual bell, drawn on the layer.
     func flashBell() {
-        // Reduce Motion, on a *flash*, cannot mean "no animation": a bell
-        // whose whole expression is a 0.18 s fade would silently stop
-        // signalling anything at zero duration. It means "no movement" — so
-        // the flash stays and is simply held steady for the same span before
-        // being removed, which is what the setting actually asks for.
+        // Reduce Motion means no movement, not no signal: hold the flash steady
+        // for the same span instead of fading.
         if SystemAccessibility.reduceMotion {
             flashBellWithoutMotion()
             return
@@ -507,8 +366,6 @@ final class TerminalView: NSView, CALayerDelegate {
         CATransaction.commit()
     }
 
-    /// The bell as a held wash rather than a fade — same layer, same colour,
-    /// same duration, no animated property.
     private func flashBellWithoutMotion() {
         let flash = CALayer()
         flash.frame = bounds
@@ -523,24 +380,12 @@ final class TerminalView: NSView, CALayerDelegate {
 
     // MARK: - Transient confirmation
 
-    /// A short-lived label in the pane's bottom-right corner — "Copied", and
-    /// anything else that is worth confirming but not worth a dialog.
+    /// A short-lived label in the pane's bottom-right corner ("Copied"),
+    /// mainly so copy-on-select is never silent.
     ///
-    /// This exists because copy-on-select is now on by default. Copying
-    /// silently was the whole argument against that default: the clipboard
-    /// changes under the user with nothing to show for it. A confirmation
-    /// they can ignore is the smallest thing that answers it.
-    ///
-    /// A `CALayer`, not a subview: this view is layer-*hosting* (see
-    /// `commonInit`), so its layer tree is the only place to put a decoration
-    /// — the same reason `flashBell` is drawn this way. Nothing here touches
-    /// the Metal drawable, so a toast never costs the render loop a frame.
-    /// `kind` decides the symbol and the fill. The symbol is the point: a
-    /// toast that distinguished "copied" from "the shell could not start" by
-    /// blue against amber would distinguish them for nobody who cannot
-    /// separate those two hues, and the words alone are easy to miss in the
-    /// corner of a screen full of text. Icon *and* word *and* colour, in that
-    /// order of importance.
+    /// A `CALayer`, since this view is layer-hosting; it never costs the
+    /// Metal render loop a frame. `kind` sets symbol and fill: icon, word and
+    /// colour, in that order, so hue is never the only signal.
     enum ToastKind {
         case confirmation
         case warning
@@ -554,13 +399,8 @@ final class TerminalView: NSView, CALayerDelegate {
 
         var fill: NSColor {
             switch self {
-            // Blue, and deliberately not one of the theme's colours: the
-            // toast has to be legible over whatever the terminal is showing
-            // under it, and a colour taken from the palette would be the one
-            // element that vanishes exactly when the theme is low-contrast or
-            // when a program has painted that colour across the screen.
-            // `systemBlue` rather than `controlAccentColor` for the same
-            // reason — the accent colour is the user's and can be grey.
+            // Not a theme colour, which could vanish into the screen; not
+            // `controlAccentColor`, which can be grey.
             case .confirmation: NSColor.systemBlue.withAlphaComponent(0.92)
             case .warning: NSColor.systemOrange.withAlphaComponent(0.94)
             }
@@ -599,8 +439,6 @@ final class TerminalView: NSView, CALayerDelegate {
             SystemAccessibility.increaseContrast ? 0.85 : 0.22
         ).cgColor
         capsule.borderWidth = 1
-        // A little lift, so the capsule reads as sitting above the text
-        // rather than as a coloured run inside it.
         capsule.shadowColor = NSColor.black.cgColor
         capsule.shadowOpacity = 0.28
         capsule.shadowRadius = 6
@@ -637,8 +475,7 @@ final class TerminalView: NSView, CALayerDelegate {
         appear.duration = SystemAccessibility.duration(0.12)
         capsule.add(appear, forKey: "appear")
 
-        // Held on the main queue rather than a `Timer`: the view may go away
-        // with the pane, and a cancelled work item leaves nothing behind.
+        // A cancellable work item leaves nothing behind if the pane goes.
         let dismissal = DispatchWorkItem { [weak self] in self?.dismissToast() }
         toastDismissal = dismissal
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.toastDuration, execute: dismissal)
@@ -660,16 +497,12 @@ final class TerminalView: NSView, CALayerDelegate {
         CATransaction.commit()
     }
 
-    /// Bottom-right, inside the same inset the text grid uses so it lines up
-    /// with the content rather than with the pane edge. The hosted layer's
-    /// geometry runs top-down with the flipped view (see `commonInit`), so
-    /// "bottom" is `maxY`. Re-run from `layout()`: a pane resized while a
-    /// toast is up must not leave it stranded mid-air.
+    /// Bottom-right inside the text inset; flipped, so bottom is `maxY`.
+    /// Re-run from `layout()` so a resize never strands it.
     private func positionToast() {
         guard let capsule = toastLayer else { return }
         let size = capsule.bounds.size
         CATransaction.begin()
-        // No implicit animation: this is a correction, not a move.
         CATransaction.setDisableActions(true)
         capsule.position = CGPoint(
             x: bounds.maxX - size.width - TerminalLayout.insets.right,
@@ -677,8 +510,6 @@ final class TerminalView: NSView, CALayerDelegate {
         CATransaction.commit()
     }
 
-    /// Long enough to read four words without looking for it, short enough
-    /// that it is gone before it becomes something to dismiss.
     private static let toastDuration: TimeInterval = 1.1
     private static let toastPadding = CGSize(width: 10, height: 5)
 
@@ -688,22 +519,15 @@ final class TerminalView: NSView, CALayerDelegate {
         guard metalLayer.contentsScale != scale || metalLayer.drawableSize != size else { return }
         metalLayer.contentsScale = scale
         metalLayer.drawableSize = size
-        // A resized drawable with no new frame in it is a stale frame
-        // stretched to fit: `CAMetalLayer` scales its contents by default, so
-        // through a fullscreen or zoom animation the text visibly grows and
-        // shrinks with the window and only returns to its real size when the
-        // animation ends and something else happens to ask for a frame. The
-        // grid is unchanged throughout, so the damage diff has nothing to
-        // report and no frame is drawn; this is what asks for one.
+        // A resized drawable holds a stale frame, and the unchanged grid gives
+        // the damage diff nothing to report; ask for a frame.
         onDrawableSizeChange?()
     }
 
 }
 
-/// One scroll input, already resolved to what it means for the scrollback
-/// viewport — the shell decides how far `.lines` clamps against actual
-/// history, and how many lines one `.page` is (it knows the cell height);
-/// this type doesn't know the scrollback depth or the font metrics.
+/// One scroll input for the scrollback viewport; the controller clamps
+/// `.lines` and sizes `.page`.
 enum ScrollGesture {
     /// A relative line delta; positive scrolls back into history.
     case lines(Int)

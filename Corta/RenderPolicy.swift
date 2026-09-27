@@ -17,29 +17,15 @@
 import AppKit
 import QuartzCore
 
-/// Adapts a pane's `CAMetalDisplayLink` frame-rate ceiling to window focus,
-/// Low Power Mode, thermal pressure, and an active scroll gesture.
+/// Adapts a pane's frame-rate ceiling to focus, Low Power Mode, thermal
+/// pressure and scrolling. It only spaces wakeups on a running link;
+/// `FrameScheduler.isPaused` still decides whether any happen
+/// (`PERFORMANCE.md` §3). It matters for a pane flooding output while
+/// hidden, throttled or on battery.
 ///
-/// This sits entirely on top of `FrameScheduler`'s `isPaused` gate, which
-/// already takes idle CPU to ~0% on its own and is unaffected by anything
-/// here (`PERFORMANCE.md` §3): `RenderPolicy` only ever widens or narrows
-/// the gap between wakeups on a link that is already running, deciding
-/// nothing about whether to render a given frame at all — that stays
-/// `ViewController.prepareFrame`'s job. A window that never redraws pays
-/// nothing for any of this; a window that is continuously producing output
-/// (a flooding build log) while occluded, backgrounded, thermally
-/// throttled, or on battery in Low Power Mode is the case this exists for.
-///
-/// **`preferredFrameLatency` is deliberately untouched.** Lowering it while
-/// typing could tighten input latency. The property is the latency the app
-/// requests, in frames (Apple's documentation; on macOS the final latency
-/// may be larger in windowed mode) — but picking a number without a
-/// measurement to justify it risks the opposite of the intended effect
-/// (running the callback too early relative to a frame that is not actually
-/// ready). `RenderMetrics` and `InputLatencySignposts` exist so a change
-/// like that is chosen from a number, not a guess (`PERFORMANCE.md`
-/// §5.3–5.4); the default stays until a keypress-to-glass trace says
-/// otherwise.
+/// `preferredFrameLatency` is untouched: a value picked without a
+/// keypress-to-glass measurement (`PERFORMANCE.md` §5.3–5.4) could as
+/// easily make latency worse.
 final class RenderPolicy {
     private weak var scheduler: FrameScheduler?
     private var thermalObserver: NSObjectProtocol?
@@ -49,13 +35,8 @@ final class RenderPolicy {
     private var isWindowActive: Bool
     private var isScrolling = false
 
-    /// Frame-rate ceilings, in ascending order of restriction below. Never
-    /// zero: a restricted window still has to redraw *something* when its
-    /// content changes (a background build finishing), just not at the
-    /// display's full rate. Deliberately modest rather than tuned to a
-    /// specific number — like `preferredFrameLatency` above, the exact
-    /// values are a candidate for the same measurement pass, not a
-    /// guess to be trusted blind.
+    /// Ceilings, increasingly restrictive; never zero, since a restricted
+    /// window still redraws on change. Modest, and due the same measurement.
     private static let unrestricted = CAFrameRateRange.default
     private static let inactiveWindow = CAFrameRateRange(minimum: 1, maximum: 30, preferred: 15)
     private static let lowPower = CAFrameRateRange(minimum: 1, maximum: 30, preferred: 15)
@@ -105,12 +86,8 @@ final class RenderPolicy {
         apply()
     }
 
-    /// Called from `TerminalView.scrollWheel(with:)` on a trackpad gesture's
-    /// phase transitions (`NSEvent.phase`/`momentumPhase`) — a plain mouse
-    /// wheel carries no phase and so never raises this, which only costs
-    /// this one enhancement for that input device, not correctness: the
-    /// policy simply never restricts the rate *while* such a wheel is
-    /// spinning, same as it wouldn't need to for a single notch at a time.
+    /// Trackpad phase transitions from `TerminalView.scrollWheel(with:)`. A
+    /// wheel has no phase, so it just never lifts the ceiling.
     func scrollingStateChanged(_ scrolling: Bool) {
         guard isScrolling != scrolling else { return }
         isScrolling = scrolling
@@ -119,11 +96,8 @@ final class RenderPolicy {
 
     private func apply() {
         guard let scheduler else { return }
-        // Highest priority first: scrolling wants the full rate so the
-        // motion reads as smooth, regardless of what else is going on —
-        // even a thermally-throttled machine should not turn a scroll
-        // gesture choppy if it can still drive the display's full rate for
-        // the couple of seconds a gesture actually lasts.
+        // Scrolling first: full rate for the seconds a gesture lasts, even when
+        // throttled.
         if isScrolling {
             scheduler.preferredFrameRateRange = Self.unrestricted
             return

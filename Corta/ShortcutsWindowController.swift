@@ -17,17 +17,8 @@
 import AppKit
 import SwiftUI
 
-/// Help > Keyboard Shortcuts (⌘/).
-///
-/// **Why this exists.** Splitting a pane, resizing one, jumping between
-/// commands, switching theme, scrolling the history: all of it was reachable
-/// only by already knowing which menu it was under, or by opening the command
-/// palette, which is itself the most hidden thing in the app. A terminal is
-/// exactly the sort of application whose users will learn a shortcut list on
-/// sight and never open a menu again — but only if there is a list.
-///
-/// A thin AppKit shell hosting `ShortcutsView` (SwiftUI), which owns the row
-/// data and layout; see that type's doc comment for what and why.
+/// Help > Keyboard Shortcuts (⌘/): a visible list, since terminal users
+/// learn shortcuts on sight. An AppKit shell hosting `ShortcutsView`.
 @MainActor
 final class ShortcutsWindowController: NSWindowController {
     static let shared = ShortcutsWindowController()

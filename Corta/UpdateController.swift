@@ -17,28 +17,17 @@
 import AppKit
 import Sparkle
 
-/// Wraps Sparkle's standard updater as the single point of contact for
-/// update checks — the automatic background check on the interval
-/// `SUScheduledCheckInterval` sets (`Sparkle-Info.plist`, merged into the
-/// generated Info.plist via `INFOPLIST_FILE`), and the manual one from
-/// "Check for Updates…", which `AppDelegate+Menus` installs directly under
-/// About, where every other Sparkle-using Mac app puts it.
+/// Sparkle's standard updater: the background check on
+/// `SUScheduledCheckInterval` (`Sparkle-Info.plist`) and Check for
+/// Updates…. Started at launch so the interval means what it says.
 ///
-/// Created (and its background timer started) at launch rather than
-/// lazily on first use: `SUScheduledCheckInterval` only means what it says
-/// if the controller has been running since launch.
-///
-/// **Not in the development build** (D22). The feed advertises the
-/// published release, so an updater running inside a Debug build would
-/// offer to replace the build under development with the shipped one — and
-/// `AppDelegate+Menus` leaves "Check for Updates…" out rather than
-/// installing a menu item that cannot do anything.
+/// Absent in the development build (D22), which the feed would offer to
+/// replace with the release; the menu item is left out too.
 @MainActor
 final class UpdateController {
     static let shared = UpdateController()
 
-    /// `nil` in the development build, which is also what makes
-    /// `isAvailable` false.
+    /// Nil in the development build (`isAvailable` false).
     private let controller: SPUStandardUpdaterController?
 
     static var isAvailable: Bool { !AppPaths.isDevelopmentBuild }
@@ -59,10 +48,7 @@ final class UpdateController {
         controller?.checkForUpdates(sender)
     }
 
-    /// `update-auto-check` (`Configuration.swift`) governs only the
-    /// unattended background check — Check for Updates… is a direct user
-    /// action and always works, on or off. Read live rather than once at
-    /// launch, the same as every other config-file setting.
+    /// `update-auto-check` gates only the background check, read live.
     @objc private func applyAutoCheckSetting() {
         controller?.updater.automaticallyChecksForUpdates =
             ConfigurationStore.shared.configuration.updateAutoCheck

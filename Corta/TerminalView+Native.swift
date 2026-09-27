@@ -16,17 +16,11 @@
 
 import Cocoa
 
-/// The native integrations a self-drawn toolkit cannot get for free,
-/// and that being an ordinary AppKit view makes cheap.
-///
-/// Dropping a file at the prompt, looking a word up with a force touch, and
-/// the Services menu acting on the selection are all things macOS already
-/// knows how to do; each one here is the small amount of plumbing that lets
-/// it reach a Metal surface with no text system behind it.
+/// File drops, Look Up and Services: the plumbing that lets macOS reach a
+/// Metal surface with no text system.
 extension TerminalView {
     // MARK: - Dragging a file or folder in
 
-    /// Registers for file drags. Called from `commonInit`.
     func registerForFileDrags() {
         registerForDraggedTypes([.fileURL])
     }
@@ -39,10 +33,8 @@ extension TerminalView {
         droppedPaths(from: sender).isEmpty ? [] : .copy
     }
 
-    /// A drop inserts the paths as text at the prompt — sanitised, quoted,
-    /// space separated — rather than doing anything with the files. The
-    /// shell is what decides what a path means, and typing it is what the
-    /// user would have done by hand.
+    /// Inserts the paths as quoted text at the prompt, as if typed; the shell
+    /// decides what they mean.
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
         let paths = droppedPaths(from: sender)
         guard !paths.isEmpty else { return false }
@@ -54,8 +46,7 @@ extension TerminalView {
         Self.droppedPaths(from: sender.draggingPasteboard)
     }
 
-    /// Kept separate from `NSDraggingInfo` so the pasteboard boundary can
-    /// be exercised without synthesising a Finder drag in a unit test.
+    /// Apart from `NSDraggingInfo`, so tests need no synthetic Finder drag.
     static func droppedPaths(from pasteboard: NSPasteboard) -> [String] {
         let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
         let urls =
@@ -66,10 +57,8 @@ extension TerminalView {
 
     // MARK: - Look Up (force touch, three-finger tap)
 
-    /// AppKit routes a force touch here. A text view answers by looking up
-    /// the word under the cursor; this view has no text system, so it asks
-    /// the controller for the word the same way a double-click selection
-    /// does, and hands it to the same dictionary panel.
+    /// A force touch: the controller supplies the word, as for a
+    /// double-click, and the dictionary panel shows it.
     override func quickLook(with event: NSEvent) {
         guard let (word, origin) = onLookUp?(convert(event.locationInWindow, from: nil)),
             !word.isEmpty
@@ -82,16 +71,13 @@ extension TerminalView {
 
     // MARK: - Services
 
-    /// The Services menu asks who can supply and receive data before it
-    /// builds itself. Answering for `.string` when there is a selection is
-    /// what makes the terminal's selection appear in Services items.
+    /// Answering for `.string` with a selection puts it in Services.
     override func validRequestor(
         forSendType sendType: NSPasteboard.PasteboardType?,
         returnType: NSPasteboard.PasteboardType?
     ) -> Any? {
         let canSend = sendType == nil || (sendType == .string && onServicesSelection?() != nil)
-        // A service that returns text is a paste: the bytes go to the child
-        // exactly as a ⌘V would send them.
+        // Returned text is a paste, sent as ⌘V would.
         let canReturn = returnType == nil || returnType == .string
         if canSend && canReturn { return self }
         return super.validRequestor(forSendType: sendType, returnType: returnType)

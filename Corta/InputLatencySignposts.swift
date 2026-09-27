@@ -18,73 +18,47 @@ import Darwin
 import Foundation
 import OSLog
 
-/// `os_signpost` across the whole keypress-to-pixel chain, so the number in
-/// `docs/PERFORMANCE.md` §1 can be attributed instead of only measured.
-///
-/// **The gap this closes.** Keypress-to-pixel is measured end to end
-/// (`PERFORMANCE.md` §5.7), and `corta-bench` measures the core half of
-/// it — but neither says *where* the time between them goes. A one-number
-/// end-to-end measurement can only ever tell you whether the last change
-/// helped; it cannot tell you that a regression is in the parse, in the
-/// MainActor hop, in waiting for a drawable, or in the GPU, and every one of
-/// those has a different fix. The frame-CPU regression the project's own
-/// rules warn about (2.40 ms → 4.19 ms, invisible to every passing test) is
-/// exactly the class of thing an attributed trace finds in one pass.
-///
-/// **The chain**, in order, with the signpost each stage emits:
+/// `os_signpost` across the keypress-to-pixel chain, so the number in
+/// `PERFORMANCE.md` §1 can be attributed — parse, main-actor hop, drawable
+/// wait or GPU each have different fixes.
 ///
 /// | Stage | Interval | Where |
 /// | --- | --- | --- |
-/// | key event → bytes on the PTY | `keyDown` | `TerminalView.deliverBytes` (the control-sequence bypass — ⌘/⌃, or an event the input context declines), `TerminalView.insertText` (ordinary typing, composed or not — most keystrokes), `TerminalView.doCommand(by:)` (Return, Delete, Escape, the arrows) |
+/// | key event → bytes on the PTY | `keyDown` | `TerminalView.deliverBytes` (⌘/⌃ bypass, or declined by the IME), `.insertText` (most typing), `.doCommand(by:)` (Return, Delete, Escape, arrows) |
 /// | reader wakes, parses, writes the grid | `output` | `ViewController.noteOutput` |
 /// | MainActor hop that wakes the display link | `wake` | `ViewController.noteOutput` |
 /// | vsync callback, damage diff, instance build | `frame` | `FrameScheduler.metalDisplayLink(_:needsUpdate:)` |
 /// | encode + commit | `commit` | `ViewController.render` |
 /// | GPU work through to completion | `gpu` | `ViewController.render` |
 ///
-/// **Cost when nothing is listening.** `OSSignposter.isEnabled` is false
-/// unless a trace is being recorded, and every call here is behind it — so
-/// the render path pays one atomic load per stage, which is what makes this
-/// safe to leave in a release build (`PERFORMANCE.md` §2: no per-frame
-/// allocation, no ObjC bridging on the hot path).
+/// Every call sits behind `OSSignposter.isEnabled`, one atomic load when
+/// no trace is recording, so it is safe in release builds.
 ///
-/// **How to record one.** `scripts/record-signpost-trace.sh` runs the whole
-/// sequence below — launch, confirm focus, attach, save — for exactly the
-/// reason the next paragraph explains. By hand, with Instruments' own
-/// "os_signpost" instrument (`--instrument`, not `--template`: this is an
-/// *instrument*, not one of `xctrace list templates`' entries), attached to
-/// an already-running, already-focused process:
+/// `scripts/record-signpost-trace.sh` records one. By hand, attach to an
+/// already-running, focused process — launching through `xctrace` doesn't
+/// give the window focus, so no `keyDown` is captured
+/// (`PERFORMANCE.md` §5.3):
 ///
 /// ```sh
 /// xcrun xctrace record --attach Corta --instrument 'os_signpost' \
 ///     --output /path/to/output.trace
 /// ```
 ///
-/// Then filter on subsystem `dev.noahqin.Corta`, category `input-latency`.
-/// Launching Corta *through* `xctrace`/Instruments (`--launch`, or
-/// Instruments' Record button) does not hand the new process window focus,
-/// so keystrokes typed right after launch land elsewhere and the trace
-/// shows zero `keyDown` — `PERFORMANCE.md` §5.3 has the fuller account.
-/// `nonisolated`: the chain crosses threads by design — `keyDown` is on the
-/// main thread, `output` is on the reader thread — so nothing here may be
-/// actor-bound. `OSSignposter` is itself thread-safe.
+/// Filter on subsystem `dev.noahqin.Corta`, category `input-latency`.
+/// `nonisolated` because the chain crosses threads.
 nonisolated enum InputLatencySignposts {
     static let subsystem = "dev.noahqin.Corta"
     static let category = "input-latency"
 
-    /// One signposter for the process. `OSLog(subsystem:category:)` is the
-    /// signpost-capable initialiser; the `Logger`-style one is not.
+    /// `OSLog(subsystem:category:)` is the signpost-capable initialiser.
     static let signposter = OSSignposter(
         logHandle: OSLog(subsystem: subsystem, category: category))
 
-    /// Whether a trace is being recorded. Checked at every call site so a
-    /// normal run does no work at all.
+    /// Whether a trace is recording; checked at every call site.
     static var isEnabled: Bool { signposter.isEnabled }
 
-    /// The signpost API takes a `StaticString` name, which cannot be an
-    /// enum's raw value (`StaticString` is not `Equatable`). So each stage
-    /// carries its literal in a computed property instead — the literal is
-    /// still static, which is what the API actually requires.
+    /// Names are `StaticString`s, which can't be raw values, so each stage
+    /// returns its literal from a property.
     enum Stage {
         case keyDown
         case output
@@ -105,7 +79,7 @@ nonisolated enum InputLatencySignposts {
         }
     }
 
-    /// Begins an interval, or returns nil when no trace is running.
+    /// Nil when no trace is running.
     static func begin(_ stage: Stage) -> OSSignpostIntervalState? {
         guard isEnabled else { return nil }
         return signposter.beginInterval(stage.name, id: signposter.makeSignpostID())
@@ -116,16 +90,13 @@ nonisolated enum InputLatencySignposts {
         signposter.endInterval(stage.name, state)
     }
 
-    /// A single point in time rather than an interval — for the hand-offs
-    /// where the two ends run on different threads and an interval would have
-    /// to be carried across them.
+    /// A point event, for hand-offs across threads.
     static func emit(_ stage: Stage) {
         guard isEnabled else { return }
         signposter.emitEvent(stage.name, id: signposter.makeSignpostID())
     }
 
-    /// Wraps `body` in an interval. The closure form so a call site cannot
-    /// forget the `end` on an early return.
+    /// An interval around `body`, so no early return skips `end`.
     @inline(__always)
     static func measure<T>(_ stage: Stage, _ body: () -> T) -> T {
         guard isEnabled else { return body() }

@@ -16,31 +16,22 @@
 
 import simd
 
-/// Block elements (U+2580–U+259F) drawn as geometry rather than glyphs.
-///
-/// A cell is `advance.rounded(.up)` wide, so a font whose advance is 8.4pt
-/// gets a 9pt cell and every glyph leaves a point of background bare on its
-/// right. Between letters that is invisible. Between block characters it is a
-/// grid of gaps: measured, `U+2588 FULL BLOCK` inked 88% of its cell, and the
-/// cell's average colour fell from the requested (255,140,0) to (203,111,0) —
-/// an orange that reads as pink once the background mixes in. Claude Code's
-/// banner is drawn with these, which is exactly how it looked.
-///
-/// No font's metrics tile reliably after that rounding, so kitty, Ghostty and
-/// Alacritty all synthesise this range instead of shaping it. This does the
-/// same: each scalar maps to rectangles in unit cell space, scaled to the
-/// cell at draw time, so they meet exactly.
+/// Block elements (U+2580–U+259F) drawn as geometry, not glyphs. A cell is
+/// the advance snapped to device pixels (`CellMetrics`), and a font's block
+/// glyphs rarely fill it exactly: measured, `U+2588 FULL BLOCK` once inked
+/// 88% of its cell, turning (255,140,0) orange pink with the background
+/// showing through — how Claude Code's banner looked. kitty, Ghostty and
+/// Alacritty synthesise the range too: rectangles in unit cell space, scaled
+/// at draw time, so they meet exactly.
 nonisolated enum BlockElements {
-    /// A rectangle in unit cell space — x, y, width, height in 0...1, with y
-    /// measured downward from the cell's top, matching the shader's pixel
-    /// space — and the coverage to draw it at.
+    /// A rectangle in unit cell space (y down, as the shader) and its
+    /// coverage.
     struct Piece {
         var rect: SIMD4<Float>
         var alpha: Float
     }
 
-    /// The pieces for `scalar`, or nil if it is not a block element and
-    /// should be shaped normally.
+    /// Nil for a scalar that isn't a block element.
     static func pieces(for scalar: UInt32) -> [Piece]? {
         func solid(_ x: Float, _ y: Float, _ w: Float, _ h: Float, _ a: Float = 1) -> [Piece] {
             [Piece(rect: SIMD4<Float>(x, y, w, h), alpha: a)]

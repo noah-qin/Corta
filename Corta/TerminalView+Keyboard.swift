@@ -19,23 +19,14 @@ import CortaTerminal
 
 /// Keyboard input: one key event to the bytes a real terminal would send.
 ///
-/// Routing: an event carrying ⌘ or ⌃ bypasses the IME entirely —
-/// control sequences are the terminal's own and must never reach an input
-/// method. Every other event is offered to the input context first
-/// (`inputContext.handleEvent(_:)`); only an event the IME does not consume
-/// falls through to the direct `bytes(for:)` translation. Text an IME
-/// commits does not come back through `keyDown` at all — it arrives via
-/// `insertText(_:replacementRange:)` in `TerminalView+IME.swift`, which is
-/// where it is written to the PTY. (`interpretKeyEvents:` is still never
-/// called; it would swallow control keys the shell needs verbatim.)
+/// ⌘ and ⌃ events bypass the IME; everything else is offered to the input
+/// context first, and only what it declines reaches `bytes(for:)`. IME
+/// commits arrive via `insertText` (`TerminalView+IME.swift`), and
+/// `interpretKeyEvents:` is never called: it swallows control keys.
 extension TerminalView {
     override func keyDown(with event: NSEvent) {
-        // The shortcuts this method recognises itself come from the
-        // binding table, never from a literal. AppKit dispatches a bound
-        // keystroke through its menu item before `keyDown` ever runs, so
-        // these branches normally do not fire at all — but a literal here
-        // *did* fire the moment the menu stopped claiming the key, which is
-        // exactly when the user had rebound or unbound the command.
+        // From the bindings, never a literal: a literal fired exactly when the
+        // menu stopped claiming the key, i.e. after a rebind or unbind.
         let bindings = keybindings?() ?? Keybindings()
         if onSearchKey?(event) == true {
             return
@@ -48,8 +39,7 @@ extension TerminalView {
             onPaste?()
             return
         }
-        // Offer the event to the IME first. A consumed event ends
-        // here — the IME answers through `insertText`/`setMarkedText`.
+        // A consumed event ends here; the IME answers via `insertText`.
         if Self.routesEventThroughIME(event, optionAsMeta: optionAsMeta?() ?? false),
             inputContext?.handleEvent(event) == true
         {
@@ -73,7 +63,7 @@ extension TerminalView {
         onKeyBytes?(bytes)
     }
 
-    /// The direct translation, run for events the IME never saw or declined.
+    /// The direct translation, for events the IME never saw or declined.
     func deliverBytes(for event: NSEvent) {
         guard
             let bytes = Self.bytes(
@@ -86,69 +76,42 @@ extension TerminalView {
             super.keyDown(with: event)
             return
         }
-        // The first link in the keypress-to-pixel chain
-        // (`InputLatencySignposts`): everything from here to the GPU
-        // completion handler is attributable in one trace.
+        // Starts the keypress-to-pixel trace (`InputLatencySignposts`).
         RenderMetrics.noteKeystroke(at: event.timestamp)
         InputLatencySignposts.measure(.keyDown) { onKeyBytes?(bytes) }
     }
 
-    /// ⌘/⌃ events bypass the IME entirely — and so does ⌥ once the
-    /// user has said ⌥ is Meta. Kept a pure function of the event so the
-    /// bypass decision is testable without a window server.
-    ///
-    /// The ⌥ bypass is what makes `option-as-meta` work at all. An ⌥-only
-    /// press carries neither ⌘ nor ⌃, so without it the event is offered to
-    /// the input context first, macOS composes it into the layout's
-    /// alternate character, and it comes back through `insertText` — ⌥F
-    /// arrives as `ƒ` and never reaches the encoder.
-    ///
-    /// With the setting off, nothing changes: ⌥ is text input on macOS and
-    /// must keep reaching the IME, which is what dead keys and every
-    /// international layout depend on.
+    /// ⌘/⌃ bypass the IME, and so does ⌥ under `option-as-meta` — otherwise
+    /// macOS composes ⌥F into `ƒ`. With the setting off ⌥ stays text input,
+    /// which dead keys and international layouts need. Pure, for tests.
     static func routesEventThroughIME(_ event: NSEvent, optionAsMeta: Bool = false) -> Bool {
         if optionAsMeta, event.modifierFlags.contains(.option) { return false }
         return event.modifierFlags.isDisjoint(with: [.command, .control])
     }
 
-    /// The keystroke bound to Paste — checked before `bytes(for:)`, which
-    /// would otherwise deliver a bare "v" to the child.
-    ///
-    /// Read from the bindings rather than written in as ⌘V. The literal
-    /// matched *any* combination containing ⌘ and "v", so `bind.paste =
-    /// cmd+shift+v` left ⌘V pasting as well, and `bind.paste =` — an unbind,
-    /// whose whole point is handing the key to the child — did not stop ⌘V
-    /// pasting at all. Unbound now means unbound: the keystroke is encoded
-    /// and sent to the child like any other key Corta does not claim.
+    /// The keystroke bound to Paste, checked before `bytes(for:)`. From the
+    /// bindings, so an unbind really hands ⌘V to the child.
     static func isPasteShortcut(_ event: NSEvent, bindings: Keybindings) -> Bool {
         bindings[.paste]?.matches(event) ?? false
     }
 
-    /// The Edit menu's Paste item lands here; ⌘V arrives via `keyDown`.
-    /// (`paste(_:)` comes from `NSStandardKeyBindingProviding`, so it is not
-    /// an `NSResponder` override.)
+    /// The Edit menu's Paste; ⌘V arrives via `keyDown`. From
+    /// `NSStandardKeyBindingProviding`, not an `NSResponder` override.
     func paste(_ sender: Any?) {
         onPaste?()
     }
 
-    /// Translates one key event directly to the bytes a real terminal would
-    /// send. Control combinations map to C0 codes; arrows, the editing block
-    /// and F1–F12 map to the xterm CSI/SS3 sequences `$TERM=xterm-256color`
-    /// promises (`DECISIONS.md` D08), with modifiers in xterm's `CSI 1 ; m X`
-    /// form and DECCKM (`CSI ? 1 h`) switching the unmodified cursor keys
-    /// and Home/End to their SS3 (application) forms.
+    /// Translates one key event to bytes: C0 for control combinations, and
+    /// the xterm CSI/SS3 forms `xterm-256color` promises (D08) for arrows, the
+    /// editing block and F1–F12, with modifiers as `CSI 1 ; m X` and DECCKM
+    /// selecting SS3 for unmodified cursor keys and Home/End.
     ///
-    /// - Parameter enhancements: the kitty keyboard protocol flags the child
-    ///   has asked for. With `disambiguate` set, the keys the legacy
-    ///   encoding collides are sent as `CSI code ; modifiers u` instead.
-    /// - Parameter applicationKeypad: DECKPAM (`ESC =`). When true the
-    ///   numeric keypad sends its SS3 forms — `ESC O p`…`ESC O y` for the
-    ///   digits, `ESC O M` for Enter — which is what a program that sent
-    ///   `smkx` is waiting for.
-    /// - Parameter optionAsMeta: When true, ⌥ on a text or control key
-    ///   sends an ESC prefix instead of the layout's alternate character —
-    ///   what a PC keyboard's Alt does. Special keys are unaffected either
-    ///   way: ⌥ already reaches the child there as the modifier parameter.
+    /// - Parameter enhancements: kitty flags; `disambiguate` sends colliding
+    ///   keys as `CSI code ; modifiers u`.
+    /// - Parameter applicationKeypad: DECKPAM (`ESC =`): the keypad sends
+    ///   `ESC O p`…`ESC O y` and `ESC O M`, as `smkx` programs expect.
+    /// - Parameter optionAsMeta: ⌥ on a text or control key sends an ESC
+    ///   prefix; special keys carry ⌥ as the modifier parameter either way.
     static func bytes(
         for event: NSEvent, enhancements: KeyboardEnhancementFlags = [],
         newLineMode: Bool = false, applicationCursorKeys: Bool = false,
@@ -159,9 +122,8 @@ extension TerminalView {
         let flags = event.modifierFlags
         let eventType = event.type == .keyUp ? 3 : (event.isARepeat ? 2 : 1)
 
-        // A release has no representation unless the child asked for event
-        // types. (Checked before the disambiguate path as well: a release
-        // must never emit the press encoding of an ambiguous key.)
+        // No release encoding unless event types were requested — checked
+        // before disambiguation so a release never sends the press encoding.
         if event.type == .keyUp, !enhancements.contains(.reportEventTypes) { return nil }
 
         if enhancements.contains(.reportEventTypes),
@@ -178,9 +140,8 @@ extension TerminalView {
             return disambiguated
         }
 
-        // Text-producing keys remain legacy UTF-8 under reportEventTypes.
-        // The protocol consequently has no release representation for them
-        // unless reportAllKeysAsEscapeCodes is also enabled (not supported).
+        // Text keys stay legacy UTF-8, with no release form without
+        // reportAllKeysAsEscapeCodes (unsupported).
         if event.type == .keyUp { return nil }
 
         let modifiers = xtermModifiers(flags)
@@ -218,36 +179,28 @@ extension TerminalView {
             }
         }
 
-        // keyCode 48 is Tab on every layout; with Shift it is backtab
-        // (`CSI Z`), which terminfo names kcbt and readline binds.
+        // Shift-Tab is backtab (`CSI Z`, terminfo kcbt).
         if event.keyCode == 48, flags.contains(.shift) {
             return modifiers == 2
                 ? Array("\u{1B}[Z".utf8)
                 : Array("\u{1B}[1;\(modifiers)Z".utf8)
         }
 
-        // ⌥ as Meta. ⌘ still belongs to the app, so it disqualifies
-        // the combination; a special key never lands here (⌥ reaches the
-        // child as the modifier parameter above).
+        // ⌥ as Meta; ⌘ belongs to the app and disqualifies it.
         let meta: [UInt8] =
             optionAsMeta && flags.contains(.option) && !flags.contains(.command) ? [0x1B] : []
 
-        // DECKPAM. The keypad's own SS3 forms, which only the keyCode
-        // can identify: ⌤ reports "\u{3}" (indistinguishable from Ctrl+C at
-        // that point) and every digit key reports the same character its
-        // main-keyboard twin does. Modified keypad presses fall through to
-        // the ordinary encoding rather than inventing a modified SS3 form —
-        // xterm has none, and `xterm-256color`'s terminfo names none.
+        // DECKPAM, by keyCode: ⌤ reports "\u{3}" like Ctrl+C, and keypad digits
+        // match the main row. Modified keypad keys use the ordinary encoding;
+        // xterm has no modified SS3 form.
         if applicationKeypad, modifiers == 1,
             let final = keypadApplicationFinal(for: event.keyCode)
         {
             return meta + Array("\u{1B}O\(final)".utf8)
         }
 
-        // The keypad's Enter (keyCode 76) reports "\u{3}" as its character,
-        // which is indistinguishable from Ctrl+C at that point — keyCode is
-        // the only honest source. Outside application keypad mode it sends
-        // what Return sends.
+        // Keypad Enter reports "\u{3}" (like Ctrl+C); outside DECKPAM it is
+        // Return.
         if event.keyCode == 76 {
             return meta + (newLineMode ? [0x0D, 0x0A] : [0x0D])
         }
@@ -255,40 +208,28 @@ extension TerminalView {
         if flags.contains(.control), let characters = event.charactersIgnoringModifiers,
             let scalar = characters.unicodeScalars.first
         {
-            // Ctrl+letter -> C0 control code; the classic (scalar & 0x1F).
+            // Ctrl+letter -> C0 (scalar & 0x1F).
             let value = scalar.value
             if (0x40...0x7E).contains(value) {
                 return meta + [UInt8(value & 0x1F)]
             }
         }
 
-        // Under option-as-meta the base character comes from
-        // `charactersIgnoringModifiers`, which keeps Shift but drops ⌥ — so
-        // ⌥E (a dead key on the US layout) sends `ESC e` immediately rather
-        // than waiting to compose. With meta off, `characters` carries the
-        // layout's alternate character (é, ø, …) or dead-key result through
-        // untouched, which is what international layouts need.
+        // Meta uses `charactersIgnoringModifiers` (Shift kept, ⌥ dropped), so ⌥E
+        // sends `ESC e` instead of starting a dead key; without meta the
+        // composed character passes through.
         let text = meta.isEmpty ? event.characters : event.charactersIgnoringModifiers
         guard let characters = text, !characters.isEmpty else { return nil }
-        // Return sends CR, not LF — the pty's line discipline turns that
-        // into whatever the child's terminal driver expects. Under LNM
-        // (`CSI 20 h`) it sends CR LF instead, which is the half of that mode
-        // the keyboard owns (ECMA-48 §8.3.106).
+        // Return sends CR, or CR LF under LNM (ECMA-48 §8.3.106).
         if characters == "\r" || characters == "\n" {
             return meta + (newLineMode ? [0x0D, 0x0A] : [0x0D])
         }
         return meta + Array(characters.utf8)
     }
 
-    /// The SS3 final byte for a keypad key under DECKPAM, by macOS virtual
-    /// keycode.
-    ///
-    /// The mapping is xterm's, which is the one `xterm-256color` promises:
-    /// digits 0–9 are `p`…`y` in order, and the operators are the finals
-    /// terminfo names as `kpADD`, `kpSUB` and friends. macOS has no Num Lock,
-    /// so keyCode 71 is the Clear key that sits where PC keyboards put it,
-    /// and it sends what xterm sends for `KP_Begin`'s neighbour rather than
-    /// toggling anything.
+    /// DECKPAM's SS3 final for a keypad keycode, as xterm maps it: digits
+    /// `p`…`y`, operators per terminfo `kpADD` and friends. Keycode 71 is the
+    /// Mac's Clear key (no Num Lock).
     private static func keypadApplicationFinal(for keyCode: UInt16) -> Character? {
         switch keyCode {
         case 82: return "p"  // 0
@@ -312,27 +253,18 @@ extension TerminalView {
         }
     }
 
-    /// The kitty encoding, applied only to the keys the legacy one cannot
-    /// tell apart. Everything else keeps its legacy bytes: the
-    /// `disambiguate` flag asks a terminal to stop colliding keys, not to
-    /// re-encode the whole keyboard — that is what `reportAllKeysAsEscapeCodes`
-    /// is for, and Corta does not claim it.
-    ///
-    /// The collisions, and why each matters:
-    /// - `Ctrl+I` is `0x09`, which is also `Tab`.
-    /// - `Ctrl+M` is `0x0D`, which is also `Return`.
-    /// - `Ctrl+[` is `0x1B`, which is also `Esc` and the start of every
-    ///   escape sequence.
-    /// - `Ctrl+H` is `0x08`, which is also `Backspace` on many keyboards.
+    /// The kitty encoding for only the keys legacy encoding collides —
+    /// `disambiguate` doesn't re-encode the keyboard
+    /// (`reportAllKeysAsEscapeCodes`, unclaimed, would). The collisions:
+    /// Ctrl+I/Tab (0x09), Ctrl+M/Return (0x0D), Ctrl+[/Esc (0x1B),
+    /// Ctrl+H/Backspace (0x08).
     private static func disambiguatedBytes(for event: NSEvent, eventType: Int?) -> [UInt8]? {
         let flags = event.modifierFlags
         guard flags.contains(.control), !flags.contains(.command),
             let characters = event.charactersIgnoringModifiers?.lowercased(),
             let scalar = characters.unicodeScalars.first
         else { return nil }
-        // The four ambiguous ones only. `Ctrl+A` has no unmodified twin, so
-        // `0x01` says exactly one thing and re-encoding it would break every
-        // program that has read it for forty years.
+        // Only these four: `0x01` and friends are unambiguous.
         let ambiguous: Set<UInt32> = [
             UInt32(UnicodeScalar("i").value),
             UInt32(UnicodeScalar("m").value),
@@ -340,16 +272,14 @@ extension TerminalView {
             UInt32(UnicodeScalar("[").value),
         ]
         guard ambiguous.contains(scalar.value) else { return nil }
-        // `CSI unicode-key-code ; modifiers u`, modifiers as the protocol's
-        // 1-based bitmask: shift 1, alt 2, ctrl 4, super 8.
+        // `CSI code ; modifiers u`, bitmask shift 1, alt 2, ctrl 4, super 8.
         let modifiers = kittyModifiers(flags)
         let suffix = eventType.map { ":\($0)" } ?? ""
         return Array("\u{1B}[\(scalar.value);\(modifiers)\(suffix)u".utf8)
     }
 
-    /// Event-reporting form for keys that already use an escape sequence.
-    /// Enter, Tab and Backspace deliberately stay legacy unless the child
-    /// also requests reportAllKeysAsEscapeCodes, per the kitty protocol.
+    /// Event-reporting form for keys already sent as escape sequences. Enter,
+    /// Tab and Backspace stay legacy without reportAllKeysAsEscapeCodes.
     private static func eventTypedFunctionalBytes(for event: NSEvent, eventType: Int) -> [UInt8]? {
         let modifiers = kittyModifiers(event.modifierFlags)
         let parameter = "\(modifiers):\(eventType)"
@@ -379,10 +309,8 @@ extension TerminalView {
         }
     }
 
-    /// Cursor keys and Home/End. DECCKM (`CSI ? 1 h`) switches the
-    /// unmodified forms from CSI to SS3; the modified form is xterm's
-    /// `CSI 1 ; m X` in both modes, which is what xterm does and what
-    /// `xterm-256color`'s terminfo entry (kUP3 and friends) names.
+    /// Cursor keys and Home/End: DECCKM picks SS3 for the unmodified form;
+    /// modified is `CSI 1 ; m X` in both modes (terminfo kUP3 and friends).
     private static func cursorKey(
         _ final: Character, modifiers: Int, application: Bool
     ) -> [UInt8] {
@@ -406,9 +334,8 @@ extension TerminalView {
             : Array("\u{1B}[\(number);\(modifiers)~".utf8)
     }
 
-    /// xterm's 1-based modifier bitmask for the legacy encoding: shift 1,
-    /// alt 2, ctrl 4, meta 8. Caps Lock is kitty-only and stays out — xterm
-    /// has no value for it.
+    /// xterm's 1-based bitmask: shift 1, alt 2, ctrl 4, meta 8. Caps Lock is
+    /// kitty-only.
     private static func xtermModifiers(_ flags: NSEvent.ModifierFlags) -> Int {
         var modifiers = 1
         if flags.contains(.shift) { modifiers += 1 }

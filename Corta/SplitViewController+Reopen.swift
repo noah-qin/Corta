@@ -17,47 +17,26 @@
 import AppKit
 import CortaTerminal
 
-/// Reopening the arrangement of a pane that was closed.
+/// Reopen Closed Pane: the arrangement (position, split, divider,
+/// directory), never the process or scrollback — hence not "Undo Close".
 ///
-/// **What this restores, and what it does not.** The *arrangement*: a pane
-/// back in the position it occupied, split the way it was split, at the
-/// divider it had, in the working directory it reported. Not the process, not
-/// the scrollback, not the command that was running — a closed child is gone,
-/// and a terminal that pretended otherwise would be showing a transcript with
-/// a prompt that answers to nothing. That is the same line `SessionRestore`
-/// draws for a relaunch, drawn again here for a pane; the command is named
-/// "Reopen Closed Pane" rather than "Undo Close" for exactly that reason.
-///
-/// **Why one, and why not a stack.** The record is a single pane deep. A
-/// deeper stack sounds free and is not: the second entry's position is
-/// described relative to a tree that the first reopen has already changed, so
-/// every entry below the top is a guess that gets worse with each one. One
-/// entry is the case that actually happens — closing the wrong pane, and
-/// wanting it back immediately.
+/// One deep: a second record describes a tree the first reopen already
+/// changed, so deeper entries are guesses.
 extension SplitViewController {
-    /// Everything needed to put a closed pane back where it was.
     struct ClosedPane {
-        /// The directory the pane last reported through OSC 7, or `nil` for
-        /// the home directory — the same fallback a fresh pane uses.
+        /// Last OSC 7 directory; nil opens home.
         var directory: String?
-        /// The pane it shared a split with, weakly: if that one has since
-        /// closed too, the position it described no longer exists.
+        /// Weak: if it closed too, the position is gone.
         weak var sibling: ViewController?
-        /// How the two were split.
         var orientation: SplitOrientation
-        /// Whether the closed pane was the *first* subview of that split —
-        /// left or top — so it comes back on its own side rather than the
-        /// other one.
+        /// Left or top, so it returns to its own side.
         var wasFirst: Bool
-        /// The divider fraction the split had, so the sibling does not simply
-        /// keep the space it inherited.
+        /// The divider fraction to restore.
         var position: Double
     }
 
-    /// Records where a pane sat, immediately before it is removed from the
-    /// tree. Nothing is recorded for the last pane in a window: closing that
-    /// closes the window, and the window's own arrangement is
-    /// `SessionRestore`'s business.
+    /// Records a pane's place before removal; not for a window's last pane,
+    /// which is `SessionRestore`'s.
     func noteClosing(_ pane: ViewController) {
         guard hasMultiplePanes,
             let split = pane.view.superview as? NSSplitView, split.subviews.count == 2,
@@ -79,15 +58,11 @@ extension SplitViewController {
             position: axis > 0 ? Double(firstExtent / axis) : 0.5)
     }
 
-    /// Whether there is a closed pane to reopen — read by the menu item, so
-    /// it is disabled rather than silent when there is not.
     var canReopenClosedPane: Bool { lastClosedPane?.sibling != nil }
 
     @objc func reopenClosedPane(_ sender: Any?) {
         guard let record = lastClosedPane, let sibling = record.sibling else {
-            // The sibling closed too, so the position the record describes no
-            // longer exists. Better to say nothing happened than to open a
-            // pane somewhere arbitrary and call it a restore.
+            // The sibling is gone: beep rather than open somewhere arbitrary.
             NSSound.beep()
             return
         }
@@ -95,9 +70,7 @@ extension SplitViewController {
         focusedPane = sibling
         splitFocusedPane(orientation: record.orientation, workingDirectory: record.directory)
         guard let reopened = focusedPane, reopened !== sibling else { return }
-        // `splitFocusedPane` always puts the new pane second and halves the
-        // split. Both are put back: the pane goes to the side it was on, and
-        // the divider to the fraction it had.
+        // `splitFocusedPane` puts it second at half; restore side and divider.
         if record.wasFirst, let split = reopened.view.superview as? NSSplitView,
             split.subviews.count == 2
         {

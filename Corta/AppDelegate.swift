@@ -21,36 +21,27 @@ import UserNotifications
 @main
 class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
-    /// Strong references to every open terminal window's controller —
-    /// nothing else retains a window controller, and a deallocated
-    /// controller takes its window (and its session) down with it.
+    /// Nothing else retains a window controller, and dropping one takes its
+    /// window and session down.
     private var windowControllers: [NSWindowController] = []
-    /// The windows an App Intent may name: every ordinary terminal
-    /// window, in the order they were opened. The Quick Terminal is left
-    /// out — it has its own intent and is not a window a person arranges.
+    /// The windows an App Intent may name, in opening order; the Quick
+    /// Terminal has its own intent.
     var terminalWindowControllers: [TerminalWindowController] {
         windowControllers.compactMap { $0 as? TerminalWindowController }.filter { !$0.isQuickTerminal }
     }
     /// The debounced arrangement write; see `noteLayoutChanged`.
     var pendingLayoutSave: DispatchWorkItem?
-    /// Set as the app starts quitting, so the windows closing on the way out
-    /// do not each schedule a save that would end up writing an empty
-    /// arrangement over the one just flushed.
+    /// Set at quit, so closing windows don't save an empty arrangement over
+    /// the one just flushed.
     private var isTerminating = false
 
-    /// File > New Window (⌘N), wired in the storyboard to First Responder. Each
-    /// window is its own `SplitViewController` composing one or more
-    /// panes — each pane a `ViewController` with its own
-    /// `TerminalSession` — so a new window is composition, not new
-    /// mechanism (`DECISIONS.md` D07).
+    /// File > New Window (⌘N).
     @objc func newDocument(_ sender: Any?) {
         openWindow(workingDirectory: nil)
     }
 
-    /// The one route every "open a window" caller takes: ⌘N, the Dock
-    /// click, and the App Intent. `workingDirectory` is where the first pane
-    /// spawns, or `nil` for the home directory; it is a *path*, handed to the
-    /// spawn as its cwd and never written to the child's stdin.
+    /// The one route for opening a window (⌘N, Dock click, App Intent).
+    /// `workingDirectory` is a spawn cwd, never written to the child's stdin.
     @discardableResult
     func openWindow(workingDirectory: String?) -> TerminalWindowController? {
         guard
@@ -58,11 +49,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                 setup: SplitViewController.Setup(workingDirectory: workingDirectory))
                 as? TerminalWindowController
         else { return nil }
-        // Offset from the window it was opened from. Placed at the same
-        // origin the new window is invisible behind the old one, and ⌘N
-        // looks like it did nothing. The Quick Terminal is not "the window
-        // it was opened from": its band across the screen edge is nowhere a
-        // normal window should be placed relative to.
+        // Cascade from the opening window, or ⌘N looks like it did nothing —
+        // except from the Quick Terminal's screen-edge band.
         if let previous = NSApp.keyWindow, let window = controller.window,
             !QuickTerminalController.shared.owns(previous)
         {
@@ -74,10 +62,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return controller
     }
 
-    /// Brings one window forward by identity, for the App Intent. The
-    /// window is made key and its tab selected; the app is activated so the
-    /// window actually reaches the front rather than ordering front inside
-    /// a background app. Returns false when no window has that id anymore.
+    /// Brings a window forward by identity for the App Intent, activating the
+    /// app so it really reaches the front. False if the id is gone.
     @discardableResult
     func focusWindow(id: String) -> Bool {
         guard let controller = terminalWindowControllers.first(where: { $0.windowID == id }),
@@ -88,30 +74,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return true
     }
 
-    /// File > New Tab (⌘T): native window tabbing. The new session is
-    /// a full window of its own, added to the key window's tab group — so a
-    /// tab can always be dragged out into a standalone window again, and
-    /// ⌘N keeps meaning "new window".
+    /// File > New Tab (⌘T): a full window joined to the key window's tab
+    /// group, so it can be dragged out again.
     @objc func newTab(_ sender: Any?) {
         guard let controller = instantiateWindowController(),
             let window = controller.window
         else { return }
         window.tabbingMode = .automatic
-        // The Quick Terminal takes no tabs (`QuickTerminalController`): ⌘T
-        // from it opens the tab in a normal window instead — which, with no
-        // ordinary key window to join, is a new standalone window.
+        // The Quick Terminal takes no tabs; ⌘T from it opens a normal window.
         if let keyWindow = NSApp.keyWindow, keyWindow !== window,
             !QuickTerminalController.shared.owns(keyWindow)
         {
-            // Join at the group's size: being born at the default size and
-            // then resized by the tab group reads as a flash.
+            // Join at the group's size rather than flash from the default.
             window.setFrame(keyWindow.frame, display: false)
             keyWindow.addTabbedWindow(window, ordered: .above)
-            // The tab bar appearing grows the chrome, and AppKit answers by
-            // shrinking the content area — every pane in the group silently
-            // loses the bar's worth of rows. The key window absorbs that
-            // delta into its frame instead; it has to be told, because it is
-            // the window the new tab covers and it never lays out again.
+            // The appearing tab bar would cost the covered window rows, and that
+            // window never lays out again, so tell it to absorb the chrome.
             (keyWindow.contentViewController as? SplitViewController)?
                 .absorbChromeChange()
         }
@@ -119,20 +97,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         window.makeKeyAndOrderFront(sender)
     }
 
-    /// The tab bar's "+" button sends this through the responder chain;
-    /// with no implementor in the chain AppKit does not show the button at
-    /// all, so this is also what makes the button appear.
+    /// The tab bar's "+" button; implementing this is also what shows it.
     @objc func newWindowForTab(_ sender: Any?) {
         newTab(sender)
     }
 
-    /// One storyboard window controller, tracked so it lives as long as its
-    /// window does. `setup` reaches the root pane *before* it spawns — see
-    /// `SplitViewController.pendingSetup` for why it cannot be assigned to
-    /// the controller afterwards. `asPanel` swaps the storyboard window for
-    /// a non-activating panel before anything observes it
-    /// (`TerminalWindowController.adoptNonactivatingPanel`) — the Quick
-    /// Terminal needs one to appear beside a full-screen application.
+    /// One tracked storyboard window controller. `setup` reaches the root
+    /// pane before it spawns (D16, `SplitViewController.pendingSetup`).
+    /// `asPanel` swaps in a non-activating panel for the Quick Terminal
+    /// (`TerminalWindowController.adoptNonactivatingPanel`).
     func instantiateWindowController(
         setup: SplitViewController.Setup? = nil, asPanel: Bool = false
     ) -> NSWindowController? {
@@ -146,16 +119,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return controller
     }
 
-    /// Retains `controller` until its window closes, so the array does not
-    /// grow without bound and no open window loses its controller.
+    /// Retains `controller` until its window closes.
     func track(_ controller: NSWindowController) {
         guard !windowControllers.contains(controller) else { return }
         windowControllers.append(controller)
         NotificationCenter.default.addObserver(
             self, selector: #selector(windowWillClose(_:)),
             name: NSWindow.willCloseNotification, object: controller.window)
-        // A moved or resized window is a changed arrangement. Both
-        // notifications are per-window and coalesce into one debounced write.
+        // Moves and resizes coalesce into one debounced write.
         for name in [NSWindow.didResizeNotification, NSWindow.didMoveNotification] {
             NotificationCenter.default.addObserver(
                 self, selector: #selector(noteLayoutChanged), name: name,
@@ -166,10 +137,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     @objc private func windowWillClose(_ note: Notification) {
         guard let window = note.object as? NSWindow else { return }
-        // A window close (red button, tab close) never reaches
-        // `SplitViewController.closePane`, so this is where the window's
-        // sessions, search monitors and observers are torn down — before
-        // the controller is dropped.
+        // Window closes bypass `SplitViewController.closePane`, so tear the
+        // sessions and observers down here.
         if let controller = windowControllers.first(where: { $0.window === window }) {
             (controller.contentViewController as? SplitViewController)?.teardown()
         }
@@ -180,41 +149,34 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         ] {
             NotificationCenter.default.removeObserver(self, name: name, object: window)
         }
-        // One window fewer is a changed arrangement — but not at quit, where
-        // every window closes in turn and the last one would otherwise write
-        // an empty arrangement over a good one.
+        // Not at quit, where the last close would save an empty arrangement.
         if !isTerminating { noteLayoutChanged() }
     }
 
     // MARK: - Settings
 
-    /// ⌘, from the app menu, and the Settings menu's own item.
     @objc func showSettings(_ sender: Any?) {
         SettingsWindowController.shared.show(sender)
     }
 
-    /// The command palette (⇧⌘P by default).
     @objc func showCommandPalette(_ sender: Any?) {
         CommandPaletteController.shared.show(sender)
     }
 
     // MARK: - System entry points
 
-    /// View ▸ Quick Terminal, the palette, and the App Intent. The hotkey
-    /// reaches `QuickTerminalController.toggle` directly.
+    /// Menu, palette and App Intent; the hotkey calls
+    /// `QuickTerminalController.toggle` directly.
     @objc func toggleQuickTerminal(_ sender: Any?) {
         QuickTerminalController.shared.toggle()
     }
 
-    /// Shell ▸ Secure Keyboard Entry. Writes the config file, which is the
-    /// setting's only store; `SecureInput` follows the file, so the menu,
-    /// the Settings page and a hand edit are one path with one state.
+    /// Writes the config file, the setting's only store; `SecureInput`
+    /// follows the file.
     @objc func toggleSecureKeyboardEntry(_ sender: Any?) {
         let turningOn = !ConfigurationStore.shared.configuration.secureKeyboardEntry
         ConfigurationStore.shared.update { $0.secureKeyboardEntry = turningOn }
-        // Said in the pane, where the user is looking, because the effect is
-        // invisible by nature: nothing on screen changes when keystrokes stop
-        // reaching other processes.
+        // A toast, because the effect itself is invisible.
         let key = turningOn ? "secureInput.toast.on" : "secureInput.toast.off"
         (NSApp.keyWindow?.contentViewController as? SplitViewController)?
             .focusedPane?.terminalView?.showToast(L10n.text(key))
@@ -231,9 +193,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         ConfigurationStore.shared.update { $0.appearance = appearance }
     }
 
-    /// Ticks the live theme and appearance. `NSMenuValidation` runs just
-    /// before a menu opens, which is the only moment the state has to be
-    /// right — and it stays right when the config file changes underneath.
+    /// Ticks the live theme and appearance as the menu opens.
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         let configuration = ConfigurationStore.shared.configuration
         switch menuItem.action {
@@ -254,50 +214,38 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return true
     }
 
-    /// Before the storyboard's first window exists — the first pane reads
-    /// the configuration as it loads and draws with the theme's live
-    /// variant, so both have to be resolved by then or the window opens in
-    /// the default colours and visibly re-themes a frame later.
+    /// Runs before the first window exists, so it opens with the right theme
+    /// rather than re-theming a frame later.
     func applicationWillFinishLaunching(_ notification: Notification) {
         _ = ConfigurationStore.shared
         _ = UpdateController.shared
         AppearanceController.shared.start()
-        // Both follow the config file from here on. Before any window:
-        // the hotkey has to be held the moment the app is up, and Secure
-        // Keyboard Entry has to see the first window become key.
+        // Before any window: the hotkey must be held from launch, and Secure
+        // Keyboard Entry must see the first window become key.
         SecureInput.shared.start()
         QuickTerminalController.shared.start()
         installMenus()
-        // Before any window opens: a "move to Applications, then relaunch"
-        // answer should not have to first show — and tear down — a shell
-        // window in the instance about to quit.
+        // Before any window, so a move-and-relaunch never spawns a shell first.
         ApplicationsFolderMover.promptIfNeeded()
     }
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
-        // The storyboard's initial window controller shows the first window;
-        // nothing retains it either, so track it like the ⌘N windows.
+        // Track the storyboard's first window like any ⌘N window.
         for window in NSApp.windows {
             if let controller = window.windowController {
                 track(controller)
             }
         }
         restoreWindowsIfConfigured()
-        // So a click on a `TaskNotifier` notification can jump back to
-        // the command it was about (`AppDelegate+Notifications.swift`).
+        // A notification click jumps back to its command
+        // (`AppDelegate+Notifications.swift`).
         UNUserNotificationCenter.current().delegate = self
     }
 
     // MARK: - Reopening
 
-    /// Clicking the Dock icon with no window open.
-    ///
-    /// Corta keeps running with its last window closed — a terminal that
-    /// quits when you close a window loses whatever else it was hosting — but
-    /// without this it kept running with *no way back*: the Dock click did
-    /// nothing at all, and ⌘N was the only route to a window. That is the
-    /// worst of both designs. AppKit asks this exact question; the answer is
-    /// simply "open one".
+    /// A Dock click with no window open opens one; Corta keeps running with
+    /// no windows, and otherwise there was no way back but ⌘N.
     func applicationShouldHandleReopen(
         _ sender: NSApplication, hasVisibleWindows: Bool
     ) -> Bool {
@@ -308,14 +256,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     // MARK: - Restoring the arrangement
 
-    /// The setting, plus an environment escape hatch for the UI tests.
-    ///
-    /// A UI test launches, does something, and is killed; the next test then
-    /// launches into whatever the previous one left behind, which for a
-    /// feature whose whole job is "reopen last time's windows" means every
-    /// window-count assertion in the suite depends on test order. The escape
-    /// hatch is one variable the tests set, not a behaviour change: a real
-    /// launch never has it.
+    /// The setting, plus an escape hatch the UI tests set so each launch
+    /// doesn't reopen the previous test's windows. A real launch never has it.
     static var isRestoreEnabled: Bool {
         guard ProcessInfo.processInfo.environment["CORTA_RESTORE_WINDOWS"] != "0" else {
             return false
@@ -323,19 +265,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return ConfigurationStore.shared.configuration.restoreWindows
     }
 
-    /// Reopens the windows and splits from the last run. The storyboard has
-    /// already opened one window by this point, so the first saved state is
-    /// applied to *that* window and the rest get windows of their own —
-    /// otherwise a restore would always leave one empty extra window behind.
+    /// Reopens last run's windows and splits.
     private func restoreWindowsIfConfigured() {
         guard Self.isRestoreEnabled else { return }
         let states: [WindowState]
         switch SessionRestore.decideRestore() {
         case .skipAfterFailure:
-            // A restore that crashed last time is not tried again: the marker
-            // outlives only a launch that died mid-restore, so the saved
-            // layout is what killed it. Dropped rather than repaired —
-            // the arrangement is the suspect, and a fresh window always works.
+            // The marker survives only a launch that died mid-restore; that layout
+            // is the suspect, so drop it.
             SessionRestore.clear()
             SessionRestore.endRestore()
             return
@@ -345,36 +282,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             states = saved
         }
         SessionRestore.beginRestore()
-        // Cleared once every window is up. The state file itself is *kept*:
-        // it is rewritten by `noteLayoutChanged` as the arrangement changes,
-        // so a later crash still has a last-known-good layout to come back
-        // to; deleting it here would make that impossible.
+        // Keep the state file: `noteLayoutChanged` rewrites it, so a later
+        // crash still has a last-known-good layout.
         defer { SessionRestore.endRestore() }
 
-        // The storyboard's window is already on screen, which means its root
-        // pane has already spawned a shell — in the home directory, because
-        // nothing had told it otherwise yet. That is the one thing a restore
-        // cannot repair afterwards: setting the pane's directory now would
-        // relabel it while leaving the child process where it started, so the
-        // first restored window would be the only one that came back in the
-        // wrong place. Every saved state therefore gets a window built from
-        // scratch, with `pendingRestore` in place before `viewDidLoad`, and
-        // the pre-opened one is closed once at least one replacement is up.
-        //
-        // `contentViewController` returns the controller without loading its
-        // view; the view (and with it the pane's session) loads at
-        // `showWindow`, after `pendingRestore` has been set.
+        // The storyboard's window already spawned its shell in the home
+        // directory, which a restore can't move. Every saved state gets a fresh
+        // window with `pendingRestore` staged before its view loads, and the
+        // pre-opened one closes once a replacement is up.
         let preopened = windowControllers.first
         var restored: [(state: WindowState, controller: NSWindowController)] = []
         for state in states {
-            // Staged before the view loads: the root pane needs its working
-            // directory (and its preset) at spawn time.
+            // Staged before the view loads (D16).
             guard
                 let controller = instantiateWindowController(
                     setup: SplitViewController.Setup(restore: state))
             else { continue }
-            // The saved identity, so an intent resolved against last
-            // run's window still names this one.
+            // Keep the saved identity for intents resolved last run.
             if let id = state.id, let terminal = controller as? TerminalWindowController {
                 terminal.windowID = id
             }
@@ -382,19 +306,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             controller.window?.makeKeyAndOrderFront(nil)
             restored.append((state, controller))
         }
-        // Only if something replaced it — closing the sole window on a failed
-        // restore would leave the app running with nothing on screen.
+        // Only if replaced; never leave the app with no window.
         if !restored.isEmpty, let preopened, preopened.window?.isVisible == true {
             preopened.window?.close()
         }
         regroupRestoredTabs(restored)
     }
 
-    /// Windows that were tabbed together come back that way, in the
-    /// order they were saved, with whichever was frontmost selected again —
-    /// instead of every restore turning previously-tabbed windows back into
-    /// standalone ones. Grouped by `tabGroupID`; a group of one (or a `nil`
-    /// ID) is left exactly as `restoreWindowsIfConfigured` already made it.
+    /// Regroups restored windows by `tabGroupID`, in saved order, reselecting
+    /// the frontmost. Groups of one are left alone.
     func regroupRestoredTabs(
         _ restored: [(state: WindowState, controller: NSWindowController)]
     ) {
@@ -405,12 +325,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             guard members.count > 1 else { continue }
             let ordered = members.sorted { ($0.state.tabIndex ?? 0) < ($1.state.tabIndex ?? 0) }
             guard var previous = ordered.first?.controller.window else { continue }
-            // Each tab goes in *after the one before it*. `addTabbedWindow(_:
-            // ordered: .above)` inserts directly after the receiver, so
-            // adding every tab after the first put the third tab between
-            // the first and the second — and, since the selected tab was
-            // the last one saved, "selected" landed in the middle of the
-            // bar.
+            // Add each tab after the previous one: `.above` inserts right after the
+            // receiver, so adding to the first reversed the order.
             for member in ordered.dropFirst() {
                 guard let window = member.controller.window else { continue }
                 previous.addTabbedWindow(window, ordered: .above)
@@ -419,9 +335,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             if let selected = ordered.first(where: { $0.state.isSelectedTab })?.controller.window {
                 selected.makeKeyAndOrderFront(nil)
             }
-            // The tab bar just appeared over every window in the group, and
-            // only the selected one will lay out on its own. The saved
-            // frames already include the bar (`adoptChromeWithoutAbsorbing`).
+            // Only the selected window lays out on its own, and the saved frames
+            // already include the tab bar (`adoptChromeWithoutAbsorbing`).
             for member in ordered {
                 (member.controller.contentViewController as? SplitViewController)?
                     .adoptChromeWithoutAbsorbing()
@@ -440,21 +355,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     // MARK: - Keeping the arrangement current
 
-    /// How long the layout has to stop changing before it is written.
-    ///
-    /// A split, a close, a divider drag and a window resize all change the
-    /// arrangement, and a live drag produces a stream of them — so the write
-    /// is coalesced rather than run per event. Half a second is short enough
-    /// that a crash loses at most the last gesture and long enough that a
-    /// drag is one write, not sixty.
+    /// The quiet time before the arrangement is written: a drag is one write,
+    /// and a crash loses at most the last gesture.
     private static let layoutSaveDelay: TimeInterval = 0.5
 
-    /// Records that the arrangement changed, and writes it once things go
-    /// quiet.
-    ///
-    /// Saving only at `applicationWillTerminate` meant a crash — the case a
-    /// restore exists for — lost the arrangement entirely, because the one
-    /// moment the file was written was the one that never came.
+    /// Schedules a debounced write. Saving only at quit lost everything on a
+    /// crash — the case restore exists for.
     @objc func noteLayoutChanged() {
         guard Self.isRestoreEnabled else { return }
         pendingLayoutSave?.cancel()
@@ -467,17 +373,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.layoutSaveDelay, execute: item)
     }
 
-    /// Writes any pending arrangement immediately — at quit, where waiting
-    /// out the debounce would mean not writing at all.
+    /// Writes a pending arrangement now, at quit.
     private func flushLayoutSave() {
         pendingLayoutSave?.cancel()
         pendingLayoutSave = nil
         saveWindowStates()
     }
 
-    /// ⌘Q with something still running. `windowShouldClose` covers closing a
-    /// window; quitting bypasses it entirely, and losing a build to a
-    /// mistyped ⌘Q is exactly the case the confirmation exists for.
+    /// Confirms ⌘Q with something running; quitting bypasses
+    /// `windowShouldClose`.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let running = windowControllers.compactMap {
             ($0.contentViewController as? SplitViewController)
@@ -492,23 +396,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         isTerminating = true
         flushLayoutSave()
         DirectoryHistoryStore.shared.flush()
-        // The secure-input counter must be back at zero before the
-        // process ends; no notification will arrive to do it afterwards.
+        // The secure-input count must reach zero before exit.
         SecureInput.shared.disengage()
         QuickTerminalController.shared.teardown()
-        // Quit does not route through `windowWillClose` on every path, so
-        // tear down explicitly rather than leaving the children to the
-        // process-exit SIGHUP. Idempotent against windows already closed.
+        // Not every quit path reaches `windowWillClose`; tear down explicitly
+        // rather than leave children to SIGHUP.
         for controller in windowControllers {
             (controller.contentViewController as? SplitViewController)?.teardown()
         }
     }
 
-    /// False: a terminal window has nothing to restore through AppKit's own
-    /// mechanism — its content is a live child process, not a document — and
-    /// `SplitViewController` already turns `isRestorable` off per window for
-    /// that reason. Corta saves and reopens the *arrangement* itself
-    /// (`SessionRestore`), which is the part that is actually meaningful.
+    /// AppKit restoration is off: a live process isn't a document.
+    /// `SessionRestore` saves the arrangement instead.
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
         return false
     }

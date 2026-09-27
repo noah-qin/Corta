@@ -17,29 +17,15 @@
 import Cocoa
 import CortaTerminal
 
-/// Turning the live split tree into a `PaneLayout` and
-/// back again.
-///
-/// The two directions are deliberately asymmetric. Capturing walks the view
-/// hierarchy, which *is* the tree (`SplitTree`), so there is nothing to keep
-/// in sync. Rebuilding replays the same `splitFocusedPane` the user's own
-/// ⌘D takes, rather than constructing split views directly — a second way to
-/// build the tree would be a second place for the divider maths, the winsize
-/// delivery and the focus rules to disagree.
+/// Split tree ↔ `PaneLayout`. Capture walks the view hierarchy, which is
+/// the tree. Restore replays ⌘D's `splitFocusedPane` rather than a second
+/// builder that could disagree on dividers, winsize and focus.
 extension SplitViewController {
     // MARK: - Capture
 
     func windowState(frame: NSRect) -> WindowState? {
-        // The *tree*, not `view.subviews.first`. While a pane is zoomed
-        // the controller's view holds that pane alone, and reading the
-        // hierarchy would save "one pane" as the arrangement — discarding
-        // the splits, and, since the arrangement is written as it changes,
-        // writing that loss straight to disk. Zoom is temporary and the saved
-        // layout has to keep saying so.
-        // While zoomed the tree is not whole — the zoomed pane's view is out
-        // of it, so the split it came from has one subview and would read as
-        // a plain pane. The layout recorded on the way in is what the
-        // arrangement still is.
+        // While zoomed the hierarchy holds one pane and the tree is incomplete;
+        // save the layout recorded at zoom, or the splits are lost on disk.
         let (tabGroupID, tabIndex, isSelectedTab) = tabState()
         if let zoomed = layoutBeforeZoom {
             return WindowState(
@@ -52,11 +38,8 @@ extension SplitViewController {
             tabIndex: tabIndex, isSelectedTab: isSelectedTab)
     }
 
-    /// This window's place in its native tab group, if any. `nil`
-    /// group/index for a window that was never tabbed; AppKit groups tabbed
-    /// windows only by having the same `tabbingIdentifier` and does not
-    /// number them itself, so the index is this window's position in
-    /// `tabbedWindows` order at save time.
+    /// This window's native tab group and index (in `tabbedWindows` order;
+    /// AppKit doesn't number tabs), or nil if never tabbed.
     private func tabState() -> (groupID: String?, index: Int?, isSelected: Bool) {
         guard let window = view.window, let tabbed = window.tabbedWindows, tabbed.count > 1
         else { return (nil, nil, true) }
@@ -76,9 +59,7 @@ extension SplitViewController {
         let extent = split.isVertical ? first.width : first.height
         return .split(
             vertical: split.isVertical,
-            // Guarded: a window laid out at zero (never shown, or mid-tab
-            // animation) would otherwise save a divide-by-zero as `nan`,
-            // which JSON cannot even encode.
+            // A zero axis would save NaN, which JSON can't encode.
             position: axis > 0 ? Double(extent / axis) : 0.5,
             first: layout(of: split.subviews[0]),
             second: layout(of: split.subviews[1]))
@@ -90,12 +71,9 @@ extension SplitViewController {
 
     // MARK: - Restore
 
-    /// Rebuilds `layout` around the window's existing single pane, which was
-    /// already created — and spawned in the right directory, via
-    /// `PaneLayout.firstDirectory` — by `viewDidLoad`.
-    ///
-    /// Called once the window has settled, because a split needs real frames
-    /// to halve and a divider fraction needs an axis to be a fraction of.
+    /// Rebuilds `layout` around the root pane, already spawned in
+    /// `firstDirectory`. Called once the window has settled, so splits have
+    /// real frames.
     func restore(layout: PaneLayout) {
         guard let root = focusedPane else { return }
         var focusTarget: ViewController?
@@ -107,18 +85,12 @@ extension SplitViewController {
             pane.resizeSessionToFitView()
             pane.endLiveResize()
         }
-        // Whichever pane's saved node was `isFocused`, or the first
-        // pane as before (`splitFocusedPane` moves focus to each new pane as
-        // it goes, so without a match this is where it already landed) for
-        // data saved before that field existed.
+        // The saved focused pane, else the first.
         view.window?.makeFirstResponder((focusTarget ?? root).terminalView)
     }
 
-    /// A preset resolved by name against the *current* config file — never
-    /// the one that was active when the window was saved, which may not
-    /// even exist anymore. A name that no longer resolves (renamed or
-    /// deleted since) degrades to directory-only exactly as if the pane had
-    /// never been launched from a preset at all.
+    /// Resolved against the current config; a vanished preset degrades to
+    /// directory-only.
     private func resolvedPreset(named name: String?) -> Preset? {
         guard let name else { return nil }
         return ConfigurationStore.shared.configuration.presets.first { $0.name == name }
@@ -140,19 +112,16 @@ extension SplitViewController {
         }
     }
 
-    /// Second pass: the dividers, once every split exists and the tree has
-    /// laid out. Done separately because splitting re-halves everything it
-    /// touches, so positions set during the build would be overwritten by the
-    /// next split below them.
-    /// Re-applies a recorded arrangement's dividers to the tree as it stands
-    /// — used on the way out of zoom, where the pane's view left its
-    /// split and came back, and AppKit re-halved what was left behind.
+    /// Re-applies dividers when leaving zoom, where AppKit re-halved the split
+    /// the pane left.
     func reapplyDividerPositions(_ layout: PaneLayout) {
         view.layoutSubtreeIfNeeded()
         applyDividerPositions(layout, subtree: layoutRoot)
         view.layoutSubtreeIfNeeded()
     }
 
+    /// Dividers go last, after the tree lays out: each split re-halves what
+    /// it touches.
     private func applyDividerPositions(_ node: PaneLayout, subtree: NSView?) {
         guard case .split(_, let position, let first, let second) = node,
             let split = subtree as? NSSplitView, split.subviews.count == 2

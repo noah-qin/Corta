@@ -16,43 +16,24 @@
 
 import Foundation
 
-/// Where Corta reads its config, keeps its own state, and looks for the
-/// shell rc file it installs into — and how a build that is not the one the
-/// user installed is kept away from all three.
+/// Where Corta reads config, keeps state and finds the rc file it installs
+/// into, and how a non-installed build stays away from all three.
 ///
-/// **Two identities.** A Debug build is a separate application: its bundle
-/// identifier ends in `.dev` (`CORTA_BUNDLE_SUFFIX`, D22). That suffix is
-/// what selects a stage directory here, so a development build is isolated
-/// however it was launched — from Xcode, from a test host, or by a
-/// double-click — rather than only when a launch script remembered to set
-/// an environment variable.
+/// A Debug build's bundle id ends in `.dev` (D22), which selects a stage
+/// directory however it was launched. The stage holds `<dir>/config`,
+/// `<dir>/ApplicationSupport` and `<dir>/<rc path>`, so "did this build
+/// touch the user's files?" is a question about one path.
 ///
-/// **The stage directory** holds everything Corta owns: the config file at
-/// `<dir>/config`, its own state (session restore, directory history,
-/// remote-edit copies) under `<dir>/ApplicationSupport`, and the rc file
-/// the shell-integration installer writes at `<dir>/<rc path>`. One
-/// directory, so "did this build touch anything of the user's?" is a
-/// question about one path.
-///
-/// `CORTA_STAGE_DIR` names an absolute directory and overrides the choice,
-/// for a staged check of a Release build (`docs/CONFORMANCE.md` §4.4). It
-/// exists because `$HOME` cannot do this on macOS: `NSHomeDirectory()`,
-/// `homeDirectoryForCurrentUser` and the Application Support lookup all
-/// answer from the account record, not the environment, so a launch with
-/// `HOME` overridden still reads the developer's own config and writes into
-/// their real Application Support — the opposite of what a staged check
-/// needs. Same class as `CORTA_RESTORE_WINDOWS`: read from the launch
-/// environment, never a config key, and ignored unless absolute.
+/// `CORTA_STAGE_DIR` (absolute, from the launch environment only)
+/// overrides it for a staged Release check (`CONFORMANCE.md` §4.4).
+/// `$HOME` can't: the home and Application Support lookups answer from the
+/// account record, not the environment.
 nonisolated enum AppPaths {
-    /// The suffix `CORTA_BUNDLE_SUFFIX` gives the Debug configuration.
     static let developmentBundleSuffix = ".dev"
 
-    /// The development build's stage, beside — never inside — the state
-    /// directory the installed build owns.
+    /// Beside, never inside, the installed build's state directory.
     static let developmentStageName = "Corta Dev"
 
-    /// True when this bundle is the development build. Read once: a bundle
-    /// identifier does not change while the process runs.
     static let isDevelopmentBuild = Bundle.main.bundleIdentifier?
         .hasSuffix(developmentBundleSuffix) ?? false
 
@@ -60,8 +41,7 @@ nonisolated enum AppPaths {
         environment: ProcessInfo.processInfo.environment,
         bundleIdentifier: Bundle.main.bundleIdentifier)
 
-    /// The choice as a function of its two inputs, so a test can make it
-    /// without a second bundle (D13 — never change the machine to test).
+    /// Pure, so tests need no second bundle (D13).
     static func stageDirectory(environment: [String: String], bundleIdentifier: String?) -> URL? {
         if let raw = environment["CORTA_STAGE_DIR"], raw.hasPrefix("/") {
             return URL(fileURLWithPath: raw, isDirectory: true)
@@ -78,8 +58,7 @@ nonisolated enum AppPaths {
             .appendingPathComponent(".config/corta/config")
     }
 
-    /// `~/Library/Application Support/Corta`, or the stage's
-    /// `ApplicationSupport`.
+    /// `~/Library/Application Support/Corta`, or the stage's.
     static var applicationSupportDirectory: URL {
         if let stageDirectory {
             return stageDirectory.appendingPathComponent("ApplicationSupport", isDirectory: true)
@@ -87,16 +66,9 @@ nonisolated enum AppPaths {
         return systemApplicationSupportDirectory.appendingPathComponent("Corta", isDirectory: true)
     }
 
-    /// `~/Library/Caches/<bundle identifier>`, or the stage's `Caches` —
-    /// disposable, regenerable content the system is free to purge.
-    ///
-    /// Keyed by the bundle identifier rather than by a fixed name because
-    /// `QuadRenderer` prunes every compiled-shader archive in this
-    /// directory that is not its own. With one shared directory the two
-    /// builds delete each other's archive on every launch, and each one
-    /// then recompiles its pipelines from source — a development build
-    /// reaching into the session the developer is working in, which is
-    /// exactly what D22 exists to stop.
+    /// `~/Library/Caches/<bundle id>`, or the stage's: purgeable. Per bundle
+    /// id because `QuadRenderer` prunes archives not its own, and a shared
+    /// directory had the two builds deleting each other's (D22).
     static var cacheDirectory: URL? {
         if let stageDirectory {
             return stageDirectory.appendingPathComponent("Caches", isDirectory: true)
@@ -108,14 +80,8 @@ nonisolated enum AppPaths {
             Bundle.main.bundleIdentifier ?? "dev.noahqin.Corta", isDirectory: true)
     }
 
-    /// What a `~`-relative path the *user* owns resolves against —
-    /// `~/.zshrc` and the rest of `ShellKind.defaultRCFileURL`.
-    ///
-    /// Staged, this is the stage directory: a development build that
-    /// installs shell integration writes a file inside its own stage, and
-    /// the rc file every real shell on the machine reads is untouched. That
-    /// file is then not sourced by anything, which is the point — the
-    /// installer's own diagnosis reports it accurately either way.
+    /// Where user-owned `~` paths like `~/.zshrc` resolve. Staged, the stage
+    /// directory, so real shells' rc files are untouched.
     static var userHomeDirectory: URL {
         stageDirectory ?? FileManager.default.homeDirectoryForCurrentUser
     }

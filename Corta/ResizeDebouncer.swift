@@ -17,15 +17,9 @@
 import CortaTerminal
 import Foundation
 
-/// Coalesces resize events so a live window drag does not hammer the child
-/// with `TIOCSWINSZ` — and the resulting `SIGWINCH` — at every mouse motion
-/// (`CONFORMANCE.md` §2.3). Events within the debounce window collapse to
-/// the latest size; the final size is always delivered, either
-/// when the window goes quiet or immediately via `flush()` at the end of the
-/// drag.
-///
-/// Main-actor isolated: window layout callbacks all arrive on the main
-/// thread, and the timer fires on the main queue.
+/// Coalesces resizes so a live drag doesn't send `TIOCSWINSZ`/`SIGWINCH`
+/// per mouse motion (`CONFORMANCE.md` §2.3). The latest size always
+/// arrives: when the drag goes quiet, or at once via `flush()`.
 @MainActor
 final class ResizeDebouncer {
     private let delay: TimeInterval
@@ -37,10 +31,8 @@ final class ResizeDebouncer {
         self.handler = handler
     }
 
-    /// Records a new size. With `coalesce` false (initial layout,
-    /// programmatic resizes) the size is delivered synchronously; with
-    /// `coalesce` true (a live drag) it replaces any pending size and is
-    /// delivered once the stream of events stops for `delay` seconds.
+    /// Delivers now unless `coalesce` (a live drag), which replaces the
+    /// pending size and waits for `delay` of quiet.
     func resize(to size: TerminalSize, coalesce: Bool) {
         pending?.cancel()
         pending = nil
@@ -57,14 +49,12 @@ final class ResizeDebouncer {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
     }
 
-    /// Delivers any pending size now — call when the live resize ends so the
-    /// child sees the final size without waiting out the debounce window.
+    /// Delivers the pending size now, at the end of a live resize.
     func flush() {
         guard let item = pending, !item.isCancelled else { return }
         pending = nil
-        // Perform *before* cancelling: a work item runs at most once, so the
-        // scheduled fire is then a no-op — but `perform()` on an
-        // already-cancelled item does nothing, so the order matters.
+        // Perform before cancelling: a cancelled item won't perform, and a
+        // performed one won't fire again.
         item.perform()
         item.cancel()
     }

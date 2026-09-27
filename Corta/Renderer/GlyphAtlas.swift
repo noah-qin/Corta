@@ -19,82 +19,44 @@ import CoreText
 import Metal
 import simd
 
-/// Rasterises glyphs into an `r8Unorm` texture atlas and caches them by
-/// scalar, cluster and weight. Color glyphs (Apple Color Emoji bitmaps)
-/// rasterise into a second, `bgra8Unorm` atlas instead — see below.
+/// Rasterises glyphs into an `r8Unorm` atlas, cached by scalar, cluster
+/// and weight; color glyphs go to a second, `bgra8Unorm` atlas.
 ///
-/// **ASCII fast path.** `glyph(forASCII:style:)` looks the glyph up directly
-/// with `CTFontGetGlyphsForCharacters` — no `CTLine`, no shaping. Calling
-/// into shaping per line per frame costs milliseconds and blows the frame
-/// budget on its own (`PERFORMANCE.md` §2.2); ASCII is the overwhelming
-/// majority of terminal content, so it must never pay that cost.
+/// **ASCII fast path.** `glyph(forASCII:style:)` maps via
+/// `CTFontGetGlyphsForCharacters` with no shaping: per-frame shaping blows
+/// the frame budget (`PERFORMANCE.md` §2.2), and ASCII is most of the
+/// screen. Everything else shapes through `CTLine` once per key and caches
+/// the result.
 ///
-/// **Everything else** goes through a shaping cache (`PERFORMANCE.md` §2.2):
-/// `glyph(shaping:style:)` for single scalars, `glyph(forCluster:style:)` for
-/// the multi-scalar grapheme clusters the core's `GraphemeTable` hands out
-/// (`DECISIONS.md` D05). Each shapes via `CTLine` once per key and caches the
-/// result — paid once, not per frame.
+/// **Font fallback** is Core Text's cascade list (pinned by `TerminalFont`),
+/// and the *run's* font rasterises the glyph: glyph ids are per-font.
 ///
-/// **Font fallback** is Core Text's cascade list: a `CTLine` shaped
-/// with a font that lacks a scalar resolves the run to a fallback font, and
-/// the *run's* font — not the requested one — is what rasterises the glyph.
-/// (Rasterising a fallback glyph with the primary font drew the wrong
-/// glyph's outlines: glyph ids are per-font.) The cascade is pinned by
-/// `TerminalFont` (PingFang SC, then Apple Color Emoji) rather than left to
-/// the system.
+/// **Color glyphs.** `CTFontDrawGlyphs` draws outlines only, so runs in a
+/// `traitColorGlyphs` font are drawn with `CTRunDraw` into `colorTexture`
+/// (premultiplied bgra), which a separate pass samples untinted.
 ///
-/// **Color glyphs.** `CTFontDrawGlyphs` rasterises outlines only — an emoji
-/// shaped through to Apple Color Emoji comes out blank, so color runs
-/// (detected by the font's `traitColorGlyphs`) are drawn with `CTRunDraw`
-/// into an RGBA context and uploaded to `colorTexture` (`bgra8Unorm`,
-/// premultiplied). The renderer draws those quads in a separate pass whose
-/// fragment returns the texture sample directly instead of tinting coverage.
+/// **Pages.** The grayscale texture holds `asciiPage` (plus the reserved
+/// white texel row) and `shapedPage`; the color texture holds `colorPage`.
+/// Each page has its own shelf allocator and cache, so a CJK- or
+/// emoji-heavy screen filling one page never evicts another.
 ///
-/// **Pages.** The grayscale texture is split into two independently
-/// packed and independently evicted regions — `asciiPage` (the ASCII fast
-/// path, plus the reserved white texel row) and `shapedPage` (everything
-/// that goes through `CTLine` shaping: single non-ASCII scalars and
-/// multi-scalar clusters, which is where CJK and combining-mark content
-/// lands) — and the color texture's `colorPage` is a third, on its own
-/// texture. Each `AtlasPage` owns its own shelf allocator and its
-/// own glyph/cluster cache, so a CJK-heavy screen overflowing `shapedPage`
-/// does not evict `asciiPage`'s cache, and an emoji-heavy screen
-/// overflowing `colorPage` does not evict either grayscale page. With one
-/// shared allocator and cache per texture, any one of them filling up
-/// would reset everything sharing its texture, including content that
-/// never came close to the limit.
+/// **Eviction is per page; `generation` is global** (`DESIGN.md` §7.4). A
+/// full page resets itself and glyphs re-rasterise on demand. Any page's
+/// eviction bumps `generation`, because a row mid-build may hold a UV
+/// from it, and the renderer's one-retry rebuild
+/// (`TerminalRenderer.updateInstances`) must catch that. Content larger
+/// than a page draws blank after the retry.
 ///
-/// **Eviction stays per-page, mid-build safety stays global**
-/// (`DESIGN.md` §7.4): a page whose shelf cannot fit the next
-/// glyph resets *that page only* — its cache cleared, its allocator
-/// rewound — and glyphs re-rasterise on demand (the strategy Alacritty uses
-/// for the same reason, just now scoped per page rather than per texture).
-/// `generation` and `evictionCount` stay single counters across every page,
-/// though, and bump on *any* page's eviction: a row mid-build can have
-/// already grabbed a UV from a page that then evicts before the row
-/// finishes, and the renderer's one-retry full rebuild
-/// (`TerminalRenderer.updateInstances`) has to catch that regardless of
-/// which page caused it. A screen whose live content alone exceeds a page
-/// cannot be served by any eviction policy; after one retry those cells
-/// draw blank.
-/// **Allocation failure.** If the device cannot allocate the atlas
-/// textures at the requested size, `init` retries at halving sizes down to
-/// `minimumAtlasPixelSize` and sets `isDegraded` — the pages and eviction
-/// machinery are size-agnostic, so a memory-pressured machine keeps
-/// rendering with reduced cache capacity instead of trapping on a force
-/// unwrap. Only failure at the minimum size still traps, deliberately: a
-/// device that cannot allocate a 64×64 texture cannot render anything.
-/// **Single-threaded.** The cache, the shelf allocator and the texture are
-/// plain mutable state with no synchronisation, and Core Text's run and line
-/// objects are not safe to share either — rasterising the same atlas from two
-/// threads segfaults inside `CTRunGetImageBounds`. In the app that holds
-/// naturally: the renderer is driven from the display link on the main
-/// thread. Tests that build an atlas therefore have to be serialised.
+/// **Allocation failure.** `init` halves the size down to
+/// `minimumAtlasPixelSize` and sets `isDegraded`; only failing at the
+/// minimum traps, since such a device can render nothing.
+///
+/// **Single-threaded.** No synchronisation, and Core Text objects are not
+/// shareable — two threads segfault in `CTRunGetImageBounds`. The app
+/// drives it from the main thread; tests that build one are serialised.
 nonisolated final class GlyphAtlas {
-    /// The four faces a cell can ask for. A raw bitfield rather than two
-    /// `Bool`s: it is the atlas's cache key and the renderer builds one per
-    /// cell per frame straight out of `Cell.attributes.rawValue`, so it must
-    /// cost two bit tests and no function calls (`PERFORMANCE.md` §3).
+    /// The four faces. A raw bitfield because it is built per cell per frame
+    /// from `Cell.attributes.rawValue` (`PERFORMANCE.md` §3).
     struct Style: Hashable {
         var rawValue: UInt8
 
@@ -115,10 +77,8 @@ nonisolated final class GlyphAtlas {
         var style: Style
     }
 
-    /// A multi-scalar cluster (`GraphemeTable` contents) plus weight. Keying
-    /// by the shaped contents — not the core's `GraphemeID` — keeps the atlas
-    /// correct across grids and across `GraphemeTable` resets, which reuse
-    /// ids.
+    /// A multi-scalar cluster plus weight, keyed by contents rather than
+    /// `GraphemeID`, which is reused across grids and table resets.
     struct ClusterKey: Hashable {
         var scalars: [UInt32]
         var style: Style
@@ -129,25 +89,18 @@ nonisolated final class GlyphAtlas {
         var uvRect: SIMD4<Float>
         /// Bitmap size, in pixels.
         var size: SIMD2<Float>
-        /// Offset from the pen origin to the bitmap's top-left, pixels.
+        /// From the pen origin to the bitmap's top-left, in pixels.
         var bearing: SIMD2<Float>
-        /// True when the bitmap lives in `colorTexture` (premultiplied bgra)
-        /// rather than `texture` — color emoji. The renderer routes these to
-        /// the color pipeline, which ignores the instance tint.
+        /// The bitmap is in `colorTexture`; drawn untinted.
         var isColor: Bool = false
-        /// True when no font in the cascade could draw the scalar at all —
-        /// the shaper produced `.notdef` and nothing else. Distinct from an
-        /// inkless glyph (a no-break space, a zero-width joiner), which is a
-        /// correct empty result: a missing glyph must be *visible*, or a
-        /// terminal that silently drops characters looks like it lost output.
-        /// The renderer draws a hollow box for these.
+        /// No font in the cascade has the scalar (only `.notdef`). Unlike an
+        /// inkless glyph such as ZWJ, it draws as a hollow box so dropped
+        /// characters stay visible.
         var isMissing: Bool = false
     }
 
-    /// One independently packed, independently evicted region of a shared
-    /// atlas texture — see the type's doc comment on why the atlas is split
-    /// this way. A plain shelf packer (`allocate`) over a fixed rectangle,
-    /// plus the glyph/cluster cache for whatever lands in that rectangle.
+    /// One independently packed and evicted region: a shelf packer over a
+    /// fixed rectangle plus its glyph and cluster caches.
     private final class AtlasPage {
         let regionOrigin: (x: Int, y: Int)
         let regionSize: (width: Int, height: Int)
@@ -156,10 +109,8 @@ nonisolated final class GlyphAtlas {
         private var nextOrigin: (x: Int, y: Int)
         private var rowHeight: Int
 
-        /// - Parameter reservedFirstRow: when true, packing starts one row
-        ///   down and that row's height counts as already claimed — for
-        ///   `asciiPage`, which shares its region with the reserved white
-        ///   texel at the atlas origin (`GlyphAtlas.solidWhiteUV`).
+        /// - Parameter reservedFirstRow: skip the first row, which holds
+        ///   `GlyphAtlas.solidWhiteUV` (for `asciiPage`).
         init(regionOrigin: (x: Int, y: Int), regionSize: (width: Int, height: Int), reservedFirstRow: Bool) {
             self.regionOrigin = regionOrigin
             self.regionSize = regionSize
@@ -179,8 +130,7 @@ nonisolated final class GlyphAtlas {
             return origin
         }
 
-        /// Resets this page only — see the type's doc comment on why a
-        /// sibling page's cache and allocator are untouched.
+        /// Resets this page only.
         func evict(reservedFirstRow: Bool) {
             cache.removeAll(keepingCapacity: true)
             clusterCache.removeAll(keepingCapacity: true)
@@ -189,95 +139,62 @@ nonisolated final class GlyphAtlas {
         }
     }
 
-    /// The one-texel border `rasterize` pads every bitmap with so linear
-    /// sampling cannot bleed in a neighbouring glyph. Callers comparing a
-    /// glyph's bitmap against the cell box have to subtract it from both
-    /// axes, or every glyph looks a little too wide.
+    /// The one-texel border against sampling bleed. Subtract it on both axes
+    /// when comparing a bitmap to the cell box.
     static let bitmapPadding: Float = 1
 
     static let atlasSize = 2048
 
-    /// The smallest atlas edge length `init` will settle for when the
-    /// device cannot allocate the requested size: at this size the
-    /// shelf allocator still fits dozens of glyphs and the page-eviction
-    /// machinery absorbs the churn, so a memory-pressured Mac degrades to
-    /// re-rasterising instead of crashing.
+    /// The smallest edge `init` falls back to; still dozens of glyphs.
     static let minimumAtlasPixelSize = 64
 
-    /// The edge length the atlas textures were actually allocated at —
-    /// smaller than the requested size when allocation had to fall back
-    /// (see `init`).
+    /// The edge actually allocated, after any fallback.
     private(set) var atlasPixelSize: Int
-    /// True when texture allocation failed at the requested size and the
-    /// atlas fell back to a smaller one. Everything keeps working —
-    /// the pages and eviction machinery are size-agnostic — but cache
-    /// capacity is reduced, so the shell can log/observe the degradation.
+    /// Allocation fell back to a smaller size; capacity is reduced.
     private(set) var isDegraded = false
     private(set) var texture: MTLTexture
-    /// The RGBA atlas color glyphs rasterise into (see the type comment).
-    /// Premultiplied bgra, matching what `CTRunDraw` produces and what the
-    /// color pipeline's blend state expects.
+    /// Premultiplied bgra, as `CTRunDraw` produces and the color pipeline
+    /// blends.
     private(set) var colorTexture: MTLTexture
-    /// The four faces, indexed by `Style.rawValue`, and whether each had to
-    /// have its weight faked because the family has no real bold face.
+    /// Indexed by `Style.rawValue`, with whether each bold is synthetic.
     private var fonts: [CTFont]
     private var isSyntheticBold: [Bool]
 
-    /// The ASCII fast path's page — the top half of the grayscale texture,
-    /// including the reserved white texel row. See the type's doc comment.
+    /// Top half of the grayscale texture.
     private var asciiPage: AtlasPage
-    /// Every shaped (non-ASCII) glyph and cluster's page — the bottom half
-    /// of the grayscale texture.
+    /// Bottom half of the grayscale texture.
     private var shapedPage: AtlasPage
-    /// Color emoji's page — the whole color texture; on its own texture
-    /// already, this only decouples its cache from the grayscale pages'.
+    /// The whole color texture.
     private var colorPage: AtlasPage
 
-    /// Counters for tests: prove the ASCII path never shapes, and that
-    /// fallback and eviction happen when they should.
+    /// Test counters: the ASCII path never shapes; fallback and eviction fire.
     private(set) var fastPathHits = 0
     private(set) var shapingHits = 0
-    /// How many shaped runs resolved to a font other than the requested one —
-    /// Core Text's cascade list at work.
     private(set) var fallbackHits = 0
-    /// How many times any single page was reset (see the type comment) —
-    /// one count across all three pages, not one per page.
+    /// Page resets, across all pages.
     private(set) var evictionCount = 0
-    /// Bumped on every page eviction, from any page. UVs issued before a
-    /// bump may be stale — see the type comment on why this stays a single,
-    /// global counter even though eviction itself is now per-page.
+    /// Bumped on any page's eviction; earlier UVs may be stale.
     private(set) var generation = 0
 
-    /// A 1×1 fully-opaque texel at the atlas origin, sampled by cursor and
-    /// selection quads so they can share the glyph pipeline instead of a
-    /// third one. Lives in `asciiPage`'s region (which reserves this row),
-    /// never evicted along with it — see `AtlasPage.evict`.
+    /// An opaque texel at the origin, so cursor and selection quads share the
+    /// glyph pipeline. Reserved in `asciiPage`, never evicted.
     static let solidWhiteUV = SIMD4<Float>(0, 0, 0, 0)
 
-    /// - Parameter atlasPixelSize: edge length of the square atlas texture.
-    ///   Tests pass a small size to exercise eviction without rasterising
-    ///   thousands of glyphs.
-    /// - Parameter makeTexture: allocation hook for tests — inject a
-    ///   closure that fails for some descriptors to exercise the fallback
-    ///   path. Production callers leave it nil, which uses the device.
+    /// - Parameter atlasPixelSize: the square atlas edge; tests pass a small
+    ///   one to exercise eviction.
+    /// - Parameter makeTexture: a test hook to fail allocations; nil uses the
+    ///   device.
     init(
         device: MTLDevice, font: CTFont, atlasPixelSize: Int = GlyphAtlas.atlasSize,
         makeTexture: ((MTLTextureDescriptor) -> MTLTexture?)? = nil
     ) {
-        // Pinning here — not only at the font's creation site — makes the
-        // atlas the single choke point: the cascade list then holds whatever
-        // font a caller hands in, and `TerminalFont.bold` re-pins after the
-        // trait copy that would otherwise drop it (see `TerminalFont`).
+        // Pinned here too, so the atlas is the one choke point for the cascade.
         let base = TerminalFont.pinningCascadeList(font, size: CTFontGetSize(font))
         (self.fonts, self.isSyntheticBold) = Self.faces(of: base)
 
         let allocate = makeTexture ?? { device.makeTexture(descriptor: $0) }
-        // Texture allocation failure is recoverable: halve the atlas
-        // and retry down to `minimumAtlasPixelSize`. The pages are built
-        // from whatever size actually succeeded, and eviction absorbs the
-        // reduced capacity. Only a device that cannot allocate even the
-        // minimum — one that cannot render anything at all — traps, which
-        // is a deliberate assertion, not an unconsidered force unwrap.
+        // Halve and retry down to `minimumAtlasPixelSize`; the trap below it is
+        // deliberate.
         var size = max(1, atlasPixelSize)
         var allocated: (gray: MTLTexture, color: MTLTexture)?
         while true {
@@ -312,11 +229,8 @@ nonisolated final class GlyphAtlas {
             region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: &white, bytesPerRow: 1)
     }
 
-    /// The three pages' fixed regions — the grayscale texture split into
-    /// top (ASCII) and bottom (shaped) halves, the color texture as one
-    /// page on its own. A fresh triple every call, for `init` and `reset`
-    /// alike, so neither has to separately remember to rewind three
-    /// allocators and clear three cache pairs by hand.
+    /// The three pages' fixed regions, fresh each call so `init` and `reset`
+    /// never rewind them by hand.
     private static func makePages(atlasPixelSize: Int) -> (ascii: AtlasPage, shaped: AtlasPage, color: AtlasPage) {
         let half = atlasPixelSize / 2
         let ascii = AtlasPage(
@@ -329,12 +243,8 @@ nonisolated final class GlyphAtlas {
         return (ascii, shaped, color)
     }
 
-    /// Re-points the atlas at a new font, reusing the texture.
-    ///
-    /// Runtime font sizing (cmd-=/cmd--) calls this per keystroke; a whole
-    /// new renderer each time would mean a fresh multi-megabyte atlas
-    /// texture *and* fresh Metal pipeline states every time a key repeats.
-    /// The font changes; the storage and the pipelines do not need to.
+    /// Re-points the atlas at a new font, keeping the texture and pipelines:
+    /// ⌘= / ⌘- call this per key repeat.
     func reset(font newFont: CTFont) {
         let base = TerminalFont.pinningCascadeList(newFont, size: CTFontGetSize(newFont))
         (fonts, isSyntheticBold) = Self.faces(of: base)
@@ -346,8 +256,8 @@ nonisolated final class GlyphAtlas {
             region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: &white, bytesPerRow: 1)
     }
 
-    /// The four styled faces of `base` and their synthetic-bold flags —
-    /// `TerminalFont.variant` does the deriving and the synthesis decisions.
+    /// The four faces of `base` and their synthetic-bold flags
+    /// (`TerminalFont.variant`).
     private static func faces(of base: CTFont) -> ([CTFont], [Bool]) {
         var fonts: [CTFont] = []
         var synthetic: [Bool] = []
@@ -371,12 +281,8 @@ nonisolated final class GlyphAtlas {
         let mapped = CTFontGetGlyphsForCharacters(f, &utf16, &glyphs, 1)
         fastPathHits += 1
         guard mapped, glyphs[0] != 0 else {
-            // Unmapped by the primary face. The fast path deliberately does
-            // not shape, so there is no cascade here to find the scalar in —
-            // it is genuinely undrawable at this point, and the answer is a
-            // *missing* glyph rather than nil. Returning nil drew nothing at
-            // all, which reads as the terminal having lost the output.
-            // Cached so the lookup does not repeat every frame.
+            // Unmapped by the primary face, and the fast path has no cascade:
+            // cache a missing glyph, never nil, which would draw nothing.
             let missing = GlyphInfo(uvRect: .zero, size: .zero, bearing: .zero, isMissing: true)
             asciiPage.cache[key] = missing
             return missing
@@ -388,7 +294,7 @@ nonisolated final class GlyphAtlas {
         return info
     }
 
-    /// Non-ASCII single-scalar path — shapes via `CTLine`, once per key.
+    /// Non-ASCII single scalars, shaped once per key.
     func glyph(shaping scalar: UInt32, style: Style) -> GlyphInfo? {
         let key = GlyphKey(scalar: scalar, style: style)
         if let cached = shapedPage.cache[key] { return cached }
@@ -401,8 +307,7 @@ nonisolated final class GlyphAtlas {
         return info
     }
 
-    // Two-value convenience overloads: most callers — and every test written
-    // before italics existed — only ever ask for regular or bold.
+    // Regular-or-bold overloads for callers that don't need italics.
     func glyph(forASCII scalar: UInt32, bold: Bool) -> GlyphInfo? {
         glyph(forASCII: scalar, style: Style(bold: bold, italic: false))
     }
@@ -415,10 +320,8 @@ nonisolated final class GlyphAtlas {
         glyph(forCluster: scalars, style: Style(bold: bold, italic: false))
     }
 
-    /// Grapheme-cluster path: shapes the whole cluster as one string,
-    /// so a ZWJ emoji sequence comes back as the single glyph run the emoji
-    /// font defines for it and a combining-mark cluster is positioned by the
-    /// shaper rather than stacked by hand.
+    /// Shapes the whole cluster as one string, so ZWJ sequences and combining
+    /// marks come out as the font defines them.
     func glyph(forCluster scalars: [UInt32], style: Style) -> GlyphInfo? {
         let key = ClusterKey(scalars: scalars, style: style)
         if let cached = shapedPage.clusterCache[key] { return cached }
@@ -436,35 +339,22 @@ nonisolated final class GlyphAtlas {
         return info
     }
 
-    /// One shaped run: the glyphs and positions resolved through the cascade
-    /// list, the font the run actually shaped with, whether that font is a
-    /// color (bitmap) font, and — for color runs — the `CTRun` itself, since
-    /// color bitmaps only rasterise through run-level drawing.
+    /// One shaped run and the font it actually used; `ctRun` for color runs.
     ///
-    /// `ctLine` is held alongside `ctRun` and is not otherwise used. A
-    /// `CTRun`'s glyph storage belongs to the line that produced it, and
-    /// retaining the run does not keep that line alive: once `shape` returned
-    /// and the line was released, `CTRunGetImageBounds` read freed memory and
-    /// crashed inside Core Text — intermittently, as dangling reads do.
+    /// `ctLine` is held only to keep `ctRun` valid: a run's glyph storage
+    /// belongs to its line, and once the line was freed
+    /// `CTRunGetImageBounds` crashed intermittently.
     private typealias ShapedRun = (
         glyphs: [CGGlyph], positions: [CGPoint], font: CTFont, isColor: Bool,
         ctRun: CTRun?, ctLine: CTLine?
     )
 
-    /// One shaped string as a flat list of runs.
-    /// The font is the run's own: when the requested font lacks the scalars,
-    /// Core Text resolves the run through its cascade list and the run carries
-    /// the fallback font — rasterising with anything else draws glyphs
-    /// from the wrong font entirely.
+    /// One shaped string as a flat list of runs, each with the font Core Text
+    /// resolved (possibly a fallback).
     ///
-    /// Glyph 0 (`.notdef`) is dropped: drawing it would ink a placeholder
-    /// box, and zero-width format characters (ZWJ) can surface as glyph 0 in
-    /// a run. A string that shapes to nothing yields no runs and rasterises
-    /// as an empty, cached glyph.
-    ///
-    /// `sawNotdef` reports that the shaper *did* produce glyphs and every one
-    /// of them was `.notdef` — the caller turns that into a visible
-    /// placeholder rather than an invisible gap.
+    /// `.notdef` glyphs are dropped (ZWJ can surface as one); `sawNotdef`
+    /// reports that every glyph was `.notdef`, so the caller draws a
+    /// placeholder.
     private func shape(_ string: String, style: Style)
         -> (runs: [ShapedRun], sawNotdef: Bool)
     {
@@ -481,16 +371,12 @@ nonisolated final class GlyphAtlas {
             let attributes = CTRunGetAttributes(run) as? [CFString: Any]
             let runFont: CTFont
             if let value = attributes?[kCTFontAttributeName] {
-                // A run's font attribute is always a CTFont; the conditional
-                // is only about the key's presence.
                 runFont = value as! CTFont
             } else {
                 runFont = requested
             }
             if !CFEqual(runFont, requested) { fallbackHits += 1 }
-            // Color fonts (Apple Color Emoji) must rasterise through
-            // `CTRunDraw` — `CTFontDrawGlyphs` draws outlines only, which
-            // for a bitmap font is nothing at all.
+            // Bitmap fonts draw nothing through `CTFontDrawGlyphs`.
             let isColor = CTFontGetSymbolicTraits(runFont).contains(.traitColorGlyphs)
                 || (CTFontCopyPostScriptName(runFont) as String).hasPrefix("AppleColorEmoji")
             var glyphs = [CGGlyph](repeating: 0, count: count)
@@ -507,25 +393,19 @@ nonisolated final class GlyphAtlas {
         return (runs, sawNotdef)
     }
 
-    /// Rasterises one shaped glyph run list into `page`. An empty list —
-    /// or one whose glyphs have no ink (a space) — yields a cached empty
-    /// `GlyphInfo`, so a blank cell is never shaped twice. A color run
-    /// ignores `page` and always goes to `colorPage` — see `rasterizeColor`.
+    /// Rasterises runs into `page`, caching inkless results too. A color run
+    /// goes to `colorPage` instead (`rasterizeColor`).
     private func rasterize(_ runs: [ShapedRun], style: Style, page: AtlasPage) -> GlyphInfo {
         if runs.contains(where: \.isColor) {
             return rasterizeColor(runs)
         }
-        // A family with no real bold face: fake the weight by stroking the
-        // outline as well as filling it, so `SGR 1` content still reads as
-        // bold instead of silently rendering regular (`TerminalFont.variant`).
-        // The stroke is centred on the outline, so half of it grows the ink —
-        // a twentieth of an em at each side, which the cell box absorbs.
+        // No real bold face: stroke as well as fill, a twentieth of an em at
+        // each side, so `SGR 1` still reads bold (`TerminalFont.variant`).
         let strokeWidth: CGFloat =
             isSyntheticBold[Int(style.rawValue)]
             ? CTFontGetSize(fonts[Int(style.rawValue)]) * 0.04
             : 0
-        // The union of every run's bounding boxes, positions applied: a
-        // cluster's glyphs do not share an origin.
+        // A cluster's glyphs don't share an origin.
         var bounds = CGRect.null
         for run in runs {
             var glyphs = run.glyphs
@@ -538,17 +418,14 @@ nonisolated final class GlyphAtlas {
         guard !bounds.isNull, !bounds.isEmpty else {
             return GlyphInfo(uvRect: .zero, size: .zero, bearing: .zero)
         }
-        // Round outward and pad by one texel so linear sampling never bleeds
-        // in a neighbouring glyph — plus half the synthetic stroke, which
-        // grows the ink outward on every side and would otherwise clip.
+        // Pad by a texel against bleed, plus half the synthetic stroke.
         let pad = CGFloat(Self.bitmapPadding) + strokeWidth / 2
         let bbox = bounds.insetBy(dx: -pad, dy: -pad)
         let width = max(1, Int(bbox.width.rounded(.up)))
         let height = max(1, Int(bbox.height.rounded(.up)))
         var allocation = page.allocate(width: width, height: height)
         if allocation == nil {
-            // The page is full: reset just this page and retry once (see
-            // the type comment).
+            // Full: reset this page and retry once.
             evict(page)
             allocation = page.allocate(width: width, height: height)
         }
@@ -567,13 +444,9 @@ nonisolated final class GlyphAtlas {
             context.setLineWidth(strokeWidth)
             context.setTextDrawingMode(.fillStroke)
         }
-        // No CTM flip. A `CGContext`'s pixel buffer is stored top-down in
-        // memory while its drawing coordinates are y-up from the bottom-left,
-        // and those two cancel: a glyph drawn normally lands with its cap
-        // height in row 0. The shader then maps quad corner (0,0) — the
-        // quad's top-left, since pixel space is y-down — straight onto the
-        // atlas region's top row, so no flip belongs anywhere in this path.
-        // Flipping the CTM here rasterised every glyph upside down.
+        // No CTM flip: the context's top-down buffer and y-up coordinates cancel,
+        // and the shader maps quad (0,0) to the region's top row. A flip drew
+        // every glyph upside down.
         for run in runs {
             var glyphs = run.glyphs
             var positions = run.positions.map {
@@ -598,29 +471,19 @@ nonisolated final class GlyphAtlas {
         )
     }
 
-    /// The color half of `rasterize` (see the type comment): at least one
-    /// run shaped to a color font, so the bitmap goes into `colorTexture`
-    /// (premultiplied bgra) instead of the coverage atlas, via `colorPage`.
+    /// The color half of `rasterize`, into `colorPage`.
     ///
-    /// Color runs draw with `CTRunDraw` — the only Core Text entry point
-    /// that renders bitmap glyphs; `CTFontDrawGlyphs` is outlines only. The
-    /// bounds come from `CTRunGetImageBounds`, which unlike
-    /// `CTFontGetBoundingRectsForGlyphs` knows the bitmap's real extent.
-    /// `CTRunDraw` places the run relative to the context's text position,
-    /// so that is set to `-bbox.origin` rather than shifting positions by
-    /// hand. A grayscale run sharing the cluster (rare, but a mixed cluster
-    /// is possible) still draws by outline with a white fill.
-    ///
-    /// Premultiplication: the context's `premultipliedFirst` bitmap info is
-    /// what Core Graphics supports drawing into, and the color pipeline's
-    /// blend state (`sourceRGB = .one`) is premultiplied-over, so the texels
-    /// upload verbatim — no un-premultiply pass, no precision loss.
+    /// `CTRunDraw` is the only Core Text call that draws bitmaps, and
+    /// `CTRunGetImageBounds` knows their real extent; the text position is set
+    /// to `-bbox.origin`. A grayscale run in a mixed cluster draws by outline
+    /// in white. Texels upload premultiplied, matching the color pipeline's
+    /// blend (`sourceRGB = .one`).
     private func rasterizeColor(_ runs: [ShapedRun]) -> GlyphInfo {
         let empty = GlyphInfo(uvRect: .zero, size: .zero, bearing: .zero, isColor: true)
         var bounds = CGRect.null
         for run in runs {
             if let ctRun = run.ctRun {
-                // location 0 / length 0 means the whole run.
+                // Length 0 means the whole run.
                 bounds = bounds.union(CTRunGetImageBounds(ctRun, nil, CFRange(location: 0, length: 0)))
             } else {
                 var glyphs = run.glyphs
@@ -637,8 +500,7 @@ nonisolated final class GlyphAtlas {
         let height = max(1, Int(bbox.height.rounded(.up)))
         var allocation = colorPage.allocate(width: width, height: height)
         if allocation == nil {
-            // The page is full: reset just this page and retry once (see
-            // the type comment).
+            // Full: reset this page and retry once.
             evict(colorPage)
             allocation = colorPage.allocate(width: width, height: height)
         }
@@ -653,8 +515,7 @@ nonisolated final class GlyphAtlas {
         context.setShouldAntialias(true)
         context.setShouldSmoothFonts(false)  // no subpixel AA since Mojave
         context.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
-        // No CTM flip, for the same reason as the grayscale path: top-down
-        // buffer against y-up drawing coordinates cancels out.
+        // No CTM flip, as in the grayscale path.
         for run in runs {
             if let ctRun = run.ctRun {
                 context.textPosition = CGPoint(x: -bbox.minX, y: -bbox.minY)
@@ -683,13 +544,8 @@ nonisolated final class GlyphAtlas {
         )
     }
 
-    /// Resets one page in place — see the type comment on why this no
-    /// longer touches its sibling pages. The textures themselves are kept:
-    /// only `page`'s allocator rewinds and `page`'s caches clear, so a
-    /// lookup on a *different* page is entirely unaffected, and every
-    /// lookup on `page` itself is a cache miss that re-rasterises into
-    /// freshly allocated (and thus freshly written) regions of the shared
-    /// texture — stale texels are never sampled.
+    /// Resets one page in place: its allocator rewinds and its caches clear,
+    /// so every lookup re-rasterises into rewritten texels.
     private func evict(_ page: AtlasPage) {
         page.evict(reservedFirstRow: page === asciiPage)
         evictionCount += 1
