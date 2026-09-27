@@ -129,7 +129,7 @@ public enum KittyGraphics {
     // Caps (`SECURITY.md` §3): a hostile or buggy stream could otherwise
     // grow any of these without limit.
 
-    /// Decoded bytes per image — about a 4K RGBA frame.
+    /// Decoded bytes per image — about two 4K RGBA frames.
     static let maximumImageBytes = 64 * 1024 * 1024
 
     /// Per axis; every Metal feature set on macOS supports 8192² textures.
