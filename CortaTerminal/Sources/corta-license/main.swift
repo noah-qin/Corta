@@ -27,9 +27,9 @@ import LicenseHeaders
 /// non-standard one, or is of a kind no rule classifies. `fix` adds the
 /// header, with the current year, to every file that lacks one; it never
 /// rewrites a correct header or touches a malformed one, so running it
-/// twice changes nothing the second time. Both work on the files git knows
-/// about — tracked, plus untracked files not ignored — so a file created a
-/// moment ago is covered before it is committed.
+/// twice changes nothing the second time. `check` looks at the files git
+/// tracks; `fix` also at untracked files that are not ignored, so a file
+/// created a moment ago gets its header before it is committed.
 
 let usage = """
     usage: corta-license check [--root <dir>]
@@ -88,7 +88,18 @@ else {
     exit(2)
 }
 
-let listed = git(["ls-files", "-z", "--cached", "--others", "--exclude-standard"], in: top) ?? ""
+// `check` judges what is committed: a release or CI job leaves build
+// products (archives, unpacked apps) in the checkout that are neither
+// tracked nor ignored, and they are not the repository's files. `fix` also
+// takes untracked files, so a file created a moment ago gets its header
+// before it is committed.
+let listArguments = command == "fix"
+    ? ["ls-files", "-z", "--cached", "--others", "--exclude-standard"]
+    : ["ls-files", "-z", "--cached"]
+guard let listed = git(listArguments, in: top) else {
+    FileHandle.standardError.write(Data("corta-license: git ls-files failed in \(top)\n".utf8))
+    exit(2)
+}
 var paths = listed.split(separator: "\0").map(String.init)
     .filter { FileManager.default.fileExists(atPath: "\(top)/\($0)") }
 if !only.isEmpty {

@@ -88,9 +88,11 @@ row here.
 
 ## The tool
 
-`corta-license`, a SwiftPM executable in the core package. It looks at the
-files git knows about — tracked, plus untracked files that are not ignored,
-so a file created a moment ago is covered before it is committed.
+`corta-license`, a SwiftPM executable in the core package. `check` looks
+at the files git tracks — what is committed is what the rules are about, and
+a release job's archives and unpacked apps in the checkout are not.
+`fix` also takes untracked files that are not ignored, so a file created a
+moment ago gets its header before it is committed.
 
 ```sh
 # Report every file that is missing its header, has a non-standard one,
