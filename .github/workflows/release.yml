@@ -192,6 +192,12 @@ jobs:
       # distribution" pipeline `archive` + `-exportArchive` does, which
       # is what actually fixes them rather than working around either
       # symptom by hand.
+      #
+      # `ARCHS=arm64` on the command line, not only in project.pbxproj:
+      # Xcode does not apply a project's ARCHS to Swift package products,
+      # so corta-exec came out universal while the app was arm64 (D21). A
+      # command-line setting reaches every target. check-release.sh fails a
+      # build where either executable carries another slice.
       - name: Build (signed)
         if: steps.signing.outputs.available == 'true'
         run: |
@@ -200,6 +206,7 @@ jobs:
             -scheme Corta \
             -configuration Release \
             -archivePath build/Corta.xcarchive \
+            ARCHS=arm64 \
             CODE_SIGN_IDENTITY="${{ secrets.MACOS_SIGNING_IDENTITY }}" \
             CODE_SIGN_STYLE=Manual \
             ENABLE_HARDENED_RUNTIME=YES \
@@ -238,6 +245,7 @@ jobs:
             -scheme Corta \
             -configuration Release \
             -derivedDataPath build \
+            ARCHS=arm64 \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGNING_REQUIRED=NO \

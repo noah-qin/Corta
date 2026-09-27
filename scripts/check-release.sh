@@ -29,14 +29,16 @@
 # version, the build number and the deployment target; the build number is
 # an integer; every file carries its license header; CHANGELOG.md has a
 # heading for the version; README.md names the release archive for it; the
-# code signature verifies.
+# app's executable and corta-exec are arm64 only (D21); the code signature
+# verifies.
 #
 #   --version V          V (a tag with its `v` stripped) must be the version.
 #   --archive ZIP        ZIP is named Corta-V.zip, holds Corta.app, and its
 #                        ZIP.sha256 sidecar matches its contents.
 #   --appcast            appcast.xml has an item for this version and build
 #                        whose enclosure names the GitHub release URL for
-#                        the archive and, with --archive, its exact length.
+#                        the archive and, with --archive, its exact length;
+#                        for an arm64-only app, the item requires arm64.
 #   --require-notarized  the signature is a Developer ID one, Gatekeeper
 #                        accepts the app, and the notarization ticket is
 #                        stapled.
@@ -45,7 +47,7 @@
 set -uo pipefail
 
 if [ "$#" -lt 1 ]; then
-  sed -n '18,42p' "$0" >&2
+  sed -n '18,44p' "$0" >&2
   exit 2
 fi
 
@@ -167,6 +169,29 @@ else
   fail "README.md does not state 'macOS $bundle_target' as the minimum"
 fi
 
+# --- Architecture ------------------------------------------------------------
+
+# Apple silicon only (D21). Xcode does not apply the project's ARCHS to
+# Swift package products, so a build that did not pass `ARCHS=arm64` on the
+# command line ships a universal corta-exec beside an arm64 app. Sparkle's
+# own binaries are not ours to thin; the rule covers the two executables
+# this project compiles.
+bundle_executable=$(plist_value CFBundleExecutable)
+app_archs=$(lipo -archs "$app/Contents/MacOS/$bundle_executable" 2>/dev/null)
+for executable in "$bundle_executable" corta-exec; do
+  path="$app/Contents/MacOS/$executable"
+  if [ -z "$executable" ] || [ ! -f "$path" ]; then
+    fail "no executable at Contents/MacOS/${executable:-<CFBundleExecutable missing>}"
+    continue
+  fi
+  archs=$(lipo -archs "$path" 2>/dev/null)
+  if [ "$archs" = "arm64" ]; then
+    pass "$executable is arm64 only"
+  else
+    fail "$executable is built for '${archs:-unreadable}', not arm64 only (D21)"
+  fi
+done
+
 # --- Signature -------------------------------------------------------------
 
 if codesign --verify --deep --strict "$app" 2>/dev/null; then
@@ -278,6 +303,7 @@ for item in root.iter("item"):
     enclosure = item.find("enclosure")
     print(item.findtext("sparkle:version", default="", namespaces=ns))
     print(enclosure.get("length", "") if enclosure is not None else "")
+    print(item.findtext("sparkle:hardwareRequirements", default="", namespaces=ns))
     break
 PROBE
   )
@@ -286,6 +312,7 @@ PROBE
   else
     appcast_build=$(echo "$item" | sed -n 1p)
     appcast_length=$(echo "$item" | sed -n 2p)
+    appcast_hardware=$(echo "$item" | sed -n 3p)
     if [ "$appcast_build" = "$bundle_build" ]; then
       pass "appcast item carries build $bundle_build"
     else
@@ -296,6 +323,18 @@ PROBE
         pass "appcast enclosure length matches the archive ($archive_length bytes)"
       else
         fail "appcast enclosure length $appcast_length != archive size $archive_length"
+      fi
+    fi
+    # What keeps an Intel Mac where it is (D21): Sparkle 2.9 and later —
+    # every shipped Corta — does not offer an item whose
+    # `sparkle:hardwareRequirements` names arm64 to a Mac without it.
+    # generate_appcast writes the element when the executable has no Intel
+    # slice; this holds the feed to it rather than trusting the heuristic.
+    if [ "$app_archs" = "arm64" ]; then
+      if [[ ",$(echo "$appcast_hardware" | tr -d ' ')," == *",arm64,"* ]]; then
+        pass "appcast item requires arm64 hardware"
+      else
+        fail "appcast item for $bundle_version has no sparkle:hardwareRequirements arm64; Intel Macs would be offered an app they cannot open"
       fi
     fi
   fi

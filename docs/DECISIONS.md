@@ -327,11 +327,44 @@ General › Workflow permissions); 1.0.1's feed had to be merged by hand
 because that switch was off, and it is the one thing the dry run cannot
 exercise.
 
-## D21 — reserved
+## D21 — Corta builds for Apple silicon only
 
-Reserved for the Apple-silicon-only build (roadmap issue #108), which
-lands after this entry was written. Left in place so decision numbers
-stay stable once they are quoted.
+**Decision.** From 1.1.0 the application and `corta-exec` are `arm64`
+only (`ARCHS = arm64` in every configuration of `project.pbxproj`, and
+on the command line of every release build). Intel Macs stay on 1.0.1,
+which remains downloadable. The deployment target does not change:
+macOS 26.0.
+
+**Why.** Metal 4 needs an M1 or later, and it is the renderer 1.1.0
+keeps (#109). macOS 26 is the last release that runs on an Intel Mac,
+and the four models it still supports are all five or more years old. A
+universal build existed only to carry the classic Metal path, which
+meant two GPU backends to maintain, test and keep pixel-equivalent for a
+shrinking audience, with no measured win for either
+(`history/2026-09-15-B12-METAL4-BACKEND.md`).
+
+**What it costs.** 1.0.0 and 1.0.1 shipped universal, and an Intel Mac
+that has one of them gets no further updates. No second feed and no
+transitional build is published for them — accepted, not mitigated.
+Every shipped Corta carries Sparkle 2.9.6, which honours an appcast
+item's `sparkle:hardwareRequirements`: an item that requires `arm64` is
+not offered to a Mac without it, so an Intel Mac on 1.0.1 sees no update
+rather than downloading one it cannot open. `generate_appcast` writes the
+element for an executable with no Intel slice, and
+`scripts/check-release.sh --appcast` fails a feed item for an arm64-only
+app that lacks it.
+
+Xcode does not apply a project's `ARCHS` to Swift package products, so
+`corta-exec` came out universal beside an arm64 app until
+`release.yml` passed `ARCHS=arm64` on the command line.
+`check-release.sh` holds both executables to `lipo -archs` = `arm64`, so
+a build route that forgets fails at packaging rather than shipping.
+
+**Consequence.** Every GPU code path may assume
+`MTLGPUFamily.metal4`-class hardware on the machine that runs it; a
+device without it is a failure to report, not a second renderer. Adding
+an Intel slice back reopens this decision, and with it the second
+backend.
 
 ## D22 — The development build is a separate application
 
