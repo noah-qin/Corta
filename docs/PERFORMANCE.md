@@ -210,8 +210,8 @@ Because the terminal core is a separate SwiftPM package (`DESIGN.md`
 | Parser-only harness over a byte corpus | Isolates parse cost from rendering     |
 
 Latency (keypress → glass) is measured separately — since 1.0.0 from
-inside the app (§5.7); before that with an external screen-capture tool
-whose figures the two historical rows below are. It is invisible to
+inside the app (§5.7); before that with an external screen-capture tool.
+It is invisible to
 throughput benchmarks and is the number users actually perceive.
 
 The measurements taken before 1.0.0 with that tool, and why they cannot

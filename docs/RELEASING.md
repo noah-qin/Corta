@@ -12,7 +12,9 @@ of them; this page is the order of operations around it. Decision D20
 For the maintainer, cutting any release:
 
 1. Move the relevant `[Unreleased]` entries under a new `## [x.y.z]`
-   heading with the date, and leave `[Unreleased]` empty above it.
+   heading with the date, and leave `[Unreleased]` empty above it. At the
+   bottom of `CHANGELOG.md`, point `[Unreleased]` at `vx.y.z...main` and
+   add an `[x.y.z]` link to the new tag.
 2. Update the three hand-written version numbers, in
    `Corta.xcodeproj/project.pbxproj` (all six build configurations) and
    the core. **Two of them carry the release's semantic version and must
@@ -67,9 +69,3 @@ For the maintainer, cutting any release:
    is the recovery (1.0.1 shipped that way).
    If the workflow cannot run at all, `scripts/release.sh` against the
    downloaded archive is the manual route to the same file.
-
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.0.1...main
-[1.0.1]: https://github.com/noah-qin/Corta/releases/tag/v1.0.1
-[1.0.0]: https://github.com/noah-qin/Corta/releases/tag/v1.0.0
-[0.1.1]: https://github.com/noah-qin/Corta/releases/tag/v0.1.1
-[0.1.0]: https://github.com/noah-qin/Corta/releases/tag/v0.1.0

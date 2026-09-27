@@ -439,8 +439,9 @@ event monitor makes that easy to get wrong:
   a sweep is in flight sets `search.needsRefresh` instead of being
   dropped; the tail of a burst is searched once the sweep lands.
 - **Closing restores the text, not the row count.**
-  `scrollOffsetBeforeSearch` is shifted by the growth in
-  `Scrollback.totalPushed` since the bar opened (§2.7).
+  `search.previousScrollOffset` is shifted by the growth in
+  `Scrollback.totalPushed` since `search.previousTotalPushed`, recorded
+  when the bar opened (§2.7).
 - **Large copy and export leave the main actor.** `Selection.text` is
   O(the range) and export is O(scrollback), so both build on
   `Task.detached`, under a generation-guarded `largeTextTask`. Cancelling

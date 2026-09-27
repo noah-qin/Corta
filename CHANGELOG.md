@@ -748,3 +748,9 @@ M1–M10.
   rewrite (M9) landed and is covered by its own unit tests, but a
   same-conditions end-to-end re-measurement against the 45.5 ms baseline
   is still open.
+
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.0.1...main
+[1.0.1]: https://github.com/noah-qin/Corta/releases/tag/v1.0.1
+[1.0.0]: https://github.com/noah-qin/Corta/releases/tag/v1.0.0
+[0.1.1]: https://github.com/noah-qin/Corta/releases/tag/v0.1.1
+[0.1.0]: https://github.com/noah-qin/Corta/releases/tag/v0.1.0
