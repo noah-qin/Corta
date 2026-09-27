@@ -28,7 +28,7 @@ import SwiftUI
 /// `AcknowledgementsTests` fails when the two drift apart.
 struct AcknowledgementsView: View {
     /// The Sparkle release whose license the bundle carries.
-    static let sparkleVersion = "2.9.6"
+    static let sparkleVersion = "2.10.0"
 
     /// The bundled license text, or `nil` in a build that lost the
     /// resource — shown as such rather than as an empty page.
