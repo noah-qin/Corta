@@ -3,7 +3,7 @@ import Testing
 
 @testable import Corta
 
-/// UI05 / M02 and M04 — what the menus call things, and whether the promises
+/// What the menus call things, and whether the promises
 /// they make are kept.
 ///
 /// `MenuShortcutTests` pins *which keys* the menu bar claims; this pins the

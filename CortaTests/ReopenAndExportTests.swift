@@ -4,7 +4,7 @@ import Testing
 
 @testable import Corta
 
-/// U15 — putting a closed pane back, and writing what is in a pane to a file.
+/// Putting a closed pane back, and writing what is in a pane to a file.
 @MainActor
 @Suite(.serialized)
 struct ReopenClosedPaneTests {
@@ -132,7 +132,7 @@ struct ExportTextTests {
     }
 }
 
-/// U15 — the bytes that land on disk. The save panel is AppKit's and is not
+/// The bytes that land on disk. The save panel is AppKit's and is not
 /// in doubt; the encoding and the trailing newline are ours.
 @MainActor
 struct ExportWriteTests {

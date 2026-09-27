@@ -3,7 +3,7 @@ import Testing
 
 @testable import Corta
 
-/// M2.6, app side (`SECURITY.md` §2.3): pasted text is data, never a command
+/// Paste (`SECURITY.md` §2.3): pasted text is data, never a command
 /// stream — ESC and C0 controls are stripped, and a paste containing a
 /// newline warns unless the application enabled bracketed paste.
 struct PasteTests {
@@ -48,7 +48,7 @@ struct PasteTests {
         #expect(Paste.bytes(for: "ls", bracketedPasteEnabled: false) == Array("ls".utf8))
     }
 
-    // MARK: - Chunking (B03)
+    // MARK: - Chunking
 
     @Test func emptyInputYieldsNoChunks() {
         #expect(Paste.chunked([]).isEmpty)

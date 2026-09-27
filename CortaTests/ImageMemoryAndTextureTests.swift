@@ -7,7 +7,7 @@ import Testing
 
 @testable import Corta
 
-/// S02/S07 — the app-layer half of the image memory budgets: PNG dimension
+/// The app-layer half of the image memory budgets: PNG dimension
 /// inspection before decoding, per-pane and app-wide GPU texture byte
 /// budgets, LRU eviction, and graceful degradation when Metal texture
 /// allocation fails (both for image textures and the glyph atlas).
@@ -34,7 +34,7 @@ import Testing
             payload: [UInt8](repeating: 0xFF, count: width * height * 4), id: id)
     }
 
-    // MARK: - PNG dimension inspection before decoding (S02)
+    // MARK: - PNG dimension inspection before decoding
 
     /// A valid PNG whose IHDR claims 100000×100000: the codestream is a
     /// real 1×1 image (built by ImageIO itself), with only the header's
@@ -74,7 +74,7 @@ import Testing
         #expect(renderer.textureCount == 0)
     }
 
-    // MARK: - Texture allocation failure (S07)
+    // MARK: - Texture allocation failure
 
     @Test("a failing texture allocation degrades to no image instead of trapping")
     func textureAllocationFailureDegradesInsteadOfTrapping() throws {
@@ -111,7 +111,7 @@ import Testing
         #expect(atlas.fastPathHits > 0)
     }
 
-    // MARK: - GPU byte budgets (S02)
+    // MARK: - GPU byte budgets
 
     @Test("over the per-pane texture budget, the least-recently-used texture is evicted")
     func perPaneTextureBudgetEvictsLeastRecentlyUsed() throws {

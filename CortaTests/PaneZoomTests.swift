@@ -3,7 +3,7 @@ import Testing
 
 @testable import Corta
 
-/// U13 — filling the window with one pane, and putting the split back.
+/// Filling the window with one pane, and putting the split back.
 ///
 /// **What makes this worth testing rather than eyeballing.** Zoom is a
 /// view-hierarchy change, and the project has already shipped six defects

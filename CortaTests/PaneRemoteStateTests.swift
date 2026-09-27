@@ -4,7 +4,7 @@ import Testing
 
 @testable import Corta
 
-/// B13 — the composition behind "which host does this pane refer to":
+/// The composition behind "which host does this pane refer to":
 /// `PaneRemoteState.resolve` is a pure function of the two signals a pane
 /// actually has (the remote shell's own OSC 7 report, and the kernel's
 /// answer for who owns the terminal), so the whole matrix is staged here
@@ -205,7 +205,7 @@ struct PaneRemoteStateTests {
     }
 }
 
-/// B13 — the isolation half, staged through real sessions: a remote OSC 7
+/// The isolation half, staged through real sessions: a remote OSC 7
 /// report (the exact bytes an `ssh` session emits, plus the marks a shell
 /// with integration sends) fed to a real pane, asserting the report is
 /// *recorded* and *displayed* but never reaches a local spawn.
@@ -301,7 +301,7 @@ struct RemotePaneIsolationTests {
     }
 }
 
-/// B13 — the command-history host scope, staged with the same real-session
+/// The command-history host scope, staged with the same real-session
 /// recipe: one command begun while the pane referred to a remote host, one
 /// begun after the pane was local again.
 @MainActor
@@ -372,7 +372,7 @@ struct CommandHistoryHostScopeTests {
     }
 }
 
-/// B13 — an ssh preset as a first-class path, staged without a network:
+/// An ssh preset as a first-class path, staged without a network:
 /// the "launcher" is a symlink to `/bin/sh` *named* `ssh` in a temporary
 /// directory, so the pane spawns exactly what an ssh preset spells (a
 /// system binary path plus arguments) while nothing about the machine

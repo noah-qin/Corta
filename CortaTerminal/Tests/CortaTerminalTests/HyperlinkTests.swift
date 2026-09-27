@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M6.8 — OSC 8 hyperlinks: the case where the text on screen and the
+/// OSC 8 hyperlinks: the case where the text on screen and the
 /// destination differ, which is the whole reason `SECURITY.md` §2.4 says to
 /// show the real target.
 @Suite("OSC 8 hyperlinks")

@@ -3,7 +3,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M6.11 — the checked-in fuzz corpus, run on every test pass.
+/// The checked-in fuzz corpus, run on every test pass.
 ///
 /// The long runs live in the `corta-fuzz` executable (millions of mutated
 /// inputs, and the `LLVMFuzzerTestOneInput` entry point for a toolchain that

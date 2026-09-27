@@ -6,8 +6,8 @@ import Testing
 
 @testable import Corta
 
-/// Renderer side of the shell-integration marks (M7.2), the hovered-link
-/// underline (M7.9) and the missing-glyph placeholder.
+/// Renderer side of the shell-integration marks, the hovered-link
+/// underline and the missing-glyph placeholder.
 ///
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded by
 /// design — see that type's comment.

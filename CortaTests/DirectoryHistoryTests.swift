@@ -3,7 +3,7 @@ import Testing
 
 @testable import Corta
 
-/// B08 — ranking, favorites, fuzzy matching and project-root detection.
+/// Ranking, favorites, fuzzy matching and project-root detection.
 /// Pure logic, no disk and no app: `DirectoryHistoryStoreTests` covers
 /// persistence separately.
 @MainActor
@@ -133,7 +133,7 @@ struct DirectoryHistoryTests {
     }
 }
 
-/// B08 — persistence. Every test points at a temporary file, never the
+/// Persistence. Every test points at a temporary file, never the
 /// user's real Application Support directory.
 @MainActor
 struct DirectoryHistoryStoreTests {
@@ -205,9 +205,9 @@ struct DirectoryHistoryStoreTests {
         #expect(store.history.entries.isEmpty)
     }
 
-    // MARK: - Versioning (B09)
+    // MARK: - Versioning
 
-    @Test("a pre-B09 file with no version wrapper still loads")
+    @Test("a file written before the version wrapper existed still loads")
     func bareArrayFileStillLoads() throws {
         defer { removeDirectory() }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

@@ -62,7 +62,7 @@ import Testing
                 == CTFontCopyPostScriptName(system) as String)
     }
 
-    // MARK: - Resolution (B09)
+    // MARK: - Resolution
 
     @Test func resolutionIsResolvedForNilAndForTheSystemFamily() {
         #expect(TerminalFont.resolution(forFamily: nil) == .resolved)
@@ -136,9 +136,9 @@ import Testing
     // MARK: - Missing glyphs
 
     /// The fast path does not shape, so it has no cascade to fall back on:
-    /// a scalar the primary font does not map used to come back `nil` and
-    /// draw nothing at all. It now comes back flagged, so the renderer can
-    /// draw a placeholder box instead of leaving a hole in the output.
+    /// a scalar the primary font does not map comes back flagged rather
+    /// than `nil`, so the renderer can draw a placeholder box instead of
+    /// leaving a hole in the output.
     @Test func theFastPathReportsAnUnmappedScalarAsMissing() throws {
         guard let device = Self.makeDevice() else {
             Issue.record("No Metal device available in this environment")

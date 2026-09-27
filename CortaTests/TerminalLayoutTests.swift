@@ -10,8 +10,8 @@ import Testing
 /// actually is — see `ViewController.updateFocusRingLayout`.
 struct TerminalLayoutTests {
     /// A pane touching the window's top edge pays for the whole chrome —
-    /// the case that used to leave the ring's top edge under the tab bar,
-    /// because the ring computed no overlap of its own at all.
+    /// the case that leaves the ring's top edge under the tab bar if the
+    /// ring computes no overlap of its own.
     @Test func chromeOverlapIsFullChromeForATopPane() {
         #expect(TerminalLayout.chromeOverlap(windowChrome: 28, paneDistanceFromTop: 0) == 28)
     }
@@ -21,12 +21,12 @@ struct TerminalLayoutTests {
     /// titlebar's share — otherwise the grid or the ring only shifts down by
     /// the old (smaller) chrome and the tab bar paints over the difference.
     @Test func chromeOverlapGrowsWithTheChromeItself() {
-        // Titlebar alone, then titlebar + tab bar (M4.7's ~40pt).
+        // Titlebar alone, then titlebar + tab bar (~40pt).
         #expect(TerminalLayout.chromeOverlap(windowChrome: 28, paneDistanceFromTop: 0) == 28)
         #expect(TerminalLayout.chromeOverlap(windowChrome: 68, paneDistanceFromTop: 0) == 68)
     }
 
-    /// A bottom-row pane in a split has no titlebar above it (M5): its
+    /// A bottom-row pane in a split has no titlebar above it: its
     /// distance from the window's top already accounts for the whole
     /// chrome, so it owes nothing more.
     @Test func chromeOverlapIsZeroForAPaneBelowTheChrome() {

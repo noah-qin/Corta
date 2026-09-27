@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M2.3 — the alternate screen (`?1049`), driven through the grid API.
+/// The alternate screen (`?1049`), driven through the grid API.
 @Suite("Alternate screen")
 struct AlternateScreenTests {
     private func write(_ text: String, to grid: inout Grid) {
@@ -47,7 +47,7 @@ struct AlternateScreenTests {
     /// of either screen's own content — `exitAlternateScreen` restores the
     /// parked main screen wholesale, and without carrying the mode across
     /// explicitly (the same way `cursorStyle` already is) a `?45` a full-
-    /// screen child set would be silently discarded on exit (B06).
+    /// screen child set would be silently discarded on exit.
     @Test("reverse-wraparound mode survives an alternate-screen round trip")
     func reverseWraparoundSurvivesAlternateScreen() {
         var grid = Grid(rows: 3, columns: 8)
@@ -76,7 +76,7 @@ struct AlternateScreenTests {
         #expect(grid.reverseWraparoundEnabled)
     }
 
-    /// An alternate screen has no history (roadmap M2.3): lines scrolled
+    /// An alternate screen has no history: lines scrolled
     /// while it is live are discarded, not pushed to the main scrollback.
     @Test("the alternate screen has no scrollback")
     func alternateScreenHasNoScrollback() {

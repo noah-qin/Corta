@@ -9,11 +9,11 @@ import UniformTypeIdentifiers
 
 /// The one render target every Metal suite draws into.
 ///
-/// It exists because each suite used to build its own and force-unwrap
-/// `makeTexture`: a descriptor Metal refused aborted the whole test runner
-/// inside `-[MTLTextureDescriptorInternal validateWithDevice:]`, taking four
+/// One shared helper rather than each suite force-unwrapping `makeTexture`:
+/// a descriptor Metal refuses aborts the whole test runner inside
+/// `-[MTLTextureDescriptorInternal validateWithDevice:]`, taking four
 /// hundred unrelated tests with it, and the crash report carries no
-/// dimensions — so the next run learned nothing about what was wrong (T07).
+/// dimensions — so the next run learns nothing about what was wrong.
 /// The size is checked here, and a bad one fails its own test with the
 /// numbers in the message.
 enum MetalRenderTarget {
@@ -96,7 +96,7 @@ enum MetalRenderTarget {
     }
 
     /// Attaches a PNG snapshot of `texture` to the current test's failure
-    /// report (B01). A pixel-coverage assertion that fails says *that* a
+    /// report. A pixel-coverage assertion that fails says *that* a
     /// pixel was wrong, never what actually got drawn — reproducing one
     /// meant re-running the test under a debugger to inspect the texture by
     /// hand. Silent on success: an attachment on every passing run would

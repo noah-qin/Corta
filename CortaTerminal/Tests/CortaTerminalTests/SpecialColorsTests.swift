@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// OSC 5 (query/set the five special colours) and OSC 105 (reset), B06.
+/// OSC 5 (query/set the five special colours) and OSC 105 (reset).
 /// Mirrors `IndexedPaletteTests`' shape for OSC 4/104, over
 /// `SpecialColors`' five fixed slots instead of a 256-entry palette.
 @Suite("Special colours (OSC 5/105)")

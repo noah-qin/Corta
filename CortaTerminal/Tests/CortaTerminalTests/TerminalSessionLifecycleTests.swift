@@ -4,12 +4,12 @@ import Testing
 
 @testable import CortaTerminal
 
-/// E02/E03 — session lifecycle and reader batching boundaries.
+/// Session lifecycle and reader batching boundaries.
 ///
 /// `.serialized` and condition-based waits, for the same reasons as
 /// `TerminalSessionTests`: every test spawns a real child.
 @Suite(.serialized) struct TerminalSessionLifecycleTests {
-    // MARK: E02 — configure-before-start
+    // MARK: Configure-before-start
 
     @Test func initDoesNotDrainUntilStartIsCalled() throws {
         let session = try TerminalSession(
@@ -84,12 +84,12 @@ import Testing
         #expect(fired.withLock { $0 })
     }
 
-    // MARK: E03 — chunk-boundary batching
+    // MARK: Chunk-boundary batching
 
     /// An exact chunk-multiple burst must be applied without waiting for
     /// more input. The scripted source returns precisely one chunk, which a
     /// real pty's kernel buffering cannot be made to guarantee — this is the
-    /// deterministic half of E03.
+    /// deterministic half.
     @Test func exactChunkBoundaryIsAppliedWithoutFurtherInput() throws {
         let session = try TerminalSession(executable: "/bin/cat")
         let source = ScriptedReaderSource()
@@ -111,7 +111,7 @@ import Testing
             "an exact 64 KiB chunk must reach the grid with no further input; grid tail:\n\(text.suffix(200))")
     }
 
-    /// The end-to-end half of E03: real ptys, writes of exactly 64 KiB,
+    /// The end-to-end half: real ptys, writes of exactly 64 KiB,
     /// 128 KiB and 64 KiB + 1, each followed by silence. The marker is the
     /// write's tail, so it can only appear once every byte before it has
     /// been drained and applied.

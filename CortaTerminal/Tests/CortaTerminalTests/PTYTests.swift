@@ -4,7 +4,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M1.1 — open a pty pair, spawn a child, read, write, close.
+/// Open a pty pair, spawn a child, read, write, close.
 ///
 /// `.serialized`: every test here forks a real child process — see the
 /// `.serialized` note on `TerminalSessionTests`.

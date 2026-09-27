@@ -6,7 +6,7 @@ import Testing
 
 @testable import Corta
 
-/// M4.4, renderer side: search matches paint as overlay quads, the current
+/// Search matches paint as overlay quads, the current
 /// match reads differently from the rest, and the overlay moves with the
 /// scroll offset exactly like a selection does.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded

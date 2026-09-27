@@ -28,12 +28,12 @@ struct MenuStructureTests {
     /// The Shell menu reads as eight groups, in the order of what each one is
     /// *for*: open a terminal a particular way, create panes, go somewhere
     /// else, throw terminal state away, change the geometry — and last, alone,
-    /// the one item that changes the machine rather than a pane (B16).
+    /// the one item that changes the machine rather than a pane.
     ///
     /// The order is the assertion. Command-to-command jumping sits with the
-    /// focus moves because both answer "go somewhere else"; it used to sit
-    /// after the resize group, which put a geometry group between the two
-    /// navigation families. The terminal-state commands (U11) are their own
+    /// focus moves because both answer "go somewhere else"; after the resize
+    /// group, a geometry group would sit between the two navigation
+    /// families. The terminal-state commands are their own
     /// group because each one discards something, and grouping them with
     /// anything else would make that less obvious, not more.
     @Test("Shell groups presets, create, move, directories, clear, resize, then secure entry")
@@ -54,7 +54,7 @@ struct MenuStructureTests {
         let zoom = #selector(SplitViewController.toggleZoomPane(_:))
         let equalize = #selector(SplitViewController.equalizePanes(_:))
 
-        // U16 — the preset list heads the menu: it is how a terminal is
+        // The preset list heads the menu: it is how a terminal is
         // opened, which comes before what is done with one.
         #expect(groups[0].count == 1, "one item: the preset submenu")
 
@@ -67,21 +67,21 @@ struct MenuStructureTests {
         #expect(groups[3].first == previousCommand)
         #expect(groups[3].contains(copyOutput))
 
-        // B08 — directory navigation: reveal/copy (reads), then the two
+        // Directory navigation: reveal/copy (reads), then the two
         // `cd` primitives, then the two new-pane variants.
         #expect(groups[4].first == revealWorkingDirectory)
         #expect(groups[4].contains(changeToProjectRoot))
 
-        // U11 — the three state commands, in the order of how much each
+        // The three state commands, in the order of how much each
         // discards.
         #expect(groups[5].first == clearScreen)
         #expect(groups[5].contains(reset))
 
-        // Geometry, zoom at its head (U13).
+        // Geometry, zoom at its head.
         #expect(groups[6].first == zoom)
         #expect(groups[6].last == equalize)
 
-        // B16 — Secure Keyboard Entry alone at the end: a system-wide input
+        // Secure Keyboard Entry alone at the end: a system-wide input
         // mode, not a pane command, and Terminal.app's own Shell menu puts
         // it in the same place.
         #expect(groups[7] == [#selector(AppDelegate.toggleSecureKeyboardEntry(_:))])

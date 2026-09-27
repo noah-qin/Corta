@@ -5,7 +5,7 @@ import Testing
 
 @testable import Corta
 
-/// B14 — the SFTP browser's app layer: gating, the command-table entry,
+/// The SFTP browser's app layer: gating, the command-table entry,
 /// the model's navigation and error states, the transfer queue, and the
 /// conflict-choice mapping. Every engine interaction goes through
 /// `FakeSFTPClient` over the `SFTPClient` protocol seam — no ssh, no

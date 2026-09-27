@@ -3,7 +3,7 @@ import Testing
 
 @testable import Corta
 
-/// M3.1–M3.4: IME routing and marked-text handling. Everything here runs
+/// IME routing and marked-text handling. Everything here runs
 /// without a live input method — the routing decision is a pure function of
 /// the event, marked text and committed text are exercised by calling the
 /// `NSTextInputClient` methods exactly as an input context would, and
@@ -27,7 +27,7 @@ struct TerminalViewIMETests {
         return view
     }
 
-    // MARK: - M3.4 routing
+    // MARK: - Routing
 
     @Test func commandAndControlEventsBypassTheIME() {
         #expect(!TerminalView.routesEventThroughIME(
@@ -49,10 +49,10 @@ struct TerminalViewIMETests {
             Self.keyEvent(characters: "´", modifiers: .option)))
     }
 
-    /// U05, found by turning the setting on and watching ⌥F still type `ƒ`.
+    /// With `option-as-meta` on, ⌥F must not type `ƒ`.
     ///
-    /// The encoder handled `option-as-meta` from the day it landed; the
-    /// event never reached it. An ⌥-only press carries neither ⌘ nor ⌃, so
+    /// The encoder handles `option-as-meta`, but only for an event that
+    /// reaches it. An ⌥-only press carries neither ⌘ nor ⌃, so
     /// it was offered to the input context, macOS composed the layout's
     /// alternate character, and it came back through `insertText`. The
     /// encoder had a test; the dispatch that feeds it did not.
@@ -96,7 +96,7 @@ struct TerminalViewIMETests {
 
     @Test func unhandledKeyFallsThroughToDirectBytes() {
         // No window, no input context — the IME path declines and keyDown
-        // behaves exactly as the pre-M3 direct path did.
+        // translates the key directly.
         let view = Self.makeView()
         var bytes: [UInt8] = []
         view.onKeyBytes = { bytes += $0 }
@@ -126,7 +126,7 @@ struct TerminalViewIMETests {
         #expect(bytes.isEmpty)
         #expect(scrolled == nil)
         // ⇧Home, the key `scroll-to-top` is bound to. ⌘↑ is Previous
-        // Command's, and no longer scrolls here (U08).
+        // Command's, and no longer scrolls here.
         view.keyDown(with: Self.shiftHome())
         guard case .some(.toTop) = scrolled else {
             Issue.record("expected .toTop")
@@ -135,7 +135,7 @@ struct TerminalViewIMETests {
         #expect(bytes.isEmpty)
     }
 
-    /// U08 — an unbound command hands its key to the child. With `bind.paste`
+    /// An unbound command hands its key to the child. With `bind.paste`
     /// and `bind.scroll-to-top` cleared, neither gesture fires and both
     /// keystrokes encode as ordinary input, which is what unbinding is for.
     @Test func unbindingHandsTheKeystrokeToTheChild() {
@@ -159,7 +159,7 @@ struct TerminalViewIMETests {
 
         // ⇧Home carries neither ⌘ nor ⌃, so once it is no longer a scroll
         // gesture it takes the ordinary route and is offered to the input
-        // context first (M3.4). The bytes it ends up sending are pinned in
+        // context first. The bytes it ends up sending are pinned in
         // `TerminalViewKeyEncodingTests`; what matters here is that the
         // gesture no longer intercepts it.
         view.keyDown(with: Self.shiftHome())
@@ -173,7 +173,7 @@ struct TerminalViewIMETests {
             charactersIgnoringModifiers: "\u{F729}", isARepeat: false, keyCode: 115)!
     }
 
-    // MARK: - M3.1 marked text / commit
+    // MARK: - Marked text / commit
 
     @Test func markedTextNeverReachesThePTY() {
         let view = Self.makeView()
@@ -240,7 +240,7 @@ struct TerminalViewIMETests {
         #expect(bytes == [0x0D, 0x7F, 0x1B] + Array("\u{1B}[A\u{1B}[B\u{1B}[D\u{1B}[C".utf8))
     }
 
-    /// B02: a candidate window (shell completion, an IME) can resolve Tab or
+    /// A candidate window (shell completion, an IME) can resolve Tab or
     /// Shift-Tab as a command instead of calling `insertText`. Before this,
     /// `doCommand(by:)` had no case for either selector and the keystroke was
     /// silently dropped — this is the exact seam the reported Claude Code
@@ -254,7 +254,7 @@ struct TerminalViewIMETests {
         #expect(bytes == [0x09] + Array("\u{1B}[Z".utf8))
     }
 
-    // MARK: - M3.3 preedit overlay
+    // MARK: - Preedit overlay
 
     @Test func preeditOverlayAppearsAtTheCursorCell() {
         let view = Self.makeView()
@@ -328,7 +328,7 @@ struct TerminalViewIMETests {
         #expect(drawn.attribute(.foregroundColor, at: 0, effectiveRange: nil) != nil)
     }
 
-    // MARK: - M3.2 candidate window placement
+    // MARK: - Candidate window placement
 
     /// `NSView.inputContext` is documented to return nil unless the receiver
     /// conforms to `NSTextInputClient` — this pins that the conformance
@@ -380,7 +380,7 @@ struct TerminalViewIMETests {
         #expect(view.firstRect(forCharacterRange: NSRange(location: 0, length: 1), actualRange: nil) == .zero)
     }
 
-    // MARK: - U02 audit: splits, resize and focus changes
+    // MARK: - Audit: splits, resize and focus changes
 
     /// A divider drag moves a pane inside its window without the window
     /// itself moving; the candidate window's anchor follows because it is
@@ -408,9 +408,8 @@ struct TerminalViewIMETests {
     /// fixed screen delta. `TerminalView` is flipped and the cursor cell sits
     /// a fixed distance below the pane's top, so what a resize must preserve
     /// is that distance; which edge AppKit holds still while it resizes is
-    /// its business, and an earlier version of this test asserting a
-    /// hard-coded +100 was asserting AppKit's choice instead of Corta's
-    /// behaviour.
+    /// its business — asserting a hard-coded +100 would assert AppKit's
+    /// choice instead of Corta's behaviour.
     @Test func firstRectStaysCorrectAfterTheWindowResizes() {
         let window = NSWindow(
             contentRect: NSRect(x: 200, y: 300, width: 400, height: 300),
@@ -479,9 +478,8 @@ struct TerminalViewIMETests {
     /// The cell arrives through `cursorRectProvider`, which the shell backs
     /// with the renderer's live `pointMetrics` — so a font-size change is a
     /// *taller cursor rect*, and that is what has to reach the overlay. The
-    /// overlay used to keep a second copy of the cell size in a stored
-    /// property as well; nothing ever read it, and sizing came from the rect
-    /// all along, so the copy is gone rather than made to agree (U02).
+    /// overlay keeps no copy of the cell size of its own: sizing comes from
+    /// the rect.
     @Test func preeditOverlayTracksCellSizeChanges() {
         let view = Self.makeView()
         var cell = CGRect(x: 0, y: 0, width: 8, height: 17)

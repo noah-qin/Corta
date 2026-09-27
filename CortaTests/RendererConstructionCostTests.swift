@@ -4,9 +4,9 @@ import Testing
 
 @testable import Corta
 
-/// B12 (issue #39): pane-creation cost driver. Every pane's
-/// `TerminalRenderer` builds a `QuadRenderer`; before the per-device
-/// pipeline cache, each of those compiled three `MTLRenderPipelineState`s
+/// Pane-creation cost driver. Every pane's `TerminalRenderer` builds a
+/// `QuadRenderer`; without the per-device pipeline cache, each of those
+/// would compile three `MTLRenderPipelineState`s
 /// and re-serialised the `MTLBinaryArchive`, so splitting a window paid a
 /// shader-compile-sized cost per new pane. This is the measurement harness
 /// for that change — not an assertion (same convention as

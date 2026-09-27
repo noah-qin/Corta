@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M4.4 — scrollback search: case-insensitive by default, matches over
+/// Scrollback search: case-insensitive by default, matches over
 /// logical lines so a wrap boundary doesn't split a match.
 @Suite("Search")
 struct SearchTests {
@@ -76,7 +76,7 @@ struct SearchTests {
         #expect(Search.find("goodbye", in: terminal.grid).isEmpty)
     }
 
-    // P04/P08 — the cap, cooperative cancellation, newest-first collection
+    // The cap, cooperative cancellation, newest-first collection
     // and the bounded long-line scan.
 
     @Test("matches report oldest first, left to right within a line")
@@ -153,7 +153,7 @@ struct SearchTests {
     }
 }
 
-/// U16 — regular-expression search, with the budget and the cancellation the
+/// Regular-expression search, with the budget and the cancellation the
 /// substring path already had, plus the per-line bound that makes the
 /// cancellation reachable at all.
 @Suite struct RegexSearchTests {
@@ -246,7 +246,7 @@ struct SearchTests {
     }
 }
 
-/// U16 — the shape check that stops a pattern before it reaches a
+/// The shape check that stops a pattern before it reaches a
 /// backtracking engine that cannot be interrupted.
 ///
 /// The measurements behind it: `(a+)+b` against a run of "a" took 0.016 s at

@@ -2,9 +2,8 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M4 Step 2 — the logical-line read API `Grid+Text.swift` exposes to
-/// search (M4.4) and URL detection (M4.6), and the boundary the M4.2
-/// storage rewrite must keep passing.
+/// The logical-line read API `Grid+Text.swift` exposes to search and URL
+/// detection — the boundary any change to row storage must keep passing.
 @Suite("Grid+Text")
 struct GridTextTests {
     @Test("a soft-wrapped line joins into one logical line with no inserted newline")

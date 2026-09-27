@@ -3,7 +3,7 @@ import Testing
 
 @testable import Corta
 
-/// B07 — install, diagnose, remove. Every test points at a temporary rc
+/// Install, diagnose, remove. Every test points at a temporary rc
 /// file, never the real `~/.zshrc` (`docs/DECISIONS.md` D13 — "Never change the machine
 /// to test").
 @MainActor

@@ -5,7 +5,7 @@ import Testing
 @testable import Corta
 import CortaTerminal
 
-/// E01 — every close path (pane, window, quit) must run the same explicit,
+/// Every close path (pane, window, quit) must run the same explicit,
 /// idempotent teardown: `TerminalSession.deinit` cannot be relied on because
 /// the reader thread retains the session until its loop exits.
 ///
@@ -117,10 +117,10 @@ struct PaneTeardownTests {
 
     /// Whether the child has exited within `timeout` — polled with a
     /// non-blocking reap and an *async* sleep. This suite is `@MainActor`,
-    /// and the blocking `waitForExit(timeout:)` it used to call held the
-    /// main thread for up to ten seconds per test while a slow child shut
-    /// down; on the CI runner that starved every other main-actor test in
-    /// the run for half a minute and failed them on their own timeouts.
+    /// and the blocking `waitForExit(timeout:)` would hold the main thread
+    /// for up to ten seconds per test while a slow child shuts down; on the
+    /// CI runner that starves every other main-actor test in the run and
+    /// fails them on their own timeouts.
     private func exited(_ pty: PTY, timeout: Duration = .seconds(10)) async -> Bool {
         let deadline = ContinuousClock.now + timeout * testTimeoutScale
         while ContinuousClock.now < deadline {

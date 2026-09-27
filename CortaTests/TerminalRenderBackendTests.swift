@@ -6,8 +6,8 @@ import Testing
 
 @testable import Corta
 
-/// The `TerminalRenderBackend` seam (M9) and the real Metal 4 command
-/// submission behind `Metal4Backend` (B12): protocol conformance, the
+/// The `TerminalRenderBackend` seam and the real Metal 4 command
+/// submission behind `Metal4Backend`: protocol conformance, the
 /// capability check, fallback construction, and — on Metal-4-capable
 /// hardware — pixel equivalence with `QuadRenderer`, ring/allocator reuse
 /// across frames, and deallocation with frames in flight.
@@ -64,7 +64,7 @@ struct TerminalRenderBackendTests {
         #expect(renderer.quadRenderer.device === device)
     }
 
-    // MARK: - B12: Metal 4 command submission
+    // MARK: - Metal 4 command submission
 
     private static let width = 64
     private static let height = 48

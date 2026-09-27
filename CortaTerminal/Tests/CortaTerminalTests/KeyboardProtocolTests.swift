@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M6.9 — the kitty keyboard protocol's mode stack and its query.
+/// The kitty keyboard protocol's mode stack and its query.
 @Suite("Kitty keyboard protocol")
 struct KeyboardProtocolTests {
     private func response(to input: String) -> String {

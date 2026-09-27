@@ -6,7 +6,7 @@ import Testing
 
 @testable import Corta
 
-/// M3.5/M3.6 — wide glyphs and grapheme clusters in the renderer: a wide
+/// Wide glyphs and grapheme clusters in the renderer: a wide
 /// pair's glyph is scaled into and centred on its two-cell box, clusters are
 /// shaped as one run, and no glyph ever inks a cell that is not its own.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
@@ -78,7 +78,7 @@ import Testing
         return true
     }
 
-    /// M3.5: 中 must ink BOTH cells of its pair — before, the lead's glyph
+    /// 中 must ink BOTH cells of its pair — before, the lead's glyph
     /// was drawn into a single cell — and nothing may spill into the cell
     /// after the pair.
     @Test func wideGlyphCoversItsWholePairAndNeverTheNextCell() throws {
@@ -135,7 +135,7 @@ import Testing
             "unexpected ink past the written text")
     }
 
-    /// M3.6: a combining mark joins the previous cell's cluster and the
+    /// A combining mark joins the previous cell's cluster and the
     /// cluster is shaped as one run — e + U+0301 renders é within its single
     /// cell, leaving the next cell blank.
     @Test func combiningClusterRendersWithinItsCell() throws {
@@ -162,7 +162,7 @@ import Testing
             "a combining cluster spilled past its cell")
     }
 
-    /// M3.6: a combining mark after a wide pair joins the pair's lead cell
+    /// A combining mark after a wide pair joins the pair's lead cell
     /// (core behaviour, `WideWriteTests`), and the wide cluster is scaled
     /// into the two-cell box — the cell after the pair stays blank even
     /// though U+20D0's enclosing circle widens the ink.
@@ -186,7 +186,7 @@ import Testing
             "a wide cluster spilled past its pair")
     }
 
-    /// M3.6 done-when, renderer half: a ZWJ family emoji drawn as the wide
+    /// Renderer half of ZWJ clusters: a ZWJ family emoji drawn as the wide
     /// cluster the grid references inks its two-cell box and nothing beyond
     /// it. This builds the quad by hand — it exercises the atlas's cluster
     /// shaping plus the scale-and-centre quad math, not the
@@ -252,7 +252,7 @@ import Testing
             "the family emoji spilled into the neighbouring cell")
     }
 
-    /// M3 eviction: a screen whose content exceeds one atlas page forces a
+    /// Atlas eviction: a screen whose content exceeds one atlas page forces a
     /// reset mid-build; the renderer notices the generation bump, rebuilds,
     /// and still draws — no crash, no wedged state.
     @Test func atlasExhaustionDuringRenderRecovers() throws {

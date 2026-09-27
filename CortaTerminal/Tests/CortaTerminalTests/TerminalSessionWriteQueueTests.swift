@@ -4,7 +4,7 @@ import Testing
 
 @testable import CortaTerminal
 
-// P01: the write path is a bounded, ordered, cancellable queue drained by a
+// The write path is a bounded, ordered, cancellable queue drained by a
 // serial writer queue — `write` itself only enqueues. These tests use the
 // `writerSink` hook to gate and record outbound bytes deterministically;
 // like `TerminalSessionTests` they wait on conditions, never on the clock,
@@ -12,9 +12,9 @@ import Testing
 @Suite(.serialized) struct TerminalSessionWriteQueueTests {
     /// Keyboard input and the parser's query replies share one FIFO: a DA1
     /// query fed to the reader between two user writes must reach the pty
-    /// between those same two writes — before P01 the reply was written
-    /// synchronously from the reader thread and could interleave with a
-    /// main-thread `write` byte stream.
+    /// between those same two writes — a reply written synchronously from
+    /// the reader thread could interleave with a main-thread `write` byte
+    /// stream.
     @Test func userInputAndProtocolRepliesKeepTheirEnqueueOrder() throws {
         let session = try TerminalSession(executable: "/bin/cat")
         defer { session.stop() }
@@ -200,7 +200,7 @@ import Testing
             "the seventh chunk arrives with a 6 MB backlog and must be dropped; drained markers: \(markers)")
     }
 
-    /// B03: the queueing decision itself must be observable, not just its
+    /// The queueing decision itself must be observable, not just its
     /// eventual effect on what the child receives — a caller that can react
     /// (a paste chunking itself) needs to know a chunk was dropped without
     /// waiting to see whether it was ever echoed back.

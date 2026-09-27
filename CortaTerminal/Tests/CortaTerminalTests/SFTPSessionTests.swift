@@ -3,7 +3,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// B14 — the session against the scripted fake server over the in-memory
+/// The session against the scripted fake server over the in-memory
 /// loopback: handshake and capabilities, request/response plumbing, the
 /// in-flight window bound, cancellation of in-flight requests, and
 /// teardown on protocol violations.

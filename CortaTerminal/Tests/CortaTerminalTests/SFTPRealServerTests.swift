@@ -4,7 +4,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// B14 against the real thing: `/usr/libexec/sftp-server` is on every Mac,
+/// SFTP against the real thing: `/usr/libexec/sftp-server` is on every Mac,
 /// and `SFTPSubprocessChannel.spawn` takes an executable and argv, so the
 /// whole stack — spawn, pipes, codec, session, engine — runs against
 /// OpenSSH's own server on a temporary directory, with no ssh, no network

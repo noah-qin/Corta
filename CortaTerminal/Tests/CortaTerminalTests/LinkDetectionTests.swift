@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M4.6 — URL detection over logical lines: the scheme allowlist, prose
+/// URL detection over logical lines: the scheme allowlist, prose
 /// punctuation trimming, soft-wrap joining and hit-testing by cell.
 @Suite("LinkDetection")
 struct LinkDetectionTests {
@@ -74,7 +74,7 @@ struct LinkDetectionTests {
         #expect(LinkDetection.link(at: SelectionPoint(row: 1, column: 0), in: terminal.grid) == nil)
     }
 
-    // P08 — the hover path is bounded: pattern detection skips logical
+    // The hover path is bounded: pattern detection skips logical
     // lines past `maxPatternScanCells`.
 
     /// One wrapped line of ~120k cells — past the cap — with a URL in the
@@ -108,7 +108,7 @@ struct LinkDetectionTests {
     }
 }
 
-/// U17 — `path:line:column` in output. The shape a *tool* emits, which is
+/// `path:line:column` in output. The shape a *tool* emits, which is
 /// what makes a match mean something; a bare path is deliberately not
 /// detected, because ordinary prose is full of things that look like one.
 @Suite struct FileReferenceDetectionTests {

@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M4.2 — reflow: re-wrapping the document when the column count changes.
+/// Reflow: re-wrapping the document when the column count changes.
 @Suite("Reflow")
 struct ReflowTests {
     private func write(_ text: String, to grid: inout Grid) {

@@ -55,7 +55,7 @@ struct MenuShortcutTests {
         #expect(duplicates.isEmpty, "duplicate key equivalents: \(duplicates.joined(separator: ", "))")
     }
 
-    /// U08 — one source of truth. The menu bar, the command palette and
+    /// One source of truth. The menu bar, the command palette and
     /// Help ▸ Keyboard Shortcuts must all show the key that actually runs the
     /// command; the palette and the sheet both read
     /// `keybindings[command]?.displayText`, and this pins the third consumer,

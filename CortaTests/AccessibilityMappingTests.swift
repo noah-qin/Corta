@@ -4,7 +4,7 @@ import Testing
 
 @testable import Corta
 
-/// U01 — the two conversions an assistive technology asks a terminal for, and
+/// The two conversions an assistive technology asks a terminal for, and
 /// the one nothing else in the app has to get right.
 ///
 /// `NSRange` counts UTF-16 code units; a grid counts columns. They agree only
@@ -28,7 +28,7 @@ struct AccessibilityMappingTests {
     // MARK: - Column -> UTF-16
 
     /// The ASCII case, where offset and column happen to be equal — the
-    /// coincidence the old code mistook for the rule.
+    /// coincidence that must not be mistaken for the rule.
     @Test func asciiColumnsAndOffsetsCoincide() {
         var terminal = Self.terminal()
         terminal.feed(Array("hello".utf8))
@@ -209,7 +209,7 @@ struct AccessibilityMappingTests {
 
     /// `accessibilityRange(for:)` is handed a **screen** point. Converting it
     /// as if it were a window point put every answer off by the window's
-    /// origin, which on a second display is thousands of points (U01).
+    /// origin, which on a second display is thousands of points.
     @Test func hitTestingConvertsFromScreenNotWindow() {
         let window = NSWindow(
             contentRect: NSRect(x: 400, y: 500, width: 400, height: 300),

@@ -3,7 +3,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M0.1 — the package exists to escape `SWIFT_DEFAULT_ACTOR_ISOLATION =
+/// The package exists to escape `SWIFT_DEFAULT_ACTOR_ISOLATION =
 /// MainActor` (`DESIGN.md` §2.2). These tests fail if that ever regresses.
 @Suite("Package isolation")
 struct PackageIsolationTests {

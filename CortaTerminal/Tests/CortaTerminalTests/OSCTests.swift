@@ -3,7 +3,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M2.8 — OSC 0/2 window title and OSC 7 working directory. Set only: the
+/// OSC 0/2 window title and OSC 7 working directory. Set only: the
 /// title query is never implemented (`SECURITY.md` §2.2), and no OSC ever
 /// produces output bytes.
 @Suite("OSC")

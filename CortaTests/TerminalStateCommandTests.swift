@@ -4,7 +4,7 @@ import Testing
 
 @testable import Corta
 
-/// U11 — Clear Screen, Clear History and Reset Terminal.
+/// Clear Screen, Clear History and Reset Terminal.
 ///
 /// The point of three commands is that each one discards a different thing,
 /// so the table in `CONFIGURATION.md` §5 is the specification and these are

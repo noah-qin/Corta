@@ -3,7 +3,7 @@ import Testing
 @testable import CortaTerminal
 
 /// `?45` — reverse-wraparound mode (not DECBKM, which is the separate `?67`
-/// backarrow-key mode) (B06). While set, `BS`/`CUB`
+/// backarrow-key mode). While set, `BS`/`CUB`
 /// running out of columns on a row that auto-wrapped from the one above
 /// continue onto that row's last column instead of stopping at column 0.
 @Suite("Reverse wraparound (?45)")

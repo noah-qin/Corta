@@ -5,12 +5,12 @@ import Testing
 @testable import Corta
 import CortaTerminal
 
-/// P05 — image decoding lives off the frame path. The frame path
+/// Image decoding lives off the frame path. The frame path
 /// (`texture(for:)`, `draw`) is a pure cache lookup; `update(table:...)`
 /// only *schedules* decodes onto an injected scheduler; reused image ids
 /// invalidate the texture decoded from the old bytes; and pruning runs even
 /// when the last placement disappears.
-@Suite("Image decode pipeline (P05)", .serialized, .metalSerialized)
+@Suite("Image decode pipeline", .serialized, .metalSerialized)
 struct ImageDecodePipelineTests {
     private static func makeDevice() -> MTLDevice? { MTLCreateSystemDefaultDevice() }
 
@@ -134,8 +134,8 @@ struct ImageDecodePipelineTests {
         #expect(renderer.cachedTextureBytes == 16)
 
         // a=d,d=i — the image and its placements go away. Pruning must run
-        // even though the table is now empty (the pre-P05 prune bailed out
-        // early on an empty placement list and leaked the texture).
+        // even though the table is now empty (a prune that bails out early
+        // on an empty placement list leaks the texture).
         terminal.feed(Array("\u{1B}_Ga=d,d=i,i=1\u{1B}\\".utf8))
         renderer.update(
             table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,

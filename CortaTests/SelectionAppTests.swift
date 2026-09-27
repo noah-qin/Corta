@@ -6,7 +6,7 @@ import Testing
 
 @testable import Corta
 
-/// M3.7, renderer side: the selection's document rows (scrollback rows
+/// The selection's document rows (scrollback rows
 /// negative) are translated to viewport rows through the scroll offset and
 /// the scrollback's growth since the selection was recorded.
 @Suite(.serialized, .metalSerialized) struct SelectionRendererTests {
@@ -167,7 +167,7 @@ import Testing
             "a stale highlight would still sit on the old row")
     }
 
-    /// B04: once the scrollback ring has saturated, `scrollback.count` stops
+    /// Once the scrollback ring has saturated, `scrollback.count` stops
     /// growing while eviction keeps shifting what each stored document row
     /// means — the shift `selectionQuads` applies must use
     /// `Scrollback.totalPushed` (monotonic) rather than `.count`
@@ -216,7 +216,7 @@ import Testing
     }
 }
 
-/// M3.7, hit-testing: a view point maps to a document position through the
+/// Hit-testing: a view point maps to a document position through the
 /// content insets, the grid's bottom anchoring and the scroll offset.
 struct SelectionCellMappingTests {
     private static let metrics = CellMetrics(

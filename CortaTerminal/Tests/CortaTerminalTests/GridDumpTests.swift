@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M1.5 — the serialiser every golden test is read through.
+/// The serialiser every golden test is read through.
 ///
 /// The expectations here are written by hand. If the dump format changes,
 /// these are the files to edit first; the goldens follow.

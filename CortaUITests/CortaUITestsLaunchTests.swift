@@ -16,7 +16,7 @@ final class CortaUITestsLaunchTests: XCTestCase {
     @MainActor
     func testLaunch() throws {
         let app = XCUIApplication()
-        // Session restore (M7.4) would otherwise carry the previous
+        // Session restore would otherwise carry the previous
         // test's windows into this one; the suite asserts window counts.
         app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
         app.launch()

@@ -4,7 +4,7 @@ import Testing
 
 @testable import CortaTerminal
 
-// P02: a `snapshot()` from the render thread must not starve behind the
+// A `snapshot()` from the render thread must not starve behind the
 // reader's feed under an output flood. Releasing the lock between feed
 // slices is not enough on its own — a woken `os_unfair_lock` waiter lands
 // slower than the reader re-acquires — so the reader leaves a real gap

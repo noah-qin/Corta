@@ -3,7 +3,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// B14 — the subprocess channel's pure policy: argv shape and exit
+/// The subprocess channel's pure policy: argv shape and exit
 /// classification. Nothing here spawns a process; the channel's real
 /// subprocess is exercised only in the app, never in tests.
 @Suite("SFTP channel")

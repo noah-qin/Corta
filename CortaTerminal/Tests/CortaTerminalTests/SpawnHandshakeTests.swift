@@ -4,7 +4,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// E04 — the `corta-exec` handshake: bounded, `EINTR`-tolerant, fully
+/// The `corta-exec` handshake: bounded, `EINTR`-tolerant, fully
 /// decoded. The pipe tests drive `readHelperStatus` directly; only the last
 /// test spawns a real child (hence `.serialized`).
 @Suite(.serialized) struct SpawnHandshakeTests {
@@ -63,7 +63,7 @@ import Testing
 
     @Test func failedExecReportsTheHelpersErrno() throws {
         // End to end: `corta-exec` fails the execve, writes ENOENT, and
-        // `Spawn.child` throws it (and reaps the helper — E04).
+        // `Spawn.child` throws it (and reaps the helper).
         #expect(throws: PTYError.spawnFailed(code: ENOENT)) {
             try PTY.spawn(executable: "/nonexistent/corta-does-not-exist")
         }

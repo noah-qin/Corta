@@ -175,7 +175,7 @@ import Testing
     }
 
     /// Same end to end for a ZWJ cluster (👨‍👩‍👧‍👦): the core collapses the
-    /// sequence into one wide cluster cell (`Grid.write`'s M3.6 path), and
+    /// sequence into one wide cluster cell (`Grid.write`'s ZWJ path), and
     /// the cluster must rasterise in color exactly like a single scalar.
     /// Runs at scale 2 as well — the live app rasterises its atlas at
     /// `font size * backingScale`.

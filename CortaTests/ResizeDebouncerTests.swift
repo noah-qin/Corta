@@ -4,7 +4,7 @@ import Testing
 
 @testable import Corta
 
-/// M2.9: a live window drag must not hammer the child with `TIOCSWINSZ` /
+/// A live window drag must not hammer the child with `TIOCSWINSZ` /
 /// `SIGWINCH` per mouse motion — N events coalesce to a bounded number of
 /// deliveries, and the final size always wins.
 @MainActor
@@ -59,7 +59,7 @@ struct ResizeDebouncerTests {
         #expect(sent.count == 1)
     }
 
-    /// P03 characterization: trailing-only means a pause longer than the
+    /// Characterization: trailing-only means a pause longer than the
     /// window delivers the size current at that pause — a slow drag is not
     /// starved, it just never delivers a superseded size.
     @Test func pauseLongerThanWindowDeliversSizeAtThePause() async throws {

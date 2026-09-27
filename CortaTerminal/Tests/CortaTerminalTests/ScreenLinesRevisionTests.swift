@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M9 — the per-row mutation stamp `TerminalRenderer` reads instead of
+/// The per-row mutation stamp `TerminalRenderer` reads instead of
 /// comparing full `Line` values (`ScreenLines.swift`, `PERFORMANCE.md` §3
 /// "On damage tracking"). Driven directly against `Grid`/`ScreenLines`, no
 /// parser, no renderer.

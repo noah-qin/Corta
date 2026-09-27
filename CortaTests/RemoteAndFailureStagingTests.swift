@@ -4,7 +4,7 @@ import Testing
 
 @testable import Corta
 
-/// U17 — the remote case, staged through the input a real `ssh` session
+/// The remote case, staged through the input a real `ssh` session
 /// actually supplies.
 ///
 /// The earlier record said "no ssh session was staged" and asserted the
@@ -122,7 +122,7 @@ struct RemoteWorkingDirectoryTests {
     }
 }
 
-/// U09 — the shell/directory fallback ladder, staged with a shell that does
+/// The shell/directory fallback ladder, staged with a shell that does
 /// not exist and a directory that does not exist.
 ///
 /// The earlier record said the ladder was "verified by inspection", because
@@ -154,8 +154,8 @@ struct SpawnFallbackLadderTests {
         #expect(started.session.pty.processIdentifier > 0)
     }
 
-    /// Both ingredients bad at once — the case that used to abort the whole
-    /// pane. The ladder drops one, then the other.
+    /// Both ingredients bad at once — still not a reason to abort the pane. The
+    /// ladder drops one, then the other.
     @Test("a bad shell and a bad directory still produce a terminal")
     func bothBadStillStarts() throws {
         let started = try ViewController.startSession(

@@ -4,7 +4,7 @@ import Testing
 
 @testable import Corta
 
-/// U17 — resolving a `path:line` reference to a file on *this* machine, and
+/// Resolving a `path:line` reference to a file on *this* machine, and
 /// refusing when it is not one.
 ///
 /// The refusals are the interesting half. A path in a pane's output names a
