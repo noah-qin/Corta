@@ -4,7 +4,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// S03 — synchronized-output (`?2026`) timeout and recovery.
+/// Synchronized-output (`?2026`) timeout and recovery.
 ///
 /// `.serialized` and condition-based waits, for the same reasons as
 /// `TerminalSessionTests`: every test spawns a real child.

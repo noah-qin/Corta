@@ -4,7 +4,7 @@ import Testing
 
 @testable import Corta
 
-/// M9 — `RenderPolicy`'s frame-rate ceiling adaptation, checked against
+/// `RenderPolicy`'s frame-rate ceiling adaptation, checked against
 /// `FrameScheduler`'s remembered `preferredFrameRateRange` rather than a
 /// live `CAMetalDisplayLink` (which needs a real window and vsync to do
 /// anything observable) — `FrameScheduler.preferredFrameRateRange`'s getter

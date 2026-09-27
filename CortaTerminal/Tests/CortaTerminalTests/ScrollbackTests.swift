@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M1.14 — the scrollback ring buffer.
+/// The scrollback ring buffer.
 @Suite("Scrollback")
 struct ScrollbackTests {
     private func line(_ text: String) -> Line {
@@ -93,7 +93,7 @@ struct ScrollbackTests {
         scrollback.push(line("after"))
         #expect(text(scrollback[0]) == "after")
     }
-    /// M6.10 — `count` saturates at the limit, so it cannot say how far the
+    /// `count` saturates at the limit, so it cannot say how far the
     /// document has moved once the ring is full. `totalPushed` can.
     @Test("totalPushed keeps counting after the ring is full")
     func totalPushedIsMonotonic() {
@@ -104,7 +104,7 @@ struct ScrollbackTests {
     }
 }
 
-/// M1.14 — the grid's side of it.
+/// The grid's side of it.
 @Suite("Grid scrollback")
 struct GridScrollbackTests {
     private func terminal(_ source: String, rows: Int, columns: Int, limit: Int) throws

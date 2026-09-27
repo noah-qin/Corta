@@ -5,7 +5,7 @@ import Testing
 
 @testable import Corta
 
-/// B14, remote editing — the store, the resolution, and the coordinator,
+/// Remote editing — the store, the resolution, and the coordinator,
 /// all against the shared fake (`SFTPTestSupport.swift`) and per-test temp
 /// directories. The real Application Support is never touched.
 @MainActor

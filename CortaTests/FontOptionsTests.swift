@@ -5,7 +5,7 @@ import Testing
 
 @testable import Corta
 
-/// U18: what the font pipeline offers beyond the shipped face — ligatures,
+/// What the font pipeline offers beyond the shipped face — ligatures,
 /// and a third-party family named from the config file.
 ///
 /// **Ligatures are not supported, and these tests pin that as a property

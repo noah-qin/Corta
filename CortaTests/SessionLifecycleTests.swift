@@ -5,7 +5,7 @@ import Testing
 @testable import Corta
 import CortaTerminal
 
-/// B03: a child that exits on its own (`exit`, a crash, `kill`) must produce
+/// A child that exits on its own (`exit`, a crash, `kill`) must produce
 /// a UI reaction — before this, `onChildExit` was never installed and the
 /// pane simply went quiet — and a child that exits *because* the user closed
 /// the pane (`teardown()`'s `SIGHUP`) must never mutate a pane that is

@@ -1,6 +1,6 @@
 import XCTest
 
-/// M4.4 and M4.7, against the live app: ⌘F opens the search bar and Esc
+/// Search and tabs, against the live app: ⌘F opens the search bar and Esc
 /// closes it; ⌘T adds a native tab (a second window in the tab group).
 final class SearchAndTabUITests: XCTestCase {
     override func setUpWithError() throws {
@@ -10,7 +10,7 @@ final class SearchAndTabUITests: XCTestCase {
     @MainActor
     func testCommandFOpensTheSearchBarAndEscapeClosesIt() throws {
         let app = XCUIApplication()
-        // Session restore (M7.4) would otherwise carry the previous
+        // Session restore would otherwise carry the previous
         // test's windows into this one; the suite asserts window counts.
         app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
         app.launch()
@@ -32,7 +32,7 @@ final class SearchAndTabUITests: XCTestCase {
     @MainActor
     func testCommandTOpensATab() throws {
         let app = XCUIApplication()
-        // Session restore (M7.4) would otherwise carry the previous
+        // Session restore would otherwise carry the previous
         // test's windows into this one; the suite asserts window counts.
         app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
         app.launch()
@@ -52,18 +52,18 @@ final class SearchAndTabUITests: XCTestCase {
         waitForExpectations(timeout: 5)
     }
 
-    /// Every ⌘T used to take a chrome height off the shared window frame —
-    /// four tabs collapsed a 451pt window to the 49pt minimum — because
-    /// inserting `.fullSizeContentView` re-derives the frame from the
-    /// content size and a tab, unlike a standalone window, never overwrites
-    /// the frame afterwards.
+    /// A ⌘T must not take a chrome height off the shared window frame —
+    /// four tabs would collapse a 451pt window to the 49pt minimum. The
+    /// risk is real because inserting `.fullSizeContentView` re-derives the
+    /// frame from the content size, and a tab, unlike a standalone window,
+    /// never overwrites the frame afterwards.
     ///
     /// The tab bar appearing does grow the frame once, by its own height, so
     /// that the panes keep their row count; after that the frame is fixed.
     @MainActor
     func testTabsDoNotShrinkTheWindow() throws {
         let app = XCUIApplication()
-        // Session restore (M7.4) would otherwise carry the previous
+        // Session restore would otherwise carry the previous
         // test's windows into this one; the suite asserts window counts.
         app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
         app.launch()

@@ -2,12 +2,12 @@ import Testing
 
 @testable import CortaTerminal
 
-/// P06 — reference-safe reclamation for the hyperlink and grapheme side
+/// Reference-safe reclamation for the hyperlink and grapheme side
 /// tables. The safety rule: an id may be recycled only when no cell or pen
 /// of the same `Grid` value still carries it; snapshots and the parked
 /// alternate screen need no scanning because each `Grid` value owns its
 /// table copy (a mutation copy-on-writes away from them).
-@Suite("Side-table reclamation (P06)")
+@Suite("Side-table reclamation")
 struct SideTableReclamationTests {
     private static let linkPrefix = "\u{1B}]8;;"
     private static let linkSuffix = "\u{1B}\\"
@@ -104,7 +104,7 @@ struct SideTableReclamationTests {
 
         // Capacity is exhausted, but every filler id is dead: the sweep in
         // `Grid.internHyperlink` must reclaim them rather than failing
-        // closed forever (the pre-P06 behaviour).
+        // closed forever.
         Self.feed(&terminal, Self.linkSequence("https://late.test", "LATE"))
         let id = terminal.grid.line(0)[0].hyperlink
         #expect(terminal.grid.hyperlinks.url(for: id) == "https://late.test")

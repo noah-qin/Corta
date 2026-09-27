@@ -10,7 +10,7 @@ import Testing
 ///
 /// - **`.metalSerialized`** — `GlyphAtlas` is single-threaded by design, and
 ///   a full parallel run aborted the runner in `ColorEmojiRenderTests` with a
-///   texture descriptor Metal refused (T07). Nothing reproduced it in
+///   texture descriptor Metal refused. Nothing reproduced it in
 ///   isolation; the suites that build an atlas now take turns.
 /// - **`.sessionRestoreSerialized`** — `SessionRestore.directory` is a
 ///   mutable static, opened up for exactly this reason. Two suites point it

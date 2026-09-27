@@ -3,7 +3,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M10 — the Kitty graphics protocol subset `KittyGraphics.swift` documents:
+/// The Kitty graphics protocol subset `KittyGraphics.swift` documents:
 /// direct (base64, in-band) transmission, placement and deletion. Driven
 /// directly against `Terminal.feed`, the same way `HyperlinkTests` and
 /// `OSCTests` exercise their protocols — real APC byte sequences in, the
@@ -86,9 +86,8 @@ struct KittyGraphicsTests {
     /// Real `kitten icat` sends exactly this shape for a plain (non-`--place`,
     /// non-reused) display — `a=T,q=2,f=100,s=64,v=64;<payload>`, no `i=` at
     /// all — captured from an actual `--transfer-mode=stream` run against a
-    /// Release build during M10's real-client verification pass. Requiring a
-    /// positive id silently dropped the whole command; this is the
-    /// regression test for that.
+    /// Release build. Requiring a positive id would silently drop the whole
+    /// command.
     @Test("a transmit-and-display with no i= at all (a real client's common shape) still places")
     func transmitAndDisplayWithNoImageIDStillPlaces() {
         var terminal = Terminal(rows: 10, columns: 40)
@@ -213,7 +212,7 @@ struct KittyGraphicsTests {
     }
 
     /// The exact bytes a real `kitten icat --transfer-mode=stream` sent
-    /// against a Release build (M10's real-client verification pass) —
+    /// against a Release build —
     /// captured with `script(1)` off the pty, not synthesised. Two things
     /// about this specific capture matter and are exactly why it is kept
     /// verbatim rather than reduced to a minimal case: no `i=` (covered
@@ -292,10 +291,9 @@ struct KittyGraphicsTests {
         #expect(terminal.takeOutput() == Array("\u{1B}_Gi=12;EINVAL:bad size\u{1B}\\".utf8))
     }
 
-    /// A PR review caught this: the per-chunk budget guard in
-    /// `receiveChunk` used to drop the pending transmission and return with
-    /// no response at all, contradicting `respond`'s own doc comment that
-    /// every non-quiet command is acknowledged — a real client would be
+    /// The per-chunk budget guard in `receiveChunk` must answer, not drop
+    /// the pending transmission silently: `respond`'s own doc comment says
+    /// every non-quiet command is acknowledged, and a real client would be
     /// left waiting on an OK/error that never comes.
     @Test("a chunked transmission that overflows the byte budget still answers, not silence")
     func oversizedChunkedTransmissionStillAnswers() {
@@ -392,9 +390,9 @@ struct KittyGraphicsTests {
         #expect(response.contains("ENOSPC"))
     }
 
-    // MARK: - Invalid ids (S01)
+    // MARK: - Invalid ids
 
-    /// S01's three release-build SIGTRAP reproducers, plus the boundary
+    /// Three release-build SIGTRAP reproducers, plus the boundary
     /// values on each side: every id on the wire is unsigned 32-bit, and a
     /// negative or overflowing one must be ignored like any unrecognised
     /// sequence (`KittyGraphicsParser.uint32ID`) — never trapped on, never

@@ -43,7 +43,7 @@ struct MenuAndPaletteAuditTests {
     /// row that does nothing when clicked. AppKit enables such an item
     /// unconditionally — `validateMenuItem` is never consulted for an item
     /// with no action — so it looks available and is not. The preset row was
-    /// exactly this bug before it was hidden rather than disabled (U16).
+    /// exactly this bug before it was hidden rather than disabled.
     @Test("no item in the menu bar is enabled with nothing behind it")
     func everyItemLeadsSomewhere() throws {
         let menu = try #require(NSApp.mainMenu)
@@ -198,7 +198,7 @@ struct LocalizationCoverageTests {
         #expect(mismatched.isEmpty, "format specifiers differ: \(mismatched.sorted())")
     }
 
-    /// B10 — mechanical, not linguistic: this cannot judge whether a
+    /// Mechanical, not linguistic: this cannot judge whether a
     /// translation reads naturally (`CONTRIBUTING.md`'s "Localization"
     /// section reserves that for a native speaker flipping the state to
     /// `translated`), only whether one was ever supplied at all. A
@@ -248,7 +248,7 @@ struct LocalizationCoverageTests {
         #expect(untranslated.isEmpty, "reads as untranslated English: \(untranslated.sorted())")
     }
 
-    /// B10 — `CONTRIBUTING.md`'s "Localization" section: `needs_review`
+    /// `CONTRIBUTING.md`'s "Localization" section: `needs_review`
     /// means untouched by a native speaker, `translated` is the claim that
     /// one has actually read it in context. `en` is the source language, not
     /// a translation of anything, so it is exempt rather than required to

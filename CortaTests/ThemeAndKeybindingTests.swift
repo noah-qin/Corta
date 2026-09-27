@@ -3,7 +3,7 @@ import Testing
 
 @testable import Corta
 
-/// M7.6 (config-file themes) and M7.7 (rebindable shortcuts) — both are new
+/// Config-file themes and rebindable shortcuts — both are
 /// key families in the config file, so both are tested through the same
 /// parse-and-serialise round trip the rest of `Configuration` is.
 @Suite struct ThemeAndKeybindingTests {
@@ -147,7 +147,7 @@ import Testing
         #expect(!text.contains("bind.new-tab"))
     }
 
-    // MARK: - Matching a key event (U08)
+    // MARK: - Matching a key event
 
     private static func event(
         _ characters: String, ignoring: String? = nil,
@@ -200,7 +200,7 @@ import Testing
         }
     }
 
-    // MARK: - The palette's filter (M7.12)
+    // MARK: - The palette's filter
 
     @Test("an abbreviation finds the command it abbreviates")
     func paletteFuzzyMatching() {
@@ -220,9 +220,9 @@ import Testing
 
     // MARK: - New scalar settings
 
-    /// U05 — `option-as-meta` was serialised but had no parse case, so a
-    /// user who typed it into the file got an "unknown key" and the setting
-    /// never applied; the settings page had no switch for it either. The
+    /// `option-as-meta` must parse as well as serialise: a key without a
+    /// parse case reads back as "unknown key" and the setting never
+    /// applies. The
     /// round trip is what catches a write-only key.
     @Test("option-as-meta round-trips through the config file")
     func optionAsMetaRoundTrips() {
@@ -241,7 +241,7 @@ import Testing
     func newSettingsRoundTrip() {
         var configuration = Configuration()
         configuration.optionAsMeta = true
-        // The non-default: copy-on-select ships on (M7.10).
+        // The non-default: copy-on-select ships on.
         configuration.copyOnSelect = false
         configuration.linkActivation = .click
         configuration.allowClipboardWrite = true

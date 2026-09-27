@@ -6,7 +6,7 @@ import Testing
 
 @testable import Corta
 
-/// B06 render-path integration: an OSC 4 override now changes what is
+/// Render-path integration: an OSC 4 override changes what is
 /// painted, not only what a query answers (`docs/DESIGN.md` §7). Same
 /// offscreen-texture pattern `CursorStyleRenderTests` already uses.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded by

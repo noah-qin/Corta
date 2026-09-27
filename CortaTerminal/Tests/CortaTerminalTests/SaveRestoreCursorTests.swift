@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M2.5 — DECSC/DECRC, driven through the grid API. The wire form
+/// DECSC/DECRC, driven through the grid API. The wire form
 /// (`ESC 7` / `ESC 8`) is covered by the `save-restore-cursor` golden.
 @Suite("Save and restore cursor")
 struct SaveRestoreCursorTests {
@@ -60,7 +60,7 @@ struct SaveRestoreCursorTests {
         #expect(grid.cursor == Cursor(row: 0, column: 3))
     }
 
-    // MARK: - SCOSC / SCORC (B06)
+    // MARK: - SCOSC / SCORC
 
     /// `CSI s` / `CSI u` (ANSI.SYS SCOSC/SCORC), wired as aliases for
     /// DECSC/DECRC since Corta has no DECLRMM margin mode to disambiguate

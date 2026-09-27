@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M2.4 — the scroll region (DECSTBM), driven through the grid API.
+/// The scroll region (DECSTBM), driven through the grid API.
 @Suite("Scroll region")
 struct ScrollRegionTests {
     private func write(_ text: String, to grid: inout Grid) {

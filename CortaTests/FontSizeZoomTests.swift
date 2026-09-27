@@ -3,12 +3,11 @@ import Testing
 
 @testable import Corta
 
-/// B09 — a font-size change from ⌘+/⌘−/pinch is a temporary, per-window
-/// zoom, not a write to the config file. Regression coverage for the bug
-/// this closes: zooming one window used to change every other open
-/// window's size (and the saved default) the moment either next re-read
-/// the config — `persistFontSize` wrote the zoomed size straight into
-/// `Configuration.fontSize`.
+/// A font-size change from ⌘+/⌘−/pinch is a temporary, per-window
+/// zoom, not a write to the config file. Written into
+/// `Configuration.fontSize`, a zoom in one window would change every other
+/// open window's size (and the saved default) the moment either next
+/// re-read the config.
 ///
 /// Real panes, like `PaneZoomTests`: each spawns a genuine `zsh -l`, torn
 /// down at the end of every test. Never writes `ConfigurationStore.shared`
@@ -68,10 +67,9 @@ struct FontSizeZoomTests {
         #expect(pane.fontSize == CGFloat(ConfigurationStore.shared.configuration.fontSize))
     }
 
-    /// The regression itself: `configurationChanged` used to apply
-    /// `Configuration.fontSize` unconditionally, so a zoomed pane snapped
-    /// back to the default the moment *anything* in the config changed —
-    /// not only a font-size edit.
+    /// `configurationChanged` must not apply `Configuration.fontSize` to a
+    /// zoomed pane, or it snaps back to the default the moment *anything*
+    /// in the config changes — not only a font-size edit.
     @Test func aZoomedPaneIgnoresAConfigurationChange() throws {
         let (split, _) = makeSplit()
         defer { split.teardown() }

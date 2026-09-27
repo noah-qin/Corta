@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M2.5 — DECSCUSR (`CSI Ps SP q`, xterm ctlseqs), driven through a
+/// DECSCUSR (`CSI Ps SP q`, xterm ctlseqs), driven through a
 /// terminal because the parameter mapping is the performer's job.
 @Suite("Cursor style")
 struct CursorStyleTests {

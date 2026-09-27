@@ -3,7 +3,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// B14 — the SFTPv3 codec against hand-computed wire bytes. Every message
+/// The SFTPv3 codec against hand-computed wire bytes. Every message
 /// type round-trips through exact bytes, and truncated, lying or oversize
 /// input fails as a typed error — never a trap, never a giant allocation.
 @Suite("SFTP protocol codec")

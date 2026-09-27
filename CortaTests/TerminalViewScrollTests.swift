@@ -3,7 +3,7 @@ import Testing
 
 @testable import Corta
 
-/// U03: precise trackpad points and discrete wheel lines are separate
+/// Precise trackpad points and discrete wheel lines are separate
 /// units, each accumulated across events so sub-line deltas carry into
 /// whole lines instead of rounding away. The view-level cases drive
 /// `scrollWheel(with:)` with synthetic CGEvent-backed scroll events;
@@ -63,8 +63,8 @@ struct TerminalViewScrollTests {
 
     @Test func wheelNotchesPassThroughAsWholeLines() {
         let accumulator = ScrollWheelAccumulator()
-        // The pre-U03 code divided every delta by 10 points, so a single
-        // 1-line notch rounded to zero and the scrollback never moved.
+        // Dividing every delta by 10 points would round a single 1-line
+        // notch to zero, and the scrollback would never move.
         #expect(accumulator.lines(discreteLines: 1) == 1)
         #expect(accumulator.lines(discreteLines: 3) == 3)
         #expect(accumulator.lines(discreteLines: -2) == -2)

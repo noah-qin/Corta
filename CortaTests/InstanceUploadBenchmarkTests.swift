@@ -7,7 +7,7 @@ import Testing
 
 @testable import Corta
 
-/// B12 (issue #39) bounded-partial-upload experiment harness: frame CPU
+/// Bounded-partial-upload experiment harness: frame CPU
 /// time for the three damage shapes a terminal actually produces, at a
 /// representative 120×40 screen full of SGR-varied text (same fixture as
 /// `FrameCPUBaselineTests`):

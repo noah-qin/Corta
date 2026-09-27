@@ -6,7 +6,7 @@ import Testing
 
 @testable import Corta
 
-/// M2.7, app side: SGR (?1006) mouse reports are exact byte sequences —
+/// SGR (?1006) mouse reports are exact byte sequences —
 /// `ESC [ < Cb ; Cx ; Cy M` for press and wheel, `... m` for release — with
 /// 1-based coordinates derived from the cell metrics.
 struct MouseReportingTests {

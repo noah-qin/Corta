@@ -4,7 +4,7 @@ import Testing
 
 @testable import Corta
 
-/// S05 — restoring must never hand a directory to a local spawn unless it
+/// Restoring must never hand a directory to a local spawn unless it
 /// names a local directory: state saved before OSC 7 reports were
 /// host-filtered can still carry a remote machine's path, and a directory on
 /// a volume that has gone away is just as unusable.
@@ -31,7 +31,7 @@ struct SessionRestoreTests {
         #expect(layout.droppingMissingDirectories() == layout)
     }
 
-    // MARK: - Preset identity and focus (B09)
+    // MARK: - Preset identity and focus
 
     @Test("presetName and isFocused round-trip through validation and directory-dropping")
     func presetAndFocusSurviveRepair() {
@@ -91,7 +91,7 @@ struct SessionRestoreTests {
 }
 
 
-/// U07 — a restore reads a file the user can edit and a crash can truncate,
+/// A restore reads a file the user can edit and a crash can truncate,
 /// so the geometry and the tree shape it names are validated rather than
 /// trusted, and a restore that dies is not tried a second time.
 @MainActor
@@ -195,8 +195,8 @@ struct RestoreValidationTests {
 
     /// A crash *during* a restore must not replay the layout that caused it;
     /// a crash at any other time must still find the arrangement waiting.
-    /// One marker file separates the two — the state file used to be deleted
-    /// at launch to get the first property, which cost the second (U07).
+    /// One marker file separates the two — deleting the state file at launch
+    /// would get the first property at the cost of the second.
     @Test("a restore that never finished is not tried again")
     func anInterruptedRestoreIsNotRetried() throws {
         let directory = FileManager.default.temporaryDirectory
@@ -240,7 +240,7 @@ struct RestoreValidationTests {
         #expect(SessionRestore.load().isEmpty)
     }
 
-    // MARK: - Versioning (B09)
+    // MARK: - Versioning
 
     @Test("a freshly constructed state carries the current version")
     func newStateCarriesCurrentVersion() {
@@ -281,7 +281,7 @@ struct RestoreValidationTests {
         #expect(SessionRestore.load().isEmpty)
     }
 
-    // MARK: - Tab group (B09)
+    // MARK: - Tab group
 
     @Test("tab group fields round-trip through the state file")
     func tabGroupFieldsRoundTrip() throws {
@@ -318,7 +318,7 @@ struct RestoreValidationTests {
     }
 }
 
-/// U07 — the crash path, staged.
+/// The crash path, staged.
 ///
 /// A test cannot kill the app mid-restore, but it does not need to: what a
 /// crash leaves behind is a marker file next to the state, and that is the

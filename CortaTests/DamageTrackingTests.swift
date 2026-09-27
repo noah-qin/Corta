@@ -6,7 +6,7 @@ import Testing
 
 @testable import Corta
 
-/// Damage tracking (M4.1 pulled into M2, `PERFORMANCE.md` §3): the instance
+/// Damage tracking (`PERFORMANCE.md` §3): the instance
 /// buffer is rebuilt only for rows whose line actually changed, and a fully
 /// static screen reports no damage at all — which is what lets the shell skip
 /// the frame and idle at ~0% CPU.
@@ -138,9 +138,9 @@ import Testing
         #expect(renderer.lastRebuiltRowCount == 4)
     }
 
-    // MARK: - M9: scroll shift
+    // MARK: - Scroll shift
 
-    /// A whole-screen scroll (M9) only rebuilds the newly exposed row —
+    /// A whole-screen scroll only rebuilds the newly exposed row —
     /// the survivors' instances are shifted in place, not rebuilt — so
     /// `lastRebuiltRowCount` after a one-line scroll is 1, not the whole
     /// screen, and the content each row shows afterward is still correct.

@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M6.5 and M6.6 — the query class the esctest failures were dominated by.
+/// The query class the esctest failures were dominated by.
 /// A probe that goes unanswered times out by design, so what these assert is
 /// not just the shape of each answer but that an answer exists at all.
 @Suite("Mode and colour queries")
@@ -13,7 +13,7 @@ struct ModeQueryTests {
         return String(decoding: terminal.takeOutput(), as: UTF8.self)
     }
 
-    // MARK: - DECRQM (M6.5)
+    // MARK: - DECRQM
 
     @Test("DECRQM reports a private mode the child has just set")
     func decrqmReportsASetPrivateMode() {
@@ -101,7 +101,7 @@ struct ModeQueryTests {
         #expect(!terminal.isBracketedPasteEnabled)
     }
 
-    // MARK: - XTVERSION (M6.5)
+    // MARK: - XTVERSION
 
     /// The envelope is the contract — `DCS > | Name(version) ST`, the shape
     /// every consumer parses — and the version inside it is whatever the
@@ -126,7 +126,7 @@ struct ModeQueryTests {
         #expect(response(to: "\u{1B}[>1q").isEmpty)
     }
 
-    // MARK: - Focus reporting (M6.7)
+    // MARK: - Focus reporting
 
     @Test("?1004 tracks like the other private modes")
     func focusReportingMode() {
@@ -143,7 +143,7 @@ struct ModeQueryTests {
         #expect(response(to: "\u{1B}[?1004h\u{1B}[?1004$p") == "\u{1B}[?1004;1$y")
     }
 
-    // MARK: - Dynamic colours (M6.6)
+    // MARK: - Dynamic colours
 
     @Test("OSC 11 ? reports the background as 16-bit rgb")
     func oscBackgroundQuery() {

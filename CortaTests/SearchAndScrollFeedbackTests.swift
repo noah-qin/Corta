@@ -4,7 +4,7 @@ import Testing
 
 @testable import Corta
 
-/// U12 — the four things scrollback search and the scrollback viewport were
+/// The four things scrollback search and the scrollback viewport were
 /// not telling the user.
 struct SearchStabilityTests {
     private static func ranges(atRows rows: [Int]) -> [SelectionRange] {
@@ -131,7 +131,7 @@ struct ScrollPositionIndicatorTests {
     }
 }
 
-/// U12 — the pill driven by real scroll events on a real pane, rather than by
+/// The pill driven by real scroll events on a real pane, rather than by
 /// setting `scrollOffset` directly.
 ///
 /// The earlier record said the appearance "was not driven by a real
@@ -219,7 +219,7 @@ struct ScrollIndicatorIntegrationTests {
         #expect(!pane.sawOutputWhileScrolled)
     }
 
-    /// **The defect this closes (B04).** `scrollOffset` is "lines above the
+    /// **The defect this closes.** `scrollOffset` is "lines above the
     /// live bottom" — so if it stayed numerically fixed while the child kept
     /// printing, the *document position* it pointed at would silently drift
     /// forward: a person mid-read on some history would find the text under
@@ -281,7 +281,7 @@ struct ScrollIndicatorIntegrationTests {
         #expect(anchor == totalBefore - offsetBefore)
     }
 
-    /// **The defect this closes (B04).** Typing while scrolled away from the
+    /// **The defect this closes.** Typing while scrolled away from the
     /// bottom went to the child exactly as it should — but the viewport
     /// stayed put, so what the user typed landed on a live screen they
     /// could not see, behind whatever history they had scrolled to. Every

@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M1.4 — the grid API, driven directly. No parser, no escape sequences.
+/// The grid API, driven directly. No parser, no escape sequences.
 @Suite("Grid")
 struct GridTests {
     @Test("an ASCII run matches scalar writes across wraps")
@@ -362,10 +362,10 @@ struct GridTests {
         #expect(!grid.line(0).wrapped)
     }
 
-    /// Shrinking used to `removeLast`, which threw away the rows the cursor
-    /// and the newest output were on — and threw them away silently, since
-    /// they never reached the scrollback either. Making a window smaller ate
-    /// the last commands you had run.
+    /// Shrinking must not `removeLast`, which throws away the rows the
+    /// cursor and the newest output are on — silently, since they never
+    /// reach the scrollback either. Making a window smaller would eat the
+    /// last commands you had run.
     @Test func shrinkingRowsScrollsIntoScrollbackInsteadOfTruncating() {
         var grid = Grid(rows: 5, columns: 10, scrollbackLimit: 100)
         for line in 1...5 {

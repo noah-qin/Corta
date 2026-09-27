@@ -6,7 +6,7 @@ import Testing
 @testable import Corta
 
 /// Renders offscreen and asserts actual pixel values — never visual
-/// inspection (roadmap M1.15's "Testing the GPU" note).
+/// inspection.
 @Suite(.serialized, .metalSerialized) struct QuadRendererTests {
     /// Reads back one BGRA8 pixel from `texture` at `x, y`.
     private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (
@@ -153,7 +153,7 @@ import Testing
         }
     }
 
-    // MARK: - M9: compiled-pipeline cache
+    // MARK: - Compiled-pipeline cache
 
     /// The first pipeline-set creation in a process writes a
     /// `MTLBinaryArchive` to disk so a later launch can look its three
@@ -161,7 +161,7 @@ import Testing
     /// file lands where `binaryArchiveURL` says it should; the compile-time
     /// saving itself is not something a unit test can observe (Metal does
     /// not expose "was this pipeline looked up or compiled"). The cache
-    /// reset forces a cold creation: since B12 the write happens inside
+    /// reset forces a cold creation: the write happens inside
     /// `QuadPipelineCache.makeEntry`, which runs at most once per device per
     /// process, and earlier tests have usually already warmed it.
     @Test func initWritesAPipelineCacheFile() throws {
@@ -182,7 +182,7 @@ import Testing
 
     /// A second renderer construction must succeed with the first one's
     /// cache file already on disk — and must not re-run the archive path at
-    /// all: since B12 it is a `QuadPipelineCache` hit. Running here, under
+    /// all: it is a `QuadPipelineCache` hit. Running here, under
     /// `CortaTests`, `loadOrCreateBinaryArchive.isRunningUnderXCTest` keeps
     /// the cold path from ever actually reading the file back —
     /// `-[_MTLDevice recordBinaryArchiveUsage:]` segfaulted inside Metal's

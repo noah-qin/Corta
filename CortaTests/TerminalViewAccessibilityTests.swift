@@ -4,7 +4,7 @@ import Testing
 
 @testable import Corta
 
-/// B10 — a programmatic audit of what VoiceOver actually calls, not a
+/// A programmatic audit of what VoiceOver actually calls, not a
 /// listening pass. `AccessibilityMappingTests` already exercises
 /// `TerminalAccessibilitySnapshot`'s column/offset math in isolation; this
 /// drives `TerminalView`'s own `NSAccessibility` overrides (`accessibility
@@ -13,7 +13,7 @@ import Testing
 /// nothing tested before this — the gap is the *view*, not the math it
 /// calls into.
 ///
-/// "Long-output reading/navigation verification" (B10's issue text) has two
+/// Verifying long-output reading and navigation has two
 /// halves: whether the data VoiceOver reads is structurally correct (this
 /// file, and `AccessibilityMappingTests`), and whether it *sounds* right
 /// read aloud (a human, listening — `docs/CONFORMANCE.md`'s "not judged"
@@ -106,7 +106,7 @@ struct TerminalViewAccessibilityTests {
 
     /// Scrolled into history, the view must report *that* text and *that*
     /// cursor line — not the live screen's, which is the defect this whole
-    /// subsystem's doc comments (U01) name as the reason a snapshot carries
+    /// subsystem's doc comments name as the reason a snapshot carries
     /// its own `scrollOffset`.
     @Test func scrolledViewReportsHistoryNotTheLiveScreen() {
         var terminal = self.terminal(rows: 5, columns: 20)

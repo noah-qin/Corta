@@ -71,7 +71,7 @@ struct AlignmentAndIdentityTests {
 
     /// It was silent. A query that goes unanswered is worse than one that is
     /// refused: the client waits rather than falling back — the same shape as
-    /// the fish hang the workflow harness hit (U10).
+    /// the fish hang the workflow harness hit.
     @Test("DECID answers, and answers exactly as Primary DA does")
     func decidAnswersLikePrimaryDA() {
         var byEscZ = Terminal(rows: 4, columns: 8)

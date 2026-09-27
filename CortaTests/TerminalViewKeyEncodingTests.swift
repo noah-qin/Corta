@@ -5,7 +5,7 @@ import Testing
 @testable import Corta
 
 /// The direct translation must keep producing exact bytes, so this is tested
-/// as a pure function from a synthetic `NSEvent` to a byte array. The M3.4
+/// as a pure function from a synthetic `NSEvent` to a byte array. The
 /// routing decision — which events ever reach this path versus the IME — is
 /// covered in `TerminalViewIMETests`.
 @MainActor
@@ -85,9 +85,9 @@ struct TerminalViewKeyEncodingTests {
         }
     }
 
-    /// U08 — the ghost binding. ⌘↑ belongs to `previous-command`; the literal
-    /// this branch used to carry made it scroll to the top of the scrollback
-    /// the moment that command was unbound.
+    /// The ghost binding. ⌘↑ belongs to `previous-command`; a literal here
+    /// would make it scroll to the top of the scrollback the moment that
+    /// command is unbound.
     @Test func commandArrowsAreNoLongerScrollGestures() throws {
         let bindings = Keybindings()
         #expect(
@@ -123,7 +123,7 @@ struct TerminalViewKeyEncodingTests {
         #expect(TerminalView.bytes(for: shiftHome) == Array("\u{1B}[1;2H".utf8))
     }
 
-    // MARK: - Paste (U08)
+    // MARK: - Paste
 
     /// The paste interception is the binding, not a written-in ⌘V.
     @Test func pasteInterceptionFollowsTheBinding() throws {
@@ -145,7 +145,7 @@ struct TerminalViewKeyEncodingTests {
         #expect(TerminalView.bytes(for: commandV) == Array("v".utf8))
     }
 
-    // MARK: - International layouts and dead keys (U05)
+    // MARK: - International layouts and dead keys
 
     /// **What `option-as-meta` has to not break.** On macOS ⌥ is text input:
     /// on a US layout ⌥e begins a dead-key acute accent, and on a German
@@ -225,7 +225,7 @@ struct TerminalViewKeyEncodingTests {
         #expect(TerminalView.bytes(for: optionLeft, optionAsMeta: true) == expected)
     }
 
-    // MARK: - The keypad (U04)
+    // MARK: - The keypad
 
     private static func keypadEvent(_ keyCode: UInt16, characters: String) -> NSEvent {
         NSEvent.keyEvent(
@@ -244,7 +244,7 @@ struct TerminalViewKeyEncodingTests {
 
     /// `ESC =` (DECKPAM) switches it to the SS3 forms xterm sends and
     /// `xterm-256color` promises. A program that sent `smkx` is waiting for
-    /// exactly these; the digits were reaching it as plain text before U04.
+    /// exactly these, not the digits as plain text.
     @Test func applicationKeypadSendsSS3Forms() {
         func bytes(_ keyCode: UInt16, _ characters: String) -> [UInt8]? {
             TerminalView.bytes(
@@ -285,9 +285,9 @@ struct TerminalViewKeyEncodingTests {
                 == Array("4".utf8))
     }
 
-    // MARK: - Kitty keyboard protocol (M6.9)
+    // MARK: - Kitty keyboard protocol
 
-    /// The done-when for M6.9: a Neovim mapping that binds `Ctrl+I` and
+    /// A Neovim mapping that binds `Ctrl+I` and
     /// `Tab` differently cannot work while both are `0x09`.
     @Test func disambiguateSeparatesControlIFromTab() throws {
         func controlI() -> NSEvent {

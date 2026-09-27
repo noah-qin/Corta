@@ -5,7 +5,7 @@ import Testing
 @testable import CortaTerminal
 
 /// Test helpers. Everything here drives a *real* pty and a *real* child
-/// process: the whole point of M1.1 is that the system calls are right, and a
+/// process: the whole point is that the system calls are right, and a
 /// mock would only assert that our mock matches our beliefs.
 enum PTYFixture {
     /// `/bin/sh -c script`, on a pty of the given size.

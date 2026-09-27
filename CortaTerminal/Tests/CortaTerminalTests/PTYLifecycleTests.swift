@@ -5,7 +5,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// S08 — PTY lifecycle audit: close ordering, descriptor reuse, repeated
+/// PTY lifecycle audit: close ordering, descriptor reuse, repeated
 /// open/close, leak-free failure paths, and foreground/background tracking.
 ///
 /// The reuse tests matter because the kernel recycles descriptor numbers:
@@ -17,7 +17,7 @@ import Testing
 ///
 /// `.serialized`: every test here spawns real children — see the
 /// `.serialized` note on `TerminalSessionTests`.
-@Suite("PTY lifecycle (S08)", .serialized)
+@Suite("PTY lifecycle", .serialized)
 struct PTYLifecycleTests {
     // MARK: Descriptor reuse after close
 

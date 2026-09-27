@@ -44,7 +44,7 @@ import Testing
     }
 
     @Test func catOfALargeFileDoesNotStallTheChild() throws {
-        // M1.19's other done-when: `cat` of a 100 MB file must not stall —
+        // `cat` of a 100 MB file must not stall —
         // the reader thread has to keep draining even though the scrollback
         // (10,000 lines by default) evicts almost everything it reads.
         let path = FileManager.default.temporaryDirectory
@@ -69,7 +69,7 @@ import Testing
     }
 
     @Test func controlCStopsAFloodingChild() throws {
-        // The other half of M1.19's `yes` scenario: even while the reader
+        // The other half of the `yes` scenario: even while the reader
         // thread is draining a flood as fast as it can, writing ETX must
         // still reach the pty's line discipline and signal the child — the
         // write path is never blocked behind the read path.
@@ -103,7 +103,7 @@ import Testing
             "expected the grid to echo the written bytes; grid held:\n\(text)")
     }
 
-    /// M4.2: the grid-side reflow runs off the calling thread (measured too
+    /// The grid-side reflow runs off the calling thread (measured too
     /// slow, at 100k lines, to run synchronously without stalling whoever
     /// called `resize` — see `TerminalSession.resize`'s doc comment) and
     /// signals completion through `onOutput`, the same hook a parse batch
@@ -126,8 +126,8 @@ import Testing
         #expect(signaled.withLock { $0 })
     }
 
-    /// P03 regression (user-reported: claude/kimi TUIs redrew garbled after
-    /// a window drag): the child must never be signalled a size the grid
+    /// Resize ordering (a TUI redraws garbled after a window drag
+    /// otherwise): the child must never be signalled a size the grid
     /// has not adopted yet, or its new-size redraw is parsed into old-size
     /// cells — permanent on the alternate screen, which is resized, never
     /// reflowed.

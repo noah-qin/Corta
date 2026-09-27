@@ -3,8 +3,8 @@ import Testing
 
 @testable import Corta
 
-/// B08 — the new commands' place in the Shell menu and the command table,
-/// the same shape `CommandOutputWiringTests` already checks for B07's
+/// The new commands' place in the Shell menu and the command table,
+/// the same shape `CommandOutputWiringTests` checks for the command-output
 /// commands.
 @MainActor
 struct CommandHistoryWiringTests {
@@ -35,8 +35,8 @@ struct CommandHistoryWiringTests {
 
     /// The window builds without a pane attached — `CommandHistoryModel
     /// .rows` degrades to empty and `noPaneMessage` explains why, rather
-    /// than crashing, the same honest-degradation rule the rest of
-    /// B07/B08 already follows.
+    /// than crashing, the same honest-degradation rule the rest of the
+    /// command history follows.
     @Test func historyWindowBuildsWithNoPaneAttached() {
         let controller = CommandHistoryController.shared
         #expect(controller.window != nil)
@@ -45,9 +45,8 @@ struct CommandHistoryWiringTests {
     }
 }
 
-/// B10 — `CommandHistoryModel`'s filter composition, now that it is a plain
-/// object a test can drive directly instead of logic embedded in the
-/// AppKit view-building code it used to live inside.
+/// `CommandHistoryModel`'s filter composition, driven directly: it is a
+/// plain object, not logic embedded in view-building code.
 @MainActor
 struct CommandHistoryModelTests {
     @Test func withNoPaneRowsAreEmptyAndTheMessageExplainsWhy() {
@@ -76,9 +75,8 @@ struct CommandHistoryModelTests {
 }
 
 /// The text filter over the history rows, and the text each row carries.
-/// The window used to show a time, a status and a directory per command
-/// and nothing a person could read the command back from or search by
-/// (B16 test pass).
+/// A time, a status and a directory per command, with nothing a person
+/// could read the command back from or search by, is not a history.
 @MainActor
 struct CommandHistoryTextFilterTests {
     private func row(_ id: Int, _ text: String?) -> CommandHistoryModel.Row {

@@ -16,8 +16,8 @@ struct CortaTests {
         #expect(ViewController.defaultFontSize == CGFloat(12))
     }
 
-    /// The live palette follows the theme and the system appearance now
-    /// (M6.2, M6.13), so the assertion is against the default theme's dark
+    /// The live palette follows the theme and the system appearance now,
+    /// so the assertion is against the default theme's dark
     /// variant — the value this test was written to pin — rather than
     /// against whichever variant happens to be live in the test process.
     @Test func defaultForegroundStaysBright() {

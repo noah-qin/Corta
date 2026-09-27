@@ -4,7 +4,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// B14 — the transfer engine against the scripted fake server: atomic
+/// The transfer engine against the scripted fake server: atomic
 /// destinations, resume with endpoint validation, conflict policies,
 /// cancellation, the concurrency queue, and retry with reconnect. Local
 /// files live in a per-test temporary directory; nothing else on the

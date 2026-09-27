@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M2.5 — IL, DL, ICH and DCH, driven through the grid API.
+/// IL, DL, ICH and DCH, driven through the grid API.
 @Suite("Editing operations")
 struct EditingTests {
     private func write(_ text: String, to grid: inout Grid) {
@@ -96,7 +96,7 @@ struct EditingTests {
     /// ECMA-48 §8.3.38: ECH erases in place — nothing shifts, the cursor
     /// stays — and clamps at the right margin. tmux draws its status line as
     /// left part, `CSI n X`, right part; with ECH unimplemented the gap kept
-    /// the previous screen's cells (B16 test pass, a shrunk tmux window).
+    /// the previous screen's cells (a shrunk tmux window).
     @Test("erasing characters blanks in place and leaves the cursor alone")
     func eraseCharactersInPlace() {
         var grid = Grid(rows: 2, columns: 8)

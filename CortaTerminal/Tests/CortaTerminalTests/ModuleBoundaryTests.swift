@@ -3,7 +3,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M0.3 — `CortaTerminal` must not import AppKit or Metal (`DESIGN.md` §4).
+/// `CortaTerminal` must not import AppKit or Metal (`DESIGN.md` §4).
 /// The core is a headless library: it is what makes the parser and grid
 /// testable and benchmarkable without launching an app, and what keeps the
 /// renderer on the far side of a snapshot boundary.

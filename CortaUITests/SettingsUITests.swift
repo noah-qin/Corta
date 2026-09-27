@@ -1,6 +1,6 @@
 import XCTest
 
-/// M6.1, M6.2 and M6.15, against the live app: the settings page opens from
+/// Settings, against the live app: the settings page opens from
 /// the menu bar, and the theme and appearance lists are where a user would
 /// look for them.
 ///
@@ -16,7 +16,7 @@ final class SettingsUITests: XCTestCase {
     @MainActor
     func testSettingsPageOpensFromTheAppMenu() throws {
         let app = XCUIApplication()
-        // Session restore (M7.4) would otherwise carry the previous
+        // Session restore would otherwise carry the previous
         // test's windows into this one; the suite asserts window counts.
         app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
         app.launch()
@@ -69,7 +69,7 @@ final class SettingsUITests: XCTestCase {
     @MainActor
     func testThemeAndAppearanceAreListedUnderView() throws {
         let app = XCUIApplication()
-        // Session restore (M7.4) would otherwise carry the previous
+        // Session restore would otherwise carry the previous
         // test's windows into this one; the suite asserts window counts.
         app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
         app.launch()
