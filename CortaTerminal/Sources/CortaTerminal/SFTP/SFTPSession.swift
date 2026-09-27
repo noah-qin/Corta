@@ -164,7 +164,7 @@ public struct SFTPVolumeInfo: Equatable, Sendable {
 /// One SSH_FXP_* conversation over a channel: request multiplexing,
 /// reply dispatch, and the bounded in-flight window.
 ///
-/// Threading mirrors `TerminalSession` (`DESIGN.md` §2.2): a dedicated
+/// Threading mirrors `TerminalSession` (`DECISIONS.md` D04): a dedicated
 /// reader `Thread` blocks in the transport's `read` and dispatches replies
 /// by request-id; sending is serialised through a lock so two requests'
 /// frames can never interleave on the wire. Everything else is async —

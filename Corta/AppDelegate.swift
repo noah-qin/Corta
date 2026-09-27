@@ -33,7 +33,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// window is its own `SplitViewController` composing one or more
     /// panes — each pane a `ViewController` with its own
     /// `TerminalSession` — so a new window is composition, not new
-    /// mechanism (`DESIGN.md` §2.4).
+    /// mechanism (`DECISIONS.md` D07).
     @objc func newDocument(_ sender: Any?) {
         openWindow(workingDirectory: nil)
     }

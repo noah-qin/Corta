@@ -118,7 +118,7 @@ extension TerminalView {
     /// Translates one key event directly to the bytes a real terminal would
     /// send. Control combinations map to C0 codes; arrows, the editing block
     /// and F1–F12 map to the xterm CSI/SS3 sequences `$TERM=xterm-256color`
-    /// promises (`DESIGN.md` §2.5), with modifiers in xterm's `CSI 1 ; m X`
+    /// promises (`DECISIONS.md` D08), with modifiers in xterm's `CSI 1 ; m X`
     /// form and DECCKM (`CSI ? 1 h`) switching the unmodified cursor keys
     /// and Home/End to their SS3 (application) forms.
     ///

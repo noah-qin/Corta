@@ -10,7 +10,8 @@ import Testing
 /// by design — see the type's comment.
 @Suite(.serialized, .metalSerialized) struct GlyphAtlasTests {
 
-    /// The cold-startup measurement (`docs/PERFORMANCE.md` §6): records
+    /// The cold-startup measurement
+    /// (`docs/history/2026-09-13-B12-RENDER-DIAGNOSTICS.md`): records
     /// `GlyphAtlas.init`'s cost and the cost of the first screenful of
     /// ordinary text afterward. A bounded eager ASCII prewarm (every
     /// printable column × all four styles, at `init`) was built and measured

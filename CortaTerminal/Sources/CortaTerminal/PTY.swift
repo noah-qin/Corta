@@ -5,9 +5,9 @@ import Synchronization
 /// A pseudoterminal and the process running on it.
 ///
 /// Nonisolated by construction: the reader that drains this lives off the
-/// main thread (`DESIGN.md` §2.2). Nothing here touches AppKit, and nothing
+/// main thread (`DECISIONS.md` D04). Nothing here touches AppKit, and nothing
 /// here is a singleton — a `PTY` is owned by a session, and a window may hold
-/// many (`DESIGN.md` §2.4).
+/// many (`DECISIONS.md` D07).
 public final class PTY: @unchecked Sendable {
     /// The primary side of the pty. Read the child's output from it, write
     /// the user's input to it. Owned by this object; do not close it.

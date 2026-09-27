@@ -2,7 +2,7 @@
 ///
 /// Fixed size, `Equatable`, no reference fields: a row is a
 /// `ContiguousArray<Cell>` that the renderer can walk without an ARC traffic
-/// jam (`PERFORMANCE.md` §3, `DESIGN.md` §2.3).
+/// jam (`PERFORMANCE.md` §3, `DECISIONS.md` D05).
 ///
 /// The layout is deliberate — 4 + 4 + 4 + 2 + 2 = 16 bytes, asserted by
 /// `CellTests`. Growing it is a real cost: a 200×100k scrollback is
@@ -48,7 +48,7 @@ public struct Cell: Equatable, Sendable {
     public var background: Color
     public var attributes: CellAttributes
     /// A key into the session's `GraphemeTable`, or `.none` for the common
-    /// case of a cell that is exactly one scalar (`DESIGN.md` §2.3).
+    /// case of a cell that is exactly one scalar (`DECISIONS.md` D05).
     public var grapheme: GraphemeID
 
     @inline(__always)

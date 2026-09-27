@@ -70,7 +70,7 @@ struct ScrollbackTests {
     }
 
     /// Rows sit in history untouched for a long time, so trailing blanks are
-    /// paid for once, here (`DESIGN.md` §2.3).
+    /// paid for once, here (`DECISIONS.md` D05).
     @Test("rows are trimmed on the way into history")
     func rowsAreTrimmed() {
         var padded = line("hi")
@@ -127,7 +127,7 @@ struct GridScrollbackTests {
 
     /// A command that soft-wrapped before it scrolled is still one logical
     /// line once it is in history, or selecting it later inserts a newline
-    /// that was never typed (`DESIGN.md` §2.1).
+    /// that was never typed (`DECISIONS.md` D03).
     @Test("the wrap flag survives into history")
     func wrapFlagSurvivesScrolling() throws {
         let terminal = try self.terminal("abcdefgh\\r\\nx\\r\\ny", rows: 2, columns: 4, limit: 10)

@@ -32,7 +32,7 @@ measured. Priorities:
 | **Scroll region** (`DECSTBM`)                           | P0   | tmux and vim status lines depend on it                  |
 | **Character width**: CJK wide, emoji, combining, zero-width | P0 | Wrong widths mean misaligned CJK text; wide pairs draw scaled into their two-cell box (M3.5) |
 | Scrollback                                              | P0   | Ring buffer, variable-length rows                       |
-| Soft-wrap flag per line                                 | P0   | Required by reflow, selection and search — see `DESIGN.md` §2.1 |
+| Soft-wrap flag per line                                 | P0   | Required by reflow, selection and search — see `DECISIONS.md` D03 |
 | Reflow on resize                                        | P1   | Must be incremental; live window drag fires continuously |
 | **Synchronized output** (`?2026`)                       | P1   | Neovim, tmux ≥ 3.4 and fzf use it; absence causes visible tearing |
 | Cursor style (`DECSCUSR`)                               | P1   |                                                         |
@@ -123,7 +123,7 @@ be **fixed-format and never echo attacker-controlled text** — see
 | Keyboard → PTY, including control and function keys | P0 |                                                    |
 | **CJK IME** (`NSTextInputClient`)                | P0   | Harder than it looks — `DESIGN.md` §7.1. Composition, candidate window and commit verified in the launched app (§4.4) |
 | Copy / paste with bracketed paste                | P0   | Copy joins soft-wrapped lines into one and trims trailing blanks; ⌘C / Edit ▸ Copy |
-| Keyboard and mouse text selection                | P0   | Drag, double-click word, triple-click logical line, ⇧-click extend; document-anchored — `DESIGN.md` §2.7 |
+| Keyboard and mouse text selection                | P0   | Drag, double-click word, triple-click logical line, ⇧-click extend; document-anchored — `DESIGN.md` §3.1 |
 | Configurable key bindings                        | P1   | `bind.<command>` in the config file, one table for menus, palette and file — `CONFIGURATION.md` §5 |
 | Click-to-position, drag-to-select                | P1   | Drag selects; a TUI that owns the mouse is overridden with `mouse-override-modifier` |
 | ⌘-click to open a URL                            | P1   | Scheme allowlist required — `SECURITY.md` §2.4      |

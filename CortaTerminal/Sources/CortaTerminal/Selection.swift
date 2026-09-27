@@ -3,7 +3,7 @@
 ///
 /// The model lives in the core, not the shell, because two of its jobs are
 /// defined by each line's `wrapped` flag, which is grid state the app layer
-/// has no business reading (`DESIGN.md` §2.1): copying a soft-wrapped line
+/// has no business reading (`DECISIONS.md` D03): copying a soft-wrapped line
 /// must yield ONE line with no inserted newline, and triple-click selects a
 /// logical line by following that flag.
 ///
@@ -18,7 +18,7 @@
 /// on its text while output scrolls underneath it.
 ///
 /// Stateless, like the rest of the core: the shell owns the range it is
-/// dragging and passes the grid in (`DESIGN.md` §2.4 — no singletons).
+/// dragging and passes the grid in (`DECISIONS.md` D07 — no singletons).
 /// Selection is not a hot path; this file allocates and builds `String`s.
 
 /// One point in the terminal document. See the file header for the row
@@ -146,7 +146,7 @@ public enum Selection {
 
     /// The selected text, as copy puts it on the clipboard.
     ///
-    /// Two rules, both load-bearing (`DESIGN.md` §2.1):
+    /// Two rules, both load-bearing (`DECISIONS.md` D03):
     ///
     /// - A row whose `wrapped` flag is set joins the next row with NO
     ///   newline — a soft-wrapped command copies as one line. A wrapped row

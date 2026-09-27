@@ -4,9 +4,10 @@
 
 The decisions that are settled, one per entry, in the shape of an
 architecture decision record: what was decided, why, and what it costs
-to reopen. `DESIGN.md` §2 carries the longer argument for the first
-seven; the rest were learned in the field and recorded where they were
-learned. Do not reopen one without a concrete new reason — and when a
+to reopen. This is the one place a decision is argued; `DESIGN.md`
+points here rather than repeating it. The first eight constrain data
+structures and were made before the first line of the grid; the rest
+were learned in the field and recorded where they were learned. Do not reopen one without a concrete new reason — and when a
 reason exists, reopen it *here*, in a pull request that edits the entry,
 so the record stays the record.
 
@@ -46,10 +47,14 @@ the row above.
 
 **Why.** Reflow on resize, selection across a wrapped line, search that
 spans a wrap and export that re-joins logical lines all consult the same
-bit. Retrofitting it means rewriting the grid and every consumer.
+bit. Without it, narrowing a window corrupts the scrollback permanently
+and copying a long command inserts a spurious newline. Retrofitting it
+means rewriting the grid and every consumer.
 
 **Consequence.** Any new feature that touches rows has to say what it does
 with the flag. `CortaTerminal/Selection.swift` is the reference consumer.
+Reflow of a large scrollback has to stay cheap enough for a live window
+drag, which fires resize continuously.
 
 ## D04 — The terminal core is not `@MainActor`
 
@@ -58,19 +63,27 @@ isolation disabled. The Xcode project's `SWIFT_DEFAULT_ACTOR_ISOLATION =
 MainActor` applies to the AppKit shell only.
 
 **Why.** The PTY reader, the parser and the grid run off the main thread;
-the hot path (`PERFORMANCE.md` §3) cannot hop actors per byte.
+the hot path (`PERFORMANCE.md` §3) cannot hop actors per byte. A package of
+its own is also what makes the core unit-testable and benchmarkable
+without launching an app.
 
 **Consequence.** Types in the core are `Sendable` by construction or
 explicitly not shared. The app owns every main-thread hand-off.
 
 ## D05 — Cells are fixed-size; complex graphemes spill to a side table
 
-**Decision.** A `Cell` is 16 bytes and is now full: `Cell.scalar` is 21
-bits and the OSC 8 hyperlink id is the other 11. Rows are variable-length.
+**Decision.** A `Cell` is 16 bytes — a `UInt32` word, attributes and two
+16-bit table keys — and is now full: Unicode's codespace ends at U+10FFFF,
+so the scalar takes 21 bits of the word and the OSC 8 hyperlink id the
+other 11. A grapheme cluster that does not fit in one scalar (combining
+marks, an emoji ZWJ sequence) stores a key into an interned side table.
+Rows are variable-length, stored up to the last non-blank cell.
 
 **Why.** A fixed cell is what makes the instance-buffer build a linear
-walk and the scrollback's memory predictable (`PERFORMANCE.md` §4 measures
-what one byte per cell costs over 100k lines).
+walk and the scrollback's memory predictable: the alternative, an 18-byte
+cell, is what `PERFORMANCE.md` §4 measures across a 100k-line scrollback.
+Variable-length rows are what the log-heavy workloads Corta targets need —
+a fixed 200-cell row over 100k lines is ~320 MB.
 
 **Consequence.** Anything that wants per-cell identity needs a side table
 keyed by position, not a new field. `CellTests` asserts the size.
@@ -84,7 +97,8 @@ app stores only the range.
 
 **Why.** A selection anchored to the viewport moves when output scrolls.
 One that lives in the core follows its text, and can be tested without a
-window (`DESIGN.md` §2.7).
+window. `DESIGN.md` §3.1 has the invariants every consumer of document
+coordinates keeps, and the tests that pin them.
 
 ## D07 — Multi-viewport from day one
 
@@ -93,7 +107,8 @@ window". No singletons in the core.
 
 **Why.** Splits, tabs and the Quick Terminal are all "another viewport";
 a renderer that assumed one window would have had to be rewritten for
-the first of them.
+the first of them. Written against a `TerminalSession` and a target
+rectangle, a split is "instantiate another session".
 
 ## D08 — `$TERM` is `xterm-256color`
 
@@ -102,8 +117,9 @@ terminfo entry.
 
 **Why.** A deliberate lie until conformance is proven: a `corta` terminfo
 that programs have never heard of degrades to `dumb` on every host the
-user ssh's into. `CONFORMANCE.md` records the esctest pass rate that
-would justify changing this.
+user ssh's into, unless a terminfo entry is shipped to every one of them.
+`CONFORMANCE.md` records the esctest pass rate that would justify
+changing this; revisit only once its conformance targets are met.
 
 ## D09 — No multiplexer, no cross-platform, no tmux control mode, no AI features
 
@@ -123,7 +139,7 @@ holds no state of its own.
 **Why.** Two stores drift, and the file has to win because a user can edit
 it. This is not hypothetical: `BellMode` kept reading a `UserDefaults` key
 after the settings page started writing `bell` to the file, so the Bell
-setting silently did nothing until M7.13.
+setting silently did nothing.
 
 **Consequence.** Do not add a `UserDefaults` key for something the config
 file could carry. A key added to `Configuration` without a row in
@@ -233,7 +249,7 @@ private URL can never be deleted from.
 `NSTextView`/TextKit was prototyped against the grid (B10, 2026-09-12)
 and rejected.
 
-**Why.** Four things make `DESIGN.md` §2.7's invariants what they are, and TextKit
+**Why.** Four things make `DESIGN.md` §3.1's invariants what they are, and TextKit
 fights each of them: it has no fixed column grid, so agreeing with the
 grid means mirroring every write into a parallel `NSTextStorage` — a
 second store that can disagree, the exact shape of the B04 bug; it places

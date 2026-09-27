@@ -66,7 +66,7 @@ struct TerminalAccessibilitySnapshot {
     /// - Parameter scrollOffset: rows scrolled back from the live screen;
     ///   `0` is the bottom. Rows are read as *document* rows so the snapshot
     ///   is what is on screen, and `selection` — which is document-anchored
-    ///   (`DESIGN.md` §2.7) — indexes into it without a second convention.
+    ///   (`DESIGN.md` §3.1) — indexes into it without a second convention.
     init(grid: Grid, selection: SelectionRange?, scrollOffset: Int = 0) {
         var text = ""
         var lineStarts: [Int] = []

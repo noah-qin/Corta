@@ -708,7 +708,7 @@ nonisolated final class TerminalRenderer {
     /// — the CJK font Core Text falls back to has its own metrics and is
     /// never exactly two primary-font advances wide, and trusting it is what
     /// made CJK spill into the next cell or draw at the wrong width. A cell
-    /// whose grapheme cluster spills to the side table (`DESIGN.md` §2.3)
+    /// whose grapheme cluster spills to the side table (`DECISIONS.md` D05)
     /// is shaped as one run and drawn into the same box — one cell, or
     /// two for a wide cluster such as a ZWJ emoji.
     private func appendRowInstances(

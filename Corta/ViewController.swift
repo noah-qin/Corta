@@ -995,7 +995,7 @@ class ViewController: NSViewController {
         let size = TerminalSize(
             rows: rows, columns: columns, pixelWidth: pixels.width, pixelHeight: pixels.height)
         guard size != lastRequestedSize else { return }
-        // DESIGN.md §2.7: only a column change reflows — `Grid.resize`
+        // DESIGN.md §3.1: only a column change reflows — `Grid.resize`
         // rebuilds `Scrollback` from scratch when columns change (never for
         // a row-only change, which just pushes/pops whole lines) — and
         // reflow rewrites every document row wholesale. A selection or

@@ -5,7 +5,7 @@ import PackageDescription
 // The terminal core is deliberately NOT `@MainActor`. The Xcode project
 // sets `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`, which is right for
 // the AppKit shell and wrong for the parser, grid and PTY reader — they
-// run off the main thread (`docs/DESIGN.md` §2.2). Disabling default
+// run off the main thread (`DECISIONS.md` D04). Disabling default
 // isolation here is the entire reason this package exists.
 let package = Package(
     name: "CortaTerminal",

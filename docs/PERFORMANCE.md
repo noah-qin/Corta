@@ -183,7 +183,7 @@ justified here: a full array copy is a sub-millisecond `memcpy`
 ## 4. Memory
 
 - **Rows are variable length**, stored up to the last non-blank cell.
-  Fixed 200-cell rows over 100k lines is ~320 MB (`DESIGN.md` §2.3).
+  Fixed 200-cell rows over 100k lines is ~320 MB (`DECISIONS.md` D05).
 - **Scrollback is a ring buffer** with a configured line cap; eviction is
   O(1) and never a reallocation of the whole history.
 - **The glyph atlas is bounded**: a full 2048×2048 page is reset on
