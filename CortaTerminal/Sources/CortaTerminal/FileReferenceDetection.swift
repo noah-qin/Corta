@@ -1,6 +1,6 @@
 import Foundation
 
-/// U17 — `path:line:column` in program output, as a thing you can click.
+/// `path:line:column` in program output, as a thing you can click.
 ///
 /// Compiler errors, `grep -n`, stack traces and test failures all say where
 /// they happened in the same shape, and following one means reading the path,
@@ -58,7 +58,7 @@ public enum FileReferenceDetection {
         pattern: #"(?<![^\s(\[<'"])([~./]?[\w.+\-/]*[\w.+\-]+):(\d{1,9})(?!\d)(?::(\d{1,9})(?!\d))?"#,
         options: [])
 
-    /// The same bound pattern link detection uses (P08): this runs on every
+    /// The same bound pattern link detection uses: this runs on every
     /// ⌘-hover, so an unbounded logical line must not become an unbounded
     /// regex pass on the main thread.
     public static let maxPatternScanCells = LinkDetection.maxPatternScanCells

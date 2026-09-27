@@ -91,9 +91,8 @@ var buffer = [UInt8](repeating: 0, count: chunkSize)
 // A real client blocks on them. `fish` opens by asking for the Kitty keyboard
 // flags, XTVERSION, the background colour, two XTGETTCAP capabilities and
 // finally Primary DA, and prints no prompt until the last one comes back — on
-// a bare PTY with nothing at the other end it simply waits. That is what the
-// U10 harness used to hit: not a defect in the terminal, but no terminal at
-// all. Serving the replies from the same core the app renders makes the
+// a bare PTY with nothing at the other end it simply waits — not a defect in
+// the terminal, but no terminal at all. Serving the replies from the same core the app renders makes the
 // harness exercise the reply path against a real client instead of asserting
 // around it.
 if serve {
@@ -138,7 +137,7 @@ FileHandle.write(
     to: STDOUT_FILENO
 )
 
-// The state the grid alone cannot show (U10): the modes a real program
+// The state the grid alone cannot show: the modes a real program
 // toggled and anything it asked to put on the clipboard, as `key = value`
 // lines a harness can assert on. Query responses the program provoked are
 // not printed — they would have gone back down the PTY, not to a human.

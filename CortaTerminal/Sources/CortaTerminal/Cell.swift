@@ -8,7 +8,7 @@
 /// `CellTests`. Growing it is a real cost: a 200×100k scrollback is
 /// 16 bytes × every cell that is actually stored.
 ///
-/// That budget is why the OSC 8 hyperlink id (M6.8) is not a field of its
+/// That budget is why the OSC 8 hyperlink id is not a field of its
 /// own. Unicode's codespace ends at U+10FFFF, so a scalar needs 21 of the
 /// 32 bits `scalar` was already spending; the hyperlink id lives in the 11
 /// left over. The cost is that `scalar` becomes a computed property over the
@@ -32,7 +32,7 @@ public struct Cell: Equatable, Sendable {
         set { packed = (packed & ~Self.scalarMask) | (newValue & Self.scalarMask) }
     }
 
-    /// The OSC 8 hyperlink this cell belongs to (M6.8), or `.none`. A key
+    /// The OSC 8 hyperlink this cell belongs to, or `.none`. A key
     /// into the grid's `HyperlinkTable`, exactly as `grapheme` is a key into
     /// its `GraphemeTable`.
     @inline(__always)

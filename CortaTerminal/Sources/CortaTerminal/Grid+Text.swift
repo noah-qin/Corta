@@ -1,9 +1,8 @@
-/// Read-only logical-line access over a grid (M4 Step 2).
+/// Read-only logical-line access over a grid.
 ///
-/// Search (M4.4) and URL detection (M4.6) both need to read text out of the
-/// grid without knowing how rows are stored, and the M4.2 storage rewrite
-/// changes exactly that underneath them — this file is the boundary between
-/// the two, so the rewrite has a safety net of its own tests to keep green.
+/// Search and URL detection both need to read text out of the grid without
+/// knowing how rows are stored — this file is the boundary between the two,
+/// so the storage can change underneath without either of them noticing.
 ///
 /// A logical line is a maximal run of consecutive document rows joined by
 /// the `wrapped` flag (`DESIGN.md` §2.1): one call to `write` may have
@@ -70,7 +69,7 @@ extension Grid {
         LogicalLineSequence(grid: self)
     }
 
-    /// Newest-first counterpart of `logicalLines()` (P04): a search with a
+    /// Newest-first counterpart of `logicalLines()`: a search with a
     /// match cap collects from the live screen backwards, so a truncated
     /// result keeps the most recent matches — the ones the user was looking
     /// at when they typed — rather than the document's oldest.
@@ -174,7 +173,7 @@ extension Grid {
 
     /// The wrap chain's row span containing `row`, without joining any
     /// text. Callers whose cost scales with the chain's size (hit-testing
-    /// on every mouse-moved, P08) check the span first and skip the join
+    /// on every mouse-moved) check the span first and skip the join
     /// for chains past their budget.
     func logicalLineRowSpan(containing row: Int) -> (first: Int, last: Int) {
         var top = row

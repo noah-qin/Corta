@@ -1,6 +1,6 @@
 import Foundation
 
-/// Scrollback search (M4.4).
+/// Scrollback search.
 ///
 /// Matching is over logical lines (`Grid+Text.swift`), not rows, so a match
 /// spanning a soft wrap is found whole. Case-insensitive by default. Reuses
@@ -15,7 +15,7 @@ import Foundation
 /// most recent matches — the ones the user was looking at when they typed
 /// the query — rather than the document's oldest.
 public enum Search {
-    /// The match cap the shell searches with (P04). Unbounded results let a
+    /// The match cap the shell searches with. Unbounded results let a
     /// pathological document — a megabyte-long line of one repeated
     /// character is one — build a highlight list far larger than the
     /// renderer or the count label can ever use; the scan stops at the cap
@@ -23,7 +23,7 @@ public enum Search {
     /// keeping the sweep's allocation and the renderer's quad list small.
     public static let defaultMatchLimit = 5_000
 
-    /// The longest logical line a *regular expression* is run against (U16).
+    /// The longest logical line a *regular expression* is run against.
     ///
     /// This bounds an *ordinary* pattern's per-line cost and the work a
     /// single line can represent — a megabyte-long logical line is a real
@@ -41,7 +41,7 @@ public enum Search {
     public static let regexLineLimit = 64_000
 
     /// How long a whole regex sweep may run before it stops and reports
-    /// itself incomplete (U16).
+    /// itself incomplete.
     ///
     /// The cooperative `shouldStop` is polled between lines and per match,
     /// which covers a superseded query but not a pattern that is merely slow
@@ -227,7 +227,7 @@ public enum Search {
         return try? NSRegularExpression(pattern: pattern, options: options)
     }
 
-    /// Every match of a regular expression, oldest first (U16).
+    /// Every match of a regular expression, oldest first.
     ///
     /// Same budget and same cancellation as the substring path — the cap is
     /// the newest `maxMatches`, `shouldStop` is polled per line and per
@@ -322,8 +322,8 @@ public enum Search {
     /// A second table rather than a `caseSensitive` test inside the scan.
     /// The table is chosen once per sweep, so the innermost comparison is
     /// one indexed load and no branch — and neither table is reached
-    /// through a global accessor per byte, which is the shape `CLAUDE.md`
-    /// records as the M6 render regression.
+    /// through a global accessor per byte, the shape `CLAUDE.md` records
+    /// as a measured frame-CPU regression.
     private static let asciiIdentity: [UInt8] = (0...255).map { UInt8($0) }
 
     /// `query` as folded ASCII bytes, or `nil` when it is not ASCII — in
@@ -450,7 +450,7 @@ public enum Search {
                 // The character offsets advance with the matches — O(gap)
                 // each, O(line) in total. Measuring every match from
                 // `startIndex` rescans the line's prefix per match, which
-                // is quadratic on a match-dense long line (P08).
+                // is quadratic on a match-dense long line.
                 searchEndOffset -= text.distance(from: found.upperBound, to: searchEnd)
                 let endOffset = searchEndOffset - 1
                 let startOffset =

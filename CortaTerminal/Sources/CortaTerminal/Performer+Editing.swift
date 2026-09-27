@@ -1,6 +1,6 @@
 extension Performer {
     /// Editing sequences — IL, DL, ICH, DCH, SU, SD — plus DECSC/DECRC and
-    /// DECSCUSR (M2.5).
+    /// DECSCUSR.
 
     /// Editing and scroll-region sequences — ECMA-48 §8.3 and VT510.
     ///
@@ -55,7 +55,7 @@ extension Performer {
         switch final {
         case 0x37: grid.saveCursor()     // DECSC — VT510 §DECSC
         case 0x38: grid.restoreCursor()  // DECRC — VT510 §DECRC
-        // DECKPAM / DECKPNM (U04). `xterm-256color`'s `smkx` is
+        // DECKPAM / DECKPNM. `xterm-256color`'s `smkx` is
         // `\E[?1h\E=`, so a program turning on application cursor keys turns
         // this on in the same breath — ignoring it left the keypad sending
         // plain digits to a program that had asked for `SS3` and was waiting
@@ -79,7 +79,7 @@ extension Performer {
     }
 
     private mutating func resetToInitialState() {
-        // Dynamic colours and the indexed palette's defaults (B06) both
+        // Dynamic colours and the indexed palette's defaults both
         // originate in the active app theme, not in terminal mode state;
         // RIS resets modes, screens, title, tab stops and cursor while
         // keeping those resource values truthful for later queries. The

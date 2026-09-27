@@ -3,7 +3,7 @@ import Dispatch
 import Foundation
 import Synchronization
 
-/// B14 — how the SFTP engine moves bytes: a channel to an sftp subsystem
+/// How the SFTP engine moves bytes: a channel to an sftp subsystem
 /// over the system ssh.
 ///
 /// The transport is deliberately the *system* ssh (`/usr/bin/ssh`) run as
@@ -18,8 +18,8 @@ import Synchronization
 /// errors (`authenticationFailed`, `hostKeyUnverified`), each of which
 /// says the remedy is a connection in the terminal first. An
 /// `SSH_ASKPASS` helper in the environment is honoured by ssh itself, as
-/// anywhere else. The rest of the OpenSSH behaviour belongs to ssh itself
-/// (B13's division of responsibility): nothing in this file knows what a
+/// anywhere else. The rest of the OpenSSH behaviour belongs to ssh itself:
+/// nothing in this file knows what a
 /// password or a known-hosts file is. The channel
 /// sees three outcomes: bytes flow, the subprocess fails in a way stderr
 /// can classify, or the local spawn itself fails.
@@ -35,7 +35,7 @@ import Synchronization
 /// executable paths only, the exec-failure handshake pipe (so a failed
 /// `execve` is reported instead of silently pumping an empty channel),
 /// `POSIX_SPAWN_CLOEXEC_DEFAULT`, and the signal reset
-/// (`SECURITY.md` §4.3). And from `PTY` (S08): a closed descriptor is
+/// (`SECURITY.md` §4.3). And from `PTY`: a closed descriptor is
 /// never reused — `close()` flips a flag first, and every subsequent read
 /// or write fails as `.closed` without touching the recycled number.
 

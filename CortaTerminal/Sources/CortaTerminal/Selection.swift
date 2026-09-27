@@ -1,4 +1,4 @@
-/// Text selection (M3.7): the rules for what a click selects and what copy
+/// Text selection: the rules for what a click selects and what copy
 /// puts on the clipboard.
 ///
 /// The model lives in the core, not the shell, because two of its jobs are
@@ -146,8 +146,7 @@ public enum Selection {
 
     /// The selected text, as copy puts it on the clipboard.
     ///
-    /// Two rules, both load-bearing (`DESIGN.md` §2.1 and the M3.7
-    /// decisions):
+    /// Two rules, both load-bearing (`DESIGN.md` §2.1):
     ///
     /// - A row whose `wrapped` flag is set joins the next row with NO
     ///   newline — a soft-wrapped command copies as one line. A wrapped row
