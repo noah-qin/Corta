@@ -65,33 +65,30 @@ public typealias IndexedColorOverrides = [UInt8: (red: UInt8, green: UInt8, blue
 
 nonisolated extension Theme.Variant {
     /// On the variant so the render loop can hold it locally; the static path
-    /// retains the ANSI array per cell. `indexedOverrides` is optional because
-    /// an empty dictionary still costs a retain/release per call (~5% on
-    /// `FrameCPUBaselineTests`); `TerminalRenderer.appendRowInstances` passes
-    /// nil per row when there are none.
+    /// retains the ANSI array per cell.
     @inline(__always)
     func resolveForeground(
-        _ color: Color, indexedOverrides: IndexedColorOverrides? = nil
+        _ color: Color, indexedOverrides: IndexedColorOverrides = [:]
     ) -> SIMD4<Float> {
         color.isDefault ? foreground : resolve(color, indexedOverrides: indexedOverrides)
     }
 
     @inline(__always)
     func resolveBackground(
-        _ color: Color, indexedOverrides: IndexedColorOverrides? = nil
+        _ color: Color, indexedOverrides: IndexedColorOverrides = [:]
     ) -> SIMD4<Float> {
         color.isDefault ? background : resolve(color, indexedOverrides: indexedOverrides)
     }
 
     @inline(__always)
-    func resolve(_ color: Color, indexedOverrides: IndexedColorOverrides? = nil) -> SIMD4<Float> {
+    func resolve(_ color: Color, indexedOverrides: IndexedColorOverrides = [:]) -> SIMD4<Float> {
         if let components = color.components {
             return SIMD4<Float>(
                 Float(components.red) / 255, Float(components.green) / 255,
                 Float(components.blue) / 255, 1)
         }
         guard let index = color.index else { return foreground }
-        if let overrides = indexedOverrides, let overridden = overrides[index] {
+        if let overridden = indexedOverrides[index] {
             return SIMD4<Float>(
                 Float(overridden.red) / 255, Float(overridden.green) / 255,
                 Float(overridden.blue) / 255, 1)

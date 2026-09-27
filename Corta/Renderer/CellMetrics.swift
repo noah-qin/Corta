@@ -19,9 +19,9 @@ import CoreText
 
 /// The cell box and baseline a monospaced font imposes, derived once per
 /// font.
-nonisolated struct CellMetrics {
-    var cellWidth: CGFloat
-    var cellHeight: CGFloat
+public nonisolated struct CellMetrics: Sendable {
+    public var cellWidth: CGFloat
+    public var cellHeight: CGFloat
     /// From the cell's top down to the baseline.
     var baselineOffset: CGFloat
 

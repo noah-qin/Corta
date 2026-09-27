@@ -541,7 +541,7 @@ reading of them — is its record under `history/`:
 | Parser-only / parser + grid | 766.9 / 161.4 MiB/s | 806.3 / 166.9 MiB/s | same run |
 | Memory @ 100k × 120 lines | 184.4 MB | **185.0 MB** | `corta-bench` |
 | Keypress → grid (core side) | p50 0.009 / p95 0.011 / p99 0.012 ms | p50 0.014 / p95 0.018 / p99 0.020 ms | `corta-bench`, 2000 samples; excludes vsync and display |
-| Frame CPU, 120×40 full rebuild, Debug | **1.79 ms** avg (1.76 / 1.75 / 1.87) | **2.26 ms** avg (2.31 / 2.26 / 2.20) | `FrameCPUBaselineTests` (D17) |
+| Frame CPU, 120×40 full rebuild, Debug | **1.79 ms** avg (1.76 / 1.75 / 1.87) | **2.26 ms** avg (2.31 / 2.26 / 2.20) | `FrameCPUBaselineTests` (D17), Debug test action; from 1.1.0 a Release figure (§5.8) |
 | Live frame CPU, Release, 2 / 4 panes flooded | not re-measured | avg 0.60 / 0.14–0.49 ms; p99 2.59 / 0.38–0.45 | `scripts/measure-app-baseline.sh`, `CORTA_RENDER_METRICS` |
 | GPU, 2 / 4 panes flooded | not re-measured | avg 0.49 / 0.47 ms | same |
 | Idle CPU, Release, 20 s | not re-measured | **0.05%**; occluded 0.0–0.1% | same |
@@ -601,3 +601,71 @@ Both kinds say the same thing the target row in §1 says: above one
 frame plus input latency, on a 60 Hz panel a good three to four frames.
 Where those frames go is the `os_signpost` chain's job (§5.3); the
 in-app number is what says whether a change moved it.
+
+### 5.8 The frame-CPU baseline, under Release (D17)
+
+D17's number is a Release number. One command produces it:
+
+```sh
+xcodebuild test -project Corta.xcodeproj -scheme Corta \
+  -testPlan Release -configuration Benchmark -destination 'platform=macOS'
+cat /tmp/corta-frame-cpu-baseline.txt
+```
+
+`TestPlans/Release` holds `FrameCPUBaselineTests`,
+`InstanceUploadBenchmarkTests` and `RendererConstructionCostTests`, in the
+`CortaPerformanceTests` bundle; `-configuration Benchmark` builds it and
+the app with Release's compiler settings (`-O`, whole-module, no
+`-enable-testing`) and the development identity (D22), so the test host is
+`CortaDev.app` and never the installed Corta. The bundle imports the app
+*without* `@testable` — testability inhibits exactly the optimisation this
+number exists to see — and so reaches only what the renderer declares
+`public`. Every report names the configuration it was built in: the same
+plan under the scheme's default configuration is a Debug run, and says
+`Debug, -Onone` on its first line.
+
+`CORTA_BASELINE_OUTPUT`, `CORTA_UPLOAD_OUTPUT` and
+`CORTA_CONSTRUCTION_OUTPUT` move the three reports, which default to
+`/tmp/corta-frame-cpu-baseline.txt`, `/tmp/corta-instance-upload.txt` and
+`/tmp/corta-renderer-construction.txt`.
+
+**What the figure includes.** The timed window runs from the `render`
+call to `waitUntilCompleted`, so it holds the instance rebuild, the
+upload, the encode *and* the GPU's round trip. In Release the CPU side is
+the small part: `InstanceUploadBenchmarkTests`' full-rebuild row, which
+stops the clock before the commit, reads ~0.13 ms p50 where this one
+averages ~0.6 ms, and its p95 is the GPU's scheduling. A change to the
+CPU path is best read on that row; the averaged figure stays the D17
+baseline so the history below remains comparable.
+
+**The bridge (2026-09-27).** Until 1.1.0 this figure was taken under the
+Debug test action (`-Onone`), which is the column §5.6 still shows for
+1.0.x. It was re-recorded both ways once, on the same commit, machine and
+toolchain, three alternating runs each:
+
+| Build | Frame CPU avg (runs) | Full rebuild p50, CPU only |
+| --- | --- | --- |
+| Debug, `-Onone` | **2.12 ms** (2.14 / 2.10 / 2.13) | 1.18 ms |
+| Release, `-O` | **0.74 ms** (0.82 / 0.68 / 0.74) | 0.13 ms |
+
+Apple M5, macOS 27.0 (26A428), Xcode 27.0 (27A266a), on mains power. The
+Debug build spends nine times the CPU on the rebuild; that ratio, not
+the GPU wait both share, is what the Debug figure was mostly measuring.
+
+**Shapes that were only there for Debug.** Three render-loop idioms were
+written against the Debug figure and were re-measured under Release
+before being kept or undone (five alternating runs each, full-rebuild
+p50 median, same machine):
+
+| Shape | Release, kept | Release, ordinary Swift | Outcome |
+| --- | --- | --- | --- |
+| Raw masks instead of `OptionSet.contains` | 0.127 ms | 0.130 ms | Undone — `contains` is elided under `-O` |
+| `nil` instead of an empty overrides dictionary | 0.137 ms | 0.132 ms | Undone — no cost to avoid |
+| The palette read once per row, not per cell | 0.130 ms | 0.137 ms | Kept — the per-cell global read costs ~5% in Release too |
+
+A fourth shape turned out to be doing real work: removing the
+single test that rejects cells with no underline, strikethrough, conceal
+or link cost ~8% (0.128 → 0.139 ms), so it stays — spelled as an
+`OptionSet` test rather than a mask. After the cleanup the Release figure
+is **0.58 ms** avg (0.50 / 0.62 / 0.63; full rebuild p50 0.128–0.135 ms),
+which is inside the bridge's spread.

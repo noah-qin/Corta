@@ -64,11 +64,11 @@ line each:
 - **D13** Never change the machine to test. **D14** App-layer changes
   are verified by launching the app. **D15** Never size the session from
   a transient layout. **D16** Window setup is staged before the
-  storyboard runs. **D17** Re-measure the frame-CPU baseline after
-  touching the render loop. **D18** No tool or session identifier in a
-  commit message. **D19** Selection is hand-rolled; TextKit is not
-  adopted. **D20** The update feed is signed from CI; the key lives in
-  the reviewed `release` environment.
+  storyboard runs. **D17** Re-measure the frame-CPU baseline, under
+  Release, after touching the render loop. **D18** No tool or session
+  identifier in a commit message. **D19** Selection is hand-rolled;
+  TextKit is not adopted. **D20** The update feed is signed from CI; the
+  key lives in the reviewed `release` environment.
 - **D21** Reserved (Apple silicon only, issue #108). **D22** The Debug
   build is a separate application — `dev.noahqin.Corta.dev`, its own stage
   directory, no updater, no move-to-Applications prompt.
@@ -160,11 +160,16 @@ the app's `SUPublicEDKey` — is `scripts/verify-appcast.swift`, which that
 check calls at release time, `ci.yml` runs offline on every run and
 `nightly.yml` runs against the published archives.
 
-**Measure the frame-CPU baseline after touching the render loop.**
-The M6 render work took it from 2.40 ms to 4.19 ms — a per-cell read of
-a global that retained an array, plus three unelided `OptionSet.contains`
-calls — and back to 2.32 ms once both were folded away. The regression
-was invisible in every test that passed; only the number caught it.
+**Measure the frame-CPU baseline, under Release, after touching the
+render loop.** The M6 render work took it from 2.40 ms to 4.19 ms — a
+per-cell read of a global that retained an array, plus three unelided
+`OptionSet.contains` calls — and back to 2.32 ms once both were folded
+away. The regression was invisible in every test that passed; only the
+number caught it. Those were Debug figures, and the `contains` calls cost
+nothing once optimised: the baseline is now the Release one, from
+`xcodebuild test -scheme Corta -testPlan Release -configuration
+Benchmark` (`docs/PERFORMANCE.md` §5.8). Write the render loop as
+ordinary Swift, not shaped for `-Onone`.
 
 **Never put a tool or session identifier in a commit message.** No
 `Claude-Session:`, no assistant URLs, no "generated with" footer. The
@@ -208,10 +213,12 @@ Layout:
 - `Corta/` — AppKit shell, Metal renderer, font stack
 - `CortaTerminal/` — the terminal core as a local SwiftPM package, with
   its own tests, golden fixtures, fuzz corpus and DocC catalog
-- `CortaTests/`, `CortaUITests/` — app-hosted test targets
+- `CortaTests/`, `CortaUITests/` — app-hosted test targets;
+  `CortaPerformanceTests/` — the Release measurements, without `@testable`
 - `Corta.xcodeproj/` — build settings live in `project.pbxproj`
 - `scripts/` — measurement, packaging and release
-- `TestPlans/` — `Unit` (the default) and `UI` (interactive sessions only)
+- `TestPlans/` — `Unit` (the default), `UI` (interactive sessions only)
+  and `Release` (the D17 measurement, `-configuration Benchmark`)
 - `docs/` — user and design documentation, plus the dated records
 
 Deployment target is macOS 26.0, Swift 6, app sandbox disabled

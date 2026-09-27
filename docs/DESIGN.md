@@ -412,9 +412,9 @@ The record: [history/2026-09-11-B05-SEARCH-STATE.md](history/2026-09-11-B05-SEAR
   sparse `overrides`. An override changes what an index *resolves to*,
   not what any `Cell` stores, so the per-row revision check cannot see
   it: `IndexedPalette.overridesGeneration` invalidates the render cache
-  instead. The renderer receives `IndexedColorOverrides?` — `nil` when a
-  session has none, because passing even an empty `Dictionary` costs a
-  retain/release per call, measured at ~5% of frame CPU.
+  instead. The renderer receives `IndexedColorOverrides`, empty when a
+  session has none; an empty dictionary costs nothing measurable under
+  Release (`PERFORMANCE.md` §5.8).
 - **OSC 5 / 105.** `SpecialColors` holds the five special colours
   (xterm's `ctlseqs.txt` `Pc` values); a query of an unset slot answers
   black. They are query/set state only — they do not yet change how bold,

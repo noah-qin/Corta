@@ -35,6 +35,9 @@
          <TestPlanReference
             reference = "container:TestPlans/UI.xctestplan">
          </TestPlanReference>
+         <TestPlanReference
+            reference = "container:TestPlans/Release.xctestplan">
+         </TestPlanReference>
       </TestPlans>
    </TestAction>
    <LaunchAction
