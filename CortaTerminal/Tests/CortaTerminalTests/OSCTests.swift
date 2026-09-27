@@ -125,6 +125,28 @@ struct OSCTests {
         #expect(!Performer.isLocalHost("noahs-mac2", localNames: local))
     }
 
+    /// The names a shell on this machine actually reports — `hostname` and
+    /// its short form, which is what zsh's `$HOST` and a prompt's `%m` are —
+    /// count as local, read from the kernel rather than resolved through DNS.
+    @Test("this machine's own hostname, full and short, is local")
+    func ownHostnameIsLocal() throws {
+        func run(_ arguments: [String]) throws -> String {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/hostname")
+            process.arguments = arguments
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            try process.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            return String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        let local = Performer.localHostnames()
+        #expect(local.contains("localhost"))
+        #expect(Performer.isLocalHost(try run([]), localNames: local))
+        #expect(Performer.isLocalHost(try run(["-s"]), localNames: local))
+    }
+
     @Test("OSC 7 with a non-file scheme is ignored")
     func nonFileSchemeIsIgnored() throws {
         #expect(try terminal("\\e]7;https://example.com/x\\a").workingDirectory == nil)
