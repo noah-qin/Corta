@@ -1,7 +1,7 @@
 # A flag is a pair of regional indicators and ONE grapheme cluster (UAX #29
 # GB12/GB13: no break between indicators when an odd number precedes the
 # break), so it occupies a single double-width cell — the lead cell holds
-# both scalars in the grapheme side table (DESIGN.md §2.3), the spacer stays
+# both scalars in the grapheme side table (DECISIONS.md D05), the spacer stays
 # blank, and the cursor advances 2 columns, not 4.
 #
 # The first flag below is U+1F1EF U+1F1F5. The lone indicator that follows

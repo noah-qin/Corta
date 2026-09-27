@@ -5,9 +5,10 @@
 The decisions that are settled, one per entry, in the shape of an
 architecture decision record: what was decided, why, and what it costs
 to reopen. This is the one place a decision is argued; `DESIGN.md`
-points here rather than repeating it. The first eight constrain data
-structures and were made before the first line of the grid; the rest
-were learned in the field and recorded where they were learned. Do not reopen one without a concrete new reason — and when a
+points here rather than repeating it. D01 and D02 are the project's
+premise; D03–D08 constrain the data structures and were made before the
+first line of the grid; the rest were learned in the field and recorded
+where they were learned. Do not reopen one without a concrete new reason — and when a
 reason exists, reopen it *here*, in a pull request that edits the entry,
 so the record stays the record.
 
@@ -80,10 +81,13 @@ marks, an emoji ZWJ sequence) stores a key into an interned side table.
 Rows are variable-length, stored up to the last non-blank cell.
 
 **Why.** A fixed cell is what makes the instance-buffer build a linear
-walk and the scrollback's memory predictable: the alternative, an 18-byte
-cell, is what `PERFORMANCE.md` §4 measures across a 100k-line scrollback.
-Variable-length rows are what the log-heavy workloads Corta targets need —
-a fixed 200-cell row over 100k lines is ~320 MB.
+walk and the scrollback's memory predictable: every byte a cell grows
+costs 12 MB across the 100k 120-column lines of `PERFORMANCE.md` §1's
+scrollback target, which is why `CellTests` asserts the size rather than
+a comment promising it. Variable-length
+rows are what the log-heavy workloads Corta targets need — a fixed
+200-cell row over 100k lines is 200 × 16 bytes × 100k ≈ 320 MB
+(`PERFORMANCE.md` §4).
 
 **Consequence.** Anything that wants per-cell identity needs a side table
 keyed by position, not a new field. `CellTests` asserts the size.

@@ -15,8 +15,8 @@ import Synchronization
 /// Owns one `TerminalSession` and the `TerminalRenderer`/`TerminalView` that
 /// draw it — the pane. A window composes panes through
 /// `SplitViewController` and its `SplitTree`; nothing here knows about
-/// sibling panes beyond the `splitController` back-reference (`DESIGN.md`
-/// §2.4).
+/// sibling panes beyond the `splitController` back-reference (D07 in
+/// `DECISIONS.md`).
 ///
 /// This file owns lifecycle, the session and the render loop. Behaviour
 /// lives in `ViewController+<concern>.swift` extensions, one concern per
