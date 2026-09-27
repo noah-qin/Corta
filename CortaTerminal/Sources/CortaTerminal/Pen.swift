@@ -4,7 +4,7 @@ public struct Pen: Equatable, Sendable {
     public var foreground: Color
     public var background: Color
     public var attributes: CellAttributes
-    /// The OSC 8 hyperlink newly written cells belong to (M6.8), or `.none`.
+    /// The OSC 8 hyperlink newly written cells belong to, or `.none`.
     ///
     /// Deliberately *not* reset by SGR 0. A hyperlink is not a rendition —
     /// `OSC 8 ; ; ST` is what ends one, and a program that colours the link

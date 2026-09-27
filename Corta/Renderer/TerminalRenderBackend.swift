@@ -8,7 +8,7 @@ import Metal
 /// capability-gated conformance — see that type's doc comment for what it
 /// actually does right now and why.
 ///
-/// Introduced (M9) for the same reason `TerminalRenderBackend` is always
+/// Introduced for the same reason `TerminalRenderBackend` is always
 /// introduced ahead of a second real implementation: so the *selection*
 /// point (`TerminalRenderer.init` choosing which backend to build) exists
 /// and is exercised before there is a second backend worth measuring against
@@ -53,7 +53,7 @@ nonisolated protocol TerminalRenderBackend: AnyObject {
 
 nonisolated extension QuadRenderer: TerminalRenderBackend {}
 
-/// The Metal 4 half of the backend seam (B12): full-frame command
+/// The Metal 4 half of the backend seam: full-frame command
 /// submission, owned end-to-end by the backend.
 ///
 /// The base protocol's three `draw*Quads` methods are Metal-3-shaped: the

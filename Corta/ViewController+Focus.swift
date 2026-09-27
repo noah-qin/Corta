@@ -1,7 +1,7 @@
 import Cocoa
 import CortaTerminal
 
-/// M6.7 — focus reporting (`?1004`).
+/// Focus reporting (`?1004`).
 ///
 /// A child that has set the mode wants to know when the terminal gains or
 /// loses focus: `CSI I` on focus in, `CSI O` on focus out. Neovim's

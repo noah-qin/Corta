@@ -4,7 +4,7 @@ import Cocoa
 ///
 /// It exists for one reason: `windowShouldClose`. The red button and ⌘W both
 /// end at the window's delegate, and the delegate is the window controller —
-/// so a "something is still running" confirmation (M7.5) has nowhere else to
+/// so a "something is still running" confirmation has nowhere else to
 /// live. Putting `SplitViewController` in the delegate slot instead would
 /// take over every other delegate message `NSWindowController` answers, which
 /// is a much larger change for the same one hook.
@@ -13,7 +13,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         contentViewController as? SplitViewController
     }
 
-    /// B16 — the identity an App Intent names this window by
+    /// The identity an App Intent names this window by
     /// (`TerminalWindowEntity`). Minted when the controller is created and
     /// carried through `WindowState`, so a Shortcut that focuses "the build
     /// window" still resolves after a relaunch restores it. Never derived
@@ -21,12 +21,12 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     /// with every `cd`.
     var windowID: String = UUID().uuidString
 
-    /// B16 — set for the Quick Terminal's window, which is summoned by a
+    /// Set for the Quick Terminal's window, which is summoned by a
     /// hotkey rather than opened by the user and is therefore neither
     /// saved into the arrangement nor listed as an ordinary window.
     var isQuickTerminal = false
 
-    /// B16 — the lock in the titlebar while Secure Keyboard Entry is
+    /// The lock in the titlebar while Secure Keyboard Entry is
     /// actually engaged for this window. Visible state is the point of the
     /// feature: the effect itself is invisible (keystrokes simply stop
     /// reaching other processes), so without an indicator a user cannot tell
@@ -41,7 +41,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         installSecureInputIndicator()
     }
 
-    /// B16 — swaps the storyboard's `NSWindow` for a non-activating
+    /// Swaps the storyboard's `NSWindow` for a non-activating
     /// `NSPanel` carrying the same content, before the window is shown.
     ///
     /// **Why a panel.** An ordinary window ordered front by an application
@@ -137,7 +137,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         return splitController.confirmClose(of: running, scope: L10n.text("close.scope.window"))
     }
 
-    /// The layout this window would be restored as (M7.4). Read at quit and
+    /// The layout this window would be restored as. Read at quit and
     /// whenever a window closes, so state survives both routes.
     var restorableState: WindowState? {
         guard let window, let splitController, !isQuickTerminal else { return nil }

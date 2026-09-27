@@ -1,6 +1,6 @@
 import Cocoa
 
-/// M6.15 — the native integrations a self-drawn toolkit cannot get for free,
+/// The native integrations a self-drawn toolkit cannot get for free,
 /// and that being an ordinary AppKit view makes cheap.
 ///
 /// Dropping a file at the prompt, looking a word up with a force touch, and

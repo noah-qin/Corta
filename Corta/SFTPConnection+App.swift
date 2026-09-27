@@ -1,7 +1,7 @@
 import CortaTerminal
 import Foundation
 
-/// B14 — the one place the app decides which `ssh` binary an SFTP
+/// The one place the app decides which `ssh` binary an SFTP
 /// connection spawns.
 ///
 /// Production is always the system client (`SFTPSubprocessChannel

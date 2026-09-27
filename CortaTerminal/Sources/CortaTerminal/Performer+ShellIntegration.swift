@@ -1,6 +1,6 @@
 import Foundation
 
-/// OSC 133 — shell integration (M7.2).
+/// OSC 133 — shell integration.
 ///
 /// A terminal without this cannot see command boundaries. It sees keystrokes
 /// leaving and bytes arriving, and everything built on "a command" has to be
@@ -34,26 +34,26 @@ extension Performer {
             let row = grid.absoluteRow(ofScreenRow: grid.cursor.row)
             state.promptRow = row
             state.commandExitStatus = nil
-            // B08 — stale until this prompt's own 'B' arrives; a directory
+            // Stale until this prompt's own 'B' arrives; a directory
             // change must not read the *previous* prompt's end column while
             // this one is still being drawn.
             state.promptEndColumn = nil
             grid.setMark(.prompt, atAbsoluteRow: row)
-            // B07 — a new command record starts here, keyed by id rather
+            // A new command record starts here, keyed by id rather
             // than this row, which is the only thing that survives the row
             // scrolling into history and the id it names moving with it.
             state.commandRecords.begin(
                 promptRow: row, workingDirectory: state.workingDirectory,
                 host: state.remoteContext?.host, at: Date())
         case 0x42:  // 'B' — command line starts
-            // B08 — the cursor sits exactly here until the user types
+            // The cursor sits exactly here until the user types
             // something; still true only when 'B' landed on the same row as
             // 'A' (a wrapped or multi-line prompt makes this an
             // under-estimate, which is the safe direction — see
             // `ViewController.canChangeDirectorySafely`).
             if state.promptRow == grid.absoluteRow(ofScreenRow: grid.cursor.row) {
                 state.promptEndColumn = grid.cursor.column
-                // B08 — the same column, kept on the record itself so a
+                // The same column, kept on the record itself so a
                 // command still recorded once it has scrolled off the live
                 // prompt (`ViewController.commandLineText(grid:record:)`)
                 // can still say where its own text started.
@@ -62,7 +62,7 @@ extension Performer {
         case 0x43:  // 'C' — the command is running, and its output starts here
             state.isCommandRunning = true
             // The row the shell reaches after echoing the command line, which
-            // is exactly where the output begins (U14). Marked so "the last
+            // is exactly where the output begins. Marked so "the last
             // command's output" is read rather than guessed at one row past
             // the prompt — a two-line prompt or a continued command makes
             // that guess take a row of what the user typed.

@@ -1,6 +1,6 @@
 import AppKit
 
-/// M5.1 — the split layout is a binary tree: a leaf is a pane's view, an
+/// The split layout is a binary tree: a leaf is a pane's view, an
 /// internal node is an `NSSplitView` with exactly two children. Splitting a
 /// leaf replaces it with a node holding the old leaf and the new one;
 /// closing a leaf collapses its parent node into the surviving sibling, so
@@ -143,7 +143,7 @@ final class SplitTree {
     /// The smallest size a subtree can take: a leaf reports its own
     /// minimum; a node adds the divider and combines its children along its
     /// axis, taking the larger across it. Used for the window's minimum
-    /// size and for clamping divider drags (M5.4).
+    /// size and for clamping divider drags.
     func minimumSize(
         of subtree: NSView, leafSize: (NSView) -> CGSize, dividerThickness: CGFloat
     ) -> CGSize {

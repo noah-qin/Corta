@@ -3,9 +3,9 @@ import Darwin
 /// Launches a child on a pty replica via `posix_spawn` of the `corta-exec`
 /// helper — see `corta-exec/main.swift` for the other half of this.
 ///
-/// This file used to `fork()` the app process directly and run
+/// The obvious alternative — `fork()` the app process directly and run
 /// hand-marshalled, async-signal-safe-only code in the forked child before
-/// `execve`. That was measured to `SIGKILL` the child roughly 8% of the
+/// `execve` — was measured to `SIGKILL` the child roughly 8% of the
 /// time under a fully serialized test run (`.serialized` on both PTY test
 /// suites, plus a `forkLockStorage` around every `fork()` call — the flake
 /// persisted regardless): `fork()` in a heavily multithreaded Cocoa/Swift
@@ -298,8 +298,8 @@ private let addressAnchor: @convention(c) () -> Void = {}
 
 /// Builds a null-terminated `char *[]` from `strings`, valid for the
 /// duration of `body`. `posix_spawn` copies everything it needs from `argv`
-/// and `envp` before returning, so — unlike the old forked-child path —
-/// nothing here needs to outlive this call.
+/// and `envp` before returning, so nothing here needs to outlive this
+/// call.
 private func withCStringArray<Result>(
     _ strings: [String], _ body: (UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>) -> Result
 ) -> Result {

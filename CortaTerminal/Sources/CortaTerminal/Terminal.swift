@@ -68,16 +68,15 @@ public struct Terminal: Sendable {
     /// Whether query responses are queued for the child.
     public var hasPendingOutput: Bool { !performer.state.outputBuffer.isEmpty }
 
-    /// `?2004` — whether the child has enabled bracketed paste (M2.6).
+    /// `?2004` — whether the child has enabled bracketed paste.
     public var isBracketedPasteEnabled: Bool { performer.state.bracketedPasteEnabled }
 
-    /// `?1006` — whether the child has asked for SGR-encoded mouse reports
-    /// (M2.7).
+    /// `?1006` — whether the child has asked for SGR-encoded mouse reports.
     public var mouseTrackingMode: MouseTrackingMode { performer.state.mouseTrackingMode }
 
     public var isSgrMouseEncodingEnabled: Bool { performer.state.sgrMouseEncodingEnabled }
 
-    /// `?2026` — whether synchronized output is active (M4.3). While true
+    /// `?2026` — whether synchronized output is active. While true
     /// the shell must present no frame; when it goes false, present once.
     public var isSynchronizedOutputEnabled: Bool { performer.state.synchronizedOutputEnabled }
 
@@ -95,8 +94,8 @@ public struct Terminal: Sendable {
         performer.state.synchronizedOutputEnabled = false
     }
 
-    /// `?1004` — whether the child has asked to be told about focus changes
-    /// (M6.7). The app sends `CSI I` / `CSI O` while this is true.
+    /// `?1004` — whether the child has asked to be told about focus changes.
+    /// The app sends `CSI I` / `CSI O` while this is true.
     public var isFocusReportingEnabled: Bool { performer.state.focusReportingEnabled }
 
     /// LNM (`CSI 20 h`). While set the Return key sends CR LF rather than
@@ -110,13 +109,13 @@ public struct Terminal: Sendable {
         performer.state.applicationCursorKeysEnabled
     }
 
-    /// DECKPAM / DECKPNM (U04) — while set, the numeric keypad sends its SS3
+    /// DECKPAM / DECKPNM — while set, the numeric keypad sends its SS3
     /// forms.
     public var applicationKeypadEnabled: Bool {
         performer.state.applicationKeypadEnabled
     }
 
-    /// The colours OSC 10/11/12 report (M6.6). The app seeds these from its
+    /// The colours OSC 10/11/12 report. The app seeds these from its
     /// palette so a query answers with what is actually drawn; the child can
     /// then change them, and the app reads them back to render.
     public var dynamicColors: DynamicColors {
@@ -125,7 +124,7 @@ public struct Terminal: Sendable {
     }
 
     /// The 256-entry indexed palette OSC 4 reports and sets, and OSC 104
-    /// resets (B06). The app seeds `defaults` from its theme (mirrors
+    /// resets. The app seeds `defaults` from its theme (mirrors
     /// `dynamicColors`) and, since a render-path integration pass, an
     /// override here also changes what is painted — see `TerminalSession
     /// .indexedPalette`'s doc comment and `docs/DESIGN.md` §7.
@@ -134,8 +133,8 @@ public struct Terminal: Sendable {
         set { performer.state.indexedPalette = newValue }
     }
 
-    /// The five special colours OSC 5 reports and sets, and OSC 105 resets
-    /// (B06). Query/set state only, like `indexedPalette` — see
+    /// The five special colours OSC 5 reports and sets, and OSC 105 resets.
+    /// Query/set state only, like `indexedPalette` — see
     /// `SpecialColors`'s own doc comment for why there is no themed
     /// default to seed here.
     public var specialColors: SpecialColors {
@@ -143,13 +142,13 @@ public struct Terminal: Sendable {
         set { performer.state.specialColors = newValue }
     }
 
-    /// The kitty keyboard protocol flags in force (M6.9). The app encodes
+    /// The kitty keyboard protocol flags in force. The app encodes
     /// key presses according to these.
     public var keyboardEnhancements: KeyboardEnhancementFlags {
         performer.state.keyboardProtocol.current
     }
 
-    /// Consumes a pending BEL (M4.8): true at most once per bell, false
+    /// Consumes a pending BEL: true at most once per bell, false
     /// otherwise. The app decides what a bell does; the core only reports
     /// that one happened.
     public mutating func takeBell() -> Bool {
@@ -158,24 +157,24 @@ public struct Terminal: Sendable {
         return requested
     }
 
-    /// The window title set by OSC 0/2 (M2.8). Set-only: the title query is
+    /// The window title set by OSC 0/2. Set-only: the title query is
     /// never answered (`SECURITY.md` §2.2).
     public var windowTitle: String? { performer.state.windowTitle }
 
-    /// The working directory reported by OSC 7 (M2.8).
+    /// The working directory reported by OSC 7.
     ///
     /// Local-only by construction: a report that names a remote host lands
     /// in `remoteContext` instead and never reaches this, so the value is
     /// always safe to hand to a local spawn.
     public var workingDirectory: String? { performer.state.workingDirectory }
 
-    /// B13 — the remote host and directory this pane most recently reported,
+    /// The remote host and directory this pane most recently reported,
     /// when an OSC 7 report names another machine. Informational only, for
     /// showing the user which host the pane refers to; nothing that spawns a
     /// local process may read it. A subsequent local OSC 7 report clears it.
     public var remoteContext: RemoteContext? { performer.state.remoteContext }
 
-    /// Whether the shell says a command is running (OSC 133, M7.2). `false`
+    /// Whether the shell says a command is running (OSC 133). `false`
     /// when the shell emits no shell-integration sequences at all, which is
     /// why the app still keeps its keystroke heuristic as a fallback.
     public var isCommandRunning: Bool { performer.state.isCommandRunning }
@@ -185,7 +184,7 @@ public struct Terminal: Sendable {
     /// between the exact command boundaries and its own heuristic.
     public var hasShellIntegration: Bool { performer.state.promptRow != nil }
 
-    /// B08 — the absolute row of the current prompt and the column its text
+    /// The absolute row of the current prompt and the column its text
     /// ended at, when both are known for *this* prompt (see
     /// `PerformerState.promptEndColumn`'s doc comment for why `B` on a
     /// different row than `A` leaves this `nil`).
@@ -195,7 +194,7 @@ public struct Terminal: Sendable {
         return (row, column)
     }
 
-    /// B07 — the bounded, id-keyed command history behind `hasShellIntegration`
+    /// The bounded, id-keyed command history behind `hasShellIntegration`
     /// and the row-based marks above. See `CommandRecord`'s doc comment.
     public var commandRecords: CommandRecordStore { performer.state.commandRecords }
 
@@ -209,7 +208,7 @@ public struct Terminal: Sendable {
     }
 
     /// Consumes text the child asked to put on the system clipboard via OSC
-    /// 52 (M7.11). The app decides whether to honour it; the core never
+    /// 52. The app decides whether to honour it; the core never
     /// touches a pasteboard, and the *read* direction does not exist.
     public mutating func takeClipboardCopy() -> String? {
         let text = performer.state.pendingClipboardCopy

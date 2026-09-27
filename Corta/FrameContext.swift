@@ -5,9 +5,8 @@ import CortaTerminal
 /// callback) and consumed by `ViewController.render(into:...)`
 /// (`FrameScheduler.onRenderFrame`), which always runs immediately after it
 /// in the same `FrameScheduler.metalDisplayLink` callback — see
-/// `FrameScheduler`. Replaces what used to be two independent
-/// `session.snapshot()` calls plus two independent `searchMatches.map { ... }`
-/// passes per frame with one of each (M9).
+/// `FrameScheduler`. Computing it once means one `session.snapshot()` and
+/// one `searchMatches.map { ... }` pass per frame, not one per consumer.
 struct FrameContext {
     var grid: Grid
     var scrollOffset: Int

@@ -1,7 +1,7 @@
 import Cocoa
 import CortaTerminal
 
-/// M7.4, window side: turning the live split tree into a `PaneLayout` and
+/// Turning the live split tree into a `PaneLayout` and
 /// back again.
 ///
 /// The two directions are deliberately asymmetric. Capturing walks the view
@@ -15,9 +15,9 @@ extension SplitViewController {
 
     func windowState(frame: NSRect) -> WindowState? {
         // The *tree*, not `view.subviews.first`. While a pane is zoomed
-        // (U13) the controller's view holds that pane alone, and reading the
+        // the controller's view holds that pane alone, and reading the
         // hierarchy would save "one pane" as the arrangement — discarding
-        // the splits, and, since U07 writes the arrangement as it changes,
+        // the splits, and, since the arrangement is written as it changes,
         // writing that loss straight to disk. Zoom is temporary and the saved
         // layout has to keep saying so.
         // While zoomed the tree is not whole — the zoomed pane's view is out
@@ -36,7 +36,7 @@ extension SplitViewController {
             tabIndex: tabIndex, isSelectedTab: isSelectedTab)
     }
 
-    /// B09 — this window's place in its native tab group, if any. `nil`
+    /// This window's place in its native tab group, if any. `nil`
     /// group/index for a window that was never tabbed; AppKit groups tabbed
     /// windows only by having the same `tabbingIdentifier` and does not
     /// number them itself, so the index is this window's position in
@@ -91,7 +91,7 @@ extension SplitViewController {
             pane.resizeSessionToFitView()
             pane.endLiveResize()
         }
-        // B09 — whichever pane's saved node was `isFocused`, or the first
+        // Whichever pane's saved node was `isFocused`, or the first
         // pane as before (`splitFocusedPane` moves focus to each new pane as
         // it goes, so without a match this is where it already landed) for
         // data saved before that field existed.
@@ -102,7 +102,7 @@ extension SplitViewController {
     /// the one that was active when the window was saved, which may not
     /// even exist anymore. A name that no longer resolves (renamed or
     /// deleted since) degrades to directory-only exactly as if the pane had
-    /// never been launched from a preset at all (B09).
+    /// never been launched from a preset at all.
     private func resolvedPreset(named name: String?) -> Preset? {
         guard let name else { return nil }
         return ConfigurationStore.shared.configuration.presets.first { $0.name == name }
@@ -129,7 +129,7 @@ extension SplitViewController {
     /// touches, so positions set during the build would be overwritten by the
     /// next split below them.
     /// Re-applies a recorded arrangement's dividers to the tree as it stands
-    /// — used on the way out of zoom (U13), where the pane's view left its
+    /// — used on the way out of zoom, where the pane's view left its
     /// split and came back, and AppKit re-halved what was left behind.
     func reapplyDividerPositions(_ layout: PaneLayout) {
         view.layoutSubtreeIfNeeded()

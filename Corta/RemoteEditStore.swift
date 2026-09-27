@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-/// B14, remote editing — the managed local copies of remote files, and the
+/// Remote editing — the managed local copies of remote files, and the
 /// manifest that remembers what each copy is a copy *of*.
 ///
 /// A copy lives under `RemoteEdit/<host>/<hash>/<name>`, where the hash is
