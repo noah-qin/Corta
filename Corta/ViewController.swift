@@ -431,9 +431,9 @@ class ViewController: NSViewController {
         view.onRenderFrame = { [weak self] drawableSize, drawable in
             guard let self else {
                 drawable.present()
-                return
+                return true
             }
-            render(drawableSize: drawableSize, drawable: drawable)
+            return render(drawableSize: drawableSize, drawable: drawable)
         }
         view.shouldRenderFrame = { [weak self] in
             self?.prepareFrame() ?? false
@@ -920,11 +920,13 @@ class ViewController: NSViewController {
     /// context; never blocks the reader (`PERFORMANCE.md` §2.1). Draws the
     /// renderer's cached instances, which `prepareFrame` last diffed, as one
     /// Metal 4 render pass; the backend commits and presents the drawable.
-    private func render(drawableSize: CGSize, drawable: CAMetalDrawable) {
+    /// Returns false for a frame the backend dropped, which the scheduler
+    /// owes another tick.
+    private func render(drawableSize: CGSize, drawable: CAMetalDrawable) -> Bool {
         guard let terminalRenderer else {
             // Never hold a drawable: an unpresented one is never recycled.
             drawable.present()
-            return
+            return true
         }
         let rect = Self.contentRect(
             in: drawableSize, scale: terminalRenderer.scale,
@@ -948,7 +950,7 @@ class ViewController: NSViewController {
             : nil
         let background = TerminalColorPalette.clearColor
         let commit = InputLatencySignposts.begin(.commit)
-        terminalRenderer.draw(
+        let drawn = terminalRenderer.draw(
             rect: rect, drawableSize: drawableSize, target: drawable.texture,
             clearColor: MTLClearColorMake(
                 Double(background.x), Double(background.y), Double(background.z),
@@ -957,6 +959,7 @@ class ViewController: NSViewController {
             drawable: drawable, label: "Corta.frame.\(ObjectIdentifier(self).hashValue)",
             onCompleted: onCompleted)
         InputLatencySignposts.end(.commit, commit)
+        return drawn
     }
 
     /// Top-anchored when the grid fits, so the rounding remainder sits at the

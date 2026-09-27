@@ -317,7 +317,9 @@ public nonisolated final class Metal4Backend {
     /// Opens a frame into `target`, clearing it, so an empty frame still
     /// clears. `label` names the capture. A frame whose slot is still busy is
     /// dropped: nothing encodes, and `endFrame` presents without drawing.
-    func beginFrame(target: MTLTexture, clearColor: MTLClearColor, label: String) {
+    /// - Returns: whether the frame will be drawn; false for a dropped one.
+    @discardableResult
+    func beginFrame(target: MTLTexture, clearColor: MTLClearColor, label: String) -> Bool {
         // A frame left open is a bug in `TerminalRenderer.draw`; close it
         // rather than trap.
         if encoder != nil { endFrame(presenting: nil, onCompleted: nil) }
@@ -332,7 +334,7 @@ public nonisolated final class Metal4Backend {
                 Metal4Diagnostics.reportStalledQueue(droppedFrames: consecutiveDroppedFrames)
             }
             encoder = nil
-            return
+            return false
         }
         consecutiveDroppedFrames = 0
         frameNumber += 1
@@ -354,7 +356,7 @@ public nonisolated final class Metal4Backend {
             commandBuffer.endCommandBuffer()
             slotSemaphores[slot].signal()
             completion.note(frameNumber)
-            return
+            return false
         }
         encoder.label = label
         self.encoder = encoder
@@ -364,6 +366,7 @@ public nonisolated final class Metal4Backend {
         solidRing.beginFrame()
         glyphRing.beginFrame()
         colorGlyphRing.beginFrame()
+        return true
     }
 
     func drawSolidQuads(_ instances: [QuadInstance], rect: CGRect, drawableSize: CGSize) {

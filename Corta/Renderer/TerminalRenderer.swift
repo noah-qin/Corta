@@ -270,12 +270,15 @@ public nonisolated final class TerminalRenderer {
     /// Draws the last cached instances, without diffing again, as one render
     /// pass: backgrounds, glyphs, colour glyphs, then images over the text.
     /// The backend owns the command buffer, the commit and the present.
+    /// - Returns: whether the frame was drawn; false when the backend dropped
+    ///   it, and the drawable was presented with stale contents.
+    @discardableResult
     func draw(
         rect: CGRect, drawableSize: CGSize, target: MTLTexture, clearColor: MTLClearColor,
         drawable: (any MTLDrawable)?, label: String,
         onCompleted: (@Sendable ((any Error)?) -> Void)?
-    ) {
-        backend.beginFrame(target: target, clearColor: clearColor, label: label)
+    ) -> Bool {
+        let drawing = backend.beginFrame(target: target, clearColor: clearColor, label: label)
         backend.drawSolidQuads(cachedBackground, rect: rect, drawableSize: drawableSize)
         backend.drawGlyphQuads(
             cachedGlyphs, atlas: glyphAtlas.texture, rect: rect, drawableSize: drawableSize)
@@ -292,6 +295,7 @@ public nonisolated final class TerminalRenderer {
                 drawableSize: drawableSize, backend: backend)
         }
         backend.endFrame(presenting: drawable, onCompleted: onCompleted)
+        return drawing
     }
 
     private func rebuildAllRows(grid: Grid, offset: Int) {

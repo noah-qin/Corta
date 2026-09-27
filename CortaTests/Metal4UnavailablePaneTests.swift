@@ -53,4 +53,25 @@ struct Metal4UnavailablePaneTests {
         pane.applyFocusAppearance()
         #expect(pane.failureView != nil)
     }
+
+    /// A split of two failed panes, resized from the menu: the step is a
+    /// cell, and a failed pane has no cell size.
+    @Test func resizingASplitOfFailedPanesChangesNothing() throws {
+        let split = SplitViewController()
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 900, height: 560),
+            styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        window.contentViewController = split
+        _ = split.view
+        split.view.layoutSubtreeIfNeeded()
+        split.splitFocusedPane(orientation: .columns)
+        defer { split.teardown() }
+        #expect(split.panes.count == 2)
+        #expect(split.panes.allSatisfy { $0.failureView != nil })
+        split.growPaneHorizontally(nil)
+        split.shrinkPaneHorizontally(nil)
+        split.growPaneVertically(nil)
+        split.shrinkPaneVertically(nil)
+        #expect(split.panes.count == 2)
+    }
 }

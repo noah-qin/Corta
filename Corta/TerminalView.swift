@@ -56,7 +56,7 @@ final class TerminalView: NSView, CALayerDelegate {
 
     /// Called once per accepted frame on the main thread; forwarded to
     /// `frameScheduler`.
-    var onRenderFrame: ((CGSize, CAMetalDrawable) -> Void)? {
+    var onRenderFrame: ((CGSize, CAMetalDrawable) -> Bool)? {
         get { frameScheduler.onRenderFrame }
         set { frameScheduler.onRenderFrame = newValue }
     }
