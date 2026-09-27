@@ -1,7 +1,7 @@
 import XCTest
 
-/// Split panes, against the live app: ⌘D splits the window, ⌘W closes the focused
-/// pane before it closes the window. The panes themselves are Metal
+/// Split panes, against the live app: ⌘D splits the window, ⌘W closes the
+/// focused pane before it closes the window. The panes themselves are Metal
 /// surfaces with no accessibility content, so the assertions are about the
 /// window surviving exactly as long as it has a pane.
 final class SplitPaneUITests: XCTestCase {

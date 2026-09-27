@@ -1,15 +1,15 @@
 import Carbon.HIToolbox
 import XCTest
 
-/// Remote context and SFTP against the live app, end to end, with nothing on the machine
-/// changed: a throwaway stage directory carries the config, a script named `ssh`
-/// stands in for a remote shell (it prints a banner, reports a remote
-/// `OSC 7`, then runs `/bin/sh -i`), and `CORTA_SFTP_SSH` points the SFTP
-/// channel at a script that `exec`s the real OpenSSH `sftp-server` on a
-/// staged directory — so the wire protocol, the engine, the browser and
-/// the remote-edit flow all run against genuine OpenSSH, the one thing the
-/// in-memory fake server cannot vouch for. `CORTA_STAGE_DIR` (`AppPaths`)
-/// is what keeps the launched app out of the developer's own config and
+/// Remote context and SFTP against the live app, end to end, with nothing on
+/// the machine changed: a throwaway stage directory carries the config, a
+/// script named `ssh` stands in for a remote shell (it prints a banner, reports
+/// a remote `OSC 7`, then runs `/bin/sh -i`), and `CORTA_SFTP_SSH` points the
+/// SFTP channel at a script that `exec`s the real OpenSSH `sftp-server` on a
+/// staged directory — so the wire protocol, the engine, the browser and the
+/// remote-edit flow all run against genuine OpenSSH, the one thing the
+/// in-memory fake server cannot vouch for. `CORTA_STAGE_DIR` (`AppPaths`) is
+/// what keeps the launched app out of the developer's own config and
 /// Application Support: `$HOME` does not move either on macOS.
 ///
 /// Not covered here, and still a human's to judge: authentication and

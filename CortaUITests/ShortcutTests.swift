@@ -33,14 +33,14 @@ final class ShortcutTests: XCTestCase {
 
     /// The pre-display layout briefly has the requested frame, then AppKit
     /// applies `.fullSizeContentView` and removes one titlebar height. The
-    /// session must stay at the configured grid through that final
-    /// adjustment (a 120×30 window must not settle at 120×27) — checked
-    /// here as frame *stability*: once the window first reports a frame,
-    /// that frame must not change again. A late correction is exactly a frame that changes after the window already
-    /// looked settled; a window that was simply wrong the whole time, never
-    /// correcting, would not be caught by this alone, but that shape of bug
-    /// is what `SplitPaneUITests` and the `CONFORMANCE.md` §4.4.2 manual
-    /// pass (`stty size` against a live window) are for.
+    /// session must stay at the configured grid through that final adjustment
+    /// (a 120×30 window must not settle at 120×27) — checked here as frame
+    /// *stability*: once the window first reports a frame, that frame must not
+    /// change again. A late correction is exactly a frame that changes after
+    /// the window already looked settled; a window that was simply wrong the
+    /// whole time, never correcting, would not be caught by this alone, but
+    /// that shape of bug is what `SplitPaneUITests` and the `CONFORMANCE.md`
+    /// §4.4.2 manual pass (`stty size` against a live window) are for.
     ///
     /// Three more direct checks were tried first and ruled out, each for a
     /// reason specific to this test machine rather than to Corta:

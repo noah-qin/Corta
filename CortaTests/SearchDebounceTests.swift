@@ -94,10 +94,10 @@ struct SearchDebounceTests {
         #expect(pane.search.matches.isEmpty)
     }
 
-    /// `NSEvent.addLocalMonitorForEvents` fires app-wide, so without a
-    /// window check an Esc meant for one pane's search bar would close every
-    /// open bar in the app. Two panes, two windows, two open bars — an Esc tagged
-    /// to window A must close only A's bar and must not be swallowed for B.
+    /// `NSEvent.addLocalMonitorForEvents` fires app-wide, so without a window
+    /// check an Esc meant for one pane's search bar would close every open bar
+    /// in the app. Two panes, two windows, two open bars — an Esc tagged to
+    /// window A must close only A's bar and must not be swallowed for B.
     @Test func escapeOnlyClosesTheSearchBarInItsOwnWindow() throws {
         func makeWindowedPane() -> ViewController {
             let pane = makePane()
@@ -278,12 +278,12 @@ struct SearchDebounceTests {
             "literal-mode B must not match \"[0-9]+\" as a substring — if it shared A's regex flag it would")
     }
 
-    /// Output arriving while a sweep is already running must not be
-    /// silently dropped — a `scheduleBackgroundSearchRefresh` that is a
-    /// no-op whenever `searchTask != nil`, with nothing re-triggering a sweep
-    /// once the in-flight one finishes, would drop it. The gate lets the test hold a sweep open
-    /// deterministically so the race is exercised on purpose rather than
-    /// hoped for.
+    /// Output arriving while a sweep is already running must not be silently
+    /// dropped — a `scheduleBackgroundSearchRefresh` that is a no-op whenever
+    /// `searchTask != nil`, with nothing re-triggering a sweep once the
+    /// in-flight one finishes, would drop it. The gate lets the test hold a
+    /// sweep open deterministically so the race is exercised on purpose rather
+    /// than hoped for.
     @Test func outputArrivingMidSweepIsCaughtUpAfterwards() async throws {
         let pane = try await makePaneWithMarker()
         defer { pane.teardown() }
