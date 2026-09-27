@@ -252,6 +252,18 @@ the reviewer and scope in the PR, and record any human-only gaps.
   private reporting channel.
 - **Conduct** — `CODE_OF_CONDUCT.md`.
 
+## License headers
+
+Every source file starts with the Apache-2.0 header, and every other file
+is covered by `REUSE.toml`. [Licensing](docs/LICENSING.md) has the exact
+header, the year rule (the year a file was created, never a range) and which
+files take one. You do not have to paste it by hand:
+
+```sh
+swift run --package-path CortaTerminal corta-license fix    # add what is missing
+swift run --package-path CortaTerminal corta-license check  # what CI enforces
+```
+
 ## Licence of contributions
 
 Corta is licensed under the Apache License 2.0. Under Section 5 of that

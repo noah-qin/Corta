@@ -10,6 +10,12 @@ what to edit.
 
 ## [Unreleased]
 
+### Added
+
+- About ▸ Acknowledgements shows the license of Sparkle, the updater Corta
+  ships with, and the notices of the code Sparkle bundles — terms that
+  require the notice to travel with the app.
+
 ### Changed
 
 - Building Corta from source now produces a separate application: **Corta

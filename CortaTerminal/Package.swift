@@ -1,4 +1,19 @@
 // swift-tools-version: 6.2
+// Copyright 2026 Noah Qin
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 import PackageDescription
 
@@ -16,6 +31,7 @@ let package = Package(
         .executable(name: "corta-bench", targets: ["corta-bench"]),
         .executable(name: "corta-exec", targets: ["corta-exec"]),
         .executable(name: "corta-fuzz", targets: ["corta-fuzz"]),
+        .executable(name: "corta-license", targets: ["corta-license"]),
     ],
     targets: [
         .target(
@@ -52,6 +68,24 @@ let package = Package(
         .executableTarget(
             name: "corta-fuzz",
             dependencies: ["CortaTerminal"],
+            swiftSettings: [.defaultIsolation(nil)]
+        ),
+        // The license-header rules (`docs/LICENSING.md`) and the tool that
+        // checks and adds them. A library of its own so the rules are
+        // testable without the file system; nothing in the terminal core
+        // depends on it.
+        .target(
+            name: "LicenseHeaders",
+            swiftSettings: [.defaultIsolation(nil)]
+        ),
+        .executableTarget(
+            name: "corta-license",
+            dependencies: ["LicenseHeaders"],
+            swiftSettings: [.defaultIsolation(nil)]
+        ),
+        .testTarget(
+            name: "LicenseHeadersTests",
+            dependencies: ["LicenseHeaders"],
             swiftSettings: [.defaultIsolation(nil)]
         ),
         .testTarget(

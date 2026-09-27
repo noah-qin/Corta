@@ -1,4 +1,20 @@
 #!/bin/bash
+# Copyright 2026 Noah Qin
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 # The one packaging check (B15 / T11). `scripts/package-release.sh`,
 # `scripts/release.sh`, `.github/workflows/release.yml` and
 # `.github/workflows/appcast.yml` all call this
@@ -11,8 +27,9 @@
 #
 # Always: the app's Info.plist agrees with project.pbxproj on the marketing
 # version, the build number and the deployment target; the build number is
-# an integer; CHANGELOG.md has a heading for the version; README.md names
-# the release archive for it; the code signature verifies.
+# an integer; every file carries its license header; CHANGELOG.md has a
+# heading for the version; README.md names the release archive for it; the
+# code signature verifies.
 #
 #   --version V          V (a tag with its `v` stripped) must be the version.
 #   --archive ZIP        ZIP is named Corta-V.zip, holds Corta.app, and its
@@ -28,7 +45,7 @@
 set -uo pipefail
 
 if [ "$#" -lt 1 ]; then
-  sed -n '2,25p' "$0" >&2
+  sed -n '18,42p' "$0" >&2
   exit 2
 fi
 
@@ -115,6 +132,19 @@ if [ "$bundle_target" = "$project_target" ] && [ -n "$bundle_target" ]; then
   pass "LSMinimumSystemVersion $bundle_target matches MACOSX_DEPLOYMENT_TARGET"
 else
   fail "LSMinimumSystemVersion '$bundle_target' != MACOSX_DEPLOYMENT_TARGET '$project_target'"
+fi
+
+# --- License headers -------------------------------------------------------
+
+# Every source file carries the Apache-2.0 header and every other file is
+# classified (docs/LICENSING.md). `corta-license` is the one implementation
+# of those rules; CI applies the same rules through `swift test`.
+if license_report=$(swift run --package-path "$repo_root/CortaTerminal" -c release -q \
+  corta-license check --root "$repo_root" 2>&1); then
+  pass "every file carries its license header"
+else
+  fail "license headers (corta-license check):"
+  echo "$license_report" | sed 's/^/      /'
 fi
 
 # --- Documents that name the version ---------------------------------------

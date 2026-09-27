@@ -39,6 +39,7 @@ source of truth; this file is an index. `docs/README.md` is the fuller one.
 | `docs/TROUBLESHOOTING.md`  | What a user sees when something fails, and the fix          |
 | `docs/TESTING.md`          | Which check each kind of change needs, and how to run it   |
 | `docs/RELEASING.md`        | The release checklist, from `[Unreleased]` to a signed feed |
+| `docs/LICENSING.md`        | The license header, which files carry it, `corta-license check`/`fix` |
 | `docs/history/`            | The M1–M10 roadmap and the 0.1.1 audit notes — the record, never edited except to fix a link |
 | `CONTRIBUTING.md`          | Commit convention, branches, pull requests                 |
 

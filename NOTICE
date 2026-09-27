@@ -19,7 +19,10 @@ and remain the property of the copyright holder:
   - The pangolin mascot and every derivative of it, including
     `docs/brand/corta-pangolin-mascot.png` and
     `docs/brand/corta-pangolin-loop.gif`.
-  - The application icon bundle `AppIcon.icon/` and its assets.
+  - The application icon bundle `AppIcon.icon/` and its assets, and the
+    development build's derivative of it, `AppIconDev.icon/`.
+  - The screenshot and social preview images under `docs/brand/`
+    (`screenshot.png`, `social-preview.png`).
 
 Forks and derivative works may use the source code freely under the
 Apache License, but must not use the Corta name, the pangolin mascot

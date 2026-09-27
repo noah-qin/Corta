@@ -1,4 +1,20 @@
 #!/bin/sh
+# Copyright 2026 Noah Qin
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 # Builds the stage `RemoteWorkflowUITests` drives the live app against, at
 # the directory given as $1, then writes `ready-$2` so the test can tell
 # *this* run's stage from a previous run's leftovers. Run by the app's own shell in the test's first
