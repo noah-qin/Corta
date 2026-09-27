@@ -4,7 +4,7 @@ import Testing
 
 @testable import Corta
 
-/// U14 — the two things OSC 133 marks make possible that Corta was not yet
+/// The two things OSC 133 marks make possible that Corta was not yet
 /// doing: taking the last command's output without selecting it by hand, and
 /// navigating to the commands that *failed* rather than to every command.
 struct CommandOutputTests {
@@ -168,7 +168,7 @@ struct CommandOutputTests {
         #expect(ViewController.commandOutput(in: terminal.grid, records: terminal.commandRecords, scrollOffset: 0) == nil)
     }
 
-    // MARK: - Command line text recovery (B08)
+    // MARK: - Command line text recovery
 
     /// `commandLineText` reads the literal command back from the grid using
     /// `promptEndColumn` — the "Fill"/"Run" half of Command History search.

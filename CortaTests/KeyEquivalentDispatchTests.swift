@@ -3,7 +3,7 @@ import Testing
 
 @testable import Corta
 
-/// U08, U13 — the ordering claim the ghost-binding fix rests on, tested
+/// The ordering claim the ghost-binding fix rests on, tested
 /// rather than argued.
 ///
 /// The argument was: AppKit dispatches a bound keystroke through its **menu
@@ -51,8 +51,8 @@ struct KeyEquivalentDispatchTests {
             "no menu item claims the keystroke for: \(unclaimed.joined(separator: ", "))")
     }
 
-    /// The three keystrokes U08 was about, each claimed by the menu item for
-    /// the command that owns it — not by the command the literal used to run.
+    /// Three keystrokes that could be ghost bindings, each claimed by the
+    /// menu item for the command that owns it — never by a literal.
     @Test func theGhostBindingKeystrokesBelongToTheirOwners() throws {
         let menu = try #require(NSApp.mainMenu)
         let bindings = ConfigurationStore.shared.configuration.keybindings
@@ -71,7 +71,7 @@ struct KeyEquivalentDispatchTests {
         #expect(findItem.action == TerminalCommand.find.action)
     }
 
-    /// U13 — Zoom Pane's key reaches the split controller's action, so the
+    /// Zoom Pane's key reaches the split controller's action, so the
     /// gesture is real and not only the menu row.
     @Test func zoomPaneIsReachableByItsKey() throws {
         let menu = try #require(NSApp.mainMenu)

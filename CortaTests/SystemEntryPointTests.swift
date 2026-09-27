@@ -4,7 +4,7 @@ import Testing
 
 @testable import Corta
 
-/// B16 — the system entry points: the Quick Terminal's hotkey and geometry,
+/// The system entry points: the Quick Terminal's hotkey and geometry,
 /// Secure Keyboard Entry's state machine, the App Intents' window identity,
 /// and the config keys all three read.
 ///
@@ -462,7 +462,7 @@ struct WindowSetupStagingTests {
     }
 }
 
-/// B09's restored tab groups come back in saved order with the saved tab
+/// Restored tab groups come back in saved order with the saved tab
 /// selected. Programmatic windows with plain view controllers, tabbed for
 /// real: AppKit's own `addTabbedWindow` ordering is what was wrong.
 @MainActor

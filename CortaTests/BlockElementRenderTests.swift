@@ -57,7 +57,7 @@ import Testing
     /// Renders one cell holding `character` in (255,140,0) and reports how
     /// many pixels have ink, the cell's pixel count, its average colour, and
     /// the texture itself — nil only when there is no GPU to render or
-    /// attach with — so a failing test can attach it (B01).
+    /// attach with — so a failing test can attach it.
     private static func render(
         _ character: String
     ) throws -> (inked: Int, total: Int, mean: SIMD3<Int>, texture: MTLTexture?) {

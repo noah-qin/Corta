@@ -4,7 +4,7 @@ import Testing
 
 @testable import Corta
 
-/// U09 — the screens Corta shows when something it depends on is not there.
+/// The screens Corta shows when something it depends on is not there.
 ///
 /// This is the one part of the app that has to work when the rest does not,
 /// which is exactly why it is the part least likely to be exercised by hand:
@@ -49,7 +49,7 @@ struct RecoveryUITests {
     }
 
     /// The panel takes keyboard focus itself, because the pane it replaced
-    /// has no terminal view for `makeFirstResponder` to land on (U09).
+    /// has no terminal view for `makeFirstResponder` to land on.
     @Test func thePanelOffersSomethingToFocus() {
         let retryable = PaneFailureView(title: "t", detail: "d", canRetry: true)
         #expect(retryable.primaryAction?.title == L10n.text("failure.button.retry"))

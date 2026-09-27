@@ -3,8 +3,8 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M7.2 (OSC 133) and M7.11 (OSC 52) — the two things the child can tell the
-/// terminal that it previously had to guess at or could not hear at all.
+/// OSC 133 and OSC 52 — two things the child can tell the terminal that it
+/// would otherwise have to guess at or could not hear at all.
 @Suite struct ShellIntegrationTests {
     private func terminal(rows: Int = 4, columns: Int = 20, scrollback: Int = 100) -> Terminal {
         Terminal(rows: rows, columns: columns, scrollbackLimit: scrollback)
@@ -194,7 +194,7 @@ import Testing
         #expect(records.record(before: -1) == nil)
     }
 
-    // MARK: - Command records (B07)
+    // MARK: - Command records
 
     @Test("a completed command gets a stable id and every field")
     func completedCommandRecordIsPopulated() {
@@ -231,7 +231,7 @@ import Testing
     }
 
     /// Each `A` starts a new record, keyed by a ever-increasing id rather
-    /// than reused across commands — the identity B07 exists to add.
+    /// than reused across commands — the identity records exist to give.
     @Test("each command gets its own, incrementing id")
     func idsIncrementAcrossCommands() {
         var terminal = self.terminal()
@@ -243,7 +243,7 @@ import Testing
 
     /// `lastCompleted` is not `last`: a still-running command must not be
     /// mistaken for "the command that just finished" — the exact confusion
-    /// U14's "copy last command's output" existed to avoid.
+    /// "copy last command's output" exists to avoid.
     @Test("the latest completed command is not the one still running")
     func lastCompletedSkipsARunningCommand() {
         var store = CommandRecordStore()
@@ -290,7 +290,7 @@ import Testing
         #expect(store.records.map(\.id) == [2, 3, 4])
     }
 
-    // MARK: - Command text recovery (B08)
+    // MARK: - Command text recovery
 
     /// `promptEndColumn` is what `ViewController.commandLineText(grid:
     /// record:)` reads a historic command's own text back from — it has to
@@ -329,7 +329,7 @@ import Testing
         #expect(terminal.grid.logicalLine(containing: 0).text == textBefore)
     }
 
-    // MARK: - Prompt end position (B08)
+    // MARK: - Prompt end position
 
     @Test("the prompt end column is where the cursor sits right after B")
     func promptEndColumnIsRecordedAtB() {
@@ -374,7 +374,7 @@ import Testing
         #expect(terminal.promptEndPosition == nil)
     }
 
-    // MARK: - Command record search (B08)
+    // MARK: - Command record search
 
     @Test("records can be filtered by directory, most recent first")
     func recordsFilterByDirectory() {
@@ -419,7 +419,7 @@ import Testing
         #expect(store.records().map(\.promptRow) == [1, 0])
     }
 
-    // MARK: - Remote context on command records (B13)
+    // MARK: - Remote context on command records
 
     /// A command begun while the pane refers to a remote host records that
     /// host on the command itself — the remote context can move on or be

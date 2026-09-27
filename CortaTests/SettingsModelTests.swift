@@ -4,10 +4,9 @@ import Testing
 @testable import Corta
 
 /// `SettingsModel`'s clamping and validation, tested directly rather than
-/// through a live window and its toolbar delegate the way the AppKit page's
-/// `SettingsPageTests` used to have to. `SettingsModel` writes through
-/// `ConfigurationStore.shared`, the same store the old controller wrote
-/// through, so these tests restore whatever they change.
+/// through a live window and its toolbar delegate. `SettingsModel` writes
+/// through `ConfigurationStore.shared`, so these tests restore whatever
+/// they change.
 @MainActor
 struct SettingsModelTests {
     @Test("a scrollback value outside 0...1,000,000 is clamped and reported")
@@ -83,7 +82,7 @@ struct SettingsModelTests {
         #expect(model.saveStatus.kind == .saved)
     }
 
-    // MARK: - U17: the open-file command
+    // MARK: - The open-file command
 
     @Test("an open-file command whose first word isn't an absolute path is refused")
     func openFileCommandRejectsRelativePath() {

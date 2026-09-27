@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M2.6/M2.7, core side — the `?2004` bracketed-paste and `?1006` SGR mouse
+/// The `?2004` bracketed-paste and `?1006` SGR mouse
 /// flags, set by DECSET/DECRST and read by the app layer later.
 @Suite("Private modes")
 struct PrivateModeTests {
@@ -47,9 +47,7 @@ struct PrivateModeTests {
     }
 
     /// Modes this terminal does not implement — `?7` auto-wrap, `?25` cursor
-    /// visibility — must not disturb the screen or produce output. (`?1049`
-    /// used to be the example here; it is implemented now and covered by the
-    /// alternate-screen tests.)
+    /// visibility — must not disturb the screen or produce output.
     @Test("unimplemented modes are ignored cleanly")
     func unknownModesAreIgnored() throws {
         var terminal = Terminal(rows: 4, columns: 10)
@@ -67,7 +65,7 @@ struct PrivateModeTests {
         #expect(terminal.takeOutput().isEmpty)
     }
 
-    // MARK: - M4.3 synchronized output
+    // MARK: - Synchronized output
 
     @Test("?2026 starts off, DECSET turns it on, DECRST turns it off")
     func synchronizedOutputToggle() throws {
@@ -114,7 +112,7 @@ struct PrivateModeTests {
     }
 }
 
-/// M4.8, core side — BEL sets a flag the app reads and clears; the core
+/// BEL sets a flag the app reads and clears; the core
 /// decides nothing about audible, visual or muted.
 @Suite("Bell")
 struct BellTests {
@@ -148,7 +146,7 @@ struct BellTests {
     }
 }
 
-/// U04 — DECKPAM / DECKPNM (`ESC =` / `ESC >`). The app encodes keys, so the
+/// DECKPAM / DECKPNM (`ESC =` / `ESC >`). The app encodes keys, so the
 /// mode is state the core tracks and answers for; `xterm-256color`'s `smkx`
 /// sends `\E[?1h\E=`, which is why the two arrive together.
 @Suite struct ApplicationKeypadModeTests {

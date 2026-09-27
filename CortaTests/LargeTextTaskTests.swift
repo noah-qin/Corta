@@ -5,7 +5,7 @@ import Testing
 @testable import Corta
 import CortaTerminal
 
-/// B05: copy and export build their (potentially whole-scrollback) text off
+/// Copy and export build their (potentially whole-scrollback) text off
 /// the interaction path, sharing one cancellable `largeTextTask` handle.
 ///
 /// `.serialized` and a real pane, like `SearchDebounceTests` — the text
@@ -50,7 +50,7 @@ struct LargeTextTaskTests {
             baseScrollbackTotal: grid.scrollback.totalPushed)
 
         // A private pasteboard, not `.general` (the real system clipboard):
-        // `pasteboardForTesting` (B05 review follow-up) is exactly the seam
+        // `pasteboardForTesting` is exactly the seam
         // `NativeIntegrationTests` already uses `.withUniqueName()` for, so
         // this never touches — and can never be raced by, or clobber — the
         // developer's own clipboard contents.
@@ -85,7 +85,7 @@ struct LargeTextTaskTests {
             await waitUpTo(5) {
                 pasteboard.string(forType: .string)?.contains("COPYTASKMARKER") == true
             })
-        // B05 review follow-up: the handle must not outlive the build it
+        // The handle must not outlive the build it
         // names, or `largeTextTask != nil` stops meaning "a build is
         // running."
         #expect(
@@ -93,7 +93,7 @@ struct LargeTextTaskTests {
             "expected the handle to clear once the copy completed")
     }
 
-    /// B05 review follow-up: `largeTextTaskGeneration` is per-pane, but the
+    /// `largeTextTaskGeneration` is per-pane, but the
     /// pasteboard is one resource shared by every pane, every other app,
     /// and the child (OSC 52) — a slow copy finishing after something else
     /// has written more recently must not clobber it.

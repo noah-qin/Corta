@@ -3,14 +3,14 @@ import Testing
 
 @testable import CortaTerminal
 
-/// S02 — the per-pane image memory budgets `ImagePlacementTable` enforces
+/// The per-pane image memory budgets `ImagePlacementTable` enforces
 /// (`KittyGraphics.maximumPaneImageBytes`, `maximumImageDimension`,
 /// `maximumImagePixels`). Driven at the table level rather than over the
 /// wire: the protocol-sized budgets are hundreds of megabytes, so the
 /// table's test-overridable `maximumStoredBytes` stands in for the real
 /// cap. Wire-level store refusals (count cap → `ENOSPC`) are already
 /// covered in `KittyGraphicsTests`.
-@Suite("Image memory budgets (S02)")
+@Suite("Image memory budgets")
 struct ImageMemoryBudgetTests {
     private static func png(_ bytes: Int) -> KittyGraphics.ImageData {
         KittyGraphics.ImageData(

@@ -3,7 +3,7 @@ import Testing
 
 @testable import Corta
 
-/// U16 — named shell/directory/environment presets, as config-file data.
+/// Named shell/directory/environment presets, as config-file data.
 struct PresetTests {
     @Test("a preset's three parts all parse")
     func fullPreset() {

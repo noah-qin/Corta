@@ -4,9 +4,9 @@ import Testing
 
 @testable import Corta
 
-/// E05 regression: the first-present flash guard is an explicit state
-/// machine (`FrameScheduler.requestFirstPresent` / `notePresentedFrame`),
-/// not the old run-loop pump with a swapped-in `onRenderFrame`. These tests
+/// The first-present flash guard is an explicit state machine
+/// (`FrameScheduler.requestFirstPresent` / `notePresentedFrame`), not a
+/// run-loop pump with a swapped-in `onRenderFrame`. These tests
 /// pin the two halves of that contract — the stand-in background that covers
 /// the transparent window until the first real present, and the absence of
 /// any nested run-loop servicing — plus the close/theme/resize orderings
@@ -54,10 +54,10 @@ struct FirstPresentTests {
         #expect(layer.backgroundColor == expected)
     }
 
-    /// The core E05 regression: `requestFirstPresent` must not run the main
-    /// run loop. A block enqueued before the call would have been serviced
-    /// *inside* the old `presentSynchronously` pump (its reentrancy); under
-    /// the state machine it can only run after this test method returns.
+    /// The core of it: `requestFirstPresent` must not run the main run
+    /// loop. A pump would service a block enqueued before the call *inside*
+    /// it (reentrancy); under the state machine it can only run after this
+    /// test method returns.
     @Test func requestDoesNotServiceTheMainRunLoop() {
         let (scheduler, _) = Self.makeScheduler()
         scheduler.attach(to: Self.makeWindow())

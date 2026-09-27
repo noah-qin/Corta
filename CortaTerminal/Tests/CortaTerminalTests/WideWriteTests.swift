@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M2.1 integration — `displayWidth` wired into the grid write path. The
+/// `displayWidth` wired into the grid write path. The
 /// table itself is covered by `CharacterWidthTests`; these tests cover what
 /// the grid does with the widths (wcwidth/xterm conventions, cited per test).
 @Suite("Wide and zero-width writes")

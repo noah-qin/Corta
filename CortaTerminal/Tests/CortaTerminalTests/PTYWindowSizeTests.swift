@@ -5,7 +5,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M1.2 — `TIOCSWINSZ`, and child-exit reporting.
+/// `TIOCSWINSZ`, and child-exit reporting.
 ///
 /// `.serialized`: every test here forks a real child process — see the
 /// `.serialized` note on `TerminalSessionTests`.

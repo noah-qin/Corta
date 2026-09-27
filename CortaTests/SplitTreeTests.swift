@@ -3,7 +3,7 @@ import Testing
 
 @testable import Corta
 
-/// M5.1 — the binary layout tree. Exercised with plain `NSView`s: the tree
+/// The binary layout tree. Exercised with plain `NSView`s: the tree
 /// surgery is view-hierarchy work and needs no session, no Metal and no
 /// window.
 @MainActor

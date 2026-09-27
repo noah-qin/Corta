@@ -2,9 +2,9 @@ import Testing
 
 @testable import CortaTerminal
 
-/// B04 follow-up — the shared coordinate conversions that replace the
-/// hand-derived arithmetic previously duplicated across the render path,
-/// selection, search and shell-integration prompt-jumping.
+/// The shared coordinate conversions the render path, selection, search
+/// and shell-integration prompt-jumping all use, instead of each deriving
+/// the arithmetic by hand.
 @Suite("Scrollback coordinates")
 struct ScrollbackCoordinatesTests {
     @Test("reanchoredRow subtracts the growth, keeping the same absolute row")

@@ -4,7 +4,7 @@ import Testing
 
 @testable import Corta
 
-/// B14 — the shared SFTP test support: a fake `SFTPClient` that answers in
+/// The shared SFTP test support: a fake `SFTPClient` that answers in
 /// the model's terms and records what it was asked, plus the small helpers
 /// both the browser and the remote-edit suites build on. No ssh, no
 /// network; filesystem staging stays inside per-test temp directories.

@@ -2,8 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// OSC 4 (set/query the 256-entry indexed palette) and OSC 104 (reset it),
-/// B06.
+/// OSC 4 (set/query the 256-entry indexed palette) and OSC 104 (reset it).
 @Suite("Indexed palette (OSC 4/104)")
 struct IndexedPaletteTests {
     private func response(to input: String, rows: Int = 24, columns: Int = 80) -> String {

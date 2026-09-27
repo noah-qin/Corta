@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M1.10–M1.12 — printable text, the C0 controls, cursor movement and erase,
+/// Printable text, the C0 controls, cursor movement and erase,
 /// asserted cell by cell. The golden files cover the same ground as whole
 /// screens; these assert the details a dump comparison hides.
 @Suite("Performer")
@@ -17,7 +17,7 @@ struct PerformerTests {
         return terminal
     }
 
-    // MARK: - M1.10, text and C0
+    // MARK: - Text and C0
 
     @Test("printable text lands in consecutive cells")
     func printableText() throws {
@@ -67,7 +67,7 @@ struct PerformerTests {
         #expect(terminal.grid.cursor == Cursor(row: 0, column: 1))
     }
 
-    // MARK: - M1.11, cursor
+    // MARK: - Cursor
 
     @Test("CUP is one-based and clamped to the screen")
     func cursorPosition() throws {
@@ -100,7 +100,7 @@ struct PerformerTests {
         #expect(try terminal("\\e[3;5H\\e[2 A").grid.cursor == Cursor(row: 2, column: 4))
     }
 
-    // MARK: - M1.12, erase
+    // MARK: - Erase
 
     @Test("erase in line respects the mode and leaves the cursor")
     func eraseInLine() throws {
@@ -148,7 +148,7 @@ struct PerformerTests {
     }
 }
 
-/// M1.13 — SGR, asserted on the cell rather than through a dump.
+/// SGR, asserted on the cell rather than through a dump.
 ///
 /// ECMA-48 §8.3.117 for the base codes; xterm's ctlseqs "Character
 /// Attributes" for 90–107 and the 38/48 extended forms.

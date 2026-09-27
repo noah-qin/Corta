@@ -10,7 +10,7 @@ import Testing
 /// by design — see the type's comment.
 @Suite(.serialized, .metalSerialized) struct GlyphAtlasTests {
 
-    /// B12's cold-startup measurement (`docs/PERFORMANCE.md` §6): records
+    /// The cold-startup measurement (`docs/PERFORMANCE.md` §6): records
     /// `GlyphAtlas.init`'s cost and the cost of the first screenful of
     /// ordinary text afterward. A bounded eager ASCII prewarm (every
     /// printable column × all four styles, at `init`) was built and measured
@@ -94,7 +94,7 @@ import Testing
         #expect(atlas.shapingHits == 1)  // second lookup is a cache hit
     }
 
-    /// M3.5 — Core Text's cascade list: Menlo has no CJK ideograph, so the
+    /// Core Text's cascade list: Menlo has no CJK ideograph, so the
     /// shaped run must resolve to a fallback font and rasterise with *that*
     /// font (glyph ids are per-font; drawing with the requested font drew the
     /// wrong outlines).
@@ -112,7 +112,7 @@ import Testing
         #expect(atlas.fallbackHits > 0, "expected the CJK run to resolve to a fallback font")
     }
 
-    /// M3.6 — a ZWJ family emoji is one cluster: it shapes into a single
+    /// A ZWJ family emoji is one cluster: it shapes into a single
     /// glyph run in the emoji font, so its bitmap is one emoji wide, not one
     /// per family member.
     @Test func zwjFamilyEmojiShapesAsOneGlyphRun() throws {
@@ -157,7 +157,7 @@ import Testing
         #expect(atlas.shapingHits == hits)
     }
 
-    /// M3 eviction (DESIGN.md §7 hard part 4): when the page fills, the atlas
+    /// Atlas eviction (`DESIGN.md` §7.4): when the page fills, the atlas
     /// resets — caches cleared, allocator rewound, `generation` bumped — and
     /// previously issued glyphs re-rasterise on their next lookup.
     @Test func exhaustingTheAtlasEvictsAndReRasterises() throws {
@@ -186,13 +186,12 @@ import Testing
         #expect(again?.size != .zero)
     }
 
-    // MARK: - M9: independent pages
+    // MARK: - Independent pages
 
     /// The actual point of splitting the atlas into pages: exhausting the
     /// shaped (CJK/cluster) page must not evict the ASCII page's cache —
-    /// before M9, both shared one allocator and one cache pair per
-    /// texture, so any one of them filling up reset everything sharing its
-    /// texture.
+    /// with one allocator and one cache pair per texture, any one of them
+    /// filling up would reset everything sharing its texture.
     @Test func exhaustingTheShapedPageDoesNotEvictASCII() throws {
         guard let device = Self.makeDevice() else {
             Issue.record("No Metal device available in this environment")

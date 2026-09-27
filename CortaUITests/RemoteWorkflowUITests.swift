@@ -1,7 +1,7 @@
 import Carbon.HIToolbox
 import XCTest
 
-/// B13/B14 against the live app, end to end, with nothing on the machine
+/// Remote context and SFTP against the live app, end to end, with nothing on the machine
 /// changed: a throwaway stage directory carries the config, a script named `ssh`
 /// stands in for a remote shell (it prints a banner, reports a remote
 /// `OSC 7`, then runs `/bin/sh -i`), and `CORTA_SFTP_SSH` points the SFTP

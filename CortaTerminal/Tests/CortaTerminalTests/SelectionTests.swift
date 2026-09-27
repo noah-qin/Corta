@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M3.7 — the selection model: wrap joining on copy, trailing-blank
+/// The selection model: wrap joining on copy, trailing-blank
 /// trimming, word and logical-line expansion, and anchoring to the document
 /// while output scrolls the viewport.
 private func point(_ row: Int, _ column: Int) -> SelectionPoint {
@@ -222,7 +222,7 @@ struct SelectionTests {
         #expect(range.end == point(3, 5))
     }
 
-    /// M6.10 — the anchoring case `scrollback.count` could not express.
+    /// The anchoring case `scrollback.count` could not express.
     ///
     /// Once the ring is full every push evicts a row, so the count stops
     /// moving while the document keeps moving underneath the selection.

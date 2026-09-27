@@ -5,7 +5,7 @@ import Testing
 @testable import Corta
 @testable import CortaTerminal
 
-/// P04 — the keystroke search path: the sweep is debounced, runs off the
+/// The keystroke search path: the sweep is debounced, runs off the
 /// main thread, a newer query supersedes the one in flight, and closing the
 /// bar cancels it. Real panes with real children, like
 /// `PaneTeardownTests` — the content under search comes from the shell
@@ -94,9 +94,9 @@ struct SearchDebounceTests {
         #expect(pane.search.matches.isEmpty)
     }
 
-    /// B02: `NSEvent.addLocalMonitorForEvents` fires app-wide, so without a
-    /// window check an Esc meant for one pane's search bar closed every open
-    /// bar in the app. Two panes, two windows, two open bars — an Esc tagged
+    /// `NSEvent.addLocalMonitorForEvents` fires app-wide, so without a
+    /// window check an Esc meant for one pane's search bar would close every
+    /// open bar in the app. Two panes, two windows, two open bars — an Esc tagged
     /// to window A must close only A's bar and must not be swallowed for B.
     @Test func escapeOnlyClosesTheSearchBarInItsOwnWindow() throws {
         func makeWindowedPane() -> ViewController {
@@ -137,8 +137,8 @@ struct SearchDebounceTests {
         #expect(paneB.search.bar != nil)
     }
 
-    /// B05: a split puts two panes in *one* window, so the window check
-    /// alone (B02's fix) is not enough to tell their bars apart — an Esc
+    /// A split puts two panes in *one* window, so the window check
+    /// alone is not enough to tell their bars apart — an Esc
     /// typed while one pane's search field is focused must close only that
     /// pane's bar, not its sibling's.
     @Test func escapeOnlyClosesTheSearchBarOfTheFocusedPaneInASplit() throws {
@@ -182,9 +182,9 @@ struct SearchDebounceTests {
         #expect(paneB.search.bar != nil)
     }
 
-    /// B05: case-sensitivity used to be read live from `ConfigurationStore`
-    /// on every sweep, so toggling it in one pane silently changed what a
-    /// second, already-open pane's *next* sweep matched. Each pane's sweep
+    /// Case-sensitivity read live from `ConfigurationStore` on every sweep
+    /// would let toggling it in one pane silently change what a second,
+    /// already-open pane's *next* sweep matches. Each pane's sweep
     /// must use only its own local flag.
     @Test func caseSensitivityIsIsolatedPerPane() async throws {
         let paneA = makePane()
@@ -234,14 +234,14 @@ struct SearchDebounceTests {
         // Exact counts depend on shell echo specifics (the typed command
         // line itself contains the query too); what this test is actually
         // proving is that the two panes' sweeps disagree at all — if they
-        // shared one flag (the pre-B05 bug), both counts would be equal.
+        // shared one flag, both counts would be equal.
         #expect(paneA.search.matches.count > 0)
         #expect(
             paneB.search.matches.count > paneA.search.matches.count,
             "case-insensitive B must find strictly more than case-sensitive A for the same text")
     }
 
-    /// B05: `searchRegex` is a separate local flag from `searchCaseSensitive`
+    /// `searchRegex` is a separate local flag from `searchCaseSensitive`
     /// with its own toggle and sweep branch (`Self.sweep`) — isolating one
     /// says nothing about the other, so it needs its own proof.
     @Test func regexModeIsIsolatedPerPane() async throws {
@@ -278,10 +278,10 @@ struct SearchDebounceTests {
             "literal-mode B must not match \"[0-9]+\" as a substring — if it shared A's regex flag it would")
     }
 
-    /// B05: output arriving while a sweep is already running used to be
-    /// silently dropped — `scheduleBackgroundSearchRefresh` was a no-op
-    /// whenever `searchTask != nil`, and nothing re-triggered a sweep once
-    /// the in-flight one finished. The gate lets the test hold a sweep open
+    /// Output arriving while a sweep is already running must not be
+    /// silently dropped — a `scheduleBackgroundSearchRefresh` that is a
+    /// no-op whenever `searchTask != nil`, with nothing re-triggering a sweep
+    /// once the in-flight one finishes, would drop it. The gate lets the test hold a sweep open
     /// deterministically so the race is exercised on purpose rather than
     /// hoped for.
     @Test func outputArrivingMidSweepIsCaughtUpAfterwards() async throws {
@@ -328,7 +328,7 @@ struct SearchDebounceTests {
             "expected a follow-up sweep to catch the output the in-flight one missed")
     }
 
-    /// B05: `scrollOffsetBeforeSearch` is a raw distance-from-bottom count;
+    /// `scrollOffsetBeforeSearch` is a raw distance-from-bottom count;
     /// restoring it verbatim after output grew the scrollback while the bar
     /// was open lands the viewport on different text than what was on
     /// screen before search opened. The restore must shift by the growth,
@@ -373,7 +373,7 @@ struct SearchDebounceTests {
         // can itself push one more line into scrollback in the gap between
         // the measurement above and `closeSearchBar`'s own — real, and not
         // what this test is about. What matters is that the restore is
-        // nowhere near the raw, unshifted `1` a pre-B05 restore would have
+        // nowhere near the raw, unshifted `1` a verbatim restore would have
         // produced, and does scale with the real growth rather than being
         // some other fixed, drifted number.
         let growth = totalPushedNow - totalPushedAtOpen
@@ -382,7 +382,7 @@ struct SearchDebounceTests {
             "expected the restore to shift by roughly the growth since capture (\(growth)), not replay the raw 1 — got \(pane.scrollOffset)")
     }
 
-    /// B05 review follow-up: zero is not a document position that drifts
+    /// Zero is not a document position that drifts
     /// with output — it *is* "follow the live bottom." A user who opened
     /// search already at the bottom must still be at the bottom on close,
     /// not scrolled up into history by however much arrived while the bar

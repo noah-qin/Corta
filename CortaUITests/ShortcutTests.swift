@@ -17,7 +17,7 @@ final class ShortcutTests: XCTestCase {
     @MainActor
     func testCommandNOpensASecondWindow() throws {
         let app = XCUIApplication()
-        // Session restore (M7.4) would otherwise carry the previous
+        // Session restore would otherwise carry the previous
         // test's windows into this one; the suite asserts window counts.
         app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
         app.launch()
@@ -34,10 +34,9 @@ final class ShortcutTests: XCTestCase {
     /// The pre-display layout briefly has the requested frame, then AppKit
     /// applies `.fullSizeContentView` and removes one titlebar height. The
     /// session must stay at the configured grid through that final
-    /// adjustment (a 120×30 window previously settled at 120×27) — checked
+    /// adjustment (a 120×30 window must not settle at 120×27) — checked
     /// here as frame *stability*: once the window first reports a frame,
-    /// that frame must not change again. A late correction (the historical
-    /// bug) is exactly a frame that changes after the window already
+    /// that frame must not change again. A late correction is exactly a frame that changes after the window already
     /// looked settled; a window that was simply wrong the whole time, never
     /// correcting, would not be caught by this alone, but that shape of bug
     /// is what `SplitPaneUITests` and the `CONFORMANCE.md` §4.4.2 manual
@@ -62,7 +61,7 @@ final class ShortcutTests: XCTestCase {
     ///    Pinyin (`com.apple.inputmethod.SCIM.ITABC`) — composes them into
     ///    Chinese candidates before Corta ever sees a byte, exactly as it
     ///    correctly would for a real Chinese-Pinyin user.
-    /// 3. Reading `AXHelp` (M8.1's "%d rows by %d columns...") through
+    /// 3. Reading `AXHelp` ("%d rows by %d columns...") through
     ///    System Events sidesteps the keyboard, but the xctest runner
     ///    process has no Automation/TCC permission to drive System Events
     ///    at all — "Application isn't running" for an application that
@@ -120,7 +119,7 @@ final class ShortcutTests: XCTestCase {
     @MainActor
     func testFontSizeShortcutsResizeTheWindowAroundTheGrid() throws {
         let app = XCUIApplication()
-        // Session restore (M7.4) would otherwise carry the previous
+        // Session restore would otherwise carry the previous
         // test's windows into this one; the suite asserts window counts.
         app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
         app.launch()

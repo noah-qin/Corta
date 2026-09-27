@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M2.2 — DA1, DA2 and DSR-CPR (`CONFORMANCE.md` §1.2). The exact response
+/// DA1, DA2 and DSR-CPR (`CONFORMANCE.md` §1.2). The exact response
 /// bytes are asserted without a PTY: the performer queues them on the
 /// terminal, and `takeOutput` is what the session writes.
 @Suite("Query responses")

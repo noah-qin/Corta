@@ -6,7 +6,7 @@ import Testing
 
 @testable import Corta
 
-/// U19, drag auto-scroll: the pure tick math behind the selection loop's
+/// Drag auto-scroll: the pure tick math behind the selection loop's
 /// periodic-event branch. Inside the grid nothing scrolls; past the top or
 /// bottom edge the viewport moves at a pace graded by overshoot, the head
 /// keeps extending into the scrollback, and the clamped offset stops the

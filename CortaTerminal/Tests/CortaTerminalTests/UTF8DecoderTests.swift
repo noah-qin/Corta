@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M1.7 — incremental UTF-8 decoding.
+/// Incremental UTF-8 decoding.
 ///
 /// The expectations follow the WHATWG Encoding Standard's UTF-8 decoder
 /// (§ "UTF-8 decoder"), which is the behaviour xterm and every other modern

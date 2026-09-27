@@ -4,7 +4,7 @@ import Synchronization
 
 @testable import CortaTerminal
 
-/// B14 test support — an in-memory transport pair and a scripted SFTP
+/// SFTP test support — an in-memory transport pair and a scripted SFTP
 /// server, so the session and transfer engine can be driven end to end
 /// without a real ssh, a network, or any machine state.
 ///

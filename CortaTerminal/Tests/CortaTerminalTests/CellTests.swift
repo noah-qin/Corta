@@ -2,7 +2,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// M1.3 — the cell and row layout the whole grid is built on.
+/// The cell and row layout the whole grid is built on.
 @Suite("Cell and Line")
 struct CellTests {
     /// The size of a cell multiplies by every stored cell in the scrollback,

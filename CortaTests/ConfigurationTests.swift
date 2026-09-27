@@ -3,7 +3,7 @@ import Testing
 
 @testable import Corta
 
-/// M6.1 — the config file format. The file is the single source of truth,
+/// The config file format. The file is the single source of truth,
 /// so what these assert is that a value survives the round trip out to text
 /// and back, and that a broken file still starts a terminal.
 struct ConfigurationTests {
@@ -74,7 +74,7 @@ struct ConfigurationTests {
     }
 
     /// The name is kept verbatim and resolved when it is *used*, not when it
-    /// is parsed: a custom theme (M7.6) may be defined further down the same
+    /// is parsed: a custom theme may be defined further down the same
     /// file, so a parse-time existence check would reject every theme the
     /// file itself declares. `AppearanceController` falls back to the default
     /// for a name nothing defines.
@@ -114,7 +114,7 @@ struct ConfigurationTests {
         }
     }
 
-    /// U06 — a value Corta cannot parse at all is not silently canonicalised
+    /// A value Corta cannot parse at all is not silently canonicalised
     /// into the default on the next write: the runtime falls back to the
     /// default, and the original line survives untouched so the user can see
     /// and fix the typo.
@@ -151,7 +151,7 @@ struct ConfigurationTests {
     }
 }
 
-/// M6.2 and M6.13 — the theme tables themselves.
+/// The theme tables themselves.
 ///
 /// Over `Theme.known`, not `Theme.builtIn`: only one theme is *offered* in
 /// the UI, but the others stay defined and stay reachable by name — a config
@@ -189,7 +189,7 @@ struct ThemeTests {
     }
 }
 
-/// U06 — the store against a real file, in a temporary directory so no test
+/// The store against a real file, in a temporary directory so no test
 /// ever touches the user's actual config. Each test gets a fresh suite
 /// instance, hence a fresh directory; the scenarios are the file's whole
 /// life cycle: absent at launch, created, replaced, deleted, malformed, and
@@ -301,8 +301,8 @@ struct ConfigurationStoreTests {
         defer { removeDirectory() }
         let store = ConfigurationStore(fileURL: file)
         #expect(store.update { $0.fontSize = 20 })
-        // Immediately after the store's own write — inside what used to be
-        // the write-suppression window — an editor replaces the file. The
+        // Immediately after the store's own write — where a write-suppression
+        // window would hide it — an editor replaces the file. The
         // file is the source of truth, so this edit must be seen.
         try writeFile("font-size = 33\n")
         #expect(await waitUpTo(5) { store.configuration.fontSize == 33 })

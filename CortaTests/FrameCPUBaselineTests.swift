@@ -7,7 +7,7 @@ import Testing
 
 @testable import Corta
 
-/// M1.21's baseline: frame CPU time, measured against a representative
+/// The frame-CPU baseline: frame CPU time, measured against a representative
 /// window (120×40, a typical terminal size) with the screen full of text —
 /// the worst case, which damage tracking would otherwise hide: every
 /// iteration calls `invalidate()` so the whole instance buffer is rebuilt,
