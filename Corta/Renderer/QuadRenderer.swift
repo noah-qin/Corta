@@ -12,12 +12,12 @@ enum QuadRendererError: Error {
 /// atlas — into a caller-given rectangle of a caller-given render target.
 ///
 /// Every entry point takes a `CGRect` and a `MTLRenderPassDescriptor`; this
-/// type never assumes "the window" (`DESIGN.md` §2.4). Two draw calls cover
-/// a typical frame — one instanced pass for every cell's background, one for
-/// every glyph — which is what "one draw call per screen" (`CONFORMANCE.md` §2.2)
-/// is protecting against: a call per cell or per row, not a call per pipeline.
-/// A frame with color emoji adds a third (the color-atlas pass), skipped
-/// entirely when no cell produced a color glyph.
+/// type never assumes "the window" (`DESIGN.md` §2.4). Two draw calls cover a
+/// typical frame — one instanced pass for every cell's background, one for
+/// every glyph — which is what "one draw call per screen" (`CONFORMANCE.md`
+/// §2.2) is protecting against: a call per cell or per row, not a call per
+/// pipeline. A frame with color emoji adds a third (the color-atlas pass),
+/// skipped entirely when no cell produced a color glyph.
 ///
 /// **Colour space.** Cell colours and the glyph atlas both hold sRGB-encoded
 /// values, and blending (glyph alpha over a cell's background) happens
@@ -297,7 +297,8 @@ nonisolated final class QuadRenderer {
         guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)
         else { return }
         // Correlates an Instruments/Metal System Trace capture with which of
-        // the up-to-three passes a frame took; purely a label, changes nothing about what draws.
+        // the up-to-three passes a frame took; purely a label, changes nothing
+        // about what draws.
         encoder.label = label
         encoder.pushDebugGroup(label)
         defer {

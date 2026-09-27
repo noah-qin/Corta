@@ -1,13 +1,13 @@
 import AppKit
 import CortaTerminal
 
-/// The leftover sub-line scroll distance for one view, kept per device
-/// class. Trackpads report *precise* deltas in points, wheel mice report
-/// lines (usually whole, occasionally fractional); rounding each event on
-/// its own would round small trackpad deltas away to nothing and could
-/// drop a wheel notch entirely. Accumulating instead keeps the totals faithful in both
-/// units. The two remainders never combine: a trackpad's leftover points
-/// must not make a wheel notch count as more than a notch.
+/// The leftover sub-line scroll distance for one view, kept per device class.
+/// Trackpads report *precise* deltas in points, wheel mice report lines
+/// (usually whole, occasionally fractional); rounding each event on its own
+/// would round small trackpad deltas away to nothing and could drop a wheel
+/// notch entirely. Accumulating instead keeps the totals faithful in both
+/// units. The two remainders never combine: a trackpad's leftover points must
+/// not make a wheel notch count as more than a notch.
 final class ScrollWheelAccumulator {
     /// Trackpad points per scrollback line — chosen so momentum scrolling
     /// stays proportionate without a config knob.

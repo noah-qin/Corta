@@ -81,12 +81,11 @@ extension TerminalView {
     /// user has said ⌥ is Meta. Kept a pure function of the event so the
     /// bypass decision is testable without a window server.
     ///
-    /// The ⌥ bypass is what makes `option-as-meta` work at all — the
-    /// encoder handles it, but only an event that reaches the encoder: an ⌥-only press carries neither ⌘ nor ⌃, so it was
-    /// offered to the input context first, macOS composed it into the
-    /// layout's alternate character, and it came back through `insertText`.
-    /// ⌥F arrived as `ƒ`. The encoder was tested in isolation and the
-    /// dispatch that feeds it was not, which is the gap this closes.
+    /// The ⌥ bypass is what makes `option-as-meta` work at all. An ⌥-only
+    /// press carries neither ⌘ nor ⌃, so without it the event is offered to
+    /// the input context first, macOS composes it into the layout's
+    /// alternate character, and it comes back through `insertText` — ⌥F
+    /// arrives as `ƒ` and never reaches the encoder.
     ///
     /// With the setting off, nothing changes: ⌥ is text input on macOS and
     /// must keep reaching the IME, which is what dead keys and every

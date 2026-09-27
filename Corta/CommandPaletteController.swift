@@ -9,13 +9,12 @@ import SwiftUI
 /// name, press Return.
 ///
 /// `CommandPaletteModel` owns the filtering and selection; `CommandPaletteView`
-/// (SwiftUI) owns the layout. This class only builds the floating panel:
-/// AppKit chrome — the panel and its `NSGlassEffectView` background — around
-/// a hosted SwiftUI content view, the same shape as every other SwiftUI
-/// window in this app. SwiftUI's own `glassEffect(_:in:)` would do for the
-/// material, but the panel is an AppKit window either way, and keeping the
-/// glass beside it keeps the Reduce Transparency handling identical to the
-/// search bar's.
+/// (SwiftUI) owns the layout. This class only builds the floating panel: AppKit
+/// chrome — the panel and its `NSGlassEffectView` background — around a hosted
+/// SwiftUI content view, the same shape as every other SwiftUI window in this
+/// app. SwiftUI's own `glassEffect(_:in:)` would do for the material, but the
+/// panel is an AppKit window either way, and keeping the glass beside it keeps
+/// the Reduce Transparency handling identical to the search bar's.
 ///
 /// Dispatch goes through `NSApp.sendAction(_:to:from:)` with a `nil` target,
 /// which is the responder chain — exactly what a menu item does. That is

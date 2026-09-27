@@ -88,11 +88,11 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// A finished selection goes straight to the pasteboard, the way
     /// X11 and every terminal that grew up beside it behave.
     ///
-    /// On by default. The objection — copying silently replaces the
-    /// clipboard, which surprises anyone who did not ask for it — is
-    /// answered by making it not silent: a confirmation appears in the
-    /// corner of the pane (`TerminalView.showToast`). What is left is the behaviour most people selecting text in
-    /// a terminal already expect.
+    /// On by default. The objection — copying silently replaces the clipboard,
+    /// which surprises anyone who did not ask for it — is answered by making it
+    /// not silent: a confirmation appears in the corner of the pane
+    /// (`TerminalView.showToast`). What is left is the behaviour most people
+    /// selecting text in a terminal already expect.
     var copyOnSelect: Bool = true
     /// See `LinkActivation`.
     var linkActivation: LinkActivation = .command

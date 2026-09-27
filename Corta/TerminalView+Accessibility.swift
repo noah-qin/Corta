@@ -269,10 +269,10 @@ extension TerminalView {
         let elapsed = now - lastAccessibilityPost
         guard elapsed >= Self.accessibilityPostInterval else {
             // Inside the interval the change is not dropped: for a burst of
-            // output that would mean the *last* change, the one that leaves
-            // the screen in its final state, is the one never announced, and
-            // VoiceOver goes on reading the state before it. Trail instead: one post when the interval ends, carrying
-            // every change since.
+            // output that would mean the *last* change, the one that leaves the
+            // screen in its final state, is the one never announced, and
+            // VoiceOver goes on reading the state before it. Trail instead: one
+            // post when the interval ends, carrying every change since.
             guard pendingAccessibilityPost == nil else { return }
             let item = DispatchWorkItem { [weak self] in
                 guard let self else { return }

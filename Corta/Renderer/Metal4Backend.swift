@@ -45,23 +45,22 @@ nonisolated enum Metal4Diagnostics {
 ///
 /// **What is MTL4 here, and what is not.** Every frame is encoded into an
 /// `MTL4CommandBuffer` (a persistent object, re-`begin`n each frame — MTL4
-/// command buffers are reusable, unlike `MTL3`'s per-frame ones) through a
-/// real `MTL4RenderCommandEncoder`, bound by address through one reused
-/// argument table (`setAddress`/`setTexture`/`setSamplerState` — MTL4 has
-/// no `setVertexBytes`, so uniforms live in the ring buffers alongside the
-/// instances), committed to an `MTL4CommandQueue`, with drawable
-/// presentation via `signalDrawable` + `MTLDrawable.present`. The pipeline
-/// state objects are the classic `MTLRenderPipelineState` — that is not a
-/// gap: `MTL4RenderCommandEncoder.setRenderPipelineState` takes exactly that
-/// type, and MTL4's own compiler (`MTL4Compiler.newRenderPipelineState`)
-/// returns it too. They come from `QuadPipelineCache`, shared with
-/// `QuadRenderer`, so construction here costs a dictionary lookup once any
-/// pane has run, and the `MTLBinaryArchive` warm-up (which lives in the
-/// cache's creation path) covers this backend too — no
-/// `MTL4Compiler`/`MTL4Archive`-specific cache is needed. The blend state, pixel format, scissor math,
-/// viewport and draw parameters replicate `QuadRenderer.draw` exactly — the
-/// pixel-equivalence tests in `TerminalRenderBackendTests` enforce that the
-/// two stay in lockstep.
+/// command buffers are reusable, unlike `MTL3`'s per-frame ones) through a real
+/// `MTL4RenderCommandEncoder`, bound by address through one reused argument
+/// table (`setAddress`/`setTexture`/`setSamplerState` — MTL4 has no
+/// `setVertexBytes`, so uniforms live in the ring buffers alongside the
+/// instances), committed to an `MTL4CommandQueue`, with drawable presentation
+/// via `signalDrawable` + `MTLDrawable.present`. The pipeline state objects are
+/// the classic `MTLRenderPipelineState` — that is not a gap:
+/// `MTL4RenderCommandEncoder.setRenderPipelineState` takes exactly that type,
+/// and MTL4's own compiler (`MTL4Compiler.newRenderPipelineState`) returns it
+/// too. They come from `QuadPipelineCache`, shared with `QuadRenderer`, so
+/// construction here costs a dictionary lookup once any pane has run, and the
+/// `MTLBinaryArchive` warm-up (which lives in the cache's creation path) covers
+/// this backend too — no `MTL4Compiler`/`MTL4Archive`-specific cache is needed.
+/// The blend state, pixel format, scissor math, viewport and draw parameters
+/// replicate `QuadRenderer.draw` exactly — the pixel-equivalence tests in
+/// `TerminalRenderBackendTests` enforce that the two stay in lockstep.
 ///
 /// **Resource lifetime (the part MTL4 makes explicit).** Ring-slot reuse is
 /// gated on GPU completion: each commit's feedback handler records the

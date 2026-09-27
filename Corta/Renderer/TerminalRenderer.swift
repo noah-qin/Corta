@@ -435,14 +435,14 @@ nonisolated final class TerminalRenderer {
         }
     }
 
-    /// The Metal 4 counterpart to `draw(rect:drawableSize:renderPassDescriptor:commandBuffer:)`:
-    /// the backend owns the command buffer, the render pass, the
-    /// commit and the drawable presentation (`Metal4FrameBackend`), so this
-    /// takes the render target, clear colour and drawable directly rather
-    /// than the Metal 3 pass/buffer pair. `ViewController.render(into:...)`
-    /// calls it when the selected backend is a Metal 4 one; the pass order —
-    /// background, glyphs, color glyphs, images — is deliberately identical
-    /// to the MTL3 path's.
+    /// The Metal 4 counterpart to
+    /// `draw(rect:drawableSize:renderPassDescriptor:commandBuffer:)`: the
+    /// backend owns the command buffer, the render pass, the commit and the
+    /// drawable presentation (`Metal4FrameBackend`), so this takes the render
+    /// target, clear colour and drawable directly rather than the Metal 3
+    /// pass/buffer pair. `ViewController.render(into:...)` calls it when the
+    /// selected backend is a Metal 4 one; the pass order — background, glyphs,
+    /// color glyphs, images — is deliberately identical to the MTL3 path's.
     func draw(
         through backend: any Metal4FrameBackend,
         rect: CGRect, drawableSize: CGSize, target: MTLTexture, clearColor: MTLClearColor,

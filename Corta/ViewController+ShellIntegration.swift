@@ -201,10 +201,10 @@ extension ViewController: NSMenuItemValidation {
 
     // MARK: - Command history: find/fill/run
 
-    /// The literal text of a historic command, read back from the grid
-    /// rather than stored anywhere — `CommandRecord` never captured it, only
-    /// row markers (`CommandRecord`'s doc comment on why a row is not
-    /// enough applies here too: the text itself is even less worth duplicating). `nil`
+    /// The literal text of a historic command, read back from the grid rather
+    /// than stored anywhere — `CommandRecord` never captured it, only row
+    /// markers (`CommandRecord`'s doc comment on why a row is not enough
+    /// applies here too: the text itself is even less worth duplicating). `nil`
     /// covers every honest reason it cannot be recovered: no `B` mark ever
     /// landed on the prompt's own row (`record.promptEndColumn`), or the row
     /// has since scrolled out of the bounded scrollback — `CommandHistory

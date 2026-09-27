@@ -140,10 +140,10 @@ nonisolated struct Shortcut: Equatable, Sendable {
 /// Everything Corta can be asked to do that is worth a key, a menu item, or a
 /// row in the command palette.
 ///
-/// One table, three consumers. A shortcut in the storyboard and an action
-/// in whichever controller implements it cannot be enumerated — nothing
-/// could rebind them and a palette would have nothing to list. The table
-/// is the single place all three read from, so a command added here appears in the
+/// One table, three consumers. A shortcut in the storyboard and an action in
+/// whichever controller implements it cannot be enumerated — nothing could
+/// rebind them and a palette would have nothing to list. The table is the
+/// single place all three read from, so a command added here appears in the
 /// menus, in the palette and in the config file at once.
 nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     case newWindow = "new-window"

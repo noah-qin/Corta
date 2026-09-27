@@ -405,7 +405,8 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         for placement in placements {
             guard let texture = texture(for: placement.imageID) else { continue }
 
-            // `totalPushed`, not `.count` — see `TerminalRenderer.selectionQuads`.
+            // `totalPushed`, not `.count` — see
+            // `TerminalRenderer.selectionQuads`.
             let viewportRow =
                 ScrollbackCoordinates.reanchoredRow(
                     placement.row, from: placement.baseScrollbackTotal, to: scrollbackTotalPushed) + offset

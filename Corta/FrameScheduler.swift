@@ -72,11 +72,11 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         newLink.isPaused = true
         newLink.preferredFrameRateRange = desiredFrameRateRange
         // Measurement hook, same class as `CORTA_MAX_DRAWABLES`
-        // (`TerminalView.commonInit`): `preferredFrameLatency`, in frames,
-        // is a value to pick from an A/B measurement, not a guess
-        // (`RenderPolicy`'s doc comment) — an environment variable, not a config key, and never read
-        // outside one. `RenderPolicy` manages only `preferredFrameRateRange`,
-        // so nothing fights this once set at attach.
+        // (`TerminalView.commonInit`): `preferredFrameLatency`, in frames, is a
+        // value to pick from an A/B measurement, not a guess (`RenderPolicy`'s
+        // doc comment) — an environment variable, not a config key, and never
+        // read outside one. `RenderPolicy` manages only
+        // `preferredFrameRateRange`, so nothing fights this once set at attach.
         if let raw = ProcessInfo.processInfo.environment["CORTA_FRAME_LATENCY"],
             let latency = Float(raw), latency >= 1
         {

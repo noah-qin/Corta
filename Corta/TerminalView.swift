@@ -262,10 +262,10 @@ final class TerminalView: NSView, CALayerDelegate {
         // it is a question to measure rather than a value to pick.
         //
         // Corta ships the default (3) because that is what has been measured
-        // (`PERFORMANCE.md` §5.7). This variable exists so the comparison can be run
-        // as two launches of the same binary rather than as a code change —
-        // an A/B where the only difference is the flag. Pair it with an
-        // `os_signpost` trace (`InputLatencySignposts`): if double buffering
+        // (`PERFORMANCE.md` §5.7). This variable exists so the comparison can
+        // be run as two launches of the same binary rather than as a code
+        // change — an A/B where the only difference is the flag. Pair it with
+        // an `os_signpost` trace (`InputLatencySignposts`): if double buffering
         // is costing rather than saving, it shows up as the `frame` interval
         // growing at its front, where `nextDrawable` waits.
         //

@@ -44,8 +44,8 @@ extension ViewController {
         terminalView?.showToast(L10n.text("toast.copiedWorkingDirectory"))
     }
 
-    /// `cd ..`, through the same safety-gated primitive every directory
-    /// change uses (`ViewController+DirectoryNavigation.swift`) — no new gate, just a
+    /// `cd ..`, through the same safety-gated primitive every directory change
+    /// uses (`ViewController+DirectoryNavigation.swift`) — no new gate, just a
     /// new source for the path.
     ///
     /// Reads `shellDirectory`, not `session.workingDirectory`, so a
