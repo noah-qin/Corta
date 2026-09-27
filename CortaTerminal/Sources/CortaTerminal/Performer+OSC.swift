@@ -278,22 +278,27 @@ extension Performer {
         return normalized.isEmpty || localNames.contains(normalized)
     }
 
-    /// This machine's names, normalised: `localhost`, the full and short
-    /// (first-label) forms of every name the system knows itself by — a
-    /// shell usually reports `hostname`'s short answer even when the system
-    /// keeps the `.local` form.
+    /// This machine's names, normalised: `localhost`, and the full and short
+    /// (first-label) forms of the kernel's hostname — what a shell reports,
+    /// since zsh's `$HOST` and `hostname` both read it, and a shell usually
+    /// reports the short form even when the system keeps the `.local` one.
+    ///
+    /// `gethostname(3)` only, never `ProcessInfo.hostName` or `Host`: those
+    /// resolve the name through DNS, blocking the caller until the lookup
+    /// answers or times out. This runs on every OSC 7 report — on the PTY
+    /// reader thread, once per prompt — and on a machine whose resolver is
+    /// slow or unreachable the lookup took 36 seconds, during which the pane
+    /// showed no output at all.
     static func localHostnames() -> Set<String> {
         var names: Set<String> = ["localhost"]
-        let candidates = [
-            ProcessInfo.processInfo.hostName, Host.current().name, Host.current().localizedName,
-        ]
-        for candidate in candidates {
-            guard let candidate else { continue }
-            let normalized = normalizeHostname(candidate)
-            names.insert(normalized)
-            if let dot = normalized.firstIndex(of: ".") {
-                names.insert(String(normalized[..<dot]))
-            }
+        var buffer = [CChar](repeating: 0, count: Int(MAXHOSTNAMELEN) + 1)
+        guard gethostname(&buffer, buffer.count - 1) == 0 else { return names }
+        let bytes = buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+        let normalized = normalizeHostname(String(decoding: bytes, as: UTF8.self))
+        guard !normalized.isEmpty else { return names }
+        names.insert(normalized)
+        if let dot = normalized.firstIndex(of: ".") {
+            names.insert(String(normalized[..<dot]))
         }
         return names
     }

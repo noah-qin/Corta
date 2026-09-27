@@ -47,6 +47,14 @@ what to edit.
 
 ### Fixed
 
+- A pane with shell integration no longer freezes when the machine's name
+  resolver is slow or unreachable. Every prompt's working-directory report
+  (OSC 7) looked this machine's name up through DNS, on the thread that
+  reads the shell's output, and on a machine where that lookup waited for
+  a timeout the pane showed nothing for as long as 40 seconds. The name
+  now comes from the kernel (`gethostname`), which is what the shell
+  itself reports.
+
 - The Quick Terminal no longer stays behind on a display that is gone. Its
   frame was computed when it was summoned and never revisited, so
   unplugging a display, changing its resolution or changing which display
