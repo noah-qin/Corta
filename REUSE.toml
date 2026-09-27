@@ -1,0 +1,70 @@
+# Copyright 2026 Noah Qin
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# The license of every file that does not carry a header of its own
+# (https://reuse.software/spec-3.3/). Which files those are is decided by
+# `LicenseHeaders.rules` (CortaTerminal/Sources/LicenseHeaders) and
+# explained in docs/LICENSING.md; keep the two in step. When several
+# annotations match a file, the last one wins.
+
+version = 1
+
+# Documentation, project files, localisation, assets that are not brand
+# artwork, and test inputs that must stay byte-for-byte what they are.
+[[annotations]]
+path = [
+  "**/*.md",
+  "NOTICE",
+  "CortaTerminal/Tests/CortaTerminalTests/Golden/**",
+  "CortaTerminal/Tests/Fuzz/**",
+  "docs/esctest/**",
+  "Corta.xcodeproj/**",
+  "Corta/Base.lproj/**",
+  "Corta/Assets.xcassets/**",
+  "Corta/Localizable.xcstrings",
+  "TestPlans/*.xctestplan",
+  "Sparkle-Info.plist",
+  "appcast.xml",
+]
+SPDX-FileCopyrightText = "2026 Noah Qin"
+SPDX-License-Identifier = "Apache-2.0"
+
+# The name, the mascot and the application icon are not under Apache-2.0
+# (NOTICE, "Trademarks and artwork").
+[[annotations]]
+path = [
+  "docs/brand/*.png",
+  "docs/brand/*.gif",
+  "AppIcon.icon/**",
+  "AppIconDev.icon/**",
+]
+SPDX-FileCopyrightText = "2026 Noah Qin"
+SPDX-License-Identifier = "LicenseRef-Corta-Brand"
+
+# Sparkle's own license, shipped inside the app because its terms require
+# the notice to accompany the software (Corta/AcknowledgementsView.swift).
+[[annotations]]
+path = "Corta/Acknowledgements/Sparkle-LICENSE.txt"
+SPDX-FileCopyrightText = [
+  "2006-2013 Andy Matuschak",
+  "2009-2013 Elgato Systems GmbH",
+  "2011-2014 Kornel Lesiński",
+  "2015-2017 Mayur Pawashe",
+  "2014 C.W. Betts",
+  "2014 Petroules Corporation",
+  "2014 Big Nerd Ranch",
+]
+SPDX-License-Identifier = "LicenseRef-Sparkle"
