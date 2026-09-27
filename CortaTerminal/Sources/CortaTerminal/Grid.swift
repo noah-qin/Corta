@@ -14,7 +14,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-/// Where the next character is written.
 public struct Cursor: Equatable, Sendable {
     public var row: Int
     public var column: Int
@@ -54,13 +53,9 @@ public enum DisplayEraseMode: Sendable {
     case all
 }
 
-/// The visible screen: rows of cells, a cursor, and the current pen.
-///
-/// This type knows nothing about escape sequences. It offers the operations
-/// a terminal performs — write a character, move, erase, feed a line, scroll
-/// — and `Performer` is what decides that `ESC [ 2 J` means `eraseDisplay`.
-/// Keeping the split lets the grid be tested without a parser and the parser
-/// without a screen.
+/// The visible screen: cells, a cursor, the pen. It knows no escape
+/// sequences — `Performer` decides what `ESC [ 2 J` means — so each is
+/// testable without the other.
 public struct Grid: Sendable {
     /// Sanity bounds. A window cannot be this large; a hostile resize
     /// request or a corrupt parameter can ask for it (`SECURITY.md` §3).
@@ -83,46 +78,28 @@ public struct Grid: Sendable {
     /// (`DECISIONS.md` D05): combining-mark clusters and emoji ZWJ sequences.
     public var graphemes: GraphemeTable
 
-    /// OSC 8 hyperlink targets, keyed by the id a cell carries.
-    /// Shared with the alternate screen and never cleared while a link may
-    /// still be on screen or in the scrollback — an id in a cell that no
-    /// longer resolves would render as a link that goes nowhere. Entries no
-    /// holder references are instead swept under capacity pressure
-    /// (`internHyperlink`), which keeps every live id valid.
+    /// OSC 8 targets. Never cleared while an id may be on screen or in
+    /// scrollback; unreferenced entries are swept under pressure
+    /// (`internHyperlink`).
     public var hyperlinks: HyperlinkTable
 
-    /// Kitty graphics image placements — a side table, not a `Cell`
-    /// field; see `ImagePlacementTable`'s doc comment. Cleared on a column
-    /// resize (`resize(rows:columns:)`), kept across a row-only one.
+    /// Cleared on a column resize, kept across a row-only one.
     public var imagePlacements = ImagePlacementTable()
 
-    /// Rows that have scrolled off the top.
     public var scrollback: Scrollback
 
-    /// The deferred-wrap state of a real VT: printing into the last column
-    /// leaves the cursor *on* that column and arms this flag. The next
-    /// printable character wraps first, and only then is the row marked
-    /// `wrapped`. Without the deferral, a program that fills the last column
-    /// and then moves the cursor would scroll the screen by one row.
-    /// IRM — ECMA-48 §8.3.64, `CSI 4 h` / `CSI 4 l`. While set, a printed
-    /// character *inserts* at the cursor and pushes the rest of the row
-    /// right, rather than overwriting the cell under it; characters pushed
-    /// past the last column are lost.
-    ///
-    /// Implemented rather than reported as unrecognised: a program that
-    /// sets a mode the terminal silently ignores draws its next screen
-    /// against a layout that never happened. `readline`'s and `ed`'s insert paths both use it.
+    /// IRM: a printed character inserts, pushing the row right. Implemented,
+    /// not merely reported — `readline`'s and `ed`'s insert paths use it.
     public var insertMode: Bool = false
 
-    /// DECRST/DECSET `?45` — reverse-wraparound mode. While set, `BS`
-    /// and `CUB` that would move left of column 0 continue onto the end of
-    /// the row above, but only when that row's own `wrapped` flag says the
-    /// two are one logical line — undoing exactly the auto-wrap DECAWM
-    /// caused, never crossing a hard newline. Off by default, matching
-    /// xterm: most programs manage line-editing at a wrap boundary
-    /// themselves and do not expect `BS` to cross rows on its own.
+    /// `?45` reverse wraparound: `BS`/`CUB` past column 0 continue onto the row
+    /// above only across an auto-wrap, never a hard newline. Off by default, as
+    /// in xterm.
     public var reverseWraparoundEnabled: Bool = false
 
+    /// Deferred wrap: printing into the last column arms this; the next
+    /// character wraps first. Otherwise filling the last column and moving the
+    /// cursor would scroll the screen.
     public internal(set) var pendingWrap: Bool
 
     /// DECSC's slot — cursor, pen and wrap state (VT510 §DECSC).
@@ -133,12 +110,9 @@ public struct Grid: Sendable {
     /// True while the alternate screen is live.
     public private(set) var isAlternateScreenActive: Bool = false
 
-    /// The parked main screen while the alternate screen is live.
     private var suspendedMain: SuspendedScreen?
 
-    /// The scroll region (DECSTBM), zero-based and inclusive: the rows that
-    /// scrolling moves. Everything outside the margins stays put. Defaults
-    /// to the whole screen.
+    /// DECSTBM, zero-based and inclusive.
     public private(set) var marginTop: Int = 0
     public private(set) var marginBottom: Int
 
@@ -177,59 +151,38 @@ public struct Grid: Sendable {
         return lines[row]
     }
 
-    /// The row's mutation stamp (`ScreenLines.revision(at:)`) — a cheap
-    /// "has this row possibly changed" check for a renderer's damage pass,
-    /// in place of comparing full `Line` values. Out-of-range answers `0`,
-    /// which a renderer that has never seen the row (an empty damage cache)
-    /// should already treat as "different" — see `TerminalRenderer`.
+    /// A cheap "possibly changed" stamp for damage tracking; out of range is
+    /// `0`, which a renderer with no cache already treats as different.
     public func lineRevision(_ row: Int) -> UInt64 {
         guard row >= 0, row < rows else { return 0 }
         return lines.revision(at: row)
     }
 
-    /// Identifies which `ScreenLines` instance backs the live screen right
-    /// now — see `ScreenLines.generation`'s doc comment for why a renderer
-    /// needs this alongside `lineRevision(_:)`: `enterAlternateScreen`/
-    /// `exitAlternateScreen` and a column resize each swap in a fresh
-    /// `ScreenLines` whose revisions restart independently of whatever a
-    /// renderer's cache already holds.
+    /// Changes when a fresh `ScreenLines` is swapped in (alternate screen, column
+    /// resize), whose revisions restart from zero.
     public var linesGeneration: UInt64 { lines.generation }
 
-    /// Cumulative rows a whole-screen scroll has rotated off the top, for
-    /// the live screen's current `ScreenLines` generation — see
-    /// `ScreenLines.totalRotated`.
     public var linesRotated: UInt64 { lines.totalRotated }
 
     // MARK: - Writing
 
-    /// Writes one scalar in the current pen at the cursor, then advances by
-    /// the scalar's display width (0, 1 or 2 — `wcwidth`/xterm conventions,
-    /// see `displayWidth`).
+    /// Advances by the scalar's display width (0, 1 or 2).
     public mutating func write(_ scalar: UInt32) {
-        // Fast path: printable ASCII is width 1 by construction and never a
-        // control — no table lookup, no scalar validation (`PERFORMANCE.md`
-        // §3; this runs once per byte of output).
+        // Printable ASCII: width 1, never a control — no lookup. Runs per byte.
         if scalar >= 0x20, scalar < 0x7F {
             writeNarrow(scalar)
             return
         }
-        // The parser never delivers controls or invalid scalars; if one
-        // arrives anyway, it is not printable — and a C0/C1 control has
-        // display width 0, which would corrupt the combining-mark path.
+        // A control has width 0 and would corrupt the combining path.
         guard let value = Unicode.Scalar(scalar), !Self.isControl(value) else { return }
-        // A scalar following a ZWJ-terminated cluster continues that
-        // cluster — an emoji ZWJ sequence (👨‍👩‍👧‍👦) is one grapheme and
-        // stays one (wide) cell, not one wide pair per emoji. ZWJ itself is
-        // zero-width and arrives through `writeZeroWidth` as usual.
+        // After a ZWJ, the scalar continues the cluster: an emoji ZWJ sequence
+        // is one wide cell, not a pair per emoji.
         if scalar != 0x200D, let target = clusterJoinTarget(), clusterEndsWithZWJ(target) {
             combine(scalar, row: target.row, column: target.column)
             return
         }
-        // A flag is a *pair* of regional indicators and one grapheme (UAX #29
-        // GB12/GB13), so the second indicator joins the first's cell instead
-        // of claiming a wide pair of its own. Without this a two-letter flag
-        // occupies four columns and every border drawn after it on the line
-        // lands two columns late.
+        // A flag is two regional indicators and one grapheme (UAX #29); without
+        // this it takes four columns and every border after it lands late.
         if Self.isRegionalIndicator(scalar), let target = clusterJoinTarget(),
             endsWithLoneRegionalIndicator(target)
         {
@@ -248,9 +201,7 @@ public struct Grid: Sendable {
         }
     }
 
-    /// Writes a ground-state printable ASCII run in row-sized chunks. The
-    /// parser has already established that every byte is printable and width
-    /// one, so repeating scalar validation and state dispatch is pure cost.
+    /// A ground-state ASCII run, already validated by the parser.
     public mutating func writeASCII(_ bytes: ArraySlice<UInt8>) {
         var index = bytes.startIndex
         while index < bytes.endIndex {
@@ -262,10 +213,7 @@ public struct Grid: Sendable {
             let available = columns - cursor.column
             let count = min(available, bytes.distance(from: index, to: bytes.endIndex))
             let end = bytes.index(index, offsetBy: count)
-            // Insert mode shifts the row right by the whole chunk once,
-            // rather than per character — the result is identical and the
-            // fast path above is untouched when the mode is off, which is
-            // always except while a line editor has it on.
+            // Insert mode shifts once per chunk, not per character.
             if insertMode {
                 lines[cursor.row].insertCells(
                     count, at: cursor.column, template: pen.eraseCell, width: columns)
@@ -286,7 +234,6 @@ public struct Grid: Sendable {
         scalar.value < 0x20 || (0x7F...0x9F).contains(scalar.value)
     }
 
-    /// Width 1: the ordinary path — one cell, advance one column.
     private mutating func writeNarrow(_ scalar: UInt32) {
         if pendingWrap {
             // The row really did continue onto the next one. This is the
@@ -309,15 +256,11 @@ public struct Grid: Sendable {
         }
     }
 
-    /// Width 2: the scalar occupies two columns — its lead cell (flagged
-    /// `.wide`) plus a spacer cell to its right (flagged `.wideSpacer`,
-    /// holding a space so it draws and dumps as blank) — and the cursor
-    /// advances 2.
+    /// Width 2: a `.wide` lead plus a blank `.wideSpacer`.
     private mutating func writeWide(_ scalar: UInt32) {
         if !pendingWrap, cursor.column == columns - 1 {
-            // Only the last column remains, and a pair may not straddle the
-            // right margin: blank the column and wrap now, so the pair lands
-            // intact on the next row (xterm does the same).
+            // A pair may not straddle the margin: blank the last column and wrap
+            // (as xterm does).
             blankWidePairHalves(row: cursor.row, column: cursor.column)
             lines[cursor.row][cursor.column] = pen.eraseCell
             pendingWrap = true
@@ -328,9 +271,7 @@ public struct Grid: Sendable {
             lineFeedWithoutClearingWrap()
         }
         if insertMode {
-            // A wide scalar is two columns, so insert mode makes room for
-            // both — inserting one and writing two would overwrite whatever
-            // the shift had just moved into the second column.
+            // Make room for both columns, or the second overwrites what shifted.
             lines[cursor.row].insertCells(
                 2, at: cursor.column, template: pen.eraseCell, width: columns)
         }
@@ -354,25 +295,18 @@ public struct Grid: Sendable {
         }
     }
 
-    /// Width 0 (combining marks, ZWJ, variation selectors): the scalar joins
-    /// the cluster of the previously written cell and the cursor does not
-    /// move — a zero-width scalar never gets a cell of its own.
+    /// Width 0: joins the previous cell's cluster; the cursor stays.
     private mutating func writeZeroWidth(_ scalar: UInt32) {
         guard let target = clusterJoinTarget() else {
-            // No previous cell (start of output, hard newline). xterm keeps
-            // the mark visible by storing it as a base character of its own
-            // (charproc.c: "we will add the combining character as a base
-            // character"), rather than dropping it.
+            // No previous cell: keep the mark as a base character, as xterm does.
             writeNarrow(scalar)
             return
         }
         combine(scalar, row: target.row, column: target.column)
     }
 
-    /// The cell a zero-width scalar — or the continuation of a
-    /// ZWJ-terminated cluster — joins: the previously written cell,
-    /// following wraps and wide pairs. `nil` when there is no previous cell
-    /// (start of output, hard newline).
+    /// The previously written cell, following wraps and wide pairs; `nil`
+    /// at the start of output or after a hard newline.
     private func clusterJoinTarget() -> (row: Int, column: Int)? {
         var row = cursor.row
         var column: Int
@@ -395,10 +329,7 @@ public struct Grid: Sendable {
         return (row, column)
     }
 
-    /// Whether the cell at `target` holds a cluster whose last scalar is
-    /// ZWJ — the join condition for the ZWJ continuation in `write`.
-    /// Plain cells (`.none` id) answer false without touching the table, so
-    /// ordinary CJK output pays a bounds check, not a lookup.
+    /// Plain cells answer without a table lookup, so CJK pays a bounds check.
     private func clusterEndsWithZWJ(_ target: (row: Int, column: Int)) -> Bool {
         let cell = lines[target.row][target.column]
         guard !cell.grapheme.isNone else { return false }
@@ -409,11 +340,8 @@ public struct Grid: Sendable {
         (0x1F1E6...0x1F1FF).contains(scalar)
     }
 
-    /// Whether the cell at `target` ends in an *unpaired* regional indicator,
-    /// which is the join condition for the second half of a flag. GB12/GB13
-    /// break between indicators only after an even number of them, so the
-    /// trailing run decides: one indicator is still waiting for its pair, two
-    /// are a finished flag and a third starts a new cell.
+    /// An *unpaired* regional indicator: an odd trailing run is waiting for
+    /// its pair; an even one is a finished flag.
     private func endsWithLoneRegionalIndicator(_ target: (row: Int, column: Int)) -> Bool {
         let cell = lines[target.row][target.column]
         guard !cell.grapheme.isNone, let cluster = graphemes.scalars(for: cell.grapheme) else {
@@ -427,19 +355,13 @@ public struct Grid: Sendable {
         return trailing % 2 == 1
     }
 
-    /// Appends `scalar` to the grapheme cluster of the cell at (`row`,
-    /// `column`), interning the extended cluster in the side table
-    /// (`DECISIONS.md` D05).
     private mutating func combine(_ scalar: UInt32, row: Int, column: Int) {
         let cell = lines[row][column]
         var cluster = graphemes.scalars(for: cell.grapheme) ?? [cell.scalar]
         cluster.append(scalar)
         var id = graphemes.intern(cluster)
         if id == nil, graphemes.count >= GraphemeTable.capacity {
-            // Full: sweep entries no cell references, then retry once.
-            // Still nil afterwards means the screen genuinely holds
-            // `capacity` distinct clusters — then, as before, the mark is
-            // dropped and the base character stays as it was.
+            // Full: sweep, retry once; still full means the mark is dropped.
             graphemes.reclaim(keeping: liveGraphemeIDs())
             id = graphemes.intern(cluster)
         }
@@ -449,10 +371,8 @@ public struct Grid: Sendable {
         lines[row][column] = updated
     }
 
-    /// Standard terminal behaviour: overwriting or erasing either half of a
-    /// wide pair blanks BOTH halves — a dangling half would draw as a stray
-    /// glyph or a stray blank. Blanks the half adjacent to (`row`, `column`)
-    /// when that column holds one half of a pair.
+    /// Touching either half of a wide pair blanks both; a lone half draws as
+    /// a stray glyph.
     private mutating func blankWidePairHalves(row: Int, column: Int) {
         let cell = lines[row][column]
         if cell.attributes.contains(.wideSpacer), column > 0 {
@@ -462,10 +382,7 @@ public struct Grid: Sendable {
         }
     }
 
-    /// After a cell-shifting edit (ICH/DCH) a wide pair can be split across
-    /// the edit boundary or the right margin. Blanks every half that lost
-    /// its partner; blanking the lead of a broken pair orphans its spacer,
-    /// which the same pass then blanks in turn.
+    /// After ICH/DCH, blanks every half that lost its partner.
     private mutating func repairWidePairs(row: Int, template: Cell) {
         var column = 0
         while column < lines[row].count {
@@ -487,8 +404,7 @@ public struct Grid: Sendable {
 
     // MARK: - Cursor movement
 
-    /// Absolute positioning, clamped to the screen. Zero-based; CUP's
-    /// one-based parameters are the performer's problem.
+    /// Zero-based and clamped.
     public mutating func moveCursor(row: Int, column: Int) {
         cursor.row = min(max(0, row), rows - 1)
         cursor.column = min(max(0, column), columns - 1)
@@ -505,11 +421,7 @@ public struct Grid: Sendable {
         moveCursor(row: min(ceiling, cursor.row + max(0, count)), column: cursor.column)
     }
 
-    /// CUB. Ordinarily clamps at column 0; with `reverseWraparoundEnabled`
-    /// (`?45`), running out of columns on a row whose *predecessor* wrapped
-    /// into it continues the move onto the end of that row instead of
-    /// stopping, one row at a time until `count` is spent or a row that was
-    /// not auto-wrapped is reached.
+    /// Clamps at column 0 unless `?45` lets it cross auto-wrapped rows.
     public mutating func moveCursorLeft(_ count: Int = 1) {
         guard reverseWraparoundEnabled else {
             moveCursor(row: cursor.row, column: cursor.column - max(0, count))
@@ -543,18 +455,13 @@ public struct Grid: Sendable {
         moveCursor(row: cursor.row - max(1, count), column: 0)
     }
 
-    /// CR — column 0, same row.
     public mutating func carriageReturn() {
         cursor.column = 0
         pendingWrap = false
     }
 
-    /// BS — one column left, stopping at the left margin unless
-    /// `reverseWraparoundEnabled` (`?45`) and the row above auto-wrapped
-    /// into this one, in which case it continues onto that row's last
-    /// column instead of stopping. A backspace out of the armed wrap
-    /// state disarms it rather than moving, which is what keeps
-    /// `printf 'x%80s' ; printf '\b'` from stepping off the row.
+    /// Like CUB by one. Out of an armed wrap it disarms rather than moves, which
+    /// keeps `printf 'x%80s'; printf '\b'` on the row.
     public mutating func backspace() {
         if pendingWrap {
             pendingWrap = false
@@ -598,26 +505,16 @@ public struct Grid: Sendable {
         self = Grid(rows: rows, columns: columns, scrollbackLimit: scrollback.limit)
     }
 
-    /// "Clear Screen": erase the visible screen and put the cursor
-    /// home, **without** touching the scrollback.
-    ///
-    /// Deliberately not `ED 2` alone: `ED 2` erases the screen and leaves the
-    /// cursor where it was, which after a full screen of output is somewhere
-    /// in the middle and looks like a bug. Deliberately not "scroll the
-    /// screen into the scrollback" either — that is what a shell's own
-    /// `clear` does on some systems, and it makes "clear the screen" and
-    /// "keep the history" the same operation, which is the confusion this
-    /// command exists to remove. Here the screen's contents are discarded and
-    /// the history is exactly as long as it was.
+    /// Erases the screen and homes the cursor, keeping the scrollback. Not
+    /// `ED 2` alone (the cursor stays mid-screen) and not a scroll into history
+    /// (which makes "clear" and "keep history" the same thing).
     public mutating func clearScreen() {
         eraseDisplay(.all)
         cursor = Cursor(row: 0, column: 0)
         pendingWrap = false
     }
 
-    /// "Clear History": discard the scrollback, leaving the visible
-    /// screen and the cursor untouched. The inverse of `clearScreen`, and the
-    /// one a person reaches for after pasting a secret into a build log.
+    /// Discards the scrollback, screen untouched — after pasting a secret.
     public mutating func clearScrollback() {
         scrollback.removeAll()
     }
@@ -635,19 +532,9 @@ public struct Grid: Sendable {
         cursorStyle = .blinkingBlock
     }
 
-    /// DECALN (`ESC # 8`) — the screen filled with `E`, margins reset, cursor
-    /// home.
-    ///
-    /// It exists to let someone adjust a CRT's geometry, which no one is
-    /// doing here. It matters because it is the cheapest way for a *program*
-    /// to put the screen into a completely known state, which is exactly what
-    /// `esctest` uses it for before checking anything else — so a terminal
-    /// that ignores it does not merely fail the alignment test, it makes
-    /// every test built on that setup meaningless.
-    ///
-    /// The fill uses the default pen rather than the current one: the point
-    /// is a uniform screen, and DEC's own description is a screen of `E`,
-    /// not a screen of `E` in whatever colour the last SGR left behind.
+    /// DECALN: `E` everywhere, margins reset, cursor home, in the default pen.
+    /// esctest uses it to reach a known state before every check, so ignoring it
+    /// voids every test built on it.
     public mutating func alignmentDisplay() {
         marginTop = 0
         marginBottom = rows - 1
@@ -658,8 +545,6 @@ public struct Grid: Sendable {
             for _ in 0..<columns {
                 write(UInt32(UInt8(ascii: "E")))
             }
-            // The last column of every row leaves the cursor pending-wrap
-            // rather than on the next row; move it deliberately instead.
             pendingWrap = false
             if cursor.row < rows - 1 {
                 cursor = Cursor(row: cursor.row + 1, column: 0)
@@ -697,8 +582,7 @@ public struct Grid: Sendable {
         }
     }
 
-    /// LF, VT, FF — down one row, scrolling at the bottom. The column does
-    /// not change; that is CR's job.
+    /// LF, VT, FF: down one row; the column is CR's job.
     public mutating func lineFeed() {
         lineFeedWithoutClearingWrap()
         pendingWrap = false
@@ -719,18 +603,12 @@ public struct Grid: Sendable {
         } else if cursor.row < rows - 1 {
             cursor.row += 1
         }
-        // Below the bottom margin a line feed neither scrolls nor wraps
-        // around: the cursor just stops at the last row.
     }
 
     // MARK: - Side-table reclamation
 
-    /// Interns `url` as the current hyperlink target, reclaiming
-    /// unreferenced entries first when the table is full: without the sweep
-    /// a session that ever interned `HyperlinkTable.capacity` distinct URLs
-    /// (a few `ls --hyperlink` runs over big directories) would never link
-    /// again. The table's own refusals — empty or over-long URLs — fall
-    /// through unchanged: reclaiming cannot admit what validation rejected.
+    /// Sweeps unreferenced entries when full; without it a session that met
+    /// `capacity` URLs would never link again.
     public mutating func internHyperlink(_ url: String) -> HyperlinkID? {
         if let id = hyperlinks.intern(url) { return id }
         guard hyperlinks.count >= HyperlinkTable.capacity else { return nil }
@@ -738,16 +616,9 @@ public struct Grid: Sendable {
         return hyperlinks.intern(url)
     }
 
-    /// The id every hyperlink-holding spot in this grid can still reference:
-    /// the live screen's and scrollback's cells and both pen slots (the
-    /// current pen and the DECSC-saved one — a saved pen restores into the
-    /// current one, so its id is as live as any cell's).
-    ///
-    /// The parked main screen and renderer snapshots are deliberately *not*
-    /// scanned: each is a separate `Grid` value carrying its own copy of the
-    /// table, and reclaiming here copy-on-writes this table away from them,
-    /// so their ids keep resolving against their own copy. Scanning only
-    /// this value's holders is exactly what makes the sweep reference-safe.
+    /// Cells on screen and in scrollback, plus both pens (a saved pen restores
+    /// into the current one). The parked main screen and snapshots hold their
+    /// own copy of the table, so scanning only this value is reference-safe.
     func liveHyperlinkIDs() -> Set<HyperlinkID> {
         var live: Set<HyperlinkID> = [pen.hyperlink]
         if let savedPen { live.insert(savedPen.hyperlink) }
@@ -765,10 +636,7 @@ public struct Grid: Sendable {
         return live
     }
 
-    /// The grapheme counterpart of `liveHyperlinkIDs` — cells only; no pen
-    /// carries a cluster. The parked main screen keeps its own
-    /// `GraphemeTable` (`enterAlternateScreen` swaps in a fresh one), so it
-    /// is not a holder of this table's ids.
+    /// Cells only: no pen carries a cluster.
     func liveGraphemeIDs() -> Set<GraphemeID> {
         var live: Set<GraphemeID> = []
         for row in 0..<rows {
@@ -784,10 +652,7 @@ public struct Grid: Sendable {
         return live
     }
 
-    /// Sweeps both side tables against what this grid actually references.
-    /// Runs on its own only from tests; in production each table sweeps
-    /// lazily, when an `intern` hits its capacity (`combine`,
-    /// `internHyperlink`).
+    /// Tests only; in production each table sweeps when `intern` is full.
     mutating func compactSideTables() {
         graphemes.reclaim(keeping: liveGraphemeIDs())
         hyperlinks.reclaim(keeping: liveHyperlinkIDs())
@@ -799,10 +664,7 @@ public struct Grid: Sendable {
         let template = pen.eraseCell
         switch mode {
         case .toEnd:
-            // Erasing rightwards from a spacer would orphan the pair's lead
-            // just left of the range: start one column earlier so both
-            // halves go. Erasing from a lead needs nothing — its spacer is
-            // inside the range.
+            // From a spacer: start one column earlier, or the lead is orphaned.
             var start = cursor.column
             if start > 0, lines[cursor.row][start].attributes.contains(.wideSpacer) {
                 start -= 1
@@ -810,8 +672,6 @@ public struct Grid: Sendable {
             lines[cursor.row].erase(start..<columns, with: template)
             lines[cursor.row].wrapped = false
         case .toStart:
-            // Symmetrically, erasing leftwards ending on a lead would orphan
-            // its spacer just right of the range: extend by one column.
             var end = cursor.column + 1
             if end < columns, lines[cursor.row][cursor.column].attributes.contains(.wide) {
                 end += 1
@@ -854,23 +714,15 @@ public struct Grid: Sendable {
 
     // MARK: - Resizing
 
-    /// Changes the visible dimensions. A column change reflows the document
-    /// (`DECISIONS.md` D03) — except on the alternate screen,
-    /// which has no scrollback and is resized, never reflowed, because a
-    /// full-screen application redraws itself on `SIGWINCH` and re-wrapping
-    /// what it drew would corrupt its own model of the screen. A row-only
-    /// change keeps the cheaper non-reflowing path: rows move to or from
-    /// scrollback without touching any row's content.
+    /// A column change reflows (D03), except on the alternate screen: the
+    /// program redraws on `SIGWINCH`, and re-wrapping would corrupt its model.
+    /// A row-only change moves rows to or from scrollback.
     public mutating func resize(rows newRows: Int, columns newColumns: Int) {
         let newRows = min(max(1, newRows), Self.maxRows)
         let newColumns = min(max(1, newColumns), Self.maxColumns)
         guard newRows != rows || newColumns != columns else { return }
 
-        // A placement's position is exact cell coordinates that a column
-        // change invalidates regardless of whether this is the reflowing
-        // path below or the alternate screen's non-reflowing one — see
-        // `ImagePlacementTable`'s doc comment on why dropping placements is
-        // the safe choice rather than trying to re-wrap image geometry.
+        // Exact cell coordinates a column change invalidates.
         if newColumns != columns {
             imagePlacements.removeAllPlacements()
         }
@@ -889,15 +741,9 @@ public struct Grid: Sendable {
         }
 
         if newRows < rows {
-            // Take the rows off the TOP, into scrollback — not off the
-            // bottom. The bottom is where the cursor and the newest output
-            // are; truncating there destroys the most recent lines outright,
-            // and silently, since they never reach the history either.
-            // Otherwise shrinking a window eats the last commands you ran.
-            //
-            // Only as many rows as it takes to keep the cursor on screen
-            // move up; anything still surplus is below the cursor and blank,
-            // so it comes off the bottom as before.
+            // Off the top, into scrollback: the bottom holds the cursor and the
+            // newest output, and truncating there loses the last commands silently.
+            // Only enough rows to keep the cursor on screen; the rest are blank.
             let excess = rows - newRows
             let fromTop = min(excess, max(0, cursor.row - (newRows - 1)))
             for row in 0..<fromTop { scrollback.push(lines[row]) }
@@ -927,10 +773,7 @@ public struct Grid: Sendable {
 
     // MARK: - Scroll region
 
-    /// DECSTBM — VT510 §DECSTBM: sets the top and bottom margins, zero-based
-    /// and inclusive here (the wire is one-based; that is the performer's
-    /// problem), then homes the cursor. A region is at least two rows;
-    /// `top >= bottom` after clamping is ignored, margins unchanged.
+    /// DECSTBM: homes the cursor; a region under two rows is ignored.
     public mutating func setScrollRegion(top: Int, bottom: Int) {
         let top = max(0, top)
         let bottom = min(bottom, rows - 1)
@@ -942,16 +785,9 @@ public struct Grid: Sendable {
 
     // MARK: - Scrolling
 
-    /// Moves the scroll region up by `count` rows, opening blank rows at the
-    /// bottom margin. Rows above the top margin and below the bottom margin
-    /// stay put.
-    ///
-    /// What falls off the top goes to the scrollback only when the region is
-    /// the whole screen — a partial region belongs to an application (a tmux
-    /// status line, a vim window), and its scrolled-off rows are not the
-    /// user's history. The rows that do go keep their `wrapped` flag, so a
-    /// command that soft-wrapped before it scrolled is still one logical
-    /// line to selection and search (`DECISIONS.md` D03).
+    /// Rows reach scrollback only when the region is the whole screen — a
+    /// partial region is an application's (tmux, vim), not history. `wrapped`
+    /// travels with them (D03).
     public mutating func scrollUp(_ count: Int) {
         let count = min(max(0, count), marginBottom - marginTop + 1)
         guard count > 0 else { return }
@@ -969,10 +805,7 @@ public struct Grid: Sendable {
         }
     }
 
-    /// SD — ECMA-48 §8.3.113: moves the scroll region down by `count` rows,
-    /// opening blank rows at the top margin. Rows outside the margins stay
-    /// put, and nothing enters the scrollback — scrolling down revisits
-    /// content, it does not create history.
+    /// SD: nothing enters scrollback — scrolling down creates no history.
     public mutating func scrollDown(_ count: Int) {
         let count = min(max(0, count), marginBottom - marginTop + 1)
         guard count > 0 else { return }
@@ -989,10 +822,7 @@ public struct Grid: Sendable {
 
     // MARK: - Editing
 
-    /// IL — ECMA-48 §8.3.67: inserts `count` erased rows at the cursor row,
-    /// shifting rows below it down within the scroll region; rows pushed
-    /// past the bottom margin are lost. Ignored when the cursor is outside
-    /// the region. The cursor does not move.
+    /// IL within the region; ignored outside it.
     public mutating func insertLines(_ count: Int) {
         guard cursor.row >= marginTop, cursor.row <= marginBottom else { return }
         let count = min(max(0, count), marginBottom - cursor.row + 1)
@@ -1009,11 +839,7 @@ public struct Grid: Sendable {
         pendingWrap = false
     }
 
-    /// DL — ECMA-48 §8.3.32: deletes `count` rows at the cursor row,
-    /// shifting rows below it up within the scroll region; erased rows open
-    /// at the bottom margin. Deleted rows are application content, never
-    /// history. Ignored when the cursor is outside the region. The cursor
-    /// does not move.
+    /// DL within the region; deleted rows are never history.
     public mutating func deleteLines(_ count: Int) {
         guard cursor.row >= marginTop, cursor.row <= marginBottom else { return }
         let count = min(max(0, count), marginBottom - cursor.row + 1)
@@ -1030,31 +856,20 @@ public struct Grid: Sendable {
         pendingWrap = false
     }
 
-    /// ICH — ECMA-48 §8.3.64: inserts `count` erased cells at the cursor.
-    /// The cursor does not move.
     public mutating func insertCharacters(_ count: Int) {
         lines[cursor.row].insertCells(count, at: cursor.column, template: pen.eraseCell, width: columns)
         repairWidePairs(row: cursor.row, template: pen.eraseCell)
         pendingWrap = false
     }
 
-    /// DCH — ECMA-48 §8.3.26: deletes `count` cells at the cursor. The
-    /// cursor does not move.
     public mutating func deleteCharacters(_ count: Int) {
         lines[cursor.row].deleteCells(count, at: cursor.column, template: pen.eraseCell, width: columns)
         repairWidePairs(row: cursor.row, template: pen.eraseCell)
         pendingWrap = false
     }
 
-    /// ECH — ECMA-48 §8.3.38: erases `count` cells from the cursor
-    /// rightwards, in place — nothing shifts, unlike DCH — and leaves the
-    /// cursor where it is. Clamped to the right margin; a count of zero
-    /// erases one, as xterm does.
-    ///
-    /// tmux draws its status line as the left part, `CSI n X` over the gap,
-    /// then the right part; with the erase ignored the gap keeps whatever
-    /// the previous screen had there — a slice of htop's function-key row,
-    /// after a window shrink, for the life of the session.
+    /// ECH: erases in place, nothing shifts; zero erases one, as xterm does.
+    /// tmux draws its status line around an ECH gap.
     public mutating func eraseCharacters(_ count: Int) {
         let start = cursor.column
         guard start < columns else { return }
@@ -1067,8 +882,7 @@ public struct Grid: Sendable {
         pendingWrap = false
     }
 
-    /// A cleared row: blank, or filled with the erase background when one is
-    /// set (BCE — an erased cell under a colour is visible, so it is stored).
+    /// With BCE, an erased cell under a colour is stored.
     private func erasedLine() -> Line {
         let template = pen.eraseCell
         guard !template.isBlank else { return Line() }
@@ -1079,18 +893,14 @@ public struct Grid: Sendable {
 
     // MARK: - Save and restore
 
-    /// DECSC — VT510 §DECSC: saves the cursor position, the pen and the
-    /// pending-wrap state. The origin-mode and character-set state the full
-    /// spec lists are not implemented (DECOM is out of scope; the
-    /// parser never selects a character set).
+    /// DECSC: cursor, pen, pending wrap. No DECOM or character sets.
     public mutating func saveCursor() {
         savedCursor = cursor
         savedPen = pen
         savedPendingWrap = pendingWrap
     }
 
-    /// DECRC — VT510 §DECRC. With nothing saved, the spec restores the
-    /// factory settings: home position and the default rendition.
+    /// DECRC; with nothing saved, home and the default rendition.
     public mutating func restoreCursor() {
         guard let savedCursor, let savedPen else {
             moveCursor(row: 0, column: 0)
@@ -1104,20 +914,11 @@ public struct Grid: Sendable {
 
     // MARK: - Alternate screen
 
-    /// `?1049` set (xterm ctlseqs, DEC Private Mode Set): save the cursor,
-    /// switch to the alternate screen, clear it.
-    ///
-    /// The alternate screen is a second screen swapped in, not a flag on
-    /// this one's storage: the main screen — lines, scrollback, margins,
-    /// pen — is parked whole in `suspendedMain` and put back untouched on
-    /// the way out. The alternate screen itself is blank, has full-screen
-    /// margins, and has **no scrollback** (a zero-limit ring whose push is
-    /// a no-op): history scrolled while it is live is discarded.
+    /// `?1049` set: the main screen is parked whole in `suspendedMain`; the
+    /// alternate screen is blank with no scrollback.
     public mutating func enterAlternateScreen() {
         saveCursor()
         guard suspendedMain == nil else {
-            // A second `?1049 h` while already active re-saves the cursor and
-            // clears again; the parked screen stays the original main one.
             eraseDisplay(.all)
             marginTop = 0
             marginBottom = rows - 1
@@ -1128,11 +929,6 @@ public struct Grid: Sendable {
         lines = ScreenLines(repeating: Line(), count: rows)
         scrollback = Scrollback(limit: 0)
         graphemes = GraphemeTable()
-        // The main screen's placements are parked whole inside
-        // `suspendedMain` along with everything else and come back on
-        // `exitAlternateScreen`'s `self = main` — a fresh table here is
-        // just the alternate screen starting with none of its own, the
-        // same as it starting blank.
         imagePlacements = ImagePlacementTable()
         marginTop = 0
         marginBottom = rows - 1
@@ -1140,23 +936,14 @@ public struct Grid: Sendable {
         moveCursor(row: 0, column: 0)
     }
 
-    /// `?1049` reset: switch back to the main screen and restore the cursor
-    /// that was saved on the way in. Ignored when the main screen is live.
-    ///
-    /// If the screen was resized while the alternate screen was live, the
-    /// parked main screen adopts the new dimensions on its way back — the
-    /// size belongs to the window, not to a screen.
+    /// `?1049` reset. A resize meanwhile applies to the parked screen too.
     public mutating func exitAlternateScreen() {
         guard let suspended = suspendedMain else { return }
         suspendedMain = nil
         var main = suspended.grid
         main.cursorStyle = cursorStyle  // the style is global, not per screen
-        // Ditto reverse-wraparound: a private mode set by the
-        // program is terminal-wide state, not part of either screen's own
-        // content, and `self = main` below would otherwise silently
-        // restore whatever `?45` was set to before the alternate screen
-        // was entered, discarding a `?45` the child set while it was
-        // active.
+        // Terminal-wide, not per screen: `self = main` would restore the old
+        // value.
         main.reverseWraparoundEnabled = reverseWraparoundEnabled
         if main.rows != rows || main.columns != columns {
             main.resize(rows: rows, columns: columns)
@@ -1166,14 +953,9 @@ public struct Grid: Sendable {
     }
 }
 
-/// The parked main screen of a grid whose alternate screen is live.
-///
-/// A value type cannot store another instance of itself inline, so the one
-/// parked screen sits behind a single reference. It is written once on the
-/// way into the alternate screen and only ever read on the way out, so the
-/// snapshots the renderer may be holding can share it without ever
-/// observing a mutation — that is what makes the `Sendable` conformance
-/// honest.
+/// The parked main screen, behind a reference (a value type cannot hold
+/// itself). Written once, read once, never mutated — so snapshots sharing it
+/// make `Sendable` honest.
 private final class SuspendedScreen: @unchecked Sendable {
     let grid: Grid
 

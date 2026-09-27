@@ -14,10 +14,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-/// The non-colour rendition flags of a cell.
-///
-/// A `UInt16` bitfield rather than a set of `Bool`s: it keeps `Cell` at 16
-/// bytes and makes "is this cell styled at all" a single comparison.
+/// Rendition flags as a `UInt16`: keeps `Cell` at 16 bytes and makes "styled
+/// at all" one comparison.
 public struct CellAttributes: OptionSet, Hashable, Sendable {
     public var rawValue: UInt16
 
@@ -35,16 +33,9 @@ public struct CellAttributes: OptionSet, Hashable, Sendable {
     public static let invisible = CellAttributes(rawValue: 1 << 6)
     public static let strikethrough = CellAttributes(rawValue: 1 << 7)
 
-    /// Width flags. These are structural, not rendition: SGR never sets
-    /// them, the grid sets them as it writes, and the dump's style layer
-    /// masks them out.
-    ///
-    /// The lead cell of a double-width pair (`wcwidth`/xterm convention: a
-    /// wide scalar occupies two columns).
+    /// Structural, not rendition: set by the grid, masked out of dumps.
     public static let wide = CellAttributes(rawValue: 1 << 8)
-    /// The second cell of a double-width pair. Distinguishable from a real
-    /// blank so erase and editing operations can keep pairs consistent —
-    /// touching either half blanks both.
+    /// Distinct from a real blank so edits can keep pairs whole.
     public static let wideSpacer = CellAttributes(rawValue: 1 << 9)
 
     /// Bits 10–15 remain reserved.

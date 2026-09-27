@@ -20,76 +20,47 @@ import Foundation
 import Synchronization
 
 /// Owns a PTY and the terminal it feeds — the unit a viewport renders
-/// (`DECISIONS.md` D07) and the boundary the AppKit shell reaches across to get
-/// pixels on screen.
+/// (`DECISIONS.md` D07).
 ///
-/// Threading (`DECISIONS.md` D04, `PERFORMANCE.md` §2.1): reading and
-/// parsing run on one dedicated `Thread`, started by `start()`, never on the
-/// main thread and never inside a `Task` on the default executor — a `Task`
-/// can be hopped off its thread or starved by other work on the same
-/// executor, and draining the PTY must never depend on either. A single parse
-/// batch is capped at roughly 1 MB before the loop re-checks whether it
-/// should stop; without the cap a sustained flood (`yes`) would never yield.
+/// **Reading** runs on one dedicated `Thread` (`DECISIONS.md` D04,
+/// `PERFORMANCE.md` §2.1), never a `Task`, which can be hopped or starved;
+/// a batch is capped near 1 MB so a flood still reaches the stop check.
 ///
-/// Writing is symmetric: `write` only enqueues, and one serial writer queue
-/// drains pending chunks to the PTY in FIFO order, so the caller (usually
-/// the main thread, on a keystroke) never blocks in `write(2)` behind a
-/// child that has stopped reading. Keyboard input and the parser's query
-/// replies share the one queue, which is what keeps the two ordered with
-/// respect to each other.
+/// **Writing** only enqueues: one serial writer queue drains to the PTY, so
+/// a keystroke never blocks behind a child that stopped reading, and query
+/// replies share that queue to stay ordered with the user's input.
 ///
-/// Lifecycle is configure-before-start: `init` does not start the reader, so
-/// `onOutput`/`onChildExit` (both guarded by a lock) are always installed
-/// before any byte is read, and a child that exits before its exit callback
-/// is installed has that exit replayed the moment one is.
+/// **Configure before start**: `init` does not start the reader, so the
+/// callbacks are installed before any byte is read; an exit that happened
+/// first is replayed to the callback.
 ///
-/// The renderer never touches `terminal` directly. It calls `snapshot()`,
-/// which copies the `Grid` value out from under the same lock the reader
-/// thread feeds against. This is copy-on-snapshot, not double buffering:
-/// `Grid` is a plain value type over `ContiguousArray`, so the copy itself
-/// is O(1) copy-on-write. The reader thread pays the actual copy cost
-/// lazily, the next time it mutates storage the snapshot still shares. On
-/// the live screen that cost is bounded by one row, because rows are the
-/// unit `Line` mutation copies. Scrollback is not: while a snapshot is
-/// alive, the next `Scrollback.push` copies the batch list and the whole
-/// tail arena (up to its `batchSize` rows) — so a snapshot should
-/// not outlive the frame it was taken for.
+/// **Snapshots** copy the `Grid` value under the reader's lock — O(1)
+/// copy-on-write, paid lazily by the next mutation: one row on the live
+/// screen, but the whole tail arena for the next `Scrollback.push`, so a
+/// snapshot should not outlive its frame.
 ///
-/// A parse batch *is* fed under that lock — the grid may never be mutated
-/// from two threads, and a resize commit must not interleave with a feed —
-/// but in slices (`feedLockSliceSize`), and the reader leaves a real gap
-/// between batches/slices whenever a render-path waiter is registered
-/// (`yieldToStateWaiters`): releasing an `os_unfair_lock` wakes a waiter,
-/// but the reader's unlock → relock window is far shorter than the wake, so
-/// slicing alone starves the waiter across whole batches (measured: 27 of
-/// 4682 `snapshot()` calls waited >10 ms, max ~490 ms, slice holds
-/// meanwhile ≤ 2.5 ms). With the gap, `corta-bench` measures p99 ≈ 0.001 ms
-/// / max ≈ 0.24 ms; the pre-fix whole-batch hold was p99 ≈ 1–43 ms, max ≈
-/// 77–269 ms. Regression: `TerminalSessionLockWaitTests`.
+/// **Fairness**: batches are fed in slices, and the reader leaves a real gap
+/// while a render-path waiter is registered (`yieldToStateWaiters`) —
+/// releasing the lock alone lets the reader win it back every time (a
+/// `snapshot()` once waited ~490 ms). `TerminalSessionLockWaitTests`.
 public final class TerminalSession: @unchecked Sendable {
-    /// Bytes read per `PTY.read` call before the batch is re-checked against
-    /// the cap. Small enough to keep the cap accurate, large enough that the
-    /// syscall count under a flood stays sane. Internal, not private, so the
-    /// lifecycle tests can feed exact chunk boundaries.
+    /// Per `read`; internal so lifecycle tests can feed exact boundaries.
     static let readChunkSize = 64 * 1024
-    /// `PERFORMANCE.md` §2.1: "roughly 1 MB".
     private static let batchByteCap = 1024 * 1024
 
     public let pty: PTY
 
     private struct State {
         var terminal: Terminal
-        /// The newest `?2026` episode the recovery timeout was armed for —
-        /// mirrored from the core's rising-edge counter, so a stale timer
-        /// can't cut a later episode short.
+        /// The `?2026` episode the recovery timeout was armed for, so a stale
+        /// timer cannot end a later one.
         var synchronizedOutputEpisode = 0
     }
 
     private struct Callbacks {
         var onOutput: (@Sendable () -> Void)?
         var onChildExit: (@Sendable (ChildExit) -> Void)?
-        /// The exit the reader loop already observed, kept so a callback
-        /// installed afterwards still receives it.
+        /// Replayed to a callback installed after the exit.
         var childExit: ChildExit?
     }
 
@@ -98,40 +69,25 @@ public final class TerminalSession: @unchecked Sendable {
     private let stopped = Mutex(false)
     private let started = Mutex(false)
 
-    /// Test hook: replaces the PTY as the reader loop's byte source so chunk
-    /// boundaries are deterministic. Must be assigned before `start()`; the
-    /// read happens on the reader thread, ordered after the assignment by
-    /// `Thread.start`.
+    /// Test hook: a scripted byte source. Assign before `start()`.
     var readerSource: ReaderSource?
-    /// How long a `?2026` episode may gate presents before the session ends
-    /// it core-side. Fixed rather than configurable: the core package reads
-    /// no configuration (`DECISIONS.md` D07), and one second is the safety cap
-    /// terminals that implement the timeout commonly use. A `var` so tests
-    /// can shorten it; assign before `start()`, like `readerSource`.
+    /// How long `?2026` may gate presents — the one-second cap terminals
+    /// commonly use; the core reads no configuration. Tests may shorten it
+    /// before `start()`.
     var synchronizedOutputTimeout: Duration = .seconds(1)
-    /// Serial, not concurrent: two resizes must apply in the order they
-    /// were requested, never race to decide which size "wins".
+    /// Serial: resizes apply in request order.
     private let resizeQueue = DispatchQueue(label: "dev.corta.terminal-session.resize")
 
-    /// The newest size handed to `resize(to:)`. A queued resize block
-    /// applies its size only while it is still this one — see `resize(to:)`.
+    /// The newest requested size; older queued resizes are skipped.
     private let requestedResize = Mutex<(serial: UInt64, size: TerminalSize)?>(nil)
 
-    /// Test hook, run on `resizeQueue` before a resize block does its work:
-    /// lets a test hold queued resize work while it observes what the child
-    /// does in the window between a resize request and its application (the
-    /// grid/SIGWINCH ordering regression). Assign before the first
-    /// `resize(to:)`; not safe to reassign afterwards.
+    /// Test hook: holds queued resize work open. Assign before the first
+    /// `resize(to:)`.
     var resizeWorkGate: (@Sendable () -> Void)?
     private let syncTimeoutQueue = DispatchQueue(label: "dev.corta.terminal-session.sync-timeout")
 
-    /// Pending outbound chunks for the writer queue. A hand-rolled
-    /// FIFO with a head index: popping one chunk at a time keeps `bytes` an
-    /// accurate count of the unwritten backlog (the back-pressure cap
-    /// applies to it), and the index keeps the pop amortized O(1) where
-    /// `removeFirst` would make draining a large backlog O(n²).
-    /// `isDraining` says a drain block is already scheduled/running, so
-    /// enqueue schedules at most one.
+    /// A FIFO with a head index: popping one chunk at a time keeps `bytes` an
+    /// exact backlog for the back-pressure cap, in amortized O(1).
     private struct PendingWrites {
         var chunks: [[UInt8]] = []
         var head = 0
@@ -165,75 +121,48 @@ public final class TerminalSession: @unchecked Sendable {
         }
     }
     private let pendingWrites = Mutex(PendingWrites())
-    /// Serial: two chunks must reach the pty in enqueue order, never
-    /// interleaved by concurrent `write(2)` calls.
+    /// Serial: chunks reach the PTY in enqueue order.
     private let writerQueue = DispatchQueue(label: "dev.corta.terminal-session.writer")
 
-    /// Back-pressure cap on queued-but-unwritten input. A backlog past this
-    /// means the child has stopped reading (a pty's input side alone absorbs
-    /// on the order of 100 MB before stalling), so further keystrokes would
-    /// never be acted on anyway; they are dropped rather than buffered
-    /// without bound, and the caller is never blocked. A single chunk larger
-    /// than the cap is still accepted when the backlog is under it, so a
-    /// large paste goes through whenever the pipe is draining at all.
+    /// A backlog past this means the child stopped reading (the PTY alone
+    /// absorbs ~100 MB), so more input is dropped rather than buffered without
+    /// bound. A chunk larger than the cap is accepted while the backlog is under
+    /// it, so a paste goes through while the pipe drains at all.
     private static let maxPendingWriteBytes = 4 * 1024 * 1024
 
-    /// Largest slice of a parse batch fed per lock acquisition — see the
-    /// type's header comment. At the measured worst observed feed rate
-    /// (a scroll-heavy `yes` flood, ~269 ms per 1 MB batch) one slice holds
-    /// the lock ≈ 4 ms; ordinary batches are far below that.
+    /// Per lock acquisition; ≈ 4 ms at the worst measured feed rate.
     private static let feedLockSliceSize = 16 * 1024
 
-    /// Test hook: replaces the PTY as the writer queue's byte sink so tests
-    /// can gate and record outbound writes deterministically. Must be
-    /// assigned before the first `write`; read on the writer queue, ordered
-    /// after the assignment by `DispatchQueue.async`.
+    /// Test hook: records outbound writes. Assign before the first `write`.
     var writerSink: (@Sendable ([UInt8]) throws -> Void)?
 
-    /// Approximate count of threads waiting to acquire `state` via the
-    /// render-path entry points (`snapshot`, the per-frame mode reads, the
-    /// resize commit). The reader's feed-slice loop checks it between slices
-    /// and leaves a gap while anyone is registered — see the loop for why
-    /// merely releasing the lock is not enough. Approximate because it is
-    /// bumped *before* the waiter blocks; a momentarily over-counted value
-    /// only costs the reader one gap.
+    /// Render-path callers waiting on `state`; bumped before blocking, so an
+    /// over-count only costs the reader one gap.
     private let stateWaiters = Mutex(0)
 
-    /// If a render-path waiter is registered on `state`, leave the lock
-    /// uncontended long enough for it to land: releasing an
-    /// `os_unfair_lock` wakes the waiter, but the reader's unlock → relock
-    /// window (~ns between slices, ~tens of µs across an inter-batch read)
-    /// is shorter than a futex wake (~µs) plus scheduling, so the reader
-    /// otherwise wins the lock back at every boundary and the waiter
-    /// starves. Called by the reader loop only.
+    /// Leaves the lock uncontended long enough for a waiter to land: the
+    /// reader's unlock → relock is shorter than a futex wake.
     private func yieldToStateWaiters() {
         guard stateWaiters.withLock({ $0 }) > 0 else { return }
         Thread.sleep(forTimeInterval: 0.0001)
     }
 
-    /// Registers a `state` waiter for the duration of the closure; the
-    /// render-path entry points wrap their `state.withLock` in this so a
-    /// feed in progress leaves them a gap. Inline rather than a
-    /// `withLock`-shaped helper because `Mutex.withLock`'s `sending`
-    /// closure signature does not forward through a wrapper cleanly.
+    /// Not a `withLock`-shaped wrapper: `Mutex.withLock`'s `sending` closure
+    /// does not forward through one.
     private func registerStateWaiter<T>(_ body: () -> T) -> T {
         stateWaiters.withLock { $0 += 1 }
         defer { stateWaiters.withLock { $0 -= 1 } }
         return body()
     }
 
-    /// Called from the reader thread whenever a batch has been applied, so
-    /// the shell can schedule a redraw. Never called on the main thread by
-    /// this type — the shell is responsible for hopping if it needs to.
+    /// On the reader thread; the caller hops if it needs to.
     public var onOutput: (@Sendable () -> Void)? {
         get { callbacks.withLock { $0.onOutput } }
         set { callbacks.withLock { $0.onOutput = newValue } }
     }
 
-    /// Called from the reader thread once the child has exited and the
-    /// reader loop has stopped. If the child already exited before the
-    /// callback was installed, the stored exit is replayed to the new
-    /// callback immediately, on the installing thread.
+    /// On the reader thread, after the loop stops; an earlier exit is replayed
+    /// on the installing thread.
     public var onChildExit: (@Sendable (ChildExit) -> Void)? {
         get { callbacks.withLock { $0.onChildExit } }
         set {
@@ -241,8 +170,7 @@ public final class TerminalSession: @unchecked Sendable {
                 state.onChildExit = newValue
                 return newValue == nil ? nil : state.childExit
             }
-            // Outside the lock: the callback is caller code and may touch
-            // this session again.
+            // Outside the lock: caller code may touch this session.
             if let replay { newValue?(replay) }
         }
     }
@@ -270,19 +198,15 @@ public final class TerminalSession: @unchecked Sendable {
                 commandHistoryLimit: commandHistoryLimit
             )
         ))
-        // The reader is NOT started here: `onOutput`/`onChildExit` must be
-        // installed first, and only `start()` may begin draining.
     }
 
     deinit {
-        // Not a teardown path to rely on: the reader thread's closure
-        // strongly retains this session, so deinit only runs once the loop
-        // has already stopped. Owners must call `stop()`.
+        // Not a teardown path: the reader retains this session until it stops.
+        // Owners call `stop()`.
         stop()
     }
 
-    /// Starts the reader thread. Call after installing `onOutput` /
-    /// `onChildExit`; idempotent, later calls are ignored.
+    /// Idempotent.
     public func start() {
         let shouldStart = started.withLock { already -> Bool in
             guard !already else { return false }
@@ -290,10 +214,6 @@ public final class TerminalSession: @unchecked Sendable {
             return true
         }
         guard shouldStart else { return }
-        // A dedicated `Thread`, not a `Task` (`DECISIONS.md` D04,
-        // `PERFORMANCE.md` §2.1): a task can be hopped or starved by unrelated
-        // work on the same executor, and draining the PTY must never depend on
-        // either.
         ReaderBox(session: self).start()
     }
 
@@ -309,21 +229,11 @@ public final class TerminalSession: @unchecked Sendable {
         batch.reserveCapacity(Self.batchByteCap)
 
         while !stopped.withLock({ $0 }) {
-            // Between batches, not just between slices: a `yes` flood
-            // mostly produces single-slice batches, and the inter-batch
-            // read phase (~tens of µs when the pty buffer stays full) is
-            // shorter than a futex wake, so a `snapshot()` waiter loses the
-            // re-acquire race at every boundary and starves for hundreds of
-            // ms — measured 27/4682 calls over 10 ms, max ~490 ms. The gap
-            // costs nothing when nobody is waiting (one atomic read).
+            // Between batches too: a flood is mostly single-slice batches.
             yieldToStateWaiters()
             batch.removeAll(keepingCapacity: true)
             var reachedEOF = false
 
-            // Drain what is immediately available, capped at ~1 MB, then
-            // yield by applying the batch and looping back to a blocking
-            // read. This is what keeps one enormous burst from starving the
-            // stop check (`PERFORMANCE.md` §2.1).
             while batch.count < Self.batchByteCap {
                 let region = UnsafeMutableRawBufferPointer(start: buffer, count: Self.readChunkSize)
                 let read: Int
@@ -339,48 +249,30 @@ public final class TerminalSession: @unchecked Sendable {
                 }
                 batch.append(contentsOf: UnsafeRawBufferPointer(start: buffer, count: read))
                 if read < Self.readChunkSize {
-                    // Nothing more was immediately available; apply now
-                    // rather than blocking for more while holding a batch.
                     break
                 }
-                // A full chunk says nothing about what remains queued —
-                // looping here into another blocking read would hold the
-                // unapplied batch until the child speaks again, which for an
-                // exact chunk-multiple burst can be forever. Ask readiness
-                // instead and apply when nothing more is pending.
+                // Ask readiness rather than block: an exact chunk-multiple burst
+                // would otherwise sit unapplied until the child speaks again.
                 if !source.isReadable() { break }
             }
 
             if !batch.isEmpty {
-                // Feed under the lock — the grid may only ever be mutated
-                // there, and a resize commit must not interleave with a
-                // feed — but in slices, releasing the lock between them, so
-                // a `snapshot()` or a queued resize never waits behind a
-                // whole batch. A resize may now commit between two
-                // slices of one batch; that is the same bound the batch cap
-                // already gave (one in-flight batch), just finer-grained.
+                // Under the lock, in slices, so a snapshot or resize never waits
+                // behind a whole batch.
                 var responses: [UInt8] = []
                 var episode: Int?
                 var offset = 0
                 while offset < batch.count {
                     let end = min(offset + Self.feedLockSliceSize, batch.count)
-                    // A fresh `[UInt8]`, not an `ArraySlice`: the parser's
-                    // ASCII fast path only applies to the contiguous-array
-                    // overload, and a 16 KB memcpy is noise next to a parse.
+                    // An `Array`, not a slice: the ASCII fast path needs it.
                     let slice = Array(batch[offset..<end])
                     let applied = state.withLock { current -> (responses: [UInt8], episode: Int?) in
                         let episodeBefore = current.terminal.synchronizedOutputEpisode
                         current.terminal.feed(slice)
                         let sliceResponses = current.terminal.takeOutput()
-                        // The core counts BSU rising edges, so a DECRST+BSU
-                        // pair in one batch — a compliant renderer's normal
-                        // frame loop — arms a fresh timeout for the new
-                        // episode; a bool compare would read on → on and let
-                        // the old episode's timer cut the new one short. A
-                        // repeated BSU inside an episode does not extend the
-                        // bounded wait — extending on every BSU is exactly
-                        // what a child that never sends ESU would use to
-                        // stall presentation forever.
+                        // Rising edges, so DECRST+BSU in one batch arms a fresh timeout.
+                        // A repeated BSU does not extend it, or a child that never sends
+                        // ESU could stall presentation forever.
                         let episodeAfter = current.terminal.synchronizedOutputEpisode
                         guard episodeAfter != episodeBefore else { return (sliceResponses, nil) }
                         current.synchronizedOutputEpisode = episodeAfter
@@ -389,16 +281,11 @@ public final class TerminalSession: @unchecked Sendable {
                     responses.append(contentsOf: applied.responses)
                     if let newEpisode = applied.episode { episode = newEpisode }
                     offset = end
-                    // Same starvation within a multi-slice batch — see the
-                    // per-batch call for the mechanism.
                     if offset < batch.count {
                         yieldToStateWaiters()
                     }
                 }
-                // Query responses. Fixed-format bytes only — never
-                // attacker-supplied text (`SECURITY.md` §2.1). They take the
-                // same queue as keyboard input so a reply stays ordered with
-                // respect to the input the user typed around it.
+                // Fixed-format only (`SECURITY.md` §2.1); same queue as input.
                 if !responses.isEmpty {
                     enqueueWrite(responses)
                 }
@@ -411,9 +298,8 @@ public final class TerminalSession: @unchecked Sendable {
             if reachedEOF { break }
         }
 
-        // A child that is gone (or hung up) can never send the DECRST that
-        // ends `?2026`; end the episode from this side and signal output so
-        // whatever the episode withheld still draws.
+        // A dead child never ends `?2026`; end it here so withheld output
+        // draws.
         let clearedSync = state.withLock { current -> Bool in
             guard current.terminal.isSynchronizedOutputEnabled else { return false }
             current.terminal.endSynchronizedOutput()
@@ -432,14 +318,11 @@ public final class TerminalSession: @unchecked Sendable {
         }
     }
 
-    /// The PTY itself as a `ReaderSource`: blocking reads, with readiness
-    /// answered by a zero-timeout `poll`.
     private var liveReaderSource: ReaderSource {
         ReaderSource(
             read: { [pty] in try pty.read(into: $0) },
             isReadable: { [pty] in
-                // Any revents (POLLIN, but also POLLERR/POLLHUP) count:
-                // the following read is what observes end of file.
+                // Any revents count; the read observes end of file.
                 while true {
                     var descriptor = pollfd(
                         fd: pty.fileDescriptor, events: Int16(POLLIN), revents: 0)
@@ -451,13 +334,8 @@ public final class TerminalSession: @unchecked Sendable {
         )
     }
 
-    /// `?2026` recovery: the child promises a DECRST to end each
-    /// episode; if it never arrives, the shell's present gate would hold
-    /// forever. After `synchronizedOutputTimeout` the episode is ended
-    /// core-side and output is signalled, so the shell — which latched that
-    /// it owes a present when the gate first held — draws the withheld
-    /// frames on the next vsync. The episode number guards against a stale
-    /// timer ending a later episode whose DECRST is still coming.
+    /// Ends a `?2026` episode the child never closes, unless a later episode
+    /// has begun.
     private func scheduleSynchronizedOutputTimeout(episode: Int) {
         let components = synchronizedOutputTimeout.components
         let nanoseconds = components.seconds * 1_000_000_000
@@ -479,33 +357,20 @@ public final class TerminalSession: @unchecked Sendable {
 
     // MARK: - Public API (any thread)
 
-    /// A copy of the current grid. Cheap (`Grid` is a value type); safe to
-    /// call from the render thread every frame. Registered as a `state`
-    /// waiter so a feed in progress leaves the caller a gap — see
-    /// `registerStateWaiter`.
+    /// Safe every frame; registered as a waiter.
     public func snapshot() -> Grid {
         registerStateWaiter { state.withLock { $0.terminal.grid } }
     }
 
-    /// The three terminal-state commands, each with one meaning.
-    ///
-    /// They are applied to the grid directly rather than by writing an escape
-    /// sequence to the child: writing to the child's *input* is how the shell
-    /// would see them as typed characters, and `SECURITY.md` §6 keeps that
-    /// channel for keyboard input only. A user asking Corta to clear its own
-    /// screen is asking Corta, not the program.
+    /// Applied to the grid, never written to the child's input, which is for
+    /// keystrokes only (`SECURITY.md` §6).
     public enum TerminalStateCommand: Sendable {
-        /// Erase the visible screen, keep the scrollback, cursor home.
         case clearScreen
-        /// Discard the scrollback, keep the visible screen.
         case clearHistory
-        /// RIS: modes, screens, tab stops, title, cursor, screen *and*
-        /// scrollback — everything a fresh terminal would not have.
+        /// RIS: everything, scrollback included.
         case reset
     }
 
-    /// Applies one of the three. Returns nothing: the caller redraws from the
-    /// next `snapshot()` like any other change.
     public func apply(_ command: TerminalStateCommand) {
         state.withLock {
             switch command {
@@ -516,57 +381,24 @@ public final class TerminalSession: @unchecked Sendable {
         }
     }
 
-    /// What became of one `write(_:)` call. A silent drop would be
-    /// indistinguishable from a queued chunk that simply has not drained
-    /// yet; with this, a caller like a large paste can tell "still coming",
-    /// "the child is not reading and this was dropped" and "the session is
-    /// gone" apart, and react to each.
+    /// Lets a caller (a paste) tell "queued" from "dropped, child not reading"
+    /// from "session gone".
     public enum WriteOutcome: Sendable, Equatable {
-        /// Not dropped: pushed onto the writer queue and will reach the
-        /// child in FIFO order unless `stop()` runs first, or — for an
-        /// empty `bytes` — nothing to queue at all, an unconditional no-op
-        /// rather than a decision that could ever go the other way.
+        /// Queued (or empty — nothing to queue).
         case accepted
-        /// Dropped: the backlog was already over `maxPendingWriteBytes`
-        /// before this chunk (the check runs before the push, so the chunk
-        /// that first crosses the cap is still accepted — see
-        /// `maxPendingWriteBytes`), meaning the child is not reading.
-        /// Buffering further would grow without bound for input nobody will
-        /// ever act on.
+        /// Dropped: the backlog was already over the cap.
         case backpressured
-        /// Dropped: the session has already `stop()`ped.
         case stopped
     }
 
-    /// Queues bytes for the child. Never routes attacker-controlled PTY
-    /// output back into this call (`SECURITY.md` §6) — it is for keyboard
-    /// input only.
-    ///
-    /// The call only enqueues; a serial writer queue performs the
-    /// actual `write(2)` in FIFO order, so the caller (a keystroke on the
-    /// main thread) never blocks behind a child that has stopped reading —
-    /// measured at 43 ms for a single 1 MB write once the pty's input side
-    /// fills, and unbounded beyond that (`corta-bench`, "write
-    /// backpressure"). The queue is bounded (`maxPendingWriteBytes`); when
-    /// the backlog exceeds the cap the child is provably not reading and new
-    /// input is dropped rather than buffered without bound — the alternative
-    /// is the whole UI freezing on a wedged child. `stop()` cancels anything
-    /// still pending.
-    ///
-    /// The return value is the queueing decision only — `.accepted` means
-    /// this chunk joined the FIFO, not that it has reached the child yet.
-    /// Most callers (keyboard input, protocol replies) have no useful
-    /// response to a drop and may ignore it; a caller that can chunk its own
-    /// input (a paste) uses it to stop feeding a child that has already
-    /// stopped reading rather than queuing chunks that can only be dropped.
+    /// Keyboard input only — never PTY output (`SECURITY.md` §6). Enqueues and
+    /// returns; a blocking `write(2)` measured 43 ms per MB once the PTY filled.
     @discardableResult
     public func write(_ bytes: [UInt8]) -> WriteOutcome {
         enqueueWrite(bytes)
     }
 
-    /// FIFO enqueue shared by keyboard input and the parser's query replies;
-    /// taking one path through one queue is what keeps the two ordered with
-    /// respect to each other.
+    /// One queue for input and replies keeps them ordered.
     @discardableResult
     private func enqueueWrite(_ bytes: [UInt8]) -> WriteOutcome {
         guard !bytes.isEmpty else { return .accepted }
@@ -587,12 +419,8 @@ public final class TerminalSession: @unchecked Sendable {
         return outcome
     }
 
-    /// Runs on `writerQueue` only. Drains until the queue is empty or the
-    /// session has stopped; a failed chunk (child gone, descriptor closed)
-    /// is dropped and the loop continues, so a dead child empties the queue
-    /// fast instead of retrying forever. Chunks are popped before being
-    /// written, so a `stop()` clearing the queue mid-write cannot make a
-    /// later pop observe a queue it already emptied.
+    /// A failed chunk is dropped, so a dead child empties the queue fast.
+    /// Popped before writing, so a `stop()` mid-write cannot be observed twice.
     private func drainPendingWrites() {
         while true {
             guard !stopped.withLock({ $0 }) else {
@@ -618,31 +446,20 @@ public final class TerminalSession: @unchecked Sendable {
         }
     }
 
-    /// `Scrollback.totalPushed` — a monotonic growth counter, read without a
-    /// full `snapshot()`. Cheap enough for the app to call every time the
-    /// viewport's scroll offset changes and every output batch, to keep a
-    /// scrolled-away offset anchored to the same document position rather
-    /// than drifting forward as new output lands.
+    /// Without a full `snapshot()`; read on every scroll and output batch.
     public var scrollbackTotalPushed: Int {
         state.withLock { $0.terminal.grid.scrollback.totalPushed }
     }
 
-    /// `Scrollback.count` — the number of rows currently buffered, which
-    /// saturates at the ring's limit unlike `scrollbackTotalPushed` above.
-    /// Read without a full `snapshot()` for the same reason.
     public var scrollbackCount: Int {
         state.withLock { $0.terminal.grid.scrollback.count }
     }
 
-    /// Whether the child has enabled bracketed paste (`?2004`).
     public var isBracketedPasteEnabled: Bool {
         state.withLock { $0.terminal.isBracketedPasteEnabled }
     }
 
-    /// The mouse tracking the child subscribed to, when it also asked for
-    /// SGR-encoded reports (`?1006`); `.off` otherwise. The two are read
-    /// under one lock, so a mode and its encoding never come from different
-    /// moments.
+    /// `.off` unless SGR encoding is on; both read under one lock.
     public var sgrMouseTrackingMode: MouseTrackingMode {
         state.withLock {
             $0.terminal.isSgrMouseEncodingEnabled ? $0.terminal.mouseTrackingMode : .off
@@ -653,201 +470,125 @@ public final class TerminalSession: @unchecked Sendable {
         state.withLock { $0.terminal.isSgrMouseEncodingEnabled }
     }
 
-    /// Whether synchronized output is active (`?2026`). While true the
-    /// shell must present no frame; when it goes false, present once. An
-    /// episode is bounded by `synchronizedOutputTimeout` and by child exit —
-    /// the mode can go false without the child's DECRST.
+    /// Can go false without the child's DECRST (timeout, exit).
     public var isSynchronizedOutputEnabled: Bool {
-        // The present gate is read every frame; register like `snapshot()`.
         registerStateWaiter { state.withLock { $0.terminal.isSynchronizedOutputEnabled } }
     }
 
-    /// Whether the child has asked to be told about focus changes
-    /// (`?1004`).
     public var isFocusReportingEnabled: Bool {
         state.withLock { $0.terminal.isFocusReportingEnabled }
     }
 
-    /// Whether LNM is set (`CSI 20 h`). The Return key sends CR LF while it
-    /// is, rather than a bare CR.
     public var isNewLineModeEnabled: Bool {
         state.withLock { $0.terminal.isNewLineModeEnabled }
     }
 
-    /// Whether DECCKM is set (`CSI ? 1 h`). The cursor keys send their SS3
-    /// (application) forms while it is.
     public var applicationCursorKeysEnabled: Bool {
         state.withLock { $0.terminal.applicationCursorKeysEnabled }
     }
 
-    /// Whether DECKPAM is set (`ESC =`). The numeric keypad sends its SS3
-    /// (application) forms while it is.
     public var applicationKeypadEnabled: Bool {
         state.withLock { $0.terminal.applicationKeypadEnabled }
     }
 
-    /// The colours OSC 10/11/12 report and set. The app seeds these
-    /// from its palette at startup so a query answers with what is drawn.
     public var dynamicColors: DynamicColors {
         get { state.withLock { $0.terminal.dynamicColors } }
         set { state.withLock { $0.terminal.dynamicColors = newValue } }
     }
 
-    /// The 256-entry indexed palette OSC 4 reports and sets, and OSC 104
-    /// resets. The app seeds `defaults` from its theme at startup and
-    /// on every theme change, the same way `dynamicColors` is seeded.
-    /// `TerminalColorPalette`/`TerminalRenderer.appendRowInstances`
-    /// (`Theme.Variant.resolve(_:indexedOverrides:)`) consult `overrides`
-    /// directly, so an OSC 4 override changes what is painted, not only
-    /// what a query answers. See `docs/DESIGN.md` §7.
     public var indexedPalette: IndexedPalette {
         get { state.withLock { $0.terminal.indexedPalette } }
         set { state.withLock { $0.terminal.indexedPalette = newValue } }
     }
 
-    /// Reseeds `indexedPalette.defaults` for a live theme switch
-    /// without discarding overrides — under one lock acquisition, not a
-    /// read of `indexedPalette` followed by a write of it back. The reader
-    /// thread applies OSC 4 under this same lock (`feed`, below); a
-    /// get-then-set from outside it would race that write and could drop
-    /// an override the child set between the get and the set.
+    /// Under one lock: a get-then-set would race the reader's OSC 4 writes and
+    /// could drop an override.
     public func updateIndexedPaletteDefaults(
         to newDefaults: [(red: UInt8, green: UInt8, blue: UInt8)]
     ) {
         state.withLock { $0.terminal.indexedPalette.updateDefaults(to: newDefaults) }
     }
 
-    /// The five special colours OSC 5 reports and sets, and OSC 105 resets;
-    /// see `SpecialColors`'s own doc comment.
     public var specialColors: SpecialColors {
         get { state.withLock { $0.terminal.specialColors } }
         set { state.withLock { $0.terminal.specialColors = newValue } }
     }
 
-    /// The kitty keyboard protocol flags in force (`CSI > flags u`).
     public var keyboardEnhancements: KeyboardEnhancementFlags {
         state.withLock { $0.terminal.keyboardEnhancements }
     }
 
-    /// Consumes a pending BEL: true at most once per bell.
     public func takeBell() -> Bool {
         state.withLock { $0.terminal.takeBell() }
     }
 
-    /// The window title set by the child via OSC 0/2. Set-only — the
-    /// title query is never answered (`SECURITY.md` §2.2).
     public var windowTitle: String? {
         state.withLock { $0.terminal.windowTitle }
     }
 
-    /// The working directory reported via OSC 7. Reports that name a
-    /// remote host (`file://remote/path` from an `ssh` session) are kept
-    /// apart in `remoteContext` — see `Performer.setWorkingDirectory` — so
-    /// this is always a local path, safe to spawn or restore from.
+    /// Always local, safe to spawn or restore from.
     public var workingDirectory: String? {
         state.withLock { $0.terminal.workingDirectory }
     }
 
-    /// The remote host and directory this pane's shell most recently
-    /// reported, when the report names another machine. Informational only:
-    /// for showing the user which host a pane refers to, never for spawning
-    /// or restoring a local process (see `RemoteContext`'s doc comment).
+    /// Informational only; never for spawning.
     public var remoteContext: RemoteContext? {
         state.withLock { $0.terminal.remoteContext }
     }
 
-    /// Whether a command other than the shell itself is running here — what
-    /// a close confirmation asks before it throws away a half-finished job.
-    /// Derived from the pty's foreground process group; see
-    /// `PTY.hasForegroundJob`.
+    /// A command other than the shell is running — what a close confirmation
+    /// asks (`PTY.hasForegroundJob`).
     public var hasForegroundJob: Bool { pty.hasForegroundJob }
 
-    /// The name of that command, when it can be read.
     public var foregroundProcessName: String? { pty.foregroundProcessName }
 
-    /// What owns the terminal right now, shell included — for a title bar
-    /// rather than for a confirmation dialog. See `PTY.activeProcessName`.
+    /// Shell included, for a title bar.
     public var activeProcessName: String? { pty.activeProcessName }
 
-    /// Where this session is, by whichever route answers.
-    ///
-    /// OSC 7 first: a shell that reports its directory is reporting the one
-    /// it believes it is in, which is the right answer when a program has
-    /// changed directory internally. A remote host's report never reaches
-    /// here — it lands in `remoteContext` instead — so the fallback also
-    /// covers panes whose shell is on another machine. That fallback is the
-    /// kernel's answer for the foreground process group, because a stock
-    /// macOS zsh sends no OSC 7 to anything but Terminal.app
-    /// (`PTY.currentWorkingDirectory`).
+    /// OSC 7 first (the shell's own answer); else the kernel's for the
+    /// foreground group, since stock macOS zsh sends OSC 7 only to Terminal.app.
     public var currentDirectory: String? {
         state.withLock { $0.terminal.workingDirectory } ?? pty.currentWorkingDirectory
     }
 
-    /// Whether the shell reports a command running via OSC 133.
     public var isCommandRunning: Bool {
         state.withLock { $0.terminal.isCommandRunning }
     }
 
-    /// Whether this session's shell emits OSC 133 at all. The app falls back
-    /// to its keystroke heuristic when it does not.
     public var hasShellIntegration: Bool {
         state.withLock { $0.terminal.hasShellIntegration }
     }
 
-    /// See `Terminal.promptEndPosition`.
     public var promptEndPosition: (row: Int, column: Int)? {
         state.withLock { $0.terminal.promptEndPosition }
     }
 
-    /// This session's bounded command history. A snapshot like
-    /// `snapshot()`'s grid: the lock is held only to copy it.
     public var commandRecords: CommandRecordStore {
         state.withLock { $0.terminal.commandRecords }
     }
 
-    /// Empties the command history without touching scrollback or the
-    /// live screen; see `Terminal.clearCommandRecords()`.
     public func clearCommandRecords() {
         state.withLock { $0.terminal.clearCommandRecords() }
     }
 
-    /// Consumes the exit status of a command that just finished (OSC 133 D).
     public func takeFinishedCommand() -> Int? {
         state.withLock { $0.terminal.takeFinishedCommand() }
     }
 
-    /// Consumes text the child asked to place on the system clipboard via
-    /// OSC 52. Whether it actually reaches the pasteboard is the
-    /// app's decision.
+    /// OSC 52; the app decides whether it reaches the pasteboard.
     public func takeClipboardCopy() -> String? {
         state.withLock { $0.terminal.takeClipboardCopy() }
     }
 
-    /// Ordering contract: the child must never observe —
-    /// via `TIOCGWINSZ`/`SIGWINCH` — a size the grid has not adopted yet.
-    /// Otherwise its new-size redraw is parsed into old-size cells, and the
-    /// damage outlives the gap: the alternate screen is resized, never
-    /// reflowed, so a mis-parsed full-screen redraw there stays
-    /// garbled until the child happens to repaint those cells. Both halves
-    /// therefore run on `resizeQueue`, in order: the grid reflow commits
-    /// first — under the same lock the reader thread parses against, so no
-    /// batch can be parsed between the commit and the signal — and only
-    /// then does `TIOCSWINSZ` let the kernel raise `SIGWINCH`.
+    /// The child must never see (`TIOCGWINSZ`/`SIGWINCH`) a size the grid has
+    /// not adopted, or its redraw is parsed into old-size cells — lasting, on the
+    /// alternate screen, which is never reflowed. So on `resizeQueue`, in order:
+    /// the reflow commits under the reader's lock, then `TIOCSWINSZ` signals.
     ///
-    /// The price is `SIGWINCH` promptness: the signal now waits on the
-    /// reflow, measured at ~108 ms for a full 100k-line scrollback
-    /// (`corta-bench`), and a drag can hand sizes over faster than that.
-    /// Queued requests therefore coalesce to the latest — an obsolete size
-    /// neither reflows the grid nor signals the child — bounding the added
-    /// latency at one reflow instead of the whole backlog. The work stays
-    /// off the calling thread regardless: running the reflow synchronously
-    /// would stall the main thread by that same ~108 ms worst case. Bytes
-    /// the child wrote *before* the signal may still be parsed after the
-    /// commit and land at the new width; that direction is bounded by one
-    /// in-flight batch and is overwritten by the child's post-`SIGWINCH`
-    /// redraw, unlike the corruption this ordering prevents. The block ends
-    /// with `onOutput` — the same wake a parse batch uses — so the reflowed
-    /// grid is drawn even when the child stays quiet after a resize.
+    /// That delays `SIGWINCH` by one reflow (~108 ms at 100k lines), so queued
+    /// requests coalesce to the latest; the work stays off the caller's thread.
+    /// Bytes written before the signal may land at the new width — bounded by
+    /// one batch, and repainted by the child. `onOutput` then wakes a redraw.
     public func resize(to size: TerminalSize) {
         let serial = requestedResize.withLock { requested -> UInt64 in
             let next = (requested?.serial ?? 0) + 1
@@ -857,9 +598,7 @@ public final class TerminalSession: @unchecked Sendable {
         resizeQueue.async { [self] in
             resizeWorkGate?()
             guard requestedResize.withLock({ $0?.serial == serial }) else { return }
-            // Registered: a drag during an output flood must not starve
-            // behind feed slices — the reflow commit is what `SIGWINCH`
-            // waits on.
+            // Registered: `SIGWINCH` waits on this commit.
             registerStateWaiter {
                 state.withLock { current in
                     var grid = current.terminal.grid
@@ -872,11 +611,8 @@ public final class TerminalSession: @unchecked Sendable {
         }
     }
 
-    /// Stops the reader thread and hangs up the child. Idempotent. Pending
-    /// outbound writes are discarded: the child is gone, so queued input has
-    /// no one left to read it. A drain currently parked in `write(2)` is
-    /// released by `terminate()` — the child's death closes the replica and
-    /// the write fails with `EIO` — and then observes `stopped`.
+    /// Idempotent. Pending input is discarded; a drain parked in `write(2)`
+    /// fails with `EIO` once the child dies, then sees `stopped`.
     public func stop() {
         let wasStopped = stopped.withLock { already -> Bool in
             let was = already
@@ -901,8 +637,7 @@ struct ReaderSource {
     var isReadable: () -> Bool
 }
 
-/// Keeps the `Thread(target:selector:)` entry point out of `TerminalSession`
-/// itself so the session's public surface stays free of `@objc`.
+/// Starts the reader thread.
 private final class ReaderBox: NSObject {
     let session: TerminalSession
 
@@ -916,12 +651,8 @@ private final class ReaderBox: NSObject {
         }
         thread.name = "com.corta.terminal.reader"
         thread.stackSize = 1 << 20
-        // Left at the default QoS, this thread can be deprioritised under
-        // CPU contention exactly like any other background thread — but it
-        // gates the output → wake → frame chain and must never stop
-        // draining regardless of what else is running (`PERFORMANCE.md`
-        // §2.1: "never stop draining the PTY"). `.userInitiated` asks the
-        // scheduler to treat it accordingly.
+        // Not the default QoS: this thread gates output → frame and must keep
+        // draining under contention (`PERFORMANCE.md` §2.1).
         thread.qualityOfService = .userInitiated
         thread.start()
     }

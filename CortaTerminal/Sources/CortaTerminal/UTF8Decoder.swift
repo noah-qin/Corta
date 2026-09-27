@@ -14,41 +14,19 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-/// An incremental UTF-8 decoder over a byte stream.
-///
-/// A PTY read boundary can fall anywhere, including between the second and
-/// third byte of a CJK character, so decoding state lives here across calls
-/// rather than in a buffer the caller must re-assemble.
-///
-/// Every byte from the PTY is hostile (`SECURITY.md` §1): malformed input
-/// yields U+FFFD and never traps, never consumes unbounded memory, and never
-/// desynchronises the stream. The rules are the ones in the WHATWG Encoding
-/// Standard's UTF-8 decoder, which is also what xterm and every other modern
-/// terminal implement:
-///
-/// - Overlong encodings are rejected — `C0 80` is not NUL. Accepting them
-///   lets a filter that scans for ASCII bytes be bypassed.
-/// - Surrogates U+D800–U+DFFF are rejected; they are not scalars.
-/// - Anything above U+10FFFF is rejected.
-/// - A byte that cannot continue the sequence in progress is *not* consumed
-///   by that sequence: the sequence yields U+FFFD and the byte is
-///   reinterpreted as a fresh start. That is what keeps a truncated sequence
-///   followed by `ESC` from swallowing the escape.
-///
-/// Works in `UInt8` and `UInt32`; no `String` (`PERFORMANCE.md` §3).
+/// Incremental UTF-8: a read can end mid-character, so state lives here.
+/// Hostile input (`SECURITY.md` §1) yields U+FFFD, never a trap or growth,
+/// following the WHATWG decoder as xterm does: overlongs, surrogates and
+/// values past U+10FFFF are rejected, and a byte that cannot continue a
+/// sequence restarts one — so a truncated sequence cannot swallow an `ESC`.
+/// No `String` (`PERFORMANCE.md` §3).
 public struct UTF8Decoder: Sendable {
-    /// What one byte produced. A byte can yield two scalars, because a
-    /// malformed sequence is reported at the moment the byte that ends it
-    /// arrives, and that byte may itself be a character.
+    /// Two scalars when the byte that ends a malformed sequence is itself one.
     public enum Result: Equatable, Sendable {
-        /// More bytes are needed; nothing to print yet.
         case incomplete
         case scalar(UInt32)
-        /// One U+FFFD. The byte is consumed.
         case invalid
-        /// One U+FFFD, then this scalar, decoded from the same byte.
         case invalidThen(UInt32)
-        /// One U+FFFD; the byte began a new, still incomplete sequence.
         case invalidThenIncomplete
     }
 
@@ -62,15 +40,13 @@ public struct UTF8Decoder: Sendable {
 
     public init() {}
 
-    /// True while a multi-byte sequence is part-way through.
     public var isPending: Bool { bytesNeeded > 0 }
 
     public mutating func decode(_ byte: UInt8) -> Result {
         guard bytesNeeded > 0 else { return start(byte) }
 
         guard byte >= lowerBoundary, byte <= upperBoundary else {
-            // The sequence is malformed. Report it, and give the byte a
-            // second chance as the start of the next one.
+            // Malformed: report it and retry the byte as a new start.
             reset()
             switch start(byte) {
             case .scalar(let scalar): return .invalidThen(scalar)
@@ -79,8 +55,7 @@ public struct UTF8Decoder: Sendable {
             }
         }
 
-        // Only the first continuation byte has a narrowed range; it is what
-        // rejects overlongs, surrogates and values above U+10FFFF.
+        // The narrowed first continuation rejects overlongs, surrogates, >U+10FFFF.
         lowerBoundary = 0x80
         upperBoundary = 0xBF
         codepoint = codepoint << 6 | UInt32(byte & 0x3F)
@@ -92,8 +67,7 @@ public struct UTF8Decoder: Sendable {
         return .scalar(scalar)
     }
 
-    /// Ends the stream. Returns true if a partial sequence was dropped, in
-    /// which case the caller prints one U+FFFD.
+    /// `true`: a partial sequence was dropped; print one U+FFFD.
     public mutating func flush() -> Bool {
         guard bytesNeeded > 0 else { return false }
         reset()
@@ -115,10 +89,7 @@ public struct UTF8Decoder: Sendable {
             if byte == 0xF0 { lowerBoundary = 0x90 }  // no overlong three-byte
             if byte == 0xF4 { upperBoundary = 0x8F }  // nothing above U+10FFFF
         default:
-            // 0x80–0xBF is a continuation byte with nothing to continue —
-            // which is also how a lone C1 control arrives in a UTF-8 stream.
-            // 0xC0, 0xC1 are overlong two-byte leads; 0xF5–0xFF are out of
-            // range. None of them can begin a character.
+            // A stray continuation (also a lone C1), an overlong lead or out of range.
             return .invalid
         }
         return .incomplete

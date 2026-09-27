@@ -16,17 +16,11 @@
 
 import Synchronization
 
-/// Process-wide, so every `ScreenLines` ever constructed — across every
-/// pane, every alternate-screen swap, every resize — gets a value no other
-/// one has. `ScreenLines.generation` reads it once at construction.
+/// Process-wide: no two `ScreenLines` ever share a generation.
 private let nextScreenLinesGeneration = Atomic<UInt64>(0)
 
-/// Logical screen rows backed by a circular buffer.
-///
-/// Full-screen scrolling is the dominant operation during sustained output.
-/// Keeping a head index turns it from `rows - 1` `Line` assignments per
-/// newline into one slot reset and one index increment, while callers keep
-/// using ordinary zero-based row coordinates.
+/// Screen rows in a circular buffer: a full-screen scroll is one slot reset
+/// and an index bump instead of `rows - 1` assignments.
 struct ScreenLines: RandomAccessCollection, MutableCollection, Sendable {
     typealias Index = Int
     typealias Element = Line
@@ -34,49 +28,18 @@ struct ScreenLines: RandomAccessCollection, MutableCollection, Sendable {
     private var storage: ContiguousArray<Line>
     private var head = 0
 
-    /// Set once, at construction, to a value no other `ScreenLines` instance
-    /// has ever had. `revision(at:)` is only comparable *within* one
-    /// generation — `Grid.enterAlternateScreen`/`exitAlternateScreen` swap in
-    /// a wholesale-replaced `ScreenLines` whose row revisions restart from
-    /// the same small numbers a moment-ago main screen's cache might already
-    /// hold, and `Grid+Reflow.swift`'s `lines = ScreenLines(...)` does the
-    /// same on a column change. `TerminalRenderer` compares this alongside
-    /// `rows`/`columns` to decide a full rebuild is needed, rather than
-    /// trusting revisions that look unchanged purely by coincidence across
-    /// two unrelated screens (`TerminalRenderer.swift`).
+    /// Revisions compare only within a generation: the alternate screen and a
+    /// column change swap in a fresh instance whose stamps restart.
     let generation: UInt64
 
-    /// A monotonic stamp per row, bumped every time that row is touched
-    /// through `subscript(position:)._modify` or `rotateUp` — the two (and
-    /// only two) chokepoints every `Grid` mutation actually goes through
-    /// (`Grid.swift`'s `write`/`erase*`/`scroll*`/`insert*`/`delete*` all
-    /// read `lines[row]...` or write `lines[row][...] = ...`, both of which
-    /// compile to `_modify`). `TerminalRenderer` reads it as a fast
-    /// "did this row change" check instead of comparing full `Line` values
-    /// (`PERFORMANCE.md` §3).
-    ///
-    /// Deliberately a stamp, not a content hash: two `Line`s with the same
-    /// stamp are only guaranteed identical because nothing has touched
-    /// either since they last shared one (a struct copy, e.g. into a
-    /// `session.snapshot()`) — it says "unchanged since", not "equal to".
-    /// Different stamps do not imply different content (a row erased back
-    /// to the same bytes still gets a fresh stamp) — the conservative
-    /// direction: a false "changed" costs a redundant rebuild, never a stale
-    /// row.
+    /// Bumped by the only two ways a `Grid` touches a row (`_modify`, `rotateUp`).
+    /// "Unchanged since", not "equal": a false "changed" costs a rebuild, never
+    /// a stale row.
     private var revisions: ContiguousArray<UInt64>
     private var nextRevision: UInt64 = 0
 
-    /// Rows rotated off the top by `rotateUp`, cumulative for this
-    /// generation's lifetime — every whole-screen scroll, with or without
-    /// scrollback attached (an alternate screen has none:
-    /// `Grid.enterAlternateScreen`). `TerminalRenderer` reads the delta
-    /// since its last sync to shift its cache instead of rebuilding every
-    /// retained row (`TerminalRenderer.applyScrollShift`). Deliberately not
-    /// `Scrollback.totalPushed`: that counter is silent during an alternate
-    /// screen (`push` is a no-op against a zero-limit ring), which would
-    /// hide a real rotation from the renderer and only cost a missed
-    /// optimisation there — but this is the more direct, correct source for
-    /// the same fact regardless of which screen is live.
+    /// The renderer shifts its cache by the delta. Not `totalPushed`, which is
+    /// silent on the alternate screen.
     private(set) var totalRotated: UInt64 = 0
 
     init(repeating line: Line, count: Int) {
@@ -108,7 +71,6 @@ struct ScreenLines: RandomAccessCollection, MutableCollection, Sendable {
         }
     }
 
-    /// The row's current revision stamp — see the property doc above.
     func revision(at position: Int) -> UInt64 {
         revisions[physicalIndex(position)]
     }
@@ -119,7 +81,6 @@ struct ScreenLines: RandomAccessCollection, MutableCollection, Sendable {
         revisions[physicalIndex] = nextRevision
     }
 
-    /// Rotates logical rows upward and clears the rows opened at the bottom.
     mutating func rotateUp(_ count: Int) {
         guard !storage.isEmpty else { return }
         let clamped = Swift.min(Swift.max(0, count), storage.count)
@@ -136,11 +97,7 @@ struct ScreenLines: RandomAccessCollection, MutableCollection, Sendable {
         materialize()
         let before = storage.count
         storage.append(contentsOf: newElements)
-        // These rows are about to be seen for the first time by whatever
-        // triggered the append (always a dimension change — `Grid.resize` —
-        // which forces a full rebuild on its own by changing `rows`), so the
-        // stamp only has to keep `revisions` the same length as `storage`,
-        // not mean anything in particular.
+        // Only keeps `revisions` the same length: a resize rebuilds anyway.
         revisions.append(contentsOf: repeatElement(0, count: storage.count - before))
     }
 

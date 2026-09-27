@@ -16,26 +16,13 @@
 
 import Darwin
 
-/// The other half of `Spawn.swift`'s spawn path.
-///
-/// `Spawn.child` `posix_spawn`s this binary — a fresh, single-threaded
-/// process image, so nothing here runs between a `fork()` and an `execve()`
-/// and the async-signal-safety rules that constrained `Spawn.swift`'s old
-/// forked-child code do not apply: ordinary Swift, `String`, `Array`,
-/// allocation, all fine.
-///
-/// By the time this file's code runs, `Spawn.child`'s `posix_spawnattr_t`
-/// has already made this process a session leader (`POSIX_SPAWN_SETSID`)
-/// with the pty replica dup'd onto fds 0/1/2 (`posix_spawn_file_actions_t`).
-/// What's left, and what `posix_spawn_file_actions_t` cannot express, is
-/// `ioctl(TIOCSCTTY)`: a session leader does not acquire a controlling
-/// terminal just by having a tty on fd 0 (see `Spawn.swift`'s doc comment
-/// for the empirical detail). Then `execve` over ourselves with the real
-/// shell.
+/// The second half of `Spawn.child`: a fresh, single-threaded image, so
+/// ordinary Swift is safe here. It arrives a session leader with the pty on
+/// fds 0/1/2; it adds what `posix_spawn` cannot express — `TIOCSCTTY` —
+/// then `execve`s the shell.
 ///
 /// argv: `[self, errorPipeWriteFD, workingDirectory-or-empty, executable,
-/// arg0, arg1, ...]`. `executable` doubles as the target's own `argv[0]`,
-/// matching what a shell expects to see there.
+/// arg0, …]`; `executable` doubles as the target's `argv[0]`.
 let arguments = CommandLine.arguments
 
 func fail() -> Never {
@@ -50,13 +37,9 @@ func fail() -> Never {
 
 guard arguments.count >= 4 else { _exit(127) }
 
-// `posix_spawn_file_actions_addinherit_np` (`Spawn.swift`) keeps this
-// descriptor open across *our own* exec into this binary, but empirically
-// does not carry its `FD_CLOEXEC` flag along — so without re-setting it
-// here, it survives into `execve` below too, and a long-lived target (a
-// shell waiting on stdin, say) then holds the error pipe's write end open
-// indefinitely. The parent's blocking read on the other end never sees
-// EOF, and every spawn of anything that doesn't exit immediately hangs.
+// Inherited across our own exec without its `FD_CLOEXEC` flag. Unset, the
+// shell holds the error pipe open, the parent's read never sees EOF, and
+// every spawn of a long-lived program hangs.
 if let pipeFD = Int32(arguments[1]) {
     _ = fcntl(pipeFD, F_SETFD, FD_CLOEXEC)
 }
@@ -71,5 +54,4 @@ var targetArgv: [UnsafeMutablePointer<CChar>?] = targetArguments.map { strdup($0
 targetArgv.append(nil)
 
 execve(targetArguments[0], &targetArgv, environ)
-// `execve` only returns on failure.
 fail()

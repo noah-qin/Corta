@@ -14,10 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-/// Identifies a grapheme cluster held in a `GraphemeTable`.
-///
-/// Zero means "this cell is exactly one scalar", which is the overwhelmingly
-/// common case and costs nothing to test for.
+/// Zero, the common case, means a single scalar — free to test.
 public struct GraphemeID: Equatable, Hashable, Sendable {
     public var rawValue: UInt16
 
@@ -30,39 +27,22 @@ public struct GraphemeID: Equatable, Hashable, Sendable {
     public var isNone: Bool { rawValue == 0 }
 }
 
-/// The side table for grapheme clusters that do not fit in a cell's single
-/// scalar — combining marks, ZWJ emoji sequences (`DECISIONS.md` D05).
-///
-/// Clusters are interned, so a screen full of the same emoji costs one entry.
-/// Capacity is capped at `UInt16.max - 1` entries; beyond that `intern`
-/// returns `nil` and the caller keeps the base scalar alone — but `Grid`
-/// first sweeps unreferenced entries (`reclaim(keeping:)`), so a
-/// long-lived session recovers instead of degrading permanently. Every
-/// unbounded input needs a cap (`SECURITY.md` §3), and this one is fed
-/// directly by the byte stream.
-///
-/// Entries are added as zero-width scalars join the previously written
-/// cell's cluster, and as an emoji ZWJ sequence continues one.
+/// Clusters too large for a cell's scalar (D05), interned: a screen of one
+/// emoji is one entry. Capped (`SECURITY.md` §3), with unreferenced entries
+/// swept before giving up and keeping the base scalar alone.
 public struct GraphemeTable: Sendable {
     public static let capacity = Int(UInt16.max) - 1
 
-    /// `nil` is a reclaimed slot: its id was referenced nowhere when
-    /// `reclaim(keeping:)` ran, and a later `intern` may hand the slot to an
-    /// unrelated cluster. Ids are indices into this array, so a *live* entry
-    /// never moves — that stability is what makes slot reuse safe.
+    /// `nil` is a reclaimed slot; a live id never moves, which makes reuse safe.
     private var clusters: ContiguousArray<[UInt32]?> = []
     private var ids: [[UInt32]: GraphemeID] = [:]
-    /// Reclaimed slots a future `intern` reuses before growing the table
-    /// further. Order is irrelevant: any free slot is a valid id.
     private var freeSlots: [Int] = []
 
     public init() {}
 
-    /// Live entries; reclaimed slots no longer count.
     public var count: Int { clusters.count - freeSlots.count }
 
-    /// Returns the id for `scalars`, interning it if it is new, or `nil` if
-    /// the table is full. A reclaimed slot is reused before the table grows.
+    /// `nil` when full.
     public mutating func intern(_ scalars: [UInt32]) -> GraphemeID? {
         if let existing = ids[scalars] { return existing }
         if let slot = freeSlots.popLast() {
@@ -78,24 +58,15 @@ public struct GraphemeTable: Sendable {
         return id
     }
 
-    /// The scalars behind an id, or `nil` for `.none`, unknown ids and
-    /// reclaimed slots.
     public func scalars(for id: GraphemeID) -> [UInt32]? {
         let index = Int(id.rawValue) - 1
         guard index >= 0, index < clusters.count else { return nil }
         return clusters[index]
     }
 
-    /// Drops every entry whose id is not in `live`, freeing its memory and
-    /// returning its slot to the pool. Returns how many slots were freed.
-    ///
-    /// SAFETY: `live` must contain every id any cell of this grid can
-    /// still carry — screen, scrollback, parked alternate screen included.
-    /// An id recycled while still referenced would afterwards resolve to an
-    /// unrelated cluster: a use-after-free in table form. The caller
-    /// (`Grid.liveGraphemeIDs`) computes the complete set; snapshots need no
-    /// scanning because each `Grid` value carries its own copy of this
-    /// table, so reclaiming here copy-on-writes away from every snapshot.
+    /// Returns the slots freed. SAFETY: `live` must hold every id any cell can
+    /// still carry — otherwise a use-after-free in table form. Snapshots keep
+    /// their own copy.
     @discardableResult
     public mutating func reclaim(keeping live: Set<GraphemeID>) -> Int {
         var freed = 0

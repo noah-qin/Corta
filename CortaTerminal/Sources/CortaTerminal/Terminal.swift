@@ -14,25 +14,13 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-/// A terminal: bytes in, grid out.
-///
-/// This is the unit a golden test feeds and a viewport renders
-/// (`DECISIONS.md` D07) — no singletons, no window, no PTY. `TerminalSession`
-/// owns the child process and synchronizes access to this value.
-///
-/// This value has no actor isolation. Callers sharing mutable terminal state
-/// must synchronize access; `TerminalSession` provides that boundary.
+/// A terminal: bytes in, grid out — the unit a golden test feeds and a
+/// viewport renders (`DECISIONS.md` D07). Not isolated: `TerminalSession`
+/// owns the child process and synchronizes access.
 public struct Terminal: Sendable {
     private var parser = Parser()
     private var performer: Performer
 
-    /// Creates an empty terminal with bounded scrollback and command history.
-    ///
-    /// - Parameters:
-    ///   - rows: Initial number of visible grid rows.
-    ///   - columns: Initial number of cells in each visible row.
-    ///   - scrollbackLimit: Maximum retained history rows above the screen.
-    ///   - commandHistoryLimit: Maximum retained shell-integration command records.
     public init(
         rows: Int = 24,
         columns: Int = 80,
@@ -45,10 +33,8 @@ public struct Terminal: Sendable {
         self.performer.state.commandRecords = CommandRecordStore(capacity: commandHistoryLimit)
     }
 
-    /// Retention control distinct from `reset()`'s scrollback clear:
-    /// a session's structured command history can be emptied on its own,
-    /// the same way `DirectoryHistoryStore.clear()` is independent of
-    /// clearing the visible scrollback.
+    /// Independent of `reset()`, as clearing directory history is of clearing
+    /// the scrollback.
     public mutating func clearCommandRecords() {
         performer.state.commandRecords = CommandRecordStore(
             capacity: performer.state.commandRecords.capacity)
@@ -59,183 +45,122 @@ public struct Terminal: Sendable {
         set { performer.grid = newValue }
     }
 
-    /// A full reset, as `RIS` (`ESC c`) performs it: modes, screens,
-    /// tab stops, title, cursor, the screen and the scrollback. Exposed so
-    /// the app can offer "Reset Terminal" without writing a control sequence
-    /// to the child's *input*, which is a channel reserved for what the user
-    /// actually typed (`SECURITY.md` §6).
+    /// `RIS`, applied here rather than written to the child's input, which
+    /// carries only what the user typed (`SECURITY.md` §6).
     public mutating func reset() {
         feed(Array("\u{1B}c".utf8))
     }
 
-    /// Consumes a chunk of PTY output. A chunk boundary may fall anywhere —
-    /// in the middle of a UTF-8 character or an escape sequence — so all
-    /// decoding state lives in the terminal, not in a call.
+    /// A chunk may end mid-character or mid-sequence; all decoding state
+    /// lives in the terminal.
     public mutating func feed(_ bytes: some Sequence<UInt8>) {
         parser.parse(bytes, performer: &performer)
     }
 
-    /// PTY reads are contiguous. Preserve that fact so `Parser` can batch
-    /// printable ASCII instead of erasing it behind `some Sequence`.
+    /// Contiguous, so `Parser` can batch printable ASCII.
     public mutating func feed(_ bytes: [UInt8]) {
         parser.parse(bytes, performer: &performer)
     }
 
-    /// Whether query responses are queued for the child.
     public var hasPendingOutput: Bool { !performer.state.outputBuffer.isEmpty }
 
-    /// `?2004` — whether the child has enabled bracketed paste.
     public var isBracketedPasteEnabled: Bool { performer.state.bracketedPasteEnabled }
 
-    /// `?1006` — whether the child has asked for SGR-encoded mouse reports.
     public var mouseTrackingMode: MouseTrackingMode { performer.state.mouseTrackingMode }
 
     public var isSgrMouseEncodingEnabled: Bool { performer.state.sgrMouseEncodingEnabled }
 
-    /// `?2026` — whether synchronized output is active. While true
-    /// the shell must present no frame; when it goes false, present once.
     public var isSynchronizedOutputEnabled: Bool { performer.state.synchronizedOutputEnabled }
 
-    /// Rising-edge counter for `?2026` episodes — see
-    /// `PerformerState.synchronizedOutputEpisode` for why a bool compare is
-    /// not enough.
     public var synchronizedOutputEpisode: Int { performer.state.synchronizedOutputEpisode }
 
-    /// Ends a synchronized-output episode (`?2026`) without waiting for the
-    /// child's DECRST. The mode is a promise the child may fail to keep — a
-    /// crashed or buggy child never sends the reset, and gating presents on
-    /// it would freeze the pane — so the session's bounded-wait timeout and
-    /// child-exit path end the episode from this side.
+    /// Ends `?2026` without the child's DECRST: a crashed or buggy child never
+    /// sends it, and gating presents on it would freeze the pane.
     public mutating func endSynchronizedOutput() {
         performer.state.synchronizedOutputEnabled = false
     }
 
-    /// `?1004` — whether the child has asked to be told about focus changes.
-    /// The app sends `CSI I` / `CSI O` while this is true.
     public var isFocusReportingEnabled: Bool { performer.state.focusReportingEnabled }
 
-    /// LNM (`CSI 20 h`). While set the Return key sends CR LF rather than
-    /// CR — the app encodes keys, so it has to be able to ask.
     public var isNewLineModeEnabled: Bool { performer.state.newLineModeEnabled }
 
-    /// DECCKM (`CSI ? 1 h`). While set the cursor keys and Home/End send
-    /// their SS3 (application) forms — the app encodes keys, so it has to
-    /// be able to ask.
     public var applicationCursorKeysEnabled: Bool {
         performer.state.applicationCursorKeysEnabled
     }
 
-    /// DECKPAM / DECKPNM — while set, the numeric keypad sends its SS3
-    /// forms.
     public var applicationKeypadEnabled: Bool {
         performer.state.applicationKeypadEnabled
     }
 
-    /// The colours OSC 10/11/12 report. The app seeds these from its
-    /// palette so a query answers with what is actually drawn; the child can
-    /// then change them, and the app reads them back to render.
+    /// Seeded by the app from its palette, so a query answers with what is
+    /// drawn; read back to render what the child set.
     public var dynamicColors: DynamicColors {
         get { performer.state.dynamicColors }
         set { performer.state.dynamicColors = newValue }
     }
 
-    /// The 256-entry indexed palette OSC 4 reports and sets, and OSC 104
-    /// resets. The app seeds `defaults` from its theme (mirrors
-    /// `dynamicColors`) and, since a render-path integration pass, an
-    /// override here also changes what is painted — see `TerminalSession
-    /// .indexedPalette`'s doc comment and `docs/DESIGN.md` §7.
     public var indexedPalette: IndexedPalette {
         get { performer.state.indexedPalette }
         set { performer.state.indexedPalette = newValue }
     }
 
-    /// The five special colours OSC 5 reports and sets, and OSC 105 resets.
-    /// Query/set state only, like `indexedPalette` — see
-    /// `SpecialColors`'s own doc comment for why there is no themed
-    /// default to seed here.
     public var specialColors: SpecialColors {
         get { performer.state.specialColors }
         set { performer.state.specialColors = newValue }
     }
 
-    /// The kitty keyboard protocol flags in force. The app encodes
-    /// key presses according to these.
     public var keyboardEnhancements: KeyboardEnhancementFlags {
         performer.state.keyboardProtocol.current
     }
 
-    /// Consumes a pending BEL: true at most once per bell, false
-    /// otherwise. The app decides what a bell does; the core only reports
-    /// that one happened.
+    // The `take…` accessors drain: each event is reported once, not on every
+    // frame after it.
+
     public mutating func takeBell() -> Bool {
         let requested = performer.state.bellRequested
         performer.state.bellRequested = false
         return requested
     }
 
-    /// The window title set by OSC 0/2. Set-only: the title query is
-    /// never answered (`SECURITY.md` §2.2).
     public var windowTitle: String? { performer.state.windowTitle }
 
-    /// The working directory reported by OSC 7.
-    ///
-    /// Local-only by construction: a report that names a remote host lands
-    /// in `remoteContext` instead and never reaches this, so the value is
-    /// always safe to hand to a local spawn.
+    /// Local-or-nil by construction, so always safe for a local spawn.
     public var workingDirectory: String? { performer.state.workingDirectory }
 
-    /// The remote host and directory this pane most recently reported,
-    /// when an OSC 7 report names another machine. Informational only, for
-    /// showing the user which host the pane refers to; nothing that spawns a
-    /// local process may read it. A subsequent local OSC 7 report clears it.
+    /// Informational only; nothing that spawns a process may read it.
     public var remoteContext: RemoteContext? { performer.state.remoteContext }
 
-    /// Whether the shell says a command is running (OSC 133). `false`
-    /// when the shell emits no shell-integration sequences at all, which is
-    /// why the app still keeps its keystroke heuristic as a fallback.
+    /// `false` without shell integration too, which is why the app keeps its
+    /// keystroke heuristic as a fallback.
     public var isCommandRunning: Bool { performer.state.isCommandRunning }
 
-    /// Whether this session has ever emitted an OSC 133 mark — i.e. whether
-    /// its shell has integration configured. The app uses this to choose
-    /// between the exact command boundaries and its own heuristic.
+    /// Whether the shell has ever emitted an OSC 133 mark.
     public var hasShellIntegration: Bool { performer.state.promptRow != nil }
 
-    /// The absolute row of the current prompt and the column its text
-    /// ended at, when both are known for *this* prompt (see
-    /// `PerformerState.promptEndColumn`'s doc comment for why `B` on a
-    /// different row than `A` leaves this `nil`).
+    /// `nil` unless `B` landed on the same row as this prompt's `A`.
     public var promptEndPosition: (row: Int, column: Int)? {
         guard let row = performer.state.promptRow, let column = performer.state.promptEndColumn
         else { return nil }
         return (row, column)
     }
 
-    /// The bounded, id-keyed command history behind `hasShellIntegration`
-    /// and the row-based marks above. See `CommandRecord`'s doc comment.
     public var commandRecords: CommandRecordStore { performer.state.commandRecords }
 
-    /// Consumes the exit status of a command that just finished (OSC 133 D).
-    /// Drained, like `takeBell`: a notification fires once per command, and a
-    /// value left in place would fire on every frame after it.
     public mutating func takeFinishedCommand() -> Int? {
         let status = performer.state.finishedCommandExitStatus
         performer.state.finishedCommandExitStatus = nil
         return status
     }
 
-    /// Consumes text the child asked to put on the system clipboard via OSC
-    /// 52. The app decides whether to honour it; the core never
-    /// touches a pasteboard, and the *read* direction does not exist.
+    /// OSC 52 writes; the app decides whether to honour them.
     public mutating func takeClipboardCopy() -> String? {
         let text = performer.state.pendingClipboardCopy
         performer.state.pendingClipboardCopy = nil
         return text
     }
 
-    /// Drains the queued query responses. `TerminalSession` calls this after
-    /// every `feed` and writes the bytes to the PTY; tests read them
-    /// directly, without a PTY. The buffer carries fixed-format response
-    /// bytes only — never stream-supplied text (`SECURITY.md` §2.1).
+    /// Query responses; `TerminalSession` writes them to the PTY after every
+    /// `feed`.
     public mutating func takeOutput() -> [UInt8] {
         let output = performer.state.outputBuffer
         performer.state.outputBuffer = []

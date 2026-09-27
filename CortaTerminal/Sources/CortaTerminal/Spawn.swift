@@ -16,44 +16,17 @@
 
 import Darwin
 
-/// Launches a child on a pty replica via `posix_spawn` of the `corta-exec`
-/// helper — see `corta-exec/main.swift` for the other half of this.
+/// Launches a child on a pty replica by `posix_spawn`ing `corta-exec`, which
+/// adds `TIOCSCTTY` (`posix_spawn` cannot express it) and `execve`s the shell.
 ///
-/// The obvious alternative — `fork()` the app process directly and run
-/// hand-marshalled, async-signal-safe-only code in the forked child before
-/// `execve` — was measured to `SIGKILL` the child roughly 8% of the
-/// time under a fully serialized test run (`.serialized` on both PTY test
-/// suites, plus a `forkLockStorage` around every `fork()` call — the flake
-/// persisted regardless): `fork()` in a heavily multithreaded Cocoa/Swift
-/// process is only as safe as whatever lock some *other* thread happens to
-/// be holding at the instant of the call, and that hazard cannot be
-/// mitigated from inside this process, only avoided by not calling `fork()`
-/// at all (`DESIGN.md` §7.2).
-///
-/// `posix_spawn` cannot express the one thing this needs —
-/// `ioctl(TIOCSCTTY)`, required because a session leader does not acquire a
-/// controlling terminal merely by having the tty `dup2`'d onto its stdin
-/// (`corta-exec/main.swift` has the empirical detail, confirmed by
-/// `TerminalSessionTests.controlCStopsAFloodingChild`). `corta-exec` exists
-/// to do that one call and then `execve` over itself with the real shell —
-/// its own `posix_spawn` already made it a session leader
-/// (`POSIX_SPAWN_SETSID`) with the pty replica on fds 0/1/2
-/// (`posix_spawn_file_actions_t`), so nothing about this needs `fork()`.
-/// Because `corta-exec` is a freshly `execve`'d image, not a forked one,
-/// there is no fork-in-a-multithreaded-process hazard here to mitigate —
-/// this is pure Swift end to end (`DESIGN.md` §1), not FFI to a hand-rolled
-/// C helper.
+/// Not `fork()`: in a multithreaded Cocoa process a forked child is only as
+/// safe as the locks other threads hold at that instant, and it was killed
+/// ~8% of the time even fully serialized (`DESIGN.md` §7.2).
 enum Spawn {
-    /// Launches `executable` with the pty replica as its controlling
-    /// terminal and standard streams.
-    ///
     /// - Parameters:
-    ///   - replicaPath: the pty replica's device path, e.g. `/dev/ttys004`.
-    ///   - parentReplica: the caller's own open reference to that same
-    ///     replica (used only to set the initial window size before this
-    ///     call). Closed here, the instant `corta-exec` has its own — see
-    ///     the note at the close site.
-    ///   - workingDirectory: absolute path, or `nil` to inherit ours.
+    ///   - parentReplica: the caller's reference, used for the initial size;
+    ///     closed here the instant `corta-exec` has its own.
+    ///   - workingDirectory: absolute, or `nil` to inherit ours.
     static func child(
         executable: String,
         arguments: [String],
@@ -62,10 +35,7 @@ enum Spawn {
         parentReplica: Int32,
         workingDirectory: String?
     ) throws(PTYError) -> pid_t {
-        // Covers every early-throw path below; the intentional close at the
-        // real close site (once `corta-exec` has its own reference) marks
-        // this so the deferred one becomes a no-op instead of a double
-        // close.
+        // Early-throw paths; the real close site disarms it.
         var parentReplicaClosed = false
         defer { if !parentReplicaClosed { close(parentReplica) } }
 
@@ -75,18 +45,14 @@ enum Spawn {
             throw .spawnFailed(code: ENOENT)
         }
 
-        // Reports a failed `execve` of `executable` inside `corta-exec` back
-        // to us — `posix_spawn`'s return value only covers launching
-        // `corta-exec` itself, which always exists and always succeeds.
+        // `posix_spawn` only reports launching `corta-exec`; this reports its
+        // `execve` of the target.
         var errorPipe: [Int32] = [0, 0]
         guard pipe(&errorPipe) == 0 else { throw .spawnFailed(code: errno) }
         let readEnd = errorPipe[0]
         let writeEnd = errorPipe[1]
         _ = fcntl(readEnd, F_SETFD, FD_CLOEXEC)
-        // Kept open across `corta-exec`'s own exec by `addinherit_np` below,
-        // despite `POSIX_SPAWN_CLOEXEC_DEFAULT`; `FD_CLOEXEC` here is what
-        // then closes it automatically the moment `corta-exec` succeeds at
-        // `execve`-ing `executable` — the parent's "it worked" signal.
+        // Closed by `execve` succeeding — the parent's "it worked".
         _ = fcntl(writeEnd, F_SETFD, FD_CLOEXEC)
 
         var fileActions: posix_spawn_file_actions_t?
@@ -105,21 +71,14 @@ enum Spawn {
             Int16(
                 POSIX_SPAWN_SETSID | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK)
         )
-        // `corta-exec` inherits neither our handlers nor our blocked set
-        // (`SECURITY.md` §4.3): every signal reset to its default action,
-        // nothing blocked. `execve`-ing `executable` afterwards does not
-        // change either, so this covers the real shell too.
+        // Default signal actions, nothing blocked (`SECURITY.md` §4.3).
         var allSignals = sigset_t()
         sigfillset(&allSignals)
         posix_spawnattr_setsigdefault(&attributes, &allSignals)
         var noSignals = sigset_t()
         sigemptyset(&noSignals)
         posix_spawnattr_setsigmask(&attributes, &noSignals)
-        // Only the descriptors above — the pty replica on 0/1/2 and the
-        // error pipe's write end — survive into `corta-exec`. Everything
-        // else this process happens to have open (sockets, XPC connections,
-        // other sessions' ptys) is closed automatically, without needing a
-        // hand-written close-everything loop.
+        // Everything else this process has open stays out of the child.
 
         var childArguments = [helperPath, String(writeEnd), workingDirectory ?? "", executable]
         childArguments.append(contentsOf: arguments)
@@ -137,44 +96,27 @@ enum Spawn {
             throw .spawnFailed(code: spawnResult)
         }
 
-        // `corta-exec`'s own reference to the replica (opened via
-        // `posix_spawn_file_actions_addopen` above) exists the instant
-        // `posix_spawn` returns — file actions run as part of spawning,
-        // before the call reports success. `parentReplica` can safely go
-        // now, and must: waiting any longer (for the pipe read below, which
-        // blocks until `corta-exec` finishes `execve`-ing `executable` —
-        // arbitrarily long for a child that never exits) risks this being
-        // the *last* close of the replica instead of a redundant second
-        // one. Empirically, on Darwin, a slave's last close performed by
-        // the process that also holds the primary side discards whatever
-        // the child had already written and not yet been read. Closing the
-        // instant a second reference is guaranteed to exist avoids ever
-        // being last, without ever leaving a gap with *no* reference open
-        // (a gap here was observed to reset the pty's window size to 0×0).
+        // `corta-exec` holds its own reference once `posix_spawn` returns, so
+        // close now: waiting could make this the *last* close, and on Darwin a
+        // last close by the primary's holder discards unread child output. Never a
+        // gap with no reference either — that reset the size to 0×0.
         close(parentReplica)
         parentReplicaClosed = true
 
         close(writeEnd)
         defer { close(readEnd) }
-        // Bounded handshake: `corta-exec` either writes its `errno` and
-        // `_exit`s (the `execve` of `executable` failed) or its FD_CLOEXEC
-        // write end closes (it succeeded — EOF with no bytes). Without a
-        // deadline a wedged helper would freeze session creation here; the
-        // UI calls this synchronously.
+        // Bounded: the UI calls this synchronously.
         let status = Self.readHelperStatus(
             from: readEnd,
             deadline: ContinuousClock.now + Self.helperHandshakeTimeout
         )
         switch status {
         case .execSucceeded:
-            // EOF with nothing written: the write end closed because
-            // `corta-exec` exec'd `executable` successfully.
             return pid
         case .execFailed(let code):
             Self.reapFailedChild(pid)
             throw .spawnFailed(code: code)
         case .truncated:
-            // A partial status is no status: the helper died mid-write.
             Self.reapFailedChild(pid)
             throw .spawnFailed(code: EIO)
         case .timedOut:
@@ -186,27 +128,19 @@ enum Spawn {
         }
     }
 
-    /// How long `child` waits for `corta-exec`'s exec handshake before
-    /// declaring the helper wedged. Generous — the handshake is two syscalls
-    /// — because the cost of a false positive is a killed healthy shell.
+    /// Generous — a false positive kills a healthy shell.
     static let helperHandshakeTimeout: Duration = .seconds(10)
 
-    /// The outcome of the helper's exec handshake: it writes its `errno`
-    /// (one `Int32`, native byte order) if the `execve` of the target fails,
-    /// and on success its `FD_CLOEXEC` write end closes — EOF with no bytes.
+    /// The helper writes its `errno` (one native-order `Int32`) on failure; on
+    /// success the write end closes with no bytes.
     enum HelperStatus: Equatable {
         case execSucceeded
         case execFailed(code: Int32)
-        /// EOF after 1–3 bytes: the helper died mid-write.
         case truncated
-        /// The deadline passed with the write end still open.
         case timedOut
-        /// `read` on the pipe itself failed.
         case readFailed(code: Int32)
     }
 
-    /// Reads the handshake from `readEnd`, tolerating `EINTR` and partial
-    /// reads, and never blocking past `deadline`.
     static func readHelperStatus(
         from readEnd: Int32, deadline: ContinuousClock.Instant
     ) -> HelperStatus {
@@ -244,30 +178,16 @@ enum Spawn {
         return .execFailed(code: reported)
     }
 
-    /// A child whose handshake failed is still our direct child: kill it if
-    /// it somehow lives on, and reap it either way so failure paths never
-    /// leave a zombie.
+    /// Kill if alive, reap either way: no zombie on a failure path.
     private static func reapFailedChild(_ pid: pid_t) {
         kill(pid, SIGKILL)
         var status: Int32 = 0
         while waitpid(pid, &status, 0) < 0, errno == EINTR {}
     }
 
-    /// `corta-exec`'s path, found next to wherever *this module's own code*
-    /// is loaded from.
-    ///
-    /// SwiftPM builds every product of a package into the same directory
-    /// (`corta-dump`, `corta-bench`, the `.xctest` bundle, `corta-exec`
-    /// itself). `_NSGetExecutablePath()` would name the wrong binary under
-    /// `swift test`: `swift-testing`'s runner (`swiftpm-testing-helper`,
-    /// outside the package entirely, in the toolchain) `dlopen`s the
-    /// `.xctest` bundle rather than being it, so the *process's* own path
-    /// is not where `CortaTerminal` — or `corta-exec` beside it — actually
-    /// lives. `dladdr` on an address inside this module reports the image
-    /// `dlopen` (or the OS loader) actually mapped it from, which is right
-    /// in every case: the bare executable itself for `corta-dump`,
-    /// `corta-bench` and a future app, the `.xctest` bundle under
-    /// `swift test`.
+    /// Beside the image this module was loaded from (`dladdr`), not the
+    /// process's executable: under `swift test` the runner `dlopen`s the
+    /// `.xctest` bundle, so the process path points outside the package.
     private static func locateHelperExecutable() -> String? {
         var info = Dl_info()
         let addressInThisModule = unsafeBitCast(
@@ -289,12 +209,9 @@ enum Spawn {
             directory = String(directory[directory.startIndex..<slash])
             let candidate = directory + "/corta-exec"
             if access(candidate, X_OK) == 0 { return candidate }
-            // Xcode makes a SwiftPM product linked by both the app and its
-            // test bundle a *versioned* framework in Contents/Frameworks, and
-            // from that image the helper (embedded in Contents/MacOS) is a
-            // sibling subtree, never an ancestor of the walk — so check it
-            // when the walk passes a bundle's Contents directory. This is the
-            // only layout in which app-hosted tests (CortaTests) can spawn.
+            // In the app, the helper is in Contents/MacOS while this image is a
+            // framework under Contents/Frameworks — never an ancestor, so check it
+            // when the walk passes Contents. The only layout app-hosted tests spawn in.
             if directory.hasSuffix("/Contents") {
                 let insideBundle = directory + "/MacOS/corta-exec"
                 if access(insideBundle, X_OK) == 0 { return insideBundle }
@@ -304,18 +221,11 @@ enum Spawn {
     }
 }
 
-/// An address inside `CortaTerminal`'s own code, for `dladdr` to resolve
-/// back to the image this module was loaded from — see
-/// `Spawn.locateHelperExecutable`. `@convention(c)`, not a plain Swift
-/// closure: a Swift function value can be a fat pointer (code plus a
-/// context), and only a C function pointer is guaranteed to be the single
-/// pointer `dladdr` needs.
+/// A C function pointer, not a Swift closure (which can be a fat pointer):
+/// `dladdr` needs one address inside this module.
 private let addressAnchor: @convention(c) () -> Void = {}
 
-/// Builds a null-terminated `char *[]` from `strings`, valid for the
-/// duration of `body`. `posix_spawn` copies everything it needs from `argv`
-/// and `envp` before returning, so nothing here needs to outlive this
-/// call.
+/// A null-terminated `char *[]`, valid for `body`.
 private func withCStringArray<Result>(
     _ strings: [String], _ body: (UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>) -> Result
 ) -> Result {

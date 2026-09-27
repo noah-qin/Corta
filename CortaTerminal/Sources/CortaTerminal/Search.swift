@@ -16,63 +16,28 @@
 
 import Foundation
 
-/// Scrollback search.
-///
-/// Matching is over logical lines (`Grid+Text.swift`), not rows, so a match
-/// spanning a soft wrap is found whole. Case-insensitive by default. Reuses
-/// `SelectionRange`/`SelectionPoint` (`Selection.swift`) for a match's span:
-/// same document-row numbering, same highlighting a caller already knows
-/// how to turn into a selection-shaped overlay.
-///
-/// Iterates via `Grid.reversedLogicalLines()`, which never materializes the
-/// whole scrollback into one array (`PERFORMANCE.md` §4) — a search over a
-/// full 100k-line scrollback is one lazy pass, not a copy. Newest-first
-/// order is what makes the match cap useful: a truncated sweep keeps the
-/// most recent matches — the ones the user was looking at when they typed
-/// the query — rather than the document's oldest.
+/// Scrollback search over logical lines, so a match across a soft wrap is
+/// found whole. Newest first and lazy (`reversedLogicalLines()`): a capped
+/// sweep keeps the matches the user was looking at.
 public enum Search {
-    /// The match cap the shell searches with. Unbounded results let a
-    /// pathological document — a megabyte-long line of one repeated
-    /// character is one — build a highlight list far larger than the
-    /// renderer or the count label can ever use; the scan stops at the cap
-    /// instead. 5_000 covers any query a person reads through via ⌘G while
-    /// keeping the sweep's allocation and the renderer's quad list small.
+    /// A megabyte line of one repeated character would otherwise build a
+    /// highlight list no renderer can use.
     public static let defaultMatchLimit = 5_000
 
-    /// The longest logical line a *regular expression* is run against.
-    ///
-    /// This bounds an *ordinary* pattern's per-line cost and the work a
-    /// single line can represent — a megabyte-long logical line is a real
-    /// thing (`cat` of a binary produces several), and running any regex over
-    /// one on every keystroke is not something to do.
-    ///
-    /// **It is deliberately not the guard against catastrophic patterns, and
-    /// could not be.** `(a+)+b` doubles its cost every two characters:
-    /// measured on this machine at 0.016 s for 18 characters, 0.52 s for 24
-    /// and 8.0 s for 28. There is no line length at which such a pattern is
-    /// affordable, so a length cap cannot be the answer — `isCatastrophic`
-    /// is. Lines longer than this are skipped and counted in
-    /// `RegexResult.skippedLongLines`, so the UI says the search was
-    /// incomplete instead of quietly finding nothing.
+    /// Bounds an ordinary pattern's per-line cost (`cat` of a binary yields
+    /// megabyte lines). Not the guard against catastrophic patterns — `(a+)+b`
+    /// took 8 s at 28 characters; `isCatastrophic` is. Skipped lines are counted
+    /// so the UI says the search was incomplete.
     public static let regexLineLimit = 64_000
 
-    /// How long a whole regex sweep may run before it stops and reports
-    /// itself incomplete.
-    ///
-    /// The cooperative `shouldStop` is polled between lines and per match,
-    /// which covers a superseded query but not a pattern that is merely slow
-    /// on every line. This is the wall clock that does. It is generous — a
-    /// full-scrollback sweep of an ordinary pattern is milliseconds — so
-    /// tripping it means the pattern, not the document.
+    /// `shouldStop` catches a superseded query, not a pattern slow on every
+    /// line; this does. Tripping it means the pattern, not the document.
     public static let regexTimeBudget: Duration = .milliseconds(500)
 
-    /// What a regex sweep found, plus what it could not look at.
     public struct RegexResult: Sendable {
         public var matches: [SelectionRange]
-        /// Logical lines skipped for exceeding `regexLineLimit`.
         public var skippedLongLines: Int
-        /// Whether the sweep stopped on `regexTimeBudget` rather than
-        /// finishing. The count it reports is a floor, not a total.
+        /// The count is then a floor.
         public var timedOut: Bool
 
         public init(
@@ -83,37 +48,19 @@ public enum Search {
             self.timedOut = timedOut
         }
 
-        /// Whether anything kept this sweep from seeing the whole document.
         public var isIncomplete: Bool { skippedLongLines > 0 || timedOut }
     }
 
-    /// A pattern that could not be compiled — surfaced rather than treated
-    /// as "no matches", because a half-typed regex is the normal state of a
-    /// regex being typed and "no results" is the wrong thing to say about it.
+    /// Not "no matches": a half-typed regex is the normal state of typing one.
     public static func isValidRegex(_ pattern: String, caseSensitive: Bool) -> Bool {
         compileRegex(pattern, caseSensitive: caseSensitive) != nil
     }
 
-    /// Whether a pattern has the shape that makes a backtracking engine take
-    /// exponential time — an unbounded quantifier applied to a group that
-    /// itself repeats or alternates (`(a+)+`, `(a*)*`, `(a|a)+`).
-    ///
-    /// **Why a shape check and not a timeout.** Neither
-    /// `NSRegularExpression` nor Swift's `Regex` exposes ICU's own time
-    /// limit, so a single match attempt cannot be interrupted from outside:
-    /// once ICU is handed such a pattern, the thread runs until it finishes.
-    /// `regexTimeBudget` bounds the sweep *between* attempts and cannot
-    /// bound one, and a length cap cannot either — the measurements on
-    /// `regexLineLimit` show `(a+)+b` costing 8 seconds at 28 characters. The
-    /// only place to stop it is before it starts.
-    ///
-    /// **Conservative on purpose.** It rejects some patterns that would in
-    /// fact have been fine — `(\w+\s*)+` is refused along with `(a+)+` —
-    /// because the alternative is a search that never returns and a core
-    /// pinned for the life of the app. A refused pattern is reported as too
-    /// slow, distinctly from one that does not compile, so the user knows to
-    /// rewrite rather than to hunt for a typo. Every one of these has a
-    /// linear equivalent: `(\w+\s*)+` is `[\w\s]+`.
+    /// Unbounded repetition of a group that repeats or alternates (`(a+)+`,
+    /// `(a|a)+`). A shape check, because neither `NSRegularExpression` nor `Regex`
+    /// can interrupt one ICU match attempt. Conservative: `(\w+\s*)+` is refused
+    /// too — every such pattern has a linear form (`[\w\s]+`) — and a refusal is
+    /// reported as too slow, not as a typo.
     public static func isCatastrophic(_ pattern: String) -> Bool {
         let characters = Array(pattern)
         var index = 0
@@ -124,7 +71,6 @@ public enum Search {
                 continue
             }
             if character == "[" {
-                // A character class: `(`, `|` and `+` inside it are literal.
                 index += 1
                 while index < characters.count, characters[index] != "]" {
                     index += characters[index] == "\\" ? 2 : 1
@@ -138,8 +84,6 @@ public enum Search {
             }
             let body = Array(characters[(index + 1)..<close])
             guard let quantified = unboundedQuantifierEnd(characters, after: close) else {
-                // Not a repeated group — step into it, since a nested one may
-                // still be.
                 index += 1
                 continue
             }
@@ -149,8 +93,6 @@ public enum Search {
         return false
     }
 
-    /// The index of the `)` closing the group that opens at `start`, honouring
-    /// nesting, escapes and character classes.
     private static func groupEnd(_ characters: [Character], from start: Int) -> Int? {
         var depth = 0
         var index = start
@@ -178,8 +120,6 @@ public enum Search {
         return nil
     }
 
-    /// The index just past an unbounded quantifier (`*`, `+`, `{n,}`) sitting
-    /// immediately after `close`, or `nil` if there is none.
     private static func unboundedQuantifierEnd(_ characters: [Character], after close: Int)
         -> Int?
     {
@@ -204,8 +144,6 @@ public enum Search {
         return index
     }
 
-    /// Whether a repeated group's body can match the same text more than one
-    /// way — an unbounded quantifier inside it, or an alternation.
     private static func bodyCanBacktrack(_ body: [Character]) -> Bool {
         var index = 0
         while index < body.count {
@@ -243,18 +181,9 @@ public enum Search {
         return try? NSRegularExpression(pattern: pattern, options: options)
     }
 
-    /// Every match of a regular expression, oldest first.
-    ///
-    /// Same budget and same cancellation as the substring path — the cap is
-    /// the newest `maxMatches`, `shouldStop` is polled per line and per
-    /// match — plus the per-line length bound above, which is what makes the
-    /// cancellation *reachable* on a document that contains one enormous
-    /// line.
-    ///
-    /// Zero-length matches (`a*`, `^`) advance by one character rather than
-    /// looping: a pattern that matches nothing at every position is a
-    /// pattern a person typed on the way to a longer one, not a reason to
-    /// spin.
+    /// Oldest first, with the substring path's cap and cancellation; the line
+    /// bound is what makes cancellation reachable on one enormous line.
+    /// Zero-length matches advance one character instead of spinning.
     public static func findRegex(
         _ pattern: String, in grid: Grid, caseSensitive: Bool = false,
         maxMatches: Int = .max, timeBudget: Duration = regexTimeBudget,
@@ -269,9 +198,7 @@ public enum Search {
             let text = logicalLine.text
             guard !text.isEmpty else { continue }
             if shouldStop() { break }
-            // Checked here as well as inside the match callback: a pattern
-            // that is merely slow on every line never trips a per-match
-            // check, because a line with no match calls the block no times.
+            // Here too: a line with no match never calls the block.
             if ContinuousClock.now >= deadline {
                 result.timedOut = true
                 break
@@ -306,9 +233,6 @@ public enum Search {
                     stop.pointee = true
                 }
             }
-            // Within a line the matches came out oldest-first; the outer walk
-            // is newest-first, so each line's own order is reversed here and
-            // the whole list is reversed once at the end.
             result.matches.append(contentsOf: found.reversed())
             if result.matches.count >= maxMatches || shouldStop() { break lineLoop }
             if ContinuousClock.now >= deadline {
@@ -320,30 +244,17 @@ public enum Search {
         return result
     }
 
-    /// ASCII case folding, `A`–`Z` to lowercase and every other byte
-    /// unchanged. A table rather than `byte | 0x20`, which would also fold
-    /// `[` into `{` and `@` into `` ` ``.
-    ///
-    /// Folding bytes is only equivalent to Foundation's `.caseInsensitive`
-    /// because both sides are known ASCII: the pairs where they disagree
-    /// (`K` and the Kelvin sign, dotted and dotless `i`) are all outside it,
-    /// which is why the fast path refuses a non-ASCII query or line rather
-    /// than folding it itself.
+    /// A table, not `| 0x20` (which folds `[` into `{`). Equivalent to
+    /// `.caseInsensitive` only for ASCII — the Kelvin sign and Turkish `i` are
+    /// outside it, so the fast path refuses non-ASCII.
     private static let asciiFold: [UInt8] = (0...255).map { byte in
         (0x41...0x5A).contains(byte) ? UInt8(byte + 0x20) : UInt8(byte)
     }
 
-    /// The case-*sensitive* counterpart: every byte maps to itself.
-    ///
-    /// A second table rather than a `caseSensitive` test inside the scan.
-    /// The table is chosen once per sweep, so the innermost comparison is
-    /// one indexed load and no branch — and neither table is reached
-    /// through a global accessor per byte, the shape `CLAUDE.md` records
-    /// as a measured frame-CPU regression.
+    /// Chosen once per sweep, so the inner comparison has no branch and reads
+    /// no global per byte — the shape of a measured frame-CPU regression.
     private static let asciiIdentity: [UInt8] = (0...255).map { UInt8($0) }
 
-    /// `query` as folded ASCII bytes, or `nil` when it is not ASCII — in
-    /// which case every line takes the `String` path.
     private static func asciiNeedle(_ query: String, caseSensitive: Bool) -> [UInt8]? {
         var bytes: [UInt8] = []
         bytes.reserveCapacity(query.utf8.count)
@@ -354,11 +265,8 @@ public enum Search {
         return bytes.isEmpty ? nil : bytes
     }
 
-    /// The last occurrence of `needle` in `haystack[..<end]`, or `nil`.
-    ///
-    /// Right-to-left to match the `String` path, which searches `.backwards`
-    /// so that a capped sweep keeps the newest matches within a line as well
-    /// as across lines.
+    /// Right to left, like the `String` path, so a capped sweep keeps the
+    /// newest matches within a line too.
     private static func lastIndex(
         of needle: [UInt8], in haystack: ContiguousArray<UInt8>, before end: Int,
         fold: [UInt8]
@@ -378,16 +286,8 @@ public enum Search {
         }
     }
 
-    /// Every match of `query` in the document, oldest first. Empty for an
-    /// empty query rather than matching every position.
-    ///
-    /// `maxMatches` bounds the result (`.max` opts out); a capped result is
-    /// the *newest* `maxMatches` matches, so the caller can infer truncation
-    /// from `count == maxMatches`. `shouldStop` is the cooperative
-    /// cancellation point for background sweeps (A03): it is polled once per
-    /// non-empty line and once per match, so a superseded search stops
-    /// within one line's scan rather than running to completion. A stopped
-    /// or capped scan returns the matches found so far.
+    /// Oldest first; empty for an empty query. A capped result is the newest
+    /// `maxMatches`. `shouldStop` is polled per line and per match.
     public static func find(
         _ query: String, in grid: Grid, caseSensitive: Bool = false,
         maxMatches: Int = .max, shouldStop: () -> Bool = { false }
@@ -396,25 +296,14 @@ public enum Search {
         var results: [SelectionRange] = []
         let options: String.CompareOptions = caseSensitive ? [] : [.caseInsensitive]
 
-        // Collected newest first (see the file header): lines scan from the
-        // live screen backwards, and within a line the search runs
-        // right-to-left, so the collection order is exactly reversed
-        // document order and one `reverse` at the end restores the
-        // oldest-first contract. Greedy right-to-left matching finds the
-        // same *number* of matches as left-to-right (both are maximal
-        // non-overlapping packings); only for a self-overlapping query
-        // ("aa" in "aaa") does the choice of which occurrence is reported
-        // change.
-        // ASCII on both sides is the overwhelmingly common search and the
-        // one the `String` path is worst at: it builds a `String` and a
-        // per-character position table for every logical line, then hands
-        // the line to Foundation. Matching the cells directly needs neither
-        // (#115). A line the byte representation cannot hold — a grapheme
-        // cluster, a scalar outside ASCII — falls back to that path on its
-        // own, so the two are never asked to agree about a line only one of
-        // them can see.
+        // Collected newest first and reversed once. Right-to-left finds the same
+        // number of matches; only which occurrence of a self-overlapping query
+        // ("aa" in "aaa") is reported changes.
+        //
+        // ASCII on both sides — the common case — matches the cells directly, no
+        // `String` per line. A line only the `String` path can represent falls back
+        // on its own.
         let needle = asciiNeedle(query, caseSensitive: caseSensitive)
-        // Resolved once for the whole sweep, not once per byte compared.
         let fold = caseSensitive ? asciiIdentity : asciiFold
         var haystack = ContiguousArray<UInt8>()
         var haystackRows = ContiguousArray<Int32>()
@@ -452,8 +341,6 @@ public enum Search {
                 firstRow: span.firstRow, lastRow: span.lastRow)
             let text = logicalLine.text
             guard !text.isEmpty else { continue }
-            // Polled per scanned line (empty ones cost nothing) and per
-            // match — a cancelled sweep stops within one line's scan.
             if shouldStop() { break }
             var searchEnd = text.endIndex
             var searchEndOffset = text.count
@@ -463,10 +350,8 @@ public enum Search {
                     range: text.startIndex..<searchEnd)
             {
                 guard !found.isEmpty else { break }
-                // The character offsets advance with the matches — O(gap)
-                // each, O(line) in total. Measuring every match from
-                // `startIndex` rescans the line's prefix per match, which
-                // is quadratic on a match-dense long line.
+                // Advance offsets with the matches; measuring each from the start is
+                // quadratic on a match-dense line.
                 searchEndOffset -= text.distance(from: found.upperBound, to: searchEnd)
                 let endOffset = searchEndOffset - 1
                 let startOffset =
