@@ -18,7 +18,7 @@ final class CommandHistoryModel {
         }
     }
 
-    /// B13 — scope records by the machine they ran on. `CommandRecord.host`
+    /// Scope records by the machine they ran on. `CommandRecord.host`
     /// is set for a command begun while the pane referred to a remote host
     /// (`Performer+ShellIntegration.swift`), so "this host" and "local" are
     /// a real question the records can answer, not a guess from text.
@@ -48,8 +48,8 @@ final class CommandHistoryModel {
     var projectOnly = false
     var exitFilter: ExitFilter = .any
     var hostScope: HostScope = .any
-    /// B16 test pass — a history you cannot search by what was typed is a
-    /// list of timestamps. Case-insensitive substring over the recovered
+    /// A history you cannot search by what was typed is a list of
+    /// timestamps. Case-insensitive substring over the recovered
     /// command text; a record whose text is gone from the scrollback
     /// cannot match a non-empty query and is left out of the results.
     var query: String = ""

@@ -1,7 +1,7 @@
 import Cocoa
 import CortaTerminal
 
-/// Opening URLs (M4.6, M7.9). Detection and the scheme allowlist live in
+/// Opening URLs. Detection and the scheme allowlist live in
 /// the core (`LinkDetection.swift` — only `http`/`https`/`mailto` can ever
 /// match); this file is hit-testing, hover feedback and the `NSWorkspace`
 /// hand-off.
@@ -26,7 +26,7 @@ extension ViewController {
     func handleLinkClick(_ event: NSEvent, in terminalView: TerminalView) -> Bool {
         guard event.modifierFlags.contains(.command) else { return false }
         if let link = linkUnder(event, in: terminalView) { return open(link) }
-        // U17 — a `path:line` reference, but only one that resolves to a file
+        // A `path:line` reference, but only one that resolves to a file
         // on *this* machine. A URL wins where both could match: the other
         // detector already refuses to start inside one, so in practice they
         // do not overlap, and the order makes that explicit rather than
@@ -34,7 +34,7 @@ extension ViewController {
         if let reference = fileReferenceUnder(event, in: terminalView) {
             return open(reference)
         }
-        // B14 — in a remote pane the same shape names a file on the host the
+        // In a remote pane the same shape names a file on the host the
         // pane is talking to: open its managed local copy in the editor.
         if let remote = remoteFileReferenceUnder(event, in: terminalView) {
             return openRemote(remote)
@@ -77,7 +77,7 @@ extension ViewController {
     /// The cursor changes on transitions only. Setting it unconditionally
     /// on every mouse-moved fights `NSSplitView`'s resize cursor at a
     /// pane's divider edge — the two take turns within a single hover and
-    /// the pointer visibly flickers (M5).
+    /// the pointer visibly flickers.
     func handleLinkHover(_ event: NSEvent, in terminalView: TerminalView) {
         // In ⌘-click mode nothing is a link until ⌘ is down, so nothing is
         // underlined either — the underline has to mean "this will open".
@@ -92,7 +92,7 @@ extension ViewController {
         } else if armed, session != nil,
             let reference = fileReferenceUnder(event, in: terminalView)
         {
-            // U17 — the same "show the real target before it can be opened"
+            // The same "show the real target before it can be opened"
             // rule (`SECURITY.md` §2.4): the tooltip names the *resolved*
             // path, not the text under the pointer, so a relative path shows
             // where it actually leads. It also says when the line number will
@@ -110,7 +110,7 @@ extension ViewController {
         } else if armed, session != nil,
             let remote = remoteFileReferenceUnder(event, in: terminalView)
         {
-            // B14 — the remote case of the same rule: the tooltip names the
+            // The remote case of the same rule: the tooltip names the
             // real target (host and path) and says the editor opens a
             // managed local copy, before any click can open it.
             if !hoveringLink {

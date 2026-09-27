@@ -2,7 +2,7 @@ import AppKit
 import CortaTerminal
 import Foundation
 
-/// B14, remote editing — the orchestration: download-or-reuse a managed
+/// Remote editing — the orchestration: download-or-reuse a managed
 /// copy, open the editor on it, watch the copy, and require an explicit
 /// decision before anything goes back to the remote.
 ///

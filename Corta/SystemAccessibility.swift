@@ -7,8 +7,8 @@ import AppKit
 /// settings window animated its own resize, the search bar and the command
 /// palette were built on `NSVisualEffectView` with no opaque alternative, and
 /// state was signalled by colour alone. Answering them per call site meant
-/// every new animation and every new panel had to remember three questions,
-/// and the ones added after M6 did not. A single façade makes the answer a
+/// every new animation and every new panel would have to remember three
+/// questions, and some would not. A single façade makes the answer a
 /// one-line lookup, and `observe(_:)` makes a surface follow a change made
 /// while the app is running rather than only at launch.
 ///

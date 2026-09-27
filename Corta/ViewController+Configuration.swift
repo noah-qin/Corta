@@ -1,7 +1,7 @@
 import Cocoa
 import CortaTerminal
 
-/// M6.1, M6.2 and M6.13, pane side: following the config file while running.
+/// Following the config file while running.
 ///
 /// A pane pulls rather than being pushed to — it reads the store when it
 /// loads and re-reads it on a change — so a pane created at any point in the
@@ -43,7 +43,7 @@ extension ViewController {
                 width: metrics.cellWidth, height: metrics.cellHeight)
             resizeSessionToFitView()
         }
-        // B09 — a zoomed window rides out a config change rather than being
+        // A zoomed window rides out a config change rather than being
         // silently snapped back to the default; `resetFontSize` is the
         // explicit way out of a zoom, not a side effect of picking a theme.
         if !isFontSizeZoomed {
@@ -55,7 +55,7 @@ extension ViewController {
     @objc func appearanceChanged() {
         // The OSC 10/11/12 answer has to track the switch too — a program
         // that queried the background before this point chose its palette
-        // for the variant that was live then, and a live theme swap (M6.13)
+        // for the variant that was live then, and a live theme swap
         // means the screen underneath it just changed colour.
         session?.dynamicColors =
             AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)

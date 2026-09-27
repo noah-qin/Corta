@@ -2,7 +2,7 @@ import AppKit
 import CortaTerminal
 import SwiftUI
 
-/// B14 — hosts `SFTPBrowserView` in a floating window, one per host, the
+/// Hosts `SFTPBrowserView` in a floating window, one per host, the
 /// `CommandHistoryController` pattern with a registry instead of a single
 /// shared window: a shared window re-targeted at another pane would either
 /// abandon live transfers or lie about which host they belong to, so each
@@ -51,7 +51,7 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
             unconnected[ObjectIdentifier(controller)] = controller
             controller.present()
         case .remoteUnknown:
-            // The host is genuinely not known, and the B13 rule stands:
+            // The host is genuinely not known, and the rule stands:
             // never the launcher's argv (aliases and `~/.ssh/config` names
             // read back wrong), never the screen. The window asks.
             let controller = SFTPBrowserController(host: nil, startDirectory: nil)
@@ -89,7 +89,7 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
         model.pickDownloadDestination = { [weak self] entries in
             await self?.pickDownloadDestination(for: entries)
         }
-        // B14 remote editing — the Edit row action, run through the shared
+        // Remote editing — the Edit row action, run through the shared
         // coordinator so browser- and pane-initiated edits of the same
         // remote file land on the same managed copy.
         model.onEditFile = { [weak model] entry in

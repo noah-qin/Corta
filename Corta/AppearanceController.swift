@@ -1,6 +1,6 @@
 import AppKit
 
-/// M6.2 and M6.13 — resolves the configured theme and appearance into the
+/// Resolves the configured theme and appearance into the
 /// one live colour variant, and keeps it live.
 ///
 /// Two inputs decide the answer: which theme the config names, and whether
@@ -40,7 +40,7 @@ final class AppearanceController: NSObject {
         apply()
     }
 
-    /// The live theme: a built-in, or one the config file defines (M7.6).
+    /// The live theme: a built-in, or one the config file defines.
     /// An unknown name falls back to the default rather than failing — the
     /// file is hand-edited, and a typo must not black out the terminal.
     var theme: Theme {

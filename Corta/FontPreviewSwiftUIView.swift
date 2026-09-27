@@ -3,7 +3,7 @@ import CoreText
 import CortaTerminal
 import SwiftUI
 
-/// B09 — a read-only preview of the *currently resolved* theme and font in
+/// A read-only preview of the *currently resolved* theme and font in
 /// the Appearance tab's own colours and glyphs, not the swatch of a picker.
 /// Nothing here can be clicked or chosen; `docs/DECISIONS.md` D11's "Corta offers
 /// one theme and one font; it resolves several" is untouched — this shows

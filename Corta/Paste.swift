@@ -41,7 +41,7 @@ nonisolated enum Paste {
         return bracketStart + payload + bracketEnd
     }
 
-    /// B03: how large a piece of an already-wrapped paste one
+    /// How large a piece of an already-wrapped paste one
     /// `TerminalSession.write` call carries. Splitting the write, not the
     /// bytes sent — the child sees the identical, unbroken byte stream
     /// either way, since separate writes to the same pty concatenate on the

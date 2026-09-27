@@ -1,6 +1,6 @@
 import Foundation
 
-/// U16 — a named way to open a terminal: a shell, a directory, and a few
+/// A named way to open a terminal: a shell, a directory, and a few
 /// environment variables.
 ///
 /// **The problem.** Corta opens one kind of terminal: `$SHELL`, in the
@@ -20,7 +20,7 @@ import Foundation
 /// Corta by design (`DESIGN.md` §6), and a preset that changed them would be
 /// a second settings store fighting the first.
 ///
-/// **The ssh preset is a first-class case** (B13). `shell = /usr/bin/ssh`
+/// **The ssh preset is a first-class case**. `shell = /usr/bin/ssh`
 /// with `arguments = user@host` — the *system* OpenSSH, deliberately, so the
 /// user's agent, `~/.ssh/config`, `ControlMaster` settings and known-hosts
 /// all apply untouched — opens a pane whose child is the connection itself.

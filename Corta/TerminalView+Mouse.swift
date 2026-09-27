@@ -4,14 +4,14 @@ import CortaTerminal
 /// Routes a gesture to the subscribed TUI or to local text selection.
 extension TerminalView {
     override func mouseDown(with event: NSEvent) {
-        // M5.2: a click focuses its pane — keyboard input follows focus, and
+        // A click focuses its pane — keyboard input follows focus, and
         // focus is the only routing rule a split window has. Not while the
         // pane's search bar owns the keyboard, though: clicking a match with
         // the bar open must not strand the bar.
         if paneController?.search.bar == nil {
             window?.makeFirstResponder(self)
         }
-        // ⌘-click opens a link (M4.6) before anything else sees the click —
+        // ⌘-click opens a link before anything else sees the click —
         // it is neither an SGR report nor the start of a selection.
         if event.modifierFlags.contains(.command),
             let controller = paneController,
@@ -140,7 +140,7 @@ extension TerminalView {
         return modifiers
     }
 
-    // MARK: - ⌘-hover link feedback (M4.6)
+    // MARK: - ⌘-hover link feedback
 
     override func mouseMoved(with event: NSEvent) {
         reportMotion(event, button: nil)

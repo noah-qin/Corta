@@ -1,10 +1,10 @@
 import AppKit
 import UserNotifications
 
-/// M6.3 — a notification when a long-running command finishes.
+/// A notification when a long-running command finishes.
 ///
 /// The honest version of this needs shell integration, and now has it: OSC
-/// 133 marks where a command starts and ends (M7.2), so when the user's
+/// 133 marks where a command starts and ends, so when the user's
 /// shell emits those marks this notifier uses the real boundaries — a
 /// command that prints nothing for a minute is still running, and the
 /// notification fires when it actually finishes, with its exit status.
@@ -44,7 +44,7 @@ final class TaskNotifier {
     /// The exit status of the command that just finished, for the body text.
     private var lastExitStatus: Int?
     /// The id of the command that just finished, so clicking the
-    /// notification can jump to it (B07) — `nil` on the heuristic path,
+    /// notification can jump to it — `nil` on the heuristic path,
     /// which has no `CommandRecord` to name.
     private var lastCommandID: Int?
     /// The window to check for key status when the task ends, and the pane's
@@ -116,8 +116,8 @@ final class TaskNotifier {
     /// this is called even once, the heuristic below stops running.
     ///
     /// - Parameter commandID: the `CommandRecord.id` that just finished, so
-    ///   a click on the resulting notification can jump straight back to it
-    ///   (B07). `nil` on a start edge, where there is nothing finished yet.
+    ///   a click on the resulting notification can jump straight back to it.
+    /// `nil` on a start edge, where there is nothing finished yet.
     func noteCommandRunning(
         _ running: Bool, exitStatus: Int?, commandID: Int?, in window: NSWindow?
     ) {
@@ -213,7 +213,7 @@ final class TaskNotifier {
         lastExitStatus = nil
         content.body = L10n.format("notification.body", outcome, Self.duration(elapsed))
         content.sound = nil
-        // B07 — carries just enough to find the pane and the command again:
+        // Carries just enough to find the pane and the command again:
         // a window number and a `CommandRecord.id`, both meaningless outside
         // this running app and neither of them the command's own text.
         var userInfo: [String: Any] = [:]
@@ -248,9 +248,8 @@ final class TaskNotifier {
         Self.didRequestAuthorization = true
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert]) {
             granted, _ in
-            // Both results used to be discarded, which is how the setting
-            // ended up able to say "on" about a feature the system had
-            // switched off.
+            // Both results are kept: discarding them lets the setting say
+            // "on" about a feature the system has switched off.
             Task { @MainActor in
                 let state: Permission = granted ? .granted : .denied
                 guard Self.permission != state else { return }

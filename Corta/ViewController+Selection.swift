@@ -1,7 +1,7 @@
 import Cocoa
 import CortaTerminal
 
-/// Selection and the viewport it is anchored to (Track C): scrolling, and
+/// Selection and the viewport it is anchored to: scrolling, and
 /// the mouse-mode query the view's mouse handlers consult.
 extension ViewController {
     /// Tracking and SGR encoding must both be enabled before reporting.
@@ -10,7 +10,7 @@ extension ViewController {
     }
 
     /// Typing or pasting while scrolled away from the bottom returns the
-    /// viewport there (B04) — the input is about to affect the child's live
+    /// viewport there — the input is about to affect the child's live
     /// screen, which is not the screen currently showing. This is
     /// deliberately not wired into ordinary output arriving while scrolled:
     /// that case is the opposite one, where the fix is *not* to move the
@@ -44,17 +44,17 @@ extension ViewController {
     }
 }
 
-/// Mouse selection (M3.7) and copy (M3.8). The rules — what a word is, how a
+/// Mouse selection and copy. The rules — what a word is, how a
 /// soft-wrapped line copies — live in the core (`Selection.swift`); this
 /// file is the AppKit side: events in, pasteboard out.
 extension ViewController {
-    // MARK: - Copy (M3.8)
+    // MARK: - Copy
 
     /// ⌘C and the Edit menu's Copy land here through the responder chain
     /// (`TerminalView` does not implement `copy:`). Copies the selection;
     /// with none there is nothing to do — ⌘C never reaches the PTY.
     ///
-    /// B05: `Selection.text` is O(the selection), which for ⌘A over a large
+    /// `Selection.text` is O(the selection), which for ⌘A over a large
     /// scrollback is the whole document — the same cost class
     /// `exportText(_:)` moved off the interaction path, so copy does too,
     /// sharing its `largeTextTask` handle (cancels a copy superseded by a
@@ -116,8 +116,7 @@ extension ViewController {
                 // something to write: an empty selection is a no-op above,
                 // and a toast for a copy that did not happen is worse than
                 // no toast. This is what makes copy-on-select safe to have
-                // on by default (M7.10) — the clipboard no longer changes
-                // silently.
+                // on by default — the clipboard never changes silently.
                 self.terminalView?.showToast(L10n.text("toast.copied"))
             }
         }
@@ -134,7 +133,7 @@ extension ViewController {
         invalidateDisplay()
     }
 
-    // MARK: - Mouse selection (M3.7)
+    // MARK: - Mouse selection
 
     /// Local selection owns the whole gesture once chosen at mouse-down,
     /// even if the override modifier is released during the drag.
@@ -169,7 +168,7 @@ extension ViewController {
             applySelection(anchor: anchor, head: anchor, unit: unit, grid: grid)
         }
 
-        // Edge auto-scroll (U19) rides on periodic events rather than a
+        // Edge auto-scroll rides on periodic events rather than a
         // Timer because nextEvent(matching:)'s modal wait does not run the
         // main run loop — a Timer scheduled there would never fire for the
         // whole drag. Periodic events arrive in the same event stream, so
@@ -177,7 +176,7 @@ extension ViewController {
         NSEvent.startPeriodicEvents(afterDelay: 0.2, withPeriod: 1.0 / 30.0)
         defer { NSEvent.stopPeriodicEvents() }
         while true {
-            // B04: the pane can close mid-drag (its own close button, the
+            // The pane can close mid-drag (its own close button, the
             // window closing, the tab closing) — `teardown()` removes
             // `terminalView` from the view hierarchy but this loop's local
             // `window` reference stays alive and would otherwise keep
@@ -189,7 +188,7 @@ extension ViewController {
             // anymore. Bail out rather than keep touching a torn-down (or
             // reparented) pane's `session`/`terminalRenderer`.
             guard terminalView.window === window else { return }
-            // B04: the window can lose key status mid-drag — Cmd-Tab to
+            // The window can lose key status mid-drag — Cmd-Tab to
             // another app, a global shortcut opening a new window, Mission
             // Control — without the pane closing or the drag's mouse-up
             // ever arriving. `nextEvent(matching:)` would otherwise keep
@@ -220,15 +219,15 @@ extension ViewController {
                 // click that never moved, which stays cleared.
                 if head != anchor || unit != .character || extending {
                     applySelection(anchor: anchor, head: head, unit: unit, grid: grid)
-                    // M7.10: a finished selection goes to the pasteboard when
+                    // A finished selection goes to the pasteboard when
                     // the user asked for that. On mouse-*up* only — copying
                     // on every intermediate drag position would rewrite the
                     // clipboard dozens of times per gesture.
                     if ConfigurationStore.shared.configuration.copyOnSelect { copy(nil) }
                 } else {
                     // A click that never moved, with no modifier: in
-                    // `link-activation = click` this is how a link opens
-                    // (M7.9). Deferred to mouse-up precisely so that
+                    // `link-activation = click` this is how a link opens.
+                    // Deferred to mouse-up precisely so that
                     // dragging across a URL still selects it.
                     openLinkOnPlainClick(next, in: terminalView)
                 }
@@ -240,7 +239,7 @@ extension ViewController {
         }
     }
 
-    /// One auto-scroll tick during a selection drag (U19): while the pointer
+    /// One auto-scroll tick during a selection drag: while the pointer
     /// is parked past the grid's top or bottom edge, scroll the viewport by
     /// the graded amount the overshoot calls for and re-extend the head to
     /// the pointer's (edge-clamped) document position under the new offset.
@@ -285,7 +284,7 @@ extension ViewController {
     ///
     /// `totalPushed`, not `scrollback.count`: the count saturates at the
     /// ring's limit, and a selection anchored on it drifted off its text as
-    /// soon as a full scrollback started evicting (M6.10).
+    /// soon as a full scrollback started evicting.
     func selectionRange(for selection: TerminalSelection, in grid: Grid) -> SelectionRange {
         let range = SelectionRange(
             start: SelectionPoint(row: selection.start.row, column: selection.start.column),
@@ -326,7 +325,7 @@ extension ViewController {
             column: min(max(0, column), grid.columns - 1))
     }
 
-    /// One tick of drag auto-scroll (U19), pure for tests: nil while the
+    /// One tick of drag auto-scroll, pure for tests: nil while the
     /// pointer is inside the grid's vertical extent; otherwise the clamped
     /// new scroll offset and the head position under it. Returns nil too
     /// when the offset cannot move further — the scrollback's top and

@@ -1,7 +1,7 @@
 import AppKit
 import Carbon.HIToolbox
 
-/// B16 — Secure Keyboard Entry, the switch Terminal.app and iTerm2 both
+/// Secure Keyboard Entry, the switch Terminal.app and iTerm2 both
 /// carry under the same name.
 ///
 /// While it is engaged the window server stops delivering keystrokes to

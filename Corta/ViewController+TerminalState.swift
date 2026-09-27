@@ -1,7 +1,7 @@
 import AppKit
 import CortaTerminal
 
-/// U11 — Clear Screen, Clear History and Reset Terminal.
+/// Clear Screen, Clear History and Reset Terminal.
 ///
 /// **Why three commands and not one.** Every terminal has *something* called
 /// "clear", and no two agree on what it throws away: a shell's `clear` erases
