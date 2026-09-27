@@ -65,7 +65,7 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 | `restore-windows` | boolean | `true` | Reopen the last run's windows, splits, divider proportions and each pane's working directory. |
 | `confirm-close` | boolean | `true` | Ask before closing a pane, window or the app while a shell still has a foreground job. |
 
-#### Quick Terminal (B16)
+#### Quick Terminal
 
 One terminal window summoned and dismissed from any application. It is an
 ordinary Corta window dressed as a panel — the same panes, splits and
@@ -97,7 +97,7 @@ into another application hides it without moving focus again.
 | `mouse-override-modifier` | `option`, `shift`, `control` | `option` | Hold this modifier when beginning a drag to select terminal text while a TUI owns the mouse. Applies immediately. The pane shows a hint on first use; `copy-on-select` controls automatic copying. |
 | `link-activation` | `command`, `click` | `command` | `command` opens a link on ⌘-click. `click` opens it on a plain click and underlines the link under the pointer; dragging across a URL still selects it. |
 | `allow-clipboard-write` | boolean | `false` | Whether OSC 52 may put text on the system clipboard — the only route from inside `tmux` or an `ssh` session. Off by default because *any* output could use it. The **read** direction does not exist under any setting (`SECURITY.md` §6). |
-| `secure-keyboard-entry` | boolean | `false` | Secure Keyboard Entry (B16): while a Corta terminal window is key and Corta is the active application, the system stops delivering keystrokes to any other process — event taps, keyloggers, macro tools and accessibility clients alike. Shell ▸ Secure Keyboard Entry toggles this key and shows a checkmark; a lock in the titlebar shows when it is *actually engaged*, which is not while another app is frontmost or Settings is key. Off by default because it is system-wide and also silences the tools a person may rely on (`SECURITY.md` §4.5). The Quick Terminal's hotkey keeps working while it is on. |
+| `secure-keyboard-entry` | boolean | `false` | Secure Keyboard Entry: while a Corta terminal window is key and Corta is the active application, the system stops delivering keystrokes to any other process — event taps, keyloggers, macro tools and accessibility clients alike. Shell ▸ Secure Keyboard Entry toggles this key and shows a checkmark; a lock in the titlebar shows when it is *actually engaged*, which is not while another app is frontmost or Settings is key. Off by default because it is system-wide and also silences the tools a person may rely on (`SECURITY.md` §4.5). The Quick Terminal's hotkey keeps working while it is on. |
 
 #### Shell integration (B07)
 

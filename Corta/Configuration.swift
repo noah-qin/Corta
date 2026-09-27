@@ -625,7 +625,7 @@ nonisolated struct Configuration: Equatable, Sendable {
             "suggest-applications-folder = \(suggestApplicationsFolder)",
             "secure-keyboard-entry = \(secureKeyboardEntry)",
             "",
-            "# Quick Terminal (B16): a panel summoned by a system-wide hotkey.",
+            "# Quick Terminal: a panel summoned by a system-wide hotkey.",
             "quick-terminal = \(quickTerminal)",
             "quick-terminal-key = \(quickTerminalKey?.text ?? "")",
             "quick-terminal-position = \(quickTerminalPosition.rawValue)",
@@ -637,7 +637,7 @@ nonisolated struct Configuration: Equatable, Sendable {
         ]
         if !presets.isEmpty {
             lines.append("")
-            lines.append("# Presets (U16): a shell, a directory and a few variables.")
+            lines.append("# Presets: a shell, a directory and a few variables.")
             for preset in presets { lines.append(contentsOf: preset.serializedLines) }
         }
         if !customThemes.isEmpty {
