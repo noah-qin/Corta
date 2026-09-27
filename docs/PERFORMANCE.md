@@ -165,7 +165,7 @@ ordinary per-row check, unoptimised but correct.
 
 **Considered and not done:** shifting the CPU-side cache is the win here,
 not shrinking what gets copied into the GPU instance buffer afterward.
-`QuadRenderer`'s ring buffers already copy the whole array in one
+`Metal4Backend`'s ring buffers already copy the whole array in one
 `memcpy` per draw (steady-state zero allocation, `PERFORMANCE.md` §3),
 and true byte-range partial updates into a *triple-buffered* ring would
 need each of the three slots to independently track which generation of
@@ -669,3 +669,27 @@ or link cost ~8% (0.128 → 0.139 ms), so it stays — spelled as an
 `OptionSet` test rather than a mask. After the cleanup the Release figure
 is **0.58 ms** avg (0.50 / 0.62 / 0.63; full rebuild p50 0.128–0.135 ms),
 which is inside the bridge's spread.
+
+**Metal 4 as the only backend (#109, 2026-09-27).** Same machine,
+toolchain and power as the bridge, three runs each side; before is
+`main` with the classic path as the default, after is the branch:
+
+| | Before (classic path) | After (Metal 4 only) |
+| --- | --- | --- |
+| Frame CPU avg | 0.68 ms (0.677 / 0.653 / 0.692) | **0.55 ms** (0.586 / 0.535 / 0.526) |
+| Frame CPU p95 | 2.65–2.98 ms | **0.70–0.86 ms** |
+| Typing (1 row) p50, CPU only | 0.035 ms | 0.018 ms |
+| Scroll (shift + 1 row) p50, CPU only | 0.012 ms | 0.016 ms |
+| Full rebuild p50, CPU only | 0.123–0.129 ms | 0.140–0.151 ms |
+| Backend construction, warm | 0.000 ms (`QuadRenderer`) | 0.057 ms p50 (`Metal4Backend`) |
+
+The averaged figure and its tail both fall: a frame is now one render
+pass, where the classic path ran up to three, each a tile load and store
+of its own. The CPU-only rows are not like for like and are recorded as
+such: `render` now commits inside its window (the backend owns the
+command buffer), and the upload benchmark waits for each frame's GPU
+completion outside it, because a frame slot is released only when its
+previous frame completes. A warm backend costs 0.06 ms per pane where
+`QuadRenderer` cost nothing: each pane's backend owns its own queue,
+command buffers, allocators and residency set.
+

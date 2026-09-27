@@ -140,10 +140,11 @@ jobs:
           sudo xcode-select -s "$pinned"
           xcodebuild -version
 
-      # Metal 4 is the render backend 1.1.0 makes the only one (#109), and
-      # it needs `MTLGPUFamily.metal4`. This runner is a virtual machine on
-      # Apple silicon, and its paravirtualised GPU reports only `apple5` —
-      # so every Metal 4 suite is skipped here. Printed before the build, so
+      # Metal 4 is the only renderer (#109), and it needs
+      # `MTLGPUFamily.metal4`. This runner is a virtual machine on Apple
+      # silicon, and its paravirtualised GPU reports only `apple5` — so no
+      # pane can render here, and every suite that renders or needs a working
+      # pane is skipped (docs/TESTING.md). Printed before the build, so
       # the value is in the log even when the tests fail.
       - name: Report the runner's Metal capability
         run: swift scripts/metal-capability.swift
@@ -189,7 +190,7 @@ jobs:
             -quiet
 
       # `-quiet` hides every per-test line, so a green run says nothing about
-      # what it skipped. On this runner the five Metal 4 tests skip — the
+      # what it skipped. On this runner every rendering suite skips — the
       # capability step above says why — and they used to do so invisibly.
       # Printing the counts is what keeps "passed" and "never ran" apart in
       # a log nobody downloads the result bundle for.

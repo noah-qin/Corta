@@ -32,7 +32,9 @@ import UniformTypeIdentifiers
 /// replaced the two-backend pixel equivalence: Metal 4 must draw what 1.0.1
 /// drew. `TEST_RUNNER_CORTA_RECORD_RENDER_REFERENCES=1` rewrites them; only
 /// for an intended visual change, with every new PNG inspected.
-@Suite(.serialized, .metalSerialized)
+@Suite(
+    .serialized, .metalSerialized,
+    .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct RenderReferenceTests {
     // MARK: - The scenes
 
@@ -214,52 +216,26 @@ struct RenderReferenceTests {
             sourceLocation: sourceLocation)
     }
 
-    // MARK: - Rendering (classic path, used to record)
-
-    static func synchronize(_ texture: MTLTexture, queue: MTLCommandQueue) {
-        guard texture.storageMode == .managed, let buffer = queue.makeCommandBuffer(),
-            let blit = buffer.makeBlitCommandEncoder()
-        else { return }
-        blit.synchronize(resource: texture)
-        blit.endEncoding()
-        buffer.commit()
-        buffer.waitUntilCompleted()
-    }
+    // MARK: - Rendering
 
     static func renderQuads(device: MTLDevice, empty: Bool) throws -> MTLTexture {
-        let queue = try #require(device.makeCommandQueue())
-        let renderer = try QuadRenderer(device: device)
+        let backend = try Metal4Backend(device: device)
         let coverage = try #require(makeCoverageTexture(device: device))
         let color = try #require(makeColorTexture(device: device))
         let target = MetalRenderTarget.make(device: device, width: width, height: height)
-        let pass = MTLRenderPassDescriptor()
-        pass.colorAttachments[0].texture = target
-        pass.colorAttachments[0].loadAction = .clear
-        pass.colorAttachments[0].clearColor = clearColor
-        pass.colorAttachments[0].storeAction = .store
-        let commandBuffer = try #require(queue.makeCommandBuffer())
-        renderer.drawSolidQuads(
-            empty ? [] : solidInstances, rect: rect, drawableSize: drawableSize,
-            renderPassDescriptor: pass, commandBuffer: commandBuffer)
-        if !empty {
-            pass.colorAttachments[0].loadAction = .load
-            renderer.drawGlyphQuads(
-                glyphInstances, atlas: coverage, rect: rect, drawableSize: drawableSize,
-                renderPassDescriptor: pass, commandBuffer: commandBuffer)
-            renderer.drawColorQuads(
-                colorInstances, atlas: color, rect: rect, drawableSize: drawableSize,
-                renderPassDescriptor: pass, commandBuffer: commandBuffer)
+        let completed = backend.renderFrameAndWait(into: target, clearColor: clearColor) { backend in
+            guard !empty else { return }
+            backend.drawSolidQuads(solidInstances, rect: rect, drawableSize: drawableSize)
+            backend.drawGlyphQuads(glyphInstances, atlas: coverage, rect: rect, drawableSize: drawableSize)
+            backend.drawColorQuads(colorInstances, atlas: color, rect: rect, drawableSize: drawableSize)
         }
-        commandBuffer.commit()
-        commandBuffer.waitUntilCompleted()
-        synchronize(target, queue: queue)
+        #expect(completed, "the frame never completed")
         return target
     }
 
     /// Renders the overlay scene with `cursorStyle` (a DECSCUSR parameter),
     /// in the dark theme, after the Kitty image has decoded.
     static func renderOverlays(device: MTLDevice, cursorStyle: Int) throws -> MTLTexture {
-        let queue = try #require(device.makeCommandQueue())
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
         let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
         var terminal = overlayTerminal()
@@ -276,27 +252,17 @@ struct RenderReferenceTests {
         TerminalColorPalette.apply(Theme.corta.dark)
         defer { TerminalColorPalette.apply(previous) }
 
-        func frame() throws {
-            let pass = MTLRenderPassDescriptor()
-            pass.colorAttachments[0].texture = target
-            pass.colorAttachments[0].loadAction = .clear
-            pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1)
-            pass.colorAttachments[0].storeAction = .store
-            let commandBuffer = try #require(queue.makeCommandBuffer())
-            renderer.render(
+        func frame() {
+            renderer.renderAndWait(
                 grid: grid, rect: CGRect(origin: .zero, size: size), drawableSize: size,
                 cursorVisible: true, selection: overlaySelection,
                 searchMatches: overlaySearchMatches, currentSearchMatchIndex: 0,
-                hoveredLink: overlayHoveredLink,
-                renderPassDescriptor: pass, commandBuffer: commandBuffer)
-            commandBuffer.commit()
-            commandBuffer.waitUntilCompleted()
+                hoveredLink: overlayHoveredLink, target: target)
         }
-        try frame()
-        #expect(decoded.wait(timeout: .now() + 10) == .success, "the Kitty image never decoded")
+        frame()
+        #expect(decoded.wait(timeout: .now() + frameCompletionTimeout) == .success, "the Kitty image never decoded")
         renderer.invalidate()
-        try frame()
-        synchronize(target, queue: queue)
+        frame()
         return target
     }
 

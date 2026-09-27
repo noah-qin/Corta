@@ -19,7 +19,7 @@ import Foundation
 
 /// Which `ssh` an SFTP connection spawns: the system client, unless
 /// `CORTA_SFTP_SSH` names an absolute path to run instead with the same
-/// argv — a verification hook (like `CORTA_METAL4`) for driving the real
+/// argv — a verification hook (like `CORTA_MAX_DRAWABLES`) for driving the real
 /// flow against a local `sftp-server` without a network or sshd. Read once
 /// from the environment; relative values are ignored (no `PATH` search,
 /// `SFTPChannel.swift`).

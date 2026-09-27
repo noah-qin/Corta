@@ -27,7 +27,7 @@ import Testing
 /// steady.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
-@Suite(.serialized, .metalSerialized) struct CursorStyleRenderTests {
+@Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct CursorStyleRenderTests {
     private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (
         r: UInt8, g: UInt8, b: UInt8, a: UInt8
     ) {
@@ -36,14 +36,6 @@ import Testing
         return (r: bytes[2], g: bytes[1], b: bytes[0], a: bytes[3])
     }
 
-    private static func synchronize(_ texture: MTLTexture, queue: MTLCommandQueue) {
-        guard let buffer = queue.makeCommandBuffer(), let blit = buffer.makeBlitCommandEncoder()
-        else { return }
-        blit.synchronize(resource: texture)
-        blit.endEncoding()
-        buffer.commit()
-        buffer.waitUntilCompleted()
-    }
 
     /// Renders a 4x10 grid containing "abc" (cursor on row 0, column 3) with
     /// the given DECSCUSR parameter applied, and returns the texture. The
@@ -51,12 +43,12 @@ import Testing
     /// whatever the test host's appearance resolved, so it is pinned here
     /// for the render and put back afterwards.
     private static func renderWithCursorStyle(
-        _ decscusr: String?, queue: MTLCommandQueue, variant: Theme.Variant = Theme.corta.dark
+        _ decscusr: String?, variant: Theme.Variant = Theme.corta.dark
     ) throws -> (texture: MTLTexture, renderer: TerminalRenderer) {
         let live = TerminalColorPalette.activeVariant
         TerminalColorPalette.apply(variant)
         defer { TerminalColorPalette.apply(live) }
-        let device = queue.device
+        let device = try #require(MTLCreateSystemDefaultDevice())
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
         let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
 
@@ -72,20 +64,10 @@ import Testing
         let texture = MetalRenderTarget.make(
             device: device, width: width, height: height)
 
-        let pass = MTLRenderPassDescriptor()
-        pass.colorAttachments[0].texture = texture
-        pass.colorAttachments[0].loadAction = .clear
-        pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1)
-        pass.colorAttachments[0].storeAction = .store
-
-        let commandBuffer = queue.makeCommandBuffer()!
-        renderer.render(
+        renderer.renderAndWait(
             grid: grid, rect: CGRect(x: 0, y: 0, width: width, height: height),
             drawableSize: CGSize(width: width, height: height), cursorVisible: true, selection: nil,
-            renderPassDescriptor: pass, commandBuffer: commandBuffer)
-        commandBuffer.commit()
-        commandBuffer.waitUntilCompleted()
-        synchronize(texture, queue: queue)
+            target: texture)
         return (texture, renderer)
     }
 
@@ -94,8 +76,7 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let queue = device.makeCommandQueue()!
-        let (texture, renderer) = try Self.renderWithCursorStyle("4", queue: queue)
+        let (texture, renderer) = try Self.renderWithCursorStyle("4")
         let cellW = Int(renderer.metrics.cellWidth)
         let cellH = Int(renderer.metrics.cellHeight)
         let cellX = 3 * cellW  // cursor column
@@ -112,8 +93,7 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let queue = device.makeCommandQueue()!
-        let (texture, renderer) = try Self.renderWithCursorStyle("6", queue: queue)
+        let (texture, renderer) = try Self.renderWithCursorStyle("6")
         let cellW = Int(renderer.metrics.cellWidth)
         let cellH = Int(renderer.metrics.cellHeight)
         let cellX = 3 * cellW
@@ -129,8 +109,7 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let queue = device.makeCommandQueue()!
-        let (texture, renderer) = try Self.renderWithCursorStyle("2", queue: queue)
+        let (texture, renderer) = try Self.renderWithCursorStyle("2")
         let cellW = Int(renderer.metrics.cellWidth)
         let cellH = Int(renderer.metrics.cellHeight)
         let cellX = 3 * cellW
@@ -149,7 +128,6 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let queue = device.makeCommandQueue()!
         var themed = Theme.corta.dark
         themed.cursor = SIMD4<Float>(0, 0, 1, 1)  // pure blue: unmistakable
 
@@ -157,7 +135,7 @@ import Testing
             ("2", "block"), ("4", "underline"), ("6", "bar"),
         ] {
             let (texture, renderer) = try Self.renderWithCursorStyle(
-                decscusr, queue: queue, variant: themed)
+                decscusr, variant: themed)
             let cellW = Int(renderer.metrics.cellWidth)
             let cellH = Int(renderer.metrics.cellHeight)
             let cellX = 3 * cellW

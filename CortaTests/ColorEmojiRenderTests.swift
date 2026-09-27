@@ -29,43 +29,24 @@ import Testing
 /// into the atlas's RGBA texture and draw through the color pipeline.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
-@Suite(.serialized, .metalSerialized) struct ColorEmojiRenderTests {
+@Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct ColorEmojiRenderTests {
     private static func makeDevice() -> MTLDevice? { MTLCreateSystemDefaultDevice() }
 
-    private static func synchronize(_ texture: MTLTexture, queue: MTLCommandQueue) {
-        guard texture.storageMode == .managed, let buffer = queue.makeCommandBuffer(),
-            let blit = buffer.makeBlitCommandEncoder()
-        else { return }
-        blit.synchronize(resource: texture)
-        blit.endEncoding()
-        buffer.commit()
-        buffer.waitUntilCompleted()
-    }
 
     /// Renders `grid` onto a fresh black texture sized exactly to the grid
     /// (same harness as `WideGlyphRenderTests`).
     private static func render(
-        _ grid: Grid, renderer: TerminalRenderer, queue: MTLCommandQueue, device: MTLDevice
+        _ grid: Grid, renderer: TerminalRenderer, device: MTLDevice
     ) -> MTLTexture {
         let width = Int(renderer.metrics.cellWidth) * grid.columns
         let height = Int(renderer.metrics.cellHeight) * grid.rows
         let texture = MetalRenderTarget.make(
             device: device, width: width, height: height)
 
-        let pass = MTLRenderPassDescriptor()
-        pass.colorAttachments[0].texture = texture
-        pass.colorAttachments[0].loadAction = .clear
-        pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1)
-        pass.colorAttachments[0].storeAction = .store
-
-        let commandBuffer = queue.makeCommandBuffer()!
-        renderer.render(
+        renderer.renderAndWait(
             grid: grid, rect: CGRect(x: 0, y: 0, width: width, height: height),
             drawableSize: CGSize(width: width, height: height), cursorVisible: false,
-            selection: nil, renderPassDescriptor: pass, commandBuffer: commandBuffer)
-        commandBuffer.commit()
-        commandBuffer.waitUntilCompleted()
-        Self.synchronize(texture, queue: queue)
+            selection: nil, target: texture)
         return texture
     }
 
@@ -141,7 +122,6 @@ import Testing
         let originX = Int(info.uvRect.x * Float(atlas.atlasPixelSize))
         let originY = Int(info.uvRect.y * Float(atlas.atlasPixelSize))
         let region = MTLRegionMake2D(originX, originY, Int(info.size.x), Int(info.size.y))
-        Self.synchronize(atlas.colorTexture, queue: device.makeCommandQueue()!)
         let result = Self.inkAndColor(in: atlas.colorTexture, region: region)
         #expect(result.inked > 0, "expected ink in the emoji's atlas rect")
         #expect(result.colored > 0, "expected at least one non-grey pixel — emoji render in color")
@@ -172,7 +152,6 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let queue = device.makeCommandQueue()!
         let renderer = try TerminalRenderer(
             device: device, font: TerminalFont.primary(ofSize: 14), scale: 1)
 
@@ -181,7 +160,7 @@ import Testing
         let grid = terminal.grid
         #expect(grid[0, 0].attributes.contains(.wide))
 
-        let texture = Self.render(grid, renderer: renderer, queue: queue, device: device)
+        let texture = Self.render(grid, renderer: renderer, device: device)
         let cellWidth = Int(renderer.metrics.cellWidth)
         let cellHeight = Int(renderer.metrics.cellHeight)
         let box = MTLRegionMake2D(0, 0, cellWidth * 2, cellHeight)
@@ -201,7 +180,6 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let queue = device.makeCommandQueue()!
         let renderer = try TerminalRenderer(
             device: device, font: TerminalFont.primary(ofSize: 14), scale: scale)
 
@@ -211,7 +189,7 @@ import Testing
         #expect(grid[0, 0].attributes.contains(.wide))
         #expect(!grid[0, 0].grapheme.isNone)
 
-        let texture = Self.render(grid, renderer: renderer, queue: queue, device: device)
+        let texture = Self.render(grid, renderer: renderer, device: device)
         let cellWidth = Int(renderer.metrics.cellWidth)
         let cellHeight = Int(renderer.metrics.cellHeight)
         let box = MTLRegionMake2D(0, 0, cellWidth * 2, cellHeight)

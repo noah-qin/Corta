@@ -201,7 +201,7 @@ four reasons and what it would have bought.
 | `TerminalSession`   | `CortaTerminal`                      | nonisolated | Owns PTY + Parser + Grid; the unit a split renders   |
 | `PTY`, `corta-exec` | `CortaTerminal`                      | nonisolated | Spawn, read/write, winsize, child lifecycle          |
 | `SFTP`              | `CortaTerminal/…/SFTP/`              | nonisolated | The SFTP protocol over the system `ssh`, no SSH library (§7.9) |
-| Renderer            | `Corta/Renderer/`                    | nonisolated | `TerminalRenderer`, `QuadRenderer`, `GlyphAtlas`, the MTL3 and Metal 4 backends; draws a session into a rect, driven from the display link |
+| Renderer            | `Corta/Renderer/`                    | nonisolated | `TerminalRenderer`, `Metal4Backend` (the only GPU backend: one render pass per frame, D21), `QuadPipelineCache`, `GlyphAtlas`, `KittyImageRenderer`; draws a session into a rect, driven from the display link |
 | Font stack          | `Corta/Renderer/`                    | nonisolated | `TerminalFont`, `MonospacedFontCatalog`, `CellMetrics`: Core Text shaping, fallback, verification, the ASCII fast path |
 | Shell               | `Corta/`                             | MainActor   | Windows, tabs, the split tree, key bindings, IME, settings, shell integration, remote context |
 

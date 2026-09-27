@@ -27,46 +27,27 @@ import Testing
 /// shaped as one run, and no glyph ever inks a cell that is not its own.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
-@Suite(.serialized, .metalSerialized) struct WideGlyphRenderTests {
+@Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct WideGlyphRenderTests {
     private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> UInt8 {
         var bytes = [UInt8](repeating: 0, count: 4)
         texture.getBytes(&bytes, bytesPerRow: 4, from: MTLRegionMake2D(x, y, 1, 1), mipmapLevel: 0)
         return bytes[2]  // r of bgra
     }
 
-    private static func synchronize(_ texture: MTLTexture, queue: MTLCommandQueue) {
-        guard texture.storageMode == .managed, let buffer = queue.makeCommandBuffer(),
-            let blit = buffer.makeBlitCommandEncoder()
-        else { return }
-        blit.synchronize(resource: texture)
-        blit.endEncoding()
-        buffer.commit()
-        buffer.waitUntilCompleted()
-    }
 
     /// Renders `grid` onto a fresh black texture sized exactly to the grid.
     private static func render(
-        _ grid: Grid, renderer: TerminalRenderer, queue: MTLCommandQueue, device: MTLDevice
+        _ grid: Grid, renderer: TerminalRenderer, device: MTLDevice
     ) -> MTLTexture {
         let width = Int(renderer.metrics.cellWidth) * grid.columns
         let height = Int(renderer.metrics.cellHeight) * grid.rows
         let texture = MetalRenderTarget.make(
             device: device, width: width, height: height)
 
-        let pass = MTLRenderPassDescriptor()
-        pass.colorAttachments[0].texture = texture
-        pass.colorAttachments[0].loadAction = .clear
-        pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1)
-        pass.colorAttachments[0].storeAction = .store
-
-        let commandBuffer = queue.makeCommandBuffer()!
-        renderer.render(
+        renderer.renderAndWait(
             grid: grid, rect: CGRect(x: 0, y: 0, width: width, height: height),
             drawableSize: CGSize(width: width, height: height), cursorVisible: false,
-            selection: nil, renderPassDescriptor: pass, commandBuffer: commandBuffer)
-        commandBuffer.commit()
-        commandBuffer.waitUntilCompleted()
-        Self.synchronize(texture, queue: queue)
+            selection: nil, target: texture)
         return texture
     }
 
@@ -102,7 +83,6 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let queue = device.makeCommandQueue()!
         let renderer = try Self.makeRenderer(device: device)
 
         var terminal = Terminal(rows: 2, columns: 6)
@@ -110,7 +90,7 @@ import Testing
         let grid = terminal.grid
         #expect(grid[0, 0].attributes.contains(.wide))
 
-        let texture = Self.render(grid, renderer: renderer, queue: queue, device: device)
+        let texture = Self.render(grid, renderer: renderer, device: device)
         let cellWidth = Int(renderer.metrics.cellWidth)
         let cellHeight = Int(renderer.metrics.cellHeight)
         let centreY = cellHeight / 2
@@ -131,7 +111,6 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let queue = device.makeCommandQueue()!
         let renderer = try Self.makeRenderer(device: device)
 
         var terminal = Terminal(rows: 2, columns: 8)
@@ -139,7 +118,7 @@ import Testing
         let grid = terminal.grid
         #expect(grid.cursor == Cursor(row: 0, column: 6))
 
-        let texture = Self.render(grid, renderer: renderer, queue: queue, device: device)
+        let texture = Self.render(grid, renderer: renderer, device: device)
         // The 'a' lives at column 4; columns 5 ('b') and beyond shift if any
         // pair drew at the wrong width.
         let cellWidth = Int(renderer.metrics.cellWidth)
@@ -159,7 +138,6 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let queue = device.makeCommandQueue()!
         let renderer = try Self.makeRenderer(device: device)
 
         var terminal = Terminal(rows: 2, columns: 6)
@@ -168,7 +146,7 @@ import Testing
         #expect(!grid[0, 0].grapheme.isNone)
         #expect(grid.cursor == Cursor(row: 0, column: 1))
 
-        let texture = Self.render(grid, renderer: renderer, queue: queue, device: device)
+        let texture = Self.render(grid, renderer: renderer, device: device)
         let cellWidth = Int(renderer.metrics.cellWidth)
         let cellHeight = Int(renderer.metrics.cellHeight)
         let ink = Self.pixel(of: texture, x: cellWidth / 2, y: cellHeight / 2)
@@ -187,7 +165,6 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let queue = device.makeCommandQueue()!
         let renderer = try Self.makeRenderer(device: device)
 
         var terminal = Terminal(rows: 2, columns: 6)
@@ -196,7 +173,7 @@ import Testing
         #expect(!grid[0, 0].grapheme.isNone)
         #expect(grid[0, 0].attributes.contains(.wide))
 
-        let texture = Self.render(grid, renderer: renderer, queue: queue, device: device)
+        let texture = Self.render(grid, renderer: renderer, device: device)
         #expect(
             Self.cellIsBlank(texture, row: 0, column: 2, metrics: renderer.metrics),
             "a wide cluster spilled past its pair")
@@ -213,7 +190,6 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let queue = device.makeCommandQueue()!
         let renderer = try Self.makeRenderer(device: device)
 
         // 👨‍👩‍👧‍👦
@@ -241,24 +217,17 @@ import Testing
         let texture = MetalRenderTarget.make(
             device: device, width: width, height: height)
 
-        let pass = MTLRenderPassDescriptor()
-        pass.colorAttachments[0].texture = texture
-        pass.colorAttachments[0].loadAction = .clear
-        pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1)
-        pass.colorAttachments[0].storeAction = .store
-        let commandBuffer = queue.makeCommandBuffer()!
         // A color emoji bitmaps into the RGBA atlas and draws through the
         // color pipeline (see `GlyphAtlas`'s type comment) — the coverage
         // pipeline would find nothing at these UVs in the grayscale atlas.
         #expect(info.isColor)
-        renderer.quadRenderer.drawColorQuads(
-            [instance], atlas: renderer.glyphAtlas.colorTexture,
-            rect: CGRect(x: 0, y: 0, width: width, height: height),
-            drawableSize: CGSize(width: width, height: height),
-            renderPassDescriptor: pass, commandBuffer: commandBuffer)
-        commandBuffer.commit()
-        commandBuffer.waitUntilCompleted()
-        Self.synchronize(texture, queue: queue)
+        #expect(
+            renderer.backend.renderFrameAndWait(into: texture) {
+                $0.drawColorQuads(
+                    [instance], atlas: renderer.glyphAtlas.colorTexture,
+                    rect: CGRect(x: 0, y: 0, width: width, height: height),
+                    drawableSize: CGSize(width: width, height: height))
+            })
 
         let centreX = Int(cellWidth)  // centre of the two-cell box
         let ink = Self.pixel(of: texture, x: centreX, y: height / 2)
@@ -276,7 +245,6 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let queue = device.makeCommandQueue()!
         // A 48×48 page holds ~9 glyphs at 14 pt; the screen below shows 15
         // distinct ones (a 3×10 grid holds five wide pairs per row).
         let renderer = try Self.makeRenderer(device: device, atlasPixelSize: 48)
@@ -287,7 +255,7 @@ import Testing
             bytes.append(contentsOf: Array(String(Unicode.Scalar(0x4E00 + i)!).utf8))
         }
         terminal.feed(bytes)
-        let texture = Self.render(terminal.grid, renderer: renderer, queue: queue, device: device)
+        let texture = Self.render(terminal.grid, renderer: renderer, device: device)
 
         #expect(renderer.glyphAtlas.evictionCount > 0, "fifteen CJK glyphs must overflow a 48x48 page")
         var anyInk = false

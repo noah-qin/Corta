@@ -83,11 +83,6 @@ jobs:
       - name: Require a Metal 4 device
         run: swift scripts/metal-capability.swift --require-metal4
 
-      # `CORTA_METAL4=1` is what makes `TerminalRenderer.init` actually
-      # select `Metal4Backend` (`Metal4Backend.isOptedIn`). Without it this
-      # job would prove the five direct-construction tests and still never
-      # take the selection path #109 turns into the only path.
-      #
       # Signing is made local for the same reason ci.yml does it: the tests
       # host inside the app, and a runner installed as a launchd service has
       # no unlocked login keychain, so an automatic signature would fail the
@@ -95,7 +90,7 @@ jobs:
       - name: Run the tests
         id: tests
         run: |
-          TEST_RUNNER_CORTA_METAL4=1 xcodebuild test \
+          xcodebuild test \
             -project Corta.xcodeproj \
             -scheme Corta \
             -testPlan ${{ inputs.test-plan }} \
@@ -111,8 +106,10 @@ jobs:
       # there is no bundle, and reporting "corrupted result bundle" on top of
       # a clear "this machine has no Metal 4" helps nobody.
       #
-      # `skipped=0` is the expected reading here. Anything else means this
-      # machine is not the hardware the runner was registered to be.
+      # `skipped=2` is the expected reading here: the two
+      # `Metal4UnavailablePaneTests`, which run only on a GPU without Metal 4.
+      # Anything more means this machine is not the hardware the runner was
+      # registered to be.
       - name: Summarise the test run
         if: always() && steps.tests.conclusion != 'skipped'
         run: |

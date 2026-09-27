@@ -157,7 +157,7 @@ struct ScrollPositionIndicatorTests {
 /// path from a gesture to the pill; what remains open is what the hardware
 /// emits, which is `NSEvent`'s business and not Corta's.
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct ScrollIndicatorIntegrationTests {
     private func makePane() -> ViewController {
         let pane = ViewController()

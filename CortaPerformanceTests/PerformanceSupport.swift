@@ -45,7 +45,7 @@ enum BenchmarkBuild {
     /// A render target of the format every pipeline is built against.
     static func renderTarget(device: MTLDevice, width: Int, height: Int) throws -> MTLTexture {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: QuadRenderer.pixelFormat, width: width, height: height, mipmapped: false)
+            pixelFormat: QuadPipelineCache.pixelFormat, width: width, height: height, mipmapped: false)
         descriptor.usage = [.renderTarget, .shaderRead]
         descriptor.storageMode = .private
         return try #require(device.makeTexture(descriptor: descriptor))

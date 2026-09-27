@@ -29,9 +29,9 @@ import QuartzCore
 /// and the scheduler pauses once nothing is pending. A spurious wake costs
 /// at most one re-presentation of unchanged pixels.
 final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
-    /// Called per accepted frame on the main thread with the resolved
-    /// drawable.
-    var onRenderFrame: ((MTLRenderPassDescriptor, CGSize, CAMetalDrawable) -> Void)?
+    /// Called per accepted frame on the main thread with the drawable size
+    /// and the resolved drawable, which the callee must present.
+    var onRenderFrame: ((CGSize, CAMetalDrawable) -> Void)?
 
     /// The per-frame prepare/diff work; returns whether anything is still
     /// pending. The drawable is presented either way; `false` only pauses.
@@ -148,26 +148,14 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         // Last tick's frame is on the glass; retire the stand-in.
         let retiringStandIn = firstPresentState == .submitted
         if retiringStandIn { notePresentedFrame() }
-        let drawable = update.drawable
         if let onRenderFrame {
-            onRenderFrame(FrameScheduler.clearPass(for: drawable), metalLayer.drawableSize, drawable)
+            onRenderFrame(metalLayer.drawableSize, update.drawable)
             noteFrameSubmitted()
         }
         // Owe one more tick while a stand-in is up, so it retires on time.
         if !stillPending && firstPresentState != .submitted {
             link.isPaused = true
         }
-    }
-
-    private static func clearPass(for drawable: CAMetalDrawable) -> MTLRenderPassDescriptor {
-        let pass = MTLRenderPassDescriptor()
-        pass.colorAttachments[0].texture = drawable.texture
-        pass.colorAttachments[0].loadAction = .clear
-        let bg = TerminalColorPalette.clearColor
-        pass.colorAttachments[0].clearColor = MTLClearColorMake(
-            Double(bg.x), Double(bg.y), Double(bg.z), Double(bg.w))
-        pass.colorAttachments[0].storeAction = .store
-        return pass
     }
 }
 

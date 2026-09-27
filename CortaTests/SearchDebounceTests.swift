@@ -28,7 +28,7 @@ import Testing
 /// itself, so the whole path (PTY → grid → snapshot → sweep → apply) is
 /// exercised rather than a mock of it.
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct SearchDebounceTests {
     /// Loads the pane's view, which builds the renderer and spawns the child
     /// exactly as a window would.

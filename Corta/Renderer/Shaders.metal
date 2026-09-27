@@ -27,7 +27,7 @@ struct QuadInstance {
     float2 origin;  // top-left, pixels, relative to the target rect's origin
     float2 size;    // width, height, pixels
     float4 color;   // straight-alpha, sRGB-encoded (see the colour-space
-                     // note in QuadRenderer.swift)
+                     // note in QuadPipelineCache.swift)
     float4 uvRect;  // atlas UV (x, y, w, h), normalised; zero for solid quads
 };
 

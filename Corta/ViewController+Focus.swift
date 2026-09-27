@@ -35,7 +35,8 @@ extension ViewController {
         let focused = hasUserFocus
         guard focused != lastReportedFocus else { return }
         lastReportedFocus = focused
-        guard session.isFocusReportingEnabled else { return }
+        // A failed pane (no Metal 4, no shell) has no session to report to.
+        guard let session, session.isFocusReportingEnabled else { return }
         session.write(focused ? Self.focusIn : Self.focusOut)
     }
 

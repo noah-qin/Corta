@@ -67,7 +67,7 @@ nonisolated enum AppPaths {
     }
 
     /// `~/Library/Caches/<bundle id>`, or the stage's: purgeable. Per bundle
-    /// id because `QuadRenderer` prunes archives not its own, and a shared
+    /// id because `QuadPipelineCache` prunes archives not its own, and a shared
     /// directory had the two builds deleting each other's (D22).
     static var cacheDirectory: URL? {
         if let stageDirectory {

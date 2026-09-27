@@ -24,7 +24,10 @@ import Testing
 @testable import Corta
 
 /// `.serialized`: builds a `GlyphAtlas`, which is single-threaded by design.
-@Suite("Block elements", .serialized, .metalSerialized) struct BlockElementRenderTests {
+@Suite(
+    "Block elements", .serialized, .metalSerialized,
+    .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+struct BlockElementRenderTests {
     /// The defect: a cell is `advance.rounded(.up)` wide, so a font whose
     /// advance is 8.4pt gets a 9pt cell and every glyph leaves a point bare on
     /// its right. Between letters that is invisible; between block characters
@@ -72,13 +75,11 @@ import Testing
 
     /// Renders one cell holding `character` in (255,140,0) and reports how
     /// many pixels have ink, the cell's pixel count, its average colour, and
-    /// the texture itself — nil only when there is no GPU to render or
-    /// attach with — so a failing test can attach it.
+    /// the texture itself, so a failing test can attach it.
     private static func render(
         _ character: String
     ) throws -> (inked: Int, total: Int, mean: SIMD3<Int>, texture: MTLTexture?) {
-        guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue()
-        else { return (1, 1, SIMD3<Int>(255, 140, 0), nil) }  // no GPU: nothing to assert against
+        let device = try #require(MTLCreateSystemDefaultDevice())
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
         let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
 
@@ -89,26 +90,10 @@ import Testing
 
         let texture = MetalRenderTarget.make(
             device: device, width: w, height: h)
-        let pass = MTLRenderPassDescriptor()
-        pass.colorAttachments[0].texture = texture
-        pass.colorAttachments[0].loadAction = .clear
-        pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1)
-        pass.colorAttachments[0].storeAction = .store
-        let commandBuffer = queue.makeCommandBuffer()!
-        renderer.render(
+        renderer.renderAndWait(
             grid: grid, rect: CGRect(x: 0, y: 0, width: w, height: h),
             drawableSize: CGSize(width: w, height: h), cursorVisible: false,
-            selection: nil, renderPassDescriptor: pass, commandBuffer: commandBuffer)
-        commandBuffer.commit()
-        commandBuffer.waitUntilCompleted()
-        if texture.storageMode == .managed, let blitBuffer = queue.makeCommandBuffer(),
-            let blit = blitBuffer.makeBlitCommandEncoder()
-        {
-            blit.synchronize(resource: texture)
-            blit.endEncoding()
-            blitBuffer.commit()
-            blitBuffer.waitUntilCompleted()
-        }
+            selection: nil, target: texture)
 
         var pixels = [UInt8](repeating: 0, count: w * h * 4)
         texture.getBytes(

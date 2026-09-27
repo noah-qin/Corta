@@ -27,7 +27,7 @@ import Testing
 /// offscreen-texture pattern `CursorStyleRenderTests` already uses.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded by
 /// design — see the type's comment.
-@Suite(.serialized, .metalSerialized) struct IndexedPaletteRenderTests {
+@Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct IndexedPaletteRenderTests {
     private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (
         r: UInt8, g: UInt8, b: UInt8, a: UInt8
     ) {
@@ -36,24 +36,16 @@ import Testing
         return (r: bytes[2], g: bytes[1], b: bytes[0], a: bytes[3])
     }
 
-    private static func synchronize(_ texture: MTLTexture, queue: MTLCommandQueue) {
-        guard let buffer = queue.makeCommandBuffer(), let blit = buffer.makeBlitCommandEncoder()
-        else { return }
-        blit.synchronize(resource: texture)
-        blit.endEncoding()
-        buffer.commit()
-        buffer.waitUntilCompleted()
-    }
 
     /// Renders a 4x10 grid whose whole first row carries background index
     /// 196 (xterm's cube red, `48;5;196m`), with `oscBeforeContent` fed
     /// first if given — an OSC 4 override, or nothing.
     private static func renderWithBackgroundIndex196(
-        oscBeforeContent: String?, queue: MTLCommandQueue
+        oscBeforeContent: String?
     ) throws -> (
         texture: MTLTexture, renderer: TerminalRenderer, terminal: Terminal
     ) {
-        let device = queue.device
+        let device = try #require(MTLCreateSystemDefaultDevice())
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
         let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
 
@@ -68,23 +60,13 @@ import Testing
         let height = Int(renderer.metrics.cellHeight * 4)
         let texture = MetalRenderTarget.make(device: device, width: width, height: height)
 
-        let pass = MTLRenderPassDescriptor()
-        pass.colorAttachments[0].texture = texture
-        pass.colorAttachments[0].loadAction = .clear
-        pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1)
-        pass.colorAttachments[0].storeAction = .store
-
-        let commandBuffer = queue.makeCommandBuffer()!
-        renderer.render(
+        renderer.renderAndWait(
             grid: grid, rect: CGRect(x: 0, y: 0, width: width, height: height),
             drawableSize: CGSize(width: width, height: height), cursorVisible: false,
             selection: nil,
             indexedOverrides: terminal.indexedPalette.overrides,
             indexedOverridesGeneration: terminal.indexedPalette.overridesGeneration,
-            renderPassDescriptor: pass, commandBuffer: commandBuffer)
-        commandBuffer.commit()
-        commandBuffer.waitUntilCompleted()
-        synchronize(texture, queue: queue)
+            target: texture)
         return (texture, renderer, terminal)
     }
 
@@ -93,9 +75,8 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let queue = device.makeCommandQueue()!
         let (texture, renderer, _) = try Self.renderWithBackgroundIndex196(
-            oscBeforeContent: nil, queue: queue)
+            oscBeforeContent: nil)
         let cellW = Int(renderer.metrics.cellWidth)
         let cellH = Int(renderer.metrics.cellHeight)
         let sample = Self.pixel(of: texture, x: cellW / 2, y: cellH / 2)
@@ -110,10 +91,9 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let queue = device.makeCommandQueue()!
         // Override index 196 to pure green before the cell that uses it.
         let (texture, renderer, terminal) = try Self.renderWithBackgroundIndex196(
-            oscBeforeContent: "\u{1B}]4;196;#00ff00\u{1B}\\", queue: queue)
+            oscBeforeContent: "\u{1B}]4;196;#00ff00\u{1B}\\")
         let cellW = Int(renderer.metrics.cellWidth)
         let cellH = Int(renderer.metrics.cellHeight)
         let sample = Self.pixel(of: texture, x: cellW / 2, y: cellH / 2)
@@ -129,9 +109,8 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let queue = device.makeCommandQueue()!
         let (texture, renderer, _) = try Self.renderWithBackgroundIndex196(
-            oscBeforeContent: "\u{1B}]4;196;#00ff00\u{1B}\\\u{1B}]104;196\u{1B}\\", queue: queue)
+            oscBeforeContent: "\u{1B}]4;196;#00ff00\u{1B}\\\u{1B}]104;196\u{1B}\\")
         let cellW = Int(renderer.metrics.cellWidth)
         let cellH = Int(renderer.metrics.cellHeight)
         let sample = Self.pixel(of: texture, x: cellW / 2, y: cellH / 2)
@@ -149,37 +128,26 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let queue = device.makeCommandQueue()!
-        let device2 = queue.device
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
-        let renderer = try TerminalRenderer(device: device2, font: font, scale: 1)
+        let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
         var terminal = Terminal(rows: 4, columns: 10)
         terminal.feed(Array("\u{1B}[48;5;196m    \u{1B}[0m".utf8))
 
         let width = Int(renderer.metrics.cellWidth * 10)
         let height = Int(renderer.metrics.cellHeight * 4)
-        let texture = MetalRenderTarget.make(device: device2, width: width, height: height)
+        let texture = MetalRenderTarget.make(device: device, width: width, height: height)
 
         func renderOnce() {
-            let pass = MTLRenderPassDescriptor()
-            pass.colorAttachments[0].texture = texture
-            pass.colorAttachments[0].loadAction = .clear
-            pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1)
-            pass.colorAttachments[0].storeAction = .store
-            let commandBuffer = queue.makeCommandBuffer()!
-            renderer.render(
+            renderer.renderAndWait(
                 grid: terminal.grid, rect: CGRect(x: 0, y: 0, width: width, height: height),
                 drawableSize: CGSize(width: width, height: height), cursorVisible: false,
                 selection: nil,
                 indexedOverrides: terminal.indexedPalette.overrides,
                 indexedOverridesGeneration: terminal.indexedPalette.overridesGeneration,
-                renderPassDescriptor: pass, commandBuffer: commandBuffer)
-            commandBuffer.commit()
-            commandBuffer.waitUntilCompleted()
+                target: texture)
         }
 
         renderOnce()
-        Self.synchronize(texture, queue: queue)
         let cellW = Int(renderer.metrics.cellWidth)
         let cellH = Int(renderer.metrics.cellHeight)
         let before = Self.pixel(of: texture, x: cellW / 2, y: cellH / 2)
@@ -188,7 +156,6 @@ import Testing
         // The override lands without touching the grid's own content at all.
         terminal.feed(Array("\u{1B}]4;196;#00ff00\u{1B}\\".utf8))
         renderOnce()
-        Self.synchronize(texture, queue: queue)
         let after = Self.pixel(of: texture, x: cellW / 2, y: cellH / 2)
         #expect(after.g > 200 && after.r < 30, "expected the override to repaint the cell, got \(after)")
     }

@@ -56,7 +56,7 @@ final class TerminalView: NSView, CALayerDelegate {
 
     /// Called once per accepted frame on the main thread; forwarded to
     /// `frameScheduler`.
-    var onRenderFrame: ((MTLRenderPassDescriptor, CGSize, CAMetalDrawable) -> Void)? {
+    var onRenderFrame: ((CGSize, CAMetalDrawable) -> Void)? {
         get { frameScheduler.onRenderFrame }
         set { frameScheduler.onRenderFrame = newValue }
     }
@@ -194,10 +194,10 @@ final class TerminalView: NSView, CALayerDelegate {
         wantsLayer = true
         metalLayer.delegate = self
         metalLayer.device = MTLCreateSystemDefaultDevice()
-        metalLayer.pixelFormat = QuadRenderer.pixelFormat
+        metalLayer.pixelFormat = QuadPipelineCache.pixelFormat
         // Tag the drawable sRGB; untagged it is read as Display P3 and every
         // colour renders oversaturated. `.bgra8Unorm`, not `_srgb`: the values
-        // are already sRGB-encoded (see `QuadRenderer`).
+        // are already sRGB-encoded (see `QuadPipelineCache`).
         metalLayer.framebufferOnly = true
         // Double buffering, opt-in for measurement. Two drawables can save a
         // frame of latency or add it (`nextDrawable` blocks more), depending on

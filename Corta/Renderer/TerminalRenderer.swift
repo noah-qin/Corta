@@ -50,9 +50,7 @@ public nonisolated struct TerminalSelection: Equatable, Sendable {
 /// imports the app without `@testable`, because `-enable-testing` inhibits
 /// the optimisation its Release figure exists to measure (#110).
 public nonisolated final class TerminalRenderer {
-    /// `QuadRenderer`, or `Metal4Backend` when opted in and supported. The name
-    /// predates the protocol and stays for the tests that reach through it.
-    let quadRenderer: any TerminalRenderBackend
+    let backend: Metal4Backend
     let glyphAtlas: GlyphAtlas
     public private(set) var metrics: CellMetrics
     /// Its own texture cache: images share no eviction policy with glyphs.
@@ -116,6 +114,9 @@ public nonisolated final class TerminalRenderer {
 
     private(set) var lastRebuiltRowCount = 0
 
+    /// Rows in the cached frame: the grid height `draw` lays out.
+    var cachedRowCount: Int { cachedLines.count }
+
     private(set) var pointMetrics: CellMetrics
     private(set) var scale: CGFloat
 
@@ -124,17 +125,12 @@ public nonisolated final class TerminalRenderer {
     ///   soft.
     /// - Parameter atlasPixelSize: small in tests, to exercise eviction;
     ///   `nil` is `GlyphAtlas.atlasSize`.
+    /// - Throws: `Metal4BackendError.metal4Unsupported` on a GPU without
+    ///   `MTLGPUFamily.metal4`. There is no other renderer to fall back to.
     public init(device: MTLDevice, font: CTFont, scale: CGFloat, atlasPixelSize: Int? = nil) throws {
         let atlasFont = CTFontCreateCopyWithAttributes(
             font, CTFontGetSize(font) * scale, nil, nil)
-        // A failed `Metal4Backend` falls back rather than failing init.
-        if Metal4Backend.isOptedIn, Metal4Backend.isSupported(by: device),
-            let metal4 = try? Metal4Backend(device: device)
-        {
-            self.quadRenderer = metal4
-        } else {
-            self.quadRenderer = try QuadRenderer(device: device)
-        }
+        self.backend = try Metal4Backend(device: device)
         // The atlas is per pane, unlike the pipelines: it is mutable and its
         // eviction forces full rebuilds, so sharing would couple every pane's
         // damage tracking to all panes' glyph churn — per frame — to save ~20 MB.
@@ -243,7 +239,8 @@ public nonisolated final class TerminalRenderer {
     }
 
     /// Diff and draw in one call, for tests and benchmarks; the app's loop
-    /// diffs in `prepareFrame` and calls `draw` directly.
+    /// diffs in `prepareFrame` and calls `draw` directly. `onCompleted`
+    /// runs when the GPU has finished the frame.
     public func render(
         grid: Grid,
         scrollOffset: Int = 0,
@@ -256,53 +253,24 @@ public nonisolated final class TerminalRenderer {
         hoveredLink: TerminalSelection? = nil,
         indexedOverrides: IndexedColorOverrides = [:],
         indexedOverridesGeneration: UInt64 = 0,
-        renderPassDescriptor: MTLRenderPassDescriptor,
-        commandBuffer: MTLCommandBuffer
+        target: MTLTexture,
+        clearColor: MTLClearColor,
+        onCompleted: (@Sendable ((any Error)?) -> Void)? = nil
     ) {
         updateInstances(
             grid: grid, scrollOffset: scrollOffset, cursorVisible: cursorVisible,
             selection: selection, searchMatches: searchMatches,
             currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink,
             indexedOverrides: indexedOverrides, indexedOverridesGeneration: indexedOverridesGeneration)
-        draw(rect: rect, drawableSize: drawableSize, renderPassDescriptor: renderPassDescriptor,
-            commandBuffer: commandBuffer)
+        draw(
+            rect: rect, drawableSize: drawableSize, target: target, clearColor: clearColor,
+            drawable: nil, label: "Corta.render", onCompleted: onCompleted)
     }
 
-    /// Draws the last cached instances without diffing again.
+    /// Draws the last cached instances, without diffing again, as one render
+    /// pass: backgrounds, glyphs, colour glyphs, then images over the text.
+    /// The backend owns the command buffer, the commit and the present.
     func draw(
-        rect: CGRect, drawableSize: CGSize, renderPassDescriptor: MTLRenderPassDescriptor,
-        commandBuffer: MTLCommandBuffer
-    ) {
-        quadRenderer.drawSolidQuads(
-            cachedBackground, rect: rect, drawableSize: drawableSize,
-            renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
-        // Never clear: that would erase the background pass. The descriptor is
-        // a reference, so this is local to these draws.
-        renderPassDescriptor.colorAttachments[0].loadAction = .load
-        quadRenderer.drawGlyphQuads(
-            cachedGlyphs, atlas: glyphAtlas.texture, rect: rect, drawableSize: drawableSize,
-            renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
-        if !cachedColorGlyphs.isEmpty {
-            quadRenderer.drawColorQuads(
-                cachedColorGlyphs, atlas: glyphAtlas.colorTexture, rect: rect,
-                drawableSize: drawableSize, renderPassDescriptor: renderPassDescriptor,
-                commandBuffer: commandBuffer)
-        }
-        // Images last, over the text.
-        if cachedImagePlacements.placementCount > 0 {
-            kittyImageRenderer.draw(
-                table: cachedImagePlacements, cellWidth: Float(metrics.cellWidth),
-                cellHeight: Float(metrics.cellHeight), rows: cachedLines.count, offset: cachedOffset,
-                scrollbackTotalPushed: cachedScrollbackTotalPushed, rect: rect, drawableSize: drawableSize,
-                quadRenderer: quadRenderer, renderPassDescriptor: renderPassDescriptor,
-                commandBuffer: commandBuffer)
-        }
-    }
-
-    /// The Metal 4 path: the backend owns buffer, pass, commit and present.
-    /// Pass order matches the MTL3 path exactly.
-    func draw(
-        through backend: any Metal4FrameBackend,
         rect: CGRect, drawableSize: CGSize, target: MTLTexture, clearColor: MTLClearColor,
         drawable: (any MTLDrawable)?, label: String,
         onCompleted: (@Sendable ((any Error)?) -> Void)?
@@ -321,7 +289,7 @@ public nonisolated final class TerminalRenderer {
                 table: cachedImagePlacements, cellWidth: Float(metrics.cellWidth),
                 cellHeight: Float(metrics.cellHeight), rows: cachedLines.count, offset: cachedOffset,
                 scrollbackTotalPushed: cachedScrollbackTotalPushed, rect: rect,
-                drawableSize: drawableSize, metal4: backend)
+                drawableSize: drawableSize, backend: backend)
         }
         backend.endFrame(presenting: drawable, onCompleted: onCompleted)
     }

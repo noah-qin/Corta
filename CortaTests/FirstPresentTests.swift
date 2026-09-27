@@ -49,7 +49,7 @@ struct FirstPresentTests {
         let (scheduler, layer) = Self.makeScheduler()
         #expect(scheduler.firstPresentState == .idle)
         #expect(layer.backgroundColor == nil)
-        scheduler.onRenderFrame = { _, _, _ in }
+        scheduler.onRenderFrame = { _, _ in }
 
         scheduler.requestFirstPresent()
 

@@ -143,6 +143,9 @@ extension ViewController {
     /// Re-points the renderer at a new size. One pane keeps its grid and
     /// resizes the window; with splits the grids refit instead.
     func setFontSize(_ newSize: CGFloat) {
+        // A failed pane has no renderer; its retry builds one at the
+        // configured size.
+        guard let terminalRenderer else { return }
         // Below ~8pt the cell degenerates; above 64pt it outgrows the minimum
         // window.
         let clamped = min(64, max(8, newSize))
