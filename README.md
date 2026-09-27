@@ -12,7 +12,7 @@ Metal rendering · AppKit input · A dependency-free terminal core
 
 [![CI](https://github.com/noah-qin/Corta/actions/workflows/ci.yml/badge.svg)](https://github.com/noah-qin/Corta/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/noah-qin/Corta?style=flat-square)](https://github.com/noah-qin/Corta/releases/latest)
-![Platform](https://img.shields.io/badge/macOS-26.0%2B-4d4d4d?style=flat-square)
+![Platform](https://img.shields.io/badge/macOS_26.0%2B-Apple_silicon-4d4d4d?style=flat-square)
 ![Swift](https://img.shields.io/badge/Swift-6-f05138?style=flat-square)
 [![License](https://img.shields.io/badge/license-Apache--2.0-2f81f7?style=flat-square)](LICENSE)
 
@@ -91,7 +91,10 @@ Ghostty is the better choice today; those are
 
 ## Install
 
-Requires **macOS 26.0 or later**. Download the archive and matching SHA-256
+Requires **macOS 26.0 or later** on a Mac with **Apple silicon** (M1 or
+later) from 1.1.0 on. Intel Macs are not supported after
+[1.0.1](https://github.com/noah-qin/Corta/releases/tag/v1.0.1), which stays
+available for them. Download the archive and matching SHA-256
 file from [GitHub Releases](https://github.com/noah-qin/Corta/releases/latest).
 Follow the signing and installation notes attached to that release, verify the
 checksum, unzip the archive and move `Corta.app` to `/Applications`.
@@ -133,7 +136,7 @@ and when changes take effect. Shell integration for zsh can be installed from
 
 ## Build and test
 
-Use macOS 26.0 or later and Xcode with Swift 6.2 or later. CI's exact Xcode
+Use macOS 26.0 or later on Apple silicon and Xcode with Swift 6.2 or later. CI's exact Xcode
 pin is recorded in [the workflow](.github/workflows/ci.yml). The app resolves
 Sparkle on its first build; the terminal core has no external packages.
 

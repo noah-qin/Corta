@@ -18,6 +18,12 @@ what to edit.
 
 ### Changed
 
+- **Intel Macs are no longer supported.** Corta now runs only on Macs
+  with Apple silicon (M1 or later); the minimum macOS stays 26.0. 1.0.1 is
+  the last version for Intel Macs and remains available from its release
+  page. An Intel Mac running 1.0.x is not offered this update, so it keeps
+  working on the version it has (D21).
+
 - The bundled updater is Sparkle 2.10.0 (was 2.9.6).
 
 - Building Corta from source now produces a separate application: **Corta
