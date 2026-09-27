@@ -252,7 +252,13 @@ struct ScrollIndicatorIntegrationTests {
 
         pane.terminalView?.scrollWheel(with: Self.wheel(lines: 12))
         let offsetBefore = try #require(pane.scrollOffset > 0 ? pane.scrollOffset : nil)
-        let totalBefore = session.scrollbackTotalPushed
+        // The total the offset was set against, recorded by `scrollOffset`
+        // itself at the moment of the scroll — not a read taken afterwards.
+        // `fill` returns once 60 lines have arrived, while its `printf` is
+        // still writing the rest of its 400; any of those that land between
+        // the scroll and a later read would be counted here but not in the
+        // offset, and the anchor would look off by exactly that many rows.
+        let totalBefore = try #require(pane.scrollAnchorTotalPushed)
 
         session.write(Array("printf 'more %s\\n' $(seq 1 20)\n".utf8))
         // Wait only for output to *arrive*. Waiting for it to stop is what
