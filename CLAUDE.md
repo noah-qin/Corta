@@ -69,7 +69,7 @@ line each:
   identifier in a commit message. **D19** Selection is hand-rolled;
   TextKit is not adopted. **D20** The update feed is signed from CI; the
   key lives in the reviewed `release` environment.
-- **D21** Reserved (Apple silicon only, issue #108). **D22** The Debug
+- **D21** Apple silicon only; Intel Macs stay on 1.0.1. **D22** The Debug
   build is a separate application — `dev.noahqin.Corta.dev`, its own stage
   directory, no updater, no move-to-Applications prompt.
 

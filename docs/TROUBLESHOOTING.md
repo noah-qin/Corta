@@ -69,6 +69,21 @@ Corta's deployment target is macOS 26.0 and it uses Metal 3 (optionally
 Metal 4) and Core Text APIs from that release. There is no build for
 earlier systems, and the project does not plan one (`DESIGN.md` §6).
 
+### "You can't open the application "Corta" because it is not supported on this type of Mac"
+
+From 1.1.0, Corta is built for Apple silicon only — a Mac with an M1 or
+later chip (`DECISIONS.md` D21). An Intel Mac cannot run it. **1.0.1** is
+the last version for Intel Macs, and it stays available on the
+[1.0.1 release page](https://github.com/noah-qin/Corta/releases/tag/v1.0.1):
+download `Corta-1.0.1.zip`, verify it and replace the copy in
+`/Applications`. An Intel Mac already running 1.0.x is not offered 1.1.0
+by **Check for Updates…**, so it keeps working where it is; this message
+appears only when a newer archive was downloaded and opened by hand.
+
+To check which chip a Mac has, choose Apple menu ▸ About This Mac: the *Chip* line
+names an Apple chip (M1, M2, …) on Apple silicon, and a *Processor* line
+names an Intel one.
+
 ---
 
 ## Starting
