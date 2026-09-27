@@ -27,7 +27,7 @@ nonisolated struct GridPosition: Equatable {
     var column: Int
 }
 
-nonisolated struct TerminalSelection: Equatable {
+public nonisolated struct TerminalSelection: Equatable, Sendable {
     var start: GridPosition
     var end: GridPosition
     /// `totalPushed` when recorded; the renderer shifts rows by the growth.
@@ -45,12 +45,16 @@ nonisolated struct TerminalSelection: Equatable {
 ///
 /// Cursor and selection are background-pass quads — colour under the glyph —
 /// not another pipeline.
-nonisolated final class TerminalRenderer {
+///
+/// `public`, with the few members `CortaPerformanceTests` drives: that bundle
+/// imports the app without `@testable`, because `-enable-testing` inhibits
+/// the optimisation its Release figure exists to measure (#110).
+public nonisolated final class TerminalRenderer {
     /// `QuadRenderer`, or `Metal4Backend` when opted in and supported. The name
     /// predates the protocol and stays for the tests that reach through it.
     let quadRenderer: any TerminalRenderBackend
     let glyphAtlas: GlyphAtlas
-    private(set) var metrics: CellMetrics
+    public private(set) var metrics: CellMetrics
     /// Its own texture cache: images share no eviction policy with glyphs.
     let kittyImageRenderer: KittyImageRenderer
     /// Cached because `draw` takes no `Grid`.
@@ -85,7 +89,7 @@ nonisolated final class TerminalRenderer {
     /// An OSC 4 change alters what an index resolves to, invisible to every
     /// other check.
     private var cachedIndexedOverridesGeneration: UInt64 = 0
-    private var indexedOverrides: IndexedColorOverrides?
+    private var indexedOverrides: IndexedColorOverrides = [:]
     /// The delta is how far a whole-screen scroll shifted: shift the cache
     /// instead of rebuilding (`applyScrollShift`).
     private var cachedLinesRotated: UInt64 = 0
@@ -105,9 +109,7 @@ nonisolated final class TerminalRenderer {
     private var overlayScratch: [QuadInstance] = []
 
     /// One test rejects nearly every cell.
-    private static let ruleAttributeMask: UInt16 =
-        CellAttributes.underline.rawValue | CellAttributes.strikethrough.rawValue
-        | CellAttributes.invisible.rawValue
+    private static let ruleAttributes: CellAttributes = [.underline, .strikethrough, .invisible]
 
     /// Secondary but readable on dark and light; zero is `invisible`'s job.
     private static let dimAlpha: Float = 0.55
@@ -120,8 +122,9 @@ nonisolated final class TerminalRenderer {
     /// - Parameter scale: glyphs rasterise at `size × scale` and `metrics` are
     ///   pixels, the shader's space; 1× on a 2× display rendered half-size and
     ///   soft.
-    /// - Parameter atlasPixelSize: small in tests, to exercise eviction.
-    init(device: MTLDevice, font: CTFont, scale: CGFloat, atlasPixelSize: Int = GlyphAtlas.atlasSize) throws {
+    /// - Parameter atlasPixelSize: small in tests, to exercise eviction;
+    ///   `nil` is `GlyphAtlas.atlasSize`.
+    public init(device: MTLDevice, font: CTFont, scale: CGFloat, atlasPixelSize: Int? = nil) throws {
         let atlasFont = CTFontCreateCopyWithAttributes(
             font, CTFontGetSize(font) * scale, nil, nil)
         // A failed `Metal4Backend` falls back rather than failing init.
@@ -136,7 +139,8 @@ nonisolated final class TerminalRenderer {
         // eviction forces full rebuilds, so sharing would couple every pane's
         // damage tracking to all panes' glyph churn — per frame — to save ~20 MB.
         // A shared read-only ASCII layer would be a new design, not a lookup.
-        self.glyphAtlas = GlyphAtlas(device: device, font: atlasFont, atlasPixelSize: atlasPixelSize)
+        self.glyphAtlas = GlyphAtlas(
+            device: device, font: atlasFont, atlasPixelSize: atlasPixelSize ?? GlyphAtlas.atlasSize)
         self.kittyImageRenderer = KittyImageRenderer(device: device)
         self.pointMetrics = CellMetrics(font: font, scale: scale)
         self.metrics = self.pointMetrics.scaled(by: scale)
@@ -156,7 +160,7 @@ nonisolated final class TerminalRenderer {
     }
 
     /// For the frame-CPU baseline's worst case.
-    func invalidate() {
+    public func invalidate() {
         needsFullRebuild = true
     }
 
@@ -169,9 +173,7 @@ nonisolated final class TerminalRenderer {
         hoveredLink: TerminalSelection? = nil,
         indexedOverrides: IndexedColorOverrides = [:], indexedOverridesGeneration: UInt64 = 0
     ) -> Bool {
-        // `nil`, not empty: an empty `Dictionary` costs a retain/release per
-        // resolve (~5% of frame CPU).
-        self.indexedOverrides = indexedOverrides.isEmpty ? nil : indexedOverrides
+        self.indexedOverrides = indexedOverrides
         let offset = min(max(0, scrollOffset), grid.scrollback.count)
         let fullRebuild =
             needsFullRebuild
@@ -242,7 +244,7 @@ nonisolated final class TerminalRenderer {
 
     /// Diff and draw in one call, for tests and benchmarks; the app's loop
     /// diffs in `prepareFrame` and calls `draw` directly.
-    func render(
+    public func render(
         grid: Grid,
         scrollOffset: Int = 0,
         rect: CGRect,
@@ -558,9 +560,8 @@ nonisolated final class TerminalRenderer {
         }
         for column in 0..<line.count {
             let cell = line[column]
-            // Masks, not `OptionSet.contains`, which is an unelided call per cell.
-            let attributes = cell.attributes.rawValue
-            let reversed = attributes & CellAttributes.reverse.rawValue != 0
+            let attributes = cell.attributes
+            let reversed = attributes.contains(.reverse)
             // Resolve each role first, then swap: swapping raw colours re-resolves
             // both `.default`s to the same values, and a reversed cell (a `less`
             // search hit) showed no highlight.
@@ -570,7 +571,7 @@ nonisolated final class TerminalRenderer {
             let bg = reversed ? resolvedFg : resolvedBg
             // SGR 2: alpha on the foreground — one multiply, and correct over a
             // coloured background, where blending to the default would tint it.
-            if attributes & CellAttributes.dim.rawValue != 0 { fg.w *= Self.dimAlpha }
+            if attributes.contains(.dim) { fg.w *= Self.dimAlpha }
 
             let origin = SIMD2<Float>(Float(column) * cellWidth, Float(row) * cellHeight)
             if !(reversed ? cell.foreground : cell.background).isDefault || reversed {
@@ -579,12 +580,12 @@ nonisolated final class TerminalRenderer {
             }
 
             // Rules, not glyphs. An OSC 8 link is always underlined — `ls
-            // --hyperlink` sets no rendition. One mask test for the group.
+            // --hyperlink` sets no rendition. One test for the group.
             let hasRuleOrHiddenWork =
-                attributes & Self.ruleAttributeMask != 0 || !cell.hyperlink.isNone
-            let isInvisible = attributes & CellAttributes.invisible.rawValue != 0
+                !attributes.isDisjoint(with: Self.ruleAttributes) || !cell.hyperlink.isNone
+            let isInvisible = attributes.contains(.invisible)
             if hasRuleOrHiddenWork, !isInvisible,
-                attributes & CellAttributes.underline.rawValue != 0 || !cell.hyperlink.isNone
+                attributes.contains(.underline) || !cell.hyperlink.isNone
             {
                 // A spacer draws it too, so it spans a wide character.
                 let thickness = max(1, Float(scale).rounded(.down))
@@ -593,9 +594,7 @@ nonisolated final class TerminalRenderer {
                         origin: .init(origin.x, origin.y + baseline + thickness),
                         size: .init(cellWidth, thickness), color: fg))
             }
-            if hasRuleOrHiddenWork, !isInvisible,
-                attributes & CellAttributes.strikethrough.rawValue != 0
-            {
+            if hasRuleOrHiddenWork, !isInvisible, attributes.contains(.strikethrough) {
                 let thickness = max(1, Float(scale).rounded(.down))
                 background.append(
                     QuadInstance(
@@ -604,8 +603,7 @@ nonisolated final class TerminalRenderer {
                         size: .init(cellWidth, thickness), color: fg))
             }
 
-            guard !isInvisible, attributes & CellAttributes.wideSpacer.rawValue == 0
-            else { continue }
+            guard !isInvisible, !attributes.contains(.wideSpacer) else { continue }
             // Geometry, not glyphs: glyphs fall short of rounded-up cells and leave
             // a grid of gaps between block characters (`BlockElements`).
             if let pieces = BlockElements.pieces(for: cell.scalar) {
@@ -622,10 +620,8 @@ nonisolated final class TerminalRenderer {
             }
 
             let style = GlyphAtlas.Style(
-                rawValue: UInt8(
-                    (attributes & CellAttributes.bold.rawValue != 0 ? 1 : 0)
-                        | (attributes & CellAttributes.italic.rawValue != 0 ? 2 : 0)))
-            let isWide = attributes & CellAttributes.wide.rawValue != 0
+                bold: attributes.contains(.bold), italic: attributes.contains(.italic))
+            let isWide = attributes.contains(.wide)
             let info: GlyphAtlas.GlyphInfo
             if !cell.grapheme.isNone,
                 let scalars = graphemes.scalars(for: cell.grapheme)

@@ -1,8 +1,8 @@
 {
   "configurations": [
     {
-      "id": "B1C0A100-0001-4000-A000-000000000001",
-      "name": "Debug",
+      "id": "B1C0A100-0003-4000-A000-000000000003",
+      "name": "Release",
       "options": {}
     }
   ],
@@ -25,22 +25,6 @@
   },
   "testTargets": [
     {
-      "target": {
-        "containerPath": "container:Corta.xcodeproj",
-        "identifier": "4F1776AE30465E2000E8DD20",
-        "name": "CortaTests"
-      }
-    },
-    {
-      "enabled": false,
-      "target": {
-        "containerPath": "container:Corta.xcodeproj",
-        "identifier": "4F1776B830465E2000E8DD20",
-        "name": "CortaUITests"
-      }
-    },
-    {
-      "enabled": false,
       "target": {
         "containerPath": "container:Corta.xcodeproj",
         "identifier": "5B0E0C1030465E2000E8DD20",

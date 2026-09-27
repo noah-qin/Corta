@@ -163,7 +163,7 @@ are snapshots, not guarantees for every machine or workload.
 
 | Check | Recorded result | Evidence |
 | :--- | :--- | :--- |
-| Frame CPU, 120 × 40 full rebuild, Debug | 2.26 ms, three-run mean | [Performance](docs/PERFORMANCE.md) |
+| Frame CPU, 120 × 40 full rebuild, Release | 0.58 ms, three-run mean | [Performance](docs/PERFORMANCE.md#58-the-frame-cpu-baseline-under-release-d17) |
 | Idle CPU, Release, 20 seconds | 0.05% | [Performance](docs/PERFORMANCE.md) |
 | Scrollback memory, 100k × 120 lines | 185.0 MB | [Performance](docs/PERFORMANCE.md) |
 | Core feed throughput | 144.2 MiB/s, five-run mean | [Performance](docs/PERFORMANCE.md) |

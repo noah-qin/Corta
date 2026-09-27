@@ -31,7 +31,7 @@ first so contributors do not duplicate effort.
 | `Corta/` | AppKit shell, input, configuration, fonts and Metal renderer |
 | `CortaTerminal/Sources/CortaTerminal/` | Parser, grid, PTY, search and terminal protocols |
 | `CortaTerminal/Tests/` | Core tests, golden fixtures and fuzz corpus |
-| `CortaTests/`, `CortaUITests/` | App-hosted tests and interactive UI tests |
+| `CortaTests/`, `CortaUITests/`, `CortaPerformanceTests/` | App-hosted tests, interactive UI tests, and the Release measurements |
 | `docs/` | User guides, architecture and verification evidence |
 | `scripts/`, `.github/` | Measurement, packaging, the isolated developer launch, and continuous integration |
 
@@ -40,7 +40,7 @@ first so contributors do not duplicate effort.
 [Testing](docs/TESTING.md) maps each change to its checks. Documentation-only
 changes need documentation checks and a rendered review; they do not require
 launching the app. App-layer changes do. Changes to the render loop also need
-a measured frame-CPU baseline.
+a frame-CPU baseline measured under Release (`-testPlan Release`).
 
 Keep public guides in English and use relative links within the repository.
 Document defaults, units, prerequisites and limitations alongside examples.

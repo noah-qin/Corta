@@ -55,8 +55,8 @@ import simd
 /// shareable — two threads segfault in `CTRunGetImageBounds`. The app
 /// drives it from the main thread; tests that build one are serialised.
 nonisolated final class GlyphAtlas {
-    /// The four faces. A raw bitfield because it is built per cell per frame
-    /// from `Cell.attributes.rawValue` (`PERFORMANCE.md` §3).
+    /// The four faces, as two bits: part of the glyph-cache key looked up
+    /// per cell per frame.
     struct Style: Hashable {
         var rawValue: UInt8
 

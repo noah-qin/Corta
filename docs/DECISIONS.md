@@ -229,15 +229,30 @@ which loads the content view and spawns the pane before returning.
 splits. The first pane of every restored window came up in the home
 directory under the default shell until B16 found it.
 
-## D17 — The frame-CPU baseline is re-measured after touching the render loop
+## D17 — The frame-CPU baseline is re-measured, under Release, after touching the render loop
 
-**Decision.** `PERFORMANCE.md` §5 records the number; a change to the
-render loop records a new one.
+**Decision.** `PERFORMANCE.md` §5.8 records the number; a change to the
+render loop records a new one. The number is taken under Release —
+`xcodebuild test -scheme Corta -testPlan Release -configuration
+Benchmark` — never under the Debug test action.
 
 **Why.** The M6 render work took it from 2.40 ms to 4.19 ms — a per-cell
 read of a global that retained an array, plus three unelided
 `OptionSet.contains` calls — and back to 2.32 ms once both were folded
 away. The regression was invisible in every test that passed.
+
+Those figures were Debug figures, and so was every baseline until 1.1.0
+(#110). A Debug number rewards code shaped for `-Onone`: re-measured
+under Release, the `OptionSet.contains` calls cost nothing, while the
+global read still cost ~5%. A baseline that can be moved by the
+optimiser being switched off defends the wrong thing, so the render loop
+is written as ordinary Swift and measured as it ships.
+
+**What it costs.** A `Benchmark` build configuration (Release's compiler
+settings, the development identity of D22) and a separate test bundle,
+`CortaPerformanceTests`, that imports the app without `@testable` —
+because `-enable-testing` inhibits the optimisation being measured. What
+that bundle drives, the renderer declares `public`.
 
 ## D18 — No tool or session identifier in a commit message
 

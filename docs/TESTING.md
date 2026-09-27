@@ -14,7 +14,7 @@ pin the same stable release; update both `XCODE_PIN` values together. A failed b
 | Documentation or GitHub templates | `python3 scripts/check-docs.py`; `DocumentationDriftTests` for `CONFIGURATION.md` | Review rendered Markdown and examples |
 | Parser, grid, search or session | Core suite, focused regression test, fuzz replay for PTY input changes | Specification or minimal reproducer |
 | AppKit, input, settings or windows | Relevant `CortaTests`, then app suite | Launch the app; record the five-point manual check |
-| Rendering or hot path | Relevant rendering tests and app suite | Before/after frame CPU using the same workload |
+| Rendering or hot path | Relevant rendering tests and app suite | Before/after frame CPU under Release (`-testPlan Release`), same machine |
 | Localization or accessibility | Relevant app tests | In-context language or VoiceOver review |
 | Packaging or release | `scripts/check-release.sh` against the artifact | Signing and notarization evidence |
 
@@ -118,12 +118,13 @@ xcodebuild test \
 Use a fresh result-bundle path for each run. Add
 `-only-testing:CortaTests/ConfigurationTests` to focus a suite.
 
-Two test plans under `TestPlans/` say what runs where:
+Three test plans under `TestPlans/` say what runs where:
 
 | Plan | Contains | Run it with |
 | ---- | -------- | ----------- |
-| `Unit` | `CortaTests`; `CortaUITests` listed but disabled | `-scheme Corta -testPlan Unit` — the default, and what CI runs |
+| `Unit` | `CortaTests`; `CortaUITests` and `CortaPerformanceTests` listed but disabled | `-scheme Corta -testPlan Unit` — the default, and what CI runs |
 | `UI` | `CortaUITests` | `-scheme Corta -testPlan UI` — an interactive desktop session only |
+| `Release` | `CortaPerformanceTests`: the frame-CPU baseline, the instance-upload benchmark, renderer construction cost | `-scheme Corta -testPlan Release -configuration Benchmark` — the measurement D17 records |
 
 `UI` is deliberately not part of the default run: a UI test drives the
 keyboard and the frontmost window, so running it takes the machine away
@@ -131,12 +132,31 @@ from whatever else is happening on it. It stays *listed* in `Unit` with
 `enabled: false` so the target is still built — a compile error in the UI
 tests is caught on every run — without anything being driven. Neither CI
 nor an offscreen rendering test replaces launching the app.
+`CortaPerformanceTests` is listed the same way, for the same reason.
 
-There is no Release plan yet. Building the test bundle against a Release
-app needs `ENABLE_TESTABILITY = YES` in that configuration, because every
-file in `CortaTests` uses `@testable import Corta`; that emits
-`-enable-testing`, which inhibits optimisation and so changes the very
-number a Release measurement is for. Issue #110 settles that trade.
+### Measuring the render loop
+
+A render-loop change records a new frame-CPU baseline (`DECISIONS.md`
+D17), and the baseline is a Release number:
+
+```sh
+xcodebuild test -project Corta.xcodeproj -scheme Corta \
+  -testPlan Release -configuration Benchmark -destination 'platform=macOS'
+cat /tmp/corta-frame-cpu-baseline.txt /tmp/corta-instance-upload.txt
+```
+
+Take three runs before the change and three after, on the same machine
+and toolchain. `-configuration Benchmark` is not optional: without it the
+scheme's Debug configuration builds the same plan, and the report's first
+line says `Debug, -Onone`. `Benchmark` is Release's compiler settings with
+the development identity (D22), so the test host is `CortaDev.app`.
+
+The measuring suites live in their own bundle, `CortaPerformanceTests`,
+which imports the app without `@testable`: `-enable-testing` inhibits the
+optimisation a Release figure exists to see, and every file in
+`CortaTests` needs it. A suite added there can reach only what `Corta`
+declares `public`. `PERFORMANCE.md` §5.8 has the recorded numbers and what
+the figure does and does not include.
 
 ### Which environments can run the render tests
 

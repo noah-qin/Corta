@@ -34,7 +34,7 @@ enum QuadRendererError: Error {
 /// that space: the target is `.bgra8Unorm`, not `_srgb`, as in xterm,
 /// Alacritty and Ghostty. Linear blending waits on stem darkening
 /// (`DESIGN.md` §7, hard part 5).
-nonisolated final class QuadRenderer {
+public nonisolated final class QuadRenderer {
     let device: MTLDevice
     private let solidPipeline: MTLRenderPipelineState
     private let glyphPipeline: MTLRenderPipelineState
@@ -71,11 +71,11 @@ nonisolated final class QuadRenderer {
     private let colorGlyphBufferRing = InstanceBufferRing()
 
     /// Every render target's format; the pipelines are built against it.
-    static let pixelFormat: MTLPixelFormat = .bgra8Unorm
+    public static let pixelFormat: MTLPixelFormat = .bgra8Unorm
 
     /// Pipelines and sampler come from `QuadPipelineCache`: one compile per
     /// device per process, shared by every pane and `Metal4Backend`.
-    init(device: MTLDevice) throws {
+    public init(device: MTLDevice) throws {
         self.device = device
         let entry = try QuadPipelineCache.entry(for: device)
         self.solidPipeline = entry.solidPipeline

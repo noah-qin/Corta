@@ -14,6 +14,7 @@
 		C07A000130465E2000E8DD20 /* CortaTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000530465E2000E8DD20 /* CortaTerminal */; };
 		C07A000230465E2000E8DD20 /* CortaTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000630465E2000E8DD20 /* CortaTerminal */; };
 		C07A000830465E2000E8DD20 /* corta-exec in Embed corta-exec */ = {isa = PBXBuildFile; productRef = C07A000730465E2000E8DD20 /* corta-exec */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		5B0E0C1D30465E2000E8DD20 /* CortaTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = 5B0E0C1C30465E2000E8DD20 /* CortaTerminal */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -25,6 +26,13 @@
 			remoteInfo = Corta;
 		};
 		4F1776BA30465E2000E8DD20 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4F17769730465E1F00E8DD20 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4F17769E30465E1F00E8DD20;
+			remoteInfo = Corta;
+		};
+		5B0E0C1730465E2000E8DD20 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 4F17769730465E1F00E8DD20 /* Project object */;
 			proxyType = 1;
@@ -54,6 +62,7 @@
 		A1C0A000030465E2000E8DD20 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		A1C0A002030465E2000E8DD20 /* AppIconDev.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIconDev.icon; sourceTree = "<group>"; };
 		E9A0D9C512919DCC5A6DF615 /* Sparkle-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Sparkle-Info.plist"; sourceTree = "<group>"; };
+		5B0E0C1130465E2000E8DD20 /* CortaPerformanceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CortaPerformanceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -70,6 +79,11 @@
 		4F1776BC30465E2000E8DD20 /* CortaUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = CortaUITests;
+			sourceTree = "<group>";
+		};
+		5B0E0C1230465E2000E8DD20 /* CortaPerformanceTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CortaPerformanceTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -100,6 +114,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5B0E0C1430465E2000E8DD20 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5B0E0C1D30465E2000E8DD20 /* CortaTerminal in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -112,6 +134,7 @@
 				4F1776A130465E1F00E8DD20 /* Corta */,
 				4F1776B230465E2000E8DD20 /* CortaTests */,
 				4F1776BC30465E2000E8DD20 /* CortaUITests */,
+				5B0E0C1230465E2000E8DD20 /* CortaPerformanceTests */,
 				4F1776A030465E1F00E8DD20 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -122,6 +145,7 @@
 				4F17769F30465E1F00E8DD20 /* Corta.app */,
 				4F1776AF30465E2000E8DD20 /* CortaTests.xctest */,
 				4F1776B930465E2000E8DD20 /* CortaUITests.xctest */,
+				5B0E0C1130465E2000E8DD20 /* CortaPerformanceTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -202,6 +226,30 @@
 			productReference = 4F1776B930465E2000E8DD20 /* CortaUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		5B0E0C1030465E2000E8DD20 /* CortaPerformanceTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5B0E0C1830465E2000E8DD20 /* Build configuration list for PBXNativeTarget "CortaPerformanceTests" */;
+			buildPhases = (
+				5B0E0C1330465E2000E8DD20 /* Sources */,
+				5B0E0C1430465E2000E8DD20 /* Frameworks */,
+				5B0E0C1530465E2000E8DD20 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5B0E0C1630465E2000E8DD20 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				5B0E0C1230465E2000E8DD20 /* CortaPerformanceTests */,
+			);
+			name = CortaPerformanceTests;
+			packageProductDependencies = (
+				5B0E0C1C30465E2000E8DD20 /* CortaTerminal */,
+			);
+			productName = CortaPerformanceTests;
+			productReference = 5B0E0C1130465E2000E8DD20 /* CortaPerformanceTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -221,6 +269,10 @@
 					};
 					4F1776B830465E2000E8DD20 = {
 						CreatedOnToolsVersion = 26.6;
+						TestTargetID = 4F17769E30465E1F00E8DD20;
+					};
+					5B0E0C1030465E2000E8DD20 = {
+						CreatedOnToolsVersion = 27.0;
 						TestTargetID = 4F17769E30465E1F00E8DD20;
 					};
 				};
@@ -254,6 +306,7 @@
 				4F17769E30465E1F00E8DD20 /* Corta */,
 				4F1776AE30465E2000E8DD20 /* CortaTests */,
 				4F1776B830465E2000E8DD20 /* CortaUITests */,
+				5B0E0C1030465E2000E8DD20 /* CortaPerformanceTests */,
 			);
 		};
 /* End PBXProject section */
@@ -276,6 +329,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		4F1776B730465E2000E8DD20 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5B0E0C1530465E2000E8DD20 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -306,6 +366,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5B0E0C1330465E2000E8DD20 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -318,6 +385,11 @@
 			isa = PBXTargetDependency;
 			target = 4F17769E30465E1F00E8DD20 /* Corta */;
 			targetProxy = 4F1776BA30465E2000E8DD20 /* PBXContainerItemProxy */;
+		};
+		5B0E0C1630465E2000E8DD20 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4F17769E30465E1F00E8DD20 /* Corta */;
+			targetProxy = 5B0E0C1730465E2000E8DD20 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -614,6 +686,221 @@
 			};
 			name = Release;
 		};
+		5B0E0C0130465E2000E8DD20 /* Benchmark */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CORTA_BUNDLE_SUFFIX = ".dev";
+				CORTA_PRODUCT_NAME = CortaDev;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 646VSJ9K5F;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Benchmark;
+		};
+		5B0E0C0230465E2000E8DD20 /* Benchmark */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconDev;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "-";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 4;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 646VSJ9K5F;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Sparkle-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Corta Dev";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Noah Qin. Apache License 2.0.";
+				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = "dev.noahqin.Corta$(CORTA_BUNDLE_SUFFIX)";
+				PRODUCT_MODULE_NAME = Corta;
+				PRODUCT_NAME = "$(CORTA_PRODUCT_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Benchmark;
+		};
+		5B0E0C0330465E2000E8DD20 /* Benchmark */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "-";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 646VSJ9K5F;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.noahqin.CortaTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/$(CORTA_PRODUCT_NAME).app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/$(CORTA_PRODUCT_NAME)";
+			};
+			name = Benchmark;
+		};
+		5B0E0C0430465E2000E8DD20 /* Benchmark */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 646VSJ9K5F;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.noahqin.CortaUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TEST_TARGET_NAME = Corta;
+			};
+			name = Benchmark;
+		};
+		5B0E0C1930465E2000E8DD20 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "-";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 646VSJ9K5F;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.noahqin.CortaPerformanceTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/$(CORTA_PRODUCT_NAME).app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/$(CORTA_PRODUCT_NAME)";
+			};
+			name = Debug;
+		};
+		5B0E0C1A30465E2000E8DD20 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 646VSJ9K5F;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.noahqin.CortaPerformanceTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/$(CORTA_PRODUCT_NAME).app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/$(CORTA_PRODUCT_NAME)";
+			};
+			name = Release;
+		};
+		5B0E0C1B30465E2000E8DD20 /* Benchmark */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "-";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 646VSJ9K5F;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.noahqin.CortaPerformanceTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/$(CORTA_PRODUCT_NAME).app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/$(CORTA_PRODUCT_NAME)";
+			};
+			name = Benchmark;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -622,6 +909,7 @@
 			buildConfigurations = (
 				4F1776C130465E2000E8DD20 /* Debug */,
 				4F1776C230465E2000E8DD20 /* Release */,
+				5B0E0C0130465E2000E8DD20 /* Benchmark */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -631,6 +919,7 @@
 			buildConfigurations = (
 				4F1776C430465E2000E8DD20 /* Debug */,
 				4F1776C530465E2000E8DD20 /* Release */,
+				5B0E0C0230465E2000E8DD20 /* Benchmark */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -640,6 +929,7 @@
 			buildConfigurations = (
 				4F1776C730465E2000E8DD20 /* Debug */,
 				4F1776C830465E2000E8DD20 /* Release */,
+				5B0E0C0330465E2000E8DD20 /* Benchmark */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -649,6 +939,17 @@
 			buildConfigurations = (
 				4F1776CA30465E2000E8DD20 /* Debug */,
 				4F1776CB30465E2000E8DD20 /* Release */,
+				5B0E0C0430465E2000E8DD20 /* Benchmark */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5B0E0C1830465E2000E8DD20 /* Build configuration list for PBXNativeTarget "CortaPerformanceTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5B0E0C1930465E2000E8DD20 /* Debug */,
+				5B0E0C1A30465E2000E8DD20 /* Release */,
+				5B0E0C1B30465E2000E8DD20 /* Benchmark */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -693,6 +994,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C07A000430465E2000E8DD20 /* XCLocalSwiftPackageReference "CortaTerminal" */;
 			productName = "corta-exec";
+		};
+		5B0E0C1C30465E2000E8DD20 /* CortaTerminal */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C07A000430465E2000E8DD20 /* XCLocalSwiftPackageReference "CortaTerminal" */;
+			productName = CortaTerminal;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -29,7 +29,7 @@ import Metal
 ///
 /// `lock` covers lookup and one-time creation, including the archive
 /// work, which happens nowhere else.
-nonisolated enum QuadPipelineCache {
+public nonisolated enum QuadPipelineCache {
     /// The immutable bundle both backends draw with; `let`-only, so sharing
     /// needs no further synchronisation.
     nonisolated final class Entry {
@@ -71,7 +71,7 @@ nonisolated enum QuadPipelineCache {
 
     /// Test hook: forces the cold path, so `QuadRendererTests` sees the
     /// archive rewritten.
-    static func resetForTesting() {
+    public static func resetForTesting() {
         lock.lock()
         entries.removeAll()
         lock.unlock()
