@@ -93,9 +93,9 @@ public struct Grid: Sendable {
     /// right, rather than overwriting the cell under it; characters pushed
     /// past the last column are lost.
     ///
-    /// Implemented rather than reported as unrecognised: a program that sets
-    /// a mode the terminal silently ignores draws its next screen against a layout that never
-    /// happened. `readline`'s and `ed`'s insert paths both use it.
+    /// Implemented rather than reported as unrecognised: a program that
+    /// sets a mode the terminal silently ignores draws its next screen
+    /// against a layout that never happened. `readline`'s and `ed`'s insert paths both use it.
     public var insertMode: Bool = false
 
     /// DECRST/DECSET `?45` — reverse-wraparound mode. While set, `BS`

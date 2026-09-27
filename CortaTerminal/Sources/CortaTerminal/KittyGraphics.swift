@@ -1,6 +1,6 @@
-/// The Kitty graphics protocol (`DESIGN.md` §6): inline images, transmitted as APC sequences
-/// (`ESC _ G ... ESC \`) the way <https://sw.kovidgoyal.net/kitty/graphics-protocol/>
-/// specifies. Ghostty, WezTerm, iTerm2 and foot all implement some or all of
+/// The Kitty graphics protocol (`DESIGN.md` §6): inline images, transmitted
+/// as APC sequences (`ESC _ G ... ESC \`) the way
+/// <https://sw.kovidgoyal.net/kitty/graphics-protocol/> specifies. Ghostty, WezTerm, iTerm2 and foot all implement some or all of
 /// the same wire format, which is why this exists — some remote toolchains
 /// (`icat`, plot libraries, image previewers in TUI file managers) assume it.
 ///

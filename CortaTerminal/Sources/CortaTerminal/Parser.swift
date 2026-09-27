@@ -239,9 +239,8 @@ public struct Parser: Sendable {
             parameters.separate()
             state = .csiParam
         case 0x3A:
-            // Sub-parameters (`SGR 38:2::r:g:b`) are not implemented (P2 in
-            // `CONFORMANCE.md`); ignoring the whole sequence is the safe
-            // reading.
+            // Sub-parameters (`SGR 38:2::r:g:b`) are not implemented;
+            // ignoring the whole sequence is the safe reading.
             state = .csiIgnore
         case 0x3C...0x3F:
             privateMarker = byte
