@@ -14,18 +14,16 @@ import QuartzCore
 /// (a flooding build log) while occluded, backgrounded, thermally
 /// throttled, or on battery in Low Power Mode is the case this exists for.
 ///
-/// **`preferredFrameLatency` is deliberately untouched.** The plan this
-/// milestone came from called for lowering it while typing, for tighter
-/// input latency. `CAMetalDisplayLink.preferredFrameLatency` is a bare
-/// `Float` with no documented default constant or unit guidance in the
-/// SDK header (`CAMetalDisplayLink.h`) beyond "how far ahead of the
-/// deadline to run" — picking a number without a measurement to justify it
-/// risks the opposite of the intended effect (running the callback too
-/// early relative to a frame that is not actually ready), and this
-/// milestone's own instrumentation (`RenderMetrics`, `InputLatencySignposts`)
-/// exists specifically so a change like that is chosen from a number, not
-/// a guess (`PERFORMANCE.md` §5.3-5.4's stated approach). Left for a
-/// follow-up once there is a keypress-to-pixel trace to tune it against.
+/// **`preferredFrameLatency` is deliberately untouched.** Lowering it while
+/// typing could tighten input latency. The property is the latency the app
+/// requests, in frames (Apple's documentation; on macOS the final latency
+/// may be larger in windowed mode) — but picking a number without a
+/// measurement to justify it risks the opposite of the intended effect
+/// (running the callback too early relative to a frame that is not actually
+/// ready). `RenderMetrics` and `InputLatencySignposts` exist so a change
+/// like that is chosen from a number, not a guess (`PERFORMANCE.md`
+/// §5.3–5.4); the default stays until a keypress-to-glass trace says
+/// otherwise.
 final class RenderPolicy {
     private weak var scheduler: FrameScheduler?
     private var thermalObserver: NSObjectProtocol?

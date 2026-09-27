@@ -28,14 +28,14 @@ nonisolated enum TerminalLayout {
     /// window is tabbed) actually overlaps a pane whose top edge sits
     /// `paneDistanceFromTop` points below the window's own top edge. Zero
     /// once a pane is far enough down that no chrome reaches it — a
-    /// bottom-row pane in a split has no titlebar above it (M5), and an
+    /// bottom-row pane in a split has no titlebar above it, and an
     /// interior pane has neither a titlebar nor a tab bar.
     ///
     /// Shared by `ViewController.topInset` (shifts the grid down) and
     /// `ViewController.updateFocusRingLayout` (shifts the focus ring's top
-    /// edge down by the same amount) — the two used to agree only on the
-    /// grid, so a top pane's ring drew flush with the pane's frame and the
-    /// tab bar painted over its top edge.
+    /// edge down by the same amount) — if they disagreed, a top pane's ring
+    /// would draw flush with the pane's frame and the tab bar would paint
+    /// over its top edge.
     static func chromeOverlap(windowChrome: CGFloat, paneDistanceFromTop: CGFloat) -> CGFloat {
         max(0, windowChrome - paneDistanceFromTop)
     }

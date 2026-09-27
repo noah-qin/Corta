@@ -1,6 +1,6 @@
 import Cocoa
 
-/// U16 — the Shell menu's list of presets, rebuilt from the config file each
+/// The Shell menu's list of presets, rebuilt from the config file each
 /// time the menu opens.
 ///
 /// Rebuilt rather than built once at launch, for the same reason the theme
@@ -80,7 +80,7 @@ extension AppDelegate {
             item.target = self
             item.toolTip = Self.summary(of: preset)
             menu.addItem(item)
-            // U16 — holding ⌥ opens the preset in a window of its own. An
+            // Holding ⌥ opens the preset in a window of its own. An
             // alternate item is the Mac idiom for "the same command, one
             // level bigger", and it costs no extra row until ⌥ is down.
             let inWindow = NSMenuItem(

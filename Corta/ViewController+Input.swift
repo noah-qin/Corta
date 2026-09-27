@@ -1,10 +1,10 @@
 import Cocoa
 import CortaTerminal
 
-/// Text input into the PTY (Track A): paste, and the home of IME-committed
-/// text once `TerminalView+IME.swift` lands.
+/// Text input into the PTY: paste. IME-committed text reaches the PTY
+/// through `TerminalView+IME.swift`'s `insertText`, the path a key takes.
 extension ViewController {
-    // MARK: - Paste (M2.6, app side)
+    // MARK: - Paste
 
     func pasteFromClipboard() {
         guard let text = NSPasteboard.general.string(forType: .string) else { return }
@@ -21,7 +21,7 @@ extension ViewController {
         }
         returnToBottomOnInput()
         let payload = Paste.bytes(for: sanitized, bracketedPasteEnabled: bracketedPasteEnabled())
-        // B03: bounded chunks, not one arbitrarily large enqueue — a
+        // Bounded chunks, not one arbitrarily large enqueue — a
         // multi-megabyte paste sent as a single `write` would occupy the
         // one FIFO the writer queue shares with keyboard input for the
         // whole write, so a keystroke typed mid-paste would wait behind all
@@ -53,7 +53,7 @@ extension ViewController {
         pasteFromClipboard()
     }
 
-    /// The core's ?2004 bracketed-paste flag (M2.6). When on, pastes are
+    /// The core's ?2004 bracketed-paste flag. When on, pastes are
     /// wrapped in `ESC[200~`…`ESC[201~` and the newline warning is skipped.
     func bracketedPasteEnabled() -> Bool {
         session.isBracketedPasteEnabled

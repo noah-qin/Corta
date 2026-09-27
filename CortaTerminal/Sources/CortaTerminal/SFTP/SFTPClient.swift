@@ -1,7 +1,7 @@
 import Foundation
 import Synchronization
 
-/// B14 — the seam between the SFTP engine and the app's browser/transfer
+/// The seam between the SFTP engine and the app's browser/transfer
 /// UI.
 ///
 /// `SFTPSession` and `SFTPTransferEngine` are concrete classes: the engine's
@@ -182,10 +182,10 @@ public final class SFTPConnection: SFTPClient, @unchecked Sendable {
             // *This* channel, by hand: the connection's pointer is moved to
             // a child only once its session is up, so on the first connect
             // there is nothing in `state` yet and `classified(_:)` alone
-            // would hand back the bare `.connectionLost` — which is what a
-            // password prompt that ssh could not show looked like in the
-            // browser, "The connection was lost", with the "connect once in
-            // the terminal first" guidance never reached (B16 test pass).
+            // would hand back the bare `.connectionLost`. A password prompt
+            // ssh could not show would then read "The connection was lost"
+            // in the browser, and never reach the "connect once in the
+            // terminal first" guidance.
             throw await classified(error, over: channel)
         }
         return (channel, session)

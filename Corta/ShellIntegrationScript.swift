@@ -1,4 +1,4 @@
-/// B07 — the snippets `ShellIntegrationInstaller` writes into a shell's rc
+/// The snippets `ShellIntegrationInstaller` writes into a shell's rc
 /// file, one per supported shell.
 ///
 /// A Swift string constant rather than a bundled resource file: this is

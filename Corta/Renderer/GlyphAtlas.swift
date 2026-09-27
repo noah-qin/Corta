@@ -19,7 +19,7 @@ import simd
 /// (`DESIGN.md` §2.3). Each shapes via `CTLine` once per key and caches the
 /// result — paid once, not per frame.
 ///
-/// **Font fallback** (M3.5) is Core Text's cascade list: a `CTLine` shaped
+/// **Font fallback** is Core Text's cascade list: a `CTLine` shaped
 /// with a font that lacks a scalar resolves the run to a fallback font, and
 /// the *run's* font — not the requested one — is what rasterises the glyph.
 /// (Rasterising a fallback glyph with the primary font drew the wrong
@@ -34,22 +34,22 @@ import simd
 /// premultiplied). The renderer draws those quads in a separate pass whose
 /// fragment returns the texture sample directly instead of tinting coverage.
 ///
-/// **Pages (M9).** The grayscale texture is split into two independently
+/// **Pages.** The grayscale texture is split into two independently
 /// packed and independently evicted regions — `asciiPage` (the ASCII fast
 /// path, plus the reserved white texel row) and `shapedPage` (everything
 /// that goes through `CTLine` shaping: single non-ASCII scalars and
 /// multi-scalar clusters, which is where CJK and combining-mark content
 /// lands) — and the color texture's `colorPage` is a third, on its own
-/// texture as before. Each `AtlasPage` owns its own shelf allocator and its
+/// texture. Each `AtlasPage` owns its own shelf allocator and its
 /// own glyph/cluster cache, so a CJK-heavy screen overflowing `shapedPage`
-/// no longer evicts `asciiPage`'s cache, and an emoji-heavy screen
-/// overflowing `colorPage` no longer evicts either grayscale page. Before
-/// this, all three shared one allocator pair and one cache pair per
-/// texture, so any one of them filling up reset everything sharing its
-/// texture, including content that never came close to the limit.
+/// does not evict `asciiPage`'s cache, and an emoji-heavy screen
+/// overflowing `colorPage` does not evict either grayscale page. With one
+/// shared allocator and cache per texture, any one of them filling up
+/// would reset everything sharing its texture, including content that
+/// never came close to the limit.
 ///
-/// **Eviction stays per-page, mid-build safety stays global** (M3,
-/// `DESIGN.md` §7 hard part 4): a page whose shelf cannot fit the next
+/// **Eviction stays per-page, mid-build safety stays global**
+/// (`DESIGN.md` §7.4): a page whose shelf cannot fit the next
 /// glyph resets *that page only* — its cache cleared, its allocator
 /// rewound — and glyphs re-rasterise on demand (the strategy Alacritty uses
 /// for the same reason, just now scoped per page rather than per texture).
@@ -61,7 +61,7 @@ import simd
 /// which page caused it. A screen whose live content alone exceeds a page
 /// cannot be served by any eviction policy; after one retry those cells
 /// draw blank.
-/// **Allocation failure (S07).** If the device cannot allocate the atlas
+/// **Allocation failure.** If the device cannot allocate the atlas
 /// textures at the requested size, `init` retries at halving sizes down to
 /// `minimumAtlasPixelSize` and sets `isDegraded` — the pages and eviction
 /// machinery are size-agnostic, so a memory-pressured machine keeps
@@ -182,7 +182,7 @@ nonisolated final class GlyphAtlas {
     static let atlasSize = 2048
 
     /// The smallest atlas edge length `init` will settle for when the
-    /// device cannot allocate the requested size (S07): at this size the
+    /// device cannot allocate the requested size: at this size the
     /// shelf allocator still fits dozens of glyphs and the page-eviction
     /// machinery absorbs the churn, so a memory-pressured Mac degrades to
     /// re-rasterising instead of crashing.
@@ -193,7 +193,7 @@ nonisolated final class GlyphAtlas {
     /// (see `init`).
     private(set) var atlasPixelSize: Int
     /// True when texture allocation failed at the requested size and the
-    /// atlas fell back to a smaller one (S07). Everything keeps working —
+    /// atlas fell back to a smaller one. Everything keeps working —
     /// the pages and eviction machinery are size-agnostic — but cache
     /// capacity is reduced, so the shell can log/observe the degradation.
     private(set) var isDegraded = false
@@ -222,7 +222,7 @@ nonisolated final class GlyphAtlas {
     private(set) var fastPathHits = 0
     private(set) var shapingHits = 0
     /// How many shaped runs resolved to a font other than the requested one —
-    /// Core Text's cascade list at work (M3.5).
+    /// Core Text's cascade list at work.
     private(set) var fallbackHits = 0
     /// How many times any single page was reset (see the type comment) —
     /// one count across all three pages, not one per page.
@@ -241,7 +241,7 @@ nonisolated final class GlyphAtlas {
     /// - Parameter atlasPixelSize: edge length of the square atlas texture.
     ///   Tests pass a small size to exercise eviction without rasterising
     ///   thousands of glyphs.
-    /// - Parameter makeTexture: allocation hook for tests (S07) — inject a
+    /// - Parameter makeTexture: allocation hook for tests — inject a
     ///   closure that fails for some descriptors to exercise the fallback
     ///   path. Production callers leave it nil, which uses the device.
     init(
@@ -256,7 +256,7 @@ nonisolated final class GlyphAtlas {
         (self.fonts, self.isSyntheticBold) = Self.faces(of: base)
 
         let allocate = makeTexture ?? { device.makeTexture(descriptor: $0) }
-        // Texture allocation failure is recoverable (S07): halve the atlas
+        // Texture allocation failure is recoverable: halve the atlas
         // and retry down to `minimumAtlasPixelSize`. The pages are built
         // from whatever size actually succeeded, and eviction absorbs the
         // reduced capacity. Only a device that cannot allocate even the
@@ -315,9 +315,9 @@ nonisolated final class GlyphAtlas {
 
     /// Re-points the atlas at a new font, reusing the texture.
     ///
-    /// Runtime font sizing (cmd-=/cmd--) used to construct a whole new
-    /// renderer per keystroke, which meant a fresh multi-megabyte atlas
-    /// texture *and* fresh Metal pipeline states every time a key repeated.
+    /// Runtime font sizing (cmd-=/cmd--) calls this per keystroke; a whole
+    /// new renderer each time would mean a fresh multi-megabyte atlas
+    /// texture *and* fresh Metal pipeline states every time a key repeats.
     /// The font changes; the storage and the pipelines do not need to.
     func reset(font newFont: CTFont) {
         let base = TerminalFont.pinningCascadeList(newFont, size: CTFontGetSize(newFont))
@@ -399,7 +399,7 @@ nonisolated final class GlyphAtlas {
         glyph(forCluster: scalars, style: Style(bold: bold, italic: false))
     }
 
-    /// Grapheme-cluster path (M3.6): shapes the whole cluster as one string,
+    /// Grapheme-cluster path: shapes the whole cluster as one string,
     /// so a ZWJ emoji sequence comes back as the single glyph run the emoji
     /// font defines for it and a combining-mark cluster is positioned by the
     /// shaper rather than stacked by hand.
@@ -438,7 +438,7 @@ nonisolated final class GlyphAtlas {
     /// One shaped string as a flat list of runs.
     /// The font is the run's own: when the requested font lacks the scalars,
     /// Core Text resolves the run through its cascade list and the run carries
-    /// the fallback font (M3.5) — rasterising with anything else draws glyphs
+    /// the fallback font — rasterising with anything else draws glyphs
     /// from the wrong font entirely.
     ///
     /// Glyph 0 (`.notdef`) is dropped: drawing it would ink a placeholder

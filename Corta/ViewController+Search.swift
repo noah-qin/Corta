@@ -1,7 +1,7 @@
 import Cocoa
 import CortaTerminal
 
-/// Scrollback search (M4.4): the glass bar, its key routing, and the match
+/// Scrollback search: the glass bar, its key routing, and the match
 /// model the renderer highlights.
 ///
 /// Matching lives in the core (`Search.find`) over logical lines, so a match
@@ -16,7 +16,7 @@ import CortaTerminal
 /// but Esc has no menu item — and while the bar is open a raw ESC byte must
 /// never reach the child.
 extension ViewController {
-    /// Keystroke debounce before a query starts its sweep (P04): long
+    /// Keystroke debounce before a query starts its sweep: long
     /// enough that a typing burst becomes one scan, short enough that a
     /// deliberate pause reads as instant. Compare `NSSearchField`'s own
     /// debounce, which `sendsSearchStringImmediately` disables — the field
@@ -37,7 +37,7 @@ extension ViewController {
         }
         // Find comes from the binding table, not from a literal ⌘F: with the
         // literal here, `bind.find = cmd+e` left ⌘F opening the bar too and
-        // `bind.find =` did not close that door at all (U08). Find Next and
+        // `bind.find =` did not close that door at all. Find Next and
         // Find Previous are the storyboard's own items and carry no `bind.`
         // key, so ⌘G / ⇧⌘G stay written in — there is no binding for them to
         // disagree with.
@@ -59,11 +59,11 @@ extension ViewController {
     /// `addLocalMonitorForEvents` fires app-wide, not per-window, so without
     /// the window check here an Esc typed into any other window (a second
     /// split pane's search bar, a second Corta window) closed every open bar
-    /// at once and swallowed the key from all of them (B02) — a pane's
+    /// at once and swallowed the key from all of them — a pane's
     /// monitor must yield to the window that actually owns the key event.
     ///
     /// The window check alone is not enough once a *split* puts two panes,
-    /// each with its own open bar, in the same window (B05): both panes'
+    /// each with its own open bar, in the same window: both panes'
     /// monitors would see `event.window === view.window` and both would
     /// close, only one of which the key was actually meant for.
     /// `isSearchBarResponderActive` tells them apart.
@@ -133,7 +133,7 @@ extension ViewController {
         // keeps the pair at least as fresh as the snapshot, never staler.
         search.previousTotalPushed = session?.snapshot().scrollback.totalPushed
         search.previousScrollOffset = scrollOffset
-        // B05: seeded from the global default, then local to this pane —
+        // Seeded from the global default, then local to this pane —
         // see `search.caseSensitive`'s doc comment.
         search.caseSensitive = ConfigurationStore.shared.configuration.searchCaseSensitive
         search.regex = ConfigurationStore.shared.configuration.searchRegex
@@ -200,14 +200,14 @@ extension ViewController {
             return button
         }
 
-        // U12 — case sensitivity, as a toggle rather than a hidden default.
+        // Case sensitivity, as a toggle rather than a hidden default.
         // `textformat` is the symbol macOS itself uses for "how the text is
         // matched"; on/off is carried by the tint *and* by the accessibility
         // value, never by the tint alone.
         let caseButton = button(
             "textformat", L10n.text("search.caseSensitive"), #selector(toggleSearchCase(_:)))
         updateCaseButton(caseButton)
-        // U16 — regular expressions, behind the same kind of toggle. `.*` is
+        // Regular expressions, behind the same kind of toggle. `.*` is
         // what every editor's find bar puts on this button.
         let regexButton = button(
             "asterisk", L10n.text("search.regex"), #selector(toggleSearchRegex(_:)))
@@ -284,7 +284,7 @@ extension ViewController {
             container.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -14),
             // `topInset`, not `windowChrome`: in a split tree only a pane
             // touching the window's top edge sits under the chrome — the
-            // bar hugs its own pane's top, not the window's (M5).
+            // bar hugs its own pane's top, not the window's.
             container.topAnchor.constraint(
                 equalTo: view.topAnchor, constant: topInset + 2),
         ])
@@ -341,7 +341,7 @@ extension ViewController {
         search.matches = []
         search.matchesTruncated = false
         search.currentMatchIndex = nil
-        // A sweep still in flight is cancelled, not just discarded (P04):
+        // A sweep still in flight is cancelled, not just discarded:
         // `Search.find` polls `Task.isCancelled` between and within lines,
         // so a dead search stops burning CPU instead of finishing into the
         // void. The generation bump keeps a result that was already past
@@ -359,7 +359,7 @@ extension ViewController {
                 // much arrived while the bar was open.
                 scrollOffset = 0
             } else {
-                // B05: shift by the growth since capture, exactly like a
+                // Shift by the growth since capture, exactly like a
                 // selection's `baseScrollbackTotal` — restoring the raw
                 // offset alone would land on different text if output
                 // arrived while the bar was open
@@ -378,7 +378,7 @@ extension ViewController {
 
     // MARK: - Matching
 
-    /// Re-runs the query, off the main thread (P04). Called on every
+    /// Re-runs the query, off the main thread. Called on every
     /// keystroke and by `useSelectionForFind` — matches are recomputed,
     /// never incrementally patched (the core's logical-line pass over a
     /// full scrollback is one lazy sweep, `Search.swift`). `scrollsToMatch`
@@ -416,7 +416,7 @@ extension ViewController {
             invalidateDisplay()
             return
         }
-        // B05: this pane's own local copy, not the live global default —
+        // This pane's own local copy, not the live global default —
         // see `search.caseSensitive`'s doc comment.
         let caseSensitive = search.caseSensitive
         let regex = search.regex
@@ -444,7 +444,7 @@ extension ViewController {
         }
     }
 
-    /// PTY-output-triggered refresh, off the render path (M9) — see the
+    /// PTY-output-triggered refresh, off the render path — see the
     /// call site in `ViewController.prepareFrame`. Unlike
     /// `updateSearchResults`, this never scrolls to the current match: an
     /// output-driven refresh must not yank the viewport out from under a
@@ -455,7 +455,7 @@ extension ViewController {
     ///
     /// At most one sweep is ever in flight: an output batch that arrives
     /// while the previous recompute is still running does not start a
-    /// second one — but it is not dropped either (B05). It sets
+    /// second one — but it is not dropped either. It sets
     /// `search.needsRefresh`, which `applySearchResults` checks once the
     /// in-flight sweep lands; without that, output arriving after the last
     /// sweep that actually ran left the results stale with nothing left to
@@ -472,7 +472,7 @@ extension ViewController {
         let query = searchField.stringValue
         let grid = session.snapshot()
         let totalPushed = grid.scrollback.totalPushed
-        // B05: this pane's own local copy — see `search.caseSensitive`'s doc
+        // This pane's own local copy — see `search.caseSensitive`'s doc
         // comment.
         let caseSensitive = search.caseSensitive
         let regex = search.regex
@@ -512,7 +512,7 @@ extension ViewController {
         // missing text instead of a missing bracket; a pattern whose shape
         // makes a backtracking engine take exponential time is refused
         // before it runs, and saying "no results" there would be a lie about
-        // a search that never happened (U16).
+        // a search that never happened.
         guard Search.isValidRegex(query, caseSensitive: caseSensitive) else {
             return SweepOutcome(matches: [], status: .invalidPattern)
         }
@@ -551,7 +551,7 @@ extension ViewController {
             noteCurrentMatchAnchor(totalPushed: totalPushed)
             scrollToCurrentMatch()
         } else {
-            // U12 — the current match keeps its *text*, not its index. Output
+            // The current match keeps its *text*, not its index. Output
             // arriving under an open search bar recomputes the list, and the
             // match that was "7 of 12" is 6 of 13 the moment a line scrolls;
             // keeping the number moved the highlight and the viewport to a
@@ -562,7 +562,7 @@ extension ViewController {
         }
         updateSearchCountLabel()
         invalidateDisplay()
-        // B05: output that arrived while this sweep was running is caught
+        // Output that arrived while this sweep was running is caught
         // up on now, rather than staying stale until something unrelated
         // (a keystroke, a scroll) happened to trigger the next sweep.
         if search.needsRefresh {
@@ -662,7 +662,7 @@ extension ViewController {
         if search.status == .invalidPattern {
             // Not "No Results": the pattern never ran, and saying it found
             // nothing would send the user looking for the missing text
-            // instead of the missing bracket (U16).
+            // instead of the missing bracket.
             label.stringValue = L10n.text("search.invalidPattern")
         } else if search.status == .patternTooSlow {
             label.stringValue = L10n.text("search.patternTooSlow")
@@ -680,7 +680,7 @@ extension ViewController {
         }
     }
 
-    /// U12 — flips this pane's local case-sensitivity (B05) and persists it
+    /// Flips this pane's local case-sensitivity and persists it
     /// to the config file as the new default for bars opened after this
     /// one; an already-open bar in another pane keeps its own local value
     /// and button state until *it* is next opened fresh.
@@ -701,7 +701,7 @@ extension ViewController {
         updateSearchResults(scrollsToMatch: true)
     }
 
-    /// U16 — flips this pane's local regex mode (B05) and persists it as
+    /// Flips this pane's local regex mode and persists it as
     /// the new default; see `toggleSearchCase`.
     @objc private func toggleSearchRegex(_ sender: Any?) {
         search.regex.toggle()

@@ -2,7 +2,7 @@ import AppKit
 import CortaTerminal
 import simd
 
-/// M6.2 — a colour theme: the sixteen ANSI colours plus the three the
+/// A colour theme: the sixteen ANSI colours plus the three the
 /// terminal itself owns (default foreground, default background, cursor).
 ///
 /// A value, not a namespace. Themes are chosen from the settings page and
@@ -12,7 +12,7 @@ import simd
 /// program asking for colour 137 means one specific colour, not "whatever
 /// this theme thinks".
 ///
-/// M6.13 — a theme carries a light and a dark variant. macOS switching
+/// A theme carries a light and a dark variant. macOS switching
 /// appearance switches which one is live, in every open window, without a
 /// restart.
 nonisolated struct Theme: Equatable, Sendable {
@@ -38,7 +38,7 @@ nonisolated struct Theme: Equatable, Sendable {
 
 nonisolated extension Theme.Variant {
     /// This variant's three colours in OSC 10/11/12's terms, so a query
-    /// answers with what is actually painted on screen (M6.6) — a program
+    /// answers with what is actually painted on screen — a program
     /// that asks before choosing its own palette must not be told the dark
     /// theme's background while the light theme is live, or vice versa.
     var dynamicColors: DynamicColors {
@@ -53,7 +53,7 @@ nonisolated extension Theme.Variant {
 
     /// This variant's sixteen ANSI colours as `IndexedPalette` defaults for
     /// indices 0–15, so an OSC 4 query for an index nothing has overridden
-    /// answers what is actually on screen (B06) — the same reasoning as
+    /// answers what is actually on screen — the same reasoning as
     /// `dynamicColors` above. Indices 16–255 come from
     /// `IndexedPalette.xtermDefaults()`, xterm's fixed, non-themed 6×6×6
     /// cube and greyscale ramp — the identical formula
@@ -178,7 +178,7 @@ extension Theme {
     /// `mono` stay defined and stay resolvable by name below, so a config
     /// file that already says `theme = solarized` keeps working and
     /// `theme.<name>.inherit = solarized` still has something to inherit
-    /// from (M7.6). Promoting one back into the offered list is one entry
+    /// from. Promoting one back into the offered list is one entry
     /// here.
     nonisolated static let builtIn: [Theme] = [.corta]
 
@@ -190,7 +190,7 @@ extension Theme {
         known.first { $0.name == name }
     }
 
-    /// A built-in *or* user-defined theme (M7.6). Custom themes win on a
+    /// A built-in *or* user-defined theme. Custom themes win on a
     /// name collision: a user who names their theme `corta` has said what
     /// they want, and silently ignoring it would be the more surprising rule.
     nonisolated static func named(_ name: String, in configuration: Configuration) -> Theme? {
@@ -218,7 +218,7 @@ extension Theme {
     }
 }
 
-// MARK: - User-defined themes (M7.6)
+// MARK: - User-defined themes
 
 extension Theme {
     /// A theme built from config-file keys, with anything unspecified taken

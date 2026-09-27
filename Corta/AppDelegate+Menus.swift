@@ -1,7 +1,7 @@
 import Cocoa
 
 /// The menu bar: the items the storyboard cannot carry, and the keyboard
-/// shortcuts every item's key equivalent is read from (M7.7).
+/// shortcuts every item's key equivalent is read from.
 ///
 /// **Why the shortcuts live here and not in the storyboard.** A key
 /// equivalent baked into a nib cannot be changed by a config file, which is
@@ -86,7 +86,7 @@ extension AppDelegate {
                 // title, not the item's — so with only the item localised
                 // the bar still read File / Shell / Edit / View / Window /
                 // Help in every language while the menus beneath it were
-                // translated (B16 test pass, Chinese). Same table, both.
+                // translated. Same table, both.
                 if let key = titles[submenu.title] { submenu.title = L10n.text(key) }
                 localizeStoryboardMenuTitles(in: submenu)
             }
@@ -337,14 +337,15 @@ extension AppDelegate {
         appMenu.insertItem(item, at: aboutIndex + 1)
     }
 
-    /// Pane geometry (M7.8) and command-to-command jumping (M7.2), under
+    /// Pane geometry and command-to-command jumping, under
     /// Shell where the other pane commands already live.
     ///
     /// The menu reads as three groups: create (the storyboard's splits),
     /// move (its focus moves, then the command jumps — both answer "go
     /// somewhere else"), and resize (the grow/shrink pairs by axis, then
-    /// Equalize). Command jumping used to sit after resize, which split the
-    /// two navigation families apart with a geometry group between them.
+    /// Equalize). Command jumping sits with the focus moves rather than
+    /// after resize, so no geometry group splits the two navigation
+    /// families apart.
     private func installShellMenuItems(in mainMenu: NSMenu) {
         guard let shell = mainMenu.items.first(where: { $0.title == "Shell" })?.submenu
         else { return }
@@ -356,11 +357,11 @@ extension AppDelegate {
         ] {
             shell.addItem(item(for: command))
         }
-        // B08 — directory navigation: reveal/copy first (reads only), then
+        // Directory navigation: reveal/copy first (reads only), then
         // the two things a `cd` primitive with real callers looks like.
-        // B14 adds Browse Remote Files at the end: directory navigation
-        // too, but of the host the pane is talking to rather than this one,
-        // and enabled only for panes that are remote (B13's gate).
+        // Browse Remote Files comes last: directory navigation too, but of
+        // the host the pane is talking to rather than this one, and enabled
+        // only for panes that are remote.
         shell.addItem(.separator())
         for command in [
             TerminalCommand.revealWorkingDirectory, .copyWorkingDirectoryPath,
@@ -370,9 +371,9 @@ extension AppDelegate {
         ] {
             shell.addItem(item(for: command))
         }
-        // U11 — the three state commands, together and in the order of how
+        // The three state commands, together and in the order of how
         // much each throws away, so the menu itself is the explanation.
-        // B13 adds Reconnect at the end of the group: it throws away the
+        // Reconnect ends the group: it throws away the
         // most (the whole session and its connection) and is enabled only
         // where that is the way back — a dead remote launcher.
         shell.addItem(.separator())
@@ -388,7 +389,7 @@ extension AppDelegate {
         ] {
             shell.addItem(item(for: command))
         }
-        // B16 — Secure Keyboard Entry, last and alone: it is the one item in
+        // Secure Keyboard Entry, last and alone: it is the one item in
         // this menu that changes the *machine's* input mode rather than a
         // pane, and Terminal.app's own Shell menu puts it in the same place.
         // Checkmarked from the config file (`validateMenuItem`).
@@ -409,12 +410,10 @@ extension AppDelegate {
 
     /// Theme, appearance, scrolling and the command palette, under View.
     ///
-    /// The theme and appearance lists used to be a top-level "Settings" menu
-    /// of their own, whose first item was a second "Settings…" duplicating
-    /// the one macOS puts in the app menu at ⌘, — two entries for one window,
-    /// and a menu bar with a Settings menu *and* a Settings item. They belong
-    /// in View: they are what the window looks like, which is what View is
-    /// for, and the app menu keeps the single Settings entry.
+    /// The theme and appearance lists belong in View: they are what the
+    /// window looks like, which is what View is for. A top-level "Settings"
+    /// menu of their own would put a second Settings entry beside the one
+    /// macOS puts in the app menu at ⌘, — two entries for one window.
     ///
     /// Theme and appearance are one submenu, not two: light-or-dark *is* the
     /// theme choice a user makes daily, and two neighbouring submenus each
@@ -433,7 +432,7 @@ extension AppDelegate {
         }
         view.addItem(.separator())
         view.addItem(item(for: .commandPalette))
-        // B16 — the Quick Terminal, beside the palette: both are "bring a
+        // The Quick Terminal, beside the palette: both are "bring a
         // surface to me" rather than a change to the window in front. Its
         // key equivalent stays empty by design: the system-wide hotkey is
         // `quick-terminal-key`, held by `GlobalHotKey`, and Settings ▸
@@ -448,7 +447,7 @@ extension AppDelegate {
 
     /// The theme and appearance list, rebuilt from the configuration each
     /// time the menu is about to open — the config file can define a theme
-    /// (M7.6) while the app is running, and a menu built once at launch
+    /// while the app is running, and a menu built once at launch
     /// would never show it. Rebuilding whole also keeps the appearance rows
     /// in place without a second delegate path.
     private var themeMenu: NSMenu {

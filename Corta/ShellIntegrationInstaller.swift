@@ -1,6 +1,6 @@
 import Foundation
 
-/// B07 — the shells Corta can install its integration snippet into.
+/// The shells Corta can install its integration snippet into.
 enum ShellKind: String, CaseIterable {
     case zsh, bash, fish
 
@@ -30,7 +30,7 @@ enum ShellKind: String, CaseIterable {
     var script: String { ShellIntegrationScript.script(for: self) }
 }
 
-/// B07 — installs, diagnoses and removes Corta's shell integration.
+/// Installs, diagnoses and removes Corta's shell integration.
 ///
 /// Nothing in Corta requires this: a session without it falls back to
 /// `TaskNotifier`'s keystroke-and-idle heuristic and greys out the menu
@@ -40,7 +40,7 @@ enum ShellKind: String, CaseIterable {
 /// `.zshrc` with a snippet from a documentation page is the thing every
 /// other terminal that ships this feature has decided not to ask.
 ///
-/// **Inspectable and reversible**, per the roadmap issue this closes:
+/// **Inspectable and reversible**:
 /// everything installed sits between two marker comments
 /// (`beginMarker`/`endMarker`) in the user's own `.zshrc`, in the clear —
 /// no sourced file elsewhere, nothing hidden in `~/Library`. `uninstall()`

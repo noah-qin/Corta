@@ -1,4 +1,4 @@
-/// The side table for Kitty graphics image placements (M10) — kept off
+/// The side table for Kitty graphics image placements — kept off
 /// `Cell` for the same reason `HyperlinkTable` is a side table rather than a
 /// cell field: a 16-byte cell has no spare bits left (`docs/DECISIONS.md` D05: "anything
 /// else that wants per-cell identity needs a side table keyed by position,
@@ -30,7 +30,7 @@ public struct ImagePlacementTable: Sendable {
     /// drawing model uses.
     private var placementOrder: [KittyGraphics.PlacementID] = []
     /// Total encoded bytes of every image in `images`, kept against
-    /// `maximumStoredBytes` (S02). Instance state, not a global: the table
+    /// `maximumStoredBytes`. Instance state, not a global: the table
     /// is a value type copied into the renderer's frame cache, so anything
     /// shared across copies would break that snapshot's isolation.
     private var storedImageBytes = 0
@@ -40,7 +40,7 @@ public struct ImagePlacementTable: Sendable {
 
     /// Per-image counter, bumped on every successful `store` of the id and
     /// dropped on delete. The renderer's texture cache compares it
-    /// (`KittyImageRenderer`, P05) to tell "same id, new transmission" from
+    /// (`KittyImageRenderer`) to tell "same id, new transmission" from
     /// "same image" without hashing payloads: a reused id must invalidate
     /// the texture decoded from the old bytes.
     private var storeGenerations: [KittyGraphics.ImageID: UInt64] = [:]
@@ -49,7 +49,7 @@ public struct ImagePlacementTable: Sendable {
     /// Bumped on any mutation of images or placements. An image delete
     /// changes no cell, so the renderer's line-granular damage tracking
     /// alone would never notice one — this is the cheap "the image layer
-    /// changed" signal `TerminalRenderer.updateInstances` compares (P05).
+    /// changed" signal `TerminalRenderer.updateInstances` compares.
     public private(set) var revision: UInt64 = 0
 
     public init() {}
@@ -78,7 +78,7 @@ public struct ImagePlacementTable: Sendable {
     /// Records `data` under `id`, refusing a *new* id once
     /// `maximumTrackedImages` is already tracked (`SECURITY.md` §3) — a
     /// re-transmission of an id already known replaces it regardless, since
-    /// that never grows the table. Also refuses (S02):
+    /// that never grows the table. Also refuses:
     /// - a raw-format image whose declared dimensions exceed
     ///   `maximumImageDimension`/`maximumImagePixels` — defence in depth,
     ///   since the parser already clamps `s=`/`v=` and the performer

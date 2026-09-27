@@ -1,7 +1,7 @@
 import Cocoa
 import CortaTerminal
 
-/// B13 — which host and directory a pane refers to, as a question asked of
+/// Which host and directory a pane refers to, as a question asked of
 /// the pane. The composition itself is a pure value (`PaneRemoteState`);
 /// this extension is the pane's fresh read of it, and the home of the one
 /// action that knowledge enables: an honest reconnect.
@@ -34,7 +34,7 @@ extension ViewController {
         return session != nil && session.pty.exitStatus == nil
     }
 
-    // MARK: - Reconnect (B13)
+    // MARK: - Reconnect
 
     /// The exact command a reconnect re-runs: what actually spawned — or,
     /// when the spawn never succeeded at all, the preset's own command,

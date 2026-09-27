@@ -1,12 +1,12 @@
 import Foundation
 import Metal
 
-/// B12 (issue #39): the per-device shared half of cross-pane resource
-/// sharing. Until this existed, every pane compiled its own copy of the
-/// same three render pipeline states (plus one sampler) — identical
-/// descriptors, same device, same shader library — because each pane builds
+/// The per-device shared half of cross-pane resource sharing. Without it,
+/// every pane would compile its own copy of the same three render
+/// pipeline states (plus one sampler) — identical descriptors, same
+/// device, same shader library — because each pane builds
 /// its own `QuadRenderer` (`ViewController.setUpPane` → `TerminalRenderer`
-/// → backend). The MTLBinaryArchive (M9) makes the *first* compile per
+/// → backend). The MTLBinaryArchive makes the *first* compile per
 /// launch cheap; it never made panes 2...n cheap, each of which re-ran the
 /// whole lookup/compile/serialise path. This cache holds the result
 /// in-process: one compile per device per process, every later pane a
@@ -96,7 +96,7 @@ nonisolated enum QuadPipelineCache {
     /// produce identical pixels for identical instances (the
     /// pixel-equivalence tests in `TerminalRenderBackendTests` hold that).
     ///
-    /// The M9 binary-archive warm-up lives here now: a cold entry creation
+    /// The binary-archive warm-up lives here: a cold entry creation
     /// looks the pipelines up in a previous launch's archive instead of
     /// compiling them, then re-serialises the archive so this launch's
     /// descriptors seed the next one's. Under XCTest the archive read path

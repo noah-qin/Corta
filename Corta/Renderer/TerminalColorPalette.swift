@@ -15,8 +15,8 @@ import simd
 /// untagged, they were interpreted in the display's own space and rendered
 /// oversaturated on a P3 screen.
 nonisolated enum TerminalColorPalette {
-    /// The live variant — the chosen theme (M6.2) resolved for the current
-    /// appearance (M6.13). `nonisolated(unsafe)` because this is read from
+    /// The live variant — the chosen theme resolved for the current
+    /// appearance. `nonisolated(unsafe)` because this is read from
     /// the renderer, which is nonisolated by design; every write goes
     /// through `apply(_:)` on the main thread, and every read happens on the
     /// main thread too (the render loop runs off the display link). It is a
@@ -68,8 +68,8 @@ nonisolated enum TerminalColorPalette {
 /// dictionary rather than a whole `IndexedPalette`, since the palette's own
 /// `defaults` duplicate exactly what `Theme.Variant.resolve` already
 /// computes inline below; passing only what changes keeps the default path
-/// (no overrides set, by far the common case) byte-identical to before
-/// B06's render-path integration (`docs/DESIGN.md` §7).
+/// (no overrides set, by far the common case) byte-identical to a palette
+/// with no override support at all (`docs/DESIGN.md` §7).
 public typealias IndexedColorOverrides = [UInt8: (red: UInt8, green: UInt8, blue: UInt8)]
 
 nonisolated extension Theme.Variant {
@@ -81,8 +81,8 @@ nonisolated extension Theme.Variant {
     /// `indexedOverrides` is an *optional* dictionary, not a defaulted empty
     /// one: passing `nil` costs nothing (no object to retain), while an
     /// always-passed empty `Dictionary` still costs a retain/release pair
-    /// per call — measured at ~5% on `FrameCPUBaselineTests` before this was
-    /// caught and fixed. `TerminalRenderer.appendRowInstances` passes `nil`
+    /// per call — measured at ~5% on `FrameCPUBaselineTests`.
+    /// `TerminalRenderer.appendRowInstances` passes `nil`
     /// outright when the session has no overrides, once per row rather than
     /// re-deriving it per cell.
     @inline(__always)

@@ -19,7 +19,7 @@ public struct CellAttributes: OptionSet, Hashable, Sendable {
     public static let invisible = CellAttributes(rawValue: 1 << 6)
     public static let strikethrough = CellAttributes(rawValue: 1 << 7)
 
-    /// M2.1 width flags. These are structural, not rendition: SGR never sets
+    /// Width flags. These are structural, not rendition: SGR never sets
     /// them, the grid sets them as it writes, and the dump's style layer
     /// masks them out.
     ///
