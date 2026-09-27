@@ -99,7 +99,7 @@ into another application hides it without moving focus again.
 | `allow-clipboard-write` | boolean | `false` | Whether OSC 52 may put text on the system clipboard — the only route from inside `tmux` or an `ssh` session. Off by default because *any* output could use it. The **read** direction does not exist under any setting (`SECURITY.md` §6). |
 | `secure-keyboard-entry` | boolean | `false` | Secure Keyboard Entry: while a Corta terminal window is key and Corta is the active application, the system stops delivering keystrokes to any other process — event taps, keyloggers, macro tools and accessibility clients alike. Shell ▸ Secure Keyboard Entry toggles this key and shows a checkmark; a lock in the titlebar shows when it is *actually engaged*, which is not while another app is frontmost or Settings is key. Off by default because it is system-wide and also silences the tools a person may rely on (`SECURITY.md` §4.5). The Quick Terminal's hotkey keeps working while it is on. |
 
-#### Shell integration (B07)
+#### Shell integration
 
 Not a config-file key — a file on disk, `~/.zshrc`, that only Settings ▸
 Terminal ▸ Shell Integration touches, and only inside one marked block:
@@ -151,7 +151,7 @@ the timer and 1.5 s of output silence ends it — which is why the feature
 is off by default. The notification carries the pane's title and the exit
 status, never the command text (`SECURITY.md` §5).
 
-### History (B08)
+### History
 
 | Key | Values | Default | Notes |
 | --- | --- | --- | --- |
@@ -626,7 +626,7 @@ search away.
 | `update-auto-check` | Immediately — applied to the live Sparkle updater on every file change. |
 | `suggest-applications-folder` | The next launch. |
 
-## 8. Config file vs. app-owned state (B09)
+## 8. Config file vs. app-owned state
 
 This file holds **settings**: values a person chose and might reasonably
 hand-edit, review in version control, or copy to another machine. Two more

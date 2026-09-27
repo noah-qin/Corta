@@ -16,7 +16,7 @@ avoids the constructs in §3.
 
 ## 1. Targets
 
-Set at M1 and defended from then on. A change that regresses one of these
+Set before the first release and defended from then on. A change that regresses one of these
 is a bug regardless of what it improves.
 
 | Metric                     | Target                        | Why                                            |
@@ -24,13 +24,13 @@ is a bug regardless of what it improves.
 | Frame budget (CPU)         | **< 4 ms**                    | 120 Hz ProMotion is an 8.3 ms frame            |
 | Parser throughput          | **> 100 MB/s** single-thread  | `cat` of a large file must not be the slow part |
 | Keypress → pixel latency   | **< 1 frame + input latency** | The metric a user actually feels               |
-| Scrollback memory          | **100k 120-column lines within ~200 MB** | Log-heavy ML workloads are a target use case; unstated column count made this unfalsifiable — 120 matches the M1 baseline measurement below |
+| Scrollback memory          | **100k 120-column lines within ~200 MB** | Log-heavy ML workloads are a target use case; the column count is stated because without it the target is unfalsifiable |
 | Idle CPU                   | **~0%**                       | No redraw when nothing changed                  |
 
-Numbers are recorded at M1 and re-measured at every milestone. "It feels
+Numbers are re-measured at every release (§5.6). "It feels
 fast" is not a measurement.
 
-### 1.1 User-visible targets (B01)
+### 1.1 User-visible targets
 
 §1's table states engineering targets (frame budget, parser throughput) — the
 numbers a change is checked against. This table states what those numbers are
@@ -46,9 +46,9 @@ rather than filled in with a guess.
 | Scrolling      | Scrolling a long buffer tracks the pointer/trackpad with no visible stutter | `scripts/measure-render-metrics.sh` (`CORTA_RENDER_METRICS` ring buffer); no dedicated automated scroll benchmark exists yet — a real gap, not an oversight |
 | Startup        | A warm launch reaches an interactive window fast enough that switching to Corta does not feel like waiting for an app to open | `scripts/measure-app-baseline.sh` phase A (5 warm launches + 1 cold-ish) |
 | Memory         | §1's scrollback figure holds, and closing panes/windows returns memory rather than leaking it | `corta-bench`'s scrollback-footprint and peak-RSS benchmarks; `scripts/measure-app-baseline.sh`'s post-close recovery phase |
-| Energy         | An idle pane draws no more power than idle CPU (§1) implies; a flooding pane does not keep the GPU busier than the frames it is actually producing require | `scripts/measure-energy.sh` (idle, occluded, background flood, two windows, Kitty image; `powermetrics` when it can run, labelled `top` samples when it cannot) — §5.6 records the 2026-09-18 runs on mains and under Low Power Mode. Thermal pressure is not forced and stays *not judged* |
+| Energy         | An idle pane draws no more power than idle CPU (§1) implies; a flooding pane does not keep the GPU busier than the frames it is actually producing require | `scripts/measure-energy.sh` (idle, occluded, background flood, two windows, Kitty image; `powermetrics` when it can run, labelled `top` samples when it cannot) — §5.6 has the figures, measured on mains and under Low Power Mode. Thermal pressure is not forced and stays *not judged* |
 | Compatibility  | The real-program and esctest pass rates `CONFORMANCE.md` already tracks | `CONFORMANCE.md` §4.2 (esctest), §4.4.2 (real-program table), §4.6 (manual scenario pass) — cross-referenced here rather than duplicated |
-| Recovery       | A crashed or force-quit Corta restores its window/split/scrollback state on next launch without asking the user to rebuild it by hand | `scripts/measure-app-baseline.sh`'s SessionRestore-driven multi-pane phases; U07's crash-marker mechanism (`CHANGELOG.md`) |
+| Recovery       | A crashed or force-quit Corta restores its window/split/scrollback state on next launch without asking the user to rebuild it by hand | `scripts/measure-app-baseline.sh`'s SessionRestore-driven multi-pane phases; `SessionRestore`'s crash marker |
 
 Startup, memory and energy inherit their machine dependency from §5.2 below —
 a number recorded here is only comparable to another run that held the same
@@ -127,19 +127,17 @@ buffer** on the CPU when nothing changed. Track damage at line
 granularity; per-cell damage tracking is complexity that does not pay for
 itself.
 
-**M9** replaced the live screen's line-granularity check itself —
-comparing each row's full `Line` value against the cache — with a
-`UInt64` stamp (`Grid.lineRevision(_:)`, bumped centrally by
+On the live screen the line-granularity check is not a comparison of
+each row's full `Line` value against the cache but a `UInt64` stamp (`Grid.lineRevision(_:)`, bumped centrally by
 `ScreenLines` on every row it touches: `ScreenLines.swift`). The
 granularity is unchanged, still one row, not one cell; only the cost of
 asking "did this row change" dropped, from an `O(row length)` comparison
 to one integer compare. Scrolled into history the rows come from
 immutable scrollback storage with no such stamp, so that path still
-compares `Line` values directly, exactly as before this change
-(`TerminalRenderer.rebuildDamagedRows`). The same milestone also merged
-the shell's two per-frame `session.snapshot()` + diff calls
-(`ViewController.updateDamage`/`render`, now `prepareFrame`/`render`)
-into one, since the second was diffing a grid the first had just
+compares `Line` values directly (`TerminalRenderer.rebuildDamagedRows`).
+The shell takes one `session.snapshot()` + diff per frame
+(`ViewController.prepareFrame`, then `render`), not two, since a second
+would diff a grid the first had just
 diffed moments earlier in the same vsync callback.
 
 Because a `ScreenLines` swap (an alternate-screen enter/exit, a column
@@ -212,52 +210,15 @@ Because the terminal core is a separate SwiftPM package (`DESIGN.md`
 | Parser-only harness over a byte corpus | Isolates parse cost from rendering     |
 
 Latency (keypress → glass) is measured separately — since 1.0.0 from
-inside the app (§5.7); before that with an external screen-capture tool
-whose figures the two historical rows below are. It is invisible to
+inside the app (§5.7); before that with an external screen-capture tool.
+It is invisible to
 throughput benchmarks and is the number users actually perceive.
 
-**M6 measurement:** external screen-capture tool against a Release
-build, 200 characters, 150 ms delay, 50 ms period, 1,000 ms length,
-synchronous mode:
-45.5 ms average, 24.8 ms minimum, 56.4 ms maximum, 6.8 ms standard
-deviation. The in-process write → PTY echo → parse → grid portion measured
-separately at 0.005 ms average / 0.007 ms p95, placing essentially all of
-the observed latency after the grid mutation.
+The measurements taken before 1.0.0 with that tool, and why they cannot
+be read against each other, are
+[a record of their own](history/2026-09-09-LATENCY-BEFORE-1.0.md).
 
-**0.1.1 measurement (2026-09-09):** the same tool, same settings — 200
-characters, 150 ms delay, 50 ms period, 1,000 ms length, synchronous, no
-intermediate pauses — against the Release build at commit `12ac1b8`:
-**57.8 ms average, 45.3 ms minimum, 78.9 ms maximum, 5.6 ms standard
-deviation** over 200 samples.
-
-The §5.2 table as held for this run: MacBook Air, Apple M5 (Mac17,3),
-macOS 26.6.2; Release build; built-in Liquid Retina at 60 Hz, native 2x
-(2940×1912 pixels, 1470×956 points); System Monospaced 12 pt, the default;
-120×30, one pane, not full screen; mains power; nothing else in the
-foreground; **test program `cat > /dev/null`**, so the tty echoes and no
-shell line editor is between the keystroke and the screen.
-
-**Against M6.12's 45.5 ms this is 12.3 ms worse, and the comparison is
-weaker than it looks.** M6.12 recorded its capture settings and not its
-test program, and neither run recorded the machine beyond "MacBook Air,
-Apple silicon" — §5.2's own first row. So the two runs are known to differ
-in at least one variable that was never written down, and possibly in the
-machine. What can be said is that this run's environment *is* recorded, in
-full, so the next one has something to be compared against.
-
-This also closes what M9 owed. M9 measured 70.1 ms for the default
-configuration in an environment §5.2's table was not held for, and flagged
-that it could not be read against 45.5 ms. It still cannot; what exists now
-is a properly held measurement of the same configuration, which is the
-number future work should move.
-
-**Those two rows are not §5.1-shaped.** The external tool reported
-minimum, maximum, average and standard deviation — not p50, p95 and p99 —
-which is exactly the shape §5.1 objects to. The in-app measure (§5.7)
-reports the percentiles, and is why the tool is no longer used or
-needed.
-
-**The percentile-shaped view of the render stage (B01).** Between
+**The percentile-shaped view of the render stage.** Between
 `corta-bench` (headless, core-only) and the end-to-end §5.7 number sits
 `CORTA_RENDER_METRICS=1`
 (`RenderMetrics.swift`'s 600-sample ring buffer, streamed by
@@ -268,19 +229,19 @@ typing and scrolling for the ring to fill with real frames (the
 `scripts/measure-app-baseline.sh` finding that synthetic System Events keystrokes
 never reach `TerminalView` applies here too — a scripted flood through the
 PTY slave fills `drawableWait`/`gpu`, but `cpuFrame` specifically wants real
-keyDown-triggered frames), so running it and reading its output is recorded
-here as the next step, not as something this pass produced a number for.
+keyDown-triggered frames), so it is a tool for a person at the keyboard,
+not a scripted number.
 
-**Establish the baseline at M1.** Without a baseline, "performance is the
+**Every target has a baseline.** Without one, "performance is the
 first priority" is a slogan rather than a constraint.
 
 ### 5.1 Report distributions, never averages
 
 Every latency number in this document must carry **p50, p95, p99 and the
-maximum**. `corta-bench` reports all four (`LatencyDistribution`); the
-M6 and 0.1.1 end-to-end figures above predate the rule and are reported
-as averages, which is exactly the shape of the problem; §5.7's number has
-the four.
+maximum**. `corta-bench` reports all four (`LatencyDistribution`), and so does
+§5.7's in-app measure; the screen-capture figures from before 1.0.0
+(`history/`) predate the rule and are averages, which is exactly the
+shape of the problem.
 
 An average is the one statistic a latency measurement should not be
 reduced to. Keypress latency is not normally distributed — a tight body
@@ -294,58 +255,6 @@ The sample count has to support the percentile it claims. The p99 of 200
 samples is the second-largest value in the set, which is one scheduling
 hiccup away from being noise; `corta-bench` takes 2,000.
 
-**A fresh headless sample (B01, 2026-09-10, this machine — see §5.2's
-toolchain table below).**
-
-```sh
-swift build --package-path CortaTerminal -c release --product corta-bench
-CortaTerminal/.build/release/corta-bench
-```
-
-| Benchmark | p50 | p95 | p99 | max | n |
-| --- | --- | --- | --- | --- | --- |
-| keypress → grid latency | 0.009 ms | 0.012 ms | 0.013 ms | 0.020 ms | 2,000 |
-| keypress → grid latency, flooding neighbour | 0.009 ms | 0.012 ms | 0.015 ms | 0.046 ms | 2,000 |
-| snapshot latency under flood | 0.000 ms | 0.000 ms | 0.000 ms | 0.032 ms | 2,000 |
-| search response, 100k-line scrollback (warm) † | 27.6 ms | 29.4 ms | 30.1 ms | 30.1 ms | 50 |
-| search response, 100k-line non-ASCII scrollback, ASCII query † | 455.4 ms | 475.6 ms | 494.7 ms | 494.7 ms | 50 |
-
-**† Search, before and after the ASCII path (#115).** These two rows were
-taken on 2026-09-25 under Xcode 27.0 / Swift 6.4, not the 2026-09-10 /
-Xcode 26.6 identity §5.2 names for every other row in this table. §5.2's
-rule applies: they are a different measurement, and only the ratios below
-are like-for-like, because each pair was taken back to back in one session
-on one machine.
-
-Matching ASCII queries against the cells, instead of building a `String`
-and a per-character position table for every logical line, takes the warm
-figure from 399.8 ms to 27.6 ms — a factor of about 14. (The 385.1 ms this
-table carried before was the 2026-09-10 measurement; 399.8 ms is the same
-benchmark re-run immediately before the change.)
-
-The second row is the case the fast path cannot take and *does* make
-slightly worse: an ASCII query over non-ASCII lines, where the byte walk
-is attempted and rejected on every line before the `String` path runs
-anyway. The fixture puts the non-ASCII character at the end of the line on
-purpose — a log line terminated by a status glyph — so the walk traverses
-the whole chain before rejecting it and the row is walked twice. Three
-runs each side, p50: 450.7 / 447.0 / 447.7 ms without the fast path,
-447.5 / 455.4 / 469.0 ms with it. That is roughly **2% slower** on the
-searches that cannot use the fast path, for a factor of 14 on the ones
-that can. An earlier fixture with the non-ASCII character near the front
-of the line made this look free, which it is not.
-
-Parser-only throughput 628.3 MiB/s, parser+grid 141.1 MiB/s, core feed
-130.0 MiB/s — all above §1's 100 MB/s target. Scrollback at 100k lines:
-185.0 MB resident, inside §1's ~200 MB target. Full raw output, including
-the resize-delivery, spawn-decomposition and multi-pane-fixed-cost
-benchmarks not tabulated above, is reproducible with the command above; it
-is headless and scripted, so — unlike the M6/0.1.1 end-to-end rows above — this
-much of §5.2's table is trivially held exactly by running it again. This is
-core-side only; it says nothing about the AppKit/render stages §5.3 and
-§5.4 cover, which is exactly the boundary `scripts/measure-app-baseline.sh` and
-`CORTA_RENDER_METRICS` exist to close.
-
 ### 5.2 The fixed benchmark environment
 
 Numbers recorded in this document or in `docs/history/ROADMAP-0.1.md` are only comparable
@@ -353,7 +262,7 @@ against numbers taken the same way. Any run that is quoted must state:
 
 | Variable          | Fixed at                                              |
 | ----------------- | ----------------------------------------------------- |
-| Machine           | The recorded machine and chip (M6: MacBook Air, Apple silicon) |
+| Machine           | The recorded machine and chip |
 | Build             | Release (`-c release` / the Release scheme), never Debug |
 | Display           | Built-in panel, and its refresh rate — a 120 Hz panel halves the vsync quantum a 60 Hz one imposes, which moves every latency number in this table |
 | Scale factor      | The display's native backing scale (the atlas is rasterised per scale) |
@@ -368,7 +277,7 @@ measurements. In particular a Debug build is not a slow Release build:
 the parse path's bounds checks and non-inlined generics change its shape,
 not only its speed.
 
-**Toolchain (B01).** Compiler, SDK, language mode and deployment target are
+**Toolchain.** Compiler, SDK, language mode and deployment target are
 four different things — conflating them makes a "same environment" claim
 unfalsifiable. Recorded on the machine this run was measured on
 (2026-09-10):
@@ -414,8 +323,8 @@ release records which one in its own notes (`release.yml`). Moving a
 number to a new toolchain means re-recording its baseline on both sides
 once, as a bridge, exactly as a Debug-to-Release move would.
 
-A run quoted without this table is a run from before B01 that predates the
-distinction — not a claim that it used a different toolchain.
+A run quoted without this table predates the distinction — it is not a
+claim that it used a different toolchain.
 
 ### 5.3 Attributing latency: `os_signpost`
 
@@ -513,7 +422,7 @@ keystrokes) gives:
 
 The core-side chain (`keyDown` → `output`) stays sub-millisecond, in line
 with `corta-bench`'s separately-measured 0.005 ms average for the same
-span — confirms this is not where the M6.12 45.5 ms figure goes.
+span — the end-to-end latency is not spent in the core.
 
 `output` → `frame` spreads roughly uniformly across the whole 0–16 ms
 window this machine's frame-begin-to-frame-begin gaps cluster around
@@ -538,8 +447,7 @@ blocks the main thread more often waiting for a drawable to be recycled.
 Which one happens depends on how long a frame takes on the machine in
 question, so it is a measurement, not a choice.
 
-Corta ships the default (3), which is what the M6 figure was measured
-against. `CORTA_MAX_DRAWABLES=2` sets it for one launch, so the
+Corta ships the default (3). `CORTA_MAX_DRAWABLES=2` sets it for one launch, so the
 comparison is two launches of the same binary rather than a code change.
 Pair it with a signpost trace: if double buffering is costing rather than
 saving, it appears as the `frame` interval growing at its front.
@@ -563,14 +471,13 @@ is not blocking on this machine under this load, which is the condition
 under which dropping to 2 has nothing to buy back and can plausibly only
 cost (more frequent blocking, not less). Not a substitute for the actual
 end-to-end A/B — that is the only way to turn "probably not worth it"
-into a number — but reason enough to de-prioritize it behind M8.19 and
-M9's own measurement pass.
+into a number.
 
-**The end-to-end A/B itself (M8.18).** `scripts/measure-drawable-ab.sh`
+**The end-to-end A/B itself.** `scripts/measure-drawable-ab.sh`
 runs the same Release build twice, back to back, so the only variable
 between the two runs is `CORTA_MAX_DRAWABLES`; since 1.0.0 each run is
 `scripts/measure-keypress-latency.sh` (§5.7) and prints the percentile
-line itself. The M8.18 pair was taken with the external screen-capture
+line itself. The pair below was taken with the external screen-capture
 tool of the day (200 chars / 150 ms delay / 50 ms period / 1,000 ms
 length, synchronous, no pauses), mains power, Corta frontmost with
 nothing else running:
@@ -599,7 +506,7 @@ absolute numbers should not be cross-cited against §5.5's.)
 
 ### 5.5 Cross-terminal comparison
 
-Taken at M6 with an external screen-capture latency tool — the only
+Taken before 1.0.0 with an external screen-capture latency tool — the only
 kind of measure that can be pointed at another terminal, which is why
 this table is not refreshed by §5.7's in-app measure. 200 characters /
 150 ms delay / 50 ms period / 1000 ms length, synchronous mode, same
@@ -619,105 +526,45 @@ distribution.)
 
 ---
 
-### 5.6 The 1.0.0 run (2026-09-18)
+### 5.6 Numbers by release
 
-Measurements for 1.0.0, taken on `main` the day before it was tagged. The initial
-benchmark session ran on **battery**, unlike the mains baseline in §5.2.
-The later keypress and energy runs used AC; their rows state this explicitly.
-App measurements use Release builds unless labelled Debug. Pane counts and
-grid sizes vary by workload and are recorded below; these are not all
-measurements of one fixed configuration.
+One column per release, on the machine §5.2 records. A cell says *not
+re-measured* rather than carrying an older figure forward. Each release's
+full run — machine state, every scenario, the energy tables and the
+reading of them — is its record under `history/`:
+[1.0.0](history/2026-09-18-V1.0.0-BENCHMARK-RUN.md),
+[1.0.1](history/2026-09-21-V1.0.1-BENCHMARK-RUN.md).
 
-| Variable | Value |
-| --- | --- |
-| Machine | MacBook Air, Apple M5, built-in 2560×1664 Retina panel |
-| macOS | 27.0 (26A428) |
-| Xcode / Swift | 27.0 (27A266a) / 6.3.3; language mode 6; deployment target 26.0 |
-| Power | Battery (§5.2 asks for mains — a re-run on mains is what would make this a clean before/after against the M6 and 0.1.1 rows) |
-
-| Metric | 1.0.0 | How |
-| --- | --- | --- |
-| Core feed throughput | **144.2 MiB/s** (5-run mean; 141.2–146.6) | `corta-bench`, `-c release` |
-| Parser-only / parser + grid | 806.3 / 166.9 MiB/s | same run |
-| Memory @ 100k × 120 lines | **185.0 MB** (resident 141.9 → 326.9 MB) | `corta-bench` |
-| Keypress → grid (core side) | p50 0.014 / p95 0.018 / p99 0.020 ms, 2000 samples, 0 timed out | `corta-bench`; excludes vsync and display |
-| Frame CPU, 120×40 full rebuild, Debug | **2.26 ms** avg (3 runs: 2.31 / 2.26 / 2.20; p95 5.4–5.6) | `FrameCPUBaselineTests`, the same measure as every milestone row |
-| Live frame CPU, Release, 2 panes flooded | avg 0.60 ms, p50 0.38, p99 2.59 | `scripts/measure-app-baseline.sh`, `CORTA_RENDER_METRICS` ring |
-| Live frame CPU, Release, 4 panes flooded | avg 0.14–0.49 ms, p99 0.38–0.45 | same |
-| GPU, 2 / 4 panes flooded | avg 0.49 / 0.47 ms | same |
-| Idle CPU, Release, 20 s | **0.05%**; occluded (minimised) 0.0–0.1% | same script |
-| Launch → first window | 208 ms (2-pane restore), 451 ms (4-pane restore) | same script |
-| Spawn: `zsh -l` → first output | p50 44.5 ms | `corta-bench` |
-| Reflow, 100k lines, 120 → 80 columns | 94.1 ms | `corta-bench` |
-| Search, 100k lines, one query | ~395 ms warm, 100 000 matches | `corta-bench` |
-| Keypress → glass (end to end, scripted) | **61.9 ms** avg, p50 61.4 / p95 69.7 / p99 70.9, 200 samples — HID stage excluded, see §5.7 | `scripts/measure-keypress-latency.sh`, in-app `keypressToPresent` |
-| Keypress → glass (end to end, a person typing) | **66.3 ms** avg, p50 67.0 / p95 78.7 / p99 84.5 / max 87.3, 200 samples, built-in keyboard, AC — the HID stage included, see §5.7 | `scripts/measure-keypress-latency.sh --manual`, 2026-09-18 20:17 |
-| Energy | measured — see below | `scripts/measure-energy.sh` with `sudo powermetrics` |
-
-The one-pane flood's render-metrics ring did not fill inside the
-script's 20 s window on this run (the 2- and 4-pane rings did), so the
-one-pane live frame number is absent rather than copied from the
-Debug-build baseline above.
-
-**Energy (2026-09-18 19:28, same machine, AC attached and charging,
-sudo `powermetrics --samplers tasks,cpu_power,gpu_power`, 20 samples at
-1 Hz per scenario — the second run of the day; the first, five minutes
-earlier, lost its fifth scenario to a script fault and read within the
-same bands for the other four).** The combined figure is machine-wide —
-every process — so it bounds Corta from above; the per-process columns
-are `powermetrics`' tasks sampler (CPU ms/s, then its Energy Impact
-figure), first five samples of each window.
-
-| Scenario | Combined CPU+GPU+ANE, machine-wide | Corta CPU ms/s | Corta Energy Impact |
+| Metric | 1.0.1 (2026-09-21) | 1.0.0 (2026-09-18) | How |
 | --- | --- | --- | --- |
-| Idle, one window frontmost | p50 243 mW, p95 311 mW | 0.05–0.8 | ≈0 |
-| Occluded (minimised) | p50 56 mW, p95 2067 mW (one sample; something else on the machine) | 0.05–2.0 | ≈0 |
-| Background output flood (`yes`, occluded) | p50 10.2 W, p95 10.5 W | ≈1210 | ≈6 300–6 500 |
-| Two windows, both visible, idle | p50 339 mW, p95 756 mW | 0.15–1.25 | ≈0 |
-| Kitty image placed, then static | p50 276 mW, p95 369 mW | 0.05–0.7 | ≈0 |
-| Low Power Mode — see the second table | measured, 20:24 the same day | | |
-| Thermal pressure | **not judged** — no safe way to force it without holding the machine at full load for a long time | — | — |
+| Core feed throughput | 138.5 MiB/s (one run) | **144.2 MiB/s** (5-run mean; 141.2–146.6) | `corta-bench`, `-c release` |
+| Parser-only / parser + grid | 766.9 / 161.4 MiB/s | 806.3 / 166.9 MiB/s | same run |
+| Memory @ 100k × 120 lines | 184.4 MB | **185.0 MB** | `corta-bench` |
+| Keypress → grid (core side) | p50 0.009 / p95 0.011 / p99 0.012 ms | p50 0.014 / p95 0.018 / p99 0.020 ms | `corta-bench`, 2000 samples; excludes vsync and display |
+| Frame CPU, 120×40 full rebuild, Debug | **1.79 ms** avg (1.76 / 1.75 / 1.87) | **2.26 ms** avg (2.31 / 2.26 / 2.20) | `FrameCPUBaselineTests` (D17) |
+| Live frame CPU, Release, 2 / 4 panes flooded | not re-measured | avg 0.60 / 0.14–0.49 ms; p99 2.59 / 0.38–0.45 | `scripts/measure-app-baseline.sh`, `CORTA_RENDER_METRICS` |
+| GPU, 2 / 4 panes flooded | not re-measured | avg 0.49 / 0.47 ms | same |
+| Idle CPU, Release, 20 s | not re-measured | **0.05%**; occluded 0.0–0.1% | same |
+| Launch → first window | not re-measured | 208 ms (2-pane restore), 451 ms (4-pane) | same |
+| Spawn: `zsh -l` → first output | p50 46.8 ms | p50 44.5 ms | `corta-bench` |
+| Reflow, 100k lines, 120 → 80 columns | 97.9 ms | 94.1 ms | `corta-bench` |
+| Search, 100k lines, one query | ~400 ms warm | ~395 ms warm | `corta-bench` |
+| Keypress → glass, scripted | not re-measured | **61.9 ms** avg; p50 61.4 / p95 69.7 / p99 70.9 | §5.7 |
+| Keypress → glass, a person typing | not re-measured | **66.3 ms** avg; p50 67.0 / p95 78.7 / p99 84.5 | §5.7, `--manual` |
+| Energy, background flood (`yes`, occluded) | not re-measured | 10.2 W machine-wide on mains; 2.6 W in Low Power Mode; idle, occluded and a static image within the machine's noise floor | `scripts/measure-energy.sh` |
 
-Reading: an idle or occluded Corta is within the machine's own noise
-floor (the whole machine idles at tens to hundreds of milliwatts); a
-sustained flood is a full core's worth of CPU (the reader → parse →
-grid path) and is what the display-link pause and per-line damage are
-there to keep off the *rendering* side — the GPU column stayed under
-0.5 ms/frame throughout the baseline run. A placed image costs nothing
-once it is static: the kitty row reads the same as idle.
-
-**Low Power Mode (2026-09-18 20:24, the maintainer's own session:
-System Settings ▸ Battery ▸ Low Power Mode set to *Always* for the run
-and put back afterwards; `pmset` reported `lowpowermode 1`; battery at
-98% and charging).** Same script, same five scenarios. One deviation to
-read the numbers with: a second, idle Corta process from an earlier
-manual check was still alive for the whole run — its rows appear in the
-tasks sampler at 0.02–1.4 CPU ms/s and are inside the machine-wide
-figure, which therefore bounds Corta from above by a little more than
-usual.
-
-| Scenario | Combined CPU+GPU+ANE, machine-wide | Corta CPU ms/s | Corta Energy Impact |
-| --- | --- | --- | --- |
-| Idle, one window frontmost | p50 318 mW, p95 453 mW | 0.05–1.4 | ≈0 |
-| Occluded (minimised) | p50 237 mW, p95 402 mW | 0.04–0.3 | ≈0 |
-| Background output flood (`yes`, occluded) | p50 2.60 W, p95 2.67 W | ≈1200 | ≈1 530–1 545 |
-| Two windows, both visible, idle | p50 569 mW, p95 629 mW | 0.05–0.8 | ≈0 |
-| Kitty image placed, then static | p50 287 mW, p95 379 mW | 0.05–0.65 | ≈0 |
-
-Reading: the idle, occluded, two-window and image rows are the same
-hundreds of milliwatts as the mains run — Low Power Mode has nothing to
-take from a terminal that is already asleep. The flood is where it
-shows: the same full core of CPU time (≈1200 ms/s in both runs) costs
-2.6 W instead of 10.2 W, because the core is being held at a lower
-clock. Corta does no more or less work under Low Power Mode; the
-machine spends less per unit of it. Thermal pressure stays not judged.
+Both runs were on battery for the core benchmarks, not the mains power
+§5.2 asks for; the 1.0.0 keypress and energy runs were on AC. Every
+1.0.1 figure is inside the run-to-run spread the 1.0.0 run recorded, and
+the frame-CPU difference is the machine's state on the day, not the
+change: the claim for 1.0.1 is "no regression".
 
 ### 5.7 Keypress → glass, measured from inside the app
 
-The end-to-end number used to need a third-party screen-capture tool —
-one that grabs the window in a loop until the pixels change. Since 1.0.0
-Corta measures the same interval from the inside, with nothing installed
-and no permission asked:
+A third-party screen-capture tool — one that grabs the window in a loop
+until the pixels change — can measure keypress to glass, but Corta
+measures the same interval from the inside, with nothing installed and no
+permission asked:
 
 - `TerminalView`'s three key-delivery sites hand `RenderMetrics` the
   event's `timestamp` — the HID timestamp for a real key, the posting
@@ -743,355 +590,14 @@ says which:
 | Kind | Includes | Comparable to |
 | --- | --- | --- |
 | Scripted (`key code` via System Events) | Corta's whole path plus the compositor and scanout; **not** the keyboard's HID stage (1–8 ms on USB/Bluetooth) | a lower bound on what a finger sees |
-| `--manual` (a person typing) | everything a screen-capture tool saw | the M6.12 / 0.1.1 rows in §5 |
+| `--manual` (a person typing) | everything a screen-capture tool saw | the pre-1.0 screen-capture figures (`history/`) |
 
-**1.0.0, scripted, 2026-09-18** (Release, built-in panel, AC, 120×30):
-**avg 61.9 ms, p50 61.4, p95 69.7, p99 70.9, max 71.0** over 200 samples.
+The two kinds differ by the keyboard's HID stage plus the wider spread of
+human keystrokes: a synthetic `key code` arrives at a fixed cadence, a
+typist's do not, and the p95–p99 tail is where that shows. §5.6 has both
+numbers for each release.
 
-**1.0.0, `--manual`, 2026-09-18 20:17** (the same build and panel, AC,
-the maintainer typing on the built-in keyboard under the ABC input
-source): **avg 66.3 ms, p50 67.0, p95 78.7, p99 84.5, max 87.3** over
-200 samples. This is the row that replaces 0.1.1's screen-capture
-figure (57.8 ms avg): it includes everything that one did — the
-keyboard's HID stage and a real person's key timing — and is measured
-at the glass rather than at a capture tool's polling interval. The
-4.4 ms between the scripted and the manual average is the HID stage
-plus the wider spread of human keystrokes (a synthetic `key code`
-arrives at a fixed cadence; a typist's do not, and the p95–p99 tail
-is where that shows).
-
-Both numbers say the same thing the target row in §1 says: above one
+Both kinds say the same thing the target row in §1 says: above one
 frame plus input latency, on a 60 Hz panel a good three to four frames.
 Where those frames go is the `os_signpost` chain's job (§5.3); the
 in-app number is what says whether a change moved it.
-
-### 5.8 The 1.0.1 run (2026-09-21)
-
-A patch release: two fixes and one write moved off the frame path
-(`CHANGELOG.md`). The render loop was touched once (the cursor overlay
-now reads the theme's cursor colour), so the frame-CPU baseline is
-re-measured (D17); the core benchmark is re-run because it is scripted
-and free. Nothing else in §5.6 was repeated — no parser, grid, PTY or
-window change since that run — and the rows below say so rather than
-copying the 1.0.0 figures forward.
-
-| Variable | Value |
-| --- | --- |
-| Machine | MacBook Air, Apple M5, built-in 2560×1664 Retina panel (same machine as §5.6) |
-| macOS | 27.0 (26A428) |
-| Xcode / Swift | 27.0 (27A266a) / 6.4; language mode 6; deployment target 26.0 |
-| Power | Battery, 89%, no other foreground work — as in §5.6's benchmark session, not the mains §5.2 asks for |
-
-| Metric | 1.0.1 | 1.0.0 (§5.6) | How |
-| --- | --- | --- | --- |
-| Core feed throughput | 138.5 MiB/s (one run) | 144.2 (5-run mean) | `corta-bench`, `-c release` |
-| Parser-only / parser + grid | 766.9 / 161.4 MiB/s | 806.3 / 166.9 | same run |
-| Memory @ 100k × 120 lines | 184.4 MB | 185.0 | `corta-bench` |
-| Keypress → grid (core side) | p50 0.009 / p95 0.011 / p99 0.012 ms, 2000 samples, 0 timed out | p50 0.014 / p99 0.020 | `corta-bench` |
-| Frame CPU, 120×40 full rebuild, Debug | **1.79 ms** avg (3 runs: 1.76 / 1.75 / 1.87; p95 2.7–3.5) | 2.26 avg | `FrameCPUBaselineTests` |
-| Spawn: `zsh -l` → first output | p50 46.8 ms | 44.5 | `corta-bench` |
-| Reflow, 100k lines, 120 → 80 columns | 97.9 ms | 94.1 | `corta-bench` |
-| Search, 100k lines, one query | ~400 ms warm, 100 000 matches | ~395 | `corta-bench` |
-| Keypress → glass, live frame CPU, energy, launch | **not re-measured** — no change on those paths since §5.6 | — | — |
-
-Reading: every re-run figure is inside the run-to-run spread §5.6 and §8
-record for this machine (the one-run core feed sits 4% under a 5-run
-mean whose own range was 141–147). The frame-CPU baseline moved from
-2.26 to 1.79 ms; the cursor change adds a read of one static per frame
-and cannot account for that, so the difference is the machine's state
-on the day, not the change — the number is recorded because D17 says
-to record it, and the claim is only "no regression".
-
-## 6. B11 — CPU, locking and memory hot-path pass (2026-09-13)
-
-**Locking.** `TerminalSession` already carries exactly one hot-path lock
-(`state: Mutex<State>`, guarding the parser, grid and scrollback
-together) plus the `stateWaiters`/`yieldToStateWaiters` anti-starvation
-mechanism a prior pass added and `TerminalSessionLockWaitTests` already
-holds to a 100 ms per-wait / 30 s total ceiling under a `yes` flood. This
-pass re-ran that measurement rather than restructuring lock ownership:
-`corta-bench`'s snapshot-latency-under-flood benchmark reports p50/p95/p99
-all 0.000 ms and max 0.030–0.032 ms on this machine, level with the
-figure already on record in §5.1. No batch-budget or ownership change is
-justified by that number.
-
-**Copy-on-write / allocation cost.** `Scrollback` already packs rows into
-shared batch arenas (`Batch`, ≤256 rows each) rather than one
-`ContiguousArray` per row — a prior pass's fix for the growth-headroom
-waste `corta-bench`'s `diagnoseScrollbackFootprint` still reports
-(608 B/row slack, 57 MB at 100k lines, entirely in the *live-screen* ring
-`ScreenLines` uses, which cannot use the same batching since its rows are
-still being edited). `snapshot()` itself is an O(1) struct copy
-(`Grid`/`ScreenLines`/`Scrollback` are all value types over
-`ContiguousArray`); the actual deep-copy cost is deferred COW, paid one
-row at a time by whichever side next mutates it. Measured scrollback
-footprint at 100k×120-column lines: 185.0 MB, inside §1's ~200 MB target
-and unchanged from the last recorded figure — this pass made no change
-here; the existing batching already addresses what "immutable blocks"
-would otherwise be evaluating.
-
-**ASCII fast path.** Both existing fast paths (`Parser.parse([UInt8],
-performer:)`'s run scan; `Grid.writeASCII`/`Line.overwriteASCII`'s
-batched cell write) read/wrote through `Array`/`ContiguousArray`
-subscripting, which re-checks bounds and the exclusivity flag on every
-element even though each scan/write's range is already fixed before it
-starts. Both now go through `Span` (`Array.span`, Swift 6.2): the
-run-boundary scan in `Parser.swift` indexes `bytes.span` instead of
-`bytes`, and `Line.overwriteASCII`'s inner loop writes through
-`cells.withUnsafeMutableBufferPointer`. `Span` was chosen over a raw
-`UnsafeBufferPointer` for the parser scan specifically because it keeps
-the lifetime/exclusivity reasoning checked by the compiler against
-`bytes`' scope rather than resting on the caller's manual promise inside
-an `withUnsafeBufferPointer` closure — `Line.overwriteASCII` still needs
-the closure form because it *writes*, and `Span`'s mutable counterpart
-(`MutableSpan`) is not yet what `ContiguousArray` exposes on this
-toolchain.
-
-Measured, `-c release`, this machine, 5 runs each before/after (noise
-band shown as the full min–max spread rather than one sample, per §5.1's
-spirit — `corta-bench`'s own harness reports percentiles only for the
-latency benchmarks, not throughput):
-
-| Benchmark | Before | After |
-| --- | --- | --- |
-| Parser-only throughput | 643.6–650.5 MiB/s | 635.3–684.3 MiB/s |
-| Parser + grid throughput | 144.0–145.6 MiB/s | 144.9–154.1 MiB/s |
-| Core feed throughput | 129.7–130.9 MiB/s | 128.2–139.5 MiB/s |
-
-The grid-write side (`Line.overwriteASCII`) shows a consistent, real gain
-— parser+grid and core-feed throughput both moved up across every
-sample, never below the old range. The parser-only scan's gain is
-smaller and its range now overlaps the old one at the bottom end; kept
-anyway because it is never worse than the old code in any sample taken,
-and because `Span` is the safer construct at no measured cost, which is
-worth keeping on its own terms even where the throughput case is weak.
-All 541 `CortaTerminalTests`, the 18 golden-file cases and a 500,000-input
-`corta-fuzz` run against `Tests/Fuzz/corpus` (`--seed 1` and `--seed 2`)
-stayed green throughout — no correctness change, byte-identical golden
-output.
-
-**Span, borrowing and `@specialize` more broadly.** `Span` is now used at
-the two boundaries above; extending it further (e.g. `Grid.write`'s
-single-scalar path) found nothing to gain — that path has no
-array-range loop left to bounds-check-eliminate, it is one table lookup
-per call already behind `@inline(__always)`. `borrowing`/`consuming`
-parameters were not introduced: every hot-path type here is a small
-value (`Cell`, `UInt32`, `UInt8`) where a `borrowing` annotation changes
-nothing measurable, and the one place a large value crosses a call
-boundary (`Grid` itself, at `snapshot()`) is COW-cheap already, not a
-copy `borrowing` would avoid. `@_specialize` was evaluated and not added:
-`Parser.parse<P: ParserPerformer>` and `Performer` are both defined in
-`CortaTerminal`, and every production call site (`Terminal.feed`,
-`corta-bench`) calls it with the concrete `Performer` type from within
-the same module, so whole-module optimization (SwiftPM's release default)
-already specializes and devirtualizes it — an explicit `@_specialize`
-annotation exists to buy this across a module boundary that does not
-exist here, and adding one changed nothing in either binary size or the
-throughput numbers above (not tabulated: confirmed and reverted).
-
-**Not attempted.** Restructuring `state`'s single-lock ownership (e.g.
-splitting parser/grid from scrollback under separate locks) was
-considered and rejected: the measured wait times above show no
-contention problem to justify it, and `TerminalSession`'s own header
-comment already documents why a single lock plus the waiter-yield
-mechanism was chosen over finer-grained locking. Widening the ASCII
-fast path itself (SIMD-scanning the printable range, or admitting C0
-controls into a run instead of ending it) was not attempted this pass —
-`Span`'s subscript is not the vectorizing kind of win a real SIMD compare
-would be, and that is a larger, separate change with its own
-before/after case to make.
-
----
-
-## 7. B12 — rendering diagnostics and a rejected prewarm (2026-09-13)
-
-**Metal/Instruments correlation labels.** `QuadRenderer`'s three render
-command encoders (solid/glyph/color-glyph) and `ViewController`'s
-per-pane command buffer now carry a `label` and, for the encoders, a
-`pushDebugGroup`/`popDebugGroup` pair (`Corta.solid`, `Corta.glyph`,
-`Corta.colorGlyph`, `Corta.frame.<pane>`). This is the B12 "platform
-diagnostics/state labels that correlate terminal scenarios with
-Instruments/Metal traces" scope item: a GPU frame capture or Metal
-System Trace can now attribute a command buffer to a pane and an encoder
-to which of the up-to-three passes it was. Purely additive — no draw
-call, pipeline state or blend changed; `CortaTests` (529 tests, offscreen
-only, no `CortaUITests`) stayed green.
-
-**Cold-startup / first-frame measurement.** Added
-`GlyphAtlasTests.measureColdStartupAndFirstFrameCost` (non-asserting,
-same pattern as `FrameCPUBaselineTests`): times `GlyphAtlas.init` and a
-simulated first screenful of ordinary text (120 columns × the printable
-ASCII range, one style) against it, writing both numbers to
-`CORTA_ATLAS_BASELINE_OUTPUT` (default `/tmp/corta-atlas-cold-startup-
-baseline.txt`). This is the B12 "measure Core Text lookup/rasterization/
-atlas alloc-eviction/cold startup" scope item.
-
-**A bounded eager ASCII prewarm was built against that measurement and
-rejected.** The idea (B12's "bounded prewarming instead of unlimited
-growth" bullet): populate the ASCII atlas page for all four styles
-(regular/bold/italic/bold-italic, 380 glyphs total) at `GlyphAtlas.init`
-and on every `reset(font:)`, so the first frame never pays per-glyph
-rasterization. Measured on this machine, `-c release`-equivalent
-(Debug scheme, offscreen `CortaTests`, no UI):
-
-| | Cold init | First simulated frame (1 style) |
-| --- | --- | --- |
-| Without prewarm | 0.29–0.79 ms | 3.28–3.53 ms |
-| With prewarm (4 styles) | 5.48 ms | 2.35 ms |
-
-Prewarming *does* make the first frame in the tested style faster (by
-about 1.1–1.2 ms — the cost of rasterizing that style's 95 glyphs, paid
-early instead of on demand), but a typical session uses one, maybe two
-of the four styles on its first screen, and the prewarm pays for all
-four regardless: cold init grew by roughly 4.7–5.2 ms to buy back at
-most ~1.2 ms, a net loss against the very "Startup" target
-(`PERFORMANCE.md` §1.1) it was meant to help, and pure waste for the two
-or three styles a given session's first screen never uses at all. Not
-kept. The measurement test stays as the harness for a narrower version
-of the idea later — prewarming only the one style a fresh pane actually
-starts in, say — which this pass did not attempt because that requires
-plumbing which style is "the default" through to `GlyphAtlas.init`,
-a larger change than this measurement pass's scope.
-
-**Everything else in B12's scope was not attempted this pass**, for the
-reason stated in `Metal4Backend.swift`'s own doc comment: replacing the
-forwarding backend with a real `MTL4CommandQueue`/`MTL4CommandAllocator`
-implementation risks silent GPU corruption or a driver-level hang on a
-wrong binding, not a compile error, and this pass had no way to visually
-verify a frame — no UI test, no Instruments capture against a running
-window. Cross-pane resource sharing (atlas/pipeline/font across split
-panes) was evaluated as a design (`B11/B12` research pass) and not
-attempted for the same reason: it changes per-pane object lifetime in
-`ViewController`/`SplitViewController`, which `CLAUDE.md`'s own working
-rules flag as needing a live-app check offscreen tests cannot substitute
-for. Display-link/drawable-depth comparison and redundant-render-pass
-removal were reviewed against the existing M8/M9 measurements and found
-already addressed (`§5.4`'s A/B, and `QuadRenderer.draw`'s one encoder
-per pass with no repeated state sets) — no further change is justified
-by anything measured here.
-
-## 8. B12 — a real Metal 4 backend, measured against the MTL3 path (2026-09-15)
-
-**The forwarding `Metal4Backend` is replaced by a real MTL4 submission
-backend** — `MTL4CommandQueue`, persistent per-slot `MTL4CommandBuffer`s,
-per-slot `MTL4CommandAllocator`s, `MTL4RenderCommandEncoder`, one reused
-`MTL4ArgumentTable` (address-bound instances/uniforms, resource-ID-bound
-atlas), an `MTLResidencySet`, and drawable sequencing via
-`waitForDrawable`/`signalDrawable` + `MTLDrawable.present`. Pipelines are
-the classic `MTLRenderPipelineState` — that is the type MTL4's encoder
-takes, not a gap. The MTL3-shaped base-protocol methods forward to a
-lazily-built `QuadRenderer` so a stray caller still gets correct output.
-Selection stays opt-in (`CORTA_METAL4=1` + `supportsFamily(.metal4)`),
-falling back to `QuadRenderer` on any construction failure; the default
-backend is unchanged. `TerminalRenderBackendTests` renders identical
-instance arrays through both backends offscreen and compares pixels, so
-the two paths cannot drift silently.
-
-Two faults only the live drawable path could produce were found by
-running the real app and fixed:
-
-1. **Residency** — a texture bound by `gpuResourceID` through an argument
-   table is neither retained nor kept resident by MTL4 (`.managed`
-   storage included); the first live run faulted at launch with
-   `kIOGPUCommandBufferCallbackErrorPageFault`. Every bound texture now
-   enters the queue's residency set on first use and is retained until
-   the last frame that bound it has completed — plus a 60-frame grace,
-   because with the GPU keeping up an exact "last frame completed" rule
-   evicted and re-added the atlas every single frame (two residency-set
-   commits per frame per texture) for a texture bound every frame.
-2. **Completion signalling** — a queue-signalled `MTLSharedEvent` never
-   advanced against a live `CAMetalDisplayLink` drawable stream, so every
-   `beginFrame` past the ring depth waited out its one-second timeout and
-   the window rendered ~1 frame/s. The completion gate now rides the
-   commit-feedback handler (the callback that demonstrably fires), and
-   commit faults are logged (bounded) instead of failing silently; a
-   queue whose work never completes stops encoding after three
-   consecutive timeouts rather than stalling-and-reallocating per frame.
-
-**A/B under an identical sustained `yes`-flood workload** (Release build,
-real window, frontmost, `CORTA_RENDER_METRICS=1` rings, 600-frame dumps;
-Mac17,3 / Apple M5, 32 GB, macOS 26.6.2 (25G83), Xcode 26.6, built-in
-1470×956@2x 60 Hz, AC power, low-power off; numbers are the medians of
-the per-dump p50/p99 across 5–7 dumps per config, plus the worst max):
-
-| config | cpuFrame p50 | cpuFrame p99 | gpu p50 | gpu p99 | worst max (cpu) |
-| --- | --- | --- | --- | --- | --- |
-| MTL3 default | 2.17 ms | 9.49 ms | 0.53 ms | 3.93 ms | 16.84 ms |
-| **Metal 4** | **1.79 ms** | 10.01 ms | 0.55 ms | 3.74 ms | 18.43 ms |
-| `CORTA_MAX_DRAWABLES=2` | 1.15 ms | 7.55 ms | 0.53 ms | 3.80 ms | 14.91 ms |
-| `CORTA_FRAME_LATENCY=2` | 1.29 ms | 9.16 ms | 0.53 ms | 3.79 ms | 36.83 ms |
-
-`drawableWait` was 0.00 ms at every percentile in every config — the
-pre-resolved display-link drawable never stalls this workload. Honest
-reading: Metal 4 submission is functional and fault-free and its cpuFrame
-p50 edge (2.17 → 1.79 ms) is within cross-run drift (the same MTL3 binary
-measured 3.88–6.11 ms avg across earlier same-day runs), so **no
-performance claim is made**; the backend exists as the real implementation
-the roadmap requires, default stays MTL3, and the comparison is now
-repeatable. The drawable-2 and latency-2 deltas are likewise within
-run-to-run drift and change nothing: defaults stand, both env hooks stay
-as measurement seams. The `preferredFrameLatency` follow-up named in
-`RenderPolicy.swift` is now instrumented (`CORTA_FRAME_LATENCY`) but its
-numbers here are flood-only; typing-latency judgment is §5.7's measure —
-not judged.
-
-**Re-measured after the residency grace (2026-09-15, review pass).**
-Same shape of run — Release build, real window launched through
-LaunchServices, `CORTA_RENDER_METRICS=1`, a 40 s `yes` flood through a
-`SHELL=` script, one 600-frame dump per config — after bound textures
-stopped leaving and re-entering the residency set every frame:
-
-| config | cpuFrame p50 | cpuFrame p99 | gpu p50 | gpu p99 | commit faults |
-| --- | --- | --- | --- | --- | --- |
-| MTL3 default | 0.75 ms | 3.32 ms | 0.63 ms | 4.54 ms | — |
-| Metal 4 | 0.73 ms | 2.77 ms | 0.59 ms | 1.33 ms | 0 |
-
-Still within drift of each other; still no speedup claimed. The
-hosted-XCTest frame-CPU baseline (`FrameCPUBaselineTests`, 120×40, Debug)
-read 2.04–2.16 ms avg on this branch against 2.00–2.22 ms on `main` over
-three runs each — no regression from the branch's render-loop changes.
-
-**Cross-pane pipeline/sampler sharing — done.** `QuadPipelineCache`
-(per-device, immutable-after-creation) holds the three pipeline states
-and sampler both backends share; the M9 binary-archive warm-up moved into
-the cache's creation path and now covers `Metal4Backend` too. Renderer
-construction, n=8, hosted-XCTest Debug (archive reads disabled, so
-"cold" is a real compile — an upper bound): before, p50 10.666 ms per
-pane; after, pane 1 unchanged (9.9–11.6 ms cold) and panes 2…n pay
-0.000–0.001 ms — a dictionary lookup. Atlas sharing was evaluated and not
-done: a `GlyphAtlas` is single-threaded mutable state whose eviction
-bumps a generation counter that full-rebuilds every consumer's instance
-cache, so sharing couples every pane's damage tracking to the union of
-all panes' glyph churn — a per-frame cost to buy ~20 MB/pane of memory.
-The evaluation lives at `TerminalRenderer.init`.
-
-**Bounded partial instance uploads — measured, reverted.** A full
-experiment (dirty-range tracking + ranged ring writes) cut typing-scene
-uploads 41× (224 520 → 5 464 B/frame) for a ~15 µs p50 frame-CPU win
-against the 4 ms budget, while scroll-shift and full-rebuild — the cases
-where upload volume is real — cannot win by construction and paid small
-bookkeeping regressions (120×40 grid; typing 0.058→0.043 ms p50, scroll
-0.066→0.076, rebuild 1.209→1.236). Not a clear win → reverted; the
-benchmark harness (`InstanceUploadBenchmarkTests`) stays. The experiment
-surfaced one real inefficiency, recorded for a later pass: the ring
-allocates exact-fit buffers, so any growing array reallocates and
-full-uploads every frame today.
-
-**Render-pass/state audit.** `QuadRenderer.draw` now skips encoder
-creation for a provably-empty pass under `.load` (pixel-identical; the
-`.clear` first pass still always runs), and `Metal4Backend` dedupes
-scissor/viewport/pipeline sets within its single per-frame encoder. The
-largest finding is recorded but not done: the up-to-three MTL3 passes per
-frame (plus one per Kitty placement) each cost a tile load/store round
-trip; merging them into one encoder needs a scoped-pass API and is a
-separate change.
-
-**Energy.** `scripts/measure-energy.sh` now exists (idle / occluded /
-background-flood / 2-window / kitty-image scenarios, §5.1 distributions,
-§5.2 environment header), closing the §1.1 gap's tooling half. On this
-machine `powermetrics` needs a sudo-capable session, which this pass did
-not have: wattage sampling is **not run**, and the harness's degraded
-top-based path has not been executed end-to-end either — the gap narrows
-to "harness exists and is untested", stated plainly rather than closed.
-Thermal and low-power scenarios are not forceable without changing
-machine-wide state: not judged.

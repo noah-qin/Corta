@@ -13,7 +13,10 @@ first so contributors do not duplicate effort.
 
 1. Fork and clone the repository, then create a branch for your change.
 2. Install a released Xcode with Swift 6.2 or later on macOS 26.0 or later.
-   Only stable Xcode toolchains are supported.
+   Only stable Xcode toolchains are supported. The project's
+   `SWIFT_VERSION = 6.0` is the *language mode* (Swift 6), not the
+   toolchain: a 6.2 compiler builds in Swift 6 mode, so the two numbers do
+   not disagree.
 3. Run `swift test --package-path CortaTerminal` for a first core check.
 4. Open `Corta.xcodeproj` to work on the app. It resolves Sparkle on the
    first build. For builds without a developer account, use the ad-hoc

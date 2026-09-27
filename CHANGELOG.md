@@ -114,587 +114,92 @@ first release signed into the update feed from CI rather than by hand
 
 ## [1.0.0] - 2026-09-19
 
-The v1.0.0 milestone: the sixteen ordered batches `B01`–`B16` that took
-Corta from a quality release to a terminal with explicit session and
-input semantics, shell integration and command-level navigation, one
-configuration file for everything, a real Metal 4 backend, remote
-context with SFTP and remote editing, the packaging and documentation
-of an open-source project, and system entry points. esctest2:
+Sixteen batches (`B01`–`B16`) on top of 0.1.1: explicit session and
+input semantics, shell integration and command navigation, one config
+file for everything, a Metal 4 backend, remote context with SFTP and
+remote editing, open-source packaging, and system entry points. esctest2:
 126 passed, 334 known bugs, 107 failed of 567 (81.1%), every failure a
-subset of 0.1.1's.
+subset of 0.1.1's. The entry as released, with the evidence behind each
+line, is in [the record](docs/history/2026-09-19-V1.0.0-CHANGELOG-FULL.md).
 
-**Known and open at this release, not blocking it** — each with a
-troubleshooting entry or a conformance note rather than a claim:
+**Known at this release:**
 
-- Keypress-to-glass latency is above its target: 66.3 ms average with
-  a person typing (p95 78.7), 61.9 ms scripted, both measured from
-  inside the app on 2026-09-18 (`PERFORMANCE.md` §5.7); the README
-  prints the number rather than omitting it.
-- One tester's ⌘, did not open Settings once. Two passes since could
-  not reproduce it — Release and Debug builds, ABC and Pinyin input
-  sources, with and without a composition open, and the palette's
-  Settings command — and the menu item works. Reported in
-  `docs/test-results/2026-09-18-release-checks.md` as unexplained, not as
-  fixed.
-- VoiceOver: the second listening pass (2026-09-18) heard the geometry
-  and the read-through correctly and *Read selected text* answer "No
-  selection." over a six-line mouse selection that the accessibility
-  API reported correctly when probed. The plural `AXSelectedTextRanges`
-  attribute `NSTextView` also answers is now implemented; whether that
-  was the cause needs one more listen.
-  `docs/test-results/2026-09-18-release-checks.md`.
-- Multi-display Quick Terminal placement (no second display on the test
-  machine) and thermal forcing: not judged. Touch ID under Secure
-  Keyboard Entry passed by hand (the same record). The energy scenarios
-  ran twice, on mains and under Low Power Mode (`PERFORMANCE.md` §5.6).
-- Mouse motion tracking and its selection override (#88), plus shared
-  viewport/selection/search/command/image mapping (#89), are complete in
-  this release. The separate toolchain follow-up (#90) was cancelled;
-  only released Xcode toolchains are supported. The reported Tab failure's
-  original evidence (B02) cannot be recovered and stays unchecked.
+- Keypress-to-glass latency is above its target: 66.3 ms average typing, 61.9 ms scripted (`docs/PERFORMANCE.md` §5.6).
+- ⌘, once failed to open Settings for one tester; not reproduced since.
+- VoiceOver's *Read selected text* needed one more listening pass to confirm the fix below.
+- Multi-display Quick Terminal placement and thermal forcing were not judged.
 
 ### Added
 
-- TUI mouse drag and motion tracking (`?1002`/`?1003`), with an Option-drag
-  text-selection override, configurable through `mouse-override-modifier`.
-  SGR encoding alone no longer enables unsolicited mouse reports.
-
-- **Keypress-to-glass latency measured from inside the app.**
-  `CORTA_RENDER_METRICS=1` now also collects `keypressToPresent`: the key
-  event's timestamp to the presented time of the first frame carrying
-  the child's echo (`MTLDrawable.presentedTime`, the moment on the glass).
-  A drawable the compositor replaced hands its keystroke to the next one
-  rather than dropping the sample. `scripts/measure-keypress-latency.sh`
-  drives or waits for 200 samples and reads the line back; no third-party
-  tool, no screen capture, no permission. `PERFORMANCE.md` §5.7 says what the
-  scripted and `--manual` kinds each include. Dumps of every
-  render metric now carry p95 as well.
-- **B16 — system entry points and the Quick Terminal.** Three App Intents
-  for the Shortcuts app (and, through a Shortcut built there,
-  `shortcuts run`): *Open Corta Window*
-  (optionally in a folder), *Focus Corta Window* and *Toggle Quick
-  Terminal*. Windows are addressed by an identity minted at creation and
-  saved with the arrangement, never by title, and a stale identity fails
-  with an error rather than picking a nearby window; no intent carries
-  text toward a shell, by rule (`SECURITY.md` §4.6). The Quick Terminal is
-  an ordinary Corta window dressed as a panel — floating, on every Space
-  and beside full-screen apps, no tabs, never saved into the arrangement —
-  summoned by a Carbon hotkey (`quick-terminal-key`, default ⌥Space) that
-  needs no Accessibility permission; dismissing it returns focus to the
-  application it was summoned from. Off by default: `quick-terminal =
-  false` claims no key, and View ▸ Quick Terminal, the palette and the
-  intent still open it. Secure Keyboard Entry ships under Shell, as
-  `secure-keyboard-entry`, engaged only while a terminal window is key and
-  Corta is active, with a titlebar lock showing the engaged state and the
-  system counter released at quit. Settings ▸ General reports which key
-  summons the panel and whether the system granted it.
-- **B15 — one packaging check, and documentation split by audience.**
-  `scripts/check-release.sh` is the single implementation of the release
-  rules — Info.plist against `project.pbxproj` for version, build number
-  and deployment target; CHANGELOG and README naming the version; the
-  signature (Developer ID, staple and Gatekeeper when required); the
-  archive, its SHA-256 sidecar and the appcast entry's build, URL, length
-  and signature — and `package-release.sh`, `release.sh` and the release
-  workflow all call it, so a local package and a CI package are refused
-  for the same reasons. The release notes read the minimum OS from the
-  built app instead of a literal that had drifted. `docs/` now separates
-  durable documents from the record: `docs/README.md` is the index,
-  `docs/DECISIONS.md` the settled decisions, `docs/TROUBLESHOOTING.md`
-  the install and fallback guide, and `docs/history/` holds the M1–M10
-  roadmap and the 0.1.1 audit notes. Issue templates (bug, install
-  blocker, "went back to my old terminal", feature) and a pull request
-  template describe what a report or a change needs to carry.
-- **B12 — a real Metal 4 rendering backend, plus rendering evidence
-  (first slice).** The forwarding `Metal4Backend` stub is replaced by a
-  genuine MTL4 submission path — `MTL4CommandQueue`, persistent per-slot
-  command buffers and allocators, argument tables, an explicit residency
-  set, and `waitForDrawable`/`signalDrawable` drawable sequencing —
-  selected only with `CORTA_METAL4=1` on Metal-4-capable hardware, with
-  the MTL3 `QuadRenderer` unchanged as the default and fallback. Pixel
-  equivalence between the two backends is enforced by tests; two faults
-  only the live drawable path could produce (argument-table texture
-  residency, and completion signalling that never fired against a live
-  display link) were found by running the real app and fixed, with commit
-  faults now logged instead of silent. Compared under an identical
-  sustained-output workload the Metal 4 path is fault-free and its
-  frame-CPU edge is within run-to-run drift, so per the batch's own rule
-  no speedup is claimed — the implementation is the deliverable.
-  Cross-pane sharing landed for the parts that are safe: the three
-  pipeline states and sampler are per-device shared
-  (`QuadPipelineCache`), so panes after the first pay ~0 ms of shader
-  compile instead of ~10 ms each; atlas sharing was evaluated and
-  declined (it would couple every pane's damage tracking to the union of
-  all panes' glyph churn). Bounded partial GPU uploads were built,
-  measured (a 41× upload reduction bought ~15 µs p50 against the 4 ms
-  frame budget), and reverted — the numbers are in PERFORMANCE.md §8.
-  Provably-empty render passes and redundant MTL4 state sets are removed.
-  New measurement seams: `CORTA_FRAME_LATENCY` (preferredFrameLatency
-  experiments) and `scripts/measure-energy.sh` (idle/occluded/flood/
-  multi-window/image energy scenarios; powermetrics sampling itself needs
-  a sudo-capable session and was not run — recorded as not judged, along
-  with end-to-end typing latency and thermal/low-power forcing).
-- **B14 — SFTP and remote editing (first slice).** Built on B13's remote
-  context. The engine is a self-contained SFTPv3 wire-protocol client in
-  the CortaTerminal package whose transport is the system's `ssh -s --
-  <host> sftp` subprocess over plain pipes — authentication, host keys,
-  `ProxyJump` and all of `~/.ssh/config` stay with OpenSSH; Corta adds no
-  SSH library. The codec treats the peer as hostile (bounded lengths,
-  checked counts, truncation is a typed error, never a trap). Shell ▸
-  Browse Remote Files… opens a per-host browser window from a remote pane.
-  The host a pane names is the remote shell's own report — program output
-  — so the first connection to a host in each run is asked, with the name
-  prefilled, editable and its provenance stated, from the browser and from
-  a ⌘-clicked file reference alike; Corta never connects on the far end's
-  say-so. The channel has no terminal, so ssh cannot prompt on it: a
-  password, an agent-less passphrase or an unknown host key fails as its
-  own typed error that says to connect once in the terminal first. Then:
-  directory listing, mkdir, rename, delete (confirming host, path and
-  entry count), explicit upload/download with a transfers list (progress,
-  per-transfer cancel, retry for transport-class failures only) and an
-  overwrite/resume/keep-both/skip conflict sheet naming host, path, sizes
-  and mtimes. Destination writes are atomic via a `.corta-part` partial
-  renamed over the target — an interrupted transfer never leaves a
-  silently-accepted partial at the destination name, and resume validates
-  both endpoints before continuing. Remote editing maps a remote file to a
-  managed local copy (`~/Library/Application Support/Corta/RemoteEdit/`),
-  opened through the existing `open-file-command` `{file}/{line}/{column}`
-  template; `path:line` references in a remote pane resolve to the same
-  flow. Local edits are detected by file watch (no polling) and offered as
-  an explicit upload; the remote is re-checked first, and a changed or
-  deleted remote forces an explicit resolution — upload anyway, re-download
-  discarding local edits, or save the local copy elsewhere. Server features
-  that are unavailable (`statvfs@openssh.com`) degrade explicitly rather
-  than being guessed. Folders transfer as trees (`SFTPTransferEngine
-  .downloadDirectory`/`uploadDirectory`): one atomic file at a time,
-  folders merging, the conflict policy applied per file, symbolic links
-  and special files skipped and reported — never followed. The engine is
-  verified against the real OpenSSH
-  `sftp-server` on this machine (`SFTPRealServerTests`, and the launched
-  app in `RemoteWorkflowUITests` — see CONFORMANCE §4.4); that first run
-  found and fixed a spawn that never returned, a write size the server
-  rejected and a SIGPIPE that terminated the app. What this does *not*
-  do: anything against a real remote host over ssh — authentication and
-  host keys are recorded as not judged.
-- **B13 — OpenSSH configuration and remote context (first slice).** A pane
-  now knows — and says — which machine it is talking to. OSC 7 reports
-  naming a remote host were previously dropped by the parser; they are now
-  recorded as a `RemoteContext` (host, directory, provenance) that drives a
-  `⟂ host · directory` badge in the pane's title and a host filter in
-  Command History, while `workingDirectory` stays local-only by
-  construction, so nothing remote can leak into local spawns, splits,
-  restore, or file-reference resolution. Foreground-process detection
-  (`ssh`/`mosh` in the foreground, or a pane spawned *as* `ssh` via a
-  preset) covers connections whose shell emits no OSC 7, with the badge
-  honestly reading "host unknown" or "remote?" for nested ssh/tmux states
-  rather than guessing from prompt text. A report the pane has since been
-  seen local behind (the connection that sent it exited) is retired rather
-  than reused: the next `ssh` reads "host unknown" until *its* far end
-  reports, never the previous host. Command records carry the host they
-  ran on. A dead remote connection offers Shell ▸ Reconnect to Host, which
-  re-runs exactly the recorded command as an explicitly *new* connection —
-  never a fallback to a local shell, never a claim that anything was
-  restored; when the command itself attaches to a remote multiplexer, the
-  copy says the reattach is the remote program's doing. Presets are the
-  documented way to open a remote terminal (`preset.<name>.shell =
-  /usr/bin/ssh`): the child is the system's own OpenSSH client, so `Host`
-  blocks, `Include`, `Match`, `ProxyJump`, agent keys and any
-  `ControlMaster` setup in `~/.ssh/config` all apply untouched — Corta
-  parses none of it. ControlMaster/ControlPersist were evaluated for a
-  Corta-side connection cache and declined: the user's own ssh config
-  already provides it, with ssh owning the master's lifetime. What this
-  does *not* do: parse or merge OpenSSH configuration, share connections
-  itself, or verify any of this against a real remote host — that matrix is
-  recorded as not judged.
-- **B10 — mark every non-English string `needs_review` (first slice).**
-  `Localizable.xcstrings` conflated "has a translation" with "a native
-  speaker has read it in context" — every one of the 222 keys across 8
-  shipped non-English locales carried the same `translated` state
-  regardless of review, which is exactly the gap B10 names ("keep
-  unreviewed languages marked as such"). All 1,776 non-English
-  localizations now carry Xcode's own `needs_review` state instead — a
-  purely editorial marker with no runtime effect, so nothing changes for
-  a user today. `CONTRIBUTING.md` gets a "Localization" section
-  explaining the convention, and `LocalizationCoverageTests` gets a
-  regression test that every non-English string carries a recognised
-  state. What this does *not* do — actually review any of the eight
-  languages — needs native speakers this PR does not have.
-- **B09 — decouple temporary font zoom from the saved default (first
-  slice, fixes a real bug).** ⌘+/⌘−/pinch used to write the zoomed size
-  straight into `Configuration.fontSize` — the *global* default — so
-  zooming one window changed every other open window's size (and what a
-  brand-new window opened at) the moment any of them next re-read the
-  config file, which a theme change, a settings-page edit or an
-  `$EDITOR` save all trigger. `isFontSizeZoomed` makes the zoom
-  per-window and `configurationChanged` skips a zoomed pane's size line
-  instead of overwriting it; ⌘0 ends the zoom by reading the *current*
-  config value rather than a hardcoded constant, so a default changed
-  in Settings while a window was zoomed is what ⌘0 lands on. A zoom no
-  longer survives a relaunch — that trade only existed to make the old,
-  incorrect behavior tolerable. Known gap: a pane split off a zoomed
-  window opens at the plain default rather than matching its zoomed
-  siblings.
-- **B08 — smart directory and contextual command navigation (first
-  slice).** `DirectoryHistory` ranks directories a completed command
-  actually ran in (frecency — visit count that halves every three days —
-  with favorites sorted first and fuzzy filtering over the list),
-  persisted separately from the config file and clearable from Settings ▸
-  General ▸ History (`directory-history` key gates whether it is kept at
-  all). `DirectoryHistory.projectRoot(for:)` finds the nearest `.git`
-  ancestor. `ViewController.changeDirectory(to:)` writes an app-initiated
-  `cd` only when `canChangeDirectorySafely` holds — shell integration
-  active, nothing currently running, and the cursor still exactly where
-  the prompt finished drawing — so a chosen directory never lands on a
-  busy shell, a TUI, or a populated prompt. `CommandRecordStore.records
-  (inDirectory:since:until:exitStatus:)` searches command history by the
-  same dimensions. Deferred to a later pass: the picker UI itself (Finder/
-  drag-drop/output-path actions, a directory-switcher panel) — this slice
-  is the ranking and safety engine underneath it, exercised by tests
-  rather than a new visible surface yet.
-- **B07 — shell integration and command-level debugging (first slice).**
-  Commands are now identified, not just marked: `CommandRecord` (bounded,
-  id-keyed, built from the same `OSC 133` marks the grid already reads)
-  distinguishes the command the viewport is scrolled to from the one that
-  most recently finished, records each command's exit status, timing and
-  working directory (`OSC 7`), and lets a still-running command's output
-  be copied as a timestamped snapshot (**Snapshot Running Command's
-  Output**, new menu item) rather than waiting for it to finish. Settings
-  ▸ Terminal ▸ Shell Integration installs, diagnoses and removes a zsh
-  integration script — reversibly, inside one marked block in `~/.zshrc`,
-  flagging a likely conflict with another terminal's own integration by
-  name rather than refusing to install (`docs/CONFIGURATION.md` §2, "Shell
-  integration"). Deferred to a later pass: fish/bash integration, and a
-  unified command-inspector surface tying navigation, output ops and
-  notifications together visually rather than through the existing
-  per-feature menu items.
-- **B03 — session lifecycle and input backpressure made explicit.**
-  `TerminalSession.write` now returns a `WriteOutcome`
-  (`.accepted`/`.backpressured`/`.stopped`) instead of silently dropping a
-  chunk the child was not reading for; a paste is split into bounded
-  chunks (`Paste.chunked`) rather than enqueued as one arbitrarily large
-  write, so a keystroke typed mid-paste waits behind one chunk instead of
-  the whole paste, and a paste that hits backpressure stops instead of
-  queuing chunks that can only be dropped. `TerminalSession.onChildExit`
-  — built since M2 but never installed by the app — is now wired: a child
-  that exits on its own (`exit`, a crash, `kill`) shows a toast, and a
-  `sessionGeneration` counter on `ViewController`, carried through every
-  reader-thread callback's `@MainActor` hop, keeps a stale session's
-  callback from touching a pane that has since started a different one
-  (`docs/DESIGN.md` §7, "Ownership and synchronization audit," has the
-  full map).
-- **B01 — the v1 validation and performance baseline.** User-visible
-  targets for input, sustained output, scrolling, startup, memory, energy,
-  compatibility and recovery (`docs/PERFORMANCE.md` §1.1); the exact
-  toolchain (Xcode, Swift compiler and language mode, macOS, deployment
-  target) recorded distinctly rather than conflated (§5.2); a fresh
-  headless `corta-bench` p50/p95/p99 sample under that toolchain (§5.1); the
-  real-workflow test matrix extended with CJK input, sleep/wake,
-  restoration and an AI CLI application row, each marked automated,
-  partly-automated or manual/"not judged" (`docs/CONFORMANCE.md` §4.6); and
-  Swift Testing `Attachment` output for the offscreen render-correctness
-  tests, so a pixel-mismatch failure carries the rendered PNG instead of
-  only the failed comparison.
-- **B04 — the scrolled-away viewport now stays anchored to what it was
-  showing.** `scrollOffset` was a raw distance from the live bottom, so it
-  silently pointed at different text every time output arrived while the
-  user was scrolled up — the same number of lines above a bottom that had
-  just moved. `scrollAnchorTotalPushed` shifts it by the scrollback's growth
-  on every output batch instead, keeping the document position fixed.
-  Typing and pasting while scrolled away now return the viewport to the
-  bottom (`ViewController.returnToBottomOnInput`), matching every comparable
-  terminal — the anchor above is deliberately *not* applied to those, since
-  input is the user's own request to talk to the live screen. `docs/DESIGN.md`
-  §7 has the full account, including what is still open (a unified
-  viewport/selection/search coordinate mapping, and a discoverable
-  selection/mouse-reporting override blocked on `?1002`/`?1003` support).
-- **B06 — an OSC 4 indexed-palette override now repaints, not just
-  answers a query.** `TerminalRenderer` consults a session's overrides
-  when resolving an indexed colour, with a new `IndexedPalette
-  .overridesGeneration` counter invalidating its cache the same way an
-  atlas or line-generation change already does — necessary because an
-  override changes what an index resolves to without changing any
-  `Cell`'s own stored content, which the ordinary per-row damage check
-  would otherwise never notice. Measured against `docs/PERFORMANCE.md`'s
-  own frame-CPU rule before and after: the first implementation measured
-  a real ~5% regression (an always-passed, defaulted-to-empty
-  `Dictionary` parameter costs a retain/release pair per cell even when
-  empty), fixed by making the parameter an optional the common case
-  passes as `nil` instead — `docs/DESIGN.md` §7 has the full account.
-- **B06 — special colours query, set and reset (OSC 5/105).** The
-  behavioural-decision blocker B06's original pass named for OSC 5 was
-  the lack of an independently verifiable specification, not esctest
-  itself — xterm's own `ctlseqs.txt` documents the five fixed slots
-  (`Pc` 0–4: bold, underline, blink, reverse, italic) and the OSC 105
-  reset pairing precisely. Added `SpecialColors`: unlike `IndexedPalette`
-  there is no themed default to seed (an unset slot means Corta's
-  ordinary SGR-attribute rendering applies), and the query form answers
-  black for an unset slot rather than silence, matching OSC 4's own
-  precedent.
-- **B06 — indexed palette query, set and reset (OSC 4/104).** A program
-  naming a colour by number (`\e]4;137;?\e\\`) got silence, and setting or
-  resetting one (`\e]4;1;#ff0000\e\\`, `\e]104\e\\`) was a no-op. Added
-  `IndexedPalette` — a 256-entry `defaults` array plus a sparse
-  `overrides` dictionary, the same shape `DynamicColors` already uses —
-  wired through `PerformerState`/`Terminal`/`TerminalSession`, with
-  `defaults` seeded from the active theme's ANSI colours (0–15) and
-  xterm's fixed 6×6×6 cube and greyscale ramp (16–255) so a query answers
-  with what is actually drawn, matching how OSC 10/11/12 already work
-  (`docs/DESIGN.md` §7). Render-path integration (making an override
-  actually repaint) and OSC 5 are explicitly out of scope for this change
-  — see the same `DESIGN.md` entry for why.
+- TUI mouse drag and motion tracking (`?1002`/`?1003`), with an Option-drag selection override (`mouse-override-modifier`); SGR encoding alone no longer turns on mouse reports.
+- Keypress-to-glass latency measured inside the app (`CORTA_RENDER_METRICS=1`, `scripts/measure-keypress-latency.sh`); render-metric dumps include p95.
+- App Intents for Shortcuts: Open, Focus and Toggle Quick Terminal; windows are addressed by a saved identity, and no intent sends text to a shell.
+- The Quick Terminal: a floating panel on every Space, summoned by a hotkey (`quick-terminal-key`), off by default (`quick-terminal`).
+- Secure Keyboard Entry under Shell (`secure-keyboard-entry`), with a titlebar lock while it is engaged.
+- `scripts/check-release.sh`: one implementation of the release rules, used by local packaging and CI alike; the release notes read the minimum macOS from the built app.
+- Documentation split into durable documents and a dated record (`docs/README.md`, `DECISIONS.md`, `TROUBLESHOOTING.md`, `docs/history/`), plus issue and pull request templates.
+- A Metal 4 rendering backend (`CORTA_METAL4=1`), pixel-equivalent to the default path; no speedup is claimed.
+- Render pipelines shared across panes: a new pane no longer pays ~10 ms of shader compile. Provably empty render passes and redundant Metal 4 state changes are skipped.
+- Measurement seams `CORTA_FRAME_LATENCY` and `scripts/measure-energy.sh`.
+- SFTP over the system `ssh`, with no SSH library: Shell ▸ Browse Remote Files…, upload and download with progress, cancel, retry and a conflict sheet, atomic partial files and validated resume, and whole-folder transfers that never follow links.
+- The first connection to a host in each run is asked, with the name editable; Corta never connects on a remote shell's say-so.
+- Remote editing: a remote file opens as a managed local copy, and changes go back only by explicit upload after the remote is re-checked.
+- Remote context: a pane shows which host it is talking to (`⟂ host · directory`), from OSC 7 or the foreground `ssh`/`mosh`; local paths never pick up a remote directory.
+- Command records carry their host, and Command History can filter by it.
+- Shell ▸ Reconnect to Host re-runs a dead connection's exact command as a new connection.
+- Every non-English string is marked `needs_review` until a native speaker reads it; `CONTRIBUTING.md` explains the convention.
+- Directory history ranked by frecency, with favourites and fuzzy filtering (`directory-history`, clearable in Settings).
+- Safe app-initiated `cd`: only when shell integration is active, nothing is running and the prompt is untouched.
+- Command records (`OSC 133`) with exit status, timing and directory; Snapshot Running Command's Output.
+- Settings ▸ Terminal ▸ Shell Integration installs, diagnoses and removes the zsh script, reversibly.
+- A child that exits on its own shows a toast; `TerminalSession.write` reports accepted, backpressured or stopped, and pastes are sent in bounded chunks.
+- User-visible performance targets (`docs/PERFORMANCE.md` §1.1), the recorded toolchain, a wider real-workflow test matrix, and PNG attachments on render-test failures.
+- OSC 4/104 (indexed palette) and OSC 5/105 (special colours) query, set and reset; an OSC 4 override repaints.
 
 ### Fixed
 
-- Settings rows are one height: a numeric field's empty title was laid
-  out as a blank second line, making those rows 11pt taller than a
-  toggle's and sitting the "×" and "seconds" beside them below the
-  field. The Terminal tab has sections; the font-status and Quick
-  Terminal status rows appear only when they have something to say; a
-  tab opens at its top instead of wherever it was last scrolled; and the
-  font preview's second line reads "ok  failed" rather than "okfailed".
-- "Open file with" is validated when the edit is committed (Return or
-  focus loss), not per keystroke — `{file}` and a space after the command
-  could not be typed, only pasted, because every intermediate value was
-  refused or trimmed and the field snapped back.
-- A settings change refreshes the page once, not twice, and no longer
-  re-reads `~/.zshrc` or re-measures the font for every control change;
-  opening the window runs its setup once instead of twice.
-- The Quick Terminal position option reads "Center", matching the American
-  spelling used everywhere else in the app.
-
-- **The Quick Terminal never appeared beside a full-screen
-  application.** With another app full-screen, the hotkey moved the
-  panel's frame and made nothing visible: an ordinary `NSWindow` ordered
-  front by an application that is not active does not reach a
-  full-screen Space, whatever its collection behaviour, and
-  `NSApp.activate()` is either refused for a hotkey or switches the
-  user out of the full-screen Space. The panel is now a non-activating
-  `NSPanel` carrying the storyboard's content
-  (`TerminalWindowController.adoptNonactivatingPanel`), ordered front
-  before the application activates; measured on macOS 27 with TextEdit
-  full-screen, `kCGWindowIsOnscreen` false for every window variant
-  and true for the panel, no Space switch, focus back in TextEdit on
-  dismissal. (2026-09-18 pass, Quick Terminal 4b.)
-- **The close confirmation's subject was never localised.** "this
-  window", "this pane" and "Corta" were English literals substituted
-  into a localised title, so a Chinese user read "要关闭this window吗？".
-  Three keys in nine languages now.
-- **VoiceOver's *Read selected text* (VO-Fn-F6) said "No selection."
-  over a real selection.** The unified-log trace showed VoiceOver
-  reading `AXSelectedTextRange` correctly and asking nothing further the
-  terminal could answer: it speaks a range through
-  `AXAttributedStringForRange`, which `NSTextView` provides and the
-  terminal did not (TextEdit, asked the same way, read its selection).
-  The terminal now answers `AXAttributedStringForRange` (the plain
-  substring, attributed), `AXRangeForIndex` (the whole grapheme) and
-  `AXStyleRangeForIndex` (the row), alongside the plural
-  `AXSelectedTextRanges` it also lacked; `AccessibilityMappingTests`
-  covers each.
-- **`CSI n X` (ECH) was not implemented.** Erase Character was dispatched
-  nowhere, so tmux's status line — drawn as its left part, an ECH over
-  the gap, then its right part — kept whatever the previous screen had in
-  the gap: after shrinking a window with two `htop` panes, a slice of the
-  function-key row sat in the status line for the rest of the session.
-  Implemented per ECMA-48 §8.3.38 (in place, cursor unmoved, clamped at
-  the margin, BCE, wide pairs repaired), with `EditingTests` covering it.
-  `CONFORMANCE.md`'s real-program table had listed ECH as passing on the
-  strength of programs that never send it; corrected. (2026-09-17
-  interactive pass, G25.)
-- **An ssh exit could be classified before its stderr was read.**
-  `awaitExit` returned as soon as the child was reaped, but the pipe can
-  still hold ssh's last line at that moment, so a refused login was
-  occasionally reported as "ssh failed (exit 255)" with no diagnostics
-  instead of the authentication error that says the channel has no
-  terminal to prompt on. The wait now needs both the exit and the
-  drain's EOF. Caught by the regression test below on CI, where it
-  raced one run in several.
-- **The SFTP browser reported a refused login as "the connection was
-  lost".** `SFTPConnection.openSession` reclassified a first-connect
-  failure against the connection's *stored* channel, and nothing is stored
-  until a session is up — so ssh's "Permission denied", exit 255, never
-  became the authentication error whose text says the channel has no
-  terminal to prompt on. Classified over the channel that failed;
-  regression test with a refusing `ssh` stand-in. (F21/F24.)
-- **A restored tab group came back in the wrong order, with the tab bar
-  over the first row.** `addTabbedWindow(_:ordered: .above)` inserts
-  directly after the receiver, and every tab was added after the *first*,
-  so three saved tabs came back first–third–second and the selected one
-  sat in the middle. And only the selected tab laid out against the bar:
-  the others kept the titlebar-only inset and drew their first row under
-  it until resized. Tabs are now chained in saved order, and every window
-  in the group lays out against the bar without absorbing it — the saved
-  frame already includes it, which is also why a restored tabbed window
-  used to come back two rows taller. (C11.)
-- **Every window reopened through the desktop for one frame.** The
-  first-present stand-in was retired in the same transaction that
-  *scheduled* the first drawable, one compositor frame before that drawable
-  was on the glass; a screen recording of the Dock-click reopen showed the
-  window transparent for a sixtieth of a second. The stand-in now outlives
-  the submitting tick and the next display-link callback retires it.
-  (`FirstPresentTests` covers the state.)
-- **⌘+ / ⌘− moved the titlebar instead of the bottom edge.** AppKit sizes
-  a window from its bottom-left origin, so each step jumped the whole
-  window — and the prompt the eye is on — up or down by the height delta.
-  Zoom is anchored at the top-left now, clamped to the screen. (C12.)
-- **Command History showed no command text and had nothing to search
-  by.** Each row carried a time, a status and a directory. Rows now show
-  the command as typed (recovered from the grid; a record whose prompt
-  line has scrolled away says so) and a search field filters on it,
-  case-insensitively. (B7.)
-- **The menu bar was English in every language.** The bar shows a
-  top-level item by its *submenu's* title and only the items were
-  localised, so File / Shell / Edit / View / Window / Help stayed English
-  above fully translated menus. The Bell picker showed the config-file
-  word (`Visual`) rather than a localised name. Chinese copy corrected
-  where the pass flagged it: one word for *pane* (窗格), the snapshot
-  command's wording, the scrollback label. (D15.)
-- **VoiceOver could be left reading a state the screen had moved past.**
-  A `valueChanged` notice arriving inside the 0.4 s rate limit was dropped
-  outright, so the last change of a burst — the one that leaves the screen
-  in its final state — was the one never announced. Trailing post added;
-  the snapshot cache is invalidated on every change regardless. One cause
-  of the D14 report, not confirmed by listening.
-- **`scripts/measure-energy.sh` and `scripts/measure-app-baseline.sh`
-  edited the real config file and window arrangement.** Both now run
-  against a throwaway `CORTA_STAGE_DIR`, so a measurement never reads,
-  flips or overwrites `~/.config/corta/config` or the saved windows.
-  (E17.)
-- **A restored or preset window's first pane spawned in the wrong
-  place.** The storyboard loads a window's content view — and spawns its
-  root pane — *inside* `instantiateInitialController`, so a restore or a
-  preset assigned to the controller afterwards was read only when the
-  splits were rebuilt. The root pane of a restored window came up in the
-  home directory under the default shell; only its siblings were right.
-  `SplitViewController.pendingSetup` stages the values before the
-  storyboard runs, with a regression test for each of the three callers.
-- **B04 — a selection drag kept running after the window lost focus.**
-  `handleSelectionMouseDown`'s blocking local event loop already exited if
-  the pane closed mid-drag, but not if the window simply lost key status
-  (Cmd-Tab, a new window from a global shortcut, Mission Control) — it kept
-  blocking on drag and auto-scroll events for a window the user was no
-  longer looking at. The loop now ends the same way the pane-closed case
-  already does, leaving whatever was selected up to that point standing.
-- **B06 — `BS`/`CUB` did not reverse-wrap at a wrap boundary.** Backspacing
-  or moving the cursor left off column 0 always stopped there, even when
-  the row above had auto-wrapped into the current one — line editing at a
-  wrap boundary (`readline`'s among them) could not walk back across it.
-  Added `?45` (reverse-wraparound mode — not DECBKM, which is the
-  separate `?67` backarrow-key mode; off by default, matching xterm):
-  while set, `BS`/`CUB` continue onto the row above's last column when
-  that row's own `wrapped` flag says the two are one logical line, never
-  across a hard newline. The mode also now survives an alternate-screen
-  round trip (`?1049`), the same way `cursorStyle` already does — it is
-  terminal-wide state, not part of either screen's own content.
-- **B06 — `CSI s` / `CSI u` cursor save/restore did nothing.** Corta has
-  no DECLRMM, so — matching xterm without left/right margins — these are
-  now unconditional aliases for `DECSC`/`DECRC` (`ESC 7`/`ESC 8`). The
-  kitty keyboard protocol's own `CSI u` forms are intercepted earlier in
-  dispatch and are unaffected.
-- **B05 — search case-sensitivity and regex mode leaked across panes.**
-  Both were read live from `ConfigurationStore` on every sweep; toggling
-  either in one pane silently changed what a second, already-open pane's
-  next sweep matched, without that pane's button ever updating. Each pane
-  now keeps its own local copy, seeded from the config default when its
-  bar opens.
-- **B05 — Esc could close the wrong pane's search bar in a split.** B02
-  scoped the Esc handler to the event's window, but two panes in one
-  split share a window; Esc now also checks that this pane's search field
-  is the one actually being edited.
-- **B05 — output at the tail of a burst could leave search results
-  stale.** `scheduleBackgroundSearchRefresh` dropped an output-triggered
-  refresh outright whenever a sweep was already running, on the
-  assumption more output would trigger another one — true only while
-  output kept arriving. A dropped request is now remembered and run once
-  the in-flight sweep lands.
-- **B05 — closing search after output arrived could restore the wrong
-  scroll position.** The pre-search offset was restored verbatim; output
-  that arrived while the bar was open shifts what that raw number points
-  at, the same drift `docs/DESIGN.md` §2.7 documents for a selection. The
-  restore now shifts by the scrollback growth since the bar opened.
-- **B05 — large copy/export could stall input.** `⌘C`/`⌘A` and `⇧⌘S`
-  built their text — up to the whole scrollback — synchronously on the
-  main actor, which is the interaction path in this app. Both now build
-  on a detached task, with an empty document or selection still skipping
-  the save panel entirely, and export's save panel itself now cancellable
-  (dismissed and its wait released) if the pane closes or a second export
-  supersedes it while the panel is open.
-- **B04 — selection highlight and copied text could disagree once the
-  scrollback ring saturated.** `TerminalRenderer.selectionQuads` and
-  `KittyImageRenderer` shifted a selection/image placement's document row by
-  `scrollback.count`, which saturates at the ring's limit; `⌘C` already used
-  the monotonic `scrollback.totalPushed`, so once the ring was full the two
-  drifted apart — the highlighted line and the text actually copied were no
-  longer the same line. Both now use `totalPushed`, including the render
-  cache's own damage-invalidation key, which had the identical bug (a
-  `.count`-based comparison stops noticing scrollback changed once the ring
-  is full, so a stale frame could stay on screen).
-- **B04 — a column-resize reflow left a stale selection and scroll
-  position.** `Grid.resize` rebuilds `Scrollback` from scratch on a column
-  change, but nothing cleared `ViewController.selection`/`scrollOffset`
-  across that, so both could keep pointing at rows a reflow had already
-  rewritten. Both now clear when the column count actually changes (a
-  row-only resize is ordinary scrollback growth and needs no clearing).
-- **B04 — a selection drag left running past its pane closing.** The
-  drag-tracking loop's blocking `window.nextEvent(matching:)` kept touching
-  the pane's `session`/`terminalRenderer` for the rest of the gesture if the
-  pane (or its window or tab) closed mid-drag. It now exits as soon as the
-  terminal view is no longer part of a window.
-- **B02 — Tab dropped by a candidate UI (e.g. Claude Code's slash-command
-  menu).** `doCommand(by:)` had no case for `insertTab(_:)` /
-  `insertBacktab(_:)`, so a Tab press a candidate window resolved as a
-  command rather than committed text was silently dropped instead of
-  reaching the child as `0x09` / `CSI Z`.
-- **B02 — search-bar Escape leaked across windows.** The Esc key monitor
-  installed while the search bar is open fired for every window in the app,
-  so Escape in one pane could close a search bar open in a different pane
-  or window. Scoped to the window the event actually belongs to.
+- ⌘+/⌘−/pinch zoom no longer changes the saved default or other windows; ⌘0 returns to the current setting, and a zoom no longer survives a relaunch.
+- The scrolled-away viewport stays on the text it showed as output arrives; typing or pasting returns to the bottom.
+- Settings rows are one height; sections, status rows, scroll position and the font preview's spacing corrected.
+- "Open file with" is validated when the edit is committed, so `{file}` can be typed.
+- A settings change refreshes the page once, and opening the window runs its setup once.
+- The Quick Terminal position reads "Center".
+- The Quick Terminal appears beside a full-screen application.
+- The close confirmation's subject is localised.
+- VoiceOver's *Read selected text* reads a real selection.
+- `CSI n X` (ECH) is implemented; tmux's status line no longer keeps stale text.
+- An ssh failure is classified after its last stderr line is read.
+- The SFTP browser reports a refused login as an authentication error, not a lost connection.
+- A restored tab group keeps its order and selected tab, and every tab lays out below the tab bar.
+- A reopened window no longer shows the desktop through it for one frame.
+- ⌘+/⌘− keep the window's top edge in place.
+- Command History shows each command's text and can search it.
+- The menu bar is localised; the Bell picker shows a localised name; Chinese wording corrected.
+- VoiceOver announces the last change of a burst of output.
+- The energy and app-baseline scripts no longer touch the real config or window arrangement.
+- A restored or preset window's first pane starts in the right directory and shell.
+- A selection drag ends when the window loses key status, or when its pane closes.
+- `BS`/`CUB` reverse-wrap under `?45`, and the mode survives the alternate screen.
+- `CSI s` / `CSI u` save and restore the cursor.
+- Search case-sensitivity and regex mode are per pane.
+- Esc closes only the focused pane's search bar, in a split or across windows.
+- Output at the tail of a burst is searched.
+- Closing search restores the scroll position to the same text.
+- Large copy and export no longer stall input; an open export panel is cancelled if its pane closes.
+- The selection highlight and the copied text agree once the scrollback is full.
+- A column-resize reflow clears the selection and scroll position.
+- Tab resolved by a candidate UI (e.g. a slash-command menu) reaches the child.
 
 ### Changed
 
-- Selection copying now uses the same scrollback coordinate mapping as
-  viewport anchoring, search, command navigation and image placement.
-- CI and nightly sanitizer/fuzz checks now use the same pinned stable
-  Xcode release. Only released Xcode toolchains are supported.
-- The maintainer confirmed Vim mouse selection, Option-drag terminal
-  selection and clipboard copying, completing the mouse-tracking acceptance.
-- Reorganized the project overview, feature reference and contributor guide;
-  clarified public release availability and the interpretation of conformance results.
-- Added a testing guide and automated checks for local documentation links,
-  with streamlined GitHub contribution templates.
-- The configuration reference now lists every `bind.` command — nine
-  (command-output export and file-reference opening, command-history
-  search, and the six working-directory actions) had shipped without a
-  row — with the spelling Corta writes back; `DocumentationDriftTests`
-  fails when a config key or command loses its row or its documented
-  default drifts from the code.
-- Documentation audit: the daily-driver checklist names the record that
-  last verified each item; the design document's hard parts are numbered
-  headings, so `§7.n` references resolve; the security change log runs
-  newest first; the performance targets table no longer says the energy
-  harness does not exist; the 2026-09-17 interactive record is in English
-  like the rest of the documentation; the isolated developer launch is
-  `scripts/build-and-run.sh` and is documented in the testing guide.
-- The dated verification passes that had accumulated inside
-  `docs/CONFORMANCE.md` (the M2 and M6 closeouts, the B10 pass, the
-  1.0.0 human and hardware items) are now files under
-  `docs/test-results/`, listed from a new §4.7; the conformance document
-  keeps the procedures, and its esctest history is one table. The `less`
-  search-highlight bug it still carried as open did not reproduce on
-  2026-09-17 and is recorded as such. The design document's selection
-  section states its invariants and the tests that pin them instead of
-  retelling the B04 investigation, and the TextKit evaluation it carried
-  is now decision D19.
-
-- **A local Release build is development-signed; Developer ID is the
-  release workflow's job.** The Release configuration hardcoded
-  `CODE_SIGN_IDENTITY = "Developer ID Application"`, which Xcode 27 flags
-  under "Update to recommended settings" and which made a plain
-  `xcodebuild -configuration Release` on a machine without that
-  certificate fail. It now signs with Apple Development like Debug;
-  `release.yml` has always passed the Developer ID identity explicitly at
-  archive time, and `scripts/check-release.sh --require-notarized` is
-  where a Developer ID signature is demanded. Xcode's "Missing
-  Localizability" analyzer check is on for the project, since it ships
-  nine languages.
+- Selection copying uses the same scrollback coordinate mapping as the viewport, search, commands and images.
+- CI and the nightly checks use the same pinned, released Xcode.
+- Vim mouse selection, Option-drag selection and clipboard copy confirmed by hand.
+- The project overview, feature reference and contributor guide reorganised; a testing guide and link checks added.
+- The configuration reference lists every `bind.` command; `DocumentationDriftTests` fails when a key or command loses its row.
+- Documentation audit: checklist records, numbered design headings, newest-first security log.
+- Dated verification passes moved from `docs/CONFORMANCE.md` to `docs/test-results/`; the TextKit evaluation became decision D19.
+- A local Release build is signed for development; Developer ID signing belongs to the release workflow. The "Missing Localizability" check is on.
 
 ## [0.1.1] - 2026-09-09
 
@@ -1243,68 +748,6 @@ M1–M10.
   rewrite (M9) landed and is covered by its own unit tests, but a
   same-conditions end-to-end re-measurement against the 45.5 ms baseline
   is still open.
-
----
-
-## Release checklist
-
-For the maintainer, cutting any release:
-
-1. Move the relevant `[Unreleased]` entries under a new `## [x.y.z]`
-   heading with the date, and leave `[Unreleased]` empty above it.
-2. Update the three hand-written version numbers, in
-   `Corta.xcodeproj/project.pbxproj` (all six build configurations) and
-   the core. **Two of them carry the release's semantic version and must
-   read exactly the same; the third is a build counter and only has to go
-   up:**
-   - `MARKETING_VERSION` — the semantic version, e.g. `0.1.1`. What the
-     bundle and the About panel show.
-   - `CortaVersion.string` in `CortaTerminal/Sources/CortaTerminal/Version.swift`
-     — the same string again, and what XTVERSION answers a program with.
-   - **`CURRENT_PROJECT_VERSION`** — *not* the semantic version. A plain
-     integer that increments once per release (0.1.0 shipped 1, 0.1.1
-     ships 2), and the one Sparkle actually compares. Two releases sharing a build number means
-     the second is invisible to everyone running the first, and
-     `generate_appcast` overwrites the earlier feed entry rather than
-     adding one. 0.1.1 hit this: it was built, signed, notarised and
-     published carrying build 1, exactly like 0.1.0, and the mistake only
-     surfaced at step 5 when the feed came out with one item in it.
-   `VersionAgreementTests` fails if the marketing version and the core
-   constant disagree, or if the build number is one a 0.1.0 install could
-   not be offered.
-3. Record current measurements in `docs/PERFORMANCE.md` and test results in
-   `docs/CONFORMANCE.md`; preserve dated historical snapshots. Point the
-   README's download instructions at `Corta-x.y.z.zip` in the same
-   commit — `scripts/check-release.sh` verifies that name at the tag, so
-   it cannot wait for publication.
-4. Commit as `chore: release x.y.z`, then tag `vx.y.z` and push the tag.
-   The release workflow builds from the tag and opens a **draft** release
-   for review — it is never published automatically.
-5. Review the draft's archive and **publish** the release. Publishing
-   starts the `Update feed` workflow (`.github/workflows/appcast.yml`),
-   which pauses for one approval: GitHub notifies the maintainer, and
-   the run's page under **Actions** shows **Review deployments** →
-   `release` → **Approve and deploy**. The approval is the gate on the
-   Sparkle private key (D20): nothing that can push a tag can sign an
-   update without a person saying so. An unapproved run waits, then
-   expires; nothing is signed or pushed until it is approved. Once
-   approved, the workflow signs the archive into `appcast.xml`, checks
-   the item against the app, and merges the file to `main` through a
-   pull request whose CI it runs and waits for — that is what makes the
-   update visible to every already-installed Corta. If the pull request
-   is left open, a check failed; the run's log says which. To rehearse or
-   re-run: `gh workflow run appcast.yml --ref main -f tag=vX.Y.Z
-   -f dry_run=true` (a dry run stops after signing and checking), with
-   `main` temporarily allowed in the environment's deployment policy.
-   The pull request is opened with the workflow's own token, which the
-   repository must allow: Settings › Actions › General › Workflow
-   permissions › *Allow GitHub Actions to create and approve pull
-   requests*. With it off, the `sign` job still pushes the signed
-   `chore/appcast-vX.Y.Z` branch and the `merge` job fails at
-   `gh pr create`; opening the pull request from that branch by hand
-   is the recovery (1.0.1 shipped that way).
-   If the workflow cannot run at all, `scripts/release.sh` against the
-   downloaded archive is the manual route to the same file.
 
 [Unreleased]: https://github.com/noah-qin/Corta/compare/v1.0.1...main
 [1.0.1]: https://github.com/noah-qin/Corta/releases/tag/v1.0.1
