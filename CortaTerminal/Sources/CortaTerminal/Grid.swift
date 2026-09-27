@@ -64,7 +64,7 @@ public struct Grid: Sendable {
     public var cursorStyle: CursorStyle = .blinkingBlock
 
     /// Grapheme clusters too large for a cell's single scalar
-    /// (`DESIGN.md` §2.3): combining-mark clusters and emoji ZWJ sequences.
+    /// (`DECISIONS.md` D05): combining-mark clusters and emoji ZWJ sequences.
     public var graphemes: GraphemeTable
 
     /// OSC 8 hyperlink targets, keyed by the id a cell carries.
@@ -274,7 +274,7 @@ public struct Grid: Sendable {
     private mutating func writeNarrow(_ scalar: UInt32) {
         if pendingWrap {
             // The row really did continue onto the next one. This is the
-            // only place `wrapped` is ever set (`DESIGN.md` §2.1).
+            // only place `wrapped` is ever set (`DECISIONS.md` D03).
             lines[cursor.row].wrapped = true
             cursor.column = 0
             lineFeedWithoutClearingWrap()
@@ -413,7 +413,7 @@ public struct Grid: Sendable {
 
     /// Appends `scalar` to the grapheme cluster of the cell at (`row`,
     /// `column`), interning the extended cluster in the side table
-    /// (`DESIGN.md` §2.3).
+    /// (`DECISIONS.md` D05).
     private mutating func combine(_ scalar: UInt32, row: Int, column: Int) {
         let cell = lines[row][column]
         var cluster = graphemes.scalars(for: cell.grapheme) ?? [cell.scalar]
@@ -839,7 +839,7 @@ public struct Grid: Sendable {
     // MARK: - Resizing
 
     /// Changes the visible dimensions. A column change reflows the document
-    /// (`DESIGN.md` §2.1) — except on the alternate screen,
+    /// (`DECISIONS.md` D03) — except on the alternate screen,
     /// which has no scrollback and is resized, never reflowed, because a
     /// full-screen application redraws itself on `SIGWINCH` and re-wrapping
     /// what it drew would corrupt its own model of the screen. A row-only
@@ -935,7 +935,7 @@ public struct Grid: Sendable {
     /// status line, a vim window), and its scrolled-off rows are not the
     /// user's history. The rows that do go keep their `wrapped` flag, so a
     /// command that soft-wrapped before it scrolled is still one logical
-    /// line to selection and search (`DESIGN.md` §2.1).
+    /// line to selection and search (`DECISIONS.md` D03).
     public mutating func scrollUp(_ count: Int) {
         let count = min(max(0, count), marginBottom - marginTop + 1)
         guard count > 0 else { return }

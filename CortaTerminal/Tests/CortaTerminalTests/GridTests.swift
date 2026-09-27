@@ -158,7 +158,7 @@ struct GridTests {
     }
 
     /// The wrap flag is what tells reflow, selection and search that two
-    /// rows are one logical line (`DESIGN.md` §2.1). A newline must not set
+    /// rows are one logical line (`DECISIONS.md` D03). A newline must not set
     /// it, or copying two separate commands would join them.
     @Test("an explicit line feed does not set the wrap flag")
     func lineFeedDoesNotWrap() {

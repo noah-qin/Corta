@@ -5,12 +5,12 @@
 /// **Variable length.** A row stores cells only up to its last written
 /// column. A fixed 200-cell row over a 100k-line scrollback is ~320 MB, which
 /// is not acceptable for the log-heavy workloads Corta targets
-/// (`DESIGN.md` §2.3). Reading past the end yields `Cell.blank`.
+/// (`DECISIONS.md` D05). Reading past the end yields `Cell.blank`.
 ///
 /// **The `wrapped` flag.** A row that filled its last column and continued on
 /// the next row records that here. Reflow, selection across a soft wrap, and
 /// search across a wrap boundary all depend on it, and adding it later means
-/// rewriting the grid (`DESIGN.md` §2.1).
+/// rewriting the grid (`DECISIONS.md` D03).
 /// What a row means to the shell, when the shell says (OSC 133).
 ///
 /// Without shell integration a terminal cannot see command boundaries at all

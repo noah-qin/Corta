@@ -16,7 +16,7 @@ import simd
 /// **Everything else** goes through a shaping cache (`PERFORMANCE.md` §2.2):
 /// `glyph(shaping:style:)` for single scalars, `glyph(forCluster:style:)` for
 /// the multi-scalar grapheme clusters the core's `GraphemeTable` hands out
-/// (`DESIGN.md` §2.3). Each shapes via `CTLine` once per key and caches the
+/// (`DECISIONS.md` D05). Each shapes via `CTLine` once per key and caches the
 /// result — paid once, not per frame.
 ///
 /// **Font fallback** is Core Text's cascade list: a `CTLine` shaped

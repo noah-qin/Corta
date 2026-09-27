@@ -2,7 +2,7 @@
 ///
 /// This is the half of the emulator that knows what a sequence *means*. The
 /// parser knows only its shape. Everything unrecognised is ignored cleanly:
-/// `$TERM` claims `xterm-256color` (`DESIGN.md` §2.5), so programs send
+/// `$TERM` claims `xterm-256color` (`DECISIONS.md` D08), so programs send
 /// sequences Corta does not implement, and skipping them is a correctness
 /// requirement (`SECURITY.md` §3).
 public struct Performer: ParserPerformer, Sendable {

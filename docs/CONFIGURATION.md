@@ -599,7 +599,7 @@ search away.
 
 ## 6. What is deliberately not configurable
 
-- **`TERM`.** Always `xterm-256color` (`DESIGN.md` §2.5).
+- **`TERM`.** Always `xterm-256color` (`DECISIONS.md` D08).
 - **Reading the clipboard from the terminal.** The OSC 52 read form is
   not implemented and will not be (`SECURITY.md` §6).
 - **Title and colour *queries*.** Corta answers what it is; it does not

@@ -8,7 +8,8 @@ import Darwin
 /// internals. Everything else is passed through — a shell that loses `PATH`,
 /// `HOME` or `SSH_AUTH_SOCK` is not a usable shell.
 public enum ChildEnvironment {
-    /// `$TERM` is a deliberate lie until conformance is proven — `DESIGN.md` §2.5.
+    /// `$TERM` is a deliberate lie until conformance is proven (D08 in
+    /// `DECISIONS.md`).
     public static let term = "xterm-256color"
 
     /// Names dropped before the child sees them.

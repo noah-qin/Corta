@@ -35,77 +35,73 @@ resource limits and a regression suite alongside the parser.
 
 ---
 
-## 2. Locked Decisions
+## 2. Settled Decisions
 
-These constrain data structures. Changing one later means a rewrite, not
-a patch. They are settled — do not relitigate them without a concrete
-reason.
+The decisions that constrain the data structures — changing one later
+means a rewrite, not a patch — are argued once, in
+[DECISIONS.md](DECISIONS.md), one record each:
 
-### 2.1 Lines carry a `wrapped` flag from day one
+| Record | Decision |
+| --- | --- |
+| D03 | Lines carry a `wrapped` flag from the first commit |
+| D04 | The terminal core is not `@MainActor`; it is a SwiftPM package of its own |
+| D05 | Cells are 16 bytes and full; complex graphemes spill to a side table; rows are variable-length |
+| D06 | Selection lives in the core and is document-anchored (§3.1) |
+| D07 | Multi-viewport from day one; no singletons in the core |
+| D08 | `$TERM` is `xterm-256color` |
 
-A line that reached the right margin and continued onto the next row must
-record that fact. This is required by three separate features:
+One more property is not a data-structure decision but outranks every
+feature: **reading the PTY is never blocked by rendering.** If the terminal
+stops draining the PTY, the child blocks on `write`, and the terminal
+becomes the reason a training job is slow. `PERFORMANCE.md` §2.1 has how.
 
-- **Reflow** on window resize (otherwise narrowing the window corrupts
-  scrollback permanently),
-- **Selection** across a soft-wrapped line (otherwise copying a long
-  command inserts a spurious newline),
-- **Search** matching across a wrap boundary.
+---
 
-The flag is part of every line. Reflow of a large scrollback must be
-incremental or lazy, because a live window drag fires resize continuously.
+## 3. Architecture
 
-### 2.2 The terminal core is not `@MainActor`
+```
+┌───────────────────────────────────────────────────────────────┐
+│  MAIN THREAD — AppKit shell                                   │
+│  NSWindow / tabs / split layout tree / key bindings           │
+│  NSTextInputClient (CJK IME, marked text)                     │
+└──────────┬──────────────────────────────────┬─────────────────┘
+           │ key, mouse, paste                │ CAMetalDisplayLink (vsync)
+           │                                  │
+           ▼                                  ▼
+┌──────────────────────┐         ┌──────────────────────────────┐
+│  PTY layer           │         │  Metal renderer              │
+│  posix_spawn + pty   │         │  glyph atlas (Core Text)     │
+│  TIOCSWINSZ, SIGCHLD │         │  instanced quads, one pass   │
+└──────────┬───────────┘         │  renders into a given rect   │
+           │ bytes               └──────────────▲───────────────┘
+           │                                    │ snapshot
+           ▼                                    │
+┌───────────────────────────────────────────────┴───────────────┐
+│  READER THREAD — terminal core (CortaTerminal)                │
+│  Parser (VT500 state machine) → Performer → Grid              │
+│  Scrollback (ring buffer) · AltScreen · ScrollRegion          │
+└───────────────────────────────────────────────────────────────┘
+```
 
-The PTY reader, parser and grid run off the main thread. The Xcode
-project sets `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`, which is
-correct for the AppKit shell and wrong for the core.
+Data flows one way: **bytes in → grid → pixels**. Input flows the other
+way: **key/IME → PTY → child**. Nothing else crosses those arrows.
 
-Therefore the core lives in a **local SwiftPM package** (`CortaTerminal`)
-with default isolation disabled. Side benefit: the core is unit-testable
-and benchmarkable without launching an app.
+Windows are cheap composition: each window is a `SplitViewController`
+owning a binary split tree whose leaves are `ViewController` +
+`TerminalSession` pairs (⌘N instantiates the storyboard scene again;
+`AppDelegate` retains the window controllers until their windows close).
+Nothing is shared between windows — that is what D07 buys.
 
-### 2.3 Cells are fixed-size; complex graphemes spill to a side table
+The two thread boundaries are the interesting part of this diagram:
 
-A cell stores a `UInt32` word plus attributes and two 16-bit table keys,
-16 bytes in total, asserted by `CellTests`. Grapheme clusters that
-do not fit in one scalar (combining marks, emoji ZWJ sequences such as
-`👨‍👩‍👧‍👦`) store a tag pointing into an interned side table.
+- **PTY/parse → render** is a snapshot taken at vsync, not a push. The
+  parser runs as fast as data arrives; the renderer runs at most once per
+  frame and always reads a consistent grid.
+- **Main thread → PTY** is a write; the main thread never touches the
+  grid directly.
 
-**That `UInt32` is now fully spent.** Unicode's codespace ends at
-U+10FFFF, so a scalar needs 21 bits; the other 11 hold the OSC 8
-hyperlink id (M6.8), keyed into a second interned side table. The
-alternative was an 18-byte cell, and `PERFORMANCE.md` §4 measures what
-that costs across a 100k-line scrollback. Anything else wanting per-cell
-identity — an image placement, for one — needs a side table keyed by
-document position instead of a new field.
+### 3.1 Document coordinates
 
-Rows are **variable length** — stored up to the last non-blank cell. A
-fixed 200-cell row over 100k scrollback lines is ~320 MB, which is not
-acceptable for the log-heavy workloads this terminal targets.
-
-### 2.4 Everything is multi-viewport from day one
-
-Rendering and input routing are written against a `TerminalSession` and a
-target rectangle, never against "the window". Splits (M5) then become
-"instantiate more sessions" rather than a rewrite of the renderer.
-
-The core owns no global state and no singletons.
-
-### 2.5 `$TERM` is `xterm-256color`
-
-A benevolent lie. Announcing a custom value requires shipping a terminfo
-entry to every remote host over SSH; until conformance is proven, that
-trades a cosmetic gain for broken remote sessions. Revisit only after the
-conformance targets in `CONFORMANCE.md` are met.
-
-### 2.6 Reading the PTY is never blocked by rendering
-
-See `PERFORMANCE.md` §2. The single most important performance property:
-if we stop draining the PTY, the child process blocks on `write`, and the
-terminal becomes the reason a training job is slow.
-
-### 2.7 Selection is anchored to the document, not the viewport
 
 Selection coordinates are document coordinates (`CortaTerminal/Selection.swift`):
 row ≥ 0 is a live-screen row, row < 0 addresses the scrollback counting
@@ -122,14 +118,14 @@ core, not the shell:
   `wrapped` in both directions.
 
 The anchoring shift is computed from `Scrollback.totalPushed`, a
-monotonic count of every line ever pushed (M6.10). `scrollback.count`
+monotonic count of every line ever pushed. `scrollback.count`
 cannot do that job: it saturates at the ring's limit, so once the ring is
 full every push evicts a row while the count reports no growth, and a
-selection anchored on it drifted onto whatever text arrived underneath
-it. The counter keeps rising, so the shift is right whether the ring is
+selection anchored on it would drift onto whatever text arrived
+underneath it. The counter keeps rising, so the shift is right whether the ring is
 filling or flooding.
 
-Reflow (M4.2) and search (M4.4) must preserve these invariants: reflow
+Reflow and search must preserve these invariants: reflow
 rewrites document rows wholesale and must invalidate or re-anchor any
 live selection, and search matches must be reported in the same document
 coordinates so a match can be selected verbatim.
@@ -138,10 +134,10 @@ coordinates so a match can be selected verbatim.
 `ScrollbackCoordinates` (core) is the single translation between a stored
 document row and the live grid for viewport anchoring, selection, search,
 command navigation and image placement — both ends of a copied selection
-included. It exists because the render path once shifted by
-`scrollback.count` while `⌘C` shifted by `totalPushed`: once a ring
-saturated, the highlight and an image placement drifted onto the wrong row
-while the copied text stayed right, and the two silently disagreed (B04).
+included. With two mappings — the render path shifting by
+`scrollback.count` while `⌘C` shifts by `totalPushed` — a saturated ring
+would put the highlight and an image placement on the wrong row while
+the copied text stayed right, and the two would silently disagree.
 The render cache's invalidation key is `totalPushed` for the same reason —
 a `.count` comparison stops noticing that scrollback changed once the ring
 is full. Pinned by `ScrollbackCoordinatesTests` and
@@ -191,51 +187,6 @@ in the core).
 **Selection stays hand-rolled.** `NSTextView`/TextKit was prototyped
 against these invariants and not adopted — `DECISIONS.md` D19 has the
 four reasons and what it would have bought.
-
----
-
-## 3. Architecture
-
-```
-┌───────────────────────────────────────────────────────────────┐
-│  MAIN THREAD — AppKit shell                                   │
-│  NSWindow / tabs / split layout tree / key bindings           │
-│  NSTextInputClient (CJK IME, marked text)                     │
-└──────────┬──────────────────────────────────┬─────────────────┘
-           │ key, mouse, paste                │ CAMetalDisplayLink (vsync)
-           │                                  │
-           ▼                                  ▼
-┌──────────────────────┐         ┌──────────────────────────────┐
-│  PTY layer           │         │  Metal renderer              │
-│  posix_spawn + pty   │         │  glyph atlas (Core Text)     │
-│  TIOCSWINSZ, SIGCHLD │         │  instanced quads, one pass   │
-└──────────┬───────────┘         │  renders into a given rect   │
-           │ bytes               └──────────────▲───────────────┘
-           │                                    │ snapshot
-           ▼                                    │
-┌───────────────────────────────────────────────┴───────────────┐
-│  READER THREAD — terminal core (CortaTerminal)                │
-│  Parser (VT500 state machine) → Performer → Grid              │
-│  Scrollback (ring buffer) · AltScreen · ScrollRegion          │
-└───────────────────────────────────────────────────────────────┘
-```
-
-Data flows one way: **bytes in → grid → pixels**. Input flows the other
-way: **key/IME → PTY → child**. Nothing else crosses those arrows.
-
-Windows are cheap composition: each window is a `SplitViewController`
-owning a binary split tree whose leaves are `ViewController` +
-`TerminalSession` pairs (⌘N instantiates the storyboard scene again;
-`AppDelegate` retains the window controllers until their windows close).
-Nothing is shared between windows — that is what §2.4 buys.
-
-The two thread boundaries are the interesting part of this diagram:
-
-- **PTY/parse → render** is a snapshot taken at vsync, not a push. The
-  parser runs as fast as data arrives; the renderer runs at most once per
-  frame and always reads a consistent grid.
-- **Main thread → PTY** is a write; the main thread never touches the
-  grid directly.
 
 ---
 
@@ -409,9 +360,10 @@ one safe to touch from more than one thread:
 | `Parser`, `Performer`, `Grid`, `Scrollback` | `nonisolated` | Pure value types / state machines; mutated only while `TerminalSession.state`'s lock is held. |
 | `TerminalSession` | `nonisolated`, `@unchecked Sendable` | `Synchronization.Mutex` around every mutable field (`State`, `Callbacks`, `PendingWrites`, `stopped`, `started`, `requestedResize`); no `@unchecked` is load-bearing on its own. |
 | `PTY` | `nonisolated`, `@unchecked Sendable` | A `Mutex<State>` around the exit/reaping/closed flags a descriptor's use depends on. |
-| AppKit shell (`ViewController`, `SplitViewController`, `AppDelegate`, `TaskNotifier`) | `@MainActor` (project default) | The Xcode target's `SWIFT_DEFAULT_ACTOR_ISOLATION`; see §2.2 for why the core opts out instead. |
+| AppKit shell (`ViewController`, `SplitViewController`, `AppDelegate`, `TaskNotifier`) | `@MainActor` (project default) | The Xcode target's `SWIFT_DEFAULT_ACTOR_ISOLATION`; see `DECISIONS.md` D04 for why the core opts out instead. |
 
-The PTY reader is a dedicated `Thread`, not a `Task` (§2.2, §2.6). It
+The PTY reader is a dedicated `Thread`, not a `Task` (`DECISIONS.md`
+D04, `PERFORMANCE.md` §2.1). It
 calls `onOutput`/`onChildExit` directly, and the shell hops to
 `@MainActor` — never the other way around. Each hop checks two things:
 that the controller is still alive (`[weak self]`) and that it is still
@@ -441,7 +393,7 @@ event monitor makes that easy to get wrong:
 - **Closing restores the text, not the row count.**
   `search.previousScrollOffset` is shifted by the growth in
   `Scrollback.totalPushed` since `search.previousTotalPushed`, recorded
-  when the bar opened (§2.7).
+  when the bar opened (§3.1).
 - **Large copy and export leave the main actor.** `Selection.text` is
   O(the range) and export is O(scrollback), so both build on
   `Task.detached`, under a generation-guarded `largeTextTask`. Cancelling
@@ -469,7 +421,7 @@ The record: [history/2026-09-11-B05-SEARCH-STATE.md](history/2026-09-11-B05-SEAR
   underline, blink, reverse or italic text paints.
 - **Reverse wraparound (`?45`).** Off by default, as in xterm (not DECBKM,
   which is `?67`). When on, `BS`/`CUB` continue onto the previous row's
-  last column only across a `wrapped` boundary (§2.1), never across a
+  last column only across a `wrapped` boundary (D03), never across a
   hard newline.
 - **Private modes survive the alternate screen.** Leaving it restores
   the parked main screen wholesale, so terminal-wide modes

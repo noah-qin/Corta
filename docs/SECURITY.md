@@ -165,7 +165,7 @@ An unterminated OSC string is the canonical case: a stream that opens one
 and never closes it must not accumulate gigabytes in a buffer.
 
 Unknown sequences must be **safely ignored**. Because `$TERM` announces
-`xterm-256color` (`DESIGN.md` §2.5), programs will send sequences Corta
+`xterm-256color` (`DECISIONS.md` D08), programs will send sequences Corta
 does not implement. Skipping them cleanly is a correctness requirement
 and a robustness one.
 

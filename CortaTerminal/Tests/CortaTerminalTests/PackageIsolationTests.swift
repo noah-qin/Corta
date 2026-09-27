@@ -4,7 +4,7 @@ import Testing
 @testable import CortaTerminal
 
 /// The package exists to escape `SWIFT_DEFAULT_ACTOR_ISOLATION =
-/// MainActor` (`DESIGN.md` §2.2). These tests fail if that ever regresses.
+/// MainActor` (`DECISIONS.md` D04). These tests fail if that ever regresses.
 @Suite("Package isolation")
 struct PackageIsolationTests {
     /// Nonisolated by default: a plain class, mutated on both sides of a

@@ -5,7 +5,7 @@
 /// so the storage can change underneath without either of them noticing.
 ///
 /// A logical line is a maximal run of consecutive document rows joined by
-/// the `wrapped` flag (`DESIGN.md` §2.1): one call to `write` may have
+/// the `wrapped` flag (`DECISIONS.md` D03): one call to `write` may have
 /// spanned several screen rows, and this file re-joins them so a search
 /// match or a URL is found even when a soft wrap falls in the middle of it.
 ///

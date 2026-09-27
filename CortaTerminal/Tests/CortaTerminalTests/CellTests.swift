@@ -7,7 +7,7 @@ import Testing
 struct CellTests {
     /// The size of a cell multiplies by every stored cell in the scrollback,
     /// so a regression here is a memory regression measured in hundreds of
-    /// megabytes (`DESIGN.md` §2.3, `PERFORMANCE.md` §4). If this assertion
+    /// megabytes (`DECISIONS.md` D05, `PERFORMANCE.md` §4). If this assertion
     /// fails, the fix is to shrink the field that grew, not to raise the
     /// number.
     @Test("a cell is 16 bytes")

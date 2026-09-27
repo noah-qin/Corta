@@ -1,6 +1,6 @@
 /// Reflow: re-wrapping the document when the column count changes.
 ///
-/// The `wrapped` flag is the source of truth (`DESIGN.md` §2.1): consecutive
+/// The `wrapped` flag is the source of truth (`DECISIONS.md` D03): consecutive
 /// rows joined by it are one logical line, and reflow re-wraps logical
 /// lines at the new width. A logical line can span the scrollback/screen
 /// boundary — a long wrapped command whose early rows already scrolled into

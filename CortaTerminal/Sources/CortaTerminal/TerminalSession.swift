@@ -4,10 +4,10 @@ import Foundation
 import Synchronization
 
 /// Owns a PTY and the terminal it feeds — the unit a viewport renders
-/// (`DESIGN.md` §2.4) and the boundary the AppKit shell reaches across to get
+/// (`DECISIONS.md` D07) and the boundary the AppKit shell reaches across to get
 /// pixels on screen.
 ///
-/// Threading (`DESIGN.md` §2.2, §2.6, `PERFORMANCE.md` §2.1): reading and
+/// Threading (`DECISIONS.md` D04, `PERFORMANCE.md` §2.1): reading and
 /// parsing run on one dedicated `Thread`, started by `start()`, never on the
 /// main thread and never inside a `Task` on the default executor — a `Task`
 /// can be hopped off its thread or starved by other work on the same
@@ -89,7 +89,7 @@ public final class TerminalSession: @unchecked Sendable {
     var readerSource: ReaderSource?
     /// How long a `?2026` episode may gate presents before the session ends
     /// it core-side. Fixed rather than configurable: the core package reads
-    /// no configuration (`DESIGN.md` §2.4), and one second is the safety cap
+    /// no configuration (`DECISIONS.md` D07), and one second is the safety cap
     /// terminals that implement the timeout commonly use. A `var` so tests
     /// can shorten it; assign before `start()`, like `readerSource`.
     var synchronizedOutputTimeout: Duration = .seconds(1)
@@ -274,9 +274,10 @@ public final class TerminalSession: @unchecked Sendable {
             return true
         }
         guard shouldStart else { return }
-        // A dedicated `Thread`, not a `Task` (`DESIGN.md` §2.2, §2.6): a task
-        // can be hopped or starved by unrelated work on the same executor,
-        // and draining the PTY must never depend on either.
+        // A dedicated `Thread`, not a `Task` (`DECISIONS.md` D04,
+        // `PERFORMANCE.md` §2.1): a task can be hopped or starved by unrelated
+        // work on the same executor, and draining the PTY must never depend on
+        // either.
         ReaderBox(session: self).start()
     }
 

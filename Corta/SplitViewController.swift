@@ -3,7 +3,7 @@ import CortaTerminal
 
 /// The window's content controller: owns the split layout tree
 /// (`SplitTree`), the panes (one `ViewController` — one `TerminalSession` —
-/// per leaf, `DESIGN.md` §2.4) and the focus that routes input to one of
+/// per leaf, `DECISIONS.md` D07) and the focus that routes input to one of
 /// them. Window-level setup the single-pane `ViewController` used
 /// to do itself (chrome, content size, first responder) lives here now:
 /// with N panes there is still exactly one window.

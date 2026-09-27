@@ -15,8 +15,8 @@ import Synchronization
 /// Owns one `TerminalSession` and the `TerminalRenderer`/`TerminalView` that
 /// draw it — the pane. A window composes panes through
 /// `SplitViewController` and its `SplitTree`; nothing here knows about
-/// sibling panes beyond the `splitController` back-reference (`DESIGN.md`
-/// §2.4).
+/// sibling panes beyond the `splitController` back-reference (D07 in
+/// `DECISIONS.md`).
 ///
 /// This file owns lifecycle, the session and the render loop. Behaviour
 /// lives in `ViewController+<concern>.swift` extensions, one concern per
@@ -995,7 +995,7 @@ class ViewController: NSViewController {
         let size = TerminalSize(
             rows: rows, columns: columns, pixelWidth: pixels.width, pixelHeight: pixels.height)
         guard size != lastRequestedSize else { return }
-        // DESIGN.md §2.7: only a column change reflows — `Grid.resize`
+        // DESIGN.md §3.1: only a column change reflows — `Grid.resize`
         // rebuilds `Scrollback` from scratch when columns change (never for
         // a row-only change, which just pushes/pops whole lines) — and
         // reflow rewrites every document row wholesale. A selection or

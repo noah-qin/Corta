@@ -15,7 +15,7 @@ public struct GraphemeID: Equatable, Hashable, Sendable {
 }
 
 /// The side table for grapheme clusters that do not fit in a cell's single
-/// scalar — combining marks, ZWJ emoji sequences (`DESIGN.md` §2.3).
+/// scalar — combining marks, ZWJ emoji sequences (`DECISIONS.md` D05).
 ///
 /// Clusters are interned, so a screen full of the same emoji costs one entry.
 /// Capacity is capped at `UInt16.max - 1` entries; beyond that `intern`

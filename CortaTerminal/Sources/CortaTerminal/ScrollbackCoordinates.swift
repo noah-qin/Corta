@@ -9,13 +9,13 @@
 /// `Scrollback.totalPushed` is the one stable coordinate everything else is
 /// measured against: it only grows, unlike `.count` (saturates at the
 /// ring's limit) or a raw `scrollOffset` (silently means a different row
-/// once the live bottom moves) — see `DESIGN.md` §2.7 and §7 for the
-/// bugs that shape came from.
+/// once the live bottom moves) — see `DESIGN.md` §3.1 for the
+/// invariants that depend on it.
 ///
 /// **Two sign conventions, both anchored to the same absolute row.** A
 /// document row is `totalPushed + relativeRow`, with `relativeRow`
 /// negative for scrollback and non-negative for the live screen
-/// (`DESIGN.md` §2.7) — that is the convention `Selection`,
+/// (`DESIGN.md` §3.1) — that is the convention `Selection`,
 /// `ImagePlacementTable` and search matches all store. `scrollOffset` is
 /// the mirror image: "lines *above* the bottom," i.e. `-relativeRow`, so a
 /// viewport row is `totalPushed - scrollOffset`. Re-anchoring the first

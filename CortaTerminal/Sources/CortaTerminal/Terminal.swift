@@ -1,7 +1,7 @@
 /// A terminal: bytes in, grid out.
 ///
 /// This is the unit a golden test feeds and a viewport renders
-/// (`DESIGN.md` §2.4) — no singletons, no window, no PTY. `TerminalSession`
+/// (`DECISIONS.md` D07) — no singletons, no window, no PTY. `TerminalSession`
 /// owns the child process and synchronizes access to this value.
 ///
 /// This value has no actor isolation. Callers sharing mutable terminal state

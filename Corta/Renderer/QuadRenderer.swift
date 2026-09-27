@@ -12,7 +12,7 @@ enum QuadRendererError: Error {
 /// atlas — into a caller-given rectangle of a caller-given render target.
 ///
 /// Every entry point takes a `CGRect` and a `MTLRenderPassDescriptor`; this
-/// type never assumes "the window" (`DESIGN.md` §2.4). Two draw calls cover a
+/// type never assumes "the window" (`DECISIONS.md` D07). Two draw calls cover a
 /// typical frame — one instanced pass for every cell's background, one for
 /// every glyph — which is what "one draw call per screen" (`CONFORMANCE.md`
 /// §2.2) is protecting against: a call per cell or per row, not a call per
