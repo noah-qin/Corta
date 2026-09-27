@@ -16,58 +16,32 @@
 
 import Foundation
 
-/// ⌘-click URL detection.
-///
-/// Detection runs over logical lines (`Grid+Text.swift`), so a URL split by
-/// a soft wrap is still found whole. The scheme allowlist from
-/// `SECURITY.md` §2.4 is enforced here, at the pattern level: `http`,
-/// `https` and `mailto` are the only schemes that can match at all — a
-/// `file://` or custom-scheme string is plain text as far as the shell is
-/// concerned, so no click path can ever carry it to `NSWorkspace`.
-///
-/// OSC 8 hyperlinks are checked first, because they are the case
-/// where the display text and the destination can differ — the whole reason
-/// "show the real target" (§2.4) is a rule. The tooltip on ⌘-hover names the
-/// destination, not the text under the pointer, and the scheme allowlist is
-/// applied to it at the hand-off; for a detected URL the two are the same
-/// string, so the same path covers both.
+/// ⌘-click URL detection over logical lines. Only `http`, `https` and
+/// `mailto` can match at all (`SECURITY.md` §2.4), so no click path can carry
+/// `file://` or a custom scheme to `NSWorkspace`. OSC 8 links are checked
+/// first — there text and target can differ, which is why the tooltip names
+/// the target.
 public enum LinkDetection {
-    /// One detected URL: its text and its span in document coordinates.
     public struct Link: Equatable, Sendable {
         public var url: String
         public var range: SelectionRange
     }
 
-    /// The pattern: an allowlisted scheme followed by non-whitespace.
-    /// Detection only — `NSWorkspace` does the final parse before opening.
+    /// Detection only; `NSWorkspace` parses before opening.
     private static let pattern = try! NSRegularExpression(
         pattern: #"(?:https?://|mailto:)\S+"#, options: [.caseInsensitive])
 
-    /// Pattern detection only scans logical lines up to this many cells.
-    /// `link(at:)` runs on every mouse-moved, so an unbounded
-    /// logical line — a megabyte-long minified bundle or base64 dump is
-    /// one — would put an unbounded regex pass and text join on the main
-    /// thread's hover path. Past the cap the line has no detected links;
-    /// explicit OSC 8 hyperlinks still resolve, because there the program
-    /// named the target itself. 100k cells is ~2_000 wrapped rows at a
-    /// narrow 50 columns — real command output never wraps that far without
-    /// a newline.
+    /// This runs on every mouse move; a megabyte minified line must not become
+    /// an unbounded regex pass on the main thread. Past it, only OSC 8 links
+    /// resolve. 100k cells is ~2,000 wrapped rows at 50 columns.
     public static let maxPatternScanCells = 100_000
 
-    /// Characters that belong to the sentence, not the URL, when they
-    /// appear at its end: `See https://example.com.` and parenthesised
-    /// URLs like `(https://example.com)` are how URLs appear in prose.
+    /// Prose punctuation: `See https://example.com.`, `(https://…)`.
     private static let trailingTrim: Set<Character> = [".", ",", ";", ":", "!", "?", "'", "\""]
 
-    /// The link under `point`, if the cell sits inside one. An explicit
-    /// OSC 8 hyperlink wins over pattern detection: the program said what
-    /// the target is, and guessing from the text it chose to display would
-    /// be guessing against the answer.
+    /// OSC 8 wins: the program named the target.
     public static func link(at point: SelectionPoint, in grid: Grid) -> Link? {
         if let explicit = hyperlink(at: point, in: grid) { return explicit }
-        // Bound the scan before paying for the join: a wrap chain
-        // past the cap is not pattern-detected at all — see
-        // `maxPatternScanCells`.
         let span = grid.logicalLineRowSpan(containing: point.row)
         guard (span.last - span.first + 1) * grid.columns <= maxPatternScanCells
         else { return nil }
@@ -76,9 +50,7 @@ public enum LinkDetection {
         return links(in: line).first { $0.range.start <= point && point <= $0.range.end }
     }
 
-    /// The OSC 8 hyperlink the cell at `point` carries, with its range
-    /// widened to the whole contiguous run of cells sharing that id on the
-    /// row — which is what the hover highlight and the tooltip want.
+    /// Widened to the contiguous run sharing the id, for hover and tooltip.
     public static func hyperlink(at point: SelectionPoint, in grid: Grid) -> Link? {
         let line = grid.documentLine(point.row)
         let id = line[point.column].hyperlink
@@ -94,17 +66,12 @@ public enum LinkDetection {
                 end: SelectionPoint(row: point.row, column: last)))
     }
 
-    /// Every link in a logical line — exposed for tests and for a shell
-    /// that wants to highlight rather than hit-test.
     public static func links(in line: LogicalLine) -> [Link] {
         let text = line.text
         let nsText = text as NSString
-        // The regex reports UTF-16 ranges; the logical line maps character
-        // offsets. The cursors walk both views forward with the matches —
-        // O(line) in total. Converting every match from the string's start
-        // rescans the prefix per match, quadratic on a link-dense long
-        // line. The two units agree for ASCII, which URLs effectively
-        // always are, but a CJK prefix before the URL shifts them apart.
+        // Walk UTF-16 and character offsets forward together — O(line);
+        // converting each match from the start is quadratic, and a CJK prefix
+        // makes the two units differ.
         var utf16Cursor = text.utf16.startIndex
         var utf16CursorOffset = 0
         var characterCursor = text.startIndex
@@ -126,8 +93,7 @@ public enum LinkDetection {
         var links: [Link] = []
         for match in pattern.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
             var url = match.range
-            // Trim prose punctuation off the end; an unbalanced closer
-            // (`)` with no opening `(` inside the URL) is prose too.
+            // An unbalanced `)` is prose too.
             while url.length > 0 {
                 let last = Character(nsText.substring(with: NSRange(location: url.length - 1 + url.location, length: 1)))
                 if trailingTrim.contains(last) {

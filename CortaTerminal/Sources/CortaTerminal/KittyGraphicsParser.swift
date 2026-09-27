@@ -16,33 +16,17 @@
 
 import Foundation
 
-/// Parses one APC payload's control-data prefix (`key=value,key=value,...`)
-/// plus everything after the first unescaped `;`, which is the base64
-/// payload — into a `KittyGraphics.Command`. Fed by `Parser`'s
-/// `.apcString` state via `Performer.apcDispatch(_:)`.
-///
-/// The wire format itself (<https://sw.kovidgoyal.net/kitty/graphics-protocol/>)
-/// is comma-separated `letter=value` pairs ending at `;`, then raw payload
-/// bytes to the terminator. Unknown keys are ignored, not rejected — the
-/// same "unknown sequences are safely ignored" rule the CSI/OSC parsers
-/// already follow (`SECURITY.md` §3), since a newer client may send a key
-/// this implementation has no use for.
+/// Parses an APC payload — `key=value,…;base64` — into a
+/// `KittyGraphics.Command`. Unknown keys are ignored, not rejected
+/// (`SECURITY.md` §3): a newer client may send one.
 enum KittyGraphicsParser {
-    /// `nil` means the payload was too malformed to act on at all (no
-    /// recognisable action) — silently ignored by the caller, the same as
-    /// any other escape sequence Corta does not implement.
+    /// `nil`: nothing recognisable, ignored like any unknown sequence.
     static func parse(_ apcBytes: ArraySlice<UInt8>) -> KittyGraphics.Command? {
-        // APC is a generic mechanism; kitty marks its own use of it with a
-        // leading `G` (`ESC _ G <control data> ; <payload> ESC \`) so a
-        // future user of APC for something else is not misread as a
-        // graphics command. An APC string that does not start with it is
-        // not this protocol at all — ignored, not an error.
+        // Kitty's APC starts with `G`; anything else is not this protocol.
         guard apcBytes.first == UInt8(ascii: "G") else { return nil }
         let bytes = apcBytes[apcBytes.index(after: apcBytes.startIndex)...]
         guard let semicolon = bytes.firstIndex(of: UInt8(ascii: ";")) else {
-            // No payload section at all — still potentially a valid
-            // control-only command (delete, or a bare display of an
-            // already-transmitted image).
+            // No payload: still a valid delete or display.
             return command(from: parseKeyValues(bytes), payload: bytes[bytes.endIndex..<bytes.endIndex])
         }
         let controlData = bytes[bytes.startIndex..<semicolon]
@@ -55,8 +39,6 @@ enum KittyGraphicsParser {
         var index = bytes.startIndex
         while index < bytes.endIndex {
             guard let equals = bytes[index...].firstIndex(of: UInt8(ascii: "=")) else { break }
-            // A single-byte key, per the spec — every key the protocol
-            // defines is one ASCII letter.
             guard bytes.distance(from: index, to: equals) == 1 else { break }
             let key = bytes[index]
             let valueStart = bytes.index(after: equals)
@@ -72,12 +54,8 @@ enum KittyGraphicsParser {
         return Int(String(decoding: raw, as: UTF8.self))
     }
 
-    /// Checked `Int` → `UInt32` for every id the wire carries (`i=`, `p=`).
-    /// The protocol's ids are unsigned 32-bit; a negative or overflowing
-    /// value cannot name an image or placement under any reading of the
-    /// spec, and an unchecked conversion here is a release-build SIGTRAP on
-    /// hostile input (`SECURITY.md` §3). Callers treat `nil` as
-    /// "ignore this command", the same as any unrecognised sequence.
+    /// Checked: an unchecked conversion of a negative or huge id is a
+    /// release-build trap on hostile input. `nil` ignores the command.
     private static func uint32ID(_ value: Int?) -> UInt32? {
         value.flatMap(UInt32.init(exactly:))
     }
@@ -90,9 +68,8 @@ enum KittyGraphicsParser {
         case "t", "T":
             guard let header = transmitHeader(fields) else { return nil }
             let moreChunks = intValue(fields, "m") == 1
-            // An unrepresentable `p=` on an `a=T` rejects the whole command,
-            // transmit included — acting on half of it would store an image
-            // the client cannot then reference the way it asked to.
+            // A bad `p=` rejects the transmit too: half a command stores an image
+            // the client cannot reference as it asked.
             if action == "T" {
                 guard let display = displayHeader(fields, imageID: header.imageID) else { return nil }
                 return .transmit(header, payloadBase64: payload, moreChunks: moreChunks, display: display)
@@ -106,48 +83,24 @@ enum KittyGraphicsParser {
         case "d":
             return .delete(deleteTarget(fields))
         case "q":
-            // The support-detection probe: answered from the header alone
-            // (`Performer.respondToQuery`), never storing or displaying —
-            // reuses `transmitHeader` since a query carries the same
-            // `i=`/`f=`/`s=`/`v=` fields a transmission's first chunk does.
             guard let header = transmitHeader(fields) else { return nil }
             return .query(header)
         default:
-            // An action this implementation does not know — an animation
-            // frame (`a=f`/`a=a`), a transmit-and-frame combination.
-            // Ignored cleanly, per the same "unknown sequences do nothing"
-            // rule as everywhere else.
+            // Animation and other unknown actions: ignored.
             return nil
         }
     }
 
     private static func transmitHeader(_ fields: [UInt8: ArraySlice<UInt8>]) -> KittyGraphics.TransmitHeader? {
-        // `t=` is the transmission medium; only `d` (direct, the payload
-        // itself) is implemented — see `KittyGraphics`'s doc comment on why
-        // file/temp-file/shared-memory are refused rather than honoured.
-        // Absent defaults to `d`, per the spec.
+        // Only direct transmission (see `KittyGraphics`); absent means `d`.
         let medium = fields[UInt8(ascii: "t")].map { String(decoding: $0, as: UTF8.self) } ?? "d"
         guard medium == "d" else { return nil }
-        // Absent `i=` defaults to 0 — a real client's most common shape, not
-        // a malformed one: a one-shot `a=T` that will never be referenced
-        // again (no later `a=p` re-display, no chunked follow-up) has no
-        // reason to mint an id, and real `kitten icat` omits it exactly this
-        // way for a plain, non-`--place` display. Requiring a positive id
-        // here silently dropped every such command — found by a real-client
-        // verification pass, the same one that found the missing response
-        // protocol (`KittyGraphics.swift`'s doc comment). Only a *negative*
-        // or oversized value is refused; those cannot be an id under any
-        // reading of the spec.
+        // Absent `i=` is 0: `kitten icat` omits it for a one-shot display, and
+        // requiring one dropped every such command.
         guard let rawImageID = uint32ID(intValue(fields, "i") ?? 0) else { return nil }
-        // `f=`/`s=`/`v=` are only meaningful on the *first* chunk of a
-        // transmission — a continuation chunk (`m=1` on the previous one)
-        // carries only `i=` and the next slice of payload, per the
-        // protocol, so these come back `nil` rather than defaulted here.
-        // `Performer.receiveChunk` applies the real defaults, and only for
-        // a transmission's first chunk — see its doc comment.
+        // First chunk only; `Performer.receiveChunk` applies the defaults.
         let format = intValue(fields, "f").flatMap(KittyGraphics.PixelFormat.init(code:))
-        // Clamped hard regardless: these numbers size an allocation before
-        // a single payload byte is trusted (`SECURITY.md` §3).
+        // Clamped: they size an allocation before a byte is trusted.
         let width = intValue(fields, "s").map { min(max(0, $0), 8192) }
         let height = intValue(fields, "v").map { min(max(0, $0), 8192) }
         let quiet = min(max(0, intValue(fields, "q") ?? 0), 2)
@@ -156,9 +109,6 @@ enum KittyGraphicsParser {
             height: height, quiet: quiet)
     }
 
-    /// `nil` when a `p=` is present but not a valid id — the caller ignores
-    /// the whole command rather than guessing at a placement id the client
-    /// did not send (`uint32ID`'s doc comment).
     private static func displayHeader(
         _ fields: [UInt8: ArraySlice<UInt8>], imageID: KittyGraphics.ImageID
     ) -> KittyGraphics.DisplayHeader? {
@@ -169,9 +119,6 @@ enum KittyGraphicsParser {
         } else {
             placementID = KittyGraphics.PlacementID(rawValue: imageID.rawValue)
         }
-        // Requested cell span, clamped to something no real terminal window
-        // would exceed — the same defensive-clamp reasoning as the pixel
-        // dimensions above.
         let columns = intValue(fields, "c").map { min(max(0, $0), 4096) }
         let rows = intValue(fields, "r").map { min(max(0, $0), 4096) }
         let zIndex = intValue(fields, "z") ?? 0
@@ -184,12 +131,7 @@ enum KittyGraphicsParser {
 
     private static func deleteTarget(_ fields: [UInt8: ArraySlice<UInt8>]) -> KittyGraphics.DeleteTarget {
         let what = fields[UInt8(ascii: "d")].map { String(decoding: $0, as: UTF8.self) } ?? "a"
-        // Lowercase deletes only the placement, leaving the transmitted
-        // image around for reuse; uppercase also frees the image itself.
-        // This implementation does not distinguish the two once deleted —
-        // both drop the image from the store, since nothing here recycles
-        // freed image ids — but still parses both spellings so a client
-        // using either does not fall through to "unrecognised".
+        // Both cases parse; both drop the image, since ids are never recycled.
         switch what.lowercased() {
         case "a":
             return .all
@@ -197,10 +139,7 @@ enum KittyGraphicsParser {
             guard let rawImageID = uint32ID(intValue(fields, "i")) else { return .unrecognised }
             let imageID = KittyGraphics.ImageID(rawValue: rawImageID)
             if let rawPlacement = intValue(fields, "p") {
-                // A `p=` that is present but not a valid id must not widen
-                // the delete to the whole image — refuse to delete anything
-                // instead, the same rule `DeleteTarget.unrecognised` exists
-                // for.
+                // An invalid `p=` must not widen to the whole image.
                 guard let placement = uint32ID(rawPlacement) else { return .unrecognised }
                 if placement > 0 {
                     return .placement(imageID, KittyGraphics.PlacementID(rawValue: placement))
@@ -208,11 +147,7 @@ enum KittyGraphicsParser {
             }
             return .image(imageID)
         default:
-            // `d`, `c`, `r`, `z`, `p`, `q`, `x`, `y` — by-position and
-            // by-range deletes. Recognised as delete requests, not
-            // misread as something else, but not honoured — see the type's
-            // doc comment on why an unrecognised delete never deletes
-            // something else instead.
+            // By-position and by-range deletes: recognised, not honoured.
             return .unrecognised
         }
     }

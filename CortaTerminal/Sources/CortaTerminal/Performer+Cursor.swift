@@ -15,17 +15,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 extension Performer {
-    /// Cursor motion — ECMA-48 §8.3: CUU, CUD, CUF, CUB, CUP, HVP, and the
-    /// absolute and relative position sequences CHA, HPA, HPR, VPA and VPR.
-    ///
-    /// The absolute ones are not decoration. A TUI that lays a line out in
-    /// segments — Ink, and so Claude Code — writes a segment, jumps to the
-    /// next column with `CSI n G`, and writes the next. Left unimplemented
-    /// the jump did nothing, every segment landed against the one before it,
-    /// and a whole screen rendered with its spacing collapsed.
-    ///
-    /// Returns false when `final` is not a cursor sequence, so the dispatch
-    /// table in `Performer.swift` can fall through to the next category.
+    /// Cursor motion, absolute forms included: Ink (Claude Code) lays a line out
+    /// in segments joined by `CSI n G`, and without it a whole screen collapsed
+    /// its spacing. `false` falls through to the next dispatch category.
     mutating func performCursorControl(final: UInt8, parameters: Parameters) -> Bool {
         switch final {
         case 0x41:  // CUU
@@ -63,19 +55,9 @@ extension Performer {
             grid.tabForward(parameters.value(0, default: 1))
         case 0x5A:  // CBT — backward horizontal tabulation
             grid.tabBackward(parameters.value(0, default: 1))
-        // SCOSC / SCORC (ANSI.SYS) — bare `CSI s` / `CSI u`, no private
-        // marker, no intermediate, and — checked here — no parameters.
-        // xterm treats the unmarked, unparameterized form as an alias for
-        // DECSC/DECRC (`ESC 7`/`ESC 8`) unless DECLRMM (left/right margin
-        // mode) is set — Corta has no margin mode to disambiguate against,
-        // so the alias is unconditional, matching xterm's fallback
-        // behaviour. `CSI ? u`/`CSI > u`/`CSI < u`/`CSI = u` (a private
-        // marker) are the kitty keyboard protocol's query/push/pop forms
-        // and are handled in `csiDispatch`'s marker branch before reaching
-        // here, but the protocol's key-report form — `CSI code;modifiers u`,
-        // unmarked but parameterized — reaches this switch on `final`
-        // alone. Requiring zero parameters keeps a received key report
-        // (e.g. `CSI 97;5u`) from being misread as a cursor restore.
+        // Bare `CSI s`/`CSI u` alias DECSC/DECRC, as xterm does without DECLRMM.
+        // Zero parameters only: kitty's key report `CSI 97;5u` reaches this switch
+        // too and must not restore the cursor.
         case 0x73 where parameters.count == 0:  // SCOSC
             grid.saveCursor()
         case 0x75 where parameters.count == 0:  // SCORC

@@ -14,55 +14,20 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-/// One row of the grid.
-///
-/// Two properties matter and both are load-bearing:
-///
-/// **Variable length.** A row stores cells only up to its last written
-/// column. A fixed 200-cell row over a 100k-line scrollback is ~320 MB, which
-/// is not acceptable for the log-heavy workloads Corta targets
-/// (`DECISIONS.md` D05). Reading past the end yields `Cell.blank`.
-///
-/// **The `wrapped` flag.** A row that filled its last column and continued on
-/// the next row records that here. Reflow, selection across a soft wrap, and
-/// search across a wrap boundary all depend on it, and adding it later means
-/// rewriting the grid (`DECISIONS.md` D03).
-/// What a row means to the shell, when the shell says (OSC 133).
-///
-/// Without shell integration a terminal cannot see command boundaries at all
-/// — it sees keystrokes going out and bytes coming back. A shell that emits
-/// OSC 133 marks them, and that one fact is what makes "jump to the previous
-/// command" and an honest long-task notification possible.
-///
-/// The mark rides on the `Line` for the same reason `wrapped` does: rows move
-/// — they scroll into history, they reflow — and anything keyed by position
-/// instead drifts off its text. It costs nothing: `Line`'s layout already had
-/// the padding byte, and so did `Scrollback`'s row span.
+/// What a row means to the shell (OSC 133). It rides on the `Line`, like
+/// `wrapped`, because rows scroll and reflow and anything keyed by position
+/// drifts; it fits existing padding, so it costs nothing.
 public enum LineMark: UInt8, Sendable {
     case none = 0
-    /// A prompt starts on this row (`OSC 133 ; A`), and the command it
-    /// introduced has not reported an exit status yet.
+    /// A prompt whose command has not finished.
     case prompt = 1
-    /// A prompt whose command finished with status 0 (`OSC 133 ; D ; 0`).
     case promptSucceeded = 2
-    /// A prompt whose command finished with a non-zero status.
     case promptFailed = 3
-    /// The row a command's *output* begins on (`OSC 133 ; C`).
-    ///
-    /// Separate from the prompt mark because they answer different
-    /// questions: the prompt row is where a command starts, and this is where
-    /// the text it printed starts. Without it, "the last command's output"
-    /// has to be guessed as "one row after the prompt", which is right for a
-    /// one-line prompt with the command typed on it and one row too much for
-    /// a two-line prompt or a command continued across lines.
+    /// Where output begins (`C`): otherwise "the last command's output" must be
+    /// guessed as one row past the prompt, wrong for a two-line prompt.
     case outputStart = 4
 
-    /// Whether this row starts a command — what command-to-command jumping
-    /// looks for, regardless of how the command ended.
-    ///
-    /// Enumerated rather than `!= .none`: an output-start mark is a mark and
-    /// is not a prompt, and jumping to one would land the viewport a line
-    /// below where the user asked to be.
+    /// Not `!= .none`: jumping to an output-start mark lands a line low.
     public var isPrompt: Bool {
         switch self {
         case .prompt, .promptSucceeded, .promptFailed: return true
@@ -71,17 +36,17 @@ public enum LineMark: UInt8, Sendable {
     }
 }
 
+/// One row of the grid. Variable length — cells only up to the last written
+/// column; reading past the end yields `Cell.blank` (D05) — and carrying
+/// `wrapped` (D03).
 public struct Line: Equatable, Sendable {
-    /// Cells up to the last written column. Never contains trailing blanks
-    /// after `trimTrailingBlanks()`; may during editing.
+    /// No trailing blanks after `trimTrailingBlanks()`; may have them while
+    /// editing.
     public private(set) var cells: ContiguousArray<Cell>
 
-    /// True when this row continues onto the next one because text reached
-    /// the right margin — not because the program printed a newline.
+    /// Continued because text reached the margin, not because of a newline.
     public var wrapped: Bool
 
-    /// The shell-integration mark on this row. `.none` for the
-    /// overwhelming majority of rows.
     public var mark: LineMark = .none
 
     public init(wrapped: Bool = false) {
@@ -89,24 +54,19 @@ public struct Line: Equatable, Sendable {
         self.wrapped = wrapped
     }
 
-    /// Rebuilds a line's cells from a slice of someone else's storage —
-    /// `Scrollback` uses this to hand back a value-type `Line` view into a
-    /// shared batch arena without exposing that arena publicly. Copies:
-    /// this is the read-side cost that pays for the batch arena needing no
-    /// growth headroom on the write side.
+    /// A copy out of `Scrollback`'s shared arena — the read-side cost of the
+    /// arena needing no growth headroom.
     init(wrapped: Bool, mark: LineMark = .none, cells: ArraySlice<Cell>) {
         self.cells = ContiguousArray(cells)
         self.wrapped = wrapped
         self.mark = mark
     }
 
-    /// The number of stored cells, which is one past the last written column.
     public var count: Int { cells.count }
 
     public var isEmpty: Bool { cells.isEmpty }
 
-    /// Reads or writes a column. Reads past the stored end return
-    /// `Cell.blank`; writes past it pad the gap with blanks.
+    /// Reads past the end are blank; writes past it pad with blanks.
     public subscript(column: Int) -> Cell {
         @inline(__always)
         get {
@@ -121,15 +81,9 @@ public struct Line: Equatable, Sendable {
         }
     }
 
-    /// Overwrites one in-row run of printable ASCII. Wide pairs cannot span
-    /// rows, so only the two run boundaries can leave a half outside the
-    /// overwritten range; everything inside is replaced. This avoids the
-    /// per-cell read/check/grow sequence used by scalar writes.
-    ///
-    /// The inner loop writes through `withUnsafeMutableBufferPointer`:
-    /// `grow(to:)` above already fixes `cells`' length for the rest of this
-    /// call, so the per-element bounds/exclusivity check `ContiguousArray`'s
-    /// subscript would otherwise repeat on every byte is redundant here.
+    /// One in-row ASCII run: only the two ends can split a wide pair. Writes
+    /// through the buffer pointer — `grow(to:)` already fixed the length, so
+    /// per-element bounds checks are redundant.
     mutating func overwriteASCII(_ bytes: ArraySlice<UInt8>, at column: Int, pen: Pen) {
         guard !bytes.isEmpty, column >= 0 else { return }
         let end = column + bytes.count
@@ -152,7 +106,6 @@ public struct Line: Equatable, Sendable {
         }
     }
 
-    /// Sets every column in `range` to `cell`.
     public mutating func fill(_ cell: Cell, in range: Range<Int>) {
         let lower = max(0, range.lowerBound)
         guard range.upperBound > lower else { return }
@@ -162,12 +115,8 @@ public struct Line: Equatable, Sendable {
         }
     }
 
-    /// Erases `range` to `template`.
-    ///
-    /// When the template is blank and the range runs to the stored end, the
-    /// cells are dropped rather than filled — that is what keeps a mostly
-    /// empty screen cheap. A range erased under a non-default background is
-    /// visible, so those cells are stored.
+    /// A blank erase to the end drops the cells (a mostly empty screen stays
+    /// cheap); one under a background colour is visible, so it is stored.
     public mutating func erase(_ range: Range<Int>, with template: Cell) {
         let lower = max(0, range.lowerBound)
         guard range.upperBound > lower else { return }
@@ -178,25 +127,20 @@ public struct Line: Equatable, Sendable {
         fill(template, in: lower..<range.upperBound)
     }
 
-    /// Drops every cell, keeping the allocation for reuse, and clears the
-    /// wrap flag — a cleared row continues nothing.
+    /// Keeps the allocation; a cleared row continues nothing.
     public mutating func clear() {
         cells.removeAll(keepingCapacity: true)
         wrapped = false
     }
 
-    /// Drops trailing blanks. Called before a row enters the scrollback,
-    /// where it will be held for a long time and never edited again.
+    /// Before a row enters scrollback, where it is never edited again.
     public mutating func trimTrailingBlanks() {
         var end = cells.count
         while end > 0, cells[end - 1].isBlank { end -= 1 }
         if end < cells.count { cells.removeSubrange(end...) }
     }
 
-    /// ICH — ECMA-48 §8.3.64: inserts `count` copies of `template` at
-    /// `column`, shifting the rest right; cells pushed past `width` are
-    /// lost. Editing a row breaks any continuation onto the next one, so
-    /// the wrap flag is cleared.
+    /// ICH; cells past `width` are lost, and editing breaks the wrap.
     public mutating func insertCells(_ count: Int, at column: Int, template: Cell, width: Int) {
         guard column >= 0, column < width else { return }
         let count = min(max(0, count), width - column)
@@ -215,8 +159,6 @@ public struct Line: Equatable, Sendable {
         if template.isBlank { trimTrailingBlanks() }
     }
 
-    /// DCH — ECMA-48 §8.3.26: deletes `count` cells at `column`, shifting
-    /// the rest left; the tail is filled with `template`.
     public mutating func deleteCells(_ count: Int, at column: Int, template: Cell, width: Int) {
         guard column >= 0, column < width else { return }
         let count = min(max(0, count), width - column)

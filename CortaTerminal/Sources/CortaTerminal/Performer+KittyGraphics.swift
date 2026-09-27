@@ -16,10 +16,7 @@
 
 import Foundation
 
-/// The Kitty graphics protocol's APC dispatch. See `KittyGraphics.swift`
-/// for the wire-format types and what subset of the real protocol this
-/// implements, and `ImagePlacementTable.swift` for where the settled state
-/// (as opposed to this file's in-progress transmission) lives.
+/// Kitty graphics dispatch; settled state lives in `ImagePlacementTable`.
 extension Performer {
     public mutating func apcDispatch(_ bytes: ArraySlice<UInt8>) {
         guard let command = KittyGraphicsParser.parse(bytes) else { return }
@@ -35,13 +32,7 @@ extension Performer {
         }
     }
 
-    /// `a=q` — answered from the header alone, never touching
-    /// `ImagePlacementTable`: the real protocol requires a query to check
-    /// only whether the terminal *could* display something shaped like
-    /// this, not to decode or store whatever payload rides along with it.
-    /// This is the response `kitten icat` and every other real client
-    /// sends before ever transmitting an actual image, and refuses outright
-    /// without.
+    /// `a=q`: from the header alone, nothing decoded or stored.
     private mutating func respondToQuery(_ header: KittyGraphics.TransmitHeader) {
         let format = header.format ?? .rgba
         let ok: Bool
@@ -56,13 +47,8 @@ extension Performer {
             error: ok ? nil : "EINVAL:bad dimensions")
     }
 
-    /// The `<ESC>_G ... <ESC>\` acknowledgment every non-quiet command gets —
-    /// `SECURITY.md` §2.1/§2.2's fixed-format rule applies here exactly as it
-    /// does to DA1/DSR/OSC 10-12: `imageID`/`placementID` are numbers this
-    /// implementation already validated, `error` is always one of this
-    /// file's own constant strings, and nothing from the input stream is
-    /// ever echoed back. `quiet` 0 (the default) responds to both success
-    /// and error, 1 suppresses only the `OK`, 2 suppresses everything.
+    /// Fixed-format (`SECURITY.md` §2.1/§2.2): validated numbers and this file's
+    /// own error strings. `quiet` 1 suppresses `OK`, 2 everything.
     private mutating func respond(
         imageID: KittyGraphics.ImageID, placementID: KittyGraphics.PlacementID?, quiet: Int,
         error: String?
@@ -74,18 +60,9 @@ extension Performer {
         state.outputBuffer.append(contentsOf: Array("\u{1B}_G\(body)\u{1B}\\".utf8))
     }
 
-    /// Appends one chunk to the transmission in progress, starting a new one
-    /// if this is the first chunk (`state.pendingImageTransmission` is
-    /// `nil`, or belongs to a different image id — a client starting a new
-    /// transmission before finishing the last one abandons the old one,
-    /// which is the same "the newest wins" rule OSC title-setting already
-    /// follows). Finalises and decodes once `moreChunks` is false.
-    ///
-    /// `header.format`/`.width`/`.height` are resolved (defaulted where
-    /// absent) only when *starting* a transmission — a continuation
-    /// chunk's header carries just `i=`/`m=` (`KittyGraphicsParser`'s doc
-    /// comment) and must not overwrite what the first chunk already
-    /// established.
+    /// A new image id abandons an unfinished transmission — newest wins. Format
+    /// and size are resolved only when starting: a continuation's header
+    /// carries just `i=`/`m=`.
     private mutating func receiveChunk(
         header: KittyGraphics.TransmitHeader, display: KittyGraphics.DisplayHeader?,
         payloadBase64: ArraySlice<UInt8>, moreChunks: Bool
@@ -98,22 +75,11 @@ extension Performer {
             state.pendingImageTransmission = PendingImageTransmission(
                 header: resolved, display: display, base64: [])
         }
-        // Roughly the base64 expansion of `maximumImageBytes` — checked on
-        // every chunk, not only at the end, so a hostile stream cannot
-        // stall the accumulator at just-under-the-limit forever by sending
-        // one enormous "still more chunks" transmission
-        // (`SECURITY.md` §3).
+        // Checked per chunk, so a stream cannot park just under the limit.
         let budget = KittyGraphics.maximumImageBytes / 3 * 4 + 4
         guard state.pendingImageTransmission!.base64.count + payloadBase64.count <= budget else {
-            // Still acknowledged, same as every other non-quiet command
-            // (`respond`'s doc comment) — a real client left waiting for
-            // this OK/error is exactly the failure mode dropping silently
-            // here would cause. `imageID`/`quiet` come from the pending
-            // transmission's own resolved header, not this chunk's: a
-            // continuation chunk's header carries no `q=` of its own
-            // (`KittyGraphicsParser`'s doc comment), so re-parsing it here
-            // would silently un-quiet a transmission the client asked to
-            // keep quiet.
+            // Still acknowledged, with the pending header's `quiet` — a continuation
+            // carries no `q=`, and re-parsing it would un-quiet the transmission.
             let pending = state.pendingImageTransmission!
             state.pendingImageTransmission = nil
             respond(
@@ -141,15 +107,10 @@ extension Performer {
             respond(imageID: imageID, placementID: nil, quiet: quiet, error: "EINVAL:too large")
             return
         }
-        // Resolved to non-optional in `receiveChunk` when the transmission
-        // started; defaulted again here purely as a second line of defence,
-        // never actually relied on.
         let format = pending.header.format ?? .rgba
         let width = pending.header.width ?? 0
         let height = pending.header.height ?? 0
-        // Raw formats are exactly `width * height * bytesPerPixel` — a
-        // mismatch is a malformed or truncated transmission, not something
-        // to clamp or pad into shape (`SECURITY.md` §3).
+        // Exactly `width * height * bytesPerPixel`, or dropped — never padded.
         switch format {
         case .rgb:
             guard bytes.count == width * height * 3 else {
@@ -178,22 +139,15 @@ extension Performer {
             respond(imageID: imageID, placementID: nil, quiet: quiet, error: "ENOSPC:image data too large")
             return
         }
-        // The combined `a=T` gets one response for the whole command, not a
-        // second one from the placement it bundles — `respond: false` here,
-        // with the bare `a=p` path below still getting its own.
+        // One response for `a=T`, not a second from its placement.
         if let display = pending.display {
             placeAtCursor(display, respond: false)
         }
         respond(imageID: imageID, placementID: nil, quiet: quiet, error: nil)
     }
 
-    /// Places an image at the cursor's current document position — what
-    /// both `a=T` (transmit-and-display) and a bare `a=p` do. Advances the
-    /// cursor past the image's footprint only when the placement gave an
-    /// explicit cell size (`c=`/`r=`): without one, sizing is deferred to
-    /// the app layer's cell metrics (see `KittyGraphics.Placement`'s doc
-    /// comment), which this method has no access to, so the cursor is left
-    /// where it is rather than guessed at.
+    /// Advances the cursor only for an explicit `c=`/`r=`: otherwise the size
+    /// depends on the app's cell metrics, and the cursor is not guessed.
     private mutating func placeAtCursor(_ display: KittyGraphics.DisplayHeader, respond respondFlag: Bool = true) {
         let placed = grid.imagePlacements.place(
             display, row: grid.cursor.row, column: grid.cursor.column,
@@ -207,24 +161,13 @@ extension Performer {
         if rows == 1 {
             grid.moveCursor(row: grid.cursor.row, column: grid.cursor.column + columns)
         } else {
-            // A multi-row placement's cursor lands at the start of the row
-            // below its last one, mirroring how the reference client's own
-            // multi-line placements are documented to leave the cursor.
+            // Start of the row below, as the reference client documents.
             grid.moveCursor(row: grid.cursor.row + rows, column: 0)
         }
     }
 
-    /// `Data(base64Encoded:)` requires `=` padding out to a multiple of 4 and
-    /// simply fails, silently, on anything short of that — but RFC 4648
-    /// §3.2 makes padding optional for a decoder that already knows where
-    /// the data ends (which a length-prefixed accumulator like this one
-    /// does), and real `kitten icat` sends unpadded base64 in practice. A
-    /// real-client verification pass (`KittyGraphics.swift`'s doc comment)
-    /// found every such transmission was being dropped as "bad base64" —
-    /// this app's own hand-written tests never caught it because
-    /// `Data.base64EncodedString()` always emits correctly padded output.
-    /// Already-padded input is unaffected: the remainder is 0, so nothing is
-    /// appended.
+    /// Pads to a multiple of 4: `Data(base64Encoded:)` rejects unpadded input,
+    /// which RFC 4648 §3.2 allows and `kitten icat` sends.
     private static func padded(_ base64: [UInt8]) -> [UInt8] {
         let remainder = base64.count % 4
         guard remainder != 0 else { return base64 }

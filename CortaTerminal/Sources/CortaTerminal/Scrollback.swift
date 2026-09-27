@@ -14,70 +14,40 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-/// The history of rows that have scrolled off the top of the screen.
+/// The rows that have scrolled off the top of the screen.
 ///
-/// Rows are packed into batches of up to `batchSize`, each batch one shared
-/// `ContiguousArray<Cell>` arena that its rows are appended into once and
-/// never mutated again. This is not the obvious design — the obvious one is
-/// one array per row — and the reason is measured, not guessed
-/// (`PERFORMANCE.md` §4): at 100k 120-column lines, a
-/// `ContiguousArray<Cell>` grown one column at a time (matching how a shell
-/// actually writes a line, one `write(_:)` call per character) lands at
-/// capacity 158 for 120 cells used — roughly 57 MB of pure growth headroom
-/// across 100k rows — and 100k separate heap allocations carry their own
-/// per-allocation overhead on top of that, together accounting for most of
-/// the 265.7 MB measured against a 183 MB floor of actual cell data.
-/// Batching amortizes both costs: packing rows into an arena as they are
-/// pushed needs no growth headroom (the row's exact length is already
-/// known), and one arena serves up to `batchSize` rows instead of one each.
+/// Rows are packed into shared arenas of up to `batchSize`, not one array
+/// each — measured (`PERFORMANCE.md` §4): one array per row carried ~57 MB of
+/// growth headroom plus 100k allocations' overhead at 100k 120-column lines
+/// (265.7 MB against 183 MB of cells). Safe because scrollback rows are never
+/// edited after the push; the live screen is not batched for that reason.
+/// Eviction is O(1) per row, dropping a batch once all its rows have aged out.
 ///
-/// This is safe here specifically because scrollback rows are immutable
-/// once pushed — held for a long time and never edited again. The live
-/// screen (`Grid.lines`) is not batched: those rows are actively written to,
-/// column by column, and batching would force exactly the repacking-per-edit
-/// cost this design avoids.
-///
-/// Batches themselves form a FIFO: a new batch is appended once the current
-/// one reaches `batchSize` rows, and the oldest batch is dropped once every
-/// one of its rows has aged out of `limit`. Eviction is still O(1) per row
-/// (`headSkip` advances by one), and dropping a whole batch happens only
-/// once every `batchSize` pushes, amortizing to O(1) as well — the number
-/// of batches alive at once is bounded by `limit`, so the FIFO's own
-/// bookkeeping array never grows large enough for its cost to matter.
-///
-/// Scrollback is never written to disk: it routinely holds credentials
-/// echoed by something that should not have echoed them (`SECURITY.md` §5).
+/// Never written to disk: it routinely holds echoed credentials
+/// (`SECURITY.md` §5).
 public struct Scrollback: Sendable {
     public static let defaultLimit = 10_000
 
     public let limit: Int
 
-    /// Rows per batch. Capped so a single batch's arena reallocation isn't
-    /// itself a large copy, and floored to `limit` so a small scrollback
-    /// still gets at least one batch that can fill and rotate rather than
-    /// growing one arena forever.
+    /// Capped so an arena reallocation is not a large copy; at most `limit`
+    /// so a small scrollback still rotates instead of growing one arena.
     private let batchSize: Int
 
     private struct RowSpan: Sendable {
         var start: Int32
         var length: Int32
         var wrapped: Bool
-        /// The shell-integration mark. Free: the span already had a
-        /// padding byte after `wrapped`.
+        /// Free: fits the padding after `wrapped`.
         var mark: LineMark = .none
     }
 
-    /// One shared arena and the spans within it that are its rows, in
-    /// insertion order. Sealed at `batchSize` rows; never mutated after.
     private struct Batch: Sendable {
         var arena: ContiguousArray<Cell> = []
         var rows: ContiguousArray<RowSpan> = []
     }
 
-    /// Oldest first, newest (still-filling) last. A plain FIFO, not a ring:
-    /// the array itself is small (bounded by `limit / batchSize`) and its
-    /// own reallocation cost on `removeFirst()` is negligible next to the
-    /// cell data it stops needing to copy per row.
+    /// Oldest first; small enough (`limit / batchSize`) to be a plain FIFO.
     private var batches: ContiguousArray<Batch> = []
 
     /// Rows already evicted from the oldest (`batches.first`) batch.
@@ -85,15 +55,9 @@ public struct Scrollback: Sendable {
 
     public private(set) var count = 0
 
-    /// Every line ever pushed, never decremented — the anchor a selection
-    /// tracks its text by.
-    ///
-    /// `count` cannot do that job: it stops at `limit`, so once the ring is
-    /// full it reports no growth while rows are still being evicted one per
-    /// push. A selection anchored against it stayed on its document rows
-    /// while the text under those rows scrolled away, and the highlight
-    /// drifted onto whatever arrived next. This counter keeps rising, so the
-    /// shift is right whether the ring is filling or flooding.
+    /// Every line ever pushed, never decremented — what anchors track.
+    /// `count` stops at `limit`, so a full ring shows no growth while rows
+    /// are still being evicted.
     public private(set) var totalPushed = 0
 
     public init(limit: Int = defaultLimit) {
@@ -118,12 +82,8 @@ public struct Scrollback: Sendable {
         return Line(wrapped: span.wrapped, mark: span.mark, cells: batch.arena[start..<end])
     }
 
-    /// Re-marks a row already in history. A command's exit status
-    /// arrives long after its prompt row was written, and for anything that
-    /// took more than a screenful of output that row is in history by then —
-    /// so the mark has to be reachable here, or a slow command could never be
-    /// marked as failed. Out-of-range indices are ignored: the row may have
-    /// been evicted while the command ran, which is not an error.
+    /// A command's status arrives after its prompt row may have scrolled
+    /// into history. An evicted row is not an error.
     public mutating func setMark(_ mark: LineMark, at index: Int) {
         guard index >= 0, index < count else { return }
         let global = index + headSkip
@@ -133,8 +93,7 @@ public struct Scrollback: Sendable {
         batches[batchIndex].rows[rowIndex].mark = mark
     }
 
-    /// The history, oldest first. Allocates; for dumps and diagnostics, not
-    /// for the render path.
+    /// Allocates; for dumps, not the render path.
     public var lines: [Line] {
         (0..<count).map { self[$0] }
     }
@@ -158,8 +117,6 @@ public struct Scrollback: Sendable {
         if count < limit {
             count += 1
         } else {
-            // Full: evict the oldest row. Once the whole head batch has
-            // aged out, drop its arena and move on to the next.
             headSkip += 1
             if headSkip >= batches[0].rows.count {
                 batches.removeFirst()
@@ -168,12 +125,9 @@ public struct Scrollback: Sendable {
         }
     }
 
-    /// Testing hook (`@testable`, internal not private): the number of live
-    /// batches, to assert the FIFO stays bounded rather than growing with
-    /// total lines ever pushed.
+    /// For tests: the FIFO must stay bounded.
     var batchCount: Int { batches.count }
 
-    /// ED 3, and anything else that discards history.
     public mutating func removeAll() {
         batches.removeAll(keepingCapacity: true)
         headSkip = 0

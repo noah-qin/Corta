@@ -16,22 +16,14 @@
 
 import Foundation
 
-/// OSC string handling. Setters only: nothing here ever writes back
-/// to the child, and the title *query* (`CSI 2 1 t`) is never implemented —
-/// it is a command-injection vector (`SECURITY.md` §2.2).
-///
-/// The payload is already capped at `Parser.maxStringLength`; an overlong
-/// string is discarded by the parser and never reaches this point.
+/// OSC handling. Setters only; the title query is never implemented — a
+/// command-injection vector (`SECURITY.md` §2.2). Payloads are already
+/// capped by `Parser.maxStringLength`.
 extension Performer {
     public mutating func oscDispatch(_ bytes: ArraySlice<UInt8>) {
         guard let separator = bytes.firstIndex(of: 0x3B) else {
-            // No `;`-separated payload at all. Every code but one needs
-            // one to do anything and is unchanged by leaving it alone here;
-            // OSC 104/105 with no arguments — "reset the whole indexed
-            // palette / every special colour" — is the one real use
-            // of a bare code, and it is the most common real-world form of
-            // the reset (xterm itself sends `OSC 104 ST` with nothing
-            // after it).
+            // A bare code: only OSC 104/105 ("reset everything") uses one — the
+            // form xterm itself sends.
             if let code = Self.parseOSCCode(bytes) {
                 if code == 104 {
                     resetIndexedColors(bytes[bytes.endIndex...])
@@ -47,8 +39,6 @@ extension Performer {
 
         switch code {
         case 0, 2:
-            // OSC 0 is icon-and-window title; Corta has no icon title, so
-            // both set the window title.
             state.windowTitle = String(decoding: payload, as: UTF8.self)
         case 7:
             setWorkingDirectory(payload)
@@ -59,27 +49,17 @@ extension Performer {
         case 8:
             setHyperlink(payload)
         case 4:
-            // The indexed palette — set/query, one or more `c ; spec`
-            // pairs.
             handleIndexedColor(payload)
         case 104:
             resetIndexedColors(payload)
         case 5:
-            // The special colours — same wire shape as OSC 4, over
-            // `SpecialColors`' five fixed slots instead of a 256-entry
-            // palette. xterm ctlseqs documents the exact Pc values
-            // (0=bold, 1=underline, 2=blink, 3=reverse, 4=italic), unlike
-            // the exotic OSC 10/11/12 colour-space specs this file already
-            // refuses for being unverifiable — this one is independently
-            // documented, so it is implemented rather than guessed.
+            // Implemented because xterm documents the `Pc` values (0 bold …
+            // 4 italic), unlike the colour spaces OSC 10/11/12 refuse.
             handleSpecialColor(payload)
         case 105:
             resetSpecialColors(payload)
         case 10, 11, 12:
-            // The dynamic colours. A payload of exactly `?` is the
-            // query form; anything else is a colour specification to set.
-            // Unlike the title, these are numeric state, so reporting them
-            // echoes nothing the stream supplied (`SECURITY.md` §2.2).
+            // `?` queries; numeric state, so nothing the stream supplied is echoed.
             if payload.count == 1, payload.first == 0x3F {
                 reportDynamicColor(code)
             } else {
@@ -90,12 +70,7 @@ extension Performer {
         }
     }
 
-    /// A decimal OSC code, capped the way the wire format is: at most three
-    /// digits. `nil` for anything else, including an empty span or an
-    /// arbitrarily long run of digits — the bound is checked *before* each
-    /// multiply-and-add, not after, so `code` never exceeds 999 regardless
-    /// of how many digits a hostile payload supplies. The caller decides
-    /// what "no code at all" means for an empty span.
+    /// At most three digits, bounded before each multiply-add.
     private static func parseOSCCode(_ bytes: ArraySlice<UInt8>) -> Int? {
         guard !bytes.isEmpty else { return nil }
         var code = 0
@@ -108,26 +83,16 @@ extension Performer {
         return code
     }
 
-    /// OSC 8 — `OSC 8 ; params ; URI ST`.
-    ///
-    /// The parameters (`id=…`, and anything a future spec adds) are parsed
-    /// and discarded: `id` exists so a terminal can treat two runs of cells
-    /// as one link for hover highlighting, which Corta does by target
-    /// instead — identical URLs intern to one id, which gives the same
-    /// answer without trusting a stream-supplied identifier.
-    ///
-    /// An empty URI ends the current link, which is how a program stops
-    /// linking. So does a URI the table cannot take (over-long, or the table
-    /// is full): failing closed means the following text is unlinked rather
-    /// than silently joined to whatever link came before.
+    /// OSC 8. `id=` is ignored: identical URLs intern to one id, which groups
+    /// cells without trusting a stream-supplied identifier. An empty URI — or
+    /// one the table cannot take — ends the link, failing closed.
     private mutating func setHyperlink(_ payload: ArraySlice<UInt8>) {
         guard let separator = payload.firstIndex(of: 0x3B) else {  // ';'
             grid.pen.hyperlink = .none
             return
         }
         let uri = String(decoding: payload[payload.index(after: separator)...], as: UTF8.self)
-        // `Grid.internHyperlink`, not the table directly: a full table gets
-        // a reference-safe sweep and one retry before failing closed.
+        // Through `Grid`: a full table gets a reference-safe sweep first.
         guard !uri.isEmpty, let id = grid.internHyperlink(uri) else {
             grid.pen.hyperlink = .none
             return
@@ -135,35 +100,16 @@ extension Performer {
         grid.pen.hyperlink = id
     }
 
-    /// OSC 52 — `OSC 52 ; Pc ; Pd ST`, the clipboard.
-    ///
-    /// **Write only.** `Pd` of `?` is the *query* form, which answers with the
-    /// clipboard's contents — a remote host reading the local clipboard, which
-    /// is a data-exfiltration primitive and one of the capabilities Corta
-    /// deliberately does not have (`SECURITY.md` §6). It is ignored here and
-    /// nowhere else implements it.
-    ///
-    /// The write half is why the sequence exists in practice: inside `tmux`
-    /// or over `ssh` there is no other route from the remote pane to this
-    /// Mac's pasteboard. The decoded text is handed to the app, which still
-    /// gets to refuse — `allow-clipboard-write = false` turns the whole thing
-    /// off.
-    ///
-    /// The payload is already bounded by `Parser.maxStringLength`, so the
-    /// decode cannot be made to allocate without limit.
-    ///
-    /// The decoded text passes through `sanitiseClipboardText` before it is
-    /// recorded: bidi and zero-width control characters are stripped, because
-    /// this is text a *stream* chose, sight unseen — there is no "copy what I
-    /// selected" contract to honour, and a payload whose pasted form differs
-    /// from what any display of it suggested is the Trojan Source class of
-    /// attack (`SECURITY.md` §2.5).
+    /// OSC 52, **write only**: the query form would let a remote host read the
+    /// local clipboard (`SECURITY.md` §6). Writing is the only route from a
+    /// remote pane to this Mac's pasteboard; `allow-clipboard-write = false`
+    /// turns it off. Text is sanitised first — a stream chose it, sight unseen
+    /// (`SECURITY.md` §2.5).
     private mutating func setClipboard(_ payload: ArraySlice<UInt8>) {
         guard let separator = payload.firstIndex(of: 0x3B) else { return }  // ';'
         let data = payload[payload.index(after: separator)...]
-        // The query form, and the "clear the selection" form (empty data),
-        // are both declined: nothing is reported back to the child, and a
-        // stream is not allowed to blank the user's clipboard either.
+        // Query and "clear" are both declined: a stream may not blank the
+        // clipboard either.
         guard !data.isEmpty, data.first != 0x3F else { return }
         guard let decoded = Self.decodeBase64(data) else { return }
         let text = Self.sanitiseClipboardText(decoded)
@@ -171,14 +117,10 @@ extension Performer {
         state.pendingClipboardCopy = text
     }
 
-    /// Removes the characters that let clipboard content lie about itself:
-    /// bidi embeddings, overrides and isolates (U+202A–U+202E, U+2066–U+2069),
-    /// which can reorder how the pasted text *displays* versus what it
-    /// *is*, and the zero-width format characters (ZWSP U+200B, word joiner
-    /// U+2060, ZWNBSP/BOM U+FEFF), which hide content outright. Kept:
-    /// ZWJ and ZWNJ (emoji sequences and scripts that need them) and
-    /// LRM/RLM, which are load-bearing in real bidi text and reorder nothing
-    /// on their own.
+    /// Strips bidi embeddings, overrides and isolates and the zero-width
+    /// characters that hide content (ZWSP, word joiner, BOM) — what lets pasted
+    /// text differ from how it displayed. Keeps ZWJ/ZWNJ and LRM/RLM, which real
+    /// text needs.
     static func sanitiseClipboardText(_ text: String) -> String {
         var scalars = String.UnicodeScalarView()
         scalars.append(contentsOf: text.unicodeScalars.filter { !isSpoofingScalar($0) })
@@ -194,15 +136,9 @@ extension Performer {
         }
     }
 
-    /// Strict base64, decoded here rather than through `Data(base64Encoded:)`
-    /// so the bytes never take a detour through `String` and a malformed
-    /// payload is rejected rather than partially accepted — including data
-    /// trailing the `=` padding, which is not a valid place for more data.
-    ///
-    /// The result is decoded as UTF-8 with replacement, not validated: this
-    /// is text bound for a pasteboard, and refusing a clipboard copy because
-    /// a byte was not valid UTF-8 helps nobody. It is never written back to
-    /// the child under any circumstances (`SECURITY.md` §2.1).
+    /// Strict base64 without a detour through `String`; data after padding is
+    /// rejected. UTF-8 with replacement — refusing a paste over one byte helps
+    /// nobody. Never written back to the child (`SECURITY.md` §2.1).
     private static func decodeBase64(_ bytes: ArraySlice<UInt8>) -> String? {
         var output: [UInt8] = []
         output.reserveCapacity(bytes.count * 3 / 4)
@@ -215,7 +151,6 @@ extension Performer {
                 continue
             }
             if byte == 0x20 || byte == 0x0A || byte == 0x0D || byte == 0x09 {
-                // Whitespace inside a long payload is common enough to skip.
                 continue
             }
             guard !paddingSeen, let value = base64Value(byte) else { return nil }
@@ -241,19 +176,10 @@ extension Performer {
         }
     }
 
-    /// OSC 7 — the payload is a `file://host/path` URL. Only `file` is
-    /// meaningful for a working directory; anything else is ignored.
-    ///
-    /// The host part decides where the report lands. A local host (empty,
-    /// `localhost`, or this machine's own names) sets `state.working
-    /// Directory`, which feeds local spawns — new tabs, splits, session
-    /// restore — and clears any remote context: the pane is local again.
-    /// A remote host (a shell reached over `ssh`, or a pane inside `tmux`
-    /// on one) is recorded in `state.remoteContext` instead: kept so
-    /// the app can show which host and directory the pane refers to, kept
-    /// *apart* because the path names a file on another computer and must
-    /// never be `chdir`'d on this Mac. A remote report also leaves any
-    /// directory already accepted in place — it does not displace it.
+    /// OSC 7 (`file://host/path`). A local host sets `workingDirectory` and
+    /// clears remote context; a remote one goes to `remoteContext`, kept apart
+    /// because that path must never be `chdir`'d here, and leaves any accepted
+    /// local directory in place.
     private mutating func setWorkingDirectory(_ payload: ArraySlice<UInt8>) {
         let string = String(decoding: payload, as: UTF8.self)
         guard let url = URL(string: string), url.scheme == "file" else { return }

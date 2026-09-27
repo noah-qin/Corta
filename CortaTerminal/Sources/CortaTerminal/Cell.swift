@@ -14,43 +14,25 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-/// One character cell.
-///
-/// Fixed size, `Equatable`, no reference fields: a row is a
-/// `ContiguousArray<Cell>` that the renderer can walk without an ARC traffic
-/// jam (`PERFORMANCE.md` §3, `DECISIONS.md` D05).
-///
-/// The layout is deliberate — 4 + 4 + 4 + 2 + 2 = 16 bytes, asserted by
-/// `CellTests`. Growing it is a real cost: a 200×100k scrollback is
-/// 16 bytes × every cell that is actually stored.
-///
-/// That budget is why the OSC 8 hyperlink id is not a field of its
-/// own. Unicode's codespace ends at U+10FFFF, so a scalar needs 21 of the
-/// 32 bits `scalar` was already spending; the hyperlink id lives in the 11
-/// left over. The cost is that `scalar` becomes a computed property over the
-/// packed word — which is a mask and a shift, and measurably nothing next to
-/// an 18- or 20-byte cell.
+/// One character cell: 16 bytes, no references (`CellTests`, D05), so a row
+/// walks without ARC traffic. The OSC 8 id shares `scalar`'s word — a scalar
+/// needs 21 of its 32 bits — at the cost of a mask and a shift, measurably
+/// nothing next to a larger cell.
 public struct Cell: Equatable, Sendable {
-    /// `scalar` in the low 21 bits, `hyperlink` in the high 11. Private so
-    /// the packing can never be assumed by anything but this type.
+    /// Low 21 bits scalar, high 11 hyperlink; private so nothing else assumes it.
     private var packed: UInt32
 
     private static let scalarBits: UInt32 = 21
     private static let scalarMask: UInt32 = (1 << scalarBits) - 1
-    /// Ids above this do not fit; `HyperlinkTable` caps itself to match.
     static let maximumHyperlinkID: UInt16 = UInt16((1 << (32 - scalarBits)) - 1)
 
-    /// The base Unicode scalar. For a cluster that does not fit in one scalar
-    /// this is the *base* character and `grapheme` names the full cluster.
+    /// For a larger cluster, the base character; `grapheme` names the rest.
     @inline(__always)
     public var scalar: UInt32 {
         get { packed & Self.scalarMask }
         set { packed = (packed & ~Self.scalarMask) | (newValue & Self.scalarMask) }
     }
 
-    /// The OSC 8 hyperlink this cell belongs to, or `.none`. A key
-    /// into the grid's `HyperlinkTable`, exactly as `grapheme` is a key into
-    /// its `GraphemeTable`.
     @inline(__always)
     public var hyperlink: HyperlinkID {
         get { HyperlinkID(rawValue: UInt16(packed >> Self.scalarBits)) }
@@ -63,8 +45,6 @@ public struct Cell: Equatable, Sendable {
     public var foreground: Color
     public var background: Color
     public var attributes: CellAttributes
-    /// A key into the session's `GraphemeTable`, or `.none` for the common
-    /// case of a cell that is exactly one scalar (`DECISIONS.md` D05).
     public var grapheme: GraphemeID
 
     @inline(__always)
@@ -84,11 +64,8 @@ public struct Cell: Equatable, Sendable {
         self.grapheme = grapheme
     }
 
-    /// An unwritten cell: a space in the default colours.
-    ///
-    /// This exact value is what "blank" means everywhere else — trimming a
-    /// row, deciding whether an erase can truncate instead of fill. A cell
-    /// erased under a non-default background is *not* blank and is stored.
+    /// What "blank" means everywhere (trimming, erase truncation). A cell erased
+    /// under a background colour is not blank.
     public static let blank = Cell()
 
     @inline(__always)

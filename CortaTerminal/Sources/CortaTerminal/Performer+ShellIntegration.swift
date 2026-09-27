@@ -16,78 +16,41 @@
 
 import Foundation
 
-/// OSC 133 — shell integration.
+/// OSC 133 — shell integration: the shell states command boundaries instead
+/// of Corta guessing them. `A` prompt start, `B` prompt end (typing begins),
+/// `C` output begins, `D` finished (`;<status>`).
 ///
-/// A terminal without this cannot see command boundaries. It sees keystrokes
-/// leaving and bytes arriving, and everything built on "a command" has to be
-/// guessed from that: `TaskNotifier` guessed from a Return keypress and an
-/// output idle timer, and said so in its own comment. A shell that emits
-/// `OSC 133` states the boundaries outright, and three features stop being
-/// heuristics — jumping between commands, marking which ones failed, and
-/// notifying when a long one actually finishes.
-///
-/// The four states, as FinalTerm defined them and every shell that implements
-/// them uses them:
-///
-/// - `A` — a prompt starts here.
-/// - `B` — the prompt ended; what follows is what the user is typing.
-/// - `C` — the user pressed Return; what follows is the command's output.
-/// - `D` — the command finished, optionally with `;<exit status>`.
-///
-/// Nothing here is echoed back to the child and nothing here is trusted
-/// beyond a small integer: the payload's only data is an exit status, parsed
-/// with a bound (`SECURITY.md` §2.1). The optional `aid=` / `cl=` parameters
-/// other terminals read are ignored — Corta has no use for them, and
-/// unparsed is unexploitable.
+/// Only a bounded exit status is read from the payload (`SECURITY.md` §2.1);
+/// `aid=`/`cl=` are ignored — unparsed is unexploitable.
 extension Performer {
     mutating func shellIntegration(_ payload: ArraySlice<UInt8>) {
-        // The alternate screen is a full-screen application's canvas, not a
-        // command history: a TUI that happens to emit these would leave marks
-        // on rows that vanish when it exits.
+        // Not on the alternate screen: its rows vanish when the TUI exits.
         guard !grid.isAlternateScreenActive, let kind = payload.first else { return }
         switch kind {
         case 0x41:  // 'A' — prompt start
             let row = grid.absoluteRow(ofScreenRow: grid.cursor.row)
             state.promptRow = row
             state.commandExitStatus = nil
-            // Stale until this prompt's own 'B' arrives; a directory
-            // change must not read the *previous* prompt's end column while
-            // this one is still being drawn.
+            // Until this prompt's own 'B', a `cd` must not read the last one's.
             state.promptEndColumn = nil
             grid.setMark(.prompt, atAbsoluteRow: row)
-            // A new command record starts here, keyed by id rather
-            // than this row, which is the only thing that survives the row
-            // scrolling into history and the id it names moving with it.
             state.commandRecords.begin(
                 promptRow: row, workingDirectory: state.workingDirectory,
                 host: state.remoteContext?.host, at: Date())
         case 0x42:  // 'B' — command line starts
-            // The cursor sits exactly here until the user types
-            // something; still true only when 'B' landed on the same row as
-            // 'A' (a wrapped or multi-line prompt makes this an
-            // under-estimate, which is the safe direction — see
-            // `ViewController.canChangeDirectorySafely`).
+            // Only when 'B' is on the same row as 'A'; a multi-line prompt
+            // under-estimates, the safe direction for an app-initiated `cd`.
             if state.promptRow == grid.absoluteRow(ofScreenRow: grid.cursor.row) {
                 state.promptEndColumn = grid.cursor.column
-                // The same column, kept on the record itself so a
-                // command still recorded once it has scrolled off the live
-                // prompt (`ViewController.commandLineText(grid:record:)`)
-                // can still say where its own text started.
                 state.commandRecords.markPromptEnd(column: grid.cursor.column)
             }
         case 0x43:  // 'C' — the command is running, and its output starts here
             state.isCommandRunning = true
-            // The row the shell reaches after echoing the command line, which
-            // is exactly where the output begins. Marked so "the last
-            // command's output" is read rather than guessed at one row past
-            // the prompt — a two-line prompt or a continued command makes
-            // that guess take a row of what the user typed.
             let outputRow = grid.absoluteRow(ofScreenRow: grid.cursor.row)
             state.outputStartRow = outputRow
             state.commandRecords.markOutputStart(outputRow)
-            // Never over a prompt mark: a command that printed nothing leaves
-            // the next prompt on this very row, and the prompt is the one
-            // that matters for jumping.
+            // A command that printed nothing leaves the next prompt here; the
+            // prompt mark wins.
             if grid.line(atAbsoluteRow: outputRow)?.mark.isPrompt != true {
                 grid.setMark(.outputStart, atAbsoluteRow: outputRow)
             }
@@ -106,9 +69,7 @@ extension Performer {
         }
     }
 
-    /// `D` or `D;<status>`. A missing or unparseable status is taken as 0:
-    /// a shell that reports the end of a command without a status is saying
-    /// it finished, and calling that a failure would paint the history red.
+    /// A missing status is 0: "finished", not "failed".
     private static func exitStatus(_ payload: ArraySlice<UInt8>) -> Int {
         guard let separator = payload.firstIndex(of: 0x3B) else { return 0 }  // ';'
         var status = 0
@@ -117,9 +78,6 @@ extension Performer {
             guard byte >= 0x30, byte <= 0x39 else { break }
             sawDigit = true
             status = status * 10 + Int(byte - 0x30)
-            // A status is a byte in every shell that reports one; the bound
-            // is here so a hostile stream cannot spin this loop into a large
-            // integer.
             if status > 255 { return 255 }
         }
         return sawDigit ? status : 0

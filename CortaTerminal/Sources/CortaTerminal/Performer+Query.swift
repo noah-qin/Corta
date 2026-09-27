@@ -14,49 +14,25 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-/// Queries a program waits on: capability and state probes that must be
-/// answered.
-///
-/// A large share of esctest's probes wait for an answer: DECRQM asking
-/// whether a mode is on,
-/// XTVERSION asking who the terminal is, and the query forms of OSC 10/11/12
-/// asking what the default colours are. A probe that times out is not a
-/// harmless omission — tmux and Neovim fall back to their most conservative
-/// behaviour when a capability check goes unanswered (`CONFORMANCE.md` §1.2).
-///
-/// Every response here is a constant or numeric state formatted by this file.
-/// Nothing from the input stream is ever echoed back, which is the rule that
-/// keeps a query from becoming a command-injection vector
-/// (`SECURITY.md` §2.1–§2.2).
+/// Probes a program waits on — DECRQM, XTVERSION, OSC 10/11/12 queries. An
+/// unanswered probe drops tmux and Neovim to their most conservative
+/// behaviour (`CONFORMANCE.md` §1.2). Every answer is a constant or numeric
+/// state; nothing from the stream is echoed (`SECURITY.md` §2.1–§2.2).
 extension Performer {
-    /// XTVERSION — `CSI > Ps q`, answered `DCS > | text ST`.
-    ///
-    /// The name is a compile-time constant, so the answer cannot carry
-    /// stream-supplied bytes. The version itself comes from `CortaVersion`,
-    /// the single place it is written, so the answer cannot go stale when
-    /// `MARKETING_VERSION` moves.
+    /// XTVERSION: a compile-time constant, from `CortaVersion`.
     private static let versionReport = Array(
         "\u{1B}P>|\(CortaVersion.report)\u{1B}\\".utf8)
 
     mutating func reportVersion(_ parameters: Parameters) {
-        // `CSI > 0 q` and `CSI > q` are the same request; any other Ps is a
-        // different sequence and is not ours to answer.
         guard parameters.value(0, default: 0) == 0 else { return }
         state.outputBuffer.append(contentsOf: Self.versionReport)
     }
 
-    /// DECRQM — `CSI Ps $ p` (ANSI modes) and `CSI ? Ps $ p` (DEC private
-    /// modes), answered `CSI Ps ; Pm $ y` and `CSI ? Ps ; Pm $ y`.
-    ///
-    /// `Pm` is DEC's four-state answer: 0 not recognised, 1 set, 2 reset,
-    /// 3 permanently set, 4 permanently reset. Answering 0 for a mode Corta
-    /// does not implement is the honest reply and is what stops the probe
-    /// blocking — silence is the only answer that hurts.
+    /// DECRQM. `Pm`: 0 unknown, 1 set, 2 reset, 3 permanently set, 4
+    /// permanently reset. 0 for an unimplemented mode is honest; silence is the
+    /// only answer that hurts.
     mutating func reportMode(_ parameters: Parameters, isPrivate: Bool) {
-        // DECRQM is a VT300-and-later sequence. A program that announced a
-        // lower conformance level with DECSCL has asked to be talked to as
-        // an older terminal, and answering anyway is the terminal ignoring
-        // what it was told.
+        // VT300+: a program that set a lower level with DECSCL asked not to hear it.
         guard state.conformanceLevel >= 63 else { return }
         let mode = parameters.value(0, default: 0)
         let marker = isPrivate ? "?" : ""
@@ -65,9 +41,8 @@ extension Performer {
             contentsOf: Array("\u{1B}[\(marker)\(mode);\(setting)$y".utf8))
     }
 
-    /// The DECRQM answer for a DEC private mode. Only modes whose state
-    /// Corta actually knows report 1 or 2; everything else is 0, because
-    /// claiming a mode is "reset" implies it could be set.
+    /// Only modes Corta actually tracks answer 1 or 2: "reset" implies it could
+    /// be set.
     private func privateModeSetting(_ mode: Int) -> Int {
         switch mode {
         case 1: return state.applicationCursorKeysEnabled ? 1 : 2
@@ -78,42 +53,20 @@ extension Performer {
         case 2026: return state.synchronizedOutputEnabled ? 1 : 2
         case 1004: return state.focusReportingEnabled ? 1 : 2
         case 45: return grid.reverseWraparoundEnabled ? 1 : 2
-        // `?7` (autowrap) and `?25` (cursor visibility) are permanently on:
-        // the grid always wraps at the right margin and always has a cursor
-        // the app may choose to draw. 3 says so — "set, and cannot be
-        // reset" — rather than pretending they are toggles.
+        // Autowrap and a cursor are always present: permanently set.
         case 7, 25: return 3
         default: return 0
         }
     }
 
-    /// The DECRQM answer for an ANSI mode.
-    ///
-    /// The ECMA-48 modes below are *permanently reset* (4), not unknown:
-    /// they describe hardware a terminal emulator has no analogue of —
-    /// guarded areas, form feeds to a printer, transfer termination — and
-    /// Corta will never implement them. 4 says exactly that, and is what
-    /// xterm answers. It is a stronger and more useful answer than 0: a
-    /// program learns not to ask again.
-    ///
-    /// Of the four ANSI modes a real program touches, two are implemented
-    /// and report their live state, and two never will be and report 4:
-    ///
-    /// - IRM (4) and LNM (20) are implemented (`applyAnsiModes`), so 1 or 2
-    ///   here is a fact about behaviour the terminal actually has.
-    /// - KAM (2) locks the keyboard and SRM (12) turns on local echo. Corta
-    ///   implements neither, on purpose — see `applyAnsiModes` for why — and
-    ///   4 is the honest answer: not "unknown", but "reset, and it will stay
-    ///   reset". A program learns not to ask again, which 0 does not tell it.
-    ///
-    /// Nothing here reports a bit Corta tracks but does not act on. That
-    /// would be a lie a program can lay out a screen against, which is worse
-    /// than admitting a mode is unimplemented.
+    /// IRM and LNM are implemented and report live state. KAM, SRM and the
+    /// hardware-only ECMA-48 modes answer 4 (permanently reset), as xterm does —
+    /// more useful than 0, since a program learns not to ask again. Nothing
+    /// reports a bit Corta tracks but does not act on.
     private func ansiModeSetting(_ mode: Int) -> Int {
         switch mode {
         case 4: return grid.insertMode ? 1 : 2
         case 20: return state.newLineModeEnabled ? 1 : 2
-        // KAM and SRM: permanently reset, deliberately.
         case 2, 12: return 4
         // GATM, SRTM, VEM, HEM, PUM, FEAM, FETM, MATM, TTM, SATM, TSM, EBM.
         case 1, 5, 7, 10, 11, 13, 14, 15, 16, 17, 18, 19: return 4
@@ -121,12 +74,7 @@ extension Performer {
         }
     }
 
-    /// The query form of OSC 10/11/12 — `OSC Ps ; ? ST`, answered
-    /// `OSC Ps ; rgb:RRRR/GGGG/BBBB ST`.
-    ///
-    /// xterm reports 16 bits per channel. Corta stores 8, so each byte is
-    /// doubled — `0x23` becomes `2323` — which is exactly how xterm widens
-    /// an 8-bit source too.
+    /// OSC 10/11/12 query: each 8-bit byte doubled to 16 bits, as xterm widens.
     mutating func reportDynamicColor(_ code: Int) {
         let color: (red: UInt8, green: UInt8, blue: UInt8)
         switch code {
@@ -144,12 +92,7 @@ extension Performer {
         state.outputBuffer.append(contentsOf: Array("\u{1B}]\(code);\(body)\u{1B}\\".utf8))
     }
 
-    /// The set form of OSC 10/11/12 — `OSC Ps ; spec ST`.
-    ///
-    /// Only the two specifications xterm defines are parsed: `#RRGGBB` and
-    /// `rgb:R/G/B` with 1–4 hex digits per channel, scaled down to 8 bits.
-    /// Anything else leaves the colour alone; a malformed spec must not
-    /// half-apply.
+    /// OSC 10/11/12 set; a malformed spec leaves the colour alone.
     mutating func setDynamicColor(_ code: Int, specification: ArraySlice<UInt8>) {
         guard let color = Self.parseColorSpecification(specification) else { return }
         switch code {
@@ -160,41 +103,17 @@ extension Performer {
         }
     }
 
-    /// The X11 colour specifications Corta accepts, and the ones it
-    /// deliberately refuses.
-    ///
-    /// **Accepted.** `#RGB` through `#RRRRGGGGBBBB`, and `rgb:R/G/B` with one
-    /// to four hex digits per channel. Between them these are what every
-    /// program that sets a colour actually sends.
-    ///
-    /// **Refused, on purpose.** X11 also defines `rgbi:` (floating-point
-    /// intensities) and four device-independent spaces — `CIELab:`,
-    /// `CIEuvY:`, `CIExyY:`, `CIEXYZ:` and `TekHVC:`. Corta returns nil for
-    /// all of them and leaves the colour unchanged, which the caller treats
-    /// as "the sequence did nothing" (`setDynamicColor`).
-    ///
-    /// That is a decision, not an omission. Each of those is a colour-space
-    /// conversion, not a parse: `CIELab` needs a white point and a gamma
-    /// curve, and the answer depends on the display's profile — so an
-    /// implementation is either colour-managed properly or it is a wrong
-    /// number dressed as a right one. The esctest cases covering them are
-    /// recorded as expected failures for exactly this reason
-    /// (`docs/history/ROADMAP-0.1.md`, `docs/CONFORMANCE.md` §3). Refusing is also the
-    /// safe direction: a program that sets a background it cannot verify and
-    /// gets no change is a program whose text stays legible, whereas a
-    /// mis-converted `CIELab` black-on-black is a terminal you cannot read.
-    ///
-    /// `rgbi:` is refused with the same reasoning and less regret — it is a
-    /// second syntax for something `rgb:` already expresses exactly, and no
-    /// program has been observed to send it.
+    /// Accepts `#RGB`…`#RRRRGGGGBBBB` and `rgb:R/G/B` (1–4 hex digits) — what
+    /// programs send. Refuses `rgbi:` and the device-independent spaces
+    /// (`CIELab:` …): each is a colour-managed conversion, and a wrong one is
+    /// unreadable black-on-black where refusing leaves text legible. esctest's
+    /// cases for them are expected failures (`CONFORMANCE.md` §3).
     static func parseColorSpecification(_ bytes: ArraySlice<UInt8>)
         -> (red: UInt8, green: UInt8, blue: UInt8)?
     {
         let text = String(decoding: bytes, as: UTF8.self)
         if text.hasPrefix("#") {
             let digits = Array(text.dropFirst())
-            // #RGB, #RRGGBB, #RRRGGGBBB and #RRRRGGGGBBBB are all legal;
-            // every one divides evenly into three channels.
             guard digits.count % 3 == 0, !digits.isEmpty else { return nil }
             let width = digits.count / 3
             guard width <= 4 else { return nil }
@@ -206,9 +125,7 @@ extension Performer {
             }
             return (channels[0], channels[1], channels[2])
         }
-        // `rgb:` and nothing else. `rgbi:` shares the prefix, so the colon
-        // has to be matched exactly or an intensity triple would be read as
-        // hex and produce a colour nobody asked for.
+        // Match the colon: `rgbi:` shares the prefix.
         guard text.hasPrefix("rgb:") else { return nil }
         let parts = text.dropFirst(4).split(separator: "/", omittingEmptySubsequences: false)
         guard parts.count == 3 else { return nil }
@@ -224,36 +141,19 @@ extension Performer {
 
     // MARK: - OSC 4 / 104 — the indexed palette
 
-    /// OSC 4 — `OSC 4 ; c ; spec ; c ; spec ; … ST`. Every `c ; spec` pair is
-    /// independent: `spec` of exactly `?` queries index `c`'s current
-    /// colour (answered `OSC 4 ; c ; rgb:RRRR/GGGG/BBBB ST`, doubled to 16
-    /// bits per channel exactly like OSC 10/11/12's query — see
-    /// `reportDynamicColor`), anything else sets it through the same
-    /// colour-spec parser and policy `setDynamicColor` uses. A malformed
-    /// pair is skipped, not treated as ending the sequence, so one bad
-    /// index in a long OSC 4 does not swallow the indices after it — this
-    /// mirrors xterm's own tolerance for multi-pair OSC 4/104.
-    ///
-    /// The query reply is the terminal's own numeric palette state, nothing
-    /// the stream supplied (`SECURITY.md` §2.1–§2.2), the identical
-    /// reasoning `reportDynamicColor`'s doc comment already gives for
-    /// OSC 10/11/12.
+    /// OSC 4: each `c ; spec` pair independent — `?` queries (16-bit, like
+    /// OSC 10/11/12), anything else sets. A malformed pair is skipped, not the
+    /// rest of the sequence, as xterm does.
     mutating func handleIndexedColor(_ payload: ArraySlice<UInt8>) {
         var start = payload.startIndex
         while start < payload.endIndex {
-            // No `;` left at all means no `spec` for whatever token remains,
-            // malformed or not — nothing left to apply, so this is the one
-            // case that actually ends the scan rather than just skipping a
-            // pair.
+            // No `;` left: nothing more to apply.
             guard let firstSeparator = payload[start...].firstIndex(of: 0x3B) else { return }
             let specStart = payload.index(after: firstSeparator)
             let specEnd = payload[specStart...].firstIndex(of: 0x3B) ?? payload.endIndex
             defer {
                 start = specEnd < payload.endIndex ? payload.index(after: specEnd) : payload.endIndex
             }
-            // A malformed or out-of-range index (e.g. `256`) skips only this
-            // pair — xterm's own tolerance for multi-pair OSC 4/104, and
-            // what the doc comment above already promises.
             guard let index = Self.parseByte(payload[start..<firstSeparator]) else { continue }
             let spec = payload[specStart..<specEnd]
             if spec.count == 1, spec.first == 0x3F {
@@ -264,9 +164,7 @@ extension Performer {
         }
     }
 
-    /// OSC 104 — `OSC 104 ST` resets every override; `OSC 104 ; c ; c ; … ST`
-    /// resets only the named indices. Never answers anything — a reset is a
-    /// command, not a query.
+    /// OSC 104: all overrides, or the named indices. Never answers.
     mutating func resetIndexedColors(_ payload: ArraySlice<UInt8>) {
         guard !payload.isEmpty else {
             state.indexedPalette.resetAllOverrides()
@@ -295,14 +193,8 @@ extension Performer {
 
     // MARK: - OSC 5 / 105 — the special colours
 
-    /// OSC 5 — `OSC 5 ; c ; spec ; c ; spec ; … ST`, the same wire shape as
-    /// OSC 4 (`handleIndexedColor`) but addressing `SpecialColors`'
-    /// five fixed slots (0–4) instead of a 256-entry palette, and with a
-    /// black fallback for the query form's reply when a slot was never
-    /// set — there being no themed default to answer instead, see
-    /// `SpecialColors`'s own doc comment, and OSC 4/10/11/12 already
-    /// establish that a query always gets *some* numeric answer here
-    /// rather than the silence a probing client would otherwise wait on.
+    /// OSC 5: OSC 4's shape over five slots. An unset slot queries as black —
+    /// a query always gets a numeric answer.
     mutating func handleSpecialColor(_ payload: ArraySlice<UInt8>) {
         var start = payload.startIndex
         while start < payload.endIndex {
@@ -324,8 +216,6 @@ extension Performer {
         }
     }
 
-    /// OSC 105 — `OSC 105 ST` resets every special colour;
-    /// `OSC 105 ; c ; c ; … ST` resets only the named slots.
     mutating func resetSpecialColors(_ payload: ArraySlice<UInt8>) {
         guard !payload.isEmpty else {
             state.specialColors.resetAllOverrides()
@@ -353,10 +243,6 @@ extension Performer {
             contentsOf: Array("\u{1B}]5;\(slot.rawValue);\(body)\u{1B}\\".utf8))
     }
 
-    /// A decimal `Pc` in OSC 5/105's 0–4 range. `nil` for anything else,
-    /// including an out-of-range value — `parseByte` already guards
-    /// digit-accumulation overflow the same way, so this only adds the
-    /// narrower bound and the `Slot` conversion.
     private static func parseSpecialColorSlot(_ bytes: ArraySlice<UInt8>) -> SpecialColors.Slot? {
         guard let byte = parseByte(bytes), let slot = SpecialColors.Slot(rawValue: byte) else {
             return nil
@@ -364,12 +250,8 @@ extension Performer {
         return slot
     }
 
-    /// A decimal palette index, 0–255. `nil` for anything out of range or
-    /// not purely digits, including an arbitrarily long run of digits — the
-    /// bound is checked *before* each multiply-and-add, not after, so
-    /// `value` itself never exceeds 255 and a payload with hundreds of
-    /// digits (the parser allows up to `Parser.maxStringLength` bytes)
-    /// cannot walk `value` past what fits before the check catches it.
+    /// Bounded before each multiply-add, so hundreds of digits cannot grow
+    /// `value` past 255.
     private static func parseByte(_ bytes: ArraySlice<UInt8>) -> UInt8? {
         guard !bytes.isEmpty else { return nil }
         var value = 0
@@ -382,9 +264,7 @@ extension Performer {
         return UInt8(value)
     }
 
-    /// Scales an n-hex-digit channel down to 8 bits the way xterm does:
-    /// by the ratio of the two full-scale values, so `f` and `ffff` both
-    /// become 255.
+    /// As xterm: `f` and `ffff` both become 255.
     private static func scaleToByte(_ value: UInt32, hexDigits: Int) -> UInt8 {
         let maximum = (UInt32(1) << (4 * UInt32(hexDigits))) - 1
         guard maximum > 0 else { return 0 }
@@ -393,41 +273,29 @@ extension Performer {
 
     // MARK: - Kitty keyboard protocol
 
-    /// `CSI ? u` — report the flags in force, as `CSI ? flags u`.
-    ///
-    /// Reporting only the flags Corta honours is the point: a program that
-    /// asks for event reporting and is told it got it would encode key
+    /// Only honoured flags: a program told it has event reporting would encode
     /// releases nobody sends.
     mutating func reportKeyboardProtocol() {
         let flags = state.keyboardProtocol.current.rawValue
         state.outputBuffer.append(contentsOf: Array("\u{1B}[?\(flags)u".utf8))
     }
 
-    /// `CSI > flags u` — push a new level onto the mode stack.
     mutating func pushKeyboardProtocol(_ parameters: Parameters) {
         state.keyboardProtocol.push(
             KeyboardEnhancementFlags(rawValue: UInt8(min(255, parameters.value(0, default: 0)))))
     }
 
-    /// `CSI < number u` — pop `number` levels, default one.
     mutating func popKeyboardProtocol(_ parameters: Parameters) {
         state.keyboardProtocol.pop(parameters.value(0, default: 1))
     }
 
-    /// `CSI = flags ; mode u` — set, add or remove flags at the current
-    /// level.
     mutating func setKeyboardProtocol(_ parameters: Parameters) {
         state.keyboardProtocol.set(
             KeyboardEnhancementFlags(rawValue: UInt8(min(255, parameters.value(0, default: 0)))),
             mode: parameters.value(1, default: 1))
     }
 
-    /// DECSCL — `CSI Ps ; Ps " p`. Sets the conformance level the terminal
-    /// answers at; see `PerformerState.conformanceLevel`.
-    ///
-    /// The second parameter (7-bit versus 8-bit controls) is ignored: Corta
-    /// emits 7-bit control sequences unconditionally, which is legal at
-    /// every level and is what every modern terminal does.
+    /// DECSCL. The 7/8-bit parameter is ignored: Corta always emits 7-bit.
     mutating func setConformanceLevel(_ parameters: Parameters) {
         let level = parameters.value(0, default: 65)
         guard (61...65).contains(level) else { return }

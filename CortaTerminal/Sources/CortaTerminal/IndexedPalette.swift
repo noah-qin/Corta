@@ -14,38 +14,18 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-/// The 256-entry indexed palette OSC 4 reports and sets, and OSC 104
-/// resets — the per-session overrides on top of a themed default.
-/// OSC 5 ("special colours") is a separate interface with its own type,
-/// `SpecialColors`; this type does not carry it despite the similar name.
-///
-/// `defaults` is seeded by the app the same way `DynamicColors` is: ANSI
-/// 0–15 from the active theme, 16–255 from xterm's fixed 6×6×6 colour cube
-/// and 24-step greyscale ramp (`Theme.Variant.indexedPaletteDefaults`,
-/// `Corta/Renderer/TerminalColorPalette.swift`'s render-side copy of the
-/// same formula — not themed, because xterm defines those numerically and a
-/// program asking for colour 137 means one specific colour under every
-/// theme). `overrides` is the sparse set of indices OSC 4 has actually
-/// changed; OSC 104 clears one, several, or (with no arguments) all of them.
+/// OSC 4/104's palette: sparse `overrides` over themed `defaults` — ANSI
+/// 0–15 from the theme, 16–255 xterm's fixed cube and ramp, since colour 137
+/// means one colour under every theme. OSC 5 is `SpecialColors`.
 public struct IndexedPalette: Sendable, Equatable {
-    // `private(set)`: the 256-entry invariant is checked wherever `defaults`
-    // can change — `init` and `updateDefaults` both `precondition` it — and
-    // `color(at:)` indexes this array with every `UInt8`, so a freely
-    // mutable public property would let a caller shrink it from outside
-    // either check and turn the next OSC 4 query into an out-of-bounds trap.
+    // Private setter: `color(at:)` indexes with any `UInt8`, so a shrunk array
+    // would trap on the next query.
     public private(set) var defaults: [(red: UInt8, green: UInt8, blue: UInt8)]
     public internal(set) var overrides: [UInt8: (red: UInt8, green: UInt8, blue: UInt8)] = [:]
 
-    /// Bumped by every `overrides` mutation (never by `updateDefaults`,
-    /// which is a theme reseed the render path already invalidates on its
-    /// own — `ViewController.appearanceChanged`). The render cache
-    /// (`TerminalRenderer.updateInstances`) compares this once a frame,
-    /// the same shape `GlyphAtlas.generation`/`ScreenLines.generation`
-    /// already use, because `overrides` changing is invisible to the
-    /// per-cell content revision a damage check otherwise relies on: an
-    /// `OSC 4` override changes what index 1 *resolves to*, not what any
-    /// `Cell` stores, so nothing about the grid's own revision tracking
-    /// would ever notice on its own.
+    /// An override changes what an index resolves to, not any `Cell`, so cell
+    /// revisions never see it; the renderer compares this instead. A theme
+    /// reseed invalidates on its own path.
     public private(set) var overridesGeneration: UInt64 = 0
 
     public init(defaults: [(red: UInt8, green: UInt8, blue: UInt8)] = IndexedPalette.xtermDefaults()) {
@@ -53,8 +33,6 @@ public struct IndexedPalette: Sendable, Equatable {
         self.defaults = defaults
     }
 
-    /// The effective colour for `index`: the OSC 4 override if one is set,
-    /// otherwise the default.
     public func color(at index: UInt8) -> (red: UInt8, green: UInt8, blue: UInt8) {
         overrides[index] ?? defaults[Int(index)]
     }
@@ -64,13 +42,8 @@ public struct IndexedPalette: Sendable, Equatable {
         overridesGeneration &+= 1
     }
 
-    /// Replaces `defaults` in place, keeping `overrides` untouched — for a
-    /// live theme switch, which reseeds what an *unoverridden*
-    /// index answers without discarding OSC 4 state a program already set,
-    /// the same way `dynamicColors` reseeding never touches OSC 52 state.
-    /// Assigning a whole new `IndexedPalette` (RIS, initial session setup)
-    /// is the "start over" case this is not: `resetAllOverrides` is what
-    /// terminal state itself provides for that.
+    /// For a live theme switch: a program's overrides survive. RIS assigns a
+    /// whole new palette instead.
     public mutating func updateDefaults(
         to newDefaults: [(red: UInt8, green: UInt8, blue: UInt8)]
     ) {
@@ -78,7 +51,6 @@ public struct IndexedPalette: Sendable, Equatable {
         defaults = newDefaults
     }
 
-    /// OSC 104 with no arguments — every index reverts to its default.
     mutating func resetAllOverrides() {
         guard !overrides.isEmpty else { return }
         overrides.removeAll()
@@ -91,14 +63,8 @@ public struct IndexedPalette: Sendable, Equatable {
         overridesGeneration &+= 1
     }
 
-    /// xterm's fixed values for indices 16–255: the 6×6×6 colour cube, then
-    /// the 24-step greyscale ramp. Indices 0–15 are placeholder black here —
-    /// the app overwrites them immediately with its theme's ANSI colours
-    /// (`Theme.Variant.indexedPaletteDefaults`), the same split
-    /// `TerminalColorPalette.swift`'s `resolve(_:)` makes on the render
-    /// side. `public`, not `private` or `internal`: `Theme.Variant
-    /// .indexedPaletteDefaults`, in the separate `Corta` app target, starts
-    /// from this array and only replaces the first sixteen entries.
+    /// 0–15 are placeholders the app replaces with the theme's colours. Public
+    /// for the app target's `Theme.Variant.indexedPaletteDefaults`.
     public static func xtermDefaults() -> [(red: UInt8, green: UInt8, blue: UInt8)] {
         var values: [(red: UInt8, green: UInt8, blue: UInt8)] = Array(
             repeating: (0, 0, 0), count: 256)
