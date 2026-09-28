@@ -142,7 +142,9 @@ public struct ImagePlacementTable: Sendable {
 
     /// `ED 2`: deletes every placement that reaches the visible screen —
     /// kitty's `grman_clear` rule, `start_row + rows > 0` — and keeps the
-    /// ones wholly in scrollback, and every image's bytes. A placement's rows
+    /// ones wholly in scrollback. Then, as kitty's `filter_refs` does with
+    /// `free_images`, frees every image left with no placement, including
+    /// one transmitted with `a=t` and never placed. A placement's rows
     /// are `r=`, else its pixel height over `cellPixelHeight`; unknown, one
     /// anchored on screen goes and one anchored in history stays.
     mutating func removePlacementsReachingScreen(scrollbackTotal: Int, cellPixelHeight: Int) {
@@ -156,6 +158,7 @@ public struct ImagePlacementTable: Sendable {
             return top + rows > 0
         }.map(\.id)
         remove(Set(toRemove))
+        freeUnplacedImages()
     }
 
     /// `ED 3` and Clear History: deletes the placements wholly in the
@@ -163,7 +166,8 @@ public struct ImagePlacementTable: Sendable {
     /// screen — the screen's text stays, so the part of an image drawn among
     /// it stays too (its rows are counted from `totalPushed`, which discarding
     /// history does not reset). Anchored in history with no known height, it
-    /// goes: there is no telling it reaches the screen.
+    /// goes: there is no telling it reaches the screen. Images left with no
+    /// placement are freed, as for `ED 2`.
     mutating func removePlacementsWhollyInScrollback(scrollbackTotal: Int, cellPixelHeight: Int) {
         let toRemove = placements.values.filter { placement in
             let top = ScrollbackCoordinates.reanchoredRow(
@@ -175,6 +179,23 @@ public struct ImagePlacementTable: Sendable {
             return top + rows <= 0
         }.map(\.id)
         remove(Set(toRemove))
+        freeUnplacedImages()
+    }
+
+    /// Frees the bytes of every image no placement shows. Kept, a session that
+    /// runs `kitten icat` and `clear` in turn would fill the byte budget with
+    /// pictures nothing can see and refuse the next one.
+    private mutating func freeUnplacedImages() {
+        let placed = Set(placements.values.map(\.imageID))
+        let unplaced = images.keys.filter { !placed.contains($0) }
+        guard !unplaced.isEmpty else { return }
+        for id in unplaced {
+            if let removed = images.removeValue(forKey: id) {
+                storedImageBytes -= removed.bytes.count
+            }
+            storeGenerations[id] = nil
+        }
+        revision &+= 1
     }
 
     private func rowCount(of placement: KittyGraphics.Placement, cellPixelHeight: Int) -> Int? {

@@ -69,7 +69,9 @@ what to edit.
   icat`) drawn over the empty screen; now, as in kitty, an image that
   reaches the visible screen is removed with it, while one scrolled wholly
   into history stays, and clearing the scrollback removes the images there
-  (#161).
+  (#161). As in kitty, an image nothing shows any more is freed with it, so
+  drawing and clearing images over and over no longer fills the pane's
+  image memory until new ones are refused.
 
 - A pane that could not start — its failure message showing — no longer
   takes the whole app down when the font size changes (⌘=, ⌘-, or the
