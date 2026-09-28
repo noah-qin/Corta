@@ -94,7 +94,7 @@ if [ "$mode" = "--manual" ]; then
   echo "waits up to five minutes for it."
   deadline=$((SECONDS + 300))
 else
-  echo "posting 320 keystrokes at 150 ms spacing (synthetic: HID stage excluded)"
+  echo "posting 320 keystrokes about 150 ms apart (synthetic: HID stage excluded)"
   # A digit, not a letter: a CJK input method composes letters and sends
   # nothing to the shell until a candidate is chosen, but passes digits
   # straight through. Which key it is does not otherwise matter.
@@ -104,19 +104,28 @@ else
   # yields one sample, and the ring only prints when it is full — 230 left
   # it short on a login shell whose prompt redraws around each echo.
   # Stops if anything else comes to the front mid-run, rather than typing
-  # into it.
-  osascript - "$app_pid" >/dev/null <<'APPLESCRIPT'
+  # into it, and says how many it sent. The check before each key adds its
+  # own few milliseconds to the spacing, which is why it is "about".
+  sent=$(osascript - "$app_pid" <<'APPLESCRIPT'
 on run argv
   set target to (item 1 of argv) as integer
+  set sent to 0
   tell application "System Events"
     repeat 320 times
       if (unix id of (first process whose frontmost is true)) is not target then exit repeat
       key code 18 -- "1"
+      set sent to sent + 1
       delay 0.15
     end repeat
   end tell
+  return sent
 end run
 APPLESCRIPT
+)
+  if [ "$sent" != 320 ]; then
+    echo "error: another app came to the front after $sent keystrokes; typing stopped" >&2
+    exit 1
+  fi
   deadline=$((SECONDS + 30))
 fi
 

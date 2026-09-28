@@ -584,8 +584,8 @@ permission asked:
 `CORTA_RENDER_METRICS=1` turns it on; 200 samples print one line on the
 unified log (`keypressToPresent: n=200 avg=… p50=… p95=… p99=… max=…`),
 and `scripts/measure-keypress-latency.sh` launches, drives 320 synthetic
-keystrokes (or, with `--manual`, waits while a person types) and reads
-the line back. Two kinds of number come out of it, and a quoted figure
+keystrokes about 150 ms apart (or, with `--manual`, waits while a person
+types) and reads the line back. Two kinds of number come out of it, and a quoted figure
 says which:
 
 | Kind | Includes | Comparable to |
