@@ -69,6 +69,14 @@ what to edit.
   notification's quiet period is now measured from the last output
   itself, so it stays right for a window that is hidden and not drawing.
 
+- Redrawing the screen costs less CPU. Text glyphs are looked up by index
+  rather than by hash, block elements (progress bars, shades, quadrants)
+  no longer allocate per cell — a screen of them went from 10,555 heap
+  allocations a frame to none beyond the frame's own — and a redraw that
+  changes every row, as a full-screen program does, is spliced into the
+  instance buffer in one pass instead of one per row. A full redraw of a
+  120×40 screen takes 0.12 ms of CPU, down from 0.17–0.34 ms.
+
 ### Fixed
 
 - Clearing the screen now clears its images. `clear`, zsh's ⌃L and Clear

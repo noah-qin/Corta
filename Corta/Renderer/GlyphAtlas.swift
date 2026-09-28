@@ -276,11 +276,15 @@ nonisolated final class GlyphAtlas {
         return (fonts, synthetic)
     }
 
-    /// ASCII fast path — see the type comment. `scalar` is below 0x80.
+    /// ASCII fast path — see the type comment. The renderer passes only
+    /// ASCII, looked up by index; anything else keeps a dictionary entry.
     func glyph(forASCII scalar: UInt32, style: Style) -> GlyphInfo? {
-        assert(scalar < 0x80, "not ASCII: \(scalar)")
-        let index = Int(style.rawValue) << 7 | Int(scalar & 0x7F)
-        if let cached = asciiPage.asciiTable[index] { return cached }
+        let index = scalar < 0x80 ? Int(style.rawValue) << 7 | Int(scalar) : nil
+        if let index {
+            if let cached = asciiPage.asciiTable[index] { return cached }
+        } else if let cached = asciiPage.cache[GlyphKey(scalar: scalar, style: style)] {
+            return cached
+        }
         var utf16 = [UniChar(scalar)]
         var glyphs: [CGGlyph] = [0]
         let f = fonts[Int(style.rawValue)]
@@ -290,14 +294,22 @@ nonisolated final class GlyphAtlas {
             // Unmapped by the primary face, and the fast path has no cascade:
             // cache a missing glyph, never nil, which would draw nothing.
             let missing = GlyphInfo(uvRect: .zero, size: .zero, bearing: .zero, isMissing: true)
-            asciiPage.asciiTable[index] = missing
+            store(missing, forASCII: scalar, style: style, at: index)
             return missing
         }
         let info = rasterize(
             [(glyphs: glyphs, positions: [CGPoint.zero], font: f, isColor: false, ctRun: nil, ctLine: nil)],
             style: style, page: asciiPage)
-        asciiPage.asciiTable[index] = info
+        store(info, forASCII: scalar, style: style, at: index)
         return info
+    }
+
+    private func store(_ info: GlyphInfo, forASCII scalar: UInt32, style: Style, at index: Int?) {
+        if let index {
+            asciiPage.asciiTable[index] = info
+        } else {
+            asciiPage.cache[GlyphKey(scalar: scalar, style: style)] = info
+        }
     }
 
     /// Non-ASCII single scalars, shaped once per key.
