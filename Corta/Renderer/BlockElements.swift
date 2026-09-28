@@ -31,40 +31,59 @@ nonisolated enum BlockElements {
         var alpha: Float
     }
 
-    /// Nil for a scalar that isn't a block element.
-    static func pieces(for scalar: UInt32) -> [Piece]? {
-        func solid(_ x: Float, _ y: Float, _ w: Float, _ h: Float, _ a: Float = 1) -> [Piece] {
-            [Piece(rect: SIMD4<Float>(x, y, w, h), alpha: a)]
+    /// Up to three pieces, stored inline: a block element on every cell of
+    /// a progress bar must not allocate an array per cell per rebuild.
+    struct Pieces: RandomAccessCollection {
+        private var storage = InlineArray<3, Piece>(repeating: Piece(rect: .zero, alpha: 0))
+        private(set) var endIndex = 0
+
+        var startIndex: Int { 0 }
+
+        subscript(position: Int) -> Piece { storage[position] }
+
+        fileprivate init() {}
+
+        fileprivate init(_ x: Float, _ y: Float, _ w: Float, _ h: Float, _ a: Float = 1) {
+            append(x, y, w, h, a)
         }
+
+        fileprivate mutating func append(
+            _ x: Float, _ y: Float, _ w: Float, _ h: Float, _ a: Float = 1
+        ) {
+            storage[endIndex] = Piece(rect: SIMD4<Float>(x, y, w, h), alpha: a)
+            endIndex += 1
+        }
+    }
+
+    /// Nil for a scalar that isn't a block element.
+    static func pieces(for scalar: UInt32) -> Pieces? {
         switch scalar {
-        case 0x2580: return solid(0, 0, 1, 0.5)            // ▀ upper half
-        case 0x2581...0x2587:                              // ▁▂▃▄▅▆▇ lower eighths
+        case 0x2580: return Pieces(0, 0, 1, 0.5)            // ▀ upper half
+        case 0x2581...0x2587:                               // ▁▂▃▄▅▆▇ lower eighths
             let eighths = Float(scalar - 0x2580)
             let h = eighths / 8
-            return solid(0, 1 - h, 1, h)
-        case 0x2588: return solid(0, 0, 1, 1)              // █ full
-        case 0x2589...0x258F:                              // ▉▊▋▌▍▎▏ left eighths
+            return Pieces(0, 1 - h, 1, h)
+        case 0x2588: return Pieces(0, 0, 1, 1)              // █ full
+        case 0x2589...0x258F:                               // ▉▊▋▌▍▎▏ left eighths
             let w = Float(0x2590 - scalar) / 8
-            return solid(0, 0, w, 1)
-        case 0x2590: return solid(0.5, 0, 0.5, 1)          // ▐ right half
-        case 0x2591: return solid(0, 0, 1, 1, 0.25)        // ░ light shade
-        case 0x2592: return solid(0, 0, 1, 1, 0.5)         // ▒ medium shade
-        case 0x2593: return solid(0, 0, 1, 1, 0.75)        // ▓ dark shade
-        case 0x2594: return solid(0, 0, 1, 0.125)          // ▔ upper eighth
-        case 0x2595: return solid(0.875, 0, 0.125, 1)      // ▕ right eighth
-        case 0x2596...0x259F:                              // quadrants
+            return Pieces(0, 0, w, 1)
+        case 0x2590: return Pieces(0.5, 0, 0.5, 1)          // ▐ right half
+        case 0x2591: return Pieces(0, 0, 1, 1, 0.25)        // ░ light shade
+        case 0x2592: return Pieces(0, 0, 1, 1, 0.5)         // ▒ medium shade
+        case 0x2593: return Pieces(0, 0, 1, 1, 0.75)        // ▓ dark shade
+        case 0x2594: return Pieces(0, 0, 1, 0.125)          // ▔ upper eighth
+        case 0x2595: return Pieces(0.875, 0, 0.125, 1)      // ▕ right eighth
+        case 0x2596...0x259F:                               // quadrants
             // Bit per quadrant: 1 = upper left, 2 = upper right,
-            // 4 = lower left, 8 = lower right.
-            let masks: [UInt8] = [
-                0b0100, 0b1000, 0b0001, 0b1101, 0b1001, 0b0111, 0b1011, 0b0010,
-                0b0110, 0b1110,
-            ]
-            let mask = masks[Int(scalar - 0x2596)]
-            var out: [Piece] = []
-            if mask & 0b0001 != 0 { out += solid(0, 0, 0.5, 0.5) }
-            if mask & 0b0010 != 0 { out += solid(0.5, 0, 0.5, 0.5) }
-            if mask & 0b0100 != 0 { out += solid(0, 0.5, 0.5, 0.5) }
-            if mask & 0b1000 != 0 { out += solid(0.5, 0.5, 0.5, 0.5) }
+            // 4 = lower left, 8 = lower right; four bits per scalar, from
+            // U+2596 in the low nibble.
+            let masks: UInt64 = 0xE6_2B79_D184
+            let mask = UInt8(truncatingIfNeeded: masks >> (4 * UInt64(scalar - 0x2596))) & 0xF
+            var out = Pieces()
+            if mask & 0b0001 != 0 { out.append(0, 0, 0.5, 0.5) }
+            if mask & 0b0010 != 0 { out.append(0.5, 0, 0.5, 0.5) }
+            if mask & 0b0100 != 0 { out.append(0, 0.5, 0.5, 0.5) }
+            if mask & 0b1000 != 0 { out.append(0.5, 0.5, 0.5, 0.5) }
             return out
         default: return nil
         }
