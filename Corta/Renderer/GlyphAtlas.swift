@@ -106,6 +106,9 @@ nonisolated final class GlyphAtlas {
         let regionSize: (width: Int, height: Int)
         var cache: [GlyphKey: GlyphInfo] = [:]
         var clusterCache: [ClusterKey: GlyphInfo] = [:]
+        /// The ASCII page's cache, indexed by `(style << 7) | scalar`: the
+        /// per-cell lookup is an index, not a hash. Empty on other pages.
+        var asciiTable: ContiguousArray<GlyphInfo?>
         private var nextOrigin: (x: Int, y: Int)
         private var rowHeight: Int
 
@@ -114,6 +117,7 @@ nonisolated final class GlyphAtlas {
         init(regionOrigin: (x: Int, y: Int), regionSize: (width: Int, height: Int), reservedFirstRow: Bool) {
             self.regionOrigin = regionOrigin
             self.regionSize = regionSize
+            self.asciiTable = reservedFirstRow ? ContiguousArray(repeating: nil, count: 4 << 7) : []
             self.nextOrigin = reservedFirstRow ? (regionOrigin.x, regionOrigin.y + 1) : regionOrigin
             self.rowHeight = reservedFirstRow ? 1 : 0
         }
@@ -134,6 +138,7 @@ nonisolated final class GlyphAtlas {
         func evict(reservedFirstRow: Bool) {
             cache.removeAll(keepingCapacity: true)
             clusterCache.removeAll(keepingCapacity: true)
+            for index in asciiTable.indices { asciiTable[index] = nil }
             nextOrigin = reservedFirstRow ? (regionOrigin.x, regionOrigin.y + 1) : regionOrigin
             rowHeight = reservedFirstRow ? 1 : 0
         }
@@ -271,10 +276,15 @@ nonisolated final class GlyphAtlas {
         return (fonts, synthetic)
     }
 
-    /// ASCII fast path — see the type comment.
+    /// ASCII fast path — see the type comment. The renderer passes only
+    /// ASCII, looked up by index; anything else keeps a dictionary entry.
     func glyph(forASCII scalar: UInt32, style: Style) -> GlyphInfo? {
-        let key = GlyphKey(scalar: scalar, style: style)
-        if let cached = asciiPage.cache[key] { return cached }
+        let index = scalar < 0x80 ? Int(style.rawValue) << 7 | Int(scalar) : nil
+        if let index {
+            if let cached = asciiPage.asciiTable[index] { return cached }
+        } else if let cached = asciiPage.cache[GlyphKey(scalar: scalar, style: style)] {
+            return cached
+        }
         var utf16 = [UniChar(scalar)]
         var glyphs: [CGGlyph] = [0]
         let f = fonts[Int(style.rawValue)]
@@ -284,14 +294,22 @@ nonisolated final class GlyphAtlas {
             // Unmapped by the primary face, and the fast path has no cascade:
             // cache a missing glyph, never nil, which would draw nothing.
             let missing = GlyphInfo(uvRect: .zero, size: .zero, bearing: .zero, isMissing: true)
-            asciiPage.cache[key] = missing
+            store(missing, forASCII: scalar, style: style, at: index)
             return missing
         }
         let info = rasterize(
             [(glyphs: glyphs, positions: [CGPoint.zero], font: f, isColor: false, ctRun: nil, ctLine: nil)],
             style: style, page: asciiPage)
-        asciiPage.cache[key] = info
+        store(info, forASCII: scalar, style: style, at: index)
         return info
+    }
+
+    private func store(_ info: GlyphInfo, forASCII scalar: UInt32, style: Style, at index: Int?) {
+        if let index {
+            asciiPage.asciiTable[index] = info
+        } else {
+            asciiPage.cache[GlyphKey(scalar: scalar, style: style)] = info
+        }
     }
 
     /// Non-ASCII single scalars, shaped once per key.
@@ -305,19 +323,6 @@ nonisolated final class GlyphAtlas {
         if shaped.runs.isEmpty, shaped.sawNotdef { info.isMissing = true }
         shapedPage.cache[key] = info
         return info
-    }
-
-    // Regular-or-bold overloads for callers that don't need italics.
-    func glyph(forASCII scalar: UInt32, bold: Bool) -> GlyphInfo? {
-        glyph(forASCII: scalar, style: Style(bold: bold, italic: false))
-    }
-
-    func glyph(shaping scalar: UInt32, bold: Bool) -> GlyphInfo? {
-        glyph(shaping: scalar, style: Style(bold: bold, italic: false))
-    }
-
-    func glyph(forCluster scalars: [UInt32], bold: Bool) -> GlyphInfo? {
-        glyph(forCluster: scalars, style: Style(bold: bold, italic: false))
     }
 
     /// Shapes the whole cluster as one string, so ZWJ sequences and combining

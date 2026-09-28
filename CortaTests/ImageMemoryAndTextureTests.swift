@@ -122,7 +122,7 @@ import Testing
         #expect(atlas.isDegraded)
         #expect(atlas.atlasPixelSize == 512)
         // Degraded, not dead: glyphs still rasterise and cache.
-        let glyph = try #require(atlas.glyph(forASCII: UInt32(0x41), bold: false))  // A
+        let glyph = try #require(atlas.glyph(forASCII: UInt32(0x41), style: .regular))  // A
         #expect(glyph.size != .zero)
         #expect(atlas.fastPathHits > 0)
     }

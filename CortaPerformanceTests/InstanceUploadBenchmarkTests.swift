@@ -33,6 +33,12 @@ extension PerformanceSuites {
     /// - **scroll** — one newline past the bottom margin: `applyScrollShift`
     ///   moves every surviving instance's Y and one row rebuilds;
     /// - **full rebuild** — `invalidate()`, the vim-paging worst case.
+    /// - **every row redrawn** — the whole screen rewritten in place with
+    ///   rows of a different length each frame, the shape of a TUI redrawing
+    ///   or a flood without a scroll: every row is damaged and changes its
+    ///   instance count, the case per-row splicing pays most for.
+    /// - **full rebuild, block elements** — `invalidate()` over a screen of
+    ///   progress bars and shades (U+2580–U+259F), drawn as geometry.
     ///
     /// Not an assertion — the distributions are written to a file, the same
     /// convention as `FrameCPUBaselineTests`. The experiment it was built for
@@ -122,6 +128,35 @@ extension PerformanceSuites {
             let fullRebuild = runScenario { _ in
                 renderer.invalidate()
             }
+            var redraws = 0
+            let redraw = runScenario { terminal in
+                redraws += 1
+                var bytes = Array("\u{1B}[H".utf8)
+                for row in 0..<rows {
+                    let length = columns / 2 + (row * 7 + redraws * 13) % (columns / 2)
+                    bytes += Array("\u{1B}[2K\u{1B}[\(31 + row % 7)m".utf8)
+                    bytes += Array(repeating: UInt8(ascii: "x"), count: length)
+                    if row < rows - 1 { bytes += Array("\r\n".utf8) }
+                }
+                terminal.feed(bytes)
+            }
+
+            let blocks = Array("█▓▒░▀▄▌▐▖▗▘▙▚▛▜▝▞▟▁▂▃▄▅▆▇".unicodeScalars)
+            let blockRebuild = runScenario { terminal in
+                if terminal.grid.line(0)[0].scalar != blocks[0].value {
+                    var bytes = Array("\u{1B}[H".utf8)
+                    for row in 0..<rows {
+                        var text = ""
+                        for column in 0..<(columns - 1) {
+                            text.unicodeScalars.append(blocks[(row + column) % blocks.count])
+                        }
+                        bytes += Array("\u{1B}[\(31 + row % 7)m\(text)".utf8)
+                        if row < rows - 1 { bytes += Array("\r\n".utf8) }
+                    }
+                    terminal.feed(bytes)
+                }
+                renderer.invalidate()
+            }
 
             func summarise(_ name: String, _ durations: [Double]) -> String {
                 let sorted = durations.sorted()
@@ -140,6 +175,8 @@ extension PerformanceSuites {
                 \(summarise("typing (1 row dirty)      ", typing))
                 \(summarise("scroll (shift + 1 row)    ", scroll))
                 \(summarise("full rebuild              ", fullRebuild))
+                \(summarise("every row redrawn         ", redraw))
+                \(summarise("full rebuild, blocks      ", blockRebuild))
 
                 """
             let outputPath =

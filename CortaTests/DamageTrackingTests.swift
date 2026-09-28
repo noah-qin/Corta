@@ -35,6 +35,63 @@ import Testing
         return try? TerminalRenderer(device: device, font: font, scale: 1)
     }
 
+    /// Whatever damage a frame carries, placing the rebuilt rows must leave
+    /// the cache exactly as a full rebuild of the same grid would: typing
+    /// (counts kept), a scroll (one row's count changes), and whole-screen
+    /// redraws where every row changes its count all reach it.
+    @Test func incrementalBuildsMatchAFullRebuild() throws {
+        let renderer = try #require(Self.makeRenderer())
+        var terminal = Terminal(rows: 12, columns: 40)
+        // SplitMix64: seeded, so a failing step reproduces.
+        struct Generator {
+            var state: UInt64
+            mutating func next() -> UInt64 {
+                state &+= 0x9E37_79B9_7F4A_7C15
+                var z = state
+                z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+                z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+                return z ^ (z >> 31)
+            }
+        }
+        var generator = Generator(state: 0x113)
+        let pieces = ["x", "y", "█", "▚", "░", "\u{1B}[41m \u{1B}[0m", "\u{1B}[7mr\u{1B}[0m", "\u{1B}[4mu\u{1B}[0m"]
+        func flatten(_ arrays: [[QuadInstance]]) -> [[Float]] {
+            arrays.map { array in
+                array.flatMap { instance in
+                    [instance.origin.x, instance.origin.y, instance.size.x, instance.size.y,
+                     instance.color.x, instance.color.y, instance.color.z, instance.color.w,
+                     instance.uvRect.x, instance.uvRect.y, instance.uvRect.z, instance.uvRect.w]
+                }
+            }
+        }
+        renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: true, selection: nil)
+        for step in 0..<300 {
+            var text = ""
+            switch generator.next() % 4 {
+            case 0:  // An edit on one row.
+                text = "\u{1B}[\(generator.next() % 12 + 1);\(generator.next() % 30 + 1)H"
+                for _ in 0..<(generator.next() % 8) { text += pieces[Int(generator.next() % 8)] }
+            case 1:  // Scroll by one to three lines.
+                text = "\u{1B}[12;1H" + String(repeating: "\r\nz", count: Int(generator.next() % 3) + 1)
+            default:  // Redraw every row at a new length.
+                text = "\u{1B}[H"
+                for row in 0..<12 {
+                    text += "\u{1B}[2K"
+                    for _ in 0..<(generator.next() % 20) { text += pieces[Int(generator.next() % 8)] }
+                    if row < 11 { text += "\r\n" }
+                }
+            }
+            terminal.feed(Array(text.utf8))
+            renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: true, selection: nil)
+            let incremental = flatten(renderer.cachedInstancesForTesting)
+            renderer.invalidate()
+            renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: true, selection: nil)
+            let full = flatten(renderer.cachedInstancesForTesting)
+            #expect(incremental == full, "step \(step)")
+            if incremental != full { return }
+        }
+    }
+
     @Test func staticScreenReportsNoDamageAfterFirstBuild() throws {
         let renderer = try #require(Self.makeRenderer())
         var terminal = Terminal(rows: 4, columns: 10)

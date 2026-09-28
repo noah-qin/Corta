@@ -766,3 +766,57 @@ signpost counts are intervals' begin and end events, so a hop or a frame
 is two. The frame-CPU figure does not move, as it should not: the render
 loop is unchanged, and D17 is recorded because the frame's entry point
 is. `corta-bench`'s *main-actor wakes under flood* holds the number.
+
+### 5.11 The per-cell loop without hashing or allocation (#113)
+
+Three changes to `TerminalRenderer`'s instance build, each measured on
+its own. `GlyphAtlas.glyph(forASCII:style:)` reads a 512-entry table
+indexed by `(style << 7) | scalar` instead of hashing a key into a
+dictionary; the table lives on the ASCII page, so an eviction or a font
+reset clears it. `BlockElements.pieces(for:)` returns an inline
+three-slot value instead of a fresh `[Piece]` per cell. And
+`rebuildDamagedRows` builds every damaged row into scratch first, then
+places them per instance array the cheaper way: row by row in place when
+the instances that would move come to less than one array (typing moves
+none; a scroll's new bottom row moves only the overlay), otherwise one
+pass that copies unchanged rows and takes rebuilt ones from scratch —
+where it had spliced per row, O(rows × instances) when a redraw changes
+every row's count.
+
+`InstanceUploadBenchmarkTests` gained two rows for it: *every row
+redrawn* (the whole screen rewritten in place at new lengths) and *full
+rebuild, blocks* (a screen of U+2580–U+259F). CPU-only p50, median of
+three alternating runs, each step against the one before:
+
+| Scenario | Before | ASCII table | Inline pieces | One-pass placement |
+| --- | --- | --- | --- | --- |
+| Full rebuild | 0.166 ms | 0.128 ms | 0.130 ms | **0.124 ms** |
+| Every row redrawn | 0.235 ms | 0.173 ms | 0.169 ms | **0.119 ms** |
+| Full rebuild, blocks | 0.336 ms | 0.408 ms | 0.129 ms | **0.138 ms** |
+| Typing (1 row) | 0.021 ms | 0.019 ms | 0.019 ms | 0.019 ms |
+| Scroll (shift + 1 row) | 0.020 ms | 0.017 ms | 0.017 ms | 0.017 ms |
+
+Heap allocations on the rendering thread per frame, counted through
+libmalloc's `malloc_logger` hook around `render` (a verification probe,
+not a checked-in test), warm atlas:
+
+| | No-damage frame | Full rebuild, ASCII | Full rebuild, blocks |
+| --- | --- | --- | --- |
+| Before | 16 | 16 | 10,555 |
+| After | 16 | 16 | 16 |
+
+The 16 are the frame's own (encoder and command buffer), with or
+without a rebuild; the ASCII path allocated nothing before either — the
+dictionary cost a hash per cell, not an allocation — and a block
+element cost one array per cell.
+
+**The averaged D17 figure did not move with them.** Nine runs each over
+three sessions, the three orders mixed: before 0.705 ms avg (0.586–0.875),
+after 0.740 ms (0.587–0.885). The first session alone put the after
+figure 0.09 ms higher; the third put it 0.08 ms lower, and a control
+that spun the saved 40 µs back into every frame landed inside the spread of
+both. The window runs to the GPU's completion (§5.8) and its spread
+between runs is several times the CPU change, so, as §5.8 says, the
+CPU-only rows are where this change is read.
+
+Apple M5, macOS 27.0 (26A428), Xcode 27.0 (27A266a), on battery.

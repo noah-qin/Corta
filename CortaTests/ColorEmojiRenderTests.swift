@@ -111,7 +111,7 @@ import Testing
         }
         let atlas = GlyphAtlas(device: device, font: TerminalFont.primary(ofSize: 32))
 
-        guard let info = atlas.glyph(shaping: 0x1F600, bold: false), info.size != .zero  // 😀
+        guard let info = atlas.glyph(shaping: 0x1F600, style: .regular), info.size != .zero  // 😀
         else {
             Issue.record("😀 failed to shape in this environment")
             return
@@ -137,7 +137,7 @@ import Testing
         }
         let atlas = GlyphAtlas(device: device, font: TerminalFont.primary(ofSize: 32))
 
-        let info = atlas.glyph(shaping: 0x4E2D, bold: false)  // 中
+        let info = atlas.glyph(shaping: 0x4E2D, style: .regular)  // 中
         #expect(info != nil)
         #expect(info?.size != .zero)
         #expect(info?.isColor == false)

@@ -100,10 +100,26 @@ public nonisolated final class TerminalRenderer {
     private var cachedHoveredLink: TerminalSelection?
     private var needsFullRebuild = true
 
-    /// Reused, so a damaged row allocates nothing.
+    /// Reused, so a damaged row allocates nothing: every damaged row's new
+    /// instances, back to back, with where each row's are.
     private var rowBackground: [QuadInstance] = []
     private var rowGlyphs: [QuadInstance] = []
     private var rowColorGlyphs: [QuadInstance] = []
+    private var rebuiltRows: [RebuiltRow] = []
+    /// The next cache while a splice builds it, then the old one's storage.
+    private var spliceBuffer: [QuadInstance] = []
+
+    /// One damaged row: its instances in the row scratch arrays, and where
+    /// its old ones start in the cache.
+    private struct RebuiltRow {
+        var row: Int
+        var background: Range<Int>
+        var glyphs: Range<Int>
+        var colorGlyphs: Range<Int>
+        var cachedBackgroundStart: Int
+        var cachedGlyphStart: Int
+        var cachedColorGlyphStart: Int
+    }
     private var overlayScratch: [QuadInstance] = []
 
     /// One test rejects nearly every cell.
@@ -121,6 +137,12 @@ public nonisolated final class TerminalRenderer {
 
     /// Rows in the cached frame: the grid height `draw` lays out.
     var cachedRowCount: Int { cachedLines.count }
+
+    /// For tests: the cached instances, so an incremental build can be
+    /// compared with a full one.
+    var cachedInstancesForTesting: [[QuadInstance]] {
+        [cachedBackground, cachedGlyphs, cachedColorGlyphs]
+    }
 
     private(set) var pointMetrics: CellMetrics
     private(set) var scale: CGFloat
@@ -334,9 +356,10 @@ public nonisolated final class TerminalRenderer {
         lastRebuiltRowCount = grid.rows
     }
 
-    /// Line-granular damage: rebuild only the rows that changed and splice
-    /// their instances in place. Walking rows in order keeps each splice
-    /// point correct, because every later row sits after it.
+    /// Line-granular damage: rebuild only the rows that changed into the
+    /// scratch arrays, then put them in the cache (`place`), so a frame
+    /// that damages every row costs one pass over the cache, not one per
+    /// row.
     ///
     /// The live screen (`offset == 0`) is checked with `Grid.lineRevision`,
     /// a single `UInt64` compare, instead of a full `Line` comparison —
@@ -346,8 +369,6 @@ public nonisolated final class TerminalRenderer {
     /// unchanged: `visibleLine` is fetched and compared by value every row,
     /// every call, same as the whole cache always did.
     private func rebuildDamagedRows(grid: Grid, offset: Int) -> Bool {
-        var changed = false
-        var rebuilt = 0
         var backgroundStart = 0
         var glyphStart = 0
         var colorGlyphStart = 0
@@ -362,6 +383,10 @@ public nonisolated final class TerminalRenderer {
                 applyScrollShift(Int(rotated), cellHeight: Float(metrics.cellHeight))
             }
         }
+        rowBackground.removeAll(keepingCapacity: true)
+        rowGlyphs.removeAll(keepingCapacity: true)
+        rowColorGlyphs.removeAll(keepingCapacity: true)
+        rebuiltRows.removeAll(keepingCapacity: true)
         for row in 0..<grid.rows {
             let revision = liveScreen ? grid.lineRevision(row) : 0
             // `!liveScreen` always re-checks by value below: history rows
@@ -370,34 +395,89 @@ public nonisolated final class TerminalRenderer {
             if possiblyChanged {
                 let line = Self.visibleLine(grid: grid, row: row, offset: offset)
                 if liveScreen || line != cachedLines[row] {
-                    rowBackground.removeAll(keepingCapacity: true)
-                    rowGlyphs.removeAll(keepingCapacity: true)
-                    rowColorGlyphs.removeAll(keepingCapacity: true)
+                    let rebuilt = RebuiltRow(
+                        row: row, background: rowBackground.count..<rowBackground.count,
+                        glyphs: rowGlyphs.count..<rowGlyphs.count,
+                        colorGlyphs: rowColorGlyphs.count..<rowColorGlyphs.count,
+                        cachedBackgroundStart: backgroundStart, cachedGlyphStart: glyphStart,
+                        cachedColorGlyphStart: colorGlyphStart)
                     appendRowInstances(
                         line: line, row: row, graphemes: grid.graphemes,
                         background: &rowBackground, glyphs: &rowGlyphs,
                         colorGlyphs: &rowColorGlyphs)
-                    cachedBackground.replaceSubrange(
-                        backgroundStart..<(backgroundStart + backgroundCounts[row]), with: rowBackground)
-                    cachedGlyphs.replaceSubrange(
-                        glyphStart..<(glyphStart + glyphCounts[row]), with: rowGlyphs)
-                    cachedColorGlyphs.replaceSubrange(
-                        colorGlyphStart..<(colorGlyphStart + colorGlyphCounts[row]), with: rowColorGlyphs)
-                    backgroundCounts[row] = rowBackground.count
-                    glyphCounts[row] = rowGlyphs.count
-                    colorGlyphCounts[row] = rowColorGlyphs.count
+                    var finished = rebuilt
+                    finished.background = rebuilt.background.lowerBound..<rowBackground.count
+                    finished.glyphs = rebuilt.glyphs.lowerBound..<rowGlyphs.count
+                    finished.colorGlyphs = rebuilt.colorGlyphs.lowerBound..<rowColorGlyphs.count
+                    rebuiltRows.append(finished)
                     cachedLines[row] = line
                     cachedRevisions[row] = revision
-                    changed = true
-                    rebuilt += 1
                 }
             }
             backgroundStart += backgroundCounts[row]
             glyphStart += glyphCounts[row]
             colorGlyphStart += colorGlyphCounts[row]
         }
-        lastRebuiltRowCount = rebuilt
-        return changed
+        lastRebuiltRowCount = rebuiltRows.count
+        guard !rebuiltRows.isEmpty else { return false }
+        place(
+            into: &cachedBackground, counts: &backgroundCounts, from: rowBackground,
+            ranges: \.background, starts: \.cachedBackgroundStart)
+        place(
+            into: &cachedGlyphs, counts: &glyphCounts, from: rowGlyphs, ranges: \.glyphs,
+            starts: \.cachedGlyphStart)
+        place(
+            into: &cachedColorGlyphs, counts: &colorGlyphCounts, from: rowColorGlyphs,
+            ranges: \.colorGlyphs, starts: \.cachedColorGlyphStart)
+        return true
+    }
+
+    /// Puts the rebuilt rows' instances from `scratch` into `cached`, the
+    /// cheaper of two ways. In place, row by row, a row whose count changed
+    /// moves everything after it — nothing for typing, the overlay alone for
+    /// a scroll's new bottom row, but every instance once per row when a
+    /// flood or a redrawing TUI changes them all. Past one array's worth of
+    /// moves, the array is rebuilt in one pass instead: unchanged rows
+    /// copied from the cache, rebuilt ones from `scratch`, then whatever
+    /// follows the rows (the background's overlay). `counts` becomes the
+    /// new per-row counts either way.
+    private func place(
+        into cached: inout [QuadInstance], counts: inout [Int], from scratch: [QuadInstance],
+        ranges: KeyPath<RebuiltRow, Range<Int>>, starts: KeyPath<RebuiltRow, Int>
+    ) {
+        var moves = 0
+        for rebuilt in rebuiltRows where rebuilt[keyPath: ranges].count != counts[rebuilt.row] {
+            moves += cached.count - rebuilt[keyPath: starts] - counts[rebuilt.row]
+        }
+        if moves <= cached.count {
+            var shift = 0
+            for rebuilt in rebuiltRows {
+                let range = rebuilt[keyPath: ranges]
+                let start = rebuilt[keyPath: starts] + shift
+                cached.replaceSubrange(start..<(start + counts[rebuilt.row]), with: scratch[range])
+                shift += range.count - counts[rebuilt.row]
+                counts[rebuilt.row] = range.count
+            }
+            return
+        }
+        spliceBuffer.removeAll(keepingCapacity: true)
+        spliceBuffer.reserveCapacity(cached.count + scratch.count)
+        var source = 0
+        var next = 0
+        for row in counts.indices {
+            let count = counts[row]
+            if next < rebuiltRows.count, rebuiltRows[next].row == row {
+                let range = rebuiltRows[next][keyPath: ranges]
+                spliceBuffer.append(contentsOf: scratch[range])
+                counts[row] = range.count
+                next += 1
+            } else {
+                spliceBuffer.append(contentsOf: cached[source..<(source + count)])
+            }
+            source += count
+        }
+        spliceBuffer.append(contentsOf: cached[source...])
+        swap(&cached, &spliceBuffer)
     }
 
     /// Reflects a whole-screen scroll of `count` rows (`Grid.scrollUp`'s
