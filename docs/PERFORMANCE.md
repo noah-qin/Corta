@@ -713,16 +713,26 @@ alternating runs, `-c release`:
 
 | Corpus | No snapshotter | Released at once | Held to the next tick |
 | --- | --- | --- | --- |
-| `yes` lines (`y\r\n`, 32 MiB) | 54.4 MiB/s | 54.0 MiB/s | 53.8 MiB/s |
-| 200-column lines (64 MiB) | 207.1 MiB/s | 199.2 MiB/s | 199.9 MiB/s |
+| `yes` lines (`y\r\n`, 32 MiB) | 53.1 MiB/s | 52.4 MiB/s | 52.1 MiB/s |
+| 200-column lines (64 MiB) | 207.6 MiB/s | 199.5 MiB/s | 199.8 MiB/s |
+
+The copy itself, timed on its own — one 200-column line fed into a full
+scrollback, 1,000 samples each:
+
+| | p50 | p95 | p99 | max |
+| --- | --- | --- | --- | --- |
+| Nothing sharing the scrollback | 0.001 ms | 0.001 ms | 0.002 ms | 0.005 ms |
+| A snapshot alive (the copy-on-write) | 0.008 ms | 0.014 ms | 0.020 ms | 0.089 ms |
 
 Apple M5, macOS 27.0 (26A428), Xcode 27.0 (27A266a), on battery.
-Held and released are inside each other's run-to-run spread: at 60 Hz the
-copy is at most 60 × 800 KB a second for a 200-column arena, and a `yes`
-row trims to one cell, so its arena is 256 cells. What a snapshot does cost
-is the lock hand-off — the ~4% between no snapshotter and either mode on
-wide lines — which is the frame's to pay. The benchmark stays so that a
-snapshot that starts outliving its frame again shows up as a number.
+Held and released are inside each other's run-to-run spread, and the
+second table says why: the copy is ~8 µs, so a snapshot held across
+every frame cost the reader ~0.5 ms a second at 60 Hz — well under the
+noise of a throughput run (a one-off run at 2 kHz could not separate the
+two either). What a snapshot does cost is the lock hand-off, the ~4%
+between no snapshotter and either mode on wide lines, which is the
+frame's to pay. The benchmark stays so that a snapshot that starts
+outliving its frame again shows up as a number.
 
 Two holders outlive a frame on purpose: a search sweep (`Task.detached`,
 for the sweep's duration) and an export (until the save panel's row walk

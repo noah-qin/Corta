@@ -630,15 +630,22 @@ func benchmarkFeedUnderSnapshotter() {
     func feedSeconds(_ corpus: [UInt8], _ mode: Snapshots) -> Double {
         let state = Mutex(Terminal(rows: 50, columns: columns, scrollbackLimit: 10_000))
         let stop = Atomic(false)
+        let finished = DispatchSemaphore(value: 0)
         let snapshotter = Thread {
             pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0)
             var held: Grid?
             while !stop.load(ordering: .relaxed) {
-                let grid = state.withLock { $0.grid }
-                if mode == .held { held = grid }
+                // Assigned or discarded in the statement that takes it, so
+                // a dropped snapshot cannot live on through the sleep.
+                if mode == .held {
+                    held = state.withLock { $0.grid }
+                } else {
+                    _ = state.withLock { $0.grid }
+                }
                 Thread.sleep(forTimeInterval: 1.0 / 60)
             }
-            withExtendedLifetime(held) {}
+            held = nil
+            finished.signal()
         }
         if mode != .none { snapshotter.start() }
         let start = DispatchTime.now()
@@ -651,6 +658,8 @@ func benchmarkFeedUnderSnapshotter() {
         }
         let elapsed = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e9
         stop.store(true, ordering: .relaxed)
+        // Joined, so its last snapshot is freed before the next run's clock.
+        if mode != .none { finished.wait() }
         return elapsed
     }
 
@@ -671,6 +680,28 @@ func benchmarkFeedUnderSnapshotter() {
                     + "\(String(format: "%.1f", median)) MiB/s median of \(runs) "
                     + "(\(rates.map { String(format: "%.1f", $0) }.joined(separator: " / ")))")
         }
+    }
+
+    // The copy itself, which the throughput runs only see diluted: one
+    // full-width line fed into a full scrollback, with a snapshot alive or
+    // not. The first is what every frame paid while a snapshot outlived it.
+    var terminal = Terminal(rows: 50, columns: columns, scrollbackLimit: 10_000)
+    terminal.feed(fullWidth.repeated(toCount: fullWidth.count * 10_100))
+    var alone: [UInt64] = []
+    var shared: [UInt64] = []
+    for iteration in 0..<2_000 {
+        let snapshot: Grid? = iteration.isMultiple(of: 2) ? terminal.grid : nil
+        let start = DispatchTime.now()
+        terminal.feed(fullWidth)
+        let elapsed = DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds
+        if snapshot == nil { alone.append(elapsed) } else { shared.append(elapsed) }
+        withExtendedLifetime(snapshot) {}
+    }
+    if let alone = LatencyDistribution(samplesNanoseconds: alone),
+        let shared = LatencyDistribution(samplesNanoseconds: shared)
+    {
+        print("one \(columns)-column line into a full scrollback, nothing sharing it: \(alone.description)")
+        print("the same line with a snapshot alive (the copy-on-write): \(shared.description)")
     }
 }
 
