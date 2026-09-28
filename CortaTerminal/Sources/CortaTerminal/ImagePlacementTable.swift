@@ -140,6 +140,50 @@ public struct ImagePlacementTable: Sendable {
         placementOrder.compactMap { placements[$0] }
     }
 
+    /// `ED 2`: deletes every placement that reaches the visible screen —
+    /// kitty's `grman_clear` rule, `start_row + rows > 0` — and keeps the
+    /// ones wholly in scrollback, and every image's bytes. A placement's rows
+    /// are `r=`, else its pixel height over `cellPixelHeight`; unknown, one
+    /// anchored on screen goes and one anchored in history stays.
+    mutating func removePlacementsReachingScreen(scrollbackTotal: Int, cellPixelHeight: Int) {
+        let toRemove = placements.values.filter { placement in
+            let top = ScrollbackCoordinates.reanchoredRow(
+                placement.row, from: placement.baseScrollbackTotal, to: scrollbackTotal)
+            if top >= 0 { return true }
+            guard let rows = rowCount(of: placement, cellPixelHeight: cellPixelHeight) else {
+                return false
+            }
+            return top + rows > 0
+        }.map(\.id)
+        remove(Set(toRemove))
+    }
+
+    /// `ED 3` and Clear History: deletes the placements anchored in the
+    /// scrollback being discarded — their anchor row is gone — and keeps the
+    /// screen's.
+    mutating func removePlacementsAnchoredInScrollback(scrollbackTotal: Int) {
+        let toRemove = placements.values.filter {
+            ScrollbackCoordinates.reanchoredRow(
+                $0.row, from: $0.baseScrollbackTotal, to: scrollbackTotal) < 0
+        }.map(\.id)
+        remove(Set(toRemove))
+    }
+
+    private func rowCount(of placement: KittyGraphics.Placement, cellPixelHeight: Int) -> Int? {
+        if let rows = placement.rows { return rows }
+        guard cellPixelHeight > 0, let height = images[placement.imageID]?.pixelHeight else {
+            return nil
+        }
+        return max(1, (height + cellPixelHeight - 1) / cellPixelHeight)
+    }
+
+    private mutating func remove(_ ids: Set<KittyGraphics.PlacementID>) {
+        guard !ids.isEmpty else { return }
+        for id in ids { placements[id] = nil }
+        placementOrder.removeAll { ids.contains($0) }
+        revision &+= 1
+    }
+
     mutating func removeAllPlacements() {
         placements.removeAll()
         placementOrder.removeAll()

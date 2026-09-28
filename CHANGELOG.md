@@ -64,6 +64,13 @@ what to edit.
 
 ### Fixed
 
+- Clearing the screen now clears its images. `clear`, zsh's ⌃L and Clear
+  Screen blanked the text but left every Kitty graphics image (`kitten
+  icat`) drawn over the empty screen; now, as in kitty, an image that
+  reaches the visible screen is removed with it, while one scrolled wholly
+  into history stays, and clearing the scrollback removes the images there
+  (#161).
+
 - A pane that could not start — its failure message showing — no longer
   takes the whole app down when the font size changes (⌘=, ⌘-, or the
   configuration file) or when focus moves to it: both reached the pane's

@@ -85,6 +85,11 @@ public struct Grid: Sendable {
 
     /// Cleared on a column resize, kept across a row-only one.
     public var imagePlacements = ImagePlacementTable()
+    /// The pty's pixel height per row (`ws_ypixel / ws_row`), which the app
+    /// reports and clients such as `kitten icat` size images by; 0 until one
+    /// arrives. Only erasing the display reads it, to tell whether an image
+    /// with no `r=` reaches the visible screen.
+    public var cellPixelHeight = 0
 
     public var scrollback: Scrollback
 
@@ -502,7 +507,9 @@ public struct Grid: Sendable {
     public static let tabInterval = 8
 
     public mutating func resetToInitialState() {
+        let cellPixelHeight = cellPixelHeight
         self = Grid(rows: rows, columns: columns, scrollbackLimit: scrollback.limit)
+        self.cellPixelHeight = cellPixelHeight
     }
 
     /// Erases the screen and homes the cursor, keeping the scrollback. Not
@@ -514,8 +521,10 @@ public struct Grid: Sendable {
         pendingWrap = false
     }
 
-    /// Discards the scrollback, screen untouched — after pasting a secret.
+    /// Discards the scrollback, screen untouched — after pasting a secret —
+    /// and the images anchored in it (`ED 3`).
     public mutating func clearScrollback() {
+        imagePlacements.removePlacementsAnchoredInScrollback(scrollbackTotal: scrollback.totalPushed)
         scrollback.removeAll()
     }
 
@@ -700,6 +709,9 @@ public struct Grid: Sendable {
             for row in 0..<rows {
                 eraseWholeLine(row, with: template)
             }
+            // The images go with the text they sat among (kitty's `ED 2`).
+            imagePlacements.removePlacementsReachingScreen(
+                scrollbackTotal: scrollback.totalPushed, cellPixelHeight: cellPixelHeight)
         }
     }
 
@@ -942,6 +954,7 @@ public struct Grid: Sendable {
         suspendedMain = nil
         var main = suspended.grid
         main.cursorStyle = cursorStyle  // the style is global, not per screen
+        main.cellPixelHeight = cellPixelHeight  // a property of the window
         // Terminal-wide, not per screen: `self = main` would restore the old
         // value.
         main.reverseWraparoundEnabled = reverseWraparoundEnabled
