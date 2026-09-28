@@ -62,6 +62,13 @@ what to edit.
   it, after the byte walk has tried and rejected that line, which measures
   about 2% slower on a document where every line is non-ASCII.
 
+- A pane flooded with output wakes the main thread at most once a frame.
+  It used to queue a main-thread task for every chunk the reader parsed
+  — about 40,000 a second under `yes` — each resuming the display link
+  and, with long-task notifications on, restarting a timer. The
+  notification's quiet period is now measured from the last output
+  itself, so it stays right for a window that is hidden and not drawing.
+
 ### Fixed
 
 - Clearing the screen now clears its images. `clear`, zsh's ⌃L and Clear

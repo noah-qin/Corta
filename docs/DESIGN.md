@@ -365,7 +365,10 @@ one safe to touch from more than one thread:
 The PTY reader is a dedicated `Thread`, not a `Task` (`DECISIONS.md`
 D04, `PERFORMANCE.md` §2.1). It
 calls `onOutput`/`onChildExit` directly, and the shell hops to
-`@MainActor` — never the other way around. Each hop checks two things:
+`@MainActor` — never the other way around. Output hops at most once a
+frame: a per-session `OutputWakeGate` lets a batch through only when the
+last frame has taken the previous one (`PERFORMANCE.md` §5.10). Each hop
+checks two things:
 that the controller is still alive (`[weak self]`) and that it is still
 the controller *for this session* (`sessionGeneration`, bumped by every
 `setUpPane()`), so a callback from a replaced session is a no-op.

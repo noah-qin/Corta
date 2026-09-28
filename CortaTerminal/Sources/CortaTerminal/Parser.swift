@@ -92,40 +92,50 @@ public struct Parser: Sendable {
         for byte in bytes { advance(byte, performer: &performer) }
     }
 
-    /// Contiguous input gets an ASCII-run fast path. PTY reads and the
-    /// benchmark both arrive as `[UInt8]`, so this is the production path;
-    /// the generic overload above remains for streaming/test sequences.
-    ///
-    /// The run-boundary scan reads through `bytes.span`: `Array`'s
-    /// subscript re-checks bounds and the exclusivity/COW flag on every
-    /// access, which is pure overhead here since `grow`'s capacity is
-    /// already fixed for the duration of the scan. `Span` gives the same
-    /// no-bounds-check-in-release access an `UnsafeBufferPointer` would,
-    /// without the unsafe type: the borrow is checked at compile time
-    /// against `bytes`' lifetime instead of being the caller's manual
-    /// promise, so there is no `withUnsafeBufferPointer` closure and no
-    /// pointer that could outlive what it points into. Measured on
-    /// `corta-bench` (`docs/PERFORMANCE.md` §5), this widened parser-only
-    /// throughput without changing `advance`'s per-byte dispatch, which
-    /// every non-run byte and every control-state byte still goes through
-    /// unchanged.
+    /// Contiguous input gets an ASCII-run fast path. PTY reads arrive as
+    /// slices of the reader's batch buffer and the benchmark as `[UInt8]`,
+    /// so these two are the production path; the generic overload above
+    /// remains for streaming/test sequences.
     public mutating func parse<P: ParserPerformer>(
         _ bytes: [UInt8],
         performer: inout P
     ) {
+        parse(bytes[...], performer: &performer)
+    }
+
+    /// A slice, so the reader feeds its batch in lock-sized pieces without
+    /// copying each one into an `Array` of its own.
+    ///
+    /// The run-boundary scan reads through `bytes.span`: the subscript
+    /// re-checks bounds and the exclusivity/COW flag on every access, which
+    /// is pure overhead here since the storage is fixed for the duration of
+    /// the scan. `Span` gives the same no-bounds-check-in-release access an
+    /// `UnsafeBufferPointer` would, without the unsafe type: the borrow is
+    /// checked at compile time against `bytes`' lifetime instead of being
+    /// the caller's manual promise. Measured on `corta-bench`
+    /// (`docs/PERFORMANCE.md` §5), this widened parser-only throughput
+    /// without changing `advance`'s per-byte dispatch, which every non-run
+    /// byte and every control-state byte still goes through unchanged.
+    /// The span counts from zero; the slice's own indices start at
+    /// `startIndex`.
+    public mutating func parse<P: ParserPerformer>(
+        _ bytes: ArraySlice<UInt8>,
+        performer: inout P
+    ) {
         let span = bytes.span
-        var index = bytes.startIndex
-        while index < bytes.endIndex {
-            if case .ground = state, span[index] >= 0x20, span[index] < 0x7F {
-                var end = index + 1
+        let base = bytes.startIndex
+        var offset = 0
+        while offset < span.count {
+            if case .ground = state, span[offset] >= 0x20, span[offset] < 0x7F {
+                var end = offset + 1
                 while end < span.count, span[end] >= 0x20, span[end] < 0x7F {
                     end += 1
                 }
-                performer.printASCII(bytes[index..<end])
-                index = end
+                performer.printASCII(bytes[(base + offset)..<(base + end)])
+                offset = end
             } else {
-                advance(bytes[index], performer: &performer)
-                index += 1
+                advance(span[offset], performer: &performer)
+                offset += 1
             }
         }
     }

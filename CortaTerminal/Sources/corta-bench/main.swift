@@ -717,6 +717,56 @@ extension Array where Element == UInt8 {
 
 benchmarkFeedUnderSnapshotter()
 
+// MARK: - Main-actor wakes under a flood
+
+/// How often a flooding session would hop to the main actor. The reader
+/// calls `onOutput` per parse batch; the app wakes the main actor only when
+/// its `OutputWakeGate` was idle, and the frame re-arms it. A thread taking
+/// the flag at 60 Hz stands in for the display link, so the gated rate
+/// should sit at or under 60 a second whatever the batch rate is.
+func benchmarkOutputWakesUnderFlood() {
+    let session: TerminalSession
+    do {
+        session = try TerminalSession(
+            executable: "/usr/bin/yes", size: TerminalSize(rows: 50, columns: 200))
+    } catch {
+        print("main-actor wakes under flood: SKIPPED (could not spawn /usr/bin/yes: \(error))")
+        return
+    }
+    defer { session.stop() }
+    let gate = OutputWakeGate()
+    let batches = Atomic(0)
+    let wakes = Atomic(0)
+    session.onOutput = {
+        batches.add(1, ordering: .relaxed)
+        if gate.noteOutput() { wakes.add(1, ordering: .relaxed) }
+    }
+    let stop = Atomic(false)
+    let frames = Thread {
+        pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0)
+        while !stop.load(ordering: .relaxed) {
+            _ = gate.takePending()
+            Thread.sleep(forTimeInterval: 1.0 / 60)
+        }
+    }
+    session.start()
+    Thread.sleep(forTimeInterval: 0.3)
+    frames.start()
+    let startBatches = batches.load(ordering: .relaxed)
+    let startWakes = wakes.load(ordering: .relaxed)
+    let seconds = 3.0
+    Thread.sleep(forTimeInterval: seconds)
+    let batchRate = Double(batches.load(ordering: .relaxed) - startBatches) / seconds
+    let wakeRate = Double(wakes.load(ordering: .relaxed) - startWakes) / seconds
+    stop.store(true, ordering: .relaxed)
+    print(
+        "main-actor wakes under flood: \(String(format: "%.0f", wakeRate))/s gated "
+            + "against \(String(format: "%.0f", batchRate)) parse batches/s "
+            + "(a `yes` flood, frames taken at 60 Hz)")
+}
+
+benchmarkOutputWakesUnderFlood()
+
 // MARK: - Write-path backpressure
 
 /// What the caller of `session.write` pays while the child never reads its

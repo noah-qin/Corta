@@ -19,7 +19,6 @@ import CoreText
 import CortaTerminal
 import Metal
 import QuartzCore
-import Synchronization
 
 /// One pane: a `TerminalSession` and the renderer and view that draw it.
 /// Knows no sibling panes beyond `splitController` (D07). This file owns
@@ -119,8 +118,9 @@ class ViewController: NSViewController {
     /// `?2026` withheld a frame, so the next one presents even if the diff
     /// finds nothing.
     private var wasSynchronizedOutputActive = false
-    /// An idle frame costs this one check, not a diff.
-    private let outputPending = Mutex(false)
+    /// An idle frame costs this one check, not a diff. One per session,
+    /// replaced with it (`OutputWakeGate`).
+    private var outputWake = OutputWakeGate()
     private var resizeDebouncer: ResizeDebouncer!
     private var cachedProcessName: String?
     private var cachedDirectory: String?
@@ -417,8 +417,11 @@ class ViewController: NSViewController {
             observeWindowFocus()
             observeConfiguration()
         }
+        let wake = OutputWakeGate()
+        outputWake = wake
+        taskNotifier.lastOutputUptimeNanoseconds = { wake.lastOutputUptimeNanoseconds }
         session.onOutput = { [weak self] in
-            self?.noteOutput(generation: generation)
+            self?.noteOutput(generation: generation, wake: wake)
         }
         session.onChildExit = { [weak self] childExit in
             Task(priority: .userInitiated) { @MainActor in
@@ -602,11 +605,7 @@ class ViewController: NSViewController {
         if session.takeBell() {
             handleBell()
         }
-        let hasOutput = outputPending.withLock { pending -> Bool in
-            let was = pending
-            pending = false
-            return was
-        }
+        let hasOutput = outputWake.takePending()
         guard needsRedraw || hasOutput else { return false }
         // Title, directory and process all arrive as output, so this keeps the
         // window and tab title current without a timer. An unfocused pane's
@@ -682,20 +681,22 @@ class ViewController: NSViewController {
         }
     }
 
-    /// On the reader thread; `generation` guards against a replaced session.
-    nonisolated private func noteOutput(generation: Int) {
+    /// On the reader thread, per parse batch; `generation` guards against a
+    /// replaced session. Hops to the main actor only when `wake` was idle:
+    /// the frame that takes the flag re-arms it, so a flood costs one hop a
+    /// frame, not one a batch.
+    nonisolated private func noteOutput(generation: Int, wake: OutputWakeGate) {
         // A point, not an interval: the interval began on another thread.
         InputLatencySignposts.emit(.output)
         RenderMetrics.noteOutputForKeystroke()
-        outputPending.withLock { $0 = true }
+        guard wake.noteOutput() else { return }
         // Measured apart: a busy main thread lengthens this stage.
-        let wake = InputLatencySignposts.begin(.wake)
+        let interval = InputLatencySignposts.begin(.wake)
         // On the keypress-to-pixel chain; the default priority has no claim.
         Task(priority: .userInitiated) { @MainActor [weak self] in
-            InputLatencySignposts.end(.wake, wake)
+            InputLatencySignposts.end(.wake, interval)
             guard let self, self.sessionGeneration == generation else { return }
             self.terminalView?.setNeedsRedraw()
-            self.taskNotifier.noteOutput()
         }
     }
 

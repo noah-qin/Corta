@@ -52,6 +52,34 @@ struct GoldenTests {
         try Golden.verify(testCase)
     }
 
+    /// The reader feeds each batch as slices of its buffer, not as arrays of
+    /// their own, so the slice path must produce the grid the array path
+    /// does — including when a slice boundary splits an escape sequence or a
+    /// UTF-8 scalar, and when the slice does not start at index zero.
+    @Test("feeding slices of a larger buffer matches feeding the array", arguments: cases)
+    func slicedFeedMatchesArrayFeed(_ testCase: Golden.Case) throws {
+        let expected = try Golden.run(testCase).dump(
+            options: DumpOptions(includeScrollback: testCase.showScrollback))
+        let url = Golden.directory.appendingPathComponent("\(testCase.name).in")
+        let bytes = try Golden.decode(String(contentsOf: url, encoding: .utf8))
+        let padding: [UInt8] = Array(repeating: 0x7E, count: 5)
+        let buffer = padding + bytes + padding
+        for sliceSize in [1, 3, 7, 16 * 1024] {
+            var terminal = Terminal(
+                rows: testCase.rows, columns: testCase.columns,
+                scrollbackLimit: testCase.scrollbackLimit)
+            var offset = padding.count
+            while offset < padding.count + bytes.count {
+                let end = min(offset + sliceSize, padding.count + bytes.count)
+                terminal.feed(buffer[offset..<end])
+                offset = end
+            }
+            let actual = terminal.dump(
+                options: DumpOptions(includeScrollback: testCase.showScrollback))
+            #expect(actual == expected, "slice size \(sliceSize)")
+        }
+    }
+
     // MARK: - The harness itself
 
     /// A golden test is only useful if a broken grid produces a diff that

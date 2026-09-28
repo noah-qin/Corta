@@ -30,10 +30,18 @@ import UserNotifications
 @MainActor
 final class TaskNotifier {
     /// How long output must be quiet before the task counts as finished.
-    private static let idleGrace: TimeInterval = 1.5
+    nonisolated private static let idleGrace: TimeInterval = 1.5
 
     private var startedAt: Date?
+    /// `startedAt` on the reader's clock, so the quiet period can be measured
+    /// against `lastOutputUptimeNanoseconds`.
+    private var startedUptime: UInt64 = 0
     private var idleTimer: Timer?
+    /// When the pane's reader last parsed output (`OutputWakeGate`), read
+    /// when the idle timer fires. Output no longer reaches the main actor per
+    /// batch, and not at all while a hidden pane's frames are paused, so the
+    /// timer asks the reader's clock rather than being restarted by output.
+    var lastOutputUptimeNanoseconds: () -> UInt64 = { 0 }
     /// Set at the first OSC 133 boundary; the heuristic then switches off.
     private var usesShellIntegration = false
     /// Detects starts as edges, not per output batch.
@@ -123,14 +131,9 @@ final class TaskNotifier {
         guard ConfigurationStore.shared.configuration.notifyOnLongTask else { return }
         self.window = window
         startedAt = Date()
+        startedUptime = DispatchTime.now().uptimeNanoseconds
         requestAuthorizationOnce()
-        restartIdleTimer()
-    }
-
-    /// Output arrived; called per parse batch.
-    func noteOutput() {
-        guard !usesShellIntegration, startedAt != nil else { return }
-        restartIdleTimer()
+        scheduleIdleTimer(after: Self.idleGrace)
     }
 
     /// The pane is closing; stop the timer.
@@ -140,13 +143,35 @@ final class TaskNotifier {
         startedAt = nil
     }
 
-    private func restartIdleTimer() {
+    private func scheduleIdleTimer(after interval: TimeInterval) {
         idleTimer?.invalidate()
         idleTimer = Timer.scheduledTimer(
-            withTimeInterval: Self.idleGrace, repeats: false
+            withTimeInterval: interval, repeats: false
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.finish() }
+            MainActor.assumeIsolated { self?.idleTimerFired() }
         }
+    }
+
+    /// Finishes after `idleGrace` of quiet; output since then re-arms the
+    /// timer for the rest of the grace, counted from that output.
+    private func idleTimerFired() {
+        guard !usesShellIntegration, startedAt != nil else { return }
+        let remaining = Self.remainingGrace(
+            now: DispatchTime.now().uptimeNanoseconds,
+            lastActivity: max(startedUptime, lastOutputUptimeNanoseconds()))
+        if let remaining {
+            scheduleIdleTimer(after: remaining)
+        } else {
+            finish()
+        }
+    }
+
+    /// The quiet time still owed before the task counts as finished, or nil
+    /// once `idleGrace` has passed since `lastActivity`. Both on the
+    /// `DispatchTime` uptime clock.
+    nonisolated static func remainingGrace(now: UInt64, lastActivity: UInt64) -> TimeInterval? {
+        let quiet = now > lastActivity ? Double(now - lastActivity) / 1e9 : 0
+        return quiet >= idleGrace ? nil : idleGrace - quiet
     }
 
     private func finish() {
