@@ -158,13 +158,21 @@ public struct ImagePlacementTable: Sendable {
         remove(Set(toRemove))
     }
 
-    /// `ED 3` and Clear History: deletes the placements anchored in the
-    /// scrollback being discarded — their anchor row is gone — and keeps the
-    /// screen's.
-    mutating func removePlacementsAnchoredInScrollback(scrollbackTotal: Int) {
-        let toRemove = placements.values.filter {
-            ScrollbackCoordinates.reanchoredRow(
-                $0.row, from: $0.baseScrollbackTotal, to: scrollbackTotal) < 0
+    /// `ED 3` and Clear History: deletes the placements wholly in the
+    /// scrollback being discarded, and keeps every one that still reaches the
+    /// screen — the screen's text stays, so the part of an image drawn among
+    /// it stays too (its rows are counted from `totalPushed`, which discarding
+    /// history does not reset). Anchored in history with no known height, it
+    /// goes: there is no telling it reaches the screen.
+    mutating func removePlacementsWhollyInScrollback(scrollbackTotal: Int, cellPixelHeight: Int) {
+        let toRemove = placements.values.filter { placement in
+            let top = ScrollbackCoordinates.reanchoredRow(
+                placement.row, from: placement.baseScrollbackTotal, to: scrollbackTotal)
+            guard top < 0 else { return false }
+            guard let rows = rowCount(of: placement, cellPixelHeight: cellPixelHeight) else {
+                return true
+            }
+            return top + rows <= 0
         }.map(\.id)
         remove(Set(toRemove))
     }

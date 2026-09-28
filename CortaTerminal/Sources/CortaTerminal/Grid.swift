@@ -522,9 +522,10 @@ public struct Grid: Sendable {
     }
 
     /// Discards the scrollback, screen untouched — after pasting a secret —
-    /// and the images anchored in it (`ED 3`).
+    /// and the images wholly in it (`ED 3`).
     public mutating func clearScrollback() {
-        imagePlacements.removePlacementsAnchoredInScrollback(scrollbackTotal: scrollback.totalPushed)
+        imagePlacements.removePlacementsWhollyInScrollback(
+            scrollbackTotal: scrollback.totalPushed, cellPixelHeight: cellPixelHeight)
         scrollback.removeAll()
     }
 

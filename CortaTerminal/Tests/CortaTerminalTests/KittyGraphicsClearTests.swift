@@ -187,5 +187,26 @@ struct KittyGraphicsClearTests {
         #expect(TerminalSize(rows: 30, columns: 120, pixelWidth: 1680, pixelHeight: 1020).cellPixelHeight == 34)
         #expect(TerminalSize(rows: 30, columns: 120).cellPixelHeight == 0)
     }
+
+    @Test("ED 3 keeps an image that starts in history but still reaches the screen")
+    func eraseScrollbackKeepsAStraddlingPlacement() {
+        var terminal = Terminal(rows: 5, columns: 40, scrollbackLimit: 100)
+        terminal.feed(Self.place(id: 1, rows: 4))  // rows 0–3; cursor to row 4
+        terminal.feed(Array("\r\n\r\n".utf8))  // rows -2…1: half still on screen
+        terminal.feed(Array("\u{1B}[3J".utf8))
+        #expect(Self.placementIDs(terminal) == [1])
+        let top = terminal.grid.imagePlacements.orderedPlacements().first.map {
+            ScrollbackCoordinates.reanchoredRow(
+                $0.row, from: $0.baseScrollbackTotal, to: terminal.grid.scrollback.totalPushed)
+        }
+        #expect(top == -2, "still drawn from where it was")
+    }
+
+    @Test("ED 3 removes an image anchored in history whose height is unknown")
+    func eraseScrollbackRemovesAnUnknownHeightHistoryPlacement() {
+        var terminal = Self.straddling(Self.placeRaw(id: 1, height: 40), scrolled: 2, cellPixelHeight: 0)
+        terminal.feed(Array("\u{1B}[3J".utf8))
+        #expect(Self.placementIDs(terminal).isEmpty)
+    }
 }
 
