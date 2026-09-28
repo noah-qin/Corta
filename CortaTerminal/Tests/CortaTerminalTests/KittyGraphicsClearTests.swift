@@ -23,7 +23,9 @@ import Testing
 /// own behaviour (`screen_erase_in_display` → `grman_clear`): `ED 2` deletes
 /// every placement that reaches the visible screen and keeps the ones wholly
 /// in scrollback; `ED 3` deletes the scrollback's; `ED 0`/`ED 1` delete
-/// nothing. The image bytes always survive, so `a=p` can place them again.
+/// nothing. Both erases then free every image no placement shows, as kitty's
+/// `filter_refs(free_images: true)` does; an image still placed keeps its
+/// bytes.
 @Suite("Kitty graphics and erasing the display")
 struct KittyGraphicsClearTests {
     private static func apc(_ control: String, payload: String = "") -> [UInt8] {
@@ -41,14 +43,49 @@ struct KittyGraphicsClearTests {
         terminal.grid.imagePlacements.orderedPlacements().map(\.imageID.rawValue)
     }
 
-    @Test("ED 2 deletes a placement on the visible screen but keeps its image")
+    @Test("ED 2 deletes a placement on the visible screen and frees its image")
     func eraseAllDeletesAVisiblePlacement() {
         var terminal = Terminal(rows: 10, columns: 40)
         terminal.feed(Self.place(id: 1))
         #expect(Self.placementIDs(terminal) == [1])
         terminal.feed(Array("\u{1B}[H\u{1B}[2J".utf8))  // clear(1), and zsh's ^L
         #expect(Self.placementIDs(terminal).isEmpty)
-        #expect(terminal.grid.imagePlacements.imageCount == 1, "the bytes stay for a=p")
+        #expect(terminal.grid.imagePlacements.imageCount == 0, "nothing shows it any more")
+    }
+
+    @Test("ED 2 frees an image nothing places, and keeps one still placed in history")
+    func eraseAllFreesOnlyUnplacedImages() {
+        var terminal = Terminal(rows: 5, columns: 40, scrollbackLimit: 100)
+        terminal.feed(Self.place(id: 1))  // scrolled wholly into history below
+        terminal.feed(Array(String(repeating: "\r\n", count: 12).utf8))
+        let payload = Data(repeating: 0xFF, count: 16).base64EncodedString()
+        terminal.feed(Self.apc("a=t,q=2,i=2,f=32,s=2,v=2", payload: payload))  // stored, never placed
+        #expect(terminal.grid.imagePlacements.imageCount == 2)
+        terminal.feed(Array("\u{1B}[2J".utf8))
+        #expect(Self.placementIDs(terminal) == [1])
+        #expect(terminal.grid.imagePlacements.image(KittyGraphics.ImageID(rawValue: 1)) != nil)
+        #expect(terminal.grid.imagePlacements.image(KittyGraphics.ImageID(rawValue: 2)) == nil)
+    }
+
+    @Test("icat then clear, over and over, never fills the byte budget")
+    func repeatedDrawAndClearDoesNotAccumulate() {
+        var terminal = Terminal(rows: 10, columns: 40)
+        for id in 1...50 {
+            terminal.feed(Self.place(id: id))
+            terminal.feed(Array("\u{1B}[H\u{1B}[2J\u{1B}[3J".utf8))
+        }
+        #expect(terminal.grid.imagePlacements.imageCount == 0)
+    }
+
+    @Test("RIS clears every placement and image, and a later transmission places again")
+    func resetClearsImagesLikeKitty() {
+        var terminal = Terminal(rows: 10, columns: 40)
+        terminal.feed(Self.place(id: 1))
+        terminal.reset()
+        #expect(Self.placementIDs(terminal).isEmpty)
+        #expect(terminal.grid.imagePlacements.imageCount == 0)
+        terminal.feed(Self.place(id: 1))
+        #expect(Self.placementIDs(terminal) == [1])
     }
 
     @Test("ED 2 keeps a placement that lies wholly in scrollback")
