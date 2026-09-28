@@ -55,7 +55,7 @@ import Testing
         let firstFrameStart = DispatchTime.now()
         for _ in 0..<120 {
             for scalar in UInt32(0x20)...UInt32(0x7E) {
-                _ = atlas.glyph(forASCII: scalar, bold: false)
+                _ = atlas.glyph(forASCII: scalar, style: .regular)
             }
         }
         let firstFrameMs =
@@ -90,7 +90,7 @@ import Testing
         let atlas = GlyphAtlas(device: device, font: font)
 
         for scalar in UInt32(0x21)...UInt32(0x7E) {
-            _ = atlas.glyph(forASCII: scalar, bold: false)
+            _ = atlas.glyph(forASCII: scalar, style: .regular)
         }
 
         #expect(atlas.fastPathHits > 0)
@@ -105,9 +105,9 @@ import Testing
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
         let atlas = GlyphAtlas(device: device, font: font)
 
-        _ = atlas.glyph(shaping: 0x4E2D, bold: false)  // 中
+        _ = atlas.glyph(shaping: 0x4E2D, style: .regular)  // 中
         #expect(atlas.shapingHits == 1)
-        _ = atlas.glyph(shaping: 0x4E2D, bold: false)
+        _ = atlas.glyph(shaping: 0x4E2D, style: .regular)
         #expect(atlas.shapingHits == 1)  // second lookup is a cache hit
     }
 
@@ -123,7 +123,7 @@ import Testing
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
         let atlas = GlyphAtlas(device: device, font: font)
 
-        let info = atlas.glyph(shaping: 0x4E2D, bold: false)  // 中
+        let info = atlas.glyph(shaping: 0x4E2D, style: .regular)  // 中
         #expect(info != nil)
         #expect(info?.size != .zero)
         #expect(atlas.fallbackHits > 0, "expected the CJK run to resolve to a fallback font")
@@ -142,8 +142,8 @@ import Testing
 
         // 👨‍👩‍👧‍👦 = 👨 ZWJ 👩 ZWJ 👧 ZWJ 👦
         let family: [UInt32] = [0x1F468, 0x200D, 0x1F469, 0x200D, 0x1F467, 0x200D, 0x1F466]
-        guard let familyInfo = atlas.glyph(forCluster: family, bold: false),
-            let singleInfo = atlas.glyph(shaping: 0x1F468, bold: false),
+        guard let familyInfo = atlas.glyph(forCluster: family, style: .regular),
+            let singleInfo = atlas.glyph(shaping: 0x1F468, style: .regular),
             familyInfo.size != .zero, singleInfo.size != .zero
         else {
             Issue.record("emoji cluster failed to shape in this environment")
@@ -152,7 +152,7 @@ import Testing
         #expect(familyInfo.size.x < singleInfo.size.x * 2, "a ZWJ family is one glyph, not four")
 
         let hits = atlas.shapingHits
-        _ = atlas.glyph(forCluster: family, bold: false)
+        _ = atlas.glyph(forCluster: family, style: .regular)
         #expect(atlas.shapingHits == hits, "the cluster shaping cache must hit on a repeat lookup")
     }
 
@@ -166,11 +166,11 @@ import Testing
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
         let atlas = GlyphAtlas(device: device, font: font)
 
-        let info = atlas.glyph(forCluster: [0x65, 0x301], bold: false)  // e + combining acute
+        let info = atlas.glyph(forCluster: [0x65, 0x301], style: .regular)  // e + combining acute
         #expect(info != nil)
         #expect(info?.size != .zero)
         let hits = atlas.shapingHits
-        _ = atlas.glyph(forCluster: [0x65, 0x301], bold: false)
+        _ = atlas.glyph(forCluster: [0x65, 0x301], style: .regular)
         #expect(atlas.shapingHits == hits)
     }
 
@@ -186,11 +186,11 @@ import Testing
         // A 64×64 page holds only a handful of 14 pt CJK glyphs.
         let atlas = GlyphAtlas(device: device, font: font, atlasPixelSize: 64)
 
-        let first = atlas.glyph(shaping: 0x4E00, bold: false)  // 一
+        let first = atlas.glyph(shaping: 0x4E00, style: .regular)  // 一
         #expect(first != nil)
 
         for i: UInt32 in 0..<40 {
-            _ = atlas.glyph(shaping: 0x4E00 + i, bold: false)
+            _ = atlas.glyph(shaping: 0x4E00 + i, style: .regular)
             if atlas.evictionCount > 0 { break }
         }
         #expect(atlas.evictionCount > 0, "40 CJK glyphs must overflow a 64x64 page")
@@ -198,7 +198,7 @@ import Testing
 
         // A glyph issued before the reset is a cache miss now and
         // re-rasterises into the rewound allocator.
-        let again = atlas.glyph(shaping: 0x4E00, bold: false)
+        let again = atlas.glyph(shaping: 0x4E00, style: .regular)
         #expect(again != nil)
         #expect(again?.size != .zero)
     }
@@ -217,11 +217,11 @@ import Testing
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
         let atlas = GlyphAtlas(device: device, font: font, atlasPixelSize: 64)
 
-        _ = atlas.glyph(forASCII: UInt32(Character("A").asciiValue!), bold: false)
+        _ = atlas.glyph(forASCII: UInt32(Character("A").asciiValue!), style: .regular)
         let asciiHitsBeforeOverflow = atlas.fastPathHits
 
         for i: UInt32 in 0..<80 {
-            _ = atlas.glyph(shaping: 0x4E00 + i, bold: false)
+            _ = atlas.glyph(shaping: 0x4E00 + i, style: .regular)
             if atlas.evictionCount > 0 { break }
         }
         #expect(atlas.evictionCount > 0, "80 CJK glyphs must overflow the shaped page's half of a 64x64 atlas")
@@ -230,7 +230,7 @@ import Testing
         // (`glyph(forASCII:)` returns before touching `fastPathHits`), so if
         // the ASCII page survived the shaped page's eviction, this count is
         // unchanged.
-        _ = atlas.glyph(forASCII: UInt32(Character("A").asciiValue!), bold: false)
+        _ = atlas.glyph(forASCII: UInt32(Character("A").asciiValue!), style: .regular)
         #expect(atlas.fastPathHits == asciiHitsBeforeOverflow, "the ASCII cache must have survived the shaped page's eviction")
     }
 
@@ -244,7 +244,7 @@ import Testing
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
         let atlas = GlyphAtlas(device: device, font: font, atlasPixelSize: 64)
 
-        _ = atlas.glyph(shaping: 0x4E00, bold: false)
+        _ = atlas.glyph(shaping: 0x4E00, style: .regular)
         let shapingHitsBeforeOverflow = atlas.shapingHits
 
         // Every printable ASCII scalar, across all four styles, repeatedly —
@@ -261,7 +261,7 @@ import Testing
         }
         #expect(atlas.evictionCount > 0, "four styles of the printable ASCII range must overflow the ASCII page's half of a 64x64 atlas")
 
-        _ = atlas.glyph(shaping: 0x4E00, bold: false)
+        _ = atlas.glyph(shaping: 0x4E00, style: .regular)
         #expect(atlas.shapingHits == shapingHitsBeforeOverflow, "the shaped-page cache must have survived the ASCII page's eviction")
     }
 
@@ -272,7 +272,7 @@ import Testing
         let font = CTFontCreateWithName("Menlo" as CFString, 32, nil)
         let atlas = GlyphAtlas(device: device, font: font)
 
-        guard let info = atlas.glyph(forASCII: UInt32(Character("X").asciiValue!), bold: true),
+        guard let info = atlas.glyph(forASCII: UInt32(Character("X").asciiValue!), style: .bold),
             info.size != .zero
         else {
             Issue.record("'X' rasterised to an empty glyph")

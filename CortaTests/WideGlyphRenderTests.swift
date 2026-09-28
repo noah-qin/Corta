@@ -194,7 +194,7 @@ import Testing
 
         // 👨‍👩‍👧‍👦
         let family: [UInt32] = [0x1F468, 0x200D, 0x1F469, 0x200D, 0x1F467, 0x200D, 0x1F466]
-        guard let info = renderer.glyphAtlas.glyph(forCluster: family, bold: false),
+        guard let info = renderer.glyphAtlas.glyph(forCluster: family, style: .regular),
             info.size != .zero
         else {
             Issue.record("the ZWJ family cluster failed to shape in this environment")

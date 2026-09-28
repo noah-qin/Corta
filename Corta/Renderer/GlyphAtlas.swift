@@ -313,19 +313,6 @@ nonisolated final class GlyphAtlas {
         return info
     }
 
-    // Regular-or-bold overloads for callers that don't need italics.
-    func glyph(forASCII scalar: UInt32, bold: Bool) -> GlyphInfo? {
-        glyph(forASCII: scalar, style: Style(bold: bold, italic: false))
-    }
-
-    func glyph(shaping scalar: UInt32, bold: Bool) -> GlyphInfo? {
-        glyph(shaping: scalar, style: Style(bold: bold, italic: false))
-    }
-
-    func glyph(forCluster scalars: [UInt32], bold: Bool) -> GlyphInfo? {
-        glyph(forCluster: scalars, style: Style(bold: bold, italic: false))
-    }
-
     /// Shapes the whole cluster as one string, so ZWJ sequences and combining
     /// marks come out as the font defines them.
     func glyph(forCluster scalars: [UInt32], style: Style) -> GlyphInfo? {
