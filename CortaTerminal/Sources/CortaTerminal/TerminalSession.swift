@@ -268,8 +268,7 @@ public final class TerminalSession: @unchecked Sendable {
                 var offset = 0
                 while offset < batch.count {
                     let end = min(offset + Self.feedLockSliceSize, batch.count)
-                    // An `Array`, not a slice: the ASCII fast path needs it.
-                    let slice = Array(batch[offset..<end])
+                    let slice = batch[offset..<end]
                     let applied = state.withLock { current -> (responses: [UInt8], episode: Int?) in
                         let episodeBefore = current.terminal.synchronizedOutputEpisode
                         current.terminal.feed(slice)

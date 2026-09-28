@@ -62,6 +62,11 @@ public struct Terminal: Sendable {
         parser.parse(bytes, performer: &performer)
     }
 
+    /// Contiguous, and fed without a copy: the reader's lock slices.
+    public mutating func feed(_ bytes: ArraySlice<UInt8>) {
+        parser.parse(bytes, performer: &performer)
+    }
+
     public var hasPendingOutput: Bool { !performer.state.outputBuffer.isEmpty }
 
     public var isBracketedPasteEnabled: Bool { performer.state.bracketedPasteEnabled }

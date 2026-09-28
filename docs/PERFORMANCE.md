@@ -338,7 +338,7 @@ subsystem `dev.noahqin.Corta`, category `input-latency`:
 | --------- | --------------------------------------------------- |
 | `keyDown` | key event → bytes written to the PTY                |
 | `output`  | a parse batch has been applied to the grid (a point, not an interval — it is emitted on the reader thread) |
-| `wake`    | the MainActor hop that un-parks the display link    |
+| `wake`    | the MainActor hop that un-parks the display link — at most one a frame (§5.10) |
 | `frame`   | the vsync callback: damage diff, instance build, `nextDrawable` |
 | `commit`  | encode and submit                                   |
 | `gpu`     | submission → the command buffer's completion handler |
@@ -738,3 +738,31 @@ Two holders outlive a frame on purpose: a search sweep (`Task.detached`,
 for the sweep's duration) and an export (until the save panel's row walk
 finishes). Each pays the copy once. A selection drag re-snapshots per
 mouse event, so it holds one for at most an event's interval.
+
+### 5.10 Main-actor wakes under a flood (#112)
+
+The reader calls `onOutput` once per parse batch, and a `yes` flood is
+tens of thousands of batches a second. Until 1.1.0 each one enqueued a
+`Task` on the main actor to resume the display link and restart the
+long-task notifier's idle `Timer`. Now each session has an
+`OutputWakeGate`: a batch hops only when the gate was idle, and the frame
+that takes the flag in `prepareFrame` re-arms it, so a flood wakes the
+main actor at most once a frame. The notifier no longer hears about
+output at all; its idle timer reads the gate's last-output time when it
+fires and re-arms itself for the rest of the grace, which also keeps it
+right while a hidden pane's frames are paused. The reader's batch is fed
+to the parser as slices of its buffer (`Terminal.feed(_: ArraySlice)`),
+not copied into an `Array` per 16 KiB lock slice.
+
+| Measure | Before | After |
+| --- | --- | --- |
+| `corta-bench`, `yes` at 200 columns, frames taken at 60 Hz | 42,499 batches/s, one hop each | **50 hops/s** |
+| The app, Debug, one `yes` pane, 5 s `os_signpost` trace: `output` / `wake` events | 22,014 / 43,904 (a hop per batch) | 22,005 / **167** (as many as `frame`, 167) |
+| Release frame CPU (D17), three alternating runs | 0.689 ms avg (0.684 / 0.712 / 0.670) | 0.691 ms avg (0.707 / 0.617 / 0.749) |
+| Parser-only / parser + grid / core feed, three alternating runs | 716–768 / 158–161 / 140–144 MiB/s | 739–748 / 164–165 / 143–146 MiB/s |
+
+Apple M5, macOS 27.0 (26A428), Xcode 27.0 (27A266a), on battery. The
+signpost counts are intervals' begin and end events, so a hop or a frame
+is two. The frame-CPU figure does not move, as it should not: the render
+loop is unchanged, and D17 is recorded because the frame's entry point
+is. `corta-bench`'s *main-actor wakes under flood* holds the number.
