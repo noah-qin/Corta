@@ -21,7 +21,8 @@
 /// A column change drops every placement (`Grid.resize`) rather than
 /// re-wrapping image geometry — a misplaced image is worse than a missing
 /// one, and clients re-place on resize anyway. The bytes survive, so a bare
-/// `a=p` re-places without re-uploading.
+/// `a=p` re-places without re-uploading — until the display is next erased,
+/// which frees every image no placement shows, as kitty does.
 public struct ImagePlacementTable: Sendable {
     private var images: [KittyGraphics.ImageID: KittyGraphics.ImageData] = [:]
     private var placements: [KittyGraphics.PlacementID: KittyGraphics.Placement] = [:]
