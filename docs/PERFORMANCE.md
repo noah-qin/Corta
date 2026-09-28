@@ -135,10 +135,11 @@ asking "did this row change" dropped, from an `O(row length)` comparison
 to one integer compare. Scrolled into history the rows come from
 immutable scrollback storage with no such stamp, so that path still
 compares `Line` values directly (`TerminalRenderer.rebuildDamagedRows`).
-The shell takes one `session.snapshot()` + diff per frame
-(`ViewController.prepareFrame`, then `render`), not two, since a second
-would diff a grid the first had just
-diffed moments earlier in the same vsync callback.
+The shell takes one `session.snapshot()` + diff per frame, in
+`ViewController.prepareFrame`, and releases it there: `render` draws the
+renderer's cached instances and reads no grid. A second snapshot would
+diff a grid the first had just diffed in the same vsync callback, and one
+held until the next frame would cost the reader a scrollback copy (§5.9).
 
 Because a `ScreenLines` swap (an alternate-screen enter/exit, a column
 resize replacing `lines` outright) restarts row revisions from small
@@ -693,3 +694,47 @@ previous frame completes. A warm backend costs 0.06 ms per pane where
 `QuadRenderer` cost nothing: each pane's backend owns its own queue,
 command buffers, allocators and residency set.
 
+
+### 5.9 A snapshot's lifetime (#111)
+
+A `Grid` snapshot shares the scrollback's arenas with the reader. While it
+lives, the reader's next `Scrollback.push` copies the `batches` array and
+the tail arena (up to 256 rows × width × 16 bytes) — once, since the copy
+is the reader's own from then on. Until 1.1.0 the frame's snapshot was
+held from one `prepareFrame` to the next, so the reader paid that copy
+once per frame under any flood; since #109 it is released as soon as it
+is diffed.
+
+`corta-bench`'s *feed throughput under a 60 Hz snapshotter* measures the
+difference: the reader feeds in the session's 16 KiB lock slices while a
+`.userInteractive` thread takes a snapshot under the same lock at 60 Hz,
+and drops it at once or holds it to the next tick. Median of three
+alternating runs, `-c release`:
+
+| Corpus | No snapshotter | Released at once | Held to the next tick |
+| --- | --- | --- | --- |
+| `yes` lines (`y\r\n`, 32 MiB) | 53.1 MiB/s | 52.4 MiB/s | 52.1 MiB/s |
+| 200-column lines (64 MiB) | 207.6 MiB/s | 199.5 MiB/s | 199.8 MiB/s |
+
+The copy itself, timed on its own — one 200-column line fed into a full
+scrollback, 1,000 samples each:
+
+| | p50 | p95 | p99 | max |
+| --- | --- | --- | --- | --- |
+| Nothing sharing the scrollback | 0.001 ms | 0.001 ms | 0.002 ms | 0.005 ms |
+| A snapshot alive (the copy-on-write) | 0.008 ms | 0.014 ms | 0.020 ms | 0.089 ms |
+
+Apple M5, macOS 27.0 (26A428), Xcode 27.0 (27A266a), on battery.
+Held and released are inside each other's run-to-run spread, and the
+second table says why: the copy is ~8 µs, so a snapshot held across
+every frame cost the reader ~0.5 ms a second at 60 Hz — well under the
+noise of a throughput run (a one-off run at 2 kHz could not separate the
+two either). What a snapshot does cost is the lock hand-off, the ~4%
+between no snapshotter and either mode on wide lines, which is the
+frame's to pay. The benchmark stays so that a snapshot that starts
+outliving its frame again shows up as a number.
+
+Two holders outlive a frame on purpose: a search sweep (`Task.detached`,
+for the sweep's duration) and an export (until the save panel's row walk
+finishes). Each pays the copy once. A selection drag re-snapshots per
+mouse event, so it holds one for at most an event's interval.

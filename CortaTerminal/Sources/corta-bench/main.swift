@@ -598,6 +598,125 @@ func benchmarkSnapshotLatencyUnderFlood() {
 
 benchmarkSnapshotLatencyUnderFlood()
 
+// MARK: - Feed throughput under a 60 Hz snapshotter
+
+/// The reader-side cost of a snapshot that outlives its frame. A `Grid`
+/// snapshot shares the scrollback's arenas; while it lives, the next
+/// `Scrollback.push` copies the `batches` array and the whole tail arena
+/// (up to 256 rows × width × 16 bytes). The app releases its snapshot as
+/// soon as `prepareFrame` has diffed it; until 1.1.0 it held one until the
+/// next frame.
+///
+/// The reader feeds in the session's 16 KiB lock slices while a thread
+/// takes a snapshot under the same lock at 60 Hz and either drops it at
+/// once or holds it until the next tick. Two corpora: `yes`-shaped lines,
+/// which trim to one cell so the arena copy is small, and full-width lines,
+/// the worst case. Runs alternate so the machine's drift lands on all three.
+func benchmarkFeedUnderSnapshotter() {
+    enum Snapshots: String, CaseIterable {
+        case none = "no snapshotter"
+        case dropped = "60 Hz, released at once"
+        case held = "60 Hz, held to the next tick"
+    }
+    let columns = 200
+    let fullWidth = Array((String(repeating: "x", count: columns) + "\r\n").utf8)
+    let corpora: [(name: String, bytes: [UInt8])] = [
+        ("`yes` lines", Array([UInt8]("y\r\n".utf8).repeated(toCount: 32 * 1_048_576))),
+        ("\(columns)-column lines", fullWidth.repeated(toCount: 64 * 1_048_576)),
+    ]
+    let sliceSize = 16 * 1024
+    let runs = 3
+
+    func feedSeconds(_ corpus: [UInt8], _ mode: Snapshots) -> Double {
+        let state = Mutex(Terminal(rows: 50, columns: columns, scrollbackLimit: 10_000))
+        let stop = Atomic(false)
+        let finished = DispatchSemaphore(value: 0)
+        let snapshotter = Thread {
+            pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0)
+            var held: Grid?
+            while !stop.load(ordering: .relaxed) {
+                // Assigned or discarded in the statement that takes it, so
+                // a dropped snapshot cannot live on through the sleep.
+                if mode == .held {
+                    held = state.withLock { $0.grid }
+                } else {
+                    _ = state.withLock { $0.grid }
+                }
+                Thread.sleep(forTimeInterval: 1.0 / 60)
+            }
+            held = nil
+            finished.signal()
+        }
+        if mode != .none { snapshotter.start() }
+        let start = DispatchTime.now()
+        var offset = 0
+        while offset < corpus.count {
+            let end = min(offset + sliceSize, corpus.count)
+            let slice = Array(corpus[offset..<end])
+            state.withLock { $0.feed(slice) }
+            offset = end
+        }
+        let elapsed = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e9
+        stop.store(true, ordering: .relaxed)
+        // Joined, so its last snapshot is freed before the next run's clock.
+        if mode != .none { finished.wait() }
+        return elapsed
+    }
+
+    for corpus in corpora {
+        var seconds: [Snapshots: [Double]] = [:]
+        for _ in 0..<runs {
+            for mode in Snapshots.allCases {
+                seconds[mode, default: []].append(feedSeconds(corpus.bytes, mode))
+            }
+        }
+        for mode in Snapshots.allCases {
+            let rates = seconds[mode, default: []].map {
+                throughput(corpus.bytes.count, elapsedSeconds: $0)
+            }
+            let median = rates.sorted()[rates.count / 2]
+            print(
+                "feed throughput, \(corpus.name), \(mode.rawValue): "
+                    + "\(String(format: "%.1f", median)) MiB/s median of \(runs) "
+                    + "(\(rates.map { String(format: "%.1f", $0) }.joined(separator: " / ")))")
+        }
+    }
+
+    // The copy itself, which the throughput runs only see diluted: one
+    // full-width line fed into a full scrollback, with a snapshot alive or
+    // not. The first is what every frame paid while a snapshot outlived it.
+    var terminal = Terminal(rows: 50, columns: columns, scrollbackLimit: 10_000)
+    terminal.feed(fullWidth.repeated(toCount: fullWidth.count * 10_100))
+    var alone: [UInt64] = []
+    var shared: [UInt64] = []
+    for iteration in 0..<2_000 {
+        let snapshot: Grid? = iteration.isMultiple(of: 2) ? terminal.grid : nil
+        let start = DispatchTime.now()
+        terminal.feed(fullWidth)
+        let elapsed = DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds
+        if snapshot == nil { alone.append(elapsed) } else { shared.append(elapsed) }
+        withExtendedLifetime(snapshot) {}
+    }
+    if let alone = LatencyDistribution(samplesNanoseconds: alone),
+        let shared = LatencyDistribution(samplesNanoseconds: shared)
+    {
+        print("one \(columns)-column line into a full scrollback, nothing sharing it: \(alone.description)")
+        print("the same line with a snapshot alive (the copy-on-write): \(shared.description)")
+    }
+}
+
+extension Array where Element == UInt8 {
+    /// `self` repeated until at least `count` bytes.
+    fileprivate func repeated(toCount count: Int) -> [UInt8] {
+        var result: [UInt8] = []
+        result.reserveCapacity(count + self.count)
+        while result.count < count { result.append(contentsOf: self) }
+        return result
+    }
+}
+
+benchmarkFeedUnderSnapshotter()
+
 // MARK: - Write-path backpressure
 
 /// What the caller of `session.write` pays while the child never reads its

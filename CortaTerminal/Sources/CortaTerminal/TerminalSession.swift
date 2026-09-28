@@ -35,9 +35,13 @@ import Synchronization
 /// first is replayed to the callback.
 ///
 /// **Snapshots** copy the `Grid` value under the reader's lock — O(1)
-/// copy-on-write, paid lazily by the next mutation: one row on the live
-/// screen, but the whole tail arena for the next `Scrollback.push`, so a
-/// snapshot should not outlive its frame.
+/// copy-on-write, paid lazily by the reader's next mutation while the
+/// snapshot lives: one row for a write to the live screen (`ScreenLines`),
+/// but the `batches` array and the whole tail arena, up to 256 rows × width,
+/// for the next `Scrollback.push`. Once per snapshot, not per push — the
+/// copy is the reader's own from then on — so the frame's snapshot is
+/// released as soon as it is diffed; a search sweep or an export, which
+/// need the grid longer, pay that copy once (`PERFORMANCE.md` §5.9).
 ///
 /// **Fairness**: batches are fed in slices, and the reader leaves a real gap
 /// while a render-path waiter is registered (`yieldToStateWaiters`) —
