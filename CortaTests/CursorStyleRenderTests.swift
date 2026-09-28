@@ -39,18 +39,16 @@ import Testing
 
     /// Renders a 4x10 grid containing "abc" (cursor on row 0, column 3) with
     /// the given DECSCUSR parameter applied, and returns the texture. The
-    /// cursor is painted in `variant`'s cursor colour — the live palette is
-    /// whatever the test host's appearance resolved, so it is pinned here
-    /// for the render and put back afterwards.
+    /// cursor is painted in `variant`'s cursor colour, pinned on this renderer
+    /// (`themeVariant`) rather than on the process-wide palette, which other
+    /// suites and the host's appearance change while this one renders.
     private static func renderWithCursorStyle(
         _ decscusr: String?, variant: Theme.Variant = Theme.corta.dark
     ) throws -> (texture: MTLTexture, renderer: TerminalRenderer) {
-        let live = TerminalColorPalette.activeVariant
-        TerminalColorPalette.apply(variant)
-        defer { TerminalColorPalette.apply(live) }
         let device = try #require(MTLCreateSystemDefaultDevice())
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
         let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
+        renderer.themeVariant = variant
 
         var terminal = Terminal(rows: 4, columns: 10)
         terminal.feed(Array("abc".utf8))  // cursor now sits at row 0, column 3
@@ -175,5 +173,20 @@ import Testing
             renderer.updateInstances(
                 grid: terminal.grid, scrollOffset: 0, cursorVisible: true, selection: nil))
         #expect(renderer.lastRebuiltRowCount == 0)
+    }
+
+    /// The race this suite used to lose: another suite applies a theme to the
+    /// process-wide palette while this one renders. A renderer with its own
+    /// variant must draw that variant whatever the live palette holds — here
+    /// a pure-green cursor no real theme has, so the assertion holds on any
+    /// host appearance without this test writing the global itself.
+    @Test func aPinnedRendererDrawsItsOwnThemeNotTheLivePalette() throws {
+        var green = Theme.corta.dark
+        green.cursor = SIMD4<Float>(0, 1, 0, 1)
+        let (texture, renderer) = try Self.renderWithCursorStyle("2", variant: green)
+        let pixel = Self.pixel(
+            of: texture, x: Int(renderer.metrics.cellWidth * 3.5),
+            y: Int(renderer.metrics.cellHeight / 2))
+        #expect(pixel.g > 100 && pixel.r < 60 && pixel.b < 60, "the pinned green cursor; got \(pixel)")
     }
 }

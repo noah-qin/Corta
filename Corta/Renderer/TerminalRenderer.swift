@@ -114,6 +114,11 @@ public nonisolated final class TerminalRenderer {
 
     private(set) var lastRebuiltRowCount = 0
 
+    /// This renderer's theme, instead of the live one (`TerminalColorPalette`).
+    /// For tests: the live palette is process-wide, and a suite that pinned it
+    /// was rendering whatever another suite had just applied.
+    var themeVariant: Theme.Variant?
+
     /// Rows in the cached frame: the grid height `draw` lays out.
     var cachedRowCount: Int { cachedLines.count }
 
@@ -483,7 +488,7 @@ public nonisolated final class TerminalRenderer {
             // Blinking styles draw steady: a blink timer would force frames on an
             // idle screen. An eighth of a cell, at least 2 device pixels.
             let stroke = max(2, (cellHeight / 8).rounded(.down))
-            let cursorColor = TerminalColorPalette.cursorColor
+            let cursorColor = (themeVariant ?? TerminalColorPalette.activeVariant).cursor
             switch grid.cursorStyle {
             case .block, .blinkingBlock:
                 overlayScratch.append(
@@ -518,7 +523,7 @@ public nonisolated final class TerminalRenderer {
         let cellHeight = Float(metrics.cellHeight)
         let baseline = Float(metrics.baselineOffset)
         // Once per row: the accessor retains the ANSI array on every touch.
-        let palette = TerminalColorPalette.activeVariant
+        let palette = themeVariant ?? TerminalColorPalette.activeVariant
         // The mark: a rule down a prompt row's left edge, coloured by outcome —
         // which of the last twenty failed, at a glance. Inside the first cell:
         // the inset is outside this renderer's rect.

@@ -248,9 +248,7 @@ struct RenderReferenceTests {
 
         let decoded = DispatchSemaphore(value: 0)
         renderer.kittyImageRenderer.onImagesReady = { decoded.signal() }
-        let previous = TerminalColorPalette.activeVariant
-        TerminalColorPalette.apply(Theme.corta.dark)
-        defer { TerminalColorPalette.apply(previous) }
+        renderer.themeVariant = Theme.corta.dark
 
         func frame() {
             renderer.renderAndWait(
