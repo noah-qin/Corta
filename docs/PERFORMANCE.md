@@ -623,9 +623,21 @@ and the tail not at all beyond the run-to-run spread — Apple's note that
 the final latency "may be larger in windowed modes on macOS" is what
 this measures. **The default stays**: `FrameScheduler.attach` sets
 nothing, and `CORTA_FRAME_LATENCY` remains the seam to measure it again
-(full-screen, another panel, a later macOS). The `--manual` kind was
-not re-run for this: the HID stage it adds sits before the app and does
-not depend on the setting.
+(full-screen, another panel, a later macOS).
+
+The `--manual` kind, a person typing digits on the built-in keyboard,
+one run of 200 samples per setting, same build, machine and power:
+
+| `preferredFrameLatency` | p50 | p95 | p99 | max |
+| --- | --- | --- | --- | --- |
+| Default (reads 2.0) | 64.2 ms | 80.3 ms | 84.5 ms | 136.7 ms |
+| 1 | 65.1 ms | 80.5 ms | 134.5 ms | 145.3 ms |
+| 2 | 63.6 ms | 79.5 ms | 133.0 ms | 146.0 ms |
+
+It says the same: 1 is no faster at the median or at p95. The tail is
+a person's — the default and 2 are one setting, yet their p99 differ by
+48 ms, since at 200 samples p99 is the second-slowest keystroke — and
+not something to choose a value by.
 
 ### 5.8 The frame-CPU baseline, under Release (D17)
 
