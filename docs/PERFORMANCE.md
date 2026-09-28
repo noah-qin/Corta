@@ -583,9 +583,9 @@ permission asked:
 
 `CORTA_RENDER_METRICS=1` turns it on; 200 samples print one line on the
 unified log (`keypressToPresent: n=200 avg=… p50=… p95=… p99=… max=…`),
-and `scripts/measure-keypress-latency.sh` launches, drives 230 synthetic
-keystrokes (or, with `--manual`, waits while a person types) and reads
-the line back. Two kinds of number come out of it, and a quoted figure
+and `scripts/measure-keypress-latency.sh` launches, drives 320 synthetic
+keystrokes about 150 ms apart (or, with `--manual`, waits while a person
+types) and reads the line back. Two kinds of number come out of it, and a quoted figure
 says which:
 
 | Kind | Includes | Comparable to |
@@ -602,6 +602,30 @@ Both kinds say the same thing the target row in §1 says: above one
 frame plus input latency, on a 60 Hz panel a good three to four frames.
 Where those frames go is the `os_signpost` chain's job (§5.3); the
 in-app number is what says whether a change moved it.
+
+**`preferredFrameLatency` (#114, 2026-09-28).** `CAMetalDisplayLink`
+asks for a latency in frames; it reads 2.0 by default and clamps
+anything below 1 to 1.0. The question was whether 1 buys back a frame
+of the three to four above. Scripted runs, 200 samples each, two rounds
+alternating, `CORTA_FRAME_LATENCY` passed through the launch; the
+Benchmark configuration's `CortaDev.app` at `main` after #166–#168; the
+built-in 60 Hz panel:
+
+| `preferredFrameLatency` | p50 | p95 | p99 | max |
+| --- | --- | --- | --- | --- |
+| Default (reads 2.0) | 63.7 / 64.3 ms | 72.2 / 70.9 ms | 80.1 / 72.3 ms | 82.8 / 72.7 ms |
+| 1 | 63.3 / 63.1 ms | 70.0 / 71.5 ms | 72.8 / 73.3 ms | 74.1 / 73.6 ms |
+| 2 | 64.0 / 64.0 ms | 71.2 / 72.1 ms | 72.8 / 74.0 ms | 74.4 / 74.6 ms |
+
+Apple M5, macOS 27.0 (26A428), Xcode 27.0 (27A266a), on battery.
+A frame is 16.7 ms here, and 1 moved the median by half a millisecond
+and the tail not at all beyond the run-to-run spread — Apple's note that
+the final latency "may be larger in windowed modes on macOS" is what
+this measures. **The default stays**: `FrameScheduler.attach` sets
+nothing, and `CORTA_FRAME_LATENCY` remains the seam to measure it again
+(full-screen, another panel, a later macOS). The `--manual` kind was
+not re-run for this: the HID stage it adds sits before the app and does
+not depend on the setting.
 
 ### 5.8 The frame-CPU baseline, under Release (D17)
 

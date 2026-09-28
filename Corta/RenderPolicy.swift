@@ -23,9 +23,14 @@ import QuartzCore
 /// (`PERFORMANCE.md` §3). It matters for a pane flooding output while
 /// hidden, throttled or on battery.
 ///
-/// `preferredFrameLatency` is untouched: a value picked without a
-/// keypress-to-glass measurement (`PERFORMANCE.md` §5.3–5.4) could as
-/// easily make latency worse.
+/// `preferredFrameLatency` is left at its default, and not for want of
+/// trying. The unit is frames: "the amount of time, in frames, your app
+/// requests to render a frame", and the system may make the final latency
+/// larger in a window on macOS. The default reads 2.0 and anything under
+/// 1 reads back as 1.0. Measured keypress to glass at the default, 1 and 2
+/// on a 60 Hz panel, 1 moved neither the median nor the tail by anything
+/// like the frame it asks for (`PERFORMANCE.md` §5.7), so nothing is set;
+/// `CORTA_FRAME_LATENCY` stays as the seam to measure it again.
 final class RenderPolicy {
     private weak var scheduler: FrameScheduler?
     private var thermalObserver: NSObjectProtocol?
