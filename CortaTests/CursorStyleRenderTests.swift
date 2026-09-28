@@ -177,16 +177,16 @@ import Testing
 
     /// The race this suite used to lose: another suite applies a theme to the
     /// process-wide palette while this one renders. A renderer with its own
-    /// variant must not see it.
-    @Test func aPinnedRendererIgnoresTheLivePalette() throws {
-        let live = TerminalColorPalette.activeVariant
-        TerminalColorPalette.apply(Theme.corta.light)
-        defer { TerminalColorPalette.apply(live) }
-        let (texture, renderer) = try Self.renderWithCursorStyle("2")
+    /// variant must draw that variant whatever the live palette holds — here
+    /// a pure-green cursor no real theme has, so the assertion holds on any
+    /// host appearance without this test writing the global itself.
+    @Test func aPinnedRendererDrawsItsOwnThemeNotTheLivePalette() throws {
+        var green = Theme.corta.dark
+        green.cursor = SIMD4<Float>(0, 1, 0, 1)
+        let (texture, renderer) = try Self.renderWithCursorStyle("2", variant: green)
         let pixel = Self.pixel(
             of: texture, x: Int(renderer.metrics.cellWidth * 3.5),
             y: Int(renderer.metrics.cellHeight / 2))
-        #expect(pixel.r > 60, "the dark theme's light cursor, not the live light theme's dark one; got \(pixel)")
+        #expect(pixel.g > 100 && pixel.r < 60 && pixel.b < 60, "the pinned green cursor; got \(pixel)")
     }
 }
-
