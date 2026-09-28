@@ -70,6 +70,18 @@ public enum KittyGraphics {
         public var width: Int
         public var height: Int
         public var bytes: [UInt8]
+
+        /// Height in pixels without decoding: `v=`, or for a PNG the `IHDR`
+        /// chunk every PNG starts with (big-endian, bytes 20–23). Nil when a
+        /// PNG is too short or not one — the app's decoder rejects it anyway.
+        var pixelHeight: Int? {
+            if height > 0 { return height }
+            guard format == .png, bytes.count >= 24,
+                bytes[12] == 0x49, bytes[13] == 0x48, bytes[14] == 0x44, bytes[15] == 0x52
+            else { return nil }
+            let value = Int(bytes[20]) << 24 | Int(bytes[21]) << 16 | Int(bytes[22]) << 8 | Int(bytes[23])
+            return value > 0 ? value : nil
+        }
     }
 
     /// One placement at a document position: `row` is relative to
@@ -79,8 +91,9 @@ public enum KittyGraphics {
         public var imageID: ImageID
         public var row: Int
         public var column: Int
-        /// `c=`/`r=`; `nil` means "from the pixel size and the renderer's
-        /// cell metrics", which only the app knows.
+        /// `c=`/`r=`; `nil` means "from the pixel size and the cell metrics".
+        /// The renderer uses its own; the core, when it must know (erasing the
+        /// display), uses the pty's winsize (`Grid.cellPixelHeight`).
         public var columns: Int?
         public var rows: Int?
         public var baseScrollbackTotal: Int

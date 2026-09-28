@@ -15,7 +15,10 @@ Configuration keys and defaults are maintained in [Configuration](CONFIGURATION.
   font fallback. AppKit IME composition is drawn outside the terminal grid.
 - Metal 4 rendering — one render pass per frame — with a glyph atlas, instanced quads and line damage tracking. Needs a GPU with Metal 4: every Apple silicon Mac; not a virtual machine's paravirtual GPU.
 - OSC 8 hyperlinks, focus reporting and the Kitty keyboard protocol.
-- Kitty graphics with direct RGB, RGBA and PNG transmission and placement.
+- Kitty graphics with direct RGB, RGBA and PNG transmission and placement. Erasing
+  the screen (`clear`, ⌃L, Clear Screen) removes the images on it; erasing the
+  scrollback (`clear`'s `ED 3`, Clear History) removes the ones in history — as
+  kitty does.
 
 Protocol coverage and dated verification results are in [Conformance](CONFORMANCE.md).
 Rendering measurements and their conditions are in [Performance](PERFORMANCE.md).

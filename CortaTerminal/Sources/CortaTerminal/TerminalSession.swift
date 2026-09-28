@@ -192,12 +192,12 @@ public final class TerminalSession: @unchecked Sendable {
             workingDirectory: workingDirectory
         )
         self.pty = pty
-        self.state = Mutex(State(
-            terminal: Terminal(
-                rows: Int(size.rows), columns: Int(size.columns), scrollbackLimit: scrollbackLimit,
-                commandHistoryLimit: commandHistoryLimit
-            )
-        ))
+        var terminal = Terminal(
+            rows: Int(size.rows), columns: Int(size.columns), scrollbackLimit: scrollbackLimit,
+            commandHistoryLimit: commandHistoryLimit
+        )
+        terminal.grid.cellPixelHeight = size.cellPixelHeight
+        self.state = Mutex(State(terminal: terminal))
     }
 
     deinit {
@@ -603,6 +603,9 @@ public final class TerminalSession: @unchecked Sendable {
                 state.withLock { current in
                     var grid = current.terminal.grid
                     grid.resize(rows: Int(size.rows), columns: Int(size.columns))
+                    // Set after, and even with rows and columns unchanged:
+                    // a font change alters only the pixels.
+                    grid.cellPixelHeight = size.cellPixelHeight
                     current.terminal.grid = grid
                 }
             }
