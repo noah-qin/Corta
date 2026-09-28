@@ -17,9 +17,20 @@
 import Foundation
 import Metal
 
+enum QuadPipelineError: Error {
+    case libraryUnavailable
+    case functionUnavailable
+    case samplerUnavailable
+}
+
 /// Render pipelines and sampler shared across panes: one compile per device
-/// per process, every later pane a dictionary lookup. (The binary archive
-/// speeds only the first compile per launch.)
+/// per process, every later pane a dictionary lookup. The first compile of a
+/// launch goes through the previous launch's `MTLBinaryArchive`.
+///
+/// **Colour space.** Colours and the atlas are sRGB-encoded and blend in
+/// that space: the target is `.bgra8Unorm`, not `_srgb`, as in xterm,
+/// Alacritty and Ghostty. Linear blending waits on stem darkening
+/// (`DESIGN.md` §7, hard part 5).
 ///
 /// Safe to share because `Entry` is immutable after creation — unlike
 /// `GlyphAtlas`, which stays per pane (`TerminalRenderer.init`).
@@ -30,14 +41,18 @@ import Metal
 /// `lock` covers lookup and one-time creation, including the archive
 /// work, which happens nowhere else.
 public nonisolated enum QuadPipelineCache {
-    /// The immutable bundle both backends draw with; `let`-only, so sharing
+    /// Every render target's format; the pipelines are built against it.
+    public static let pixelFormat: MTLPixelFormat = .bgra8Unorm
+
+    /// The immutable bundle every pane draws with; `let`-only, so sharing
     /// needs no further synchronisation.
     nonisolated final class Entry {
         /// Retained so the `ObjectIdentifier` key can't be recycled.
         let device: MTLDevice
         let solidPipeline: MTLRenderPipelineState
         let glyphPipeline: MTLRenderPipelineState
-        /// Premultiplied source blending (see `QuadRenderer`).
+        /// Returns the premultiplied sample untinted and blends
+        /// premultiplied-over.
         let colorGlyphPipeline: MTLRenderPipelineState
         let sampler: MTLSamplerState
 
@@ -69,7 +84,7 @@ public nonisolated enum QuadPipelineCache {
         return entry
     }
 
-    /// Test hook: forces the cold path, so `QuadRendererTests` sees the
+    /// Test hook: forces the cold path, so `QuadPipelineCacheTests` sees the
     /// archive rewritten.
     public static func resetForTesting() {
         lock.lock()
@@ -77,30 +92,29 @@ public nonisolated enum QuadPipelineCache {
         lock.unlock()
     }
 
-    /// Builds the pipelines (identical for both backends, per
-    /// `TerminalRenderBackendTests`) through the previous launch's binary
-    /// archive, then re-serialises it. Under XCTest the archive read stays off
-    /// (`QuadRenderer.isRunningUnderXCTest`).
+    /// Builds the pipelines through the previous launch's binary archive, then
+    /// re-serialises it. Under XCTest the archive read stays off
+    /// (`isRunningUnderXCTest`).
     private static func makeEntry(device: MTLDevice) throws -> Entry {
         guard let library = device.makeDefaultLibrary() else {
-            throw QuadRendererError.libraryUnavailable
+            throw QuadPipelineError.libraryUnavailable
         }
         guard let vertexFunction = library.makeFunction(name: "quad_vertex"),
             let solidFragment = library.makeFunction(name: "quad_fragment_solid"),
             let glyphFragment = library.makeFunction(name: "quad_fragment_glyph"),
             let colorGlyphFragment = library.makeFunction(name: "quad_fragment_color")
         else {
-            throw QuadRendererError.functionUnavailable
+            throw QuadPipelineError.functionUnavailable
         }
 
-        let archive = QuadRenderer.loadOrCreateBinaryArchive(device: device)
+        let archive = loadOrCreateBinaryArchive(device: device)
 
         func makePipeline(fragment: MTLFunction, premultipliedSource: Bool = false) throws -> MTLRenderPipelineState {
             let descriptor = MTLRenderPipelineDescriptor()
             descriptor.vertexFunction = vertexFunction
             descriptor.fragmentFunction = fragment
             let attachment = descriptor.colorAttachments[0]!
-            attachment.pixelFormat = QuadRenderer.pixelFormat
+            attachment.pixelFormat = pixelFormat
             attachment.isBlendingEnabled = true
             attachment.rgbBlendOperation = .add
             attachment.alphaBlendOperation = .add
@@ -122,19 +136,101 @@ public nonisolated enum QuadPipelineCache {
         let solidPipeline = try makePipeline(fragment: solidFragment)
         let glyphPipeline = try makePipeline(fragment: glyphFragment)
         let colorGlyphPipeline = try makePipeline(fragment: colorGlyphFragment, premultipliedSource: true)
-        if let archive, let url = QuadRenderer.binaryArchiveURL {
-            QuadRenderer.serialize(archive, to: url)
+        if let archive, let url = binaryArchiveURL {
+            serialize(archive, to: url)
         }
 
         let samplerDescriptor = MTLSamplerDescriptor()
         samplerDescriptor.minFilter = .linear
         samplerDescriptor.magFilter = .linear
         guard let sampler = device.makeSamplerState(descriptor: samplerDescriptor) else {
-            throw QuadRendererError.samplerUnavailable
+            throw QuadPipelineError.samplerUnavailable
         }
 
         return Entry(
             device: device, solidPipeline: solidPipeline, glyphPipeline: glyphPipeline,
             colorGlyphPipeline: colorGlyphPipeline, sampler: sampler)
+    }
+
+    // MARK: - Binary archive
+
+    /// The compiled-pipeline archive, in `AppPaths.cacheDirectory`: purgeable
+    /// and per bundle id, so pruning only touches this build's archives (D22).
+    /// Named by `buildFingerprint`, so a rebuild never reads an older build's
+    /// cache. Internal for `QuadPipelineCacheTests`.
+    static var binaryArchiveURL: URL? {
+        guard let directory = AppPaths.cacheDirectory else { return nil }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        pruneStaleBinaryArchives(in: directory)
+        return directory.appendingPathComponent("\(archivePrefix)\(buildFingerprint).metallib-archive")
+    }
+
+    private static let archivePrefix = "QuadPipelines-"
+
+    /// The executable's modification time, which changes on every rebuild.
+    /// A stable `"unknown"` if unreadable still caches correctly.
+    private static var buildFingerprint: String {
+        guard let url = Bundle.main.executableURL,
+            let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+            let modified = attributes[.modificationDate] as? Date
+        else { return "unknown" }
+        return String(Int(modified.timeIntervalSince1970))
+    }
+
+    /// Removes every other archive in the directory — older builds', and the
+    /// ones 1.0 wrote under another name — which would otherwise pile up.
+    /// Best-effort.
+    private static func pruneStaleBinaryArchives(in directory: URL) {
+        let current = "\(archivePrefix)\(buildFingerprint).metallib-archive"
+        guard
+            let entries = try? FileManager.default.contentsOfDirectory(
+                at: directory, includingPropertiesForKeys: nil)
+        else { return }
+        for entry in entries
+        where entry.pathExtension == "metallib-archive" && entry.lastPathComponent != current
+        {
+            try? FileManager.default.removeItem(at: entry)
+        }
+    }
+
+    /// Writes via a temp file and an atomic `replaceItemAt`, so a reader never
+    /// sees a half-written archive.
+    static func serialize(_ archive: any MTLBinaryArchive, to url: URL) {
+        let temporaryURL =
+            url.deletingLastPathComponent()
+            .appendingPathComponent("\(UUID().uuidString).tmp")
+        guard (try? archive.serialize(to: temporaryURL)) != nil else {
+            try? FileManager.default.removeItem(at: temporaryURL)
+            return
+        }
+        do {
+            _ = try FileManager.default.replaceItemAt(url, withItemAt: temporaryURL)
+        } catch {
+            try? FileManager.default.removeItem(at: temporaryURL)
+        }
+    }
+
+    /// True under XCTest (`XCTestConfigurationFilePath`), where reading an
+    /// archive back segfaults inside Metal
+    /// (`-[_MTLDevice recordBinaryArchiveUsage:]`, a null C string reaching
+    /// `strlen`). Neither a standalone repro nor two real launches crash, and
+    /// an upstream report ties the signature to `MTLGetShaderCachePath()`
+    /// returning nil — plausibly the hosted-test launch. Only that harness
+    /// skips the read.
+    private static var isRunningUnderXCTest: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
+    /// Opens the previous launch's archive, or a fresh one under XCTest;
+    /// `makeEntry` adds this launch's pipelines and re-serialises it. Nil on
+    /// failure, falling back to a plain compile.
+    static func loadOrCreateBinaryArchive(device: MTLDevice) -> (any MTLBinaryArchive)? {
+        let descriptor = MTLBinaryArchiveDescriptor()
+        if !isRunningUnderXCTest, let url = binaryArchiveURL,
+            FileManager.default.fileExists(atPath: url.path)
+        {
+            descriptor.url = url
+        }
+        return try? device.makeBinaryArchive(descriptor: descriptor)
     }
 }

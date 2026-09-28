@@ -232,7 +232,7 @@ struct PaneRemoteStateTests {
 /// no rc file, so the only OSC 7 the parser sees is the staged one — and no
 /// machine state changes, which the project's rule requires.
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct RemotePaneIsolationTests {
     private static func makePane(script: String) -> ViewController {
         var preset = Preset(name: "b13-staging")
@@ -321,7 +321,7 @@ struct RemotePaneIsolationTests {
 /// recipe: one command begun while the pane referred to a remote host, one
 /// begun after the pane was local again.
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct CommandHistoryHostScopeTests {
     /// What a shell with integration emits across one remote command and
     /// one local one: the remote OSC 7, the first command's marks, a local
@@ -397,7 +397,7 @@ struct CommandHistoryHostScopeTests {
 /// Reconnect re-runs the same command as a new session rather than falling
 /// back to a local shell.
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct SSHPresetPaneTests {
     /// A symlink to `/bin/sh` under the name `ssh`, inside a throwaway
     /// directory the caller removes (`launcher.deletingLastPathComponent()`).

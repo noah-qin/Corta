@@ -28,7 +28,7 @@ import Testing
 /// the frame and idle at ~0% CPU.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
-@Suite(.serialized, .metalSerialized) struct DamageTrackingTests {
+@Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct DamageTrackingTests {
     private static func makeRenderer() -> TerminalRenderer? {
         guard let device = MTLCreateSystemDefaultDevice() else { return nil }
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
@@ -91,7 +91,6 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let queue = device.makeCommandQueue()!
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
         let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
 
@@ -104,18 +103,10 @@ import Testing
             device: device, width: width, height: height)
 
         func draw() {
-            let pass = MTLRenderPassDescriptor()
-            pass.colorAttachments[0].texture = texture
-            pass.colorAttachments[0].loadAction = .clear
-            pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1)
-            pass.colorAttachments[0].storeAction = .store
-            let commandBuffer = queue.makeCommandBuffer()!
-            renderer.render(
+            renderer.renderAndWait(
                 grid: terminal.grid, rect: CGRect(x: 0, y: 0, width: width, height: height),
                 drawableSize: CGSize(width: width, height: height), cursorVisible: false,
-                selection: nil, renderPassDescriptor: pass, commandBuffer: commandBuffer)
-            commandBuffer.commit()
-            commandBuffer.waitUntilCompleted()
+                selection: nil, target: texture)
         }
 
         // Whether any pixel in a cell is non-black (a glyph was drawn there).

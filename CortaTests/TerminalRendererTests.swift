@@ -24,7 +24,7 @@ import Testing
 
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
-@Suite(.serialized, .metalSerialized) struct TerminalRendererTests {
+@Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct TerminalRendererTests {
     private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (
         r: UInt8, g: UInt8, b: UInt8, a: UInt8
     ) {
@@ -33,22 +33,12 @@ import Testing
         return (r: bytes[2], g: bytes[1], b: bytes[0], a: bytes[3])
     }
 
-    private static func synchronize(_ texture: MTLTexture, queue: MTLCommandQueue) {
-        guard texture.storageMode == .managed, let buffer = queue.makeCommandBuffer(),
-            let blit = buffer.makeBlitCommandEncoder()
-        else { return }
-        blit.synchronize(resource: texture)
-        blit.endEncoding()
-        buffer.commit()
-        buffer.waitUntilCompleted()
-    }
 
     @Test func cursorBlockRendersAtTheCursorCell() throws {
         guard let device = MTLCreateSystemDefaultDevice() else {
             Issue.record("No Metal device available in this environment")
             return
         }
-        let queue = device.makeCommandQueue()!
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
         let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
         // The cursor takes the live theme's colour; pin the dark variant so
@@ -66,20 +56,10 @@ import Testing
         let texture = MetalRenderTarget.make(
             device: device, width: width, height: height)
 
-        let pass = MTLRenderPassDescriptor()
-        pass.colorAttachments[0].texture = texture
-        pass.colorAttachments[0].loadAction = .clear
-        pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1)
-        pass.colorAttachments[0].storeAction = .store
-
-        let commandBuffer = queue.makeCommandBuffer()!
-        renderer.render(
+        renderer.renderAndWait(
             grid: grid, rect: CGRect(x: 0, y: 0, width: width, height: height),
             drawableSize: CGSize(width: width, height: height), cursorVisible: true, selection: nil,
-            renderPassDescriptor: pass, commandBuffer: commandBuffer)
-        commandBuffer.commit()
-        commandBuffer.waitUntilCompleted()
-        Self.synchronize(texture, queue: queue)
+            target: texture)
 
         let cursorX = Int(Float(grid.cursor.column) * Float(renderer.metrics.cellWidth) + Float(renderer.metrics.cellWidth) / 2)
         let cursorY = Int(Float(grid.cursor.row) * Float(renderer.metrics.cellHeight) + Float(renderer.metrics.cellHeight) / 2)
@@ -100,7 +80,6 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let queue = device.makeCommandQueue()!
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
         let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
 
@@ -112,23 +91,13 @@ import Testing
         let texture = MetalRenderTarget.make(
             device: device, width: width, height: height)
 
-        let pass = MTLRenderPassDescriptor()
-        pass.colorAttachments[0].texture = texture
-        pass.colorAttachments[0].loadAction = .clear
-        pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1)
-        pass.colorAttachments[0].storeAction = .store
-
         let selection = TerminalSelection(
             start: GridPosition(row: 1, column: 2), end: GridPosition(row: 1, column: 4))
 
-        let commandBuffer = queue.makeCommandBuffer()!
-        renderer.render(
+        renderer.renderAndWait(
             grid: grid, rect: CGRect(x: 0, y: 0, width: width, height: height),
             drawableSize: CGSize(width: width, height: height), cursorVisible: false,
-            selection: selection, renderPassDescriptor: pass, commandBuffer: commandBuffer)
-        commandBuffer.commit()
-        commandBuffer.waitUntilCompleted()
-        Self.synchronize(texture, queue: queue)
+            selection: selection, target: texture)
 
         let insideX = Int(Float(3) * Float(renderer.metrics.cellWidth) + Float(renderer.metrics.cellWidth) / 2)
         let insideY = Int(Float(1) * Float(renderer.metrics.cellHeight) + Float(renderer.metrics.cellHeight) / 2)
@@ -147,7 +116,6 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let queue = device.makeCommandQueue()!
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
         let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
 
@@ -167,20 +135,11 @@ import Testing
             device: device, width: width, height: height)
 
         func draw(into texture: MTLTexture, scrollOffset: Int) {
-            let pass = MTLRenderPassDescriptor()
-            pass.colorAttachments[0].texture = texture
-            pass.colorAttachments[0].loadAction = .clear
-            pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1)
-            pass.colorAttachments[0].storeAction = .store
-            let commandBuffer = queue.makeCommandBuffer()!
-            renderer.render(
+            renderer.renderAndWait(
                 grid: grid, scrollOffset: scrollOffset,
                 rect: CGRect(x: 0, y: 0, width: width, height: height),
                 drawableSize: CGSize(width: width, height: height), cursorVisible: false,
-                selection: nil, renderPassDescriptor: pass, commandBuffer: commandBuffer)
-            commandBuffer.commit()
-            commandBuffer.waitUntilCompleted()
-            Self.synchronize(texture, queue: queue)
+                selection: nil, target: texture)
         }
 
         draw(into: liveTexture, scrollOffset: 0)

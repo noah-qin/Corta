@@ -30,6 +30,7 @@ path = [
   "NOTICE",
   "CortaTerminal/Tests/CortaTerminalTests/Golden/**",
   "CortaTerminal/Tests/Fuzz/**",
+  "CortaTests/RenderReferences/**",
   "docs/esctest/**",
   "Corta.xcodeproj/**",
   "Corta/Base.lproj/**",

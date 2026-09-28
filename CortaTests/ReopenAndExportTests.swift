@@ -37,7 +37,8 @@ struct ReopenClosedPaneTests {
         return split
     }
 
-    @Test func aClosedPaneComesBackInItsOwnPlace() throws {
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func aClosedPaneComesBackInItsOwnPlace() throws {
         let split = makeSplit(panes: 2)
         defer { split.teardown() }
         let closed = try #require(split.focusedPane)

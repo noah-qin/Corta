@@ -21,10 +21,10 @@ import Testing
 
 extension PerformanceSuites {
     /// Pane-creation cost driver. Every pane's `TerminalRenderer` builds a
-    /// `QuadRenderer`; without the per-device pipeline cache, each of those
-    /// would compile three `MTLRenderPipelineState`s
-    /// and re-serialised the `MTLBinaryArchive`, so splitting a window paid a
-    /// shader-compile-sized cost per new pane. This is the measurement harness
+    /// `Metal4Backend`; without the per-device pipeline cache, each of those
+    /// would compile three `MTLRenderPipelineState`s and re-serialise the
+    /// `MTLBinaryArchive`, so splitting a window paid a shader-compile-sized
+    /// cost per new pane. This is the measurement harness
     /// for that change — not an assertion (same convention as
     /// `FrameCPUBaselineTests`): the per-construction distribution is written to
     /// a file so it survives outside the ephemeral test log.
@@ -39,14 +39,14 @@ extension PerformanceSuites {
             // shows the compile cost panes no longer pay past the first;
             // #2...#8 are the warm-cache cost every split pane actually hits.
             // Under XCTest the binary-archive read path is disabled
-            // (`QuadRenderer.isRunningUnderXCTest`), so cold here means a real
+            // (`QuadPipelineCache.isRunningUnderXCTest`), so cold here means a real
             // compile — an upper bound on what a real launch's first pane pays.
             let constructions = 8
             var durations: [Double] = []
             QuadPipelineCache.resetForTesting()
             for _ in 0..<constructions {
                 let start = DispatchTime.now()
-                _ = try QuadRenderer(device: device)
+                _ = try Metal4Backend(device: device)
                 let elapsedMs =
                     Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000
                 durations.append(elapsedMs)
@@ -61,7 +61,7 @@ extension PerformanceSuites {
                 .map { "  #\($0.offset + 1): \(String(format: "%.3f", $0.element)) ms" }
                 .joined(separator: "\n")
             let report = """
-                renderer construction cost (\(constructions) QuadRenderer inits, one device, \(BenchmarkBuild.configuration)):
+                renderer construction cost (\(constructions) Metal4Backend inits, one device, \(BenchmarkBuild.configuration)):
                 \(perConstruction)
                 p50 \(String(format: "%.3f", p50)) ms, p95 \(String(format: "%.3f", p95)) ms, max \(String(format: "%.3f", max)) ms
 

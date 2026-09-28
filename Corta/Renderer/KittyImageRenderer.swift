@@ -22,8 +22,8 @@ import Metal
 import simd
 
 /// Decodes Kitty graphics images into textures and draws each placement as
-/// one instanced quad through `QuadRenderer`'s color pipeline, the one
-/// color emoji use (`quad_fragment_color`). A placement is just a rect, so
+/// one instanced quad through the colour pipeline, the one colour emoji use
+/// (`quad_fragment_color`), in the frame's one render pass. A placement is just a rect, so
 /// no new pipeline.
 ///
 /// **Decoding.** RGB/RGBA are reordered to premultiplied bgra by hand; PNG
@@ -280,31 +280,13 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     }
 
     /// Draws visible placements in z-index then transmission order, placed
-    /// like `TerminalRenderer.selectionQuads`. Cache reads only: an uncached
-    /// placement draws nothing this frame.
+    /// like `TerminalRenderer.selectionQuads`, into the backend's open
+    /// frame. Cache reads only: an uncached placement draws nothing this
+    /// frame.
     func draw(
         table: ImagePlacementTable, cellWidth: Float, cellHeight: Float, rows: Int,
         offset: Int, scrollbackTotalPushed: Int, rect: CGRect, drawableSize: CGSize,
-        quadRenderer: any TerminalRenderBackend, renderPassDescriptor: MTLRenderPassDescriptor,
-        commandBuffer: MTLCommandBuffer
-    ) {
-        forEachVisiblePlacement(
-            table: table, cellWidth: cellWidth, cellHeight: cellHeight, rows: rows,
-            offset: offset, scrollbackTotalPushed: scrollbackTotalPushed
-        ) { instance, texture in
-            quadRenderer.drawColorQuads(
-                [instance], atlas: texture, rect: rect, drawableSize: drawableSize,
-                renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
-            // Passes after the first never clear (`TerminalRenderer.draw`).
-            renderPassDescriptor.colorAttachments[0].loadAction = .load
-        }
-    }
-
-    /// The Metal 4 `draw`, into the backend's open frame.
-    func draw(
-        table: ImagePlacementTable, cellWidth: Float, cellHeight: Float, rows: Int,
-        offset: Int, scrollbackTotalPushed: Int, rect: CGRect, drawableSize: CGSize,
-        metal4 backend: any Metal4FrameBackend
+        backend: Metal4Backend
     ) {
         forEachVisiblePlacement(
             table: table, cellWidth: cellWidth, cellHeight: cellHeight, rows: rows,
@@ -315,8 +297,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         }
     }
 
-    /// The culling and quad math both `draw` paths share, so they never
-    /// disagree about what draws.
+    /// The culling and quad math.
     private func forEachVisiblePlacement(
         table: ImagePlacementTable, cellWidth: Float, cellHeight: Float, rows: Int,
         offset: Int, scrollbackTotalPushed: Int,

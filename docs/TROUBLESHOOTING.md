@@ -65,8 +65,8 @@ has one (`CONTRIBUTING.md`, "Developing Corta in Corta").
 
 ### "This version of Corta requires macOS 26.0 or later"
 
-Corta's deployment target is macOS 26.0 and it uses Metal 3 (optionally
-Metal 4) and Core Text APIs from that release. There is no build for
+Corta's deployment target is macOS 26.0 and it uses Metal 4 and Core Text
+APIs from that release. There is no build for
 earlier systems, and the project does not plan one (`DESIGN.md` §6).
 
 ### "You can't open the application "Corta" because it is not supported on this type of Mac"

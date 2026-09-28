@@ -34,7 +34,6 @@ class ViewController: NSViewController {
     /// since replaced is a no-op — `[weak self]` only says the controller is
     /// alive, not that it is still this session's.
     private var sessionGeneration = 0
-    private var commandQueue: MTLCommandQueue!
     /// Kept so a font change can rebuild the renderer.
     var device: MTLDevice!
     /// A change rebuilds the renderer: the atlas is rasterised for one size.
@@ -122,9 +121,6 @@ class ViewController: NSViewController {
     private var wasSynchronizedOutputActive = false
     /// An idle frame costs this one check, not a diff.
     private let outputPending = Mutex(false)
-    /// One snapshot shared by `prepareFrame` and `render`, which run in the same
-    /// callback — two snapshots could see different grids.
-    private var pendingFrameContext: FrameContext?
     private var resizeDebouncer: ResizeDebouncer!
     private var cachedProcessName: String?
     private var cachedDirectory: String?
@@ -274,6 +270,14 @@ class ViewController: NSViewController {
                 detail: L10n.text("failure.detail.metal"), canRetry: false)
             return
         }
+        // Metal 4 is the only renderer (D21). A GPU without it — a virtual
+        // machine's — gets this pane and no session, not a fallback.
+        guard Metal4Backend.isSupported(by: device) else {
+            presentFailure(
+                title: L10n.text("failure.title.metal4"),
+                detail: L10n.text("failure.detail.metal4"), canRetry: false)
+            return
+        }
         self.device = device
         let scale = NSScreen.main?.backingScaleFactor ?? 2
         do {
@@ -284,7 +288,6 @@ class ViewController: NSViewController {
                 detail: Self.describe(error), canRetry: true)
             return
         }
-        commandQueue = device.makeCommandQueue()
 
         var initialSize = initialGridSize ?? configuredGridSize
         if let terminalRenderer {
@@ -425,8 +428,12 @@ class ViewController: NSViewController {
     }
 
     private func installTerminalCallbacks(on view: TerminalView) {
-        view.onRenderFrame = { [weak self] pass, drawableSize, drawable in
-            self?.render(into: pass, drawableSize: drawableSize, drawable: drawable)
+        view.onRenderFrame = { [weak self] drawableSize, drawable in
+            guard let self else {
+                drawable.present()
+                return true
+            }
+            return render(drawableSize: drawableSize, drawable: drawable)
         }
         view.shouldRenderFrame = { [weak self] in
             self?.prepareFrame() ?? false
@@ -661,11 +668,6 @@ class ViewController: NSViewController {
             currentSearchMatchIndex: search.currentMatchIndex, hoveredLink: hoveredLink,
             indexedOverrides: indexedPalette.overrides,
             indexedOverridesGeneration: indexedPalette.overridesGeneration)
-        pendingFrameContext = FrameContext(
-            grid: grid, scrollOffset: scrollOffset,
-            cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
-            searchMatches: mappedSearchMatches,
-            currentSearchMatchIndex: search.currentMatchIndex, hoveredLink: hoveredLink)
         return forced || damaged
     }
 
@@ -915,76 +917,25 @@ class ViewController: NSViewController {
     }
 
     /// Right after `prepareFrame()` in the same callback, drawing its cached
-    /// context; never blocks the reader (`PERFORMANCE.md` §2.1).
-    private func render(
-        into renderPassDescriptor: MTLRenderPassDescriptor, drawableSize: CGSize, drawable: CAMetalDrawable
-    ) {
-        guard let session, let terminalRenderer else { return }
-        // For Metal System Trace: ties a command buffer to its pane.
-        let frameLabel = "Corta.frame.\(ObjectIdentifier(self).hashValue)"
-        // Metal 4 owns submission end to end.
-        if let metal4 = terminalRenderer.quadRenderer as? any Metal4FrameBackend {
-            renderThroughMetal4(
-                metal4, session: session, renderer: terminalRenderer,
-                renderPassDescriptor: renderPassDescriptor, drawableSize: drawableSize,
-                drawable: drawable, frameLabel: frameLabel)
-            return
-        }
-        guard let commandQueue, let commandBuffer = commandQueue.makeCommandBuffer()
-        else { return }
-        commandBuffer.label = frameLabel
-        guard let context = pendingFrameContext else {
-            // Defensive only: the scheduler always prepares first.
-            let grid = session.snapshot()
-            terminalRenderer.render(
-                grid: grid, scrollOffset: scrollOffset,
-                rect: Self.contentRect(
-                    in: drawableSize, scale: terminalRenderer.scale,
-                    gridHeight: CGFloat(grid.rows) * terminalRenderer.metrics.cellHeight,
-                    topInset: topInset),
-                drawableSize: drawableSize,
-                cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
-                searchMatches: search.matches.map { TerminalSelection($0, grid: grid) },
-                currentSearchMatchIndex: search.currentMatchIndex, hoveredLink: hoveredLink,
-                renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
-            presentAndCommit(commandBuffer: commandBuffer, drawable: drawable)
-            return
-        }
-        terminalRenderer.draw(
-            rect: Self.contentRect(
-                in: drawableSize, scale: terminalRenderer.scale,
-                gridHeight: CGFloat(context.grid.rows) * terminalRenderer.metrics.cellHeight,
-                topInset: topInset),
-            drawableSize: drawableSize,
-            renderPassDescriptor: renderPassDescriptor, commandBuffer: commandBuffer)
-        presentAndCommit(commandBuffer: commandBuffer, drawable: drawable)
-    }
-
-    /// Mirrors the MTL3 path; only submission moves into the backend.
-    private func renderThroughMetal4(
-        _ backend: any Metal4FrameBackend, session: TerminalSession, renderer: TerminalRenderer,
-        renderPassDescriptor: MTLRenderPassDescriptor, drawableSize: CGSize,
-        drawable: CAMetalDrawable, frameLabel: String
-    ) {
-        let gridRows: Int
-        if let context = pendingFrameContext {
-            gridRows = context.grid.rows
-        } else {
-            // Defensive only, as above.
-            let grid = session.snapshot()
-            renderer.updateInstances(
-                grid: grid, scrollOffset: scrollOffset,
-                cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
-                searchMatches: search.matches.map { TerminalSelection($0, grid: grid) },
-                currentSearchMatchIndex: search.currentMatchIndex, hoveredLink: hoveredLink)
-            gridRows = grid.rows
+    /// context; never blocks the reader (`PERFORMANCE.md` §2.1). Draws the
+    /// renderer's cached instances, which `prepareFrame` last diffed, as one
+    /// Metal 4 render pass; the backend commits and presents the drawable.
+    /// Returns false for a frame the backend dropped, which the scheduler
+    /// owes another tick.
+    private func render(drawableSize: CGSize, drawable: CAMetalDrawable) -> Bool {
+        guard let terminalRenderer else {
+            // Never hold a drawable: an unpresented one is never recycled.
+            drawable.present()
+            return true
         }
         let rect = Self.contentRect(
-            in: drawableSize, scale: renderer.scale,
-            gridHeight: CGFloat(gridRows) * renderer.metrics.cellHeight,
+            in: drawableSize, scale: terminalRenderer.scale,
+            gridHeight: CGFloat(terminalRenderer.cachedRowCount) * terminalRenderer.metrics.cellHeight,
             topInset: topInset)
         let gpu = InputLatencySignposts.begin(.gpu)
         let gpuStart = RenderMetrics.isEnabled ? DispatchTime.now() : nil
+        // `gpu` spans submission to completion — the only place GPU time and a
+        // drawable wait become visible.
         let onCompleted: (@Sendable ((any Error)?) -> Void)? =
             (gpu != nil || gpuStart != nil)
             ? { @Sendable _ in
@@ -997,37 +948,18 @@ class ViewController: NSViewController {
                 }
             }
             : nil
+        let background = TerminalColorPalette.clearColor
         let commit = InputLatencySignposts.begin(.commit)
-        let attachment = renderPassDescriptor.colorAttachments[0]
-        renderer.draw(
-            through: backend, rect: rect, drawableSize: drawableSize,
-            target: attachment?.texture ?? drawable.texture,
-            clearColor: attachment?.clearColor ?? MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1),
-            drawable: drawable, label: frameLabel, onCompleted: onCompleted)
+        let drawn = terminalRenderer.draw(
+            rect: rect, drawableSize: drawableSize, target: drawable.texture,
+            clearColor: MTLClearColorMake(
+                Double(background.x), Double(background.y), Double(background.z),
+                Double(background.w)),
+            // For Metal System Trace: ties a command buffer to its pane.
+            drawable: drawable, label: "Corta.frame.\(ObjectIdentifier(self).hashValue)",
+            onCompleted: onCompleted)
         InputLatencySignposts.end(.commit, commit)
-    }
-
-    /// `gpu` spans submission to completion — the only place GPU time and a
-    /// drawable wait become visible.
-    private func presentAndCommit(commandBuffer: MTLCommandBuffer, drawable: CAMetalDrawable) {
-        let gpu = InputLatencySignposts.begin(.gpu)
-        let gpuStart = RenderMetrics.isEnabled ? DispatchTime.now() : nil
-        if gpu != nil || gpuStart != nil {
-            commandBuffer.addCompletedHandler { _ in
-                InputLatencySignposts.end(.gpu, gpu)
-                if let gpuStart {
-                    let ms =
-                        Double(DispatchTime.now().uptimeNanoseconds - gpuStart.uptimeNanoseconds)
-                        / 1_000_000
-                    RenderMetrics.record(.gpu, milliseconds: ms)
-                }
-            }
-        }
-        let commit = InputLatencySignposts.begin(.commit)
-        RenderMetrics.notePresent(of: drawable)
-        commandBuffer.present(drawable)
-        commandBuffer.commit()
-        InputLatencySignposts.end(.commit, commit)
+        return drawn
     }
 
     /// Top-anchored when the grid fits, so the rounding remainder sits at the

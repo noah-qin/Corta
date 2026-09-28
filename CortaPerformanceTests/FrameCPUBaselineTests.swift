@@ -41,7 +41,6 @@ extension PerformanceSuites {
                 Issue.record("No Metal device available in this environment")
                 return
             }
-            let queue = device.makeCommandQueue()!
             let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
             let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
 
@@ -65,22 +64,17 @@ extension PerformanceSuites {
 
             let iterations = 60
             var durations: [Double] = []
+            let completed = DispatchSemaphore(value: 0)
             for _ in 0..<iterations {
-                let pass = MTLRenderPassDescriptor()
-                pass.colorAttachments[0].texture = texture
-                pass.colorAttachments[0].loadAction = .clear
-                pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1)
-                pass.colorAttachments[0].storeAction = .store
-
-                let commandBuffer = queue.makeCommandBuffer()!
                 renderer.invalidate()  // force the full-rebuild worst case
                 let start = DispatchTime.now()
+                // The window runs to the frame's GPU completion, as it always has.
                 renderer.render(
                     grid: grid, rect: CGRect(x: 0, y: 0, width: width, height: height),
                     drawableSize: CGSize(width: width, height: height), cursorVisible: true,
-                    selection: nil, renderPassDescriptor: pass, commandBuffer: commandBuffer)
-                commandBuffer.commit()
-                commandBuffer.waitUntilCompleted()
+                    selection: nil, target: texture, clearColor: MTLClearColorMake(0, 0, 0, 1)
+                ) { _ in completed.signal() }
+                completed.wait()
                 let elapsedMs =
                     Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000
                 durations.append(elapsedMs)

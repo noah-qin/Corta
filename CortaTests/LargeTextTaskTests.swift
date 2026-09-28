@@ -27,7 +27,7 @@ import CortaTerminal
 /// `.serialized` and a real pane, like `SearchDebounceTests` — the text
 /// under copy comes from a genuine shell.
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct LargeTextTaskTests {
     private func makePane() -> ViewController {
         let pane = ViewController()

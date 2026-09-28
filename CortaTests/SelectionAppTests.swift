@@ -25,7 +25,7 @@ import Testing
 /// The selection's document rows (scrollback rows
 /// negative) are translated to viewport rows through the scroll offset and
 /// the scrollback's growth since the selection was recorded.
-@Suite(.serialized, .metalSerialized) struct SelectionRendererTests {
+@Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct SelectionRendererTests {
     private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (
         r: UInt8, g: UInt8, b: UInt8, a: UInt8
     ) {
@@ -34,19 +34,9 @@ import Testing
         return (r: bytes[2], g: bytes[1], b: bytes[0], a: bytes[3])
     }
 
-    private static func synchronize(_ texture: MTLTexture, queue: MTLCommandQueue) {
-        guard texture.storageMode == .managed, let buffer = queue.makeCommandBuffer(),
-            let blit = buffer.makeBlitCommandEncoder()
-        else { return }
-        blit.synchronize(resource: texture)
-        blit.endEncoding()
-        buffer.commit()
-        buffer.waitUntilCompleted()
-    }
 
     private struct Fixture {
         let renderer: TerminalRenderer
-        let queue: MTLCommandQueue
         let width: Int
         let height: Int
     }
@@ -58,8 +48,7 @@ import Testing
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
         let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
         return Fixture(
-            renderer: renderer, queue: device.makeCommandQueue()!,
-            width: Int(renderer.metrics.cellWidth * 10),
+            renderer: renderer, width: Int(renderer.metrics.cellWidth * 10),
             height: Int(renderer.metrics.cellHeight * 4))
     }
 
@@ -68,22 +57,13 @@ import Testing
         _ fixture: Fixture, grid: Grid, scrollOffset: Int, selection: TerminalSelection?
     ) -> MTLTexture {
         let texture = MetalRenderTarget.make(
-            device: fixture.renderer.quadRenderer.device, width: fixture.width, height: fixture.height)
-        let pass = MTLRenderPassDescriptor()
-        pass.colorAttachments[0].texture = texture
-        pass.colorAttachments[0].loadAction = .clear
-        pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1)
-        pass.colorAttachments[0].storeAction = .store
-        let commandBuffer = fixture.queue.makeCommandBuffer()!
-        fixture.renderer.render(
+            device: fixture.renderer.backend.device, width: fixture.width, height: fixture.height)
+        fixture.renderer.renderAndWait(
             grid: grid, scrollOffset: scrollOffset,
             rect: CGRect(x: 0, y: 0, width: fixture.width, height: fixture.height),
             drawableSize: CGSize(width: fixture.width, height: fixture.height),
             cursorVisible: false, selection: selection,
-            renderPassDescriptor: pass, commandBuffer: commandBuffer)
-        commandBuffer.commit()
-        commandBuffer.waitUntilCompleted()
-        Self.synchronize(texture, queue: fixture.queue)
+            target: texture)
         return texture
     }
 

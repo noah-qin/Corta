@@ -265,13 +265,10 @@ import Testing
         #expect(atlas.shapingHits == shapingHitsBeforeOverflow, "the shaped-page cache must have survived the ASCII page's eviction")
     }
 
-    @Test func aGlyphProducesInkInsideItsCellAndNoneOutside() throws {
-        guard let device = Self.makeDevice() else {
-            Issue.record("No Metal device available in this environment")
-            return
-        }
-        let queue = device.makeCommandQueue()!
-        let renderer = try QuadRenderer(device: device)
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func aGlyphProducesInkInsideItsCellAndNoneOutside() throws {
+        let device = try #require(Self.makeDevice())
+        let backend = try Metal4Backend(device: device)
         let font = CTFontCreateWithName("Menlo" as CFString, 32, nil)
         let atlas = GlyphAtlas(device: device, font: font)
 
@@ -290,29 +287,13 @@ import Testing
         let target = MetalRenderTarget.make(
             device: device, width: Int(cellWidth), height: Int(cellHeight))
 
-        let pass = MTLRenderPassDescriptor()
-        pass.colorAttachments[0].texture = target
-        pass.colorAttachments[0].loadAction = .clear
-        pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1)
-        pass.colorAttachments[0].storeAction = .store
-
-        let commandBuffer = queue.makeCommandBuffer()!
-        renderer.drawGlyphQuads(
-            [instance], atlas: atlas.texture,
-            rect: CGRect(x: 0, y: 0, width: Double(cellWidth), height: Double(cellHeight)),
-            drawableSize: CGSize(width: Double(cellWidth), height: Double(cellHeight)),
-            renderPassDescriptor: pass, commandBuffer: commandBuffer)
-        commandBuffer.commit()
-        commandBuffer.waitUntilCompleted()
-
-        if target.storageMode == .managed, let blitBuffer = queue.makeCommandBuffer(),
-            let blit = blitBuffer.makeBlitCommandEncoder()
-        {
-            blit.synchronize(resource: target)
-            blit.endEncoding()
-            blitBuffer.commit()
-            blitBuffer.waitUntilCompleted()
-        }
+        #expect(
+            backend.renderFrameAndWait(into: target) {
+                $0.drawGlyphQuads(
+                    [instance], atlas: atlas.texture,
+                    rect: CGRect(x: 0, y: 0, width: Double(cellWidth), height: Double(cellHeight)),
+                    drawableSize: CGSize(width: Double(cellWidth), height: Double(cellHeight)))
+            })
 
         // Sample the centre of the glyph's own quad, not the cell's — a
         // narrow or off-centre glyph like 'X' at this size does not

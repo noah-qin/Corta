@@ -26,6 +26,15 @@ what to edit.
 
 - The bundled updater is Sparkle 2.10.0 (was 2.9.6).
 
+- **Metal 4 is the only renderer.** The classic Metal path is gone, and
+  every frame — backgrounds, text, colour glyphs and every Kitty image —
+  is drawn in one render pass. A GPU that stops completing work now costs
+  dropped frames instead of stalling the window: before, each frame could
+  wait up to a second for the GPU on the main thread. A Mac whose GPU does
+  not support Metal 4 — in practice, macOS running in a virtual machine —
+  shows "This GPU does not support Metal 4" in the pane and starts no
+  shell, rather than falling back to a second renderer.
+
 - Building Corta from source now produces a separate application: **Corta
   Dev** (`dev.noahqin.Corta.dev`), with its own icon, its own
   configuration and state under `~/Library/Application Support/Corta
@@ -54,6 +63,11 @@ what to edit.
   about 2% slower on a document where every line is non-ASCII.
 
 ### Fixed
+
+- A pane that could not start — its failure message showing — no longer
+  takes the whole app down when the font size changes (⌘=, ⌘-, or the
+  configuration file) or when focus moves to it: both reached the pane's
+  missing session or renderer.
 
 - A pane with shell integration no longer freezes when the machine's name
   resolver is slow or unreachable. Every prompt's working-directory report

@@ -30,7 +30,7 @@ import CortaTerminal
 ///
 /// `.serialized` and a real shell, for the same reason as `PaneTeardownTests`.
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct SessionLifecycleTests {
     private func makePane(preset: Preset? = nil) -> ViewController {
         let pane = ViewController()

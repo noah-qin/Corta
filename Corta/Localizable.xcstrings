@@ -24073,6 +24073,124 @@
           }
         }
       }
+    },
+    "failure.title.metal4": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This GPU does not support Metal 4"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此 GPU 不支持 Metal 4"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "此 GPU 不支援 Metal 4"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "この GPU は Metal 4 に対応していません"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "이 GPU는 Metal 4를 지원하지 않습니다"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Diese GPU unterstützt Metal 4 nicht"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ce GPU ne prend pas en charge Metal 4"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Esta GPU no es compatible con Metal 4"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Esta GPU não é compatível com o Metal 4"
+          }
+        }
+      }
+    },
+    "failure.detail.metal4": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corta draws the terminal with Metal 4, which needs a Mac with Apple silicon. This GPU does not report Metal 4 — usually because macOS is running in a virtual machine."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corta 使用 Metal 4 绘制终端，需要搭载 Apple 芯片的 Mac。此 GPU 未报告支持 Metal 4，通常是因为 macOS 运行在虚拟机中。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta 使用 Metal 4 繪製終端機，需要搭載 Apple 晶片的 Mac。此 GPU 未回報支援 Metal 4，通常是因為 macOS 在虛擬機中執行。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta は Metal 4 でターミナルを描画するため、Apple シリコン搭載の Mac が必要です。この GPU は Metal 4 に対応していると報告していません。多くの場合、macOS が仮想マシンで動作していることが原因です。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta는 Metal 4로 터미널을 그리므로 Apple 실리콘이 탑재된 Mac이 필요합니다. 이 GPU는 Metal 4 지원을 보고하지 않습니다. 대개 macOS가 가상 머신에서 실행 중이기 때문입니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta zeichnet das Terminal mit Metal 4 und benötigt dafür einen Mac mit Apple Chip. Diese GPU meldet kein Metal 4 – meist, weil macOS in einer virtuellen Maschine läuft."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta dessine le terminal avec Metal 4, qui nécessite un Mac avec puce Apple. Ce GPU ne signale pas Metal 4 — généralement parce que macOS s’exécute dans une machine virtuelle."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta dibuja el terminal con Metal 4, que requiere un Mac con chip de Apple. Esta GPU no informa de Metal 4, normalmente porque macOS se ejecuta en una máquina virtual."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O Corta desenha o terminal com o Metal 4, que requer um Mac com Apple Silicon. Esta GPU não informa suporte ao Metal 4 — geralmente porque o macOS está sendo executado em uma máquina virtual."
+          }
+        }
+      }
     }
   }
 }

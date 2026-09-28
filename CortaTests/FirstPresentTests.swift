@@ -49,7 +49,7 @@ struct FirstPresentTests {
         let (scheduler, layer) = Self.makeScheduler()
         #expect(scheduler.firstPresentState == .idle)
         #expect(layer.backgroundColor == nil)
-        scheduler.onRenderFrame = { _, _, _ in }
+        scheduler.onRenderFrame = { _, _ in true }
 
         scheduler.requestFirstPresent()
 
@@ -232,5 +232,15 @@ struct FirstPresentTests {
         #expect(layer.backgroundColor != nil)
         // No window, so the backing scale is 1 and points are pixels.
         #expect(layer.drawableSize == CGSize(width: 400, height: 300))
+    }
+
+    /// A frame the backend dropped showed a stale drawable, and the damage
+    /// it carried was already taken — so the link must keep ticking until a
+    /// frame draws, or the pane stays stale until the next output.
+    @Test func aDroppedFrameKeepsTheLinkTickingUntilOneDraws() {
+        #expect(!FrameScheduler.mayPause(stillPending: false, drawn: false, firstPresentState: .idle))
+        #expect(FrameScheduler.mayPause(stillPending: false, drawn: true, firstPresentState: .idle))
+        #expect(!FrameScheduler.mayPause(stillPending: true, drawn: true, firstPresentState: .idle))
+        #expect(!FrameScheduler.mayPause(stillPending: false, drawn: true, firstPresentState: .submitted))
     }
 }

@@ -15,9 +15,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import CoreGraphics
+import CortaTerminal
 import Foundation
 import ImageIO
 import Metal
+import Synchronization
 import Testing
 import UniformTypeIdentifiers
 
@@ -39,11 +41,13 @@ enum MetalRenderTarget {
     /// not a device this project has to accommodate.
     static let maximumDimension = 16384
 
-    /// Whether this machine can run the Metal 4 suites at all.
+    /// Whether this machine can render at all. Metal 4 is the only renderer
+    /// (#109), so every suite that draws — or opens a pane, which builds a
+    /// renderer before it starts a session — needs it.
     ///
     /// The hosted `macos-26` runner answers **no**: its GPU is an "Apple
     /// Paravirtual device" reporting only `MTLGPUFamily.apple5` (issue
-    /// #107, measured 2026-09-25). Metal 4 tests carry
+    /// #107, measured 2026-09-25). Those suites carry
     /// `.enabled(if: MetalRenderTarget.supportsMetal4, …)` so a run without
     /// the family reports them as *skipped, with the reason* — an early
     /// `return` made them indistinguishable from tests that ran and passed,
@@ -100,10 +104,12 @@ enum MetalRenderTarget {
 
     private static func texture(device: MTLDevice, width: Int, height: Int) -> MTLTexture? {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: QuadRenderer.pixelFormat, width: width, height: height,
+            pixelFormat: QuadPipelineCache.pixelFormat, width: width, height: height,
             mipmapped: false)
         descriptor.usage = [.renderTarget, .shaderRead]
-        descriptor.storageMode = .managed
+        // Shared: on Apple silicon the CPU reads what the GPU wrote once the
+        // frame completes, with no blit to synchronise it (D21).
+        descriptor.storageMode = .shared
         return device.makeTexture(descriptor: descriptor)
     }
 
@@ -118,9 +124,9 @@ enum MetalRenderTarget {
     /// hand. Silent on success: an attachment on every passing run would
     /// bury the failures it exists to make visible.
     ///
-    /// `texture` must already be readable on the CPU (synchronized, if
-    /// `.managed`) — the same precondition every caller already meets
-    /// before reading pixels for its own assertion.
+    /// `texture` must already be readable on the CPU — its frame completed —
+    /// the same precondition every caller already meets before reading
+    /// pixels for its own assertion.
     static func attachPNG(_ texture: MTLTexture, named name: String) {
         guard let data = pngData(of: texture) else { return }
         Attachment.record([UInt8](data), named: name)
@@ -156,6 +162,74 @@ enum MetalRenderTarget {
     }
 }
 
+/// How long a test waits for a frame's commit feedback: a ceiling, scaled on
+/// a loaded machine (`testTimeoutScale`), never a sleep.
+let frameCompletionTimeout: DispatchTimeInterval = .seconds(Int(10 * testTimeoutScale))
+
+extension Metal4Backend {
+    /// One offscreen frame of `draws` into `target`, waited for. Returns
+    /// false if its commit feedback never arrived, or the frame was dropped.
+    @discardableResult
+    func renderFrameAndWait(
+        into target: MTLTexture,
+        clearColor: MTLClearColor = MTLClearColorMake(0, 0, 0, 1),
+        _ draws: (Metal4Backend) -> Void = { _ in }
+    ) -> Bool {
+        beginFrame(target: target, clearColor: clearColor, label: "Corta.test")
+        draws(self)
+        let done = DispatchSemaphore(value: 0)
+        let drawn = Mutex(false)
+        endFrame(presenting: nil) { error in
+            drawn.withLock { $0 = error == nil }
+            done.signal()
+        }
+        return done.wait(timeout: .now() + frameCompletionTimeout) == .success
+            && drawn.withLock { $0 }
+    }
+}
+
+extension TerminalRenderer {
+    /// `render` into `target`, waited for, so its pixels can be read.
+    /// Records an issue if the frame never completed.
+    func renderAndWait(
+        grid: Grid,
+        scrollOffset: Int = 0,
+        rect: CGRect,
+        drawableSize: CGSize,
+        cursorVisible: Bool,
+        selection: TerminalSelection?,
+        searchMatches: [TerminalSelection] = [],
+        currentSearchMatchIndex: Int? = nil,
+        hoveredLink: TerminalSelection? = nil,
+        indexedOverrides: IndexedColorOverrides = [:],
+        indexedOverridesGeneration: UInt64 = 0,
+        target: MTLTexture,
+        clearColor: MTLClearColor = MTLClearColorMake(0, 0, 0, 1),
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) {
+        let done = DispatchSemaphore(value: 0)
+        let failure = Mutex<(any Error)?>(nil)
+        render(
+            grid: grid, scrollOffset: scrollOffset, rect: rect, drawableSize: drawableSize,
+            cursorVisible: cursorVisible, selection: selection, searchMatches: searchMatches,
+            currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink,
+            indexedOverrides: indexedOverrides,
+            indexedOverridesGeneration: indexedOverridesGeneration,
+            target: target, clearColor: clearColor
+        ) { error in
+            failure.withLock { $0 = error }
+            done.signal()
+        }
+        guard done.wait(timeout: .now() + frameCompletionTimeout) == .success else {
+            Issue.record("the frame never completed", sourceLocation: sourceLocation)
+            return
+        }
+        if let error = failure.withLock({ $0 }) {
+            Issue.record("the frame failed: \(error)", sourceLocation: sourceLocation)
+        }
+    }
+}
+
 /// The guard itself, since everything else in `CortaTests` now depends on it
 /// to fail rather than to abort.
 @Suite(.serialized, .metalSerialized) struct MetalRenderTargetTests {
@@ -186,6 +260,6 @@ enum MetalRenderTarget {
         let texture = MetalRenderTarget.make(device: device, width: 64, height: 32)
         #expect(texture.width == 64)
         #expect(texture.height == 32)
-        #expect(texture.pixelFormat == QuadRenderer.pixelFormat)
+        #expect(texture.pixelFormat == QuadPipelineCache.pixelFormat)
     }
 }

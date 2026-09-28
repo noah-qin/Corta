@@ -175,12 +175,19 @@ swift scripts/metal-capability.swift --require-metal4  # exit 1 without Metal 4
 | GitHub hosted `macos-26` | `Apple Paravirtual device` | **no** | `apple5` |
 | Apple silicon hardware (M1 or later) | e.g. `Apple M5` | yes | `metal4`, `apple9`, … |
 
-So the hosted runner runs the ordinary offscreen render tests — it does
-have a Metal device — but **cannot** run the Metal 4 suites. Those carry
+Metal 4 is the only renderer (#109), so the hosted runner cannot build
+one at all, and a pane there shows the "does not support Metal 4" failure
+and starts no shell — the same thing a user in a virtual machine sees.
+Every suite that renders, or that needs a working pane (a live session, a
+font size the renderer applied), carries
 `.enabled(if: MetalRenderTarget.supportsMetal4, …)`, so a run without the
-family reports them as *skipped, with the reason*. Until this was
-measured they returned early instead, which is indistinguishable from
-passing: every Metal 4 test in `TerminalRenderBackendTests` went
+family reports it as *skipped, with the reason*. That is not done to keep
+CI green: those tests have nothing to test on that GPU, and running them
+there would test the failure pane instead. `Metal4UnavailablePaneTests`
+is the reverse — enabled only *without* Metal 4 — and holds the failure
+pane to its message, to starting no shell, and to surviving a font-size
+and a focus change. Until #107 measured this, the Metal 4 tests returned
+early instead, which is indistinguishable from passing: every one went
 unexecuted on CI for the whole of 1.0 while the job stayed green.
 
 `ci.yml` prints both halves of that on every run: the capability line
@@ -195,21 +202,29 @@ and there are two ways to get there:
   Apple silicon runner. It is `workflow_dispatch` only, on purpose: this
   repository is public, and a `pull_request` trigger would let a stranger's
   fork run code on the maintainer's machine. It fails before the tests if
-  the machine does not report `metal4`, records which Xcode produced the
-  result, and sets `CORTA_METAL4=1` — without that
-  `TerminalRenderer.init` still builds a `QuadRenderer`
-  (`Metal4Backend.isOptedIn`), so the selection path #109 turns into the
-  only path would go untaken even on Metal 4 hardware.
-- Locally, before a release:
-  `TEST_RUNNER_CORTA_METAL4=1 xcodebuild test -scheme Corta -testPlan Unit`
-  on an M1 or later, with the result recorded under `docs/test-results/`.
-  The five-point launched-app check (`CONFORMANCE.md` §4.4) is done on the
-  same machine and carries the rest of the guarantee.
+  the machine does not report `metal4`, and records which Xcode produced
+  the result.
+- Locally, on any Apple silicon Mac:
+  `xcodebuild test -scheme Corta -testPlan Unit`, with the result recorded
+  under `docs/test-results/` before a release. The five-point
+  launched-app check (`CONFORMANCE.md` §4.4) is done on the same machine
+  and carries the rest of the guarantee.
 
-Once #109 makes Metal 4 the only backend, the hosted runner will not be
-able to construct a renderer at all, and *every* render test moves to
-those two routes. That is the trade #107 measured and #109 accepts; it is
-not a reason to keep a second backend alive.
+That is the trade #107 measured and #109 accepted; it is not a reason to
+keep a second backend alive.
+
+**Whole frames against a reference.** `RenderReferenceTests` compares
+complete frames — the synthetic quad scene, an empty frame's clear, and a
+terminal frame with a Kitty image, a selection, current and other search
+matches, a hovered link and each cursor shape — with the PNGs in
+`CortaTests/RenderReferences/`. They were recorded from the classic Metal
+path before #109 removed it, so they are the before/after comparison that
+replaced comparing two live backends: one code value per channel is
+blend rounding, anything more fails with both images attached.
+`TEST_RUNNER_CORTA_RECORD_RENDER_REFERENCES=1` rewrites them; use it only
+for an intended visual change, and inspect every PNG it writes. They were
+recorded with Menlo 14 on macOS 27; a macOS release that changes glyph
+rasterisation fails them, which is the signal to look, then re-record.
 
 ### Waits are ceilings, and CI gets a bigger one
 

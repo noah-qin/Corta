@@ -555,7 +555,7 @@ the keychain, and connect once in the terminal first for a new host.
 (`CORTA_SFTP_SSH`, an environment variable and never a config key, names
 an absolute path to run instead of `/usr/bin/ssh` with the same argv — a
 verification hook for driving the channel against a local
-`sftp-server`, in the same class as `CORTA_METAL4`.) Transfers are
+`sftp-server`, in the same class as `CORTA_MAX_DRAWABLES`.) Transfers are
 atomic (a
 `.corta-part` partial renamed over the destination), resumable with both
 endpoints re-validated, and every overwrite is a decision you make in a

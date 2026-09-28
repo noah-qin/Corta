@@ -29,9 +29,11 @@ import QuartzCore
 /// and the scheduler pauses once nothing is pending. A spurious wake costs
 /// at most one re-presentation of unchanged pixels.
 final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
-    /// Called per accepted frame on the main thread with the resolved
-    /// drawable.
-    var onRenderFrame: ((MTLRenderPassDescriptor, CGSize, CAMetalDrawable) -> Void)?
+    /// Called per accepted frame on the main thread with the drawable size
+    /// and the resolved drawable, which the callee must present. Returns
+    /// whether the frame was drawn: a dropped frame (`Metal4Backend`) was
+    /// presented with stale contents and is owed another tick.
+    var onRenderFrame: ((CGSize, CAMetalDrawable) -> Bool)?
 
     /// The per-frame prepare/diff work; returns whether anything is still
     /// pending. The drawable is presented either way; `false` only pauses.
@@ -148,26 +150,25 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         // Last tick's frame is on the glass; retire the stand-in.
         let retiringStandIn = firstPresentState == .submitted
         if retiringStandIn { notePresentedFrame() }
-        let drawable = update.drawable
+        var drawn = true
         if let onRenderFrame {
-            onRenderFrame(FrameScheduler.clearPass(for: drawable), metalLayer.drawableSize, drawable)
-            noteFrameSubmitted()
+            drawn = onRenderFrame(metalLayer.drawableSize, update.drawable)
+            // Only a drawn frame may retire the stand-in; a dropped one would
+            // strip it over a drawable that was never drawn into.
+            if drawn { noteFrameSubmitted() }
         }
-        // Owe one more tick while a stand-in is up, so it retires on time.
-        if !stillPending && firstPresentState != .submitted {
+        if Self.mayPause(stillPending: stillPending, drawn: drawn, firstPresentState: firstPresentState) {
             link.isPaused = true
         }
     }
 
-    private static func clearPass(for drawable: CAMetalDrawable) -> MTLRenderPassDescriptor {
-        let pass = MTLRenderPassDescriptor()
-        pass.colorAttachments[0].texture = drawable.texture
-        pass.colorAttachments[0].loadAction = .clear
-        let bg = TerminalColorPalette.clearColor
-        pass.colorAttachments[0].clearColor = MTLClearColorMake(
-            Double(bg.x), Double(bg.y), Double(bg.z), Double(bg.w))
-        pass.colorAttachments[0].storeAction = .store
-        return pass
+    /// Whether the link may pause after a tick. Not while anything is
+    /// pending; not after a dropped frame, whose drawable shows stale
+    /// contents until one draws — the damage it carried was already taken,
+    /// so nothing else would ask again; and not while a stand-in is up, so it
+    /// retires on time.
+    static func mayPause(stillPending: Bool, drawn: Bool, firstPresentState: FirstPresentState) -> Bool {
+        !stillPending && drawn && firstPresentState != .submitted
     }
 }
 

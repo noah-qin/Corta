@@ -49,7 +49,6 @@ extension PerformanceSuites {
                 Issue.record("No Metal device available in this environment")
                 return
             }
-            let queue = device.makeCommandQueue()!
             let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
             let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
 
@@ -75,25 +74,21 @@ extension PerformanceSuites {
             }
 
             /// One measured frame: the CPU-side `render` call (diff, rebuild,
-            /// upload, encode) is the window; the commit is outside it. The GPU
-            /// is paced every eighth frame so the queue stays bounded without a
-            /// per-frame wait landing inside the measured window.
-            var lastCommandBuffer: MTLCommandBuffer?
+            /// upload, encode, commit) is the window. Each frame's GPU
+            /// completion is waited for *after* the window closes: a frame
+            /// slot is free only once its previous frame completed
+            /// (`Metal4Backend`), so without the wait the fourth frame would
+            /// time the GPU instead of the CPU.
+            let completed = DispatchSemaphore(value: 0)
             func drawFrame(grid: Grid) -> Double {
-                let pass = MTLRenderPassDescriptor()
-                pass.colorAttachments[0].texture = texture
-                pass.colorAttachments[0].loadAction = .clear
-                pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1)
-                pass.colorAttachments[0].storeAction = .store
-                let commandBuffer = queue.makeCommandBuffer()!
                 let start = DispatchTime.now()
                 renderer.render(
                     grid: grid, rect: rect, drawableSize: drawableSize, cursorVisible: true,
-                    selection: nil, renderPassDescriptor: pass, commandBuffer: commandBuffer)
+                    selection: nil, target: texture, clearColor: MTLClearColorMake(0, 0, 0, 1)
+                ) { _ in completed.signal() }
                 let elapsedMs =
                     Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000
-                commandBuffer.commit()
-                lastCommandBuffer = commandBuffer
+                completed.wait()
                 return elapsedMs
             }
 
@@ -107,14 +102,11 @@ extension PerformanceSuites {
                     mutate(&terminal)
                     _ = drawFrame(grid: terminal.grid)
                 }
-                lastCommandBuffer?.waitUntilCompleted()
                 var durations: [Double] = []
-                for iteration in 0..<iterations {
+                for _ in 0..<iterations {
                     mutate(&terminal)
                     durations.append(drawFrame(grid: terminal.grid))
-                    if iteration % 8 == 7 { lastCommandBuffer?.waitUntilCompleted() }
                 }
-                lastCommandBuffer?.waitUntilCompleted()
                 return durations
             }
 

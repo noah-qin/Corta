@@ -45,7 +45,8 @@ extension SplitViewController {
             split.subviews.count == 2
         else { return }
 
-        let metrics = focusedPane.terminalRenderer.pointMetrics
+        // A failed pane (no Metal 4) has no cell size to step by.
+        guard let metrics = focusedPane.terminalRenderer?.pointMetrics else { return }
         let step = vertical ? metrics.cellWidth : metrics.cellHeight
         // Two children per node, so the divider sits at the first's extent,
         // measured from the top (flipped).

@@ -30,7 +30,7 @@ import CortaTerminal
 /// the assertions are against real PIDs, file descriptors and Mach threads
 /// of the test-host process.
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct PaneTeardownTests {
     /// Loads the pane's view, which builds the renderer and spawns the child
     /// exactly as a window would.

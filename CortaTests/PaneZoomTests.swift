@@ -73,7 +73,8 @@ struct PaneZoomTests {
     /// Zoom is temporary and changes nothing: both panes are still there,
     /// both children are still running, and the saved arrangement still
     /// describes the split rather than the zoom.
-    @Test func zoomingChangesNoPaneAndNoSavedLayout() throws {
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func zoomingChangesNoPaneAndNoSavedLayout() throws {
         let (split, window) = makeSplit(panes: 2)
         defer { split.teardown() }
         let before = try #require(split.windowState(frame: window.frame))
