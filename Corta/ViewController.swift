@@ -567,6 +567,7 @@ class ViewController: NSViewController {
         largeTextTask = nil
         taskNotifier.cancel()
         NotificationCenter.default.removeObserver(self)
+        terminalView?.stopRendering()
         session?.stop()
     }
 

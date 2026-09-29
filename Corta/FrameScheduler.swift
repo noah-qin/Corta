@@ -82,6 +82,9 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         link?.isPaused = false
     }
 
+    /// Whether a display link is on the run loop for this layer.
+    var isAttached: Bool { link != nil }
+
     var isPaused: Bool {
         get { link?.isPaused ?? true }
         set { link?.isPaused = newValue }
