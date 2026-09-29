@@ -26,6 +26,9 @@ import Testing
 ///
 /// The document is read from the repository rather than a copy, located from
 /// this file the way `LocalizationCoverageTests` locates the string catalog.
+///
+/// Every Markdown file's local links are held to the tree the same way: a
+/// document that moves or disappears takes its inbound links with it.
 struct DocumentationDriftTests {
 
     private static var configurationReference: URL {
@@ -115,5 +118,135 @@ struct DocumentationDriftTests {
             }
         }
         #expect(wrong.isEmpty, "\(wrong)")
+    }
+
+    // MARK: - Local links
+
+    private static var repositoryRoot: URL {
+        configurationReference.deletingLastPathComponent().deletingLastPathComponent()
+    }
+
+    /// Every Markdown file git would see, including new ones not yet staged,
+    /// with `.gitignore` respected so build products never enter the scan.
+    private static func markdownFiles() throws -> [URL] {
+        let git = Process()
+        git.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        git.arguments = ["ls-files", "--cached", "--others", "--exclude-standard", "-z"]
+        git.currentDirectoryURL = repositoryRoot
+        let pipe = Pipe()
+        git.standardOutput = pipe
+        try git.run()
+        let output = pipe.fileHandleForReading.readDataToEndOfFile()
+        git.waitUntilExit()
+        #expect(git.terminationStatus == 0, "git ls-files failed")
+        return String(decoding: output, as: UTF8.self)
+            .split(separator: "\0")
+            .filter { $0.hasSuffix(".md") }
+            .map { repositoryRoot.appendingPathComponent(String($0)) }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+            .sorted { $0.path < $1.path }
+    }
+
+    private static func regex(_ pattern: String) -> NSRegularExpression {
+        // The patterns are literals below; a typo is a test failure, not a crash path.
+        try! NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines])
+    }
+
+    private static let fence = regex(#"^\s{0,3}(`{3,}|~{3,})"#)
+    private static let inlineCode = regex(#"(`+).*?\1"#)
+    private static let linkPatterns = [
+        regex(#"\]\(\s*(<[^>]+>|[^\s)]+)"#),              // [text](destination)
+        regex(#"^\s{0,3}\[[^\]]+\]:\s*(<[^>]+>|\S+)"#),  // [label]: destination
+        regex(#"(?:src|href)\s*=\s*["']([^"']+)["']"#),    // HTML href/src
+    ]
+
+    /// Local-link candidates with their line numbers. Fenced and inline code
+    /// are skipped: a link written as an example is not a link.
+    static func linkDestinations(in text: String) -> [(line: Int, destination: String)] {
+        var found: [(Int, String)] = []
+        var openFence: String?
+        for (index, raw) in text.components(separatedBy: "\n").enumerated() {
+            let whole = NSRange(raw.startIndex..., in: raw)
+            if let marker = fence.firstMatch(in: raw, range: whole),
+               let range = Range(marker.range(at: 1), in: raw) {
+                let token = String(raw[range])
+                if let open = openFence {
+                    if token.first == open.first, token.count >= open.count { openFence = nil }
+                } else {
+                    openFence = token
+                }
+                continue
+            }
+            if openFence != nil { continue }
+            let line = inlineCode.stringByReplacingMatches(in: raw, range: whole, withTemplate: "")
+            let span = NSRange(line.startIndex..., in: line)
+            for pattern in linkPatterns {
+                for match in pattern.matches(in: line, range: span) {
+                    guard let range = Range(match.range(at: 1), in: line) else { continue }
+                    let destination = line[range].trimmingCharacters(in: CharacterSet(charactersIn: "<>"))
+                    found.append((index + 1, destination))
+                }
+            }
+        }
+        return found
+    }
+
+    /// The file a destination names, or nil when it is not a local path:
+    /// a remote URL, another scheme (`mailto:`, `doc:`) or a bare fragment.
+    static func localTarget(of destination: String, from file: URL, root: URL) -> URL? {
+        if destination.hasPrefix("//") { return nil }
+        if destination.range(of: #"^[A-Za-z][A-Za-z0-9+.-]*:"#, options: .regularExpression) != nil {
+            return nil
+        }
+        let path = String(destination.prefix { $0 != "?" && $0 != "#" })
+        guard !path.isEmpty else { return nil }
+        let target = path.removingPercentEncoding ?? path
+        if target.hasPrefix("/") {
+            return root.appendingPathComponent(String(target.dropFirst()))
+        }
+        return file.deletingLastPathComponent().appendingPathComponent(target)
+    }
+
+    /// Inline links, reference definitions and HTML `href`/`src` in every
+    /// Markdown file resolve to something in the repository. Fragments,
+    /// remote URLs and DocC symbol references are outside this check.
+    @Test("every local link and asset in the Markdown files exists")
+    func everyLocalLinkResolves() throws {
+        let root = Self.repositoryRoot
+        let files = try Self.markdownFiles()
+        #expect(files.count > 20, "the Markdown scan looks empty: \(files.count) files")
+        var missing: [String] = []
+        for file in files {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            for (line, destination) in Self.linkDestinations(in: text) {
+                guard let target = Self.localTarget(of: destination, from: file, root: root) else { continue }
+                if !FileManager.default.fileExists(atPath: target.path) {
+                    let name = file.path.replacingOccurrences(of: root.path + "/", with: "")
+                    missing.append("\(name):\(line): missing target: \(destination)")
+                }
+            }
+        }
+        #expect(missing.isEmpty, "\(missing.joined(separator: "\n"))")
+    }
+
+    @Test("links in code are not links, and only local paths are checked")
+    func theLinkScannerSkipsWhatItShould() {
+        let text = """
+            [a](docs/A.md) `[b](B.md)`
+            ```
+            [c](C.md)
+            ```
+            [ref]: <docs/D%20E.md#part>
+            <img src="assets/f.png">
+            """
+        #expect(Self.linkDestinations(in: text).map(\.destination)
+                == ["docs/A.md", "docs/D%20E.md#part", "assets/f.png"])
+        let root = URL(fileURLWithPath: "/repo")
+        let file = root.appendingPathComponent("docs/X.md")
+        #expect(Self.localTarget(of: "https://example.com", from: file, root: root) == nil)
+        #expect(Self.localTarget(of: "doc:Terminal", from: file, root: root) == nil)
+        #expect(Self.localTarget(of: "#section", from: file, root: root) == nil)
+        #expect(Self.localTarget(of: "D%20E.md#part", from: file, root: root)?.path == "/repo/docs/D E.md")
+        #expect(Self.localTarget(of: "/README.md", from: file, root: root)?.path == "/repo/README.md")
     }
 }

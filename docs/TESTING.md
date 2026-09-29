@@ -11,7 +11,7 @@ pin the same stable release; update both `XCODE_PIN` values together. A failed b
 
 | Change | Automated verification | Additional evidence |
 | :--- | :--- | :--- |
-| Documentation or GitHub templates | `python3 scripts/check-docs.py`; `DocumentationDriftTests` for `CONFIGURATION.md` | Review rendered Markdown and examples |
+| Documentation or GitHub templates | `DocumentationDriftTests` (local links, and `CONFIGURATION.md` against the code) | Review rendered Markdown and examples |
 | Parser, grid, search or session | Core suite, focused regression test, fuzz replay for PTY input changes | Specification or minimal reproducer |
 | AppKit, input, settings or windows | Relevant `CortaTests`, then app suite | Launch the app; record the five-point manual check |
 | Rendering or hot path | Relevant rendering tests and app suite | Before/after frame CPU under Release (`-testPlan Release`), same machine |
@@ -351,13 +351,14 @@ Exit status is the number of failed checks, as `check-release.sh` reports.
 ## Documentation
 
 ```sh
-python3 scripts/check-docs.py
+xcodebuild test -project Corta.xcodeproj -scheme Corta \
+  -only-testing:CortaTests/DocumentationDriftTests
 ```
 
-Checks every local link and image in the repository's Markdown, including
-files not yet staged. It does not follow remote URLs or fragments — review
+`DocumentationDriftTests` checks every local link and image in the
+repository's Markdown, including files not yet staged. It does not follow remote URLs or fragments — review
 those, and the rendered result, on GitHub or in a Markdown preview.
-`DocumentationDriftTests` in the app suite pins `docs/CONFIGURATION.md` to
+The same suite, part of the app suite, pins `docs/CONFIGURATION.md` to
 the code: every key the config file is written with, and every `bind.`
 command with its default, must have a matching row.
 

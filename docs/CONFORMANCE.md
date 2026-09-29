@@ -505,10 +505,10 @@ Run at every milestone, because these are the actual workload:
 **B01 additions — the real-workflow matrix.** The issue asked for zsh, fish,
 ssh, tmux, Neovim, fzf, CJK input, long output, sleep/wake, restoration and
 AI CLI applications. zsh/tmux/Neovim/ssh/long-output are items 1–4 above;
-fzf and fish are covered by `scripts/u10-real-workflows.py`'s scenario table
-(it spawns real zsh/fish/tmux/nvim/fzf/ssh processes on real PTYs and
-replays their output through the core — see the script's own docstring for
-exactly what it can and cannot prove). The remainder, added here rather than
+fzf and fish were covered by the 0.1.1 audit's real-program harness
+(U10 in [the quality plan](history/V0.1.1-QUALITY-PLAN.md), which records
+what it proved and what it could not); it was a one-time verification and
+was removed in 1.1.0. The remainder, added here rather than
 to the scriptable harness because none of them are drivable through a PTY
 alone:
 
