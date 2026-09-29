@@ -34,6 +34,59 @@ import Testing
 // ceiling only stops a genuinely wedged run (see TerminalSessionTests'
 // header).
 @Suite(.serialized) struct TerminalSessionLockWaitTests {
+    /// A frame reads more than the grid: the bell, command state, the
+    /// synchronized-output mode, the palette. Each of those took the lock
+    /// without registering, so the reader never left them a gap — found as
+    /// a live frame's wall time doubling under a flood once the per-batch
+    /// main-actor hop, which had been leaving one by accident, went away.
+    @Test(arguments: ["takeBell", "takeFinishedCommand", "isCommandRunning", "indexedPalette"])
+    func aFramesOtherReadsDoNotStarveDuringAnOutputFlood(accessor: String) throws {
+        let session = try TerminalSession(
+            executable: "/usr/bin/yes", size: TerminalSize(rows: 50, columns: 200))
+        defer { session.stop() }
+        session.start()
+        let floodDeadline = ContinuousClock.now + .seconds(30)
+        while !session.snapshot().dump().contains("y"), ContinuousClock.now < floodDeadline {
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        let read: @Sendable () -> Void = {
+            switch accessor {
+            case "takeBell": _ = session.takeBell()
+            case "takeFinishedCommand": _ = session.takeFinishedCommand()
+            case "isCommandRunning": _ = session.isCommandRunning
+            default: _ = session.indexedPalette
+            }
+        }
+        let worst = Self.worstWait(of: read, samples: 500)
+        #expect(worst != nil, "500 reads should complete during a flood well inside 30 s")
+        #expect(
+            (worst ?? .max) < 100_000_000,
+            "\(accessor) starved behind the feed for \(Double(worst ?? 0) / 1e6) ms")
+    }
+
+    /// The longest of `samples` calls on a user-interactive thread, the
+    /// render thread's QoS in the app; nil if they did not finish in 30 s.
+    private static func worstWait(of body: @escaping @Sendable () -> Void, samples: Int) -> UInt64? {
+        let maxWaitNanos = Mutex<UInt64>(0)
+        let done = Mutex(false)
+        let sampler = Thread {
+            pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0)
+            for _ in 0..<samples {
+                let start = DispatchTime.now()
+                body()
+                let elapsed = DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds
+                maxWaitNanos.withLock { $0 = max($0, elapsed) }
+            }
+            done.withLock { $0 = true }
+        }
+        sampler.start()
+        let hangCeiling = ContinuousClock.now + .seconds(30)
+        while !done.withLock({ $0 }), ContinuousClock.now < hangCeiling {
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        return done.withLock { $0 } ? maxWaitNanos.withLock { $0 } : nil
+    }
+
     @Test func snapshotDoesNotStarveDuringAnOutputFlood() throws {
         let session = try TerminalSession(
             executable: "/usr/bin/yes", size: TerminalSize(rows: 50, columns: 200))
