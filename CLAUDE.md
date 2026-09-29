@@ -71,7 +71,9 @@ line each:
   key lives in the reviewed `release` environment.
 - **D21** Apple silicon only; Intel Macs stay on 1.0.1. **D22** The Debug
   build is a separate application — `dev.noahqin.Corta.dev`, its own stage
-  directory, no updater, no move-to-Applications prompt.
+  directory, no updater, no move-to-Applications prompt. **D23** Sparkle is
+  the one accepted third-party runtime dependency; the Mac App Store is
+  closed to an unsandboxed terminal.
 
 ## Working Rules
 

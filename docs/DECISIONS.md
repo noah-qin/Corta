@@ -402,3 +402,37 @@ is isolated; it is how a *Release* build is staged for a launched-app
 check (`CONFORMANCE.md` §4.4). A new piece of state Corta owns goes under
 `AppPaths`, not under a path derived from the home directory —
 `AppPathsTests` and the release check are what catch the exceptions.
+
+## D23 — Sparkle is the one accepted third-party runtime dependency
+
+**Decision.** Corta updates itself with Sparkle, and Sparkle is the only
+third-party code that ships inside the app. D02 is about the terminal
+core; this entry is about the application around it, and a second
+runtime dependency is a new decision here, not a package added in passing.
+
+**Why.** macOS has no native in-app update mechanism outside the Mac App
+Store, and the Mac App Store is not open to Corta: it requires the App
+Sandbox, which `SECURITY.md` §4.1 deliberately does not use, because a
+terminal has to spawn the user's shell with the user's reach. Without an
+updater a user stays on whatever version they downloaded until they
+remember to look. Sparkle is the updater nearly every directly
+distributed Mac application uses, verifies every archive against the
+EdDSA public key in the app before it installs anything, and is
+maintained; writing one would be a second product with the same
+security surface and none of its field record.
+
+**What it costs.** The whole update path is kept on purpose, not as
+legacy: `.github/workflows/appcast.yml` and the EdDSA key in the reviewed
+`release` environment (D20); the Sparkle-shaped rules in the release
+check — an integer build number, the enclosure URL naming the GitHub
+release archive, the enclosure length matching the archive; the
+`SUPublicEDKey` the feed is verified under; and Sparkle's MIT notice, with
+the notices of the code it bundles, in About ▸ Acknowledgements (#118,
+`LICENSING.md`). Dependabot proposes Sparkle bumps from the committed
+`Package.resolved`, and each is reviewed as a change to what installs
+code on users' machines.
+
+**Consequence.** A proposal to drop Sparkle, replace it, or move Corta to
+the Mac App Store reopens this entry and §4.1 together. The development
+build carries no updater (D22), so Sparkle only ever runs in the signed
+Release application.
