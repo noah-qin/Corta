@@ -43,10 +43,13 @@ import Synchronization
 /// released as soon as it is diffed; a search sweep or an export, which
 /// need the grid longer, pay that copy once (`PERFORMANCE.md` §5.9).
 ///
-/// **Fairness**: batches are fed in slices, and the reader leaves a real gap
-/// while a render-path waiter is registered (`yieldToStateWaiters`) —
+/// **Fairness**: batches are fed in slices, and after every slice the reader
+/// leaves a real gap while a waiter is registered (`yieldToStateWaiters`) —
 /// releasing the lock alone lets the reader win it back every time (a
-/// `snapshot()` once waited ~490 ms). `TerminalSessionLockWaitTests`.
+/// `snapshot()` once waited ~490 ms). Every accessor off the reader thread
+/// registers, not only `snapshot()`: a frame reads the bell, the synchronized
+/// output mode and the palette as well, and one unregistered read is enough
+/// to stall it. `TerminalSessionLockWaitTests`.
 public final class TerminalSession: @unchecked Sendable {
     /// Per `read`; internal so lifecycle tests can feed exact boundaries.
     static let readChunkSize = 64 * 1024
@@ -284,9 +287,10 @@ public final class TerminalSession: @unchecked Sendable {
                     responses.append(contentsOf: applied.responses)
                     if let newEpisode = applied.episode { episode = newEpisode }
                     offset = end
-                    if offset < batch.count {
-                        yieldToStateWaiters()
-                    }
+                    // After the last slice too: the next batch's first slice is
+                    // one `read(2)` away, sooner than a waiter's wake, so a flood
+                    // of one-slice batches would never leave a gap.
+                    yieldToStateWaiters()
                 }
                 // Fixed-format only (`SECURITY.md` §2.1); same queue as input.
                 if !responses.isEmpty {
@@ -375,11 +379,13 @@ public final class TerminalSession: @unchecked Sendable {
     }
 
     public func apply(_ command: TerminalStateCommand) {
-        state.withLock {
-            switch command {
-            case .clearScreen: $0.terminal.grid.clearScreen()
-            case .clearHistory: $0.terminal.grid.clearScrollback()
-            case .reset: $0.terminal.reset()
+        registerStateWaiter {
+            state.withLock {
+                switch command {
+                case .clearScreen: $0.terminal.grid.clearScreen()
+                case .clearHistory: $0.terminal.grid.clearScrollback()
+                case .reset: $0.terminal.reset()
+                }
             }
         }
     }
@@ -451,26 +457,28 @@ public final class TerminalSession: @unchecked Sendable {
 
     /// Without a full `snapshot()`; read on every scroll and output batch.
     public var scrollbackTotalPushed: Int {
-        state.withLock { $0.terminal.grid.scrollback.totalPushed }
+        registerStateWaiter { state.withLock { $0.terminal.grid.scrollback.totalPushed } }
     }
 
     public var scrollbackCount: Int {
-        state.withLock { $0.terminal.grid.scrollback.count }
+        registerStateWaiter { state.withLock { $0.terminal.grid.scrollback.count } }
     }
 
     public var isBracketedPasteEnabled: Bool {
-        state.withLock { $0.terminal.isBracketedPasteEnabled }
+        registerStateWaiter { state.withLock { $0.terminal.isBracketedPasteEnabled } }
     }
 
     /// `.off` unless SGR encoding is on; both read under one lock.
     public var sgrMouseTrackingMode: MouseTrackingMode {
-        state.withLock {
-            $0.terminal.isSgrMouseEncodingEnabled ? $0.terminal.mouseTrackingMode : .off
+        registerStateWaiter {
+            state.withLock {
+                $0.terminal.isSgrMouseEncodingEnabled ? $0.terminal.mouseTrackingMode : .off
+            }
         }
     }
 
     public var isSgrMouseEncodingEnabled: Bool {
-        state.withLock { $0.terminal.isSgrMouseEncodingEnabled }
+        registerStateWaiter { state.withLock { $0.terminal.isSgrMouseEncodingEnabled } }
     }
 
     /// Can go false without the child's DECRST (timeout, exit).
@@ -479,29 +487,29 @@ public final class TerminalSession: @unchecked Sendable {
     }
 
     public var isFocusReportingEnabled: Bool {
-        state.withLock { $0.terminal.isFocusReportingEnabled }
+        registerStateWaiter { state.withLock { $0.terminal.isFocusReportingEnabled } }
     }
 
     public var isNewLineModeEnabled: Bool {
-        state.withLock { $0.terminal.isNewLineModeEnabled }
+        registerStateWaiter { state.withLock { $0.terminal.isNewLineModeEnabled } }
     }
 
     public var applicationCursorKeysEnabled: Bool {
-        state.withLock { $0.terminal.applicationCursorKeysEnabled }
+        registerStateWaiter { state.withLock { $0.terminal.applicationCursorKeysEnabled } }
     }
 
     public var applicationKeypadEnabled: Bool {
-        state.withLock { $0.terminal.applicationKeypadEnabled }
+        registerStateWaiter { state.withLock { $0.terminal.applicationKeypadEnabled } }
     }
 
     public var dynamicColors: DynamicColors {
-        get { state.withLock { $0.terminal.dynamicColors } }
-        set { state.withLock { $0.terminal.dynamicColors = newValue } }
+        get { registerStateWaiter { state.withLock { $0.terminal.dynamicColors } } }
+        set { registerStateWaiter { state.withLock { $0.terminal.dynamicColors = newValue } } }
     }
 
     public var indexedPalette: IndexedPalette {
-        get { state.withLock { $0.terminal.indexedPalette } }
-        set { state.withLock { $0.terminal.indexedPalette = newValue } }
+        get { registerStateWaiter { state.withLock { $0.terminal.indexedPalette } } }
+        set { registerStateWaiter { state.withLock { $0.terminal.indexedPalette = newValue } } }
     }
 
     /// Under one lock: a get-then-set would race the reader's OSC 4 writes and
@@ -509,34 +517,34 @@ public final class TerminalSession: @unchecked Sendable {
     public func updateIndexedPaletteDefaults(
         to newDefaults: [(red: UInt8, green: UInt8, blue: UInt8)]
     ) {
-        state.withLock { $0.terminal.indexedPalette.updateDefaults(to: newDefaults) }
+        registerStateWaiter { state.withLock { $0.terminal.indexedPalette.updateDefaults(to: newDefaults) } }
     }
 
     public var specialColors: SpecialColors {
-        get { state.withLock { $0.terminal.specialColors } }
-        set { state.withLock { $0.terminal.specialColors = newValue } }
+        get { registerStateWaiter { state.withLock { $0.terminal.specialColors } } }
+        set { registerStateWaiter { state.withLock { $0.terminal.specialColors = newValue } } }
     }
 
     public var keyboardEnhancements: KeyboardEnhancementFlags {
-        state.withLock { $0.terminal.keyboardEnhancements }
+        registerStateWaiter { state.withLock { $0.terminal.keyboardEnhancements } }
     }
 
     public func takeBell() -> Bool {
-        state.withLock { $0.terminal.takeBell() }
+        registerStateWaiter { state.withLock { $0.terminal.takeBell() } }
     }
 
     public var windowTitle: String? {
-        state.withLock { $0.terminal.windowTitle }
+        registerStateWaiter { state.withLock { $0.terminal.windowTitle } }
     }
 
     /// Always local, safe to spawn or restore from.
     public var workingDirectory: String? {
-        state.withLock { $0.terminal.workingDirectory }
+        registerStateWaiter { state.withLock { $0.terminal.workingDirectory } }
     }
 
     /// Informational only; never for spawning.
     public var remoteContext: RemoteContext? {
-        state.withLock { $0.terminal.remoteContext }
+        registerStateWaiter { state.withLock { $0.terminal.remoteContext } }
     }
 
     /// A command other than the shell is running — what a close confirmation
@@ -551,36 +559,36 @@ public final class TerminalSession: @unchecked Sendable {
     /// OSC 7 first (the shell's own answer); else the kernel's for the
     /// foreground group, since stock macOS zsh sends OSC 7 only to Terminal.app.
     public var currentDirectory: String? {
-        state.withLock { $0.terminal.workingDirectory } ?? pty.currentWorkingDirectory
+        registerStateWaiter { state.withLock { $0.terminal.workingDirectory } } ?? pty.currentWorkingDirectory
     }
 
     public var isCommandRunning: Bool {
-        state.withLock { $0.terminal.isCommandRunning }
+        registerStateWaiter { state.withLock { $0.terminal.isCommandRunning } }
     }
 
     public var hasShellIntegration: Bool {
-        state.withLock { $0.terminal.hasShellIntegration }
+        registerStateWaiter { state.withLock { $0.terminal.hasShellIntegration } }
     }
 
     public var promptEndPosition: (row: Int, column: Int)? {
-        state.withLock { $0.terminal.promptEndPosition }
+        registerStateWaiter { state.withLock { $0.terminal.promptEndPosition } }
     }
 
     public var commandRecords: CommandRecordStore {
-        state.withLock { $0.terminal.commandRecords }
+        registerStateWaiter { state.withLock { $0.terminal.commandRecords } }
     }
 
     public func clearCommandRecords() {
-        state.withLock { $0.terminal.clearCommandRecords() }
+        registerStateWaiter { state.withLock { $0.terminal.clearCommandRecords() } }
     }
 
     public func takeFinishedCommand() -> Int? {
-        state.withLock { $0.terminal.takeFinishedCommand() }
+        registerStateWaiter { state.withLock { $0.terminal.takeFinishedCommand() } }
     }
 
     /// OSC 52; the app decides whether it reaches the pasteboard.
     public func takeClipboardCopy() -> String? {
-        state.withLock { $0.terminal.takeClipboardCopy() }
+        registerStateWaiter { state.withLock { $0.terminal.takeClipboardCopy() } }
     }
 
     /// The child must never see (`TIOCGWINSZ`/`SIGWINCH`) a size the grid has

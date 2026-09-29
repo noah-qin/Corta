@@ -79,6 +79,13 @@ what to edit.
 
 ### Fixed
 
+- Frames no longer wait behind a flood of output. Drawing a frame reads a
+  few pieces of the terminal's state besides the screen — the bell, the
+  running command, the palette — and those reads could queue behind the
+  thread reading the child's output for most of a frame. Under a `yes`
+  flood a frame took about 6 ms to prepare (2.4 ms in 1.0.0); it now takes
+  under 0.1 ms, with the same output throughput.
+
 - Closing a window now frees its memory. A closed window's display link
   was never stopped, so it stayed scheduled and kept the whole window
   alive — its scrollback, its drawables, its renderer. Each closed window
