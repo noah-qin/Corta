@@ -234,7 +234,8 @@ directory under the default shell until B16 found it.
 **Decision.** `PERFORMANCE.md` §5.8 records the number; a change to the
 render loop records a new one. The number is taken under Release —
 `xcodebuild test -scheme Corta -testPlan Release -configuration
-Benchmark` — never under the Debug test action.
+Benchmark -only-testing:CortaPerformanceTests` — never under the Debug
+test action.
 
 **Why.** The M6 render work took it from 2.40 ms to 4.19 ms — a per-cell
 read of a global that retained an array, plus three unelided

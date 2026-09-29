@@ -518,16 +518,14 @@ alone:
    baked characters, so composition never opens for them.
 8. **Sleep/wake** — the machine actually sleeping and waking with Corta
    running. Manual only, deliberately not scripted:
-   `scripts/measure-app-baseline.sh`'s own comment is explicit that sleep/wake and
-   low-power mode change machine-wide state other processes depend on, and
-   need a dedicated session on an idle machine, not a CI-style script.
+   sleep/wake and low-power mode change machine-wide state other processes
+   depend on, and need a dedicated session on an idle machine, not a
+   CI-style script (D13).
 9. **Restoration** — force-quit or crash Corta with a multi-pane layout and
    scrollback, relaunch, confirm the arrangement and content return (U07).
-   Partly scriptable: `scripts/measure-app-baseline.sh`'s `SessionRestore`
-   config-flip pattern drives this without touching global machine state
-   (it flips `restore-windows` in the config file, writes a `state.json`,
-   launches, then restores the original config on every exit path) — but it
-   drives the *mechanism*, and a human still has to judge whether what came
+   Partly scriptable: a staged `CORTA_STAGE_DIR` with `restore-windows =
+   true` and a written `state.json` drives the mechanism without touching
+   global machine state — but a human still has to judge whether what came
    back looks right.
 10. **An AI CLI application** — Claude Code (or a similar TUI-driven AI CLI)
     run as the child, covering ordinary interactive use including

@@ -123,8 +123,8 @@ Three test plans under `TestPlans/` say what runs where:
 | Plan | Contains | Run it with |
 | ---- | -------- | ----------- |
 | `Unit` | `CortaTests`; `CortaUITests` and `CortaPerformanceTests` listed but disabled | `-scheme Corta -testPlan Unit` — the default, and what CI runs |
-| `UI` | `CortaUITests` | `-scheme Corta -testPlan UI` — an interactive desktop session only |
-| `Release` | `CortaPerformanceTests`: the frame-CPU baseline, the instance-upload benchmark, renderer construction cost | `-scheme Corta -testPlan Release -configuration Benchmark` — the measurement D17 records |
+| `UI` | `CortaUITests`, except `MeasurementUITests` | `-scheme Corta -testPlan UI` — an interactive desktop session only |
+| `Release` | `CortaPerformanceTests`: the frame-CPU baseline, the instance-upload benchmark, renderer construction cost; `CortaUITests/MeasurementUITests`: the app-level numbers | `-scheme Corta -testPlan Release -configuration Benchmark`, with `-only-testing:` one of the two — the measurement D17 records, or the app's (below) |
 
 `UI` is deliberately not part of the default run: a UI test drives the
 keyboard and the frontmost window, so running it takes the machine away
@@ -141,7 +141,8 @@ D17), and the baseline is a Release number:
 
 ```sh
 xcodebuild test -project Corta.xcodeproj -scheme Corta \
-  -testPlan Release -configuration Benchmark -destination 'platform=macOS'
+  -testPlan Release -configuration Benchmark -destination 'platform=macOS' \
+  -only-testing:CortaPerformanceTests
 cat /tmp/corta-frame-cpu-baseline.txt /tmp/corta-instance-upload.txt
 ```
 
@@ -157,6 +158,54 @@ optimisation a Release figure exists to see, and every file in
 `CortaTests` needs it. A suite added there can reach only what `Corta`
 declares `public`. `PERFORMANCE.md` §5.8 has the recorded numbers and what
 the figure does and does not include.
+
+### Measuring the app
+
+The numbers `PERFORMANCE.md` §5.6 quotes from a live window come from
+four commands, run from the repository root on the machine the numbers
+are for (§5.2). None of them reads or writes your configuration: the
+Benchmark build is `CortaDev.app` (D22).
+
+```sh
+# 1. Launch time, idle and occluded CPU, 1/2/4-pane floods, window
+#    memory, scripted keypress → glass. About five minutes; it drives the
+#    keyboard and the front window, so leave the machine alone.
+xcodebuild test -project Corta.xcodeproj -scheme Corta \
+  -testPlan Release -configuration Benchmark -destination 'platform=macOS' \
+  -only-testing:CortaUITests/MeasurementUITests
+
+# 2. Energy: per-process CPU, idle wakeups and App Nap, recorded while
+#    command 1 runs in another terminal. Filter the trace on CortaDev.
+xcrun xctrace record --template 'Activity Monitor' --all-processes \
+  --time-limit 6m --output .build/traces/energy.trace
+
+# 3. Where the latency goes: the os_signpost chain (§5.3), recorded while
+#    command 1's keypress test — or a person — types.
+xcrun xctrace record --instrument os_signpost --all-processes \
+  --time-limit 90s --output .build/traces/signposts.trace
+
+# 4. A person typing (the --manual kind, §5.7) or scrolling: launch the
+#    Benchmark build with the rings on, type ~300 digits, read the lines.
+xcodebuild build -project Corta.xcodeproj -scheme Corta \
+  -configuration Benchmark -derivedDataPath .build/measure -quiet &&
+  CORTA_RESTORE_WINDOWS=0 CORTA_RENDER_METRICS=1 SHELL=/bin/sh \
+  .build/measure/Build/Products/Benchmark/CortaDev.app/Contents/MacOS/CortaDev &
+  log stream --style compact \
+  --predicate 'subsystem == "dev.noahqin.Corta" AND category == "render-metrics"'
+```
+
+Command 1 prints every figure on a line starting `measurement:` and
+attaches the raw summary lines to the result bundle. The distributions —
+`keypressToPresent`, `cpuFrame`, `gpu`, `drawableWait` — are what gets
+quoted; XCTest's launch, CPU and memory metrics are averages and are
+regression baselines only (§5.1). It types with a Latin keyboard layout
+selected and puts yours back afterwards. For an A/B, put
+`TEST_RUNNER_CORTA_MAX_DRAWABLES=2` or `TEST_RUNNER_CORTA_FRAME_LATENCY=1`
+in front of it; the test passes the variable to the app.
+
+Machine-wide power in watts needs `powermetrics`, which needs root: `sudo
+powermetrics --samplers cpu_power,gpu_power -i 1000` beside command 1, when
+the person running it chooses to. Nothing here asks for it.
 
 ### Which environments can run the render tests
 

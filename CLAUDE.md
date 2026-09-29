@@ -171,7 +171,8 @@ away. The regression was invisible in every test that passed; only the
 number caught it. Those were Debug figures, and the `contains` calls cost
 nothing once optimised: the baseline is now the Release one, from
 `xcodebuild test -scheme Corta -testPlan Release -configuration
-Benchmark` (`docs/PERFORMANCE.md` §5.8). Write the render loop as
+Benchmark -only-testing:CortaPerformanceTests` (`docs/PERFORMANCE.md`
+§5.8). Write the render loop as
 ordinary Swift, not shaped for `-Onone`.
 
 **Never put a tool or session identifier in a commit message.** No

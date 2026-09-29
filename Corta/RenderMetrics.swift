@@ -25,7 +25,9 @@ import OSLog
 ///
 /// Gated by `CORTA_RENDER_METRICS`, a measurement harness rather than a
 /// config key (D10), read once at start: disabled, each call costs one
-/// Bool check.
+/// Bool check. Any value turns it on; an absolute path also appends each
+/// summary line to that file, which is how `MeasurementUITests` — a
+/// sandboxed runner that cannot read the unified log — gets the numbers.
 nonisolated enum RenderMetrics {
     enum Metric: String, CaseIterable {
         case drawableWait
@@ -37,6 +39,12 @@ nonisolated enum RenderMetrics {
     }
 
     static let isEnabled = ProcessInfo.processInfo.environment["CORTA_RENDER_METRICS"] != nil
+
+    private static let outputFile: URL? = {
+        guard let raw = ProcessInfo.processInfo.environment["CORTA_RENDER_METRICS"], raw.hasPrefix("/")
+        else { return nil }
+        return URL(fileURLWithPath: raw)
+    }()
 
     private static let log = OSLog(subsystem: "dev.noahqin.Corta", category: "render-metrics")
 
@@ -94,6 +102,26 @@ nonisolated enum RenderMetrics {
         os_log(
             "%{public}@: n=%{public}d avg=%{public}.2fms p50=%{public}.2fms p95=%{public}.2fms p99=%{public}.2fms max=%{public}.2fms",
             log: log, type: .default, metric.rawValue, count, avg, p50, p95, p99, max)
+        if let outputFile {
+            let line = String(
+                format: "%@: n=%d avg=%.2fms p50=%.2fms p95=%.2fms p99=%.2fms max=%.2fms\n",
+                metric.rawValue, count, avg, p50, p95, p99, max)
+            append(line, to: outputFile)
+        }
+    }
+
+    /// Once per full ring, never per frame; a failed write loses a line of
+    /// measurement, which the reader reports as a ring that never filled.
+    private static func append(_ line: String, to file: URL) {
+        lock.lock()
+        defer { lock.unlock() }
+        if !FileManager.default.fileExists(atPath: file.path) {
+            FileManager.default.createFile(atPath: file.path, contents: nil)
+        }
+        guard let handle = try? FileHandle(forWritingTo: file) else { return }
+        defer { try? handle.close() }
+        _ = try? handle.seekToEnd()
+        try? handle.write(contentsOf: Data(line.utf8))
     }
 
     // MARK: - Keypress → glass

@@ -19,7 +19,10 @@
         "containerPath": "container:Corta.xcodeproj",
         "identifier": "4F1776B830465E2000E8DD20",
         "name": "CortaUITests"
-      }
+      },
+      "skippedTests": [
+        "MeasurementUITests"
+      ]
     }
   ],
   "version": 1

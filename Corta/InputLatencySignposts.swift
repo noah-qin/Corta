@@ -34,14 +34,13 @@ import OSLog
 /// Every call sits behind `OSSignposter.isEnabled`, one atomic load when
 /// no trace is recording, so it is safe in release builds.
 ///
-/// `scripts/record-signpost-trace.sh` records one. By hand, attach to an
-/// already-running, focused process — launching through `xctrace` doesn't
-/// give the window focus, so no `keyDown` is captured
-/// (`PERFORMANCE.md` §5.3):
+/// Record every process while something else brings Corta forward —
+/// launching through `xctrace` doesn't give the window focus, so no
+/// `keyDown` is captured (`PERFORMANCE.md` §5.3):
 ///
 /// ```sh
-/// xcrun xctrace record --attach Corta --instrument 'os_signpost' \
-///     --output /path/to/output.trace
+/// xcrun xctrace record --instrument os_signpost --all-processes \
+///     --time-limit 90s --output .build/traces/signposts.trace
 /// ```
 ///
 /// Filter on subsystem `dev.noahqin.Corta`, category `input-latency`.
