@@ -236,6 +236,21 @@ final class TerminalView: NSView, CALayerDelegate {
         registerForFileDrags()
     }
 
+    /// Tears the display link down for a pane that is closing. A closed
+    /// window keeps its views, so `viewDidMoveToWindow` never sees `nil`:
+    /// without this the link stays on the main run loop, and the run loop
+    /// keeps the layer, this view and the whole pane alive.
+    var isRendering: Bool { frameScheduler.isAttached }
+
+    func stopRendering() {
+        if let occlusionObserver {
+            NotificationCenter.default.removeObserver(occlusionObserver)
+            self.occlusionObserver = nil
+        }
+        renderPolicy = nil
+        frameScheduler.attach(to: nil)
+    }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         if let occlusionObserver {

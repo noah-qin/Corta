@@ -79,6 +79,13 @@ what to edit.
 
 ### Fixed
 
+- Closing a window now frees its memory. A closed window's display link
+  was never stopped, so it stayed scheduled and kept the whole window
+  alive — its scrollback, its drawables, its renderer. Each closed window
+  with a long scrollback held on to tens of megabytes until Corta quit;
+  opening and closing four such windows grew the app from 64 MB to
+  194 MB, and now leaves it where it started.
+
 - Clearing the screen now clears its images. `clear`, zsh's ⌃L and Clear
   Screen blanked the text but left every Kitty graphics image (`kitten
   icat`) drawn over the empty screen; now, as in kitty, an image that
