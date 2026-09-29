@@ -60,7 +60,7 @@ struct LicenseHeaderRuleTests {
             ("Corta/AppDelegate.swift", LicenseHeaders.Treatment.header(.slashes)),
             ("CortaTerminal/Package.swift", .header(.slashes)),
             ("Corta/Renderer/Shaders.metal", .header(.slashes)),
-            ("scripts/release.sh", .header(.hash)),
+            ("scripts/example.sh", .header(.hash)),
             ("scripts/example.py", .header(.hash)),
             (".github/workflows/ci.yml", .header(.hash)),
             (".gitignore", .header(.hash)),

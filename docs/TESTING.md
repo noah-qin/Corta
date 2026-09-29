@@ -16,7 +16,7 @@ pin the same stable release; update both `XCODE_PIN` values together. A failed b
 | AppKit, input, settings or windows | Relevant `CortaTests`, then app suite | Launch the app; record the five-point manual check |
 | Rendering or hot path | Relevant rendering tests and app suite | Before/after frame CPU under Release (`-testPlan Release`), same machine |
 | Localization or accessibility | Relevant app tests | In-context language or VoiceOver review |
-| Packaging or release | `scripts/check-release.sh` against the artifact | Signing and notarization evidence |
+| Packaging or release | `corta-release-check` against the artifact ([below](#packaging)) | Signing and notarization evidence |
 
 The [conformance guide](CONFORMANCE.md) defines manual checks and protocol
 coverage. [Performance](PERFORMANCE.md) defines benchmark workloads. Record
@@ -328,10 +328,10 @@ swift scripts/verify-appcast.swift --download            # every item, against t
   base64 64-byte signature; each enclosure URL being exactly the GitHub
   release URL for its own version; build numbers unique and newest-first,
   since Sparkle offers whichever item has the highest one.
-- The **archive** layer is what `scripts/check-release.sh` adds whenever it
+- The **archive** layer is what `corta-release-check` adds whenever it
   is given an `--archive`, offline, against the archive it already holds.
-  It deliberately does *not* require `--appcast`: `package-release.sh`
-  passes `--archive` alone, and a packaging run that reported "all checks
+  It deliberately does *not* require `--appcast`: `corta-release-check
+  package` passes `--archive` alone, and a packaging run that reported "all checks
   passed" without having verified a signature was the reassurance this
   exists to stop giving.
 - The **`--download`** layer runs nightly and covers *every* item, not
@@ -346,7 +346,27 @@ install, with every other check green. The SHA-256 sidecar does not catch
 that — it proves the bytes are the published bytes, not that the key pairs
 with the app.
 
-Exit status is the number of failed checks, as `check-release.sh` reports.
+Exit status is the number of failed checks, as `corta-release-check` reports.
+
+## Packaging
+
+```sh
+swift run --package-path CortaTerminal -c release corta-release-check \
+  package path/to/Corta.app 1.1.0 dist          # archive, sidecar, then the check
+swift run --package-path CortaTerminal -c release corta-release-check \
+  check path/to/Corta.app --version 1.1.0 --archive dist/Corta-1.1.0.zip \
+  --appcast --require-notarized
+```
+
+`corta-release-check` is the one implementation of the release rules
+(`RELEASING.md`): versions and build number against `project.pbxproj`,
+license headers, the CHANGELOG and README naming the version, arm64-only
+executables (D21), the code signature, and — with the flags — the archive
+and its sidecar, the feed item, Developer ID, the staple and Gatekeeper.
+Every rule prints `ok` or `FAIL`; the exit status is the number that
+failed. The judgements over text live in the `ReleaseCheck` library and
+are unit-tested by `swift test --package-path CortaTerminal`; the checks
+that need a signed, notarised app only run against one.
 
 ## Documentation
 

@@ -18,10 +18,10 @@ name: Update feed
 
 # Signs a *published* release into appcast.xml (D20). `release.yml` builds,
 # signs, notarises and drafts the release when a `v*` tag is pushed; a
-# person reviews and publishes the draft; this workflow then does what
-# `scripts/release.sh` does by hand — sign the archive with the Sparkle
-# EdDSA key, hold the feed to `scripts/check-release.sh`, and merge it to
-# `main` through a pull request that runs the ordinary checks.
+# person reviews and publishes the draft; this workflow then signs the
+# archive with the Sparkle EdDSA key, holds the feed to
+# `corta-release-check`, and merges it to `main` through a pull request
+# that runs the ordinary checks. It is the only route that signs the feed.
 #
 # The key is a secret of the `release` environment: only `v*` tags may use
 # it and every run waits for the maintainer's approval. It reaches
@@ -132,7 +132,7 @@ jobs:
           cp feed/appcast.xml appcast.xml
           git --no-pager diff --stat appcast.xml
 
-      # The same check the manual route runs, against the unpacked archive:
+      # The release check, against the unpacked archive:
       # the item's build, URL, length and signature agree with the app the
       # release actually shipped, and that app is Developer ID signed,
       # stapled and accepted by Gatekeeper.
@@ -140,7 +140,8 @@ jobs:
         run: |
           mkdir -p unpacked
           ditto -x -k "feed/Corta-${{ steps.version.outputs.version }}.zip" unpacked
-          scripts/check-release.sh unpacked/Corta.app \
+          swift run --package-path CortaTerminal -c release corta-release-check \
+            check unpacked/Corta.app \
             --version "${{ steps.version.outputs.version }}" \
             --archive "feed/Corta-${{ steps.version.outputs.version }}.zip" \
             --appcast --require-notarized
@@ -188,11 +189,11 @@ jobs:
             exit 1
           fi
           git commit -m "chore: publish ${version} to the update feed" -m \
-            "Signed from the published v${version} release by the update-feed workflow (D20); scripts/check-release.sh --appcast --require-notarized passed in the sign job."
+            "Signed from the published v${version} release by the update-feed workflow (D20); corta-release-check --appcast --require-notarized passed in the sign job."
           git push -u origin "$branch"
           gh pr create --base main --head "$branch" \
             --title "chore: publish ${version} to the update feed" \
-            --body "Release checklist step 5, from CI (D20, #101). The \`sign\` job downloaded the published \`Corta-${version}.zip\`, verified its checksum, signed it into \`appcast.xml\` and passed \`scripts/check-release.sh --appcast --require-notarized\`. This pull request is merged by the same workflow once CI on this commit is green." \
+            --body "Release checklist step 5, from CI (D20, #101). The \`sign\` job downloaded the published \`Corta-${version}.zip\`, verified its checksum, signed it into \`appcast.xml\` and passed \`corta-release-check check --appcast --require-notarized\`. This pull request is merged by the same workflow once CI on this commit is green." \
             > pr-url.txt
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
           echo "url=$(cat pr-url.txt)" >> "$GITHUB_OUTPUT"

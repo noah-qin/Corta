@@ -17,7 +17,7 @@
 // Holds the update feed, the signatures in it and the archives it points
 // at to one invariant (issue raised 2026-09-25).
 //
-// `scripts/check-release.sh --appcast` establishes that invariant for the
+// `corta-release-check --appcast` establishes that invariant for the
 // version being released, at the moment it is released. Two things were
 // missing from it, and this tool is both:
 //
@@ -48,7 +48,7 @@
 // `--download` fetches every enclosure and verifies every item. That is
 // the whole invariant, and it is what the nightly run does.
 //
-// Exit status is the number of failed checks, as `check-release.sh` does.
+// Exit status is the number of failed checks, as `corta-release-check` does.
 
 import CryptoKit
 import Foundation
@@ -96,7 +96,7 @@ func fail(_ message: String) {
 }
 func pass(_ message: String) { print("ok    \(message)") }
 
-/// Exit status is the number of failed checks, as `check-release.sh` does.
+/// Exit status is the number of failed checks, as `corta-release-check` does.
 func finish() -> Never {
     if failures == 0 {
         print("verify-appcast: all checks passed")

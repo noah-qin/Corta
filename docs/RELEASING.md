@@ -3,7 +3,7 @@
 [Documentation index](README.md) · [Contributing](../CONTRIBUTING.md)
 
 The steps the maintainer takes to cut a release. The rules a release must
-satisfy are enforced by `scripts/check-release.sh`, the one implementation
+satisfy are enforced by `corta-release-check`, the one implementation
 of them; this page is the order of operations around it. Decision D20
 (`DECISIONS.md`) explains why the update feed is signed from CI.
 
@@ -39,7 +39,7 @@ For the maintainer, cutting any release:
    run as a dated file under `docs/history/`; record test results in
    `docs/CONFORMANCE.md`. Point the
    README's download instructions at `Corta-x.y.z.zip` in the same
-   commit — `scripts/check-release.sh` verifies that name at the tag, so
+   commit — `corta-release-check` verifies that name at the tag, so
    it cannot wait for publication.
 4. Commit as `chore: release x.y.z`, then tag `vx.y.z` and push the tag.
    The release workflow builds from the tag and opens a **draft** release
@@ -67,5 +67,5 @@ For the maintainer, cutting any release:
    `chore/appcast-vX.Y.Z` branch and the `merge` job fails at
    `gh pr create`; opening the pull request from that branch by hand
    is the recovery (1.0.1 shipped that way).
-   If the workflow cannot run at all, `scripts/release.sh` against the
-   downloaded archive is the manual route to the same file.
+   The workflow is the only route that signs the feed (D20); if it cannot
+   run, fix it and re-run it rather than signing by hand.

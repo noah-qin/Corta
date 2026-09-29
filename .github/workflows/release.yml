@@ -145,24 +145,17 @@ jobs:
       - name: Print test failure details
         if: failure()
         run: |
-          xcrun xcresulttool get test-results tests \
-            --path test-results.xcresult --compact | \
-            python3 -c "
-          import json, sys
-          data = json.load(sys.stdin)
           # 'Failure Message' is a *child node type* here, not a field on
           # the failing test — confirmed against this schema locally
-          # before relying on it in CI (\`xcresulttool ... --schema\`).
-          def walk(node, under=None):
-              node_type = node.get('nodeType')
-              if node_type == 'Failure Message':
-                  print(f'{under}: {node.get(\"name\")}')
-              label = node.get('name') if node_type == 'Test Case' else under
-              for child in node.get('children', []) or []:
-                  walk(child, label)
-          for suite in data.get('testNodes', []) or []:
-              walk(suite)
-          "
+          # before relying on it in CI (`xcresulttool ... --schema`).
+          xcrun xcresulttool get test-results tests \
+            --path test-results.xcresult --compact | \
+            jq -r '
+              def failures($under):
+                (if .nodeType == "Failure Message" then "\($under): \(.name)" else empty end),
+                ((if .nodeType == "Test Case" then .name else $under end) as $label
+                  | (.children // [])[] | failures($label));
+              (.testNodes // [])[] | failures(null)'
 
       - name: Import the signing certificate
         if: steps.signing.outputs.available == 'true'
@@ -196,7 +189,7 @@ jobs:
       # `ARCHS=arm64` on the command line, not only in project.pbxproj:
       # Xcode does not apply a project's ARCHS to Swift package products,
       # so corta-exec came out universal while the app was arm64 (D21). A
-      # command-line setting reaches every target. check-release.sh fails a
+      # command-line setting reaches every target. corta-release-check fails a
       # build where either executable carries another slice.
       - name: Build (signed)
         if: steps.signing.outputs.available == 'true'
@@ -252,10 +245,11 @@ jobs:
             DEVELOPMENT_TEAM="" \
             -quiet
 
-      # The same script a maintainer runs locally (`scripts/package-release.sh`
-      # → `scripts/check-release.sh`): versions, build number, deployment
-      # target, CHANGELOG/README agreement, signature, archive and sidecar.
-      # One implementation of the rules, so the two routes reject the same
+      # The same command a maintainer runs locally (`corta-release-check
+      # package`): the archive, its SHA-256 sidecar, then the release check —
+      # versions, build number, deployment target, CHANGELOG/README
+      # agreement, architecture, signature, archive and sidecar. One
+      # implementation of the rules, so the two routes reject the same
       # artifact (B15).
       - name: Package and check
         id: package
@@ -263,7 +257,8 @@ jobs:
           app=build/Build/Products/Release/Corta.app
           test -d "$app" || { echo "no app at $app"; exit 1; }
           zip="Corta-${{ steps.version.outputs.version }}.zip"
-          scripts/package-release.sh "$app" "${{ steps.version.outputs.version }}" .
+          swift run --package-path CortaTerminal -c release corta-release-check \
+            package "$app" "${{ steps.version.outputs.version }}" .
           echo "zip=$zip" >> "$GITHUB_OUTPUT"
 
       - name: Notarise and staple
@@ -287,7 +282,8 @@ jobs:
           # Re-packaged with the ticket stapled, and re-checked — this time
           # requiring the Developer ID signature, the staple and
           # Gatekeeper's acceptance.
-          scripts/package-release.sh build/Build/Products/Release/Corta.app \
+          swift run --package-path CortaTerminal -c release corta-release-check \
+            package build/Build/Products/Release/Corta.app \
             "${{ steps.version.outputs.version }}" . --require-notarized
 
       # The minimum OS is read from the app, not typed here: a note that

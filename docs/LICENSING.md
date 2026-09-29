@@ -120,7 +120,7 @@ for a person.
 - **Every CI run.** `RepositoryLicenseHeaderTests` (in
   `CortaTerminal/Tests/LicenseHeadersTests`) applies the same rules to every
   tracked file, and `swift test --package-path CortaTerminal` runs it.
-- **Every release.** `scripts/check-release.sh` runs `corta-license check`
+- **Every release.** `corta-release-check` runs `corta-license check`
   before it looks at anything else.
 
 `REUSE.toml` follows the [REUSE specification](https://reuse.software/spec-3.3/),
