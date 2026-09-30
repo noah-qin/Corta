@@ -41,9 +41,7 @@ documentation. Generated documentation is not a goal in itself; the
 catalog exists so that a contributor can find where a byte goes.
 
 The scripts a document tells you to run live in [`scripts/`](../scripts/):
-measurement (`measure-*.sh`, `record-signpost-trace.sh`), the real-program
-harness (`u10-real-workflows.py`), the isolated developer launch
-(the `Corta (Dev)` scheme), the documentation link check (`check-docs.py`), and
+measurement (`measure-*.sh`, `record-signpost-trace.sh`) and
 packaging (`check-release.sh`, `package-release.sh`, `release.sh`). Each
 script's header comment says what it changes and what it never touches.
 

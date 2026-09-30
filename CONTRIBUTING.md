@@ -56,7 +56,8 @@ fixture comments should identify the rule being checked.
 Before opening a documentation pull request, run the link check:
 
 ```sh
-python3 scripts/check-docs.py
+xcodebuild test -project Corta.xcodeproj -scheme Corta \
+  -only-testing:CortaTests/DocumentationDriftTests
 ```
 
 ## Developing Corta in Corta

@@ -61,7 +61,7 @@ struct LicenseHeaderRuleTests {
             ("CortaTerminal/Package.swift", .header(.slashes)),
             ("Corta/Renderer/Shaders.metal", .header(.slashes)),
             ("scripts/release.sh", .header(.hash)),
-            ("scripts/check-docs.py", .header(.hash)),
+            ("scripts/example.py", .header(.hash)),
             (".github/workflows/ci.yml", .header(.hash)),
             (".gitignore", .header(.hash)),
             ("README.md", .reuse),
