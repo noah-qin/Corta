@@ -45,6 +45,11 @@ enum ShellIntegrationStatus: Equatable {
     case notInstalled
     /// The Corta block is present.
     case installed
+    /// The Corta block is present but its hooks are not this version's — an
+    /// earlier version's, or edited by hand. An installed block is never
+    /// rewritten behind the user's back, so a fix to the hooks reaches it
+    /// only through `update()`.
+    case outdated
     /// No Corta block, but another terminal's integration (named) is sourced.
     case conflicting(String)
 }
@@ -100,7 +105,12 @@ struct ShellIntegrationInstaller {
         guard let text = try? String(contentsOf: rcFileURL, encoding: .utf8) else {
             return .notInstalled
         }
-        if text.contains(Self.beginMarker) { return .installed }
+        if text.contains(Self.beginMarker) {
+            // A block whose end marker is gone cannot be updated in place;
+            // calling it outdated would offer an Update that does nothing.
+            guard let script = installedScript(in: text) else { return .installed }
+            return script == shell.script ? .installed : .outdated
+        }
         for entry in Self.knownConflictSignatures where text.contains(entry.signature) {
             return .conflicting(entry.name)
         }
@@ -115,6 +125,32 @@ struct ShellIntegrationInstaller {
         if !existing.isEmpty, !existing.hasSuffix("\n") { existing += "\n" }
         let block = "\n\(Self.beginMarker)\n\(shell.script)\n\(Self.endMarker)\n"
         return write(existing + block)
+    }
+
+    /// Replaces an installed block's hooks with this version's, in place: a
+    /// block moved to the end would run after lines the user put below it.
+    /// Everything between the markers is replaced, edits included. Fails
+    /// when there is no whole block to replace.
+    @discardableResult
+    func update() -> Bool {
+        guard let existing = try? String(contentsOf: rcFileURL, encoding: .utf8),
+            let range = scriptRange(in: existing)
+        else { return false }
+        var updated = existing
+        updated.replaceSubrange(range, with: shell.script)
+        return write(updated)
+    }
+
+    /// Between the marker lines, without the newlines that frame it.
+    private func installedScript(in text: String) -> String? {
+        scriptRange(in: text).map { String(text[$0]) }
+    }
+
+    private func scriptRange(in text: String) -> Range<String.Index>? {
+        guard let begin = text.range(of: Self.beginMarker + "\n"),
+            let end = text.range(of: "\n" + Self.endMarker, range: begin.upperBound..<text.endIndex)
+        else { return nil }
+        return begin.upperBound..<end.lowerBound
     }
 
     /// Removes exactly the block `install()` wrote, with its separator line,
