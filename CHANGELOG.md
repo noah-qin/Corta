@@ -112,6 +112,15 @@ what to edit.
   app from 63 MB to 193 MB; it now stays where it started. 1.0.0 and 1.0.1
   have the same leak.
 
+- With fish 4 and Corta's shell integration for fish, each command is now
+  recorded once. fish 4 marks its own prompts, so every prompt arrived
+  with two sets of marks, and the second opened and closed a phantom
+  command that had never run. "The last command" and command history found
+  that empty command instead of the real one. The fish integration now leaves the marks to fish
+  when fish sends them, and Corta counts a doubled mark once, so an
+  integration installed by an earlier version works too. An empty line in
+  fish no longer leaves a command that looks as if it is still running.
+
 - Frames no longer wait behind a flood of output. Drawing a frame reads a
   few pieces of the terminal's state besides the screen — the bell, the
   running command, the palette — and those reads could queue behind the

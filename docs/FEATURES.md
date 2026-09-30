@@ -82,6 +82,10 @@ files, remote connections and child-process input.
   is rejected by design. Animation and Unicode-placeholder placement are absent.
 - **Quick Terminal hotkeys use physical key positions**, not characters emitted
   by the active input source. Multi-display placement still needs verification.
+- **Prompt marks are not nested.** Inside `ssh` to a host whose shell marks
+  its own prompts (OSC 133), the remote commands are recorded as commands of
+  their own, the `ssh` command itself is never recorded as finished, and its
+  exit status marks the last remote prompt.
 - **Remote editing uses managed local copies**, not general directory sync.
   Preserve any local edits before removing Corta's application data.
 - **Input and accessibility reports remain open.** A Settings shortcut failure
