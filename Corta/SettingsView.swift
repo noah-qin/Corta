@@ -191,7 +191,8 @@ struct SettingsView: View {
                 .help(L10n.text("settings.help.openFileCommand"))
                 LabeledContent(L10n.text("settings.label.shellIntegration")) {
                     StatusRowView(
-                        status: model.shellIntegrationStatus, action: model.toggleShellIntegration)
+                        status: model.shellIntegrationStatus, action: model.toggleShellIntegration,
+                        secondaryAction: model.removeShellIntegration)
                 }
                 .help(L10n.text("settings.help.shellIntegration"))
             }

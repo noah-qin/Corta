@@ -118,14 +118,15 @@ whole thing. Installing twice changes nothing the second time, and the
 script itself guards its own hooks with `CORTA_SHELL_INTEGRATION_ACTIVE` in
 case something else sources it again.
 
-The row reports one of three states, read fresh from `~/.zshrc` every time
+The row reports one of four states, read fresh from `~/.zshrc` every time
 Settings opens — the file, not a cached flag, is the ground truth, the same
 rule the config file itself follows (§1):
 
 | State | Meaning |
 | --- | --- |
 | Not installed | No Corta block. Offers **Install**. |
-| Installed | The block is present. Offers **Remove**. |
+| Installed | The block is present and holds this version's hooks. Offers **Remove**. |
+| Installed hooks differ | The block is present, but what sits between its marker lines is not this version's hooks — an earlier version's, or edited by hand. Corta never rewrites the block on its own, so a fix to the hooks waits here. Offers **Update**, which replaces everything between the two marker lines, edits included, and leaves the block where it is; and **Remove**. A block whose end marker is missing reads as Installed, since there is nothing whole to update. |
 | Possible conflict | No Corta block, but the file already sources another terminal's own integration (iTerm2, Starship, VS Code or WezTerm's are recognised by name). Offers **Install Anyway** — installing alongside another integration is not refused, only flagged, since only the user knows whether that is what they want. |
 
 Only zsh ships today; fish and bash are evaluated separately (the B07

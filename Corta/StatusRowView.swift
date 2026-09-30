@@ -29,6 +29,7 @@ import SwiftUI
 struct StatusRowView: View {
     let status: RowStatus
     var action: (() -> Void)?
+    var secondaryAction: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 5) {
@@ -48,9 +49,16 @@ struct StatusRowView: View {
                     .buttonStyle(.accessoryBarAction)
                     .controlSize(.small)
             }
+            if let title = status.secondaryActionTitle, let secondaryAction {
+                Button(title, action: secondaryAction)
+                    .buttonStyle(.accessoryBarAction)
+                    .controlSize(.small)
+            }
         }
         .frame(minHeight: 17, alignment: .leading)
-        .accessibilityElement(children: .ignore)
+        // `.contain`, not `.ignore`: ignoring the children hid the buttons, so
+        // VoiceOver read the status and could not press Install or Remove.
+        .accessibilityElement(children: .contain)
         .accessibilityLabel(status.message.isEmpty ? "" : status.message)
         .onChange(of: status) { _, newValue in
             guard !newValue.message.isEmpty, NSWorkspace.shared.isVoiceOverEnabled else { return }
