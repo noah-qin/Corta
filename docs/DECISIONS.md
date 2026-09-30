@@ -295,9 +295,11 @@ into `appcast.xml` with the Sparkle EdDSA key and merges the result
 through a pull request. The private key is a secret of the `release`
 GitHub environment, which only `v*` tags may use and which requires the
 maintainer's approval on every run; the key is piped to
-`generate_appcast --ed-key-file -` and never written to disk.
-`scripts/release.sh` remains the manual route and runs the same
-`scripts/check-release.sh --appcast --require-notarized`.
+`generate_appcast --ed-key-file -` and never written to disk. The
+workflow is the only route: the manual `scripts/release.sh` was removed
+in 1.1.0 (#133), because a second path that signs the feed is a second
+place for the rules to drift, and a failed run is recovered by fixing
+and re-running the workflow, not by going around it.
 
 **Why.** Until 1.0.0 the feed was signed by hand from the maintainer's
 login keychain — the one step of a release that depended on one machine.
@@ -351,13 +353,13 @@ item's `sparkle:hardwareRequirements`: an item that requires `arm64` is
 not offered to a Mac without it, so an Intel Mac on 1.0.1 sees no update
 rather than downloading one it cannot open. `generate_appcast` writes the
 element for an executable with no Intel slice, and
-`scripts/check-release.sh --appcast` fails a feed item for an arm64-only
+`corta-release-check --appcast` fails a feed item for an arm64-only
 app that lacks it.
 
 Xcode does not apply a project's `ARCHS` to Swift package products, so
 `corta-exec` came out universal beside an arm64 app until
 `release.yml` passed `ARCHS=arm64` on the command line.
-`check-release.sh` holds both executables to `lipo -archs` = `arm64`, so
+`corta-release-check` holds both executables to `lipo -archs` = `arm64`, so
 a build route that forgets fails at packaging rather than shipping.
 
 **Consequence.** Every GPU code path may assume

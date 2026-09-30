@@ -33,4 +33,4 @@
 - [ ] Parser / PTY input: added a focused regression and replayed the fuzz corpus; preserved the trust boundaries in `docs/SECURITY.md`.
 - [ ] Configuration: documented keys, defaults and when changes apply.
 - [ ] Localization: updated all nine locales and marked unreviewed translations `needs_review`.
-- [ ] Packaging: ran `scripts/check-release.sh` against the artifact; kept release rules in that script.
+- [ ] Packaging: ran `corta-release-check` against the artifact; kept release rules in that tool.

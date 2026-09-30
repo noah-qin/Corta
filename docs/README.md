@@ -42,8 +42,10 @@ catalog exists so that a contributor can find where a byte goes.
 
 The scripts a document tells you to run live in [`scripts/`](../scripts/):
 measurement (`measure-*.sh`, `record-signpost-trace.sh`) and
-packaging (`check-release.sh`, `package-release.sh`, `release.sh`). Each
-script's header comment says what it changes and what it never touches.
+the update feed's check (`verify-appcast.swift`). Each script's header
+comment says what it changes and what it never touches. The release check
+is a Swift tool, `corta-release-check`, in `CortaTerminal`
+([testing](TESTING.md#packaging)).
 
 ## The record
 

@@ -153,10 +153,11 @@ restore, a preset or a working directory for the root pane goes through
 `AppDelegate.instantiateWindowController(setup:)`, never onto the
 controller afterwards (D16).
 
-**Packaging has one check.** `scripts/check-release.sh` is the only
-implementation of the release rules; `package-release.sh`, `release.sh`,
-`.github/workflows/release.yml` and `appcast.yml` call it. A new rule goes
-there and nowhere else. The feed's own invariant — the appcast, its
+**Packaging has one check.** `corta-release-check` (a SwiftPM executable
+in `CortaTerminal`, its judgements in the `ReleaseCheck` library) is the
+only implementation of the release rules; its `package` subcommand,
+`.github/workflows/release.yml` and `appcast.yml` all run it. A new rule
+goes there and nowhere else. The feed's own invariant — the appcast, its
 signature and the archive it names being the same bytes, verified under
 the app's `SUPublicEDKey` — is `scripts/verify-appcast.swift`, which that
 check calls at release time, `ci.yml` runs offline on every run and

@@ -260,7 +260,7 @@ after a person publishes the GitHub release (D20). The private key is a
 secret of the `release` GitHub environment: only a `v*` tag may use it,
 every run waits for the maintainer's approval, and the key reaches
 `generate_appcast` on stdin rather than as a file or an argument. The
-feed item is then held to `scripts/check-release.sh --appcast
+feed item is then held to `corta-release-check --appcast
 --require-notarized` — build number, enclosure URL, exact length,
 signature, Developer ID, staple, Gatekeeper — before a pull request
 carries it to `main` through the ordinary checks. The key has no
@@ -330,7 +330,8 @@ made them.
   `appcast.xml` through a pull request, holding the item to
   `check-release.sh --appcast --require-notarized` first (§4.7). The key
   is piped, never written; actions and Sparkle's tools are pinned by hash.
-  `scripts/release.sh` remains the manual route.
+  `scripts/release.sh` remained the manual route until 1.1.0 removed it
+  (#133); the workflow is now the only one.
 - **S10 — 2026-09-16: system entry points added without a command path
   (B16).** Three App Intents (open a window, focus a window by identity,
   toggle the Quick Terminal), one Carbon hotkey and Secure Keyboard Entry

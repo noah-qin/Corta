@@ -142,7 +142,7 @@ jobs:
 
       # `appcast.xml` on `main` *is* the live update feed — `SUFeedURL`
       # points straight at it — so anything merged here is served to every
-      # running Corta immediately. `check-release.sh --appcast` only ever
+      # running Corta immediately. `corta-release-check --appcast` only ever
       # ran at release time, against the one version being released; a hand
       # edit, a bad merge or a corrupted older entry had nothing looking at
       # it. This is the offline half of that invariant: structure, the

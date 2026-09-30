@@ -40,7 +40,7 @@ shasum -a 256 -c Corta-<version>.zip.sha256
 ```
 
 A mismatch means download again. Every release archive is checked against
-its sidecar before it is published (`scripts/check-release.sh`), so a
+its sidecar before it is published (`corta-release-check`), so a
 mismatch is a reason to stop and download again. If the checksum matches,
 include the release version and macOS error in your report.
 

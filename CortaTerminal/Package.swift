@@ -32,6 +32,7 @@ let package = Package(
         .executable(name: "corta-exec", targets: ["corta-exec"]),
         .executable(name: "corta-fuzz", targets: ["corta-fuzz"]),
         .executable(name: "corta-license", targets: ["corta-license"]),
+        .executable(name: "corta-release-check", targets: ["corta-release-check"]),
     ],
     targets: [
         .target(
@@ -86,6 +87,23 @@ let package = Package(
         .testTarget(
             name: "LicenseHeadersTests",
             dependencies: ["LicenseHeaders"],
+            swiftSettings: [.defaultIsolation(nil)]
+        ),
+        // The release rules (`docs/RELEASING.md`) and the one tool that
+        // enforces them. The judgements over text are a library so they are
+        // testable without a built app; the tool gathers the facts.
+        .target(
+            name: "ReleaseCheck",
+            swiftSettings: [.defaultIsolation(nil)]
+        ),
+        .executableTarget(
+            name: "corta-release-check",
+            dependencies: ["ReleaseCheck"],
+            swiftSettings: [.defaultIsolation(nil)]
+        ),
+        .testTarget(
+            name: "ReleaseCheckTests",
+            dependencies: ["ReleaseCheck"],
             swiftSettings: [.defaultIsolation(nil)]
         ),
         .testTarget(

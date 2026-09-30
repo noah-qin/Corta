@@ -9,8 +9,8 @@
   No separate server: pushing an updated copy of this file to `main` *is*
   publishing an update.
 
-  <item> entries are appended by `scripts/release.sh` against the archive
-  `.github/workflows/release.yml` builds, signs and notarizes — never
+  <item> entries are appended by `.github/workflows/appcast.yml` against the
+  archive `.github/workflows/release.yml` builds, signs and notarizes — never
   written by hand. Each one carries an `sparkle:edSignature` over the exact
   archive it describes, produced by Sparkle's own `generate_appcast` against
   the private half of `Sparkle-Info.plist`'s `SUPublicEDKey`. A hand-typed

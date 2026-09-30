@@ -46,6 +46,14 @@ what to edit.
   replaced by the `Corta (Dev)` scheme, and the test suites are selected
   by test plan (`Unit`, `UI`) rather than by `-skip-testing`.
 
+- The release check is a Swift tool, `corta-release-check`, in the core
+  package; it also builds the archive and its SHA-256 sidecar.
+  `scripts/check-release.sh`, `package-release.sh` and the manual
+  feed-signing `release.sh` are gone, and the update-feed workflow is the
+  only route that signs `appcast.xml` (D20). A release archive's sidecar
+  now names the archive without a leading `./`; `shasum -a 256 -c` reads
+  it the same way.
+
 - The configuration file Corta writes no longer labels its Quick Terminal
   and Presets sections with internal work-item codes (`(B16)`, `(U16)`).
   An existing file still loads unchanged; the new wording replaces the
