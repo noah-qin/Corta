@@ -123,21 +123,36 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
 
+      # None of the five is a fork: build ad hoc. All five: sign. Anything
+      # in between is a misconfigured environment — an emptied secret reads
+      # exactly like a missing one — and would otherwise ship an unsigned
+      # draft without a word, so it fails and names what is missing. A dry
+      # run exists to rehearse signing, so it never falls back to ad hoc.
       - name: Check whether signing secrets are available
         id: signing
         env:
+          DRY_RUN: ${{ inputs.dry_run }}
           P12: ${{ secrets.DEVELOPER_ID_P12 }}
           P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
           ASC_KEY: ${{ secrets.ASC_KEY }}
           ASC_KEY_ID: ${{ vars.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ vars.ASC_ISSUER_ID }}
         run: |
-          if [ -n "$P12" ] && [ -n "$P12_PASSWORD" ] && [ -n "$ASC_KEY" ] && \
-             [ -n "$ASC_KEY_ID" ] && [ -n "$ASC_ISSUER_ID" ]; then
+          missing=""
+          [ -n "$P12" ] || missing="$missing DEVELOPER_ID_P12"
+          [ -n "$P12_PASSWORD" ] || missing="$missing DEVELOPER_ID_P12_PASSWORD"
+          [ -n "$ASC_KEY" ] || missing="$missing ASC_KEY"
+          [ -n "$ASC_KEY_ID" ] || missing="$missing ASC_KEY_ID"
+          [ -n "$ASC_ISSUER_ID" ] || missing="$missing ASC_ISSUER_ID"
+          count=$(echo $missing | wc -w | tr -d ' ')
+          if [ "$count" -eq 0 ]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
-          else
+          elif [ "$count" -eq 5 ] && [ "$DRY_RUN" != "true" ]; then
             echo "available=false" >> "$GITHUB_OUTPUT"
             echo "::warning::No signing secrets. Producing an ad-hoc signed, un-notarised build."
+          else
+            echo "::error::The release environment is missing or has emptied:$missing"
+            exit 1
           fi
 
       - name: Run the tests before shipping anything

@@ -90,8 +90,13 @@ restored:
 | `ASC_KEY_ID`                | environment variable | its Key ID                             |
 | `ASC_ISSUER_ID`             | environment variable | the team's Issuer ID                   |
 
-Without all five the workflow produces an ad-hoc build and its release
-notes say so; that is also what a fork gets.
+With none of the five — a fork — the workflow produces an ad-hoc build
+and its release notes say so. With only some of them it fails and names
+the missing ones: an emptied secret reads exactly like a missing one,
+and an unsigned draft is not what a tag in this repository should
+produce. A dry run fails without all five, since signing is what it
+rehearses. Check the file before storing it — `base64` of a path that
+does not exist prints nothing, and `gh secret set` stores that nothing.
 
 **Why a certificate and not the key alone.** An App Store Connect API
 key cannot sign with the team's cloud-managed Developer ID certificate:
