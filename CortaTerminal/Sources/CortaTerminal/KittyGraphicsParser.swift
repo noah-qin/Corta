@@ -126,7 +126,7 @@ enum KittyGraphicsParser {
         return KittyGraphics.DisplayHeader(
             imageID: imageID, placementID: placementID,
             columns: (columns ?? 0) > 0 ? columns : nil, rows: (rows ?? 0) > 0 ? rows : nil,
-            zIndex: zIndex, quiet: quiet)
+            zIndex: zIndex, quiet: quiet, movesCursor: intValue(fields, "C") != 1)
     }
 
     private static func deleteTarget(_ fields: [UInt8: ArraySlice<UInt8>]) -> KittyGraphics.DeleteTarget {

@@ -126,7 +126,14 @@ extension Performer {
             break  // Decoded (and validated) by the app layer, which owns ImageIO.
         }
         let data = KittyGraphics.ImageData(format: format, width: width, height: height, bytes: bytes)
-        switch grid.imagePlacements.store(imageID, data: data) {
+        let storedID: KittyGraphics.ImageID
+        let refusal: ImagePlacementTable.StoreRefusal?
+        if imageID.rawValue == 0 {
+            (storedID, refusal) = grid.imagePlacements.storeAnonymous(data)
+        } else {
+            (storedID, refusal) = (imageID, grid.imagePlacements.store(imageID, data: data))
+        }
+        switch refusal {
         case nil:
             break
         case .dimensionsExceedCaps?:
@@ -140,14 +147,18 @@ extension Performer {
             return
         }
         // One response for `a=T`, not a second from its placement.
-        if let display = pending.display {
+        if var display = pending.display {
+            if display.imageID.rawValue == 0 {
+                display.imageID = storedID
+                if display.placementID.rawValue == 0 {
+                    display.placementID = KittyGraphics.PlacementID(rawValue: storedID.rawValue)
+                }
+            }
             placeAtCursor(display, respond: false)
         }
         respond(imageID: imageID, placementID: nil, quiet: quiet, error: nil)
     }
 
-    /// Advances the cursor only for an explicit `c=`/`r=`: otherwise the size
-    /// depends on the app's cell metrics, and the cursor is not guessed.
     private mutating func placeAtCursor(_ display: KittyGraphics.DisplayHeader, respond respondFlag: Bool = true) {
         let placed = grid.imagePlacements.place(
             display, row: grid.cursor.row, column: grid.cursor.column,
@@ -157,13 +168,57 @@ extension Performer {
                 imageID: display.imageID, placementID: display.placementID, quiet: display.quiet,
                 error: placed ? nil : "ENOSPC:too many placements")
         }
-        guard placed, let columns = display.columns, let rows = display.rows, rows > 0 else { return }
-        if rows == 1 {
-            grid.moveCursor(row: grid.cursor.row, column: grid.cursor.column + columns)
-        } else {
-            // Start of the row below, as the reference client documents.
-            grid.moveCursor(row: grid.cursor.row + rows, column: 0)
+        guard placed, display.movesCursor, let extent = cellExtent(of: display) else { return }
+        moveCursorPast(columns: extent.columns, rows: extent.rows)
+    }
+
+    /// The cells a placement covers: `c=`/`r=`, else the image's pixel size
+    /// over the pty's cell size, rounded up — what the renderer draws. Nil
+    /// when either is unknown (no pixel size reported, or an undecodable
+    /// PNG); the cursor is then not guessed at.
+    private func cellExtent(of display: KittyGraphics.DisplayHeader) -> (columns: Int, rows: Int)? {
+        let image = grid.imagePlacements.image(display.imageID)
+        func cells(_ explicit: Int?, pixels: Int?, perCell: Int) -> Int? {
+            if let explicit { return explicit }
+            guard let pixels, perCell > 0 else { return nil }
+            return max(1, (pixels + perCell - 1) / perCell)
         }
+        guard
+            let columns = cells(display.columns, pixels: image?.pixelWidth, perCell: grid.cellPixelWidth),
+            let rows = cells(display.rows, pixels: image?.pixelHeight, perCell: grid.cellPixelHeight)
+        else { return nil }
+        return (columns, rows)
+    }
+
+    /// Kitty's rule (`graphics.c` `create_ref`, `screen.c`
+    /// `screen_handle_graphics_command`): right by the columns, down to the
+    /// image's last row; past the right edge, the start of the next row; past
+    /// the bottom margin, the region scrolls — so the image goes up with the
+    /// text, and the next line starts below it rather than on top of it.
+    /// `kitten icat` ends with a newline that relies on exactly this. A cursor
+    /// already below the region only clamps: scrolling a region it is not in
+    /// would move text it never touched.
+    private mutating func moveCursorPast(columns: Int, rows: Int) {
+        var column = grid.cursor.column + columns
+        var row = grid.cursor.row + rows - 1
+        if column >= grid.columns {
+            column = 0
+            row += 1
+        }
+        if grid.cursor.row <= grid.marginBottom, row > grid.marginBottom {
+            // The whole distance, as kitty's `screen_scroll` does: `scrollUp`
+            // stops at one region's height, which would leave the cursor
+            // inside an image taller than the screen.
+            let regionHeight = grid.marginBottom - grid.marginTop + 1
+            var remaining = row - grid.marginBottom
+            while remaining > 0 {
+                let step = min(remaining, regionHeight)
+                grid.scrollUp(step)
+                remaining -= step
+            }
+            row = grid.marginBottom
+        }
+        grid.moveCursor(row: row, column: column)
     }
 
     /// Pads to a multiple of 4: `Data(base64Encoded:)` rejects unpadded input,

@@ -38,6 +38,12 @@ public struct ImagePlacementTable: Sendable {
     private var storeGenerations: [KittyGraphics.ImageID: UInt64] = [:]
     private var storeGenerationCounter: UInt64 = 0
 
+    /// Images sent with no `i=`, oldest first; ids may already be gone.
+    private var anonymousOrder: [KittyGraphics.ImageID] = []
+    /// Counts down from the top of the id space, where clients — which
+    /// number from 1 — do not reach.
+    private var nextAnonymousID = UInt32.max
+
     /// An image delete changes no cell, so line damage alone would miss it.
     public private(set) var revision: UInt64 = 0
 
@@ -63,12 +69,7 @@ public struct ImagePlacementTable: Sendable {
     /// change, so a same-size re-transmission always fits. `nil` on success.
     @discardableResult
     mutating func store(_ id: KittyGraphics.ImageID, data: KittyGraphics.ImageData) -> StoreRefusal? {
-        if data.format != .png, data.width > 0, data.height > 0 {
-            guard data.width <= KittyGraphics.maximumImageDimension,
-                data.height <= KittyGraphics.maximumImageDimension,
-                data.width <= KittyGraphics.maximumImagePixels / data.height
-            else { return .dimensionsExceedCaps }
-        }
+        guard Self.dimensionsFit(data) else { return .dimensionsExceedCaps }
         guard images[id] != nil || images.count < KittyGraphics.maximumTrackedImages
         else { return .tooManyImages }
         let replacedBytes = images[id]?.bytes.count ?? 0
@@ -80,6 +81,49 @@ public struct ImagePlacementTable: Sendable {
         storeGenerations[id] = storeGenerationCounter
         revision &+= 1
         return nil
+    }
+
+    /// An image sent with no `i=` — `kitten icat`'s every image. kitty keeps
+    /// each as its own image that nothing can refer to again; stored under
+    /// the one id 0, each replaced the last, and so took the previous
+    /// picture off the screen. Past the image cap or the byte budget, the
+    /// oldest anonymous images give way — kitty's quota evicts oldest first
+    /// too — so a session of `icat` after `icat` is never refused.
+    mutating func storeAnonymous(
+        _ data: KittyGraphics.ImageData
+    ) -> (id: KittyGraphics.ImageID, refusal: StoreRefusal?) {
+        anonymousOrder.removeAll { images[$0] == nil }
+        // Refused whatever gives way: then nothing may, or a rejected image
+        // would still take every earlier `icat` picture off the screen.
+        guard Self.dimensionsFit(data) else { return (KittyGraphics.ImageID(rawValue: 0), .dimensionsExceedCaps) }
+        let anonymousBytes = anonymousOrder.reduce(0) { $0 + (images[$1]?.bytes.count ?? 0) }
+        guard images.count - anonymousOrder.count < KittyGraphics.maximumTrackedImages else {
+            return (KittyGraphics.ImageID(rawValue: 0), .tooManyImages)
+        }
+        guard storedImageBytes - anonymousBytes + data.bytes.count <= maximumStoredBytes else {
+            return (KittyGraphics.ImageID(rawValue: 0), .byteBudgetExceeded)
+        }
+        while !anonymousOrder.isEmpty,
+            images.count >= KittyGraphics.maximumTrackedImages
+                || storedImageBytes + data.bytes.count > maximumStoredBytes
+        {
+            delete(.image(anonymousOrder.removeFirst()))
+        }
+        var id = KittyGraphics.ImageID(rawValue: nextAnonymousID)
+        while images[id] != nil || id.rawValue == 0 {
+            id.rawValue &-= 1
+        }
+        nextAnonymousID = id.rawValue &- 1
+        if let refusal = store(id, data: data) { return (id, refusal) }
+        anonymousOrder.append(id)
+        return (id, nil)
+    }
+
+    private static func dimensionsFit(_ data: KittyGraphics.ImageData) -> Bool {
+        guard data.format != .png, data.width > 0, data.height > 0 else { return true }
+        return data.width <= KittyGraphics.maximumImageDimension
+            && data.height <= KittyGraphics.maximumImageDimension
+            && data.width <= KittyGraphics.maximumImagePixels / data.height
     }
 
     /// Public: the app decodes it; the core has no ImageIO.
@@ -109,6 +153,7 @@ public struct ImagePlacementTable: Sendable {
         switch target {
         case .all:
             images.removeAll()
+            anonymousOrder.removeAll()
             storeGenerations.removeAll()
             storedImageBytes = 0
             placements.removeAll()

@@ -155,6 +155,7 @@ allocating without bound. These caps are asserted in the fuzz harness
 | Input                      | Cap                                                   |
 | -------------------------- | ----------------------------------------------------- |
 | OSC / DCS string length    | Hard limit; discard the sequence on overflow and resynchronise |
+| APC (Kitty graphics) chunk | 132 KiB — one `kitten icat` chunk plus its header; discard the sequence on overflow and resynchronise. A whole image is capped separately, as is a pane's image memory |
 | CSI parameter count        | 16 (xterm's limit); ignore the remainder               |
 | CSI parameter value        | Clamp to a sane maximum before use                     |
 | Repeat counts (e.g. `REP`) | Clamp to the screen or scrollback dimension            |
@@ -323,6 +324,13 @@ which records S01–S04 and S07 in full); the entries below are the ones
 whose write-up belongs with the design rather than with the release that
 made them.
 
+- **S12 — 2026-09-30: an APC chunk may be 132 KiB, not 6 KiB.** The
+  cap was sized to the graphics protocol's text, which asks for 4096-byte
+  chunks; kitty's own `kitten icat` has written 128 KiB chunks since kitty
+  0.31, so every image it sent above about 4 KB was discarded. The cap is
+  still a hard one per sequence, the parser's buffer is the only thing it
+  sizes, and the per-image (64 MB) and per-pane (320 MB) caps behind it
+  are unchanged.
 - **S11 — 2026-09-20: the update feed is signed from CI (D20).** The
   Sparkle EdDSA key moved from the maintainer's login keychain to the
   `release` GitHub environment — `v*` tags only, maintainer approval on

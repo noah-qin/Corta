@@ -116,8 +116,8 @@ struct RenderReferenceTests {
         terminal.feed(Array("plain \u{1B}[1mbold\u{1B}[0m \u{1B}[4;31munder\u{1B}[0m\r\n".utf8))
         terminal.feed(Array("\u{1B}[44mblue bg\u{1B}[0m \u{1B}[7mrev\u{1B}[0m find\r\n".utf8))
         terminal.feed(Array("find again\r\n".utf8))
-        terminal.feed(kittyImage)
-        terminal.feed(Array("\r\n\r\n\r\n$ ".utf8))
+        terminal.feed(kittyImage)  // the cursor ends on its last row, right of it
+        terminal.feed(Array("\r\n\r\n\r\n\r\n$ ".utf8))
         return terminal
     }
 

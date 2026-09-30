@@ -96,6 +96,15 @@ what to edit.
 
 ### Fixed
 
+- `kitten icat` shows images again. kitty's own client sends an image in
+  128 KiB pieces, far past the 6 KiB a single piece was allowed, so any
+  image above about 4 KB was silently discarded — in 1.0.0 and 1.0.1 too.
+  And after an image, the cursor now moves below it as it does in kitty,
+  scrolling the screen when the image reaches the bottom, instead of
+  staying where the image began so the prompt was drawn over it. Each
+  image `icat` shows now stays on screen; before, every one shared a
+  single slot and the next took the last one's place.
+
 - `clear` no longer leaves a faint vertical line at the left edge of the
   window (#165). Shell integration's prompt marks outlived the text they
   sat beside: clearing the screen kept every earlier command's green or

@@ -228,8 +228,8 @@ struct KittyGraphicsClearTests {
     @Test("ED 3 keeps an image that starts in history but still reaches the screen")
     func eraseScrollbackKeepsAStraddlingPlacement() {
         var terminal = Terminal(rows: 5, columns: 40, scrollbackLimit: 100)
-        terminal.feed(Self.place(id: 1, rows: 4))  // rows 0–3; cursor to row 4
-        terminal.feed(Array("\r\n\r\n".utf8))  // rows -2…1: half still on screen
+        terminal.feed(Self.place(id: 1, rows: 4))  // rows 0–3; cursor on row 3, right of it
+        terminal.feed(Array("\r\n\r\n\r\n".utf8))  // rows -2…1: half still on screen
         terminal.feed(Array("\u{1B}[3J".utf8))
         #expect(Self.placementIDs(terminal) == [1])
         let top = terminal.grid.imagePlacements.orderedPlacements().first.map {
