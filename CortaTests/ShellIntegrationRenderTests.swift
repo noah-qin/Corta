@@ -89,6 +89,25 @@ import Testing
         #expect(unmarked.r == 0 && unmarked.g == 0 && unmarked.b == 0)
     }
 
+    /// A prompt still waiting on its command, and the row output starts on,
+    /// draw nothing: after `clear` the grey rule on the lone current prompt
+    /// looked like a stray line (#165).
+    @Test func aMarkWithoutAnOutcomeDrawsNothing() throws {
+        guard let fixture = try Self.fixture() else {
+            Issue.record("No Metal device available in this environment")
+            return
+        }
+        var grid = Grid(rows: 4, columns: 10)
+        grid.setMark(.prompt, atAbsoluteRow: grid.absoluteRow(ofScreenRow: 1))
+        grid.setMark(.outputStart, atAbsoluteRow: grid.absoluteRow(ofScreenRow: 2))
+        let texture = Self.draw(fixture, grid: grid)
+        let rowHeight = Int(fixture.renderer.metrics.cellHeight)
+        for row in 1...2 {
+            let edge = Self.pixel(of: texture, x: 0, y: row * rowHeight + rowHeight / 2)
+            #expect(edge.r == 0 && edge.g == 0 && edge.b == 0)
+        }
+    }
+
     /// The mark is one rule at the left edge, not a wash over the row: text
     /// has to stay readable.
     @Test func aMarkDoesNotTintTheWholeRow() throws {
