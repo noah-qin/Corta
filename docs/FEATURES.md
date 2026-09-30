@@ -74,6 +74,9 @@ files, remote connections and child-process input.
   for what is included and the hardware used.
 - **Bundled shell integration is zsh-only.** Other shells need their own OSC
   133 hooks for command boundaries; without them notifications use a heuristic.
+- **A prompt redrawn by zsh's ⌃L gets no status mark.** The shell repaints the
+  prompt without announcing it again, so the next command's green or red rule
+  is not drawn; the prompt after it is marked as usual.
 - **Kitty graphics support direct transmission only.** File-based transmission
   is rejected by design. Animation and Unicode-placeholder placement are absent.
 - **Quick Terminal hotkeys use physical key positions**, not characters emitted

@@ -607,7 +607,7 @@ public nonisolated final class TerminalRenderer {
         // The mark: a rule down a prompt row's left edge, coloured by outcome —
         // which of the last twenty failed, at a glance. Inside the first cell:
         // the inset is outside this renderer's rect.
-        if line.mark != .none {
+        if line.mark == .promptSucceeded || line.mark == .promptFailed {
             let width = max(2, Float(scale) * 2)
             background.append(
                 QuadInstance(
@@ -767,13 +767,14 @@ public nonisolated final class TerminalRenderer {
                 color: color))
     }
 
-    /// Grey while a command has not reported, including the running one.
+    /// Only an outcome is drawn (the caller's test). A prompt whose command
+    /// has not reported — always the current one — and an output-start row
+    /// carry nothing a reader can use, and after `clear` a grey rule on the
+    /// lone prompt read as a rendering artefact (#165).
     private static func markColor(_ mark: LineMark) -> SIMD4<Float> {
-        switch mark {
-        case .promptSucceeded: return SIMD4<Float>(0.25, 0.75, 0.35, 0.85)
-        case .promptFailed: return SIMD4<Float>(0.9, 0.3, 0.25, 0.9)
-        default: return SIMD4<Float>(0.55, 0.55, 0.6, 0.55)
-        }
+        mark == .promptFailed
+            ? SIMD4<Float>(0.9, 0.3, 0.25, 0.9)
+            : SIMD4<Float>(0.25, 0.75, 0.35, 0.85)
     }
 
     private static func selectionsEqual(_ a: TerminalSelection?, _ b: TerminalSelection?) -> Bool {

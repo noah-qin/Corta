@@ -96,6 +96,15 @@ what to edit.
 
 ### Fixed
 
+- `clear` no longer leaves a faint vertical line at the left edge of the
+  window (#165). Shell integration's prompt marks outlived the text they
+  sat beside: clearing the screen kept every earlier command's green or
+  red rule on the now-empty rows, and `clear`'s own result coloured the
+  empty row it had been typed on. Clearing the screen now removes the
+  marks with the text. The grey rule on the current prompt — and on the
+  row a command's output starts — is gone too: a mark now appears only
+  once a command reports, green for success and red for failure.
+
 - Closing a window or a pane now frees its memory. The terminal view held
   on to itself through its own keyboard handler, so every closed pane
   stayed in memory with its drawables until Corta quit — about 33 MB a

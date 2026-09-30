@@ -716,7 +716,10 @@ public struct Grid: Sendable {
         }
     }
 
+    /// The mark goes with the prompt it sat beside: after `clear` a kept one
+    /// was a coloured rule down an empty row (#165).
     private mutating func eraseWholeLine(_ row: Int, with template: Cell) {
+        lines[row].mark = .none
         if template.isBlank {
             lines[row].clear()
         } else {

@@ -59,7 +59,9 @@ extension Performer {
             let status = Self.exitStatus(payload)
             state.commandExitStatus = status
             state.finishedCommandExitStatus = status
-            if let row = state.promptRow {
+            // Only a row still holding its prompt: `clear` erased the one it
+            // was typed on, and colouring that drew a rule down an empty row.
+            if let row = state.promptRow, grid.line(atAbsoluteRow: row)?.mark.isPrompt == true {
                 grid.setMark(status == 0 ? .promptSucceeded : .promptFailed, atAbsoluteRow: row)
             }
             let endRow = grid.absoluteRow(ofScreenRow: grid.cursor.row)

@@ -90,6 +90,30 @@ import Testing
         #expect(terminal.grid.line(0).mark == .promptSucceeded)
     }
 
+    /// `clear` is `ESC[H ESC[2J` between its own C and D. Before #165 the
+    /// erase kept every mark, and the D coloured the now-empty row `clear`
+    /// was typed on: rules down blank rows under the fresh prompt.
+    @Test("clear leaves no mark on the rows it erased")
+    func clearDropsTheMarksItErases() {
+        var terminal = self.terminal(rows: 6)
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\$ true\r\n\u{1B}]133;C\u{1B}\\\u{1B}]133;D;0\u{1B}\\".utf8))
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\$ clear\r\n\u{1B}]133;C\u{1B}\\".utf8))
+        terminal.feed(Array("\u{1B}[H\u{1B}[2J".utf8))
+        terminal.feed(Array("\u{1B}]133;D;0\u{1B}\\\u{1B}]133;A\u{1B}\\$ ".utf8))
+        #expect(terminal.grid.line(0).mark == .prompt)
+        for row in 1..<6 {
+            #expect(terminal.grid.line(row).mark == .none, "row \(row)")
+        }
+    }
+
+    /// Erasing part of the screen keeps the rows it did not touch.
+    @Test("an erase below the cursor keeps the prompt's mark")
+    func eraseBelowKeepsTheCursorRowsMark() {
+        var terminal = self.terminal()
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\$ \u{1B}[J\u{1B}]133;C\u{1B}\\\u{1B}]133;D;1\u{1B}\\".utf8))
+        #expect(terminal.grid.line(0).mark == .promptFailed)
+    }
+
     // MARK: - OSC 52
 
     @Test("a base64 payload becomes a pending clipboard copy")
