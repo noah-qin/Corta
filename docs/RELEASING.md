@@ -150,8 +150,26 @@ gh workflow run release.yml --ref <branch> -f dry_run=true
 ```
 
 A dry run builds the ref at the version the project carries, signs,
-notarises and runs `corta-release-check --require-notarized`, then keeps
-the archive as a workflow artifact for a week instead of drafting a
-release. The `release` environment only admits `v*` tags, so add the
-branch to its deployment policy for the rehearsal and remove it after,
-as for `appcast.yml`'s dry run.
+notarises and runs `corta-release-check package --require-notarized
+--rehearsal` — the flag skips only the rule that the feed must not yet
+publish the version, since a rehearsal usually rebuilds one it does —
+then keeps the archive as a workflow artifact for a week instead of
+drafting a release.
+
+The `release` environment only admits `v*` tags, so the branch has to be
+added to its deployment policy for the rehearsal. While it is there, a
+run from that branch can reach the signing certificate and the Sparkle
+key with one approval, and the approval page shows the branch, not the
+workflow it runs. Rehearse from a short-lived branch nobody else can push
+to, and remove it from the policy as soon as the run finishes.
+
+**Re-running a tag** (a failed draft, say) is a dispatch on the tag
+itself — the workflow builds exactly the ref it runs on, and has no input
+that could name another:
+
+```sh
+gh workflow run release.yml --ref vX.Y.Z
+```
+
+It runs the workflow as that tag has it, so a tag cut before a signing
+change re-runs with the old signing steps.

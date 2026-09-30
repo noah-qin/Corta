@@ -47,16 +47,15 @@ name: Release
 on:
   push:
     tags: ["v*"]
-  # A re-run of an existing tag, or a rehearsal. `dry_run` builds, signs,
-  # notarises and checks the dispatched ref at the version its project
-  # carries, keeps the archive as a workflow artifact, and drafts no
-  # release. The ref must be one the `release` environment allows; see
-  # docs/RELEASING.md.
+  # A re-run of an existing tag (`gh workflow run release.yml --ref vX.Y.Z`),
+  # or a rehearsal (`--ref <branch> -f dry_run=true`). The job builds the
+  # ref it was dispatched on and nothing else: the `release` environment
+  # admits a run by that ref, so a free-text tag input would let a run
+  # admitted as a `v*` tag check out and sign any other ref. `dry_run`
+  # builds, signs, notarises and checks the ref at the version its project
+  # carries, keeps the archive as a workflow artifact, and drafts no release.
   workflow_dispatch:
     inputs:
-      tag:
-        description: Existing tag to build (e.g. v1.1.0); ignored by a dry run
-        required: false
       dry_run:
         description: Sign, notarise and check only; draft no release
         type: boolean
@@ -69,6 +68,10 @@ env:
   # The shipping artifact is the one place the toolchain matters most; see
   # the same pin in `ci.yml`.
   XCODE_PIN: "26.6.0"
+  # The team the Developer ID certificate belongs to. A fork that signs with
+  # its own certificate changes this; one with no signing secrets builds ad
+  # hoc and never reads it.
+  TEAM_ID: 646VSJ9K5F
 
 jobs:
   release:
@@ -80,7 +83,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.dry_run && github.ref || inputs.tag || github.ref }}
           fetch-depth: 0
 
       - name: Select the pinned Xcode
@@ -95,29 +97,27 @@ jobs:
           sudo xcode-select -s "$pinned"
           xcodebuild -version
 
+      # A real run is a `v*` tag, and the tag is the version. A dry run has
+      # no tag, so it takes the version the project builds with — the one
+      # `corta-release-check` holds the CHANGELOG and README to.
       - name: Work out the version
         id: version
-        # A dry run has no tag to read, so it takes the version the
-        # project carries — the one `corta-release-check` holds the
-        # CHANGELOG and README to.
         env:
           DRY_RUN: ${{ inputs.dry_run }}
-          TAG_INPUT: ${{ inputs.tag }}
         run: |
           if [ "$DRY_RUN" = "true" ]; then
-            versions=$(sed -n 's/.*MARKETING_VERSION = \(.*\);/\1/p' \
-              Corta.xcodeproj/project.pbxproj | sort -u)
-            if [ "$(echo "$versions" | wc -l)" -ne 1 ]; then
-              echo "::error::project.pbxproj carries more than one MARKETING_VERSION: $versions"
+            version=$(xcodebuild -project Corta.xcodeproj -scheme Corta \
+              -configuration Release -showBuildSettings 2>/dev/null | \
+              awk '$1 == "MARKETING_VERSION" { print $3; exit }')
+            if [ -z "$version" ]; then
+              echo "::error::Could not read MARKETING_VERSION from the project."
               exit 1
             fi
-            tag="v$versions"
-          elif [ -n "$TAG_INPUT" ]; then
-            tag="$TAG_INPUT"
-          elif [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            tag="v$version"
+          elif [ "$GITHUB_REF_TYPE" = "tag" ] && [[ "$GITHUB_REF_NAME" == v* ]]; then
             tag="$GITHUB_REF_NAME"
           else
-            echo "::error::Name a tag to build, or ask for a dry run."
+            echo "::error::A release builds a v* tag. Dispatch on one (--ref vX.Y.Z), or ask for a dry run."
             exit 1
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
@@ -212,21 +212,6 @@ jobs:
                   | (.children // [])[] | failures($label));
               (.testNodes // [])[] | failures(null)'
 
-      # `xcodebuild build` is a development action: it left the
-      # com.apple.security.get-task-allow entitlement on Corta and
-      # corta-exec, and re-signed Sparkle.framework's own nested helpers
-      # (Autoupdate, Updater.app, the two XPC services) without a secure
-      # timestamp — both are things notarization rejects outright, and a
-      # plain `build` does not go through the same "prepare for
-      # distribution" pipeline `archive` + `-exportArchive` does, which
-      # is what actually fixes them rather than working around either
-      # symptom by hand.
-      #
-      # `ARCHS=arm64` on the command line, not only in project.pbxproj:
-      # Xcode does not apply a project's ARCHS to Swift package products,
-      # so corta-exec came out universal while the app was arm64 (D21). A
-      # command-line setting reaches every target. corta-release-check fails a
-      # build where either executable carries another slice.
       - name: Import the signing certificate
         if: steps.signing.outputs.available == 'true'
         env:
@@ -247,6 +232,22 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: \
             -s -k "$password" "$keychain" > /dev/null
 
+      # `xcodebuild build` is a development action: it left the
+      # com.apple.security.get-task-allow entitlement on Corta and
+      # corta-exec, and re-signed Sparkle.framework's own nested helpers
+      # (Autoupdate, Updater.app, the two XPC services) without a secure
+      # timestamp — both are things notarization rejects outright, and a
+      # plain `build` does not go through the same "prepare for
+      # distribution" pipeline `archive` + `-exportArchive` does, which
+      # is what actually fixes them rather than working around either
+      # symptom by hand.
+      #
+      # `ARCHS=arm64` on the command line, not only in project.pbxproj:
+      # Xcode does not apply a project's ARCHS to Swift package products,
+      # so corta-exec came out universal while the app was arm64 (D21). A
+      # command-line setting reaches every target. corta-release-check fails a
+      # build where either executable carries another slice.
+      #
       # The identity is named by its kind and the team rather than stored
       # as a secret: the keychain holds exactly one Developer ID
       # Application certificate, so the name is unambiguous.
@@ -264,7 +265,7 @@ jobs:
             ARCHS=arm64 \
             CODE_SIGN_IDENTITY="Developer ID Application" \
             CODE_SIGN_STYLE=Manual \
-            DEVELOPMENT_TEAM=646VSJ9K5F \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
             ENABLE_HARDENED_RUNTIME=YES \
             OTHER_CODE_SIGN_FLAGS="--timestamp --options=runtime" \
             -quiet
@@ -277,7 +278,7 @@ jobs:
             <key>method</key>
             <string>developer-id</string>
             <key>teamID</key>
-            <string>646VSJ9K5F</string>
+            <string>$TEAM_ID</string>
             <key>signingStyle</key>
             <string>manual</string>
             <key>signingCertificate</key>
@@ -307,47 +308,32 @@ jobs:
             DEVELOPMENT_TEAM="" \
             -quiet
 
-      # A rehearsal rebuilds a version the feed usually already publishes
-      # (the project carries the last release's version until the next is
-      # cut), and the check rightly refuses to package a published version.
-      # So a dry run sets that item aside in the runner's copy of the feed;
-      # nothing it changes is committed or pushed.
-      - name: Set the published feed item aside (dry run)
-        if: inputs.dry_run
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          swift - <<'SWIFT'
-          import Foundation
-          let version = ProcessInfo.processInfo.environment["VERSION"]!
-          let url = URL(fileURLWithPath: "appcast.xml")
-          let feed = try XMLDocument(contentsOf: url, options: [.nodePreserveAll])
-          let items = try feed.nodes(forXPath:
-              "//item[*[local-name()='shortVersionString' and normalize-space()='\(version)']]")
-          items.forEach { $0.detach() }
-          try feed.xmlData(options: [.nodePreserveAll]).write(to: url)
-          print("set aside \(items.count) item(s) for \(version)")
-          SWIFT
-
       # The same command a maintainer runs locally (`corta-release-check
       # package`): the archive, its SHA-256 sidecar, then the release check —
       # versions, build number, deployment target, CHANGELOG/README
       # agreement, architecture, signature, archive and sidecar. One
       # implementation of the rules, so the two routes reject the same
       # artifact (B15).
+      #
+      # A dry run passes `--rehearsal`: it rebuilds the version the project
+      # carries, which the feed usually already publishes, and that is the
+      # one rule the package check would otherwise refuse it on.
       - name: Package and check
         id: package
+        env:
+          REHEARSAL: ${{ inputs.dry_run && '--rehearsal' || '' }}
         run: |
           app=build/Build/Products/Release/Corta.app
           test -d "$app" || { echo "no app at $app"; exit 1; }
           zip="Corta-${{ steps.version.outputs.version }}.zip"
           swift run --package-path CortaTerminal -c release corta-release-check \
-            package "$app" "${{ steps.version.outputs.version }}" .
+            package "$app" "${{ steps.version.outputs.version }}" . $REHEARSAL
           echo "zip=$zip" >> "$GITHUB_OUTPUT"
 
       - name: Notarise and staple
         if: steps.signing.outputs.available == 'true'
         env:
+          REHEARSAL: ${{ inputs.dry_run && '--rehearsal' || '' }}
           ASC_KEY: ${{ secrets.ASC_KEY }}
           ASC_KEY_ID: ${{ vars.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ vars.ASC_ISSUER_ID }}
@@ -370,7 +356,7 @@ jobs:
           # Gatekeeper's acceptance.
           swift run --package-path CortaTerminal -c release corta-release-check \
             package build/Build/Products/Release/Corta.app \
-            "${{ steps.version.outputs.version }}" . --require-notarized
+            "${{ steps.version.outputs.version }}" . --require-notarized $REHEARSAL
 
       # The minimum OS is read from the app, not typed here: a note that
       # said "26.5" while the app said 26.0 is exactly the drift T11 found.
