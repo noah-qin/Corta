@@ -712,13 +712,31 @@ public nonisolated final class TerminalRenderer {
                 origin.y + baseline - info.bearing.y - info.size.y
             )
             var glyphSize = info.size
-            let boxWidth = isWide ? cellWidth * 2 : cellWidth
+            var boxWidth = isWide ? cellWidth * 2 : cellWidth
+            // An emoji the grid holds in one column — a text-default base with
+            // VS16, which wcwidth still counts as one — draws at full size into
+            // a following blank cell instead of shrinking into its own. Only the
+            // drawing grows; the width applications count on is unchanged.
+            if info.isColor, !isWide, column + 1 < line.count,
+                Self.isBlankForOverflow(line[column + 1])
+            {
+                boxWidth = cellWidth * 2
+            }
             // Fit every glyph's ink to its box, not just wide ones: a bold face a
             // shade wider, or a font monospaced for letters only, spills into the
             // next column and nothing clips it. One device pixel of tolerance keeps
             // ordinary text on the fast path.
             let ink = info.size.x - 2 * GlyphAtlas.bitmapPadding
-            if isWide || ink > boxWidth + 1 {
+            if info.isColor {
+                // The atlas drew it to fill two cells; centre it in its box on
+                // whole pixels — a bitmap sampled at a fractional origin blurs.
+                let fit = min(1, boxWidth / info.size.x, cellHeight / info.size.y)
+                glyphSize = info.size * fit
+                glyphOrigin = SIMD2<Float>(
+                    (origin.x + (boxWidth - glyphSize.x) / 2).rounded(),
+                    (origin.y + (cellHeight - glyphSize.y) / 2).rounded()
+                )
+            } else if isWide || ink > boxWidth + 1 {
                 // Down, never up; centred; the baseline keeps it on the line.
                 let fit = min(1, boxWidth / info.size.x, cellHeight / info.size.y)
                 glyphSize = info.size * fit
@@ -726,7 +744,7 @@ public nonisolated final class TerminalRenderer {
                     origin.x + (boxWidth - glyphSize.x) / 2,
                     origin.y + baseline - (info.bearing.y + info.size.y) * fit
                 )
-            } else if !info.isColor {
+            } else {
                 // Pixel-aligned: sampling at a fractional origin filters Core Text's
                 // antialiasing twice and softens 12pt text.
                 glyphOrigin.x = glyphOrigin.x.rounded()
@@ -740,6 +758,12 @@ public nonisolated final class TerminalRenderer {
                 glyphs.append(instance)
             }
         }
+    }
+
+    /// A cell a one-column emoji may draw into: a space or an empty cell,
+    /// with no cluster of its own.
+    private static func isBlankForOverflow(_ cell: Cell) -> Bool {
+        cell.grapheme.isNone && (cell.scalar == 0x20 || cell.scalar == 0)
     }
 
     /// Inset so a run of them reads as boxes, not a grid.
