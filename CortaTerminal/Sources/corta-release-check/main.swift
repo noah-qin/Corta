@@ -27,7 +27,7 @@ import ReleaseCheck
 ///     corta-release-check check APP [--version V] [--archive ZIP]
 ///                                   [--appcast] [--require-notarized]
 ///     corta-release-check package APP VERSION [OUTPUT_DIRECTORY]
-///                                   [--require-notarized]
+///                                   [--require-notarized] [--rehearsal]
 ///
 /// `check`, always: the app's Info.plist agrees with project.pbxproj on the
 /// marketing version, the build number and the deployment target; the
@@ -50,8 +50,16 @@ import ReleaseCheck
 ///
 /// `package` zips the app with `ditto` into OUTPUT_DIRECTORY (default
 /// `dist`) as Corta-VERSION.zip, writes the SHA-256 sidecar beside it, and
-/// runs `check --version VERSION --archive ZIP` — so an archive that would
-/// be rejected on CI is rejected here first, for the same reason.
+/// runs the same checks on it — so an archive that would be rejected on CI
+/// is rejected here first, for the same reason. One exception: the feed is
+/// signed only after a release is published (D20), so a package has no
+/// signature to verify yet. It checks the feed alone instead, and that the
+/// feed does not already publish VERSION, whose signed bytes a rebuild would
+/// never match.
+///
+///     --rehearsal          skip only that last rule, for release.yml's dry
+///                          run, which rebuilds the version the project
+///                          carries — usually one already published.
 ///
 /// Run from the repository (or pass `--root`). Exit status is the number
 /// of failed checks, and every failure is printed; 2 is a usage error.
@@ -60,7 +68,7 @@ let usage = """
     usage: corta-release-check check APP [--version V] [--archive ZIP] [--appcast]
                                          [--require-notarized] [--root DIR]
            corta-release-check package APP VERSION [OUTPUT_DIRECTORY]
-                                         [--require-notarized] [--root DIR]
+                                         [--require-notarized] [--rehearsal] [--root DIR]
     """
 
 func usageError(_ message: String? = nil) -> Never {
@@ -115,6 +123,7 @@ var archivePath: String?
 var checkAppcast = false
 var requireNotarized = false
 var rootOverride: String?
+var rehearsal = false
 while let argument = arguments.first {
     arguments.removeFirst()
     func value() -> String {
@@ -127,6 +136,7 @@ while let argument = arguments.first {
     case "--archive" where command == "check": archivePath = value()
     case "--appcast" where command == "check": checkAppcast = true
     case "--require-notarized": requireNotarized = true
+    case "--rehearsal" where command == "package": rehearsal = true
     case "--root": rootOverride = value()
     case let flag where flag.hasPrefix("--"): usageError("unknown argument \(flag)")
     default: positional.append(argument)
@@ -370,17 +380,27 @@ if let archivePath {
     // What only this check can add is the archive in hand: presence is not
     // validity, and a signature made with a key whose public half is not the
     // shipped SUPublicEDKey is well-formed and rejected by every installed
-    // Corta. It runs whenever there is an archive, with or without
-    // `--appcast`, so a packaging run never reports success without it.
+    // Corta. So `check --archive` verifies V's signature over it, with or
+    // without `--appcast`.
+    //
+    // `package` is the exception. It runs in release.yml before the release
+    // is published, and the feed is signed only after that (D20), so there is
+    // no signature for V yet: it verifies the feed alone, and that the feed
+    // does not already publish V, whose signed bytes this archive would never
+    // match.
+    let packaging = command == "package"
+    let feedArguments = packaging ? [] : ["--archive", archive, "--version", bundleVersion]
     let verify = run("/usr/bin/xcrun", ["swift", "\(root)/scripts/verify-appcast.swift",
-                                        "\(root)/appcast.xml", "\(root)/Sparkle-Info.plist",
-                                        "--archive", archive, "--version", bundleVersion])
+                                        "\(root)/appcast.xml", "\(root)/Sparkle-Info.plist"]
+                                        + feedArguments)
     for line in ((verify?.stdout ?? "") + (verify?.stderr ?? "")).split(separator: "\n") {
         print("      \(line)")
     }
     switch verify?.status {
     case 0?:
-        pass("the feed verifies, and \(bundleVersion)'s signature verifies under SUPublicEDKey")
+        pass(packaging
+            ? "the feed verifies"
+            : "the feed verifies, and \(bundleVersion)'s signature verifies under SUPublicEDKey")
     case nil, 2?, 126?, 127?:
         // Not a verdict on the signature: sending a maintainer after the
         // signing key when `swift` simply failed to start would be worse
@@ -388,6 +408,19 @@ if let archivePath {
         fail("verify-appcast could not run (status \(verify.map { String($0.status) } ?? "none")); the feed was not checked")
     case let status?:
         fail("verify-appcast reported \(status) failed check(s) — its output is above")
+    }
+    if packaging {
+        let feed = (try? Data(contentsOf: URL(fileURLWithPath: "\(root)/appcast.xml"))) ?? Data()
+        switch Result(catching: { try ReleaseCheck.appcastItem(version: bundleVersion, in: feed) }) {
+        case .success(nil):
+            pass("appcast.xml does not publish \(bundleVersion) yet")
+        case .success(.some) where rehearsal:
+            print("skip  appcast.xml already publishes \(bundleVersion) — a rehearsal rebuilds it")
+        case .success(.some):
+            fail("appcast.xml already publishes \(bundleVersion); an archive built now is not the one it signed")
+        case .failure(let error):
+            fail("appcast.xml does not parse: \(error.localizedDescription)")
+        }
     }
 }
 

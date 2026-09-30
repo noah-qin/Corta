@@ -21,26 +21,45 @@ name: Release
 # review — nothing is ever published automatically. Once a person
 # publishes the draft, `appcast.yml` signs it into the update feed (D20).
 #
-# Signing and notarisation (M6.16) run only when all six repository
-# secrets below exist. Until they do, the workflow still produces an
-# ad-hoc signed build, and the release notes say so plainly rather than
-# handing users a download that Gatekeeper will silently refuse.
+# Signing and notarisation run only when the `release` environment
+# carries all five values below. Without them — a fork, or a repository
+# that has not set them up — the workflow still produces an ad-hoc signed
+# build, and the release notes say so plainly rather than handing users a
+# download that Gatekeeper will silently refuse.
 #
-#   MACOS_CERTIFICATE          Developer ID Application .p12, base64
-#   MACOS_CERTIFICATE_PASSWORD Password for that .p12
-#   MACOS_SIGNING_IDENTITY     e.g. "Developer ID Application: Name (TEAMID)"
-#   MACOS_NOTARY_KEY           App Store Connect API private key (.p8), base64
-#   MACOS_NOTARY_KEY_ID        Key ID for that .p8
-#   MACOS_NOTARY_ISSUER_ID     Issuer ID from App Store Connect
+#   DEVELOPER_ID_P12           secret   Developer ID Application .p12, base64
+#   DEVELOPER_ID_P12_PASSWORD  secret   its password
+#   ASC_KEY                    secret   App Store Connect team API key (.p8)
+#   ASC_KEY_ID                 variable that key's Key ID
+#   ASC_ISSUER_ID              variable the team's Issuer ID
+#
+# The certificate signs and the API key notarises. The key cannot sign:
+# cloud-managed Developer ID signing is refused to API keys whatever their
+# role ("Cloud signing permission error", #134), and a hosted runner cannot
+# sign in to an Xcode account, so the certificate has to reach the runner.
+# It lives in a throwaway keychain for the length of the job.
+#
+# The job runs in the `release` environment, so a build that can reach
+# either secret waits for the maintainer's approval and runs only from a
+# `v*` tag — the same gate the Sparkle key sits behind (D20). Rotating
+# either is in docs/RELEASING.md.
 
 on:
   push:
     tags: ["v*"]
+  # A re-run of an existing tag (`gh workflow run release.yml --ref vX.Y.Z`),
+  # or a rehearsal (`--ref <branch> -f dry_run=true`). The job builds the
+  # ref it was dispatched on and nothing else: the `release` environment
+  # admits a run by that ref, so a free-text tag input would let a run
+  # admitted as a `v*` tag check out and sign any other ref. `dry_run`
+  # builds, signs, notarises and checks the ref at the version its project
+  # carries, keeps the archive as a workflow artifact, and drafts no release.
   workflow_dispatch:
     inputs:
-      tag:
-        description: Existing tag to build (e.g. v0.1.0)
-        required: true
+      dry_run:
+        description: Sign, notarise and check only; draft no release
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -49,17 +68,21 @@ env:
   # The shipping artifact is the one place the toolchain matters most; see
   # the same pin in `ci.yml`.
   XCODE_PIN: "26.6.0"
+  # The team the Developer ID certificate belongs to. A fork that signs with
+  # its own certificate changes this; one with no signing secrets builds ad
+  # hoc and never reads it.
+  TEAM_ID: 646VSJ9K5F
 
 jobs:
   release:
     name: Build and draft a release
     runs-on: macos-26
     timeout-minutes: 90
+    environment: release
 
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
           fetch-depth: 0
 
       - name: Select the pinned Xcode
@@ -74,30 +97,62 @@ jobs:
           sudo xcode-select -s "$pinned"
           xcodebuild -version
 
+      # A real run is a `v*` tag, and the tag is the version. A dry run has
+      # no tag, so it takes the version the project builds with — the one
+      # `corta-release-check` holds the CHANGELOG and README to.
       - name: Work out the version
         id: version
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
-          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          if [ "$DRY_RUN" = "true" ]; then
+            version=$(xcodebuild -project Corta.xcodeproj -scheme Corta \
+              -configuration Release -showBuildSettings 2>/dev/null | \
+              awk '$1 == "MARKETING_VERSION" { print $3; exit }')
+            if [ -z "$version" ]; then
+              echo "::error::Could not read MARKETING_VERSION from the project."
+              exit 1
+            fi
+            tag="v$version"
+          elif [ "$GITHUB_REF_TYPE" = "tag" ] && [[ "$GITHUB_REF_NAME" == v* ]]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            echo "::error::A release builds a v* tag. Dispatch on one (--ref vX.Y.Z), or ask for a dry run."
+            exit 1
+          fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
 
+      # None of the five is a fork: build ad hoc. All five: sign. Anything
+      # in between is a misconfigured environment — an emptied secret reads
+      # exactly like a missing one — and would otherwise ship an unsigned
+      # draft without a word, so it fails and names what is missing. A dry
+      # run exists to rehearse signing, so it never falls back to ad hoc.
       - name: Check whether signing secrets are available
         id: signing
         env:
-          CERT: ${{ secrets.MACOS_CERTIFICATE }}
-          CERT_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-          SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
-          NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
-          NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
-          NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          P12: ${{ secrets.DEVELOPER_ID_P12 }}
+          P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+          ASC_KEY: ${{ secrets.ASC_KEY }}
+          ASC_KEY_ID: ${{ vars.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ vars.ASC_ISSUER_ID }}
         run: |
-          if [ -n "$CERT" ] && [ -n "$CERT_PASSWORD" ] && \
-             [ -n "$SIGNING_IDENTITY" ] && [ -n "$NOTARY_KEY" ] && \
-             [ -n "$NOTARY_KEY_ID" ] && [ -n "$NOTARY_ISSUER_ID" ]; then
+          missing=""
+          [ -n "$P12" ] || missing="$missing DEVELOPER_ID_P12"
+          [ -n "$P12_PASSWORD" ] || missing="$missing DEVELOPER_ID_P12_PASSWORD"
+          [ -n "$ASC_KEY" ] || missing="$missing ASC_KEY"
+          [ -n "$ASC_KEY_ID" ] || missing="$missing ASC_KEY_ID"
+          [ -n "$ASC_ISSUER_ID" ] || missing="$missing ASC_ISSUER_ID"
+          count=$(echo $missing | wc -w | tr -d ' ')
+          if [ "$count" -eq 0 ]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
-          else
+          elif [ "$count" -eq 5 ] && [ "$DRY_RUN" != "true" ]; then
             echo "available=false" >> "$GITHUB_OUTPUT"
             echo "::warning::No signing secrets. Producing an ad-hoc signed, un-notarised build."
+          else
+            echo "::error::The release environment is missing or has emptied:$missing"
+            exit 1
           fi
 
       - name: Run the tests before shipping anything
@@ -160,21 +215,22 @@ jobs:
       - name: Import the signing certificate
         if: steps.signing.outputs.available == 'true'
         env:
-          CERT: ${{ secrets.MACOS_CERTIFICATE }}
-          CERT_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          P12: ${{ secrets.DEVELOPER_ID_P12 }}
+          P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
         run: |
-          keychain=build.keychain
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          certificate="$RUNNER_TEMP/certificate.p12"
+          trap 'rm -f "$certificate"' EXIT
           password=$(uuidgen)
           security create-keychain -p "$password" "$keychain"
           security set-keychain-settings -lut 3600 "$keychain"
           security unlock-keychain -p "$password" "$keychain"
           security list-keychains -d user -s "$keychain" login.keychain-db
-          echo "$CERT" | base64 --decode > /tmp/certificate.p12
-          security import /tmp/certificate.p12 -k "$keychain" \
-            -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          (umask 077 && printf '%s' "$P12" | base64 --decode > "$certificate")
+          security import "$certificate" -k "$keychain" \
+            -P "$P12_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: \
-            -s -k "$password" "$keychain"
-          rm -f /tmp/certificate.p12
+            -s -k "$password" "$keychain" > /dev/null
 
       # `xcodebuild build` is a development action: it left the
       # com.apple.security.get-task-allow entitlement on Corta and
@@ -191,22 +247,30 @@ jobs:
       # so corta-exec came out universal while the app was arm64 (D21). A
       # command-line setting reaches every target. corta-release-check fails a
       # build where either executable carries another slice.
+      #
+      # The identity is named by its kind and the team rather than stored
+      # as a secret: the keychain holds exactly one Developer ID
+      # Application certificate, so the name is unambiguous.
       - name: Build (signed)
         if: steps.signing.outputs.available == 'true'
         run: |
+          options="$RUNNER_TEMP/ExportOptions.plist"
+          trap 'rm -f "$options"' EXIT
+
           xcodebuild archive \
             -project Corta.xcodeproj \
             -scheme Corta \
             -configuration Release \
             -archivePath build/Corta.xcarchive \
             ARCHS=arm64 \
-            CODE_SIGN_IDENTITY="${{ secrets.MACOS_SIGNING_IDENTITY }}" \
+            CODE_SIGN_IDENTITY="Developer ID Application" \
             CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
             ENABLE_HARDENED_RUNTIME=YES \
             OTHER_CODE_SIGN_FLAGS="--timestamp --options=runtime" \
             -quiet
 
-          cat > /tmp/ExportOptions.plist <<PLIST
+          cat > "$options" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -214,11 +278,11 @@ jobs:
             <key>method</key>
             <string>developer-id</string>
             <key>teamID</key>
-            <string>646VSJ9K5F</string>
+            <string>$TEAM_ID</string>
             <key>signingStyle</key>
             <string>manual</string>
             <key>signingCertificate</key>
-            <string>${{ secrets.MACOS_SIGNING_IDENTITY }}</string>
+            <string>Developer ID Application</string>
           </dict>
           </plist>
           PLIST
@@ -226,9 +290,8 @@ jobs:
           xcodebuild -exportArchive \
             -archivePath build/Corta.xcarchive \
             -exportPath build/Build/Products/Release \
-            -exportOptionsPlist /tmp/ExportOptions.plist \
+            -exportOptionsPlist "$options" \
             -quiet
-          rm -f /tmp/ExportOptions.plist
 
       - name: Build (ad-hoc)
         if: steps.signing.outputs.available != 'true'
@@ -251,40 +314,49 @@ jobs:
       # agreement, architecture, signature, archive and sidecar. One
       # implementation of the rules, so the two routes reject the same
       # artifact (B15).
+      #
+      # A dry run passes `--rehearsal`: it rebuilds the version the project
+      # carries, which the feed usually already publishes, and that is the
+      # one rule the package check would otherwise refuse it on.
       - name: Package and check
         id: package
+        env:
+          REHEARSAL: ${{ inputs.dry_run && '--rehearsal' || '' }}
         run: |
           app=build/Build/Products/Release/Corta.app
           test -d "$app" || { echo "no app at $app"; exit 1; }
           zip="Corta-${{ steps.version.outputs.version }}.zip"
           swift run --package-path CortaTerminal -c release corta-release-check \
-            package "$app" "${{ steps.version.outputs.version }}" .
+            package "$app" "${{ steps.version.outputs.version }}" . $REHEARSAL
           echo "zip=$zip" >> "$GITHUB_OUTPUT"
 
       - name: Notarise and staple
         if: steps.signing.outputs.available == 'true'
         env:
-          NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
-          NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
-          NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+          REHEARSAL: ${{ inputs.dry_run && '--rehearsal' || '' }}
+          ASC_KEY: ${{ secrets.ASC_KEY }}
+          ASC_KEY_ID: ${{ vars.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ vars.ASC_ISSUER_ID }}
         run: |
-          echo "$NOTARY_KEY" | base64 --decode > /tmp/notary.p8
+          key="$RUNNER_TEMP/asc-key.p8"
+          trap 'rm -f "$key"' EXIT
+          (umask 077 && printf '%s\n' "$ASC_KEY" > "$key")
           xcrun notarytool submit "${{ steps.package.outputs.zip }}" \
-            --key /tmp/notary.p8 \
-            --key-id "$NOTARY_KEY_ID" \
-            --issuer "$NOTARY_ISSUER_ID" \
+            --key "$key" \
+            --key-id "$ASC_KEY_ID" \
+            --issuer "$ASC_ISSUER_ID" \
             --wait
           xcrun stapler staple build/Build/Products/Release/Corta.app
           xcrun stapler validate build/Build/Products/Release/Corta.app
           codesign --verify --deep --strict --verbose=2 \
             build/Build/Products/Release/Corta.app
-          rm -f /tmp/notary.p8 "${{ steps.package.outputs.zip }}"
+          rm -f "${{ steps.package.outputs.zip }}"
           # Re-packaged with the ticket stapled, and re-checked — this time
           # requiring the Developer ID signature, the staple and
           # Gatekeeper's acceptance.
           swift run --package-path CortaTerminal -c release corta-release-check \
             package build/Build/Products/Release/Corta.app \
-            "${{ steps.version.outputs.version }}" . --require-notarized
+            "${{ steps.version.outputs.version }}" . --require-notarized $REHEARSAL
 
       # The minimum OS is read from the app, not typed here: a note that
       # said "26.5" while the app said 26.0 is exactly the drift T11 found.
@@ -321,7 +393,21 @@ jobs:
             echo "\`\`\`"
           } > release-notes.md
 
+      # A rehearsal's archive is kept for a week for inspection, never
+      # attached to a release.
+      - name: Keep the rehearsal's archive
+        if: inputs.dry_run
+        uses: actions/upload-artifact@v7
+        with:
+          name: rehearsal-${{ steps.package.outputs.zip }}
+          path: |
+            ${{ steps.package.outputs.zip }}
+            ${{ steps.package.outputs.zip }}.sha256
+            release-notes.md
+          retention-days: 7
+
       - name: Open a draft release
+        if: ${{ !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -341,5 +427,4 @@ jobs:
         if: always() && steps.signing.outputs.available == 'true'
         run: |
           security list-keychains -d user -s login.keychain-db || true
-          security delete-keychain build.keychain || true
-          rm -f /tmp/certificate.p12 /tmp/notary.p8 /tmp/ExportOptions.plist || true
+          security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true

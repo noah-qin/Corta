@@ -3,10 +3,11 @@
 A native macOS terminal emulator in pure Swift. Metal rendering, Core
 Text shaping, AppKit shell, a hand-written VT parser.
 
-**Status (2026-09-27): 1.0.1 is the current release; 1.1.0 is in
+**Status (2026-10-01): 1.0.1 is the current release; 1.1.0 is in
 progress, and its GitHub milestone is the working list.** A release is a
 tag, a reviewed draft and a publish; CI then signs `appcast.xml` (D20) —
-`docs/RELEASING.md` has the steps.
+`docs/RELEASING.md` has the steps. The tag's build and the feed each wait
+for the maintainer's approval of the `release` environment.
 `CHANGELOG.md`'s `[Unreleased]` section is the record of what lands
 after it. Compatibility with AI command-line tools
 is terminal correctness; built-in AI is a non-goal. A roadmap issue is
@@ -162,6 +163,19 @@ signature and the archive it names being the same bytes, verified under
 the app's `SUPublicEDKey` — is `scripts/verify-appcast.swift`, which that
 check calls at release time, `ci.yml` runs offline on every run and
 `nightly.yml` runs against the published archives.
+
+**Release secrets live behind the approval, and signing needs the
+certificate.** The Developer ID `.p12` and its password, the App Store
+Connect key that notarises, and the Sparkle key are secrets of the
+`release` environment (`v*` tags only, approval on every run), never
+repository secrets. An API key cannot sign with a cloud-managed Developer
+ID certificate — the export fails with *Cloud signing permission error*
+whatever the key's role — so do not propose key-only signing. A signing
+change is proven with `release.yml`'s `dry_run` before it merges, and a
+dry run that did not sign is a failure, not a pass: `release.yml` refuses
+to fall back to ad hoc when only some of the secrets are set. Storing the
+`.p12`: `base64` of a file the terminal cannot read (a TCC-protected
+`~/Documents`) prints nothing, and `gh secret set` stores that nothing.
 
 **Measure the frame-CPU baseline, under Release, after touching the
 render loop.** The M6 render work took it from 2.40 ms to 4.19 ms — a

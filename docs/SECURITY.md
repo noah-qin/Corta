@@ -251,7 +251,7 @@ needs no Accessibility permission (rule 7) and, unlike an `NSEvent`
 global monitor, keeps working under Secure Keyboard Entry. Terminal
 transcripts are never indexed for Spotlight.
 
-### 4.7 The update feed is signed, and the key is the release's fourth secret
+### 4.7 The update feed is signed, and its key sits behind an approval
 
 An installed Corta accepts an update only when `appcast.xml` on `main`
 carries an EdDSA signature that the public key baked into the app
@@ -266,9 +266,13 @@ feed item is then held to `corta-release-check --appcast
 signature, Developer ID, staple, Gatekeeper — before a pull request
 carries it to `main` through the ordinary checks. The key has no
 revocation path (a new public key is unknown to every copy that has not
-updated), which is why it lives behind an approval rather than beside the
-certificate as a plain repository secret, and why every third-party
-action and Sparkle's own tools in that workflow are pinned by hash.
+updated), which is why it lives behind an approval rather than as a plain
+repository secret, and why every third-party action and Sparkle's own
+tools in that workflow are pinned by hash. The Developer ID certificate
+`release.yml` signs with and the App Store Connect API key it notarises
+with sit in the same environment behind the same approval; the
+certificate reaches the runner only inside a keychain the job creates
+and deletes.
 
 ## 5. Data at Rest
 
@@ -324,6 +328,14 @@ which records S01–S04 and S07 in full); the entries below are the ones
 whose write-up belongs with the design rather than with the release that
 made them.
 
+- **S13 — 2026-09-30: release signing secrets moved behind the approval
+  (#134).** The Developer ID `.p12`, its password and the notary key
+  were repository secrets that any workflow on any branch could read.
+  They are now secrets of the `release` environment — `v*` tags only,
+  maintainer approval on every run — and notarisation uses a new App
+  Store Connect API key. Signing with the key alone, through a
+  cloud-managed certificate, was tried and is refused to API keys, so the
+  certificate still reaches the runner in a throwaway keychain (§4.7).
 - **S12 — 2026-09-30: an APC chunk may be 132 KiB, not 6 KiB.** The
   cap was sized to the graphics protocol's text, which asks for 4096-byte
   chunks; kitty's own `kitten icat` has written 128 KiB chunks since kitty
