@@ -245,6 +245,28 @@ jobs:
             DEVELOPMENT_TEAM="" \
             -quiet
 
+      # A rehearsal rebuilds a version the feed usually already publishes
+      # (the project carries the last release's version until the next is
+      # cut), and the check rightly refuses to package a published version.
+      # So a dry run sets that item aside in the runner's copy of the feed;
+      # nothing it changes is committed or pushed.
+      - name: Set the published feed item aside (dry run)
+        if: inputs.dry_run
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          swift - <<'SWIFT'
+          import Foundation
+          let version = ProcessInfo.processInfo.environment["VERSION"]!
+          let url = URL(fileURLWithPath: "appcast.xml")
+          let feed = try XMLDocument(contentsOf: url, options: [.nodePreserveAll])
+          let items = try feed.nodes(forXPath:
+              "//item[*[local-name()='shortVersionString' and normalize-space()='\(version)']]")
+          items.forEach { $0.detach() }
+          try feed.xmlData(options: [.nodePreserveAll]).write(to: url)
+          print("set aside \(items.count) item(s) for \(version)")
+          SWIFT
+
       # The same command a maintainer runs locally (`corta-release-check
       # package`): the archive, its SHA-256 sidecar, then the release check —
       # versions, build number, deployment target, CHANGELOG/README
