@@ -57,6 +57,7 @@ extension Performer {
             }
         case 0x43:  // 'C' — the command is running, and its output starts here
             state.isCommandRunning = true
+            state.shellMarksOutputStart = true
             let outputRow = grid.absoluteRow(ofScreenRow: grid.cursor.row)
             state.outputStartRow = outputRow
             state.commandRecords.markOutputStart(outputRow)
@@ -69,11 +70,14 @@ extension Performer {
             // One outcome per prompt. A second `D`, or one on the prompt's own
             // row before anything ran, is a doubled hook — fish 4 marks its
             // prompts itself, and a hook's `D` after fish's `A` closed a phantom
-            // command with the last one's status.
+            // command with the last one's status. "Before anything ran" needs a
+            // shell that sends `C`: without one, `clear` puts the cursor back
+            // on a top-row prompt and a real command's `D` looks the same.
             let cursorRow = grid.absoluteRow(ofScreenRow: grid.cursor.row)
-            if state.commandExitStatus != nil
-                || (!state.isCommandRunning && state.promptRow == cursorRow)
-            {
+            let nothingRan =
+                state.shellMarksOutputStart && !state.isCommandRunning
+                && state.promptRow == cursorRow
+            if state.commandExitStatus != nil || nothingRan {
                 break
             }
             state.isCommandRunning = false

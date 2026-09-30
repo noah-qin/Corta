@@ -134,15 +134,30 @@ import Testing
         terminal.feed(Array((prompt(status: 1) + run("true", status: 0)).utf8))
         terminal.feed(Array(prompt(status: 0).utf8))
 
+        // Before the first `C` the shell may be one that never sends it, so
+        // the session's first prompt still yields one empty record; every
+        // prompt after it, none.
         let records = terminal.commandRecords.records
-        #expect(records.map(\.exitStatus) == [1, 0, nil])
-        #expect(records.map(\.promptRow) == [0, 2, 4])
+        #expect(records.map(\.exitStatus) == [0, 1, 0, nil])
+        #expect(records.map(\.promptRow) == [0, 0, 2, 4])
+        #expect(records.first?.outputStartRow == nil)
         #expect(terminal.commandRecords.lastCompleted?.promptRow == 2)
         #expect(terminal.grid.line(0).mark == .promptFailed)
         #expect(terminal.grid.line(2).mark == .promptSucceeded)
         // The waiting prompt: nothing has run there yet.
         #expect(terminal.grid.line(4).mark == .prompt)
         #expect(!terminal.isCommandRunning)
+    }
+
+    /// A shell that sends only `A` and `D` gives no sign of a command having
+    /// run. `clear` there puts the cursor back on a top-row prompt, and its
+    /// `D` must still count.
+    @Test("without C, a D on the prompt's own row still finishes the command")
+    func anADOnlyShellKeepsItsOutcomeAfterClear() {
+        var terminal = self.terminal()
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\$ clear\r\n\u{1B}[H\u{1B}[2J\u{1B}]133;D;0\u{1B}\\".utf8))
+        #expect(terminal.commandRecords.last?.exitStatus == 0)
+        #expect(terminal.takeFinishedCommand() == 0)
     }
 
     /// A second report for one command keeps the first, and is not a second
