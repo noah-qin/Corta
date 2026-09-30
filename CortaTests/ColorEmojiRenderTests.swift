@@ -169,6 +169,87 @@ import Testing
         #expect(result.colored > 0, "expected colored pixels in the rendered emoji")
     }
 
+    /// The atlas draws an emoji at the size two cells take, so the renderer
+    /// maps it texel for texel: a bitmap scaled on the GPU, or placed at a
+    /// fractional pixel, is resampled and comes out soft.
+    @Test(arguments: [1.0, 2.0])
+    func emojiBitmapFitsTwoCellsWithoutScaling(scale: Double) throws {
+        guard let device = Self.makeDevice() else {
+            Issue.record("No Metal device available in this environment")
+            return
+        }
+        let renderer = try TerminalRenderer(
+            device: device, font: TerminalFont.primary(ofSize: 14), scale: scale)
+        let info = try #require(renderer.glyphAtlas.glyph(shaping: 0x1F600, style: .regular))
+        #expect(info.isColor)
+        let boxWidth = Float(renderer.metrics.cellWidth) * 2
+        #expect(info.size.x <= boxWidth, "the bitmap is wider than its two cells")
+        let placed = TerminalRenderer.colorGlyphPlacement(
+            info, cellOrigin: .zero, boxWidth: boxWidth,
+            cellHeight: Float(renderer.metrics.cellHeight))
+        #expect(placed.size == info.size, "a two-cell emoji was scaled")
+        #expect(placed.origin.x == placed.origin.x.rounded())
+        #expect(placed.origin.y == placed.origin.y.rounded())
+    }
+
+    /// A small design stays smaller than its large counterpart once drawn:
+    /// the atlas scales a bitmap emoji by its whole design square, which is
+    /// the same for both, never by the part of it that is drawn.
+    @Test func smallEmojiDesignsStaySmall() throws {
+        guard let device = Self.makeDevice() else {
+            Issue.record("No Metal device available in this environment")
+            return
+        }
+        let renderer = try TerminalRenderer(
+            device: device, font: TerminalFont.primary(ofSize: 14), scale: 2)
+        let box = MTLRegionMake2D(
+            0, 0, Int(renderer.metrics.cellWidth) * 2, Int(renderer.metrics.cellHeight))
+        func drawn(_ text: String) -> Int {
+            var terminal = Terminal(rows: 1, columns: 4)
+            terminal.feed(Array(text.utf8))
+            return Self.inkAndColor(
+                in: Self.render(terminal.grid, renderer: renderer, device: device), region: box
+            ).colored
+        }
+        let small = drawn("\u{1F538}"), large = drawn("\u{1F536}")
+        #expect(small > 0 && large > 0)
+        #expect(Double(small) < Double(large) * 0.8, "🔸 drew as large as 🔶: \(small) vs \(large)")
+    }
+
+    /// A text-default base with VS16 (✍️) is one column in the grid, as
+    /// wcwidth counts it, but draws into a blank cell after it. Without VS16,
+    /// or with text after it, it keeps to its own cell.
+    @Test func emojiSelectorOverflowsOnlyIntoABlankCell() throws {
+        guard let device = Self.makeDevice() else {
+            Issue.record("No Metal device available in this environment")
+            return
+        }
+        let renderer = try TerminalRenderer(
+            device: device, font: TerminalFont.primary(ofSize: 14), scale: 2)
+        let cellWidth = Int(renderer.metrics.cellWidth)
+        let cellHeight = Int(renderer.metrics.cellHeight)
+        func coloredInSecondCell(_ text: String) -> Int {
+            var terminal = Terminal(rows: 1, columns: 6)
+            terminal.feed(Array(text.utf8))
+            let texture = Self.render(terminal.grid, renderer: renderer, device: device)
+            return Self.inkAndColor(
+                in: texture, region: MTLRegionMake2D(cellWidth, 0, cellWidth, cellHeight)
+            ).colored
+        }
+        var terminal = Terminal(rows: 1, columns: 6)
+        terminal.feed(Array("\u{270D}\u{FE0F} x".utf8))
+        #expect(!terminal.grid[0, 0].attributes.contains(.wide), "VS16 widened the cell")
+
+        #expect(coloredInSecondCell("\u{270D}\u{FE0F} x") > 0, "✍️ did not draw into the blank cell")
+        // The foreground is not a pure grey, so text counts as colored too:
+        // the same x after a plain letter is the baseline.
+        let squeezed = coloredInSecondCell("\u{270D}\u{FE0F}x"), plain = coloredInSecondCell("ax")
+        #expect(squeezed == plain, "✍️ drew over the text after it: \(squeezed) vs \(plain)")
+        // 🖼 without VS16: one column, drawn from the color font all the same.
+        #expect(renderer.glyphAtlas.glyph(shaping: 0x1F5BC, style: .regular)?.isColor == true)
+        #expect(coloredInSecondCell("\u{1F5BC} x") == 0, "an emoji without VS16 overflowed")
+    }
+
     /// Same end to end for a ZWJ cluster (👨‍👩‍👧‍👦): the core collapses the
     /// sequence into one wide cluster cell (`Grid.write`'s ZWJ path), and
     /// the cluster must rasterise in color exactly like a single scalar.

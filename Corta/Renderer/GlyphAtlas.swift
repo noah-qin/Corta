@@ -164,7 +164,7 @@ nonisolated final class GlyphAtlas {
     /// Indexed by `Style.rawValue`, with whether each bold is synthetic.
     private var fonts: [CTFont]
     private var isSyntheticBold: [Bool]
-    /// The two-cell box a color glyph is rasterised to fill, in pixels.
+    /// The two-cell box a color glyph is rasterised to fit, in pixels.
     private var colorBox: CGSize
 
     /// Top half of the grayscale texture.
@@ -237,8 +237,9 @@ nonisolated final class GlyphAtlas {
             region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: &white, bytesPerRow: 1)
     }
 
-    /// Two cells of `font`, which is already in pixels: the renderer's box for
-    /// a wide glyph, so an emoji drawn to fit it is never scaled on the GPU.
+    /// Two cells of `font`, which is already in pixels: the renderer's box
+    /// for a wide glyph, so an emoji drawn to fit it is never scaled on the
+    /// GPU.
     private static func colorBox(for font: CTFont) -> CGSize {
         let metrics = CellMetrics(font: font)
         return CGSize(width: metrics.cellWidth * 2, height: metrics.cellHeight)
@@ -491,10 +492,13 @@ nonisolated final class GlyphAtlas {
     ///
     /// `CTRunDraw` is the only Core Text call that draws bitmaps, and
     /// `CTRunGetImageBounds` knows their real extent; the text position is set
-    /// to `-bbox.origin`. The glyph is drawn scaled to fill `colorBox`: drawn
-    /// at the text size and then scaled on the GPU, a bitmap emoji came out
-    /// both smaller than its two cells and soft. Scaling the context instead
-    /// lets Core Text pick the bitmap strike for the size actually drawn. A grayscale run in a mixed cluster draws by outline
+    /// to `-bbox.origin`. The glyph is drawn scaled so its image, padding
+    /// included, fits `colorBox` exactly, and the renderer draws the bitmap
+    /// texel for texel. Drawn at the text size and scaled on the GPU instead,
+    /// a bitmap emoji came out smaller than its two cells and soft. For a
+    /// bitmap emoji the image bounds are the whole design square, so a small
+    /// design (🔸) keeps its size against a large one (🔶). Scaling the
+    /// context lets Core Text pick the strike for the size drawn. A grayscale run in a mixed cluster draws by outline
     /// in white. Texels upload premultiplied, matching the color pipeline's
     /// blend (`sourceRGB = .one`).
     private func rasterizeColor(_ runs: [ShapedRun]) -> GlyphInfo {
@@ -514,11 +518,14 @@ nonisolated final class GlyphAtlas {
             }
         }
         guard !bounds.isNull, !bounds.isEmpty else { return empty }
-        let fill = min(colorBox.width / bounds.width, colorBox.height / bounds.height)
+        let pad = CGFloat(Self.bitmapPadding)
+        let fill = min(
+            (colorBox.width - 2 * pad) / bounds.width,
+            (colorBox.height - 2 * pad) / bounds.height)
         let scaled = CGRect(
             x: bounds.minX * fill, y: bounds.minY * fill,
             width: bounds.width * fill, height: bounds.height * fill)
-        let bbox = scaled.insetBy(dx: -CGFloat(Self.bitmapPadding), dy: -CGFloat(Self.bitmapPadding))
+        let bbox = scaled.insetBy(dx: -pad, dy: -pad)
         let width = max(1, Int(bbox.width.rounded(.up)))
         let height = max(1, Int(bbox.height.rounded(.up)))
         var allocation = colorPage.allocate(width: width, height: height)
