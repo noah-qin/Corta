@@ -83,7 +83,9 @@ struct CommandPaletteView: View {
             }
         }
         .padding(16)
-        .frame(width: 520, height: 360)
+        // The panel's frame, titlebar strip included, is the view's height.
+        .frame(width: 520)
+        .frame(maxHeight: .infinity)
         .onAppear { searchFocused = true }
     }
 }
