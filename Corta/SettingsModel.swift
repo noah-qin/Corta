@@ -32,6 +32,7 @@ struct RowStatus: Equatable {
     var kind: Kind = .none
     var message: String = ""
     var actionTitle: String?
+    var secondaryActionTitle: String?
 }
 
 /// The settings page's state, as a `SettingsView` binds to it.
@@ -576,41 +577,36 @@ final class SettingsModel {
                 message: L10n.format(
                     "settings.status.shellIntegrationOutdated",
                     ShellIntegrationInstaller.shared.displayPath),
-                actionTitle: L10n.text("settings.action.update"))
+                actionTitle: L10n.text("settings.action.update"),
+                // Removing must not first require writing the new hooks in.
+                secondaryActionTitle: L10n.text("settings.action.remove"))
         }
     }
 
-    /// One dispatch point for the row's one button, whichever of the three
-    /// states put it there.
+    /// One dispatch point for the row's first button, whichever state put
+    /// it there.
     func toggleShellIntegration() {
-        switch ShellIntegrationInstaller.shared.status() {
-        case .notInstalled, .conflicting:
-            guard ShellIntegrationInstaller.shared.install() else {
-                shellIntegrationStatus = RowStatus(
-                    kind: .failed,
-                    message: L10n.format(
-                        "settings.status.shellIntegrationWriteFailed",
-                        ShellIntegrationInstaller.shared.displayPath))
-                return
-            }
-        case .outdated:
-            guard ShellIntegrationInstaller.shared.update() else {
-                shellIntegrationStatus = RowStatus(
-                    kind: .failed,
-                    message: L10n.format(
-                        "settings.status.shellIntegrationWriteFailed",
-                        ShellIntegrationInstaller.shared.displayPath))
-                return
-            }
-        case .installed:
-            guard ShellIntegrationInstaller.shared.uninstall() else {
-                shellIntegrationStatus = RowStatus(
-                    kind: .failed,
-                    message: L10n.format(
-                        "settings.status.shellIntegrationWriteFailed",
-                        ShellIntegrationInstaller.shared.displayPath))
-                return
-            }
+        let installer = ShellIntegrationInstaller.shared
+        switch installer.status() {
+        case .notInstalled, .conflicting: applyShellIntegration(installer.install())
+        case .outdated: applyShellIntegration(installer.update())
+        case .installed: applyShellIntegration(installer.uninstall())
+        }
+    }
+
+    /// The second button, offered only beside Update.
+    func removeShellIntegration() {
+        applyShellIntegration(ShellIntegrationInstaller.shared.uninstall())
+    }
+
+    private func applyShellIntegration(_ succeeded: Bool) {
+        guard succeeded else {
+            shellIntegrationStatus = RowStatus(
+                kind: .failed,
+                message: L10n.format(
+                    "settings.status.shellIntegrationWriteFailed",
+                    ShellIntegrationInstaller.shared.displayPath))
+            return
         }
         refreshShellIntegrationStatus()
     }

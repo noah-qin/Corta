@@ -24198,55 +24198,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "An earlier version is installed in %@"
+            "value": "Installed hooks differ from this version in %@"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已安装旧版本，位于 %@"
+            "value": "已安装的钩子与当前版本不同，位于 %@"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "已安裝舊版本，位於 %@"
+            "value": "已安裝的鉤子與目前版本不同，位於 %@"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "以前のバージョンが %@ にインストール済み"
+            "value": "インストール済みのフックがこのバージョンと異なります（%@）"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "이전 버전이 %@에 설치됨"
+            "value": "설치된 훅이 이 버전과 다름: %@"
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Ältere Version in %@ installiert"
+            "value": "Installierte Hooks weichen von dieser Version ab: %@"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Version antérieure installée dans %@"
+            "value": "Les hooks installés diffèrent de cette version : %@"
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Versión anterior instalada en %@"
+            "value": "Los hooks instalados difieren de esta versión: %@"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Versão anterior instalada em %@"
+            "value": "Os hooks instalados diferem desta versão: %@"
           }
         }
       }

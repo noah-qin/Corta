@@ -134,6 +134,17 @@ struct ShellIntegrationInstallerTests {
         #expect(try String(contentsOf: file, encoding: .utf8) == "export EDITOR=vim\nalias ll='ls -l'\n")
     }
 
+    /// Without its end marker there is no whole block to replace: an Update
+    /// offered there would report success and change nothing.
+    @Test("a block missing its end marker is not offered an update")
+    func aBrokenBlockIsNotOutdated() throws {
+        defer { removeDirectory() }
+        try writeFile("# >>> Corta shell integration >>>\n# older hooks\n")
+        #expect(installer.status() == .installed)
+        #expect(!installer.update())
+        #expect(try String(contentsOf: file, encoding: .utf8) == "# >>> Corta shell integration >>>\n# older hooks\n")
+    }
+
     @Test("uninstalling when nothing is installed is a no-op that still succeeds")
     func uninstallOfNothingSucceeds() throws {
         defer { removeDirectory() }
