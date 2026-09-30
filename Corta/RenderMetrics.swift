@@ -25,7 +25,9 @@ import OSLog
 ///
 /// Gated by `CORTA_RENDER_METRICS`, a measurement harness rather than a
 /// config key (D10), read once at start: disabled, each call costs one
-/// Bool check.
+/// Bool check. Any value turns it on; an absolute path also appends each
+/// summary line to that file, which is how `MeasurementUITests` — a
+/// sandboxed runner that cannot read the unified log — gets the numbers.
 nonisolated enum RenderMetrics {
     enum Metric: String, CaseIterable {
         case drawableWait
@@ -37,6 +39,12 @@ nonisolated enum RenderMetrics {
     }
 
     static let isEnabled = ProcessInfo.processInfo.environment["CORTA_RENDER_METRICS"] != nil
+
+    private static let outputFile: URL? = {
+        guard let raw = ProcessInfo.processInfo.environment["CORTA_RENDER_METRICS"], raw.hasPrefix("/")
+        else { return nil }
+        return URL(fileURLWithPath: raw)
+    }()
 
     private static let log = OSLog(subsystem: "dev.noahqin.Corta", category: "render-metrics")
 
@@ -94,6 +102,26 @@ nonisolated enum RenderMetrics {
         os_log(
             "%{public}@: n=%{public}d avg=%{public}.2fms p50=%{public}.2fms p95=%{public}.2fms p99=%{public}.2fms max=%{public}.2fms",
             log: log, type: .default, metric.rawValue, count, avg, p50, p95, p99, max)
+        if let outputFile {
+            let line = String(
+                format: "%@: n=%d avg=%.2fms p50=%.2fms p95=%.2fms p99=%.2fms max=%.2fms\n",
+                metric.rawValue, count, avg, p50, p95, p99, max)
+            append(line, to: outputFile)
+        }
+    }
+
+    /// Once per full ring, never per frame; a failed write loses a line of
+    /// measurement, which the reader reports as a ring that never filled.
+    private static func append(_ line: String, to file: URL) {
+        lock.lock()
+        defer { lock.unlock() }
+        if !FileManager.default.fileExists(atPath: file.path) {
+            FileManager.default.createFile(atPath: file.path, contents: nil)
+        }
+        guard let handle = try? FileHandle(forWritingTo: file) else { return }
+        defer { try? handle.close() }
+        _ = try? handle.seekToEnd()
+        try? handle.write(contentsOf: Data(line.utf8))
     }
 
     // MARK: - Keypress → glass
@@ -103,6 +131,8 @@ nonisolated enum RenderMetrics {
     private struct PendingKeystroke {
         var timestamp: TimeInterval
         var outputLanded = false
+        /// Asks the pane for another frame (`TerminalView.setNeedsRedraw`).
+        var requestFrame: @Sendable () -> Void
     }
 
     nonisolated(unsafe) private static var pending: PendingKeystroke?
@@ -110,10 +140,12 @@ nonisolated enum RenderMetrics {
     /// Called at `TerminalView`'s three delivery sites. `NSEvent.timestamp`
     /// shares `presentedTime`'s clock. Synthetic events are stamped at
     /// posting, missing the HID stage (`PERFORMANCE.md` §5.7).
-    static func noteKeystroke(at timestamp: TimeInterval) {
+    /// `requestFrame` wakes the pane when the echo's frame never reached
+    /// the glass (see `notePresent`).
+    static func noteKeystroke(at timestamp: TimeInterval, requestFrame: @escaping @Sendable () -> Void) {
         guard isEnabled else { return }
         lock.lock()
-        pending = PendingKeystroke(timestamp: timestamp)
+        pending = PendingKeystroke(timestamp: timestamp, requestFrame: requestFrame)
         lock.unlock()
     }
 
@@ -140,10 +172,15 @@ nonisolated enum RenderMetrics {
         drawable.addPresentedHandler { presented in
             // Zero when the compositor replaced this drawable (about half a burst's
             // frames); re-pend rather than drop, which would flatter the number.
+            // And ask for another frame: the echo was the last change, so the
+            // display link parks, and without one the sample waits for the next
+            // keystroke, which replaces it — under XCTest that lost five in six.
             guard presented.presentedTime > 0 else {
                 lock.lock()
-                if pending == nil { pending = keystroke }
+                let repended = pending == nil
+                if repended { pending = keystroke }
                 lock.unlock()
+                if repended { keystroke.requestFrame() }
                 return
             }
             let seconds = presented.presentedTime - keystroke.timestamp

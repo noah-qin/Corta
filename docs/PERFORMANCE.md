@@ -41,14 +41,14 @@ rather than filled in with a guess.
 
 | Category      | Target                                              | Held accountable by |
 | -------------- | ---------------------------------------------------- | -------------------- |
-| Input          | Keypress → glass feels immediate; §1's latency target | `RenderMetrics.keypressToPresent` via `scripts/measure-keypress-latency.sh` (§5.7), `corta-bench`'s `benchmarkKeypressLatency` |
-| Sustained output | A flood (`yes`, a build log, a training run) does not fall behind or drop frames below §1's frame budget | `corta-bench`'s parse-throughput and write-backpressure benchmarks; `scripts/measure-app-baseline.sh` phase B flood |
-| Scrolling      | Scrolling a long buffer tracks the pointer/trackpad with no visible stutter | `scripts/measure-render-metrics.sh` (`CORTA_RENDER_METRICS` ring buffer); no dedicated automated scroll benchmark exists yet — a real gap, not an oversight |
-| Startup        | A warm launch reaches an interactive window fast enough that switching to Corta does not feel like waiting for an app to open | `scripts/measure-app-baseline.sh` phase A (5 warm launches + 1 cold-ish) |
-| Memory         | §1's scrollback figure holds, and closing panes/windows returns memory rather than leaking it | `corta-bench`'s scrollback-footprint and peak-RSS benchmarks; `scripts/measure-app-baseline.sh`'s post-close recovery phase |
-| Energy         | An idle pane draws no more power than idle CPU (§1) implies; a flooding pane does not keep the GPU busier than the frames it is actually producing require | `scripts/measure-energy.sh` (idle, occluded, background flood, two windows, Kitty image; `powermetrics` when it can run, labelled `top` samples when it cannot) — §5.6 has the figures, measured on mains and under Low Power Mode. Thermal pressure is not forced and stays *not judged* |
+| Input          | Keypress → glass feels immediate; §1's latency target | `RenderMetrics.keypressToPresent` via `MeasurementUITests.testKeypressToGlass` (§5.7), `corta-bench`'s `benchmarkKeypressLatency` |
+| Sustained output | A flood (`yes`, a build log, a training run) does not fall behind or drop frames below §1's frame budget | `corta-bench`'s parse-throughput and write-backpressure benchmarks; `MeasurementUITests`' 1-, 2- and 4-pane floods |
+| Scrolling      | Scrolling a long buffer tracks the pointer/trackpad with no visible stutter | `CORTA_RENDER_METRICS` ring buffer, by hand (`TESTING.md`, *Measuring the app*); no dedicated automated scroll benchmark exists yet — a real gap, not an oversight |
+| Startup        | A warm launch reaches an interactive window fast enough that switching to Corta does not feel like waiting for an app to open | `MeasurementUITests.testLaunchToFirstWindow` (`XCTApplicationLaunchMetric`, 5 warm launches) |
+| Memory         | §1's scrollback figure holds, and closing panes/windows returns memory rather than leaking it | `corta-bench`'s scrollback-footprint and peak-RSS benchmarks; `MeasurementUITests.testOpenAndCloseWindowReturnsMemory` |
+| Energy         | An idle pane draws no more power than idle CPU (§1) implies; a flooding pane does not keep the GPU busier than the frames it is actually producing require | An *Activity Monitor* `xctrace` recording (per-process CPU, idle wakeups, App Nap) across `MeasurementUITests`' idle, occluded and flood scenarios; machine-wide watts need `sudo powermetrics`, a person's call (`TESTING.md`, *Measuring the app*) — §5.6 has the figures. Thermal pressure is not forced and stays *not judged* |
 | Compatibility  | The real-program and esctest pass rates `CONFORMANCE.md` already tracks | `CONFORMANCE.md` §4.2 (esctest), §4.4.2 (real-program table), §4.6 (manual scenario pass) — cross-referenced here rather than duplicated |
-| Recovery       | A crashed or force-quit Corta restores its window/split/scrollback state on next launch without asking the user to rebuild it by hand | `scripts/measure-app-baseline.sh`'s SessionRestore-driven multi-pane phases; `SessionRestore`'s crash marker |
+| Recovery       | A crashed or force-quit Corta restores its window/split/scrollback state on next launch without asking the user to rebuild it by hand | `SessionRestore`'s crash marker and its tests; the manual scenario in `CONFORMANCE.md` §4.6 |
 
 Startup, memory and energy inherit their machine dependency from §5.2 below —
 a number recorded here is only comparable to another run that held the same
@@ -221,17 +221,13 @@ be read against each other, are
 
 **The percentile-shaped view of the render stage.** Between
 `corta-bench` (headless, core-only) and the end-to-end §5.7 number sits
-`CORTA_RENDER_METRICS=1`
-(`RenderMetrics.swift`'s 600-sample ring buffer, streamed by
-`scripts/measure-render-metrics.sh`): it dumps real p50/p99 for `cpuFrame`,
-`drawableWait` and `gpu` from a live, on-screen app, without Instruments.
-Its limit: it needs a person at the keyboard
-typing and scrolling for the ring to fill with real frames (the
-`scripts/measure-app-baseline.sh` finding that synthetic System Events keystrokes
-never reach `TerminalView` applies here too — a scripted flood through the
-PTY slave fills `drawableWait`/`gpu`, but `cpuFrame` specifically wants real
-keyDown-triggered frames), so it is a tool for a person at the keyboard,
-not a scripted number.
+`CORTA_RENDER_METRICS`
+(`RenderMetrics.swift`'s 600-sample ring buffer): it dumps real p50/p99 for
+`cpuFrame`, `drawableWait` and `gpu` from a live, on-screen app, without
+Instruments. `MeasurementUITests` fills the rings with a sustained `yes`
+in 1, 2 and 4 panes and reports each summary line; a scroll or a real
+typing session is still a person's, with the rings streamed from the
+unified log (`TESTING.md`, *Measuring the app*).
 
 **Every target has a baseline.** Without one, "performance is the
 first priority" is a slogan rather than a constraint.
@@ -344,22 +340,23 @@ subsystem `dev.noahqin.Corta`, category `input-latency`:
 | `gpu`     | submission → the command buffer's completion handler |
 
 ```sh
-xcrun xctrace record --attach Corta --instrument 'os_signpost' \
-    --output /path/to/output.trace
+xcrun xctrace record --instrument os_signpost --all-processes \
+    --time-limit 90s --output .build/traces/signposts.trace
 ```
 
 `--instrument`, not `--template`: `os_signpost` is not one of
 `xctrace list templates`' entries on current Xcode (it is one of
 `xctrace list instruments`' entries instead), so `--template 'os_signpost'` — this
 document's own earlier wording — fails outright with "Cannot find
-template matching name". `--attach` to an already-running, already-
-launched Corta, not `--launch`, for the reason the paragraph below this
-one explains: launching *through* xctrace/Instruments does not hand the
-new process window focus, so typing right after fails silently instead.
-`scripts/record-signpost-trace.sh` runs the whole sequence (launch,
-activate, attach, save to `.build/traces/` — not `~/Desktop`, which
-needs a one-time Files-and-Folders permission grant Terminal does not
-have by default and `xctrace` fails on outright).
+template matching name". Never `--launch`, for the reason the paragraph
+below this one explains: launching *through* xctrace/Instruments does not
+hand the new process window focus, so typing right after fails silently.
+Record every process and let something else bring Corta forward — run
+`MeasurementUITests/testKeypressToGlass` during the recording, or launch
+Corta yourself and type — then filter on the subsystem. The trace goes
+under `.build/traces/`, not `~/Desktop`, which needs a one-time
+Files-and-Folders permission grant Terminal does not have by default and
+`xctrace` fails on outright.
 
 Everything is behind `OSSignposter.isEnabled`, which is false unless a
 trace is recording, so the render path pays one atomic load per stage.
@@ -392,10 +389,10 @@ this machine at rest, not only under load.
 was possible, both real gaps rather than test-environment noise:
 
 1. Launching *through* `xctrace`/Instruments never hands the new process
-   focus, confirmed again — the fix is `scripts/record-signpost-trace.sh`:
-   launch Corta normally (it gets focus the way it always does), block
-   until System Events itself confirms it is frontmost, *then* attach a
-   trace to the already-running process. An unguarded `activate` that
+   focus, confirmed again — the fix, at the time a script, was to launch
+   Corta normally (it gets focus the way it always does), block until
+   System Events itself confirms it is frontmost, *then* attach a trace to
+   the already-running process. An unguarded `activate` that
    silently swallowed its own failure (`2>/dev/null || true`) was the
    actual reason two further attempts still showed a mistyped-into-the-
    wrong-window session — the script now surfaces that failure instead of
@@ -454,8 +451,8 @@ Pair it with a signpost trace: if double buffering is costing rather than
 saving, it appears as the `frame` interval growing at its front.
 
 **Preliminary signal, not the A/B itself.** `RenderMetrics`
-(`Corta/RenderMetrics.swift`, `CORTA_RENDER_METRICS=1`,
-`scripts/measure-render-metrics.sh`) reports `drawableWait` — how long
+(`Corta/RenderMetrics.swift`, `CORTA_RENDER_METRICS=1`) reports
+`drawableWait` — how long
 `nextDrawable()` blocks — directly, without Instruments. One
 informal run at the default drawable count (3), auto-repeat plus `yes`
 for a few seconds, held nothing else about the machine fixed the way
@@ -474,11 +471,11 @@ cost (more frequent blocking, not less). Not a substitute for the actual
 end-to-end A/B — that is the only way to turn "probably not worth it"
 into a number.
 
-**The end-to-end A/B itself.** `scripts/measure-drawable-ab.sh`
-runs the same Release build twice, back to back, so the only variable
-between the two runs is `CORTA_MAX_DRAWABLES`; since 1.0.0 each run is
-`scripts/measure-keypress-latency.sh` (§5.7) and prints the percentile
-line itself. The pair below was taken with the external screen-capture
+**The end-to-end A/B itself.** The same Release build measured twice,
+back to back, so the only variable between the two runs is
+`CORTA_MAX_DRAWABLES`: `MeasurementUITests/testKeypressToGlass` (§5.7)
+once as is and once with `TEST_RUNNER_CORTA_MAX_DRAWABLES=2` in front of
+the command, which the test passes to the app it launches. The pair below was taken with the external screen-capture
 tool of the day (200 chars / 150 ms delay / 50 ms period / 1,000 ms
 length, synchronous, no pauses), mains power, Corta frontmost with
 nothing else running:
@@ -543,7 +540,7 @@ reading of them — is its record under `history/`:
 | Memory @ 100k × 120 lines | 184.4 MB | **185.0 MB** | `corta-bench` |
 | Keypress → grid (core side) | p50 0.009 / p95 0.011 / p99 0.012 ms | p50 0.014 / p95 0.018 / p99 0.020 ms | `corta-bench`, 2000 samples; excludes vsync and display |
 | Frame CPU, 120×40 full rebuild, Debug | **1.79 ms** avg (1.76 / 1.75 / 1.87) | **2.26 ms** avg (2.31 / 2.26 / 2.20) | `FrameCPUBaselineTests` (D17), Debug test action; from 1.1.0 a Release figure (§5.8) |
-| Live frame CPU, Release, 2 / 4 panes flooded | not re-measured | avg 0.60 / 0.14–0.49 ms; p99 2.59 / 0.38–0.45 | `scripts/measure-app-baseline.sh`, `CORTA_RENDER_METRICS` |
+| Live frame CPU, Release, 2 / 4 panes flooded | not re-measured | avg 0.60 / 0.14–0.49 ms; p99 2.59 / 0.38–0.45 | `MeasurementUITests` floods, `CORTA_RENDER_METRICS` |
 | GPU, 2 / 4 panes flooded | not re-measured | avg 0.49 / 0.47 ms | same |
 | Idle CPU, Release, 20 s | not re-measured | **0.05%**; occluded 0.0–0.1% | same |
 | Launch → first window | not re-measured | 208 ms (2-pane restore), 451 ms (4-pane) | same |
@@ -552,7 +549,7 @@ reading of them — is its record under `history/`:
 | Search, 100k lines, one query | ~400 ms warm | ~395 ms warm | `corta-bench` |
 | Keypress → glass, scripted | not re-measured | **61.9 ms** avg; p50 61.4 / p95 69.7 / p99 70.9 | §5.7 |
 | Keypress → glass, a person typing | not re-measured | **66.3 ms** avg; p50 67.0 / p95 78.7 / p99 84.5 | §5.7, `--manual` |
-| Energy, background flood (`yes`, occluded) | not re-measured | 10.2 W machine-wide on mains; 2.6 W in Low Power Mode; idle, occluded and a static image within the machine's noise floor | `scripts/measure-energy.sh` |
+| Energy, background flood (`yes`, occluded) | not re-measured | 10.2 W machine-wide on mains; 2.6 W in Low Power Mode; idle, occluded and a static image within the machine's noise floor | 1.0.0: a `powermetrics` script, since removed; now an *Activity Monitor* trace (§5.6 note) |
 
 Both runs were on battery for the core benchmarks, not the mains power
 §5.2 asks for; the 1.0.0 keypress and energy runs were on AC. Every
@@ -582,16 +579,27 @@ permission asked:
   keep only the lucky frames.
 
 `CORTA_RENDER_METRICS=1` turns it on; 200 samples print one line on the
-unified log (`keypressToPresent: n=200 avg=… p50=… p95=… p99=… max=…`),
-and `scripts/measure-keypress-latency.sh` launches, drives 320 synthetic
-keystrokes about 150 ms apart (or, with `--manual`, waits while a person
-types) and reads the line back. Two kinds of number come out of it, and a quoted figure
+unified log (`keypressToPresent: n=200 avg=… p50=… p95=… p99=… max=…`) —
+and, when the variable names a file, to that file.
+`MeasurementUITests/testKeypressToGlass` launches the Benchmark build,
+types 320 digits about 150 ms apart and reports the line; a person typing
+is the `--manual` kind, the launch-and-stream command in `TESTING.md`
+(*Measuring the app*). Two kinds of number come out of it, and a quoted figure
 says which:
 
 | Kind | Includes | Comparable to |
 | --- | --- | --- |
-| Scripted (`key code` via System Events) | Corta's whole path plus the compositor and scanout; **not** the keyboard's HID stage (1–8 ms on USB/Bluetooth) | a lower bound on what a finger sees |
+| Scripted (`typeKey` from XCTest; `key code` via System Events before 1.1.0) | Corta's whole path plus the compositor and scanout; **not** the keyboard's HID stage (1–8 ms on USB/Bluetooth) | a lower bound on what a finger sees |
 | `--manual` (a person typing) | everything a screen-capture tool saw | the pre-1.0 screen-capture figures (`history/`) |
+
+Under XCTest (1.1.0 on), more of the echo's frames are replaced before
+they reach the glass than under System Events, so a sample is closed by a
+later frame — the one that actually showed the echo, which the pane is
+asked for as soon as the first one reports `presentedTime == 0`. The
+median agrees with the System Events runs (68 ms against 61–64 ms); the
+p95–p99 tail is longer (about 147–153 ms against about 71 ms) and is not
+to be compared across the two drivers. Before that request existed the
+test closed only about 60 of 320 keystrokes and never filled the ring.
 
 The two kinds differ by the keyboard's HID stage plus the wider spread of
 human keystrokes: a synthetic `key code` arrives at a fixed cadence, a
@@ -645,7 +653,8 @@ D17's number is a Release number. One command produces it:
 
 ```sh
 xcodebuild test -project Corta.xcodeproj -scheme Corta \
-  -testPlan Release -configuration Benchmark -destination 'platform=macOS'
+  -testPlan Release -configuration Benchmark -destination 'platform=macOS' \
+  -only-testing:CortaPerformanceTests
 cat /tmp/corta-frame-cpu-baseline.txt
 ```
 

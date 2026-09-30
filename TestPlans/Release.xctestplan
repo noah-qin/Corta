@@ -30,6 +30,16 @@
         "identifier": "5B0E0C1030465E2000E8DD20",
         "name": "CortaPerformanceTests"
       }
+    },
+    {
+      "selectedTests": [
+        "MeasurementUITests"
+      ],
+      "target": {
+        "containerPath": "container:Corta.xcodeproj",
+        "identifier": "4F1776B830465E2000E8DD20",
+        "name": "CortaUITests"
+      }
     }
   ],
   "version": 1

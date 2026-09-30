@@ -347,6 +347,15 @@ final class TerminalView: NSView, CALayerDelegate {
         frameScheduler.resume()
     }
 
+    /// Starts a keypress-to-glass sample (`RenderMetrics`); a frame that
+    /// never reached the glass wakes this pane for another.
+    func noteKeystrokeForMetrics(at timestamp: TimeInterval) {
+        guard RenderMetrics.isEnabled else { return }
+        RenderMetrics.noteKeystroke(at: timestamp) { [weak self] in
+            DispatchQueue.main.async { self?.setNeedsRedraw() }
+        }
+    }
+
     /// Arms the first-present guard: the layer shows the theme background
     /// until the first real frame, so a new window, tab or theme change never
     /// flashes what is behind it. Returns immediately

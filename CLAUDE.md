@@ -171,7 +171,8 @@ away. The regression was invisible in every test that passed; only the
 number caught it. Those were Debug figures, and the `contains` calls cost
 nothing once optimised: the baseline is now the Release one, from
 `xcodebuild test -scheme Corta -testPlan Release -configuration
-Benchmark` (`docs/PERFORMANCE.md` §5.8). Write the render loop as
+Benchmark -only-testing:CortaPerformanceTests` (`docs/PERFORMANCE.md`
+§5.8). Write the render loop as
 ordinary Swift, not shaped for `-Onone`.
 
 **Never put a tool or session identifier in a commit message.** No
@@ -219,9 +220,11 @@ Layout:
 - `CortaTests/`, `CortaUITests/` — app-hosted test targets;
   `CortaPerformanceTests/` — the Release measurements, without `@testable`
 - `Corta.xcodeproj/` — build settings live in `project.pbxproj`
-- `scripts/` — measurement, packaging and release
+- `scripts/` — the two Swift scripts CI runs (Metal 4 probe, feed check);
+  packaging is `corta-release-check`, measurement is `TestPlans/Release`
 - `TestPlans/` — `Unit` (the default), `UI` (interactive sessions only)
-  and `Release` (the D17 measurement, `-configuration Benchmark`)
+  and `Release` (`-configuration Benchmark`: the D17 measurement, and
+  `MeasurementUITests` for the app-level numbers)
 - `docs/` — user and design documentation, plus the dated records
 
 Deployment target is macOS 26.0, Swift 6, app sandbox disabled
