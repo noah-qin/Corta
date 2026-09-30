@@ -54,6 +54,24 @@ struct PaneTeardownTests {
             "the child PID must be gone after teardown, not merely signalled")
     }
 
+    /// Found by opening and closing windows: each closed window left its
+    /// terminal view behind, and with it the view's drawables — about 33 MB
+    /// a window, for as long as Corta ran. `onKeyBytes` captured the view it
+    /// is stored on, so the view kept itself alive once its pane was gone.
+    @Test func aTornDownPaneLetsGoOfItsTerminalView() async throws {
+        weak var view: TerminalView?
+        var session: TerminalSession?
+        autoreleasepool {
+            let pane = makePane()
+            view = pane.terminalView
+            session = pane.session
+            #expect(view != nil)
+            pane.teardown()
+        }
+        if let session { _ = await exited(session.pty) }
+        #expect(view == nil, "a closed pane's terminal view is still alive")
+    }
+
     @Test func teardownIsIdempotent() async throws {
         let pane = makePane()
         let session = try #require(pane.session)

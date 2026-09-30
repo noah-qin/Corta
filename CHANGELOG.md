@@ -79,6 +79,13 @@ what to edit.
 
 ### Fixed
 
+- Closing a window or a pane now frees its memory. The terminal view held
+  on to itself through its own keyboard handler, so every closed pane
+  stayed in memory with its drawables until Corta quit — about 33 MB a
+  window on a Retina display. Opening and closing four windows grew the
+  app from 63 MB to 193 MB; it now stays where it started. 1.0.0 and 1.0.1
+  have the same leak.
+
 - Frames no longer wait behind a flood of output. Drawing a frame reads a
   few pieces of the terminal's state besides the screen — the bell, the
   running command, the palette — and those reads could queue behind the
