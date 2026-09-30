@@ -128,8 +128,9 @@ class ViewController: NSViewController {
     /// Shared by both readers so they supersede the same report.
     private var remoteReportTracker = PaneRemoteState.ReportTracker()
     private var lastProcessFactsRefresh: CFTimeInterval = 0
-    /// A title rebuild waiting out `processFactsInterval`; at most one.
-    private var trailingTitleRefreshPending = false
+    /// A title rebuild waiting out `processFactsInterval`; at most one, and
+    /// cancelled by `teardown`.
+    private var trailingTitleRefresh: DispatchWorkItem?
     private var isShowingTransientSize = false
     private var transientSizeReset: DispatchWorkItem?
 
@@ -566,6 +567,8 @@ class ViewController: NSViewController {
     func teardown() {
         guard !didTeardown else { return }
         didTeardown = true
+        trailingTitleRefresh?.cancel()
+        trailingTitleRefresh = nil
         closeSearchBar()
         largeTextTask?.cancel()
         largeTextTask = nil
@@ -632,6 +635,12 @@ class ViewController: NSViewController {
             terminalView?.noteAccessibilityValueChanged()
             drainClipboardRequests()
             let finished = session.takeFinishedCommand()
+            // The prompt's return is the moment the program left: the title
+            // names the shell again now, not an interval later.
+            if finished != nil, isFocusedPane {
+                invalidateProcessFacts()
+                applyWindowTitle()
+            }
             if session.hasShellIntegration {
                 taskNotifier.noteCommandRunning(
                     session.isCommandRunning, exitStatus: finished,
@@ -900,15 +909,16 @@ class ViewController: NSViewController {
     /// back the prompt within the interval is followed by nothing: without
     /// this, `kitten icat` left "— kitten" in the title until the next output.
     private func scheduleTrailingTitleRefresh(after delay: CFTimeInterval) {
-        guard !trailingTitleRefreshPending else { return }
-        trailingTitleRefreshPending = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+        guard trailingTitleRefresh == nil else { return }
+        let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
-            trailingTitleRefreshPending = false
+            trailingTitleRefresh = nil
             // An unfocused pane's title applies on focus.
-            guard isFocusedPane, session != nil else { return }
+            guard !didTeardown, isFocusedPane else { return }
             applyWindowTitle()
         }
+        trailingTitleRefresh = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
     /// On focus and command boundaries, where waiting out the interval would
