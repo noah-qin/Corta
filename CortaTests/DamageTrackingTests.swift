@@ -32,7 +32,12 @@ import Testing
     private static func makeRenderer() -> TerminalRenderer? {
         guard let device = MTLCreateSystemDefaultDevice() else { return nil }
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
-        return try? TerminalRenderer(device: device, font: font, scale: 1)
+        let renderer = try? TerminalRenderer(device: device, font: font, scale: 1)
+        // Pinned here, not read from the process: another suite applying a
+        // palette between the incremental build and the full one made the
+        // two differ in colour, and the comparison failed now and then.
+        renderer?.themeVariant = Theme.corta.dark
+        return renderer
     }
 
     /// Whatever damage a frame carries, placing the rebuilt rows must leave
