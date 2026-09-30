@@ -13,6 +13,7 @@ document is right and the record is a record.
 
 | Document | Read it when |
 | :--- | :--- |
+| [User guide](USER-GUIDE.md) | You want to learn every feature, where it lives and how to use it. |
 | [Features](FEATURES.md) | You want an overview of what the development tree does and its known limits. |
 | [Configuration](CONFIGURATION.md) | You want to change a setting, define a theme, rebind a key, add a preset, or find out when a change takes effect. Every key in `~/.config/corta/config`, in one table each. |
 | [Troubleshooting](TROUBLESHOOTING.md) | Corta will not install, will not start, or does something your last terminal did not. Ends with how to uninstall cleanly. |
