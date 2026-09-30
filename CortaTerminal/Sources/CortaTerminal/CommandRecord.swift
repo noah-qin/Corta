@@ -76,6 +76,20 @@ public struct CommandRecordStore: Sendable, Equatable {
         }
     }
 
+    /// The last record's prompt, drawn again before anything ran at it: the
+    /// same command-to-be, so the record moves rather than a new one opening.
+    mutating func movePrompt(
+        to promptRow: Int, workingDirectory: String?, host: String? = nil, at date: Date
+    ) {
+        guard !records.isEmpty else { return }
+        let last = records.count - 1
+        records[last].promptRow = promptRow
+        records[last].workingDirectory = workingDirectory
+        records[last].host = host
+        records[last].startedAt = date
+        records[last].promptEndColumn = nil
+    }
+
     mutating func markOutputStart(_ row: Int) {
         guard !records.isEmpty else { return }
         records[records.count - 1].outputStartRow = row
