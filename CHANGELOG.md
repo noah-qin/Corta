@@ -121,6 +121,18 @@ what to edit.
   integration installed by an earlier version works too. An empty line in
   fish no longer leaves a command that looks as if it is still running.
 
+- A fish prompt that shows the last command's exit status shows it again
+  with Corta's shell integration installed. The integration ran its own
+  commands before drawing the prompt, so `$status` and `$pipestatus` always
+  read 0 there — fish's default prompt never showed a failure in red. The
+  prompt is now drawn first.
+
+- Settings ▸ Terminal ▸ Shell Integration now says when the installed
+  hooks come from an earlier version of Corta, and offers **Update**, which
+  replaces them where they sit in the rc file. Corta never rewrites that
+  block on its own, so until now a fix to the hooks — the fish ones above
+  — never reached anyone who had already installed them.
+
 - Frames no longer wait behind a flood of output. Drawing a frame reads a
   few pieces of the terminal's state besides the screen — the bell, the
   running command, the palette — and those reads could queue behind the

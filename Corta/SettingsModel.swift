@@ -570,6 +570,13 @@ final class SettingsModel {
                     "settings.status.shellIntegrationInstalled",
                     ShellIntegrationInstaller.shared.displayPath),
                 actionTitle: L10n.text("settings.action.remove"))
+        case .outdated:
+            shellIntegrationStatus = RowStatus(
+                kind: .adjusted,
+                message: L10n.format(
+                    "settings.status.shellIntegrationOutdated",
+                    ShellIntegrationInstaller.shared.displayPath),
+                actionTitle: L10n.text("settings.action.update"))
         }
     }
 
@@ -579,6 +586,15 @@ final class SettingsModel {
         switch ShellIntegrationInstaller.shared.status() {
         case .notInstalled, .conflicting:
             guard ShellIntegrationInstaller.shared.install() else {
+                shellIntegrationStatus = RowStatus(
+                    kind: .failed,
+                    message: L10n.format(
+                        "settings.status.shellIntegrationWriteFailed",
+                        ShellIntegrationInstaller.shared.displayPath))
+                return
+            }
+        case .outdated:
+            guard ShellIntegrationInstaller.shared.update() else {
                 shellIntegrationStatus = RowStatus(
                     kind: .failed,
                     message: L10n.format(
