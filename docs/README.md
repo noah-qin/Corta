@@ -41,11 +41,14 @@ documentation. Generated documentation is not a goal in itself; the
 catalog exists so that a contributor can find where a byte goes.
 
 The scripts a document tells you to run live in [`scripts/`](../scripts/):
-measurement (`measure-*.sh`, `record-signpost-trace.sh`) and
-the update feed's check (`verify-appcast.swift`). Each script's header
-comment says what it changes and what it never touches. The release check
-is a Swift tool, `corta-release-check`, in `CortaTerminal`
-([testing](TESTING.md#packaging)).
+the Metal 4 capability probe CI runs (`metal-capability.swift`) and the
+update feed's check (`verify-appcast.swift`); each one's header comment
+says what it reads and what it never touches. Everything else is Swift
+code or a test plan: the release check is `corta-release-check` in
+`CortaTerminal` ([testing](TESTING.md#packaging)), and the app's
+measurements are `MeasurementUITests` in the `Release` test plan, with
+the two `xctrace` recordings beside them
+([testing](TESTING.md#measuring-the-app)).
 
 ## The record
 

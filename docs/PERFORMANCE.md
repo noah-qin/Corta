@@ -592,6 +592,15 @@ says which:
 | Scripted (`typeKey` from XCTest; `key code` via System Events before 1.1.0) | Corta's whole path plus the compositor and scanout; **not** the keyboard's HID stage (1–8 ms on USB/Bluetooth) | a lower bound on what a finger sees |
 | `--manual` (a person typing) | everything a screen-capture tool saw | the pre-1.0 screen-capture figures (`history/`) |
 
+Under XCTest (1.1.0 on), more of the echo's frames are replaced before
+they reach the glass than under System Events, so a sample is closed by a
+later frame — the one that actually showed the echo, which the pane is
+asked for as soon as the first one reports `presentedTime == 0`. The
+median agrees with the System Events runs (68 ms against 61–64 ms); the
+p95–p99 tail is longer (about 147–153 ms against about 71 ms) and is not
+to be compared across the two drivers. Before that request existed the
+test closed only about 60 of 320 keystrokes and never filled the ring.
+
 The two kinds differ by the keyboard's HID stage plus the wider spread of
 human keystrokes: a synthetic `key code` arrives at a fixed cadence, a
 typist's do not, and the p95–p99 tail is where that shows. §5.6 has both

@@ -144,10 +144,14 @@ final class MeasurementUITests: XCTestCase {
         measure(metrics: [XCTMemoryMetric(application: app)]) {
             app.typeKey("n", modifierFlags: .command)
             pause(1.5)
+            // Both counts checked: a keystroke that never lands measures
+            // nothing and looks like a flat line.
+            XCTAssertEqual(app.windows.count, 2, "⌘N did not open a window")
             app.typeText("yes | head -n 200000\n")
             pause(2)
             app.typeKey("w", modifierFlags: .command)
             pause(1.5)
+            XCTAssertEqual(app.windows.count, 1, "⌘W left the new window open")
         }
         app.terminate()
     }

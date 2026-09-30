@@ -220,9 +220,11 @@ Layout:
 - `CortaTests/`, `CortaUITests/` — app-hosted test targets;
   `CortaPerformanceTests/` — the Release measurements, without `@testable`
 - `Corta.xcodeproj/` — build settings live in `project.pbxproj`
-- `scripts/` — measurement, packaging and release
+- `scripts/` — the two Swift scripts CI runs (Metal 4 probe, feed check);
+  packaging is `corta-release-check`, measurement is `TestPlans/Release`
 - `TestPlans/` — `Unit` (the default), `UI` (interactive sessions only)
-  and `Release` (the D17 measurement, `-configuration Benchmark`)
+  and `Release` (`-configuration Benchmark`: the D17 measurement, and
+  `MeasurementUITests` for the app-level numbers)
 - `docs/` — user and design documentation, plus the dated records
 
 Deployment target is macOS 26.0, Swift 6, app sandbox disabled

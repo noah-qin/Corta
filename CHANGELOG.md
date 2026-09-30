@@ -46,6 +46,15 @@ what to edit.
   replaced by the `Corta (Dev)` scheme, and the test suites are selected
   by test plan (`Unit`, `UI`) rather than by `-skip-testing`.
 
+- The app's measurements are Xcode tests: `MeasurementUITests`, in the
+  `Release` test plan, times launch, idle and occluded CPU, 1-, 2- and
+  4-pane floods, the memory of opening and closing windows, and scripted
+  keypress-to-glass; energy and the signpost chain are one `xctrace`
+  recording each. The `measure-*.sh`, `record-signpost-trace.sh` and
+  `find-release-app.sh` scripts are gone, and no Python remains in
+  `scripts/`. `CORTA_RENDER_METRICS` accepts a file path, and appends each
+  summary line to it.
+
 - The release check is a Swift tool, `corta-release-check`, in the core
   package; it also builds the archive and its SHA-256 sidecar.
   `scripts/check-release.sh`, `package-release.sh` and the manual

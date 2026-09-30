@@ -131,6 +131,8 @@ nonisolated enum RenderMetrics {
     private struct PendingKeystroke {
         var timestamp: TimeInterval
         var outputLanded = false
+        /// Asks the pane for another frame (`TerminalView.setNeedsRedraw`).
+        var requestFrame: @Sendable () -> Void
     }
 
     nonisolated(unsafe) private static var pending: PendingKeystroke?
@@ -138,10 +140,12 @@ nonisolated enum RenderMetrics {
     /// Called at `TerminalView`'s three delivery sites. `NSEvent.timestamp`
     /// shares `presentedTime`'s clock. Synthetic events are stamped at
     /// posting, missing the HID stage (`PERFORMANCE.md` §5.7).
-    static func noteKeystroke(at timestamp: TimeInterval) {
+    /// `requestFrame` wakes the pane when the echo's frame never reached
+    /// the glass (see `notePresent`).
+    static func noteKeystroke(at timestamp: TimeInterval, requestFrame: @escaping @Sendable () -> Void) {
         guard isEnabled else { return }
         lock.lock()
-        pending = PendingKeystroke(timestamp: timestamp)
+        pending = PendingKeystroke(timestamp: timestamp, requestFrame: requestFrame)
         lock.unlock()
     }
 
@@ -168,10 +172,15 @@ nonisolated enum RenderMetrics {
         drawable.addPresentedHandler { presented in
             // Zero when the compositor replaced this drawable (about half a burst's
             // frames); re-pend rather than drop, which would flatter the number.
+            // And ask for another frame: the echo was the last change, so the
+            // display link parks, and without one the sample waits for the next
+            // keystroke, which replaces it — under XCTest that lost five in six.
             guard presented.presentedTime > 0 else {
                 lock.lock()
-                if pending == nil { pending = keystroke }
+                let repended = pending == nil
+                if repended { pending = keystroke }
                 lock.unlock()
+                if repended { keystroke.requestFrame() }
                 return
             }
             let seconds = presented.presentedTime - keystroke.timestamp
