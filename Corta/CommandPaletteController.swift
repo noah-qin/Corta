@@ -36,7 +36,7 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
 
     private init() {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 520, height: 360),
+            contentRect: NSRect(origin: .zero, size: CommandPaletteView.size),
             styleMask: [.titled, .fullSizeContentView, .nonactivatingPanel],
             backing: .buffered, defer: false)
         panel.titlebarAppearsTransparent = true
