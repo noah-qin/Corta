@@ -31,16 +31,19 @@ first so contributors do not duplicate effort.
 | `Corta/` | AppKit shell, input, configuration, fonts and Metal renderer |
 | `CortaTerminal/Sources/CortaTerminal/` | Parser, grid, PTY, search and terminal protocols |
 | `CortaTerminal/Tests/` | Core tests, golden fixtures and fuzz corpus |
+| `CortaTerminal/Sources/corta-*` | `corta-exec`, the helper the app embeds, and the repository's tools: `corta-release-check` (the one packaging check), `corta-license`, `corta-fuzz`, `corta-bench`, `corta-dump` |
 | `CortaTests/`, `CortaUITests/`, `CortaPerformanceTests/` | App-hosted tests, interactive UI tests, and the Release measurements |
 | `docs/` | User guides, architecture and verification evidence |
-| `scripts/`, `.github/` | Measurement, packaging, the isolated developer launch, and continuous integration |
+| `TestPlans/` | `Unit` (the default), `UI` (interactive sessions only) and `Release` (the Release measurements) |
+| `scripts/`, `.github/` | The two Swift scripts CI runs (Metal 4 probe, update-feed check), and the CI, release and update-feed workflows |
 
 ## Tests and documentation
 
 [Testing](docs/TESTING.md) maps each change to its checks. Documentation-only
 changes need documentation checks and a rendered review; they do not require
 launching the app. App-layer changes do. Changes to the render loop also need
-a frame-CPU baseline measured under Release (`-testPlan Release`).
+a frame-CPU baseline measured under Release
+(`-testPlan Release -configuration Benchmark`, [Performance](docs/PERFORMANCE.md) §5.8).
 
 Keep public guides in English and use relative links within the repository.
 Document defaults, units, prerequisites and limitations alongside examples.
@@ -252,6 +255,17 @@ the reviewer and scope in the PR, and record any human-only gaps.
 - **Security vulnerabilities** — never in public. `SECURITY.md` has the
   private reporting channel.
 - **Conduct** — `CODE_OF_CONDUCT.md`.
+
+## Releases
+
+Releases are cut by the maintainer, following
+[Releasing](docs/RELEASING.md); a contributor never needs a certificate or
+a key. The Developer ID certificate, the notarisation key and the Sparkle
+update key are secrets of the reviewed `release` environment: only a
+`v*` tag can reach them, and every run waits for the maintainer's
+approval. A fork that pushes a tag gets an ad-hoc signed build, and its
+release notes say so. A change to how releases are signed is rehearsed
+with the release workflow's dry run before it merges.
 
 ## License headers
 
