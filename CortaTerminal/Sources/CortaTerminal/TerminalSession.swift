@@ -204,6 +204,7 @@ public final class TerminalSession: @unchecked Sendable {
             commandHistoryLimit: commandHistoryLimit
         )
         terminal.grid.cellPixelHeight = size.cellPixelHeight
+        terminal.grid.cellPixelWidth = size.cellPixelWidth
         self.state = Mutex(State(terminal: terminal))
     }
 
@@ -617,6 +618,7 @@ public final class TerminalSession: @unchecked Sendable {
                     // Set after, and even with rows and columns unchanged:
                     // a font change alters only the pixels.
                     grid.cellPixelHeight = size.cellPixelHeight
+                    grid.cellPixelWidth = size.cellPixelWidth
                     current.terminal.grid = grid
                 }
             }

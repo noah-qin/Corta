@@ -111,8 +111,35 @@ struct KittyGraphicsTests {
         terminal.feed(Self.apc("a=T,q=2,f=32,s=1,v=1", payload: payload))
         let placements = terminal.grid.imagePlacements.orderedPlacements()
         #expect(placements.count == 1)
-        #expect(placements.first?.imageID == KittyGraphics.ImageID(rawValue: 0))
+        #expect(placements.first?.imageID != KittyGraphics.ImageID(rawValue: 0), "an id of its own")
         #expect(terminal.grid.imagePlacements.imageCount == 1)
+    }
+
+    /// kitty keeps every id-less image; under one shared id 0, each `icat`
+    /// replaced the last and took the earlier picture off the screen.
+    @Test("each image sent with no i= is kept, and stays placed, beside the others")
+    func idlessImagesDoNotReplaceEachOther() {
+        var terminal = Terminal(rows: 10, columns: 40)
+        let payload = Self.rgba(1).base64EncodedString()
+        terminal.feed(Self.apc("a=T,q=2,f=32,s=1,v=1", payload: payload))
+        terminal.feed(Array("\r\n".utf8))
+        terminal.feed(Self.apc("a=T,q=2,f=32,s=1,v=1", payload: payload))
+        let placements = terminal.grid.imagePlacements.orderedPlacements()
+        #expect(placements.map(\.row) == [0, 1])
+        #expect(Set(placements.map(\.imageID)).count == 2)
+        #expect(terminal.grid.imagePlacements.imageCount == 2)
+    }
+
+    @Test("past the image cap, the oldest id-less image gives way rather than the new one being refused")
+    func idlessImagesEvictOldestAtTheCap() {
+        var terminal = Terminal(rows: 10, columns: 40)
+        let payload = Self.rgba(1).base64EncodedString()
+        for _ in 0..<(KittyGraphics.maximumTrackedImages + 5) {
+            terminal.feed(Self.apc("a=T,f=32,s=1,v=1", payload: payload))
+            #expect(terminal.takeOutput() == Array("\u{1B}_Gi=0;OK\u{1B}\\".utf8))
+        }
+        #expect(terminal.grid.imagePlacements.imageCount == KittyGraphics.maximumTrackedImages)
+        #expect(terminal.grid.imagePlacements.placementCount == KittyGraphics.maximumTrackedImages)
     }
 
     @Test("a=p for an image that was never transmitted places nothing")
@@ -251,9 +278,8 @@ struct KittyGraphicsTests {
 
         let placements = terminal.grid.imagePlacements.orderedPlacements()
         #expect(placements.count == 1)
-        #expect(placements.first?.imageID == KittyGraphics.ImageID(rawValue: 0))
         #expect(terminal.grid.imagePlacements.imageCount == 1)
-        let image = terminal.grid.imagePlacements.image(KittyGraphics.ImageID(rawValue: 0))
+        let image = placements.first.flatMap { terminal.grid.imagePlacements.image($0.imageID) }
         #expect(image?.format == .png)
         #expect(image?.bytes.count == 158, "the correctly-decoded PNG's real byte count")
         #expect(image?.bytes.prefix(8).elementsEqual([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) == true)
@@ -315,10 +341,10 @@ struct KittyGraphicsTests {
     func oversizedChunkedTransmissionStillAnswers() {
         var terminal = Terminal(rows: 10, columns: 40)
         let budget = KittyGraphics.maximumImageBytes / 3 * 4 + 4
-        // Each wire chunk is itself capped at Parser.maxAPCStringLength
-        // (6144), so crossing the accumulator's ~85 MB budget takes many
-        // legitimate-sized chunks, not one large one — chosen well under
-        // that cap to leave room for the control-data prefix.
+        // Each wire chunk is itself capped at Parser.maxAPCStringLength, so
+        // crossing the accumulator's ~85 MB budget takes many legitimate-
+        // sized chunks, not one large one — chosen well under that cap to
+        // leave room for the control-data prefix.
         let chunkPayload = String(repeating: "A", count: 6000)
         let continuationChunk = Self.apc("i=15,m=1", payload: chunkPayload)
 

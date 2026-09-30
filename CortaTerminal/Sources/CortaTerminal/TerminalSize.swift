@@ -36,6 +36,11 @@ public struct TerminalSize: Equatable, Sendable {
         rows > 0 ? Int(pixelHeight) / Int(rows) : 0
     }
 
+    /// Pixels per column, or 0 when the app reported no pixel size.
+    public var cellPixelWidth: Int {
+        columns > 0 ? Int(pixelWidth) / Int(columns) : 0
+    }
+
     public init(
         rows: UInt16 = 24,
         columns: UInt16 = 80,

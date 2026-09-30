@@ -62,16 +62,17 @@ public struct Parser: Sendable {
     /// as an allocator.
     public static let maxStringLength = 4096
 
-    /// The hard limit on one APC chunk. The Kitty graphics protocol is
-    /// designed around chunked transmission specifically so no single
-    /// escape sequence has to be arbitrarily long — every reference client
-    /// chunks a base64 payload at 4096 bytes and continues with `m=1` — so
-    /// this affords a full chunk (4096 bytes of payload) plus generous
-    /// headroom for the `key=value,...;` control-data prefix, while still
-    /// being a hard, explicit cap (`SECURITY.md` §3): an unterminated APC
+    /// The hard limit on one APC chunk. The Kitty graphics protocol chunks a
+    /// transmission so that no single escape sequence has to be arbitrarily
+    /// long. Its text asks for 4096-byte chunks, but kitty's own client —
+    /// `kitten icat`, since kitty 0.31 — writes 128 KiB of base64 per chunk
+    /// (`tools/tui/graphics/command.go`), and a cap sized to the text dropped
+    /// every image it sent bigger than about 4 KB. So this is one of those
+    /// chunks plus headroom for the `key=value,...;` control-data prefix,
+    /// and still a hard, explicit cap (`SECURITY.md` §3): an unterminated APC
     /// string must not accumulate without bound any more than an
     /// unterminated OSC one may.
-    public static let maxAPCStringLength = 6144
+    public static let maxAPCStringLength = 128 * 1024 + 4096
 
     public private(set) var state: State = .ground
 
