@@ -76,10 +76,23 @@ public enum KittyGraphics {
         /// PNG is too short or not one — the app's decoder rejects it anyway.
         var pixelHeight: Int? {
             if height > 0 { return height }
+            return pngHeaderValue(at: 20)
+        }
+
+        /// Width in pixels without decoding: `s=`, or the `IHDR` width
+        /// (bytes 16–19), as for `pixelHeight`.
+        var pixelWidth: Int? {
+            if width > 0 { return width }
+            return pngHeaderValue(at: 16)
+        }
+
+        private func pngHeaderValue(at offset: Int) -> Int? {
             guard format == .png, bytes.count >= 24,
                 bytes[12] == 0x49, bytes[13] == 0x48, bytes[14] == 0x44, bytes[15] == 0x52
             else { return nil }
-            let value = Int(bytes[20]) << 24 | Int(bytes[21]) << 16 | Int(bytes[22]) << 8 | Int(bytes[23])
+            let value =
+                Int(bytes[offset]) << 24 | Int(bytes[offset + 1]) << 16
+                | Int(bytes[offset + 2]) << 8 | Int(bytes[offset + 3])
             return value > 0 ? value : nil
         }
     }
@@ -128,6 +141,9 @@ public enum KittyGraphics {
         var rows: Int?
         var zIndex: Int
         var quiet: Int = 0
+        /// `C=1` leaves the cursor where it is; `kitten icat --place` sends
+        /// it and positions the cursor itself.
+        var movesCursor = true
     }
 
     /// The `d=` subset implemented. Any other letter is ignored rather than

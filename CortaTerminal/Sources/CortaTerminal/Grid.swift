@@ -87,9 +87,13 @@ public struct Grid: Sendable {
     public var imagePlacements = ImagePlacementTable()
     /// The pty's pixel height per row (`ws_ypixel / ws_row`), which the app
     /// reports and clients such as `kitten icat` size images by; 0 until one
-    /// arrives. Only erasing the display reads it, to tell whether an image
-    /// with no `r=` reaches the visible screen.
+    /// arrives. Erasing the display reads it, to tell whether an image with
+    /// no `r=` reaches the visible screen, and so does placing one, to move
+    /// the cursor past it.
     public var cellPixelHeight = 0
+    /// The pty's pixel width per column (`ws_xpixel / ws_col`); 0 until one
+    /// arrives. Only placing an image with no `c=` reads it.
+    public var cellPixelWidth = 0
 
     public var scrollback: Scrollback
 
@@ -508,8 +512,10 @@ public struct Grid: Sendable {
 
     public mutating func resetToInitialState() {
         let cellPixelHeight = cellPixelHeight
+        let cellPixelWidth = cellPixelWidth
         self = Grid(rows: rows, columns: columns, scrollbackLimit: scrollback.limit)
         self.cellPixelHeight = cellPixelHeight
+        self.cellPixelWidth = cellPixelWidth
     }
 
     /// Erases the screen and homes the cursor, keeping the scrollback. Not
@@ -959,6 +965,7 @@ public struct Grid: Sendable {
         var main = suspended.grid
         main.cursorStyle = cursorStyle  // the style is global, not per screen
         main.cellPixelHeight = cellPixelHeight  // a property of the window
+        main.cellPixelWidth = cellPixelWidth
         // Terminal-wide, not per screen: `self = main` would restore the old
         // value.
         main.reverseWraparoundEnabled = reverseWraparoundEnabled
