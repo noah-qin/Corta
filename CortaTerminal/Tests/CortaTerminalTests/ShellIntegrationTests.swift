@@ -137,6 +137,39 @@ import Testing
         #expect(terminal.grid.promptRows == [0])
     }
 
+    /// The session's first prompt: no `C` has arrived yet, and the repaint's
+    /// `B` is sign enough that the prompt, not a command, was cleared.
+    @Test("⌃L at the session's first prompt still marks the next command")
+    func ctrlLBeforeAnyCommandIsMarked() {
+        var terminal = self.terminal(rows: 6)
+        terminal.feed(Array("\u{1B}]133;A\u{7}$ \u{1B}]133;B\u{7}".utf8))
+        terminal.feed(Array("\u{1B}[H\u{1B}[2J$ \u{1B}]133;B\u{7}".utf8))
+        terminal.feed(Array("false\r\n\u{1B}]133;C\u{7}\u{1B}]133;D;1\u{7}".utf8))
+        #expect(terminal.grid.line(0).mark == .promptFailed)
+    }
+
+    /// Erase first, home second: the prompt moves where its repaint lands,
+    /// not to the row the cursor sat on during the erase — that one is empty.
+    @Test("an erase before the cursor moves home marks the repainted row")
+    func eraseThenHomeMarksTheRepaintedRow() {
+        var terminal = self.terminal(rows: 6)
+        terminal.feed(Array("a\r\nb\r\nc\r\n\u{1B}]133;A\u{7}$ \u{1B}]133;B\u{7}".utf8))
+        terminal.feed(Array("\u{1B}[2J\u{1B}[H$ \u{1B}]133;B\u{7}".utf8))
+        terminal.feed(Array("false\r\n\u{1B}]133;C\u{7}\u{1B}]133;D;1\u{7}".utf8))
+        #expect(terminal.grid.line(0).mark == .promptFailed)
+        #expect(terminal.grid.line(3).mark == .none)
+    }
+
+    /// Clear Screen before any command: the prompt's `B` shows it is waiting.
+    @Test("Clear Screen at the session's first prompt still marks the next command")
+    func clearScreenBeforeAnyCommandIsMarked() {
+        var terminal = self.terminal(rows: 6)
+        terminal.feed(Array("\u{1B}]133;A\u{7}$ \u{1B}]133;B\u{7}".utf8))
+        terminal.clearScreen()
+        terminal.feed(Array("ls\r\n\u{1B}]133;C\u{7}\u{1B}]133;D;0\u{7}".utf8))
+        #expect(terminal.grid.line(0).mark == .promptSucceeded)
+    }
+
     /// A command that clears the screen while it runs is not a prompt
     /// repainted: its prompt stays where it was.
     @Test("an erase while a command runs leaves the prompt alone")

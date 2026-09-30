@@ -49,7 +49,7 @@ public struct Terminal: Sendable {
     /// the top, where the next command is typed.
     public mutating func clearScreen() {
         performer.grid.clearScreen()
-        performer.promptFollowsErase()
+        performer.screenClearedByUser()
     }
 
     /// `RIS`, applied here rather than written to the child's input, which

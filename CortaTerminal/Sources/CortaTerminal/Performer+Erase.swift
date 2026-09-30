@@ -27,7 +27,7 @@ extension Performer {
             case 1: grid.eraseDisplay(.toStart)
             case 2:
                 grid.eraseDisplay(.all)
-                promptFollowsErase()
+                promptErased()
             // ED 3 (xterm): erase the scrollback, and the images anchored in
             // it. Not in ECMA-48, but tmux and clear(1) both send it.
             case 3: grid.clearScrollback()

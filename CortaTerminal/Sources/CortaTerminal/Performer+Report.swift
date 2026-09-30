@@ -65,6 +65,10 @@ public struct PerformerState: Sendable {
     /// Set by the first `C`. Only a shell that marks where output begins can
     /// be judged by a `C` missing; one that sends only `A` and `D` never will.
     public internal(set) var shellMarksOutputStart = false
+    /// An ED 2 wiped the waiting prompt; its repaint's `B` says where it is now.
+    var promptAwaitsRepaint = false
+    /// This prompt's `B` has arrived: the shell is waiting for a command line.
+    var sawPromptEnd = false
     /// Drained by `Terminal.takeFinishedCommand()`, so a notification fires
     /// once per command, not once per frame.
     public internal(set) var finishedCommandExitStatus: Int?
