@@ -2,10 +2,11 @@
 
 [Documentation index](README.md) · [Project overview](../README.md)
 
-This reference describes **1.0.0** and the development tree on `main` since
+This reference describes **1.0.1** and the development tree on `main` since
 it; a feature added after the release is listed under `[Unreleased]` in the
 [changelog](../CHANGELOG.md).
-Configuration keys and defaults are maintained in [Configuration](CONFIGURATION.md).
+Configuration keys and defaults are maintained in [Configuration](CONFIGURATION.md);
+the [user guide](USER-GUIDE.md) says where each feature lives and how to use it.
 
 ## Terminal and text
 
@@ -40,7 +41,8 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
 
 - OSC 133 shell integration: prompt marks, command history, command-output
   copy/export, navigation between commands and long-task notifications.
-  Install or remove the bundled zsh hooks in **Settings ▸ Terminal**.
+  Install or remove the bundled zsh, bash or fish hooks in **Settings ▸
+  Terminal**; they go into the login shell's startup file.
 - Remote context reported by shell integration, a host indicator and reconnect
   action. SSH connections use system OpenSSH, including its configuration,
   agent and `ProxyJump`; Corta does not provide its own SSH implementation.
@@ -72,8 +74,12 @@ files, remote connections and child-process input.
 - **Input latency is above target.** The 2026-09-18 manual measurement was
   66.3 ms average, p95 78.7 ms. See [the method](PERFORMANCE.md)
   for what is included and the hardware used.
-- **Bundled shell integration is zsh-only.** Other shells need their own OSC
-  133 hooks for command boundaries; without them notifications use a heuristic.
+- **Bundled shell integration covers zsh, bash and fish.** Other shells need
+  their own OSC 133 hooks for command boundaries; without them notifications
+  use a heuristic.
+- **An emoji keeps the width `wcwidth` gives it.** A text-default character
+  with the emoji selector (✍️, 🖼️) is one column, as the shell counts it; it
+  draws at full size only when a blank cell follows it.
 - **Kitty graphics support direct transmission only.** File-based transmission
   is rejected by design. Animation and Unicode-placeholder placement are absent.
 - **Quick Terminal hotkeys use physical key positions**, not characters emitted

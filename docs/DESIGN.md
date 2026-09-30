@@ -243,8 +243,8 @@ manual edit; it is not a separate settings store.
   are implemented. Animation and Unicode-placeholder placement remain out
   of scope. File-based transmission is rejected because terminal output must
   not cause arbitrary local files to be read; see [Security](SECURITY.md).
-- **Shell integration:** OSC 133 command boundaries and installable zsh
-  hooks are implemented. Bundled bash and fish hooks remain unavailable.
+- **Shell integration:** OSC 133 command boundaries, with installable hooks
+  for zsh, bash and fish — the login shell's, chosen from `$SHELL`.
 - **Kitty keyboard:** implemented; see [Conformance](CONFORMANCE.md).
 
 The original ordering decision for Kitty graphics is recorded in

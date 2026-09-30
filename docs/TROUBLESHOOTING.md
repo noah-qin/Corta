@@ -262,8 +262,9 @@ for unsaved work before deleting application data:
 1. **Shell integration**, if you installed it from Settings ▸ Terminal:
    remove it there, or delete the block between
    `# >>> Corta shell integration >>>` and
-   `# <<< Corta shell integration <<<` in `~/.zshrc`. Nothing else in
-   that file is Corta's.
+   `# <<< Corta shell integration <<<` in your shell's startup file —
+   `~/.zshrc`, `~/.bashrc` or `~/.config/fish/config.fish`. Nothing else
+   in that file is Corta's.
 2. **Secure Keyboard Entry** releases itself when Corta quits. If Corta
    was force-quit while a window was key and typing elsewhere seems to be
    blocked, launch and quit Corta once; the counter is balanced on the way
