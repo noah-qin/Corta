@@ -73,31 +73,38 @@ For the maintainer, cutting any release:
    The workflow is the only route that signs the feed (D20); if it cannot
    run, fix it and re-run it rather than signing by hand.
 
-## The signing key
+## The signing secrets
 
-`release.yml` signs and notarises with one App Store Connect API key and
-nothing else: no certificate, no `.p12`, no keychain on the runner.
-`xcodebuild -exportArchive -allowProvisioningUpdates` signs with the
-team's cloud-managed Developer ID certificate, whose private key stays
-with Apple, and `notarytool` authenticates with the same key. The key
-lives in the `release` GitHub environment, beside the Sparkle key, and
-no copy is kept anywhere else — a lost key is replaced, not restored:
+`release.yml` signs with the Developer ID Application certificate and
+notarises with an App Store Connect API key. All of it lives in the
+`release` GitHub environment, beside the Sparkle key, so a run that can
+reach it waits for the maintainer's approval and starts only from a `v*`
+tag. No copy is kept anywhere else — a lost secret is replaced, not
+restored:
 
-| Name            | Kind                 | Value                                   |
-| --------------- | -------------------- | --------------------------------------- |
-| `ASC_KEY`       | environment secret   | the `.p8` file, as downloaded           |
-| `ASC_KEY_ID`    | environment variable | its Key ID                              |
-| `ASC_ISSUER_ID` | environment variable | the team's Issuer ID                    |
+| Name                        | Kind                 | Value                                  |
+| --------------------------- | -------------------- | -------------------------------------- |
+| `DEVELOPER_ID_P12`          | environment secret   | the Developer ID Application `.p12`, base64 |
+| `DEVELOPER_ID_P12_PASSWORD` | environment secret   | its password                           |
+| `ASC_KEY`                   | environment secret   | the API key's `.p8`, as downloaded     |
+| `ASC_KEY_ID`                | environment variable | its Key ID                             |
+| `ASC_ISSUER_ID`             | environment variable | the team's Issuer ID                   |
 
-Without all three the workflow produces an ad-hoc build and its release
+Without all five the workflow produces an ad-hoc build and its release
 notes say so; that is also what a fork gets.
 
-**Rotating the key**, when it may have leaked or once a year:
+**Why a certificate and not the key alone.** An App Store Connect API
+key cannot sign with the team's cloud-managed Developer ID certificate:
+`xcodebuild -exportArchive -allowProvisioningUpdates` with the key fails
+with *Cloud signing permission error*, whatever the key's role (#134's
+rehearsal, 2026-09-30), and a hosted runner cannot sign in to an Xcode
+account instead. So the `.p12` reaches the runner, in a throwaway
+keychain that the job deletes.
+
+**Rotating the API key**, when it may have leaked or once a year:
 
 1. In App Store Connect, **Users and Access → Integrations → Team Keys**,
-   generate a key with the **Admin** role. Cloud-managed Developer ID
-   signing needs Admin; the Account Holder may also have to allow access
-   to cloud-managed Developer ID certificates.
+   generate a key. Notarisation needs no more than the Developer role.
 2. Store it without letting it touch the command line, then delete the
    download:
 
@@ -109,14 +116,27 @@ notes say so; that is also what a fork gets.
 
    `ASC_ISSUER_ID` only changes if the team does.
 3. Rehearse (below). Once it passes, **Revoke** the old key in App Store
-   Connect.
+   Connect. Revoking a key stops nothing that already shipped.
 
-Revoking the key stops nothing that already shipped. Revoking a
-Developer ID *certificate* is a different matter — Gatekeeper can then
-refuse software signed with it — so an old certificate is left to expire.
-A new certificate from the same team satisfies the designated requirement
-of every earlier build, so Sparkle updates and the user's privacy grants
-carry over.
+**Replacing the certificate**, before it expires (the current one runs
+to 2031-09-04) or if it may have leaked:
+
+1. As the Account Holder, create a Developer ID Application certificate
+   (developer.apple.com → Certificates) and export it with its private
+   key from Keychain Access as a `.p12` with a password.
+2. Store both, then delete the file and the keychain copy:
+
+   ```sh
+   base64 -i Developer-ID.p12 | gh secret set DEVELOPER_ID_P12 --env release
+   gh secret set DEVELOPER_ID_P12_PASSWORD --env release   # prompts
+   rm Developer-ID.p12
+   ```
+
+3. Rehearse. A new certificate from the same team satisfies the
+   designated requirement of every earlier build, so Sparkle updates and
+   the user's privacy grants carry over. Only a leaked certificate is
+   revoked: Gatekeeper can then refuse software signed with it, so an
+   old one is otherwise left to expire.
 
 **Rehearsing** a signing change without a release:
 

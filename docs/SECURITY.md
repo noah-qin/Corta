@@ -267,11 +267,11 @@ carries it to `main` through the ordinary checks. The key has no
 revocation path (a new public key is unknown to every copy that has not
 updated), which is why it lives behind an approval rather than as a plain
 repository secret, and why every third-party action and Sparkle's own
-tools in that workflow are pinned by hash. The only other release secret
-is the App Store Connect API key `release.yml` signs and notarises with;
-it sits in the same environment behind the same approval, and the
-Developer ID certificate it signs with is cloud-managed, so no
-certificate or private key reaches the runner.
+tools in that workflow are pinned by hash. The Developer ID certificate
+`release.yml` signs with and the App Store Connect API key it notarises
+with sit in the same environment behind the same approval; the
+certificate reaches the runner only inside a keychain the job creates
+and deletes.
 
 ## 5. Data at Rest
 
@@ -327,13 +327,14 @@ which records S01–S04 and S07 in full); the entries below are the ones
 whose write-up belongs with the design rather than with the release that
 made them.
 
-- **S12 — 2026-09-30: releases are signed with an App Store Connect API
-  key (#134).** The Developer ID `.p12`, its password and the notary key
+- **S12 — 2026-09-30: release signing secrets moved behind the approval
+  (#134).** The Developer ID `.p12`, its password and the notary key
   were repository secrets that any workflow on any branch could read.
-  They are replaced by one API key in the `release` environment, so
-  signing now waits for the same approval as the Sparkle key, and the
-  export signs with the team's cloud-managed Developer ID certificate:
-  there is no certificate to leak and no keychain on the runner (§4.7).
+  They are now secrets of the `release` environment — `v*` tags only,
+  maintainer approval on every run — and notarisation uses a new App
+  Store Connect API key. Signing with the key alone, through a
+  cloud-managed certificate, was tried and is refused to API keys, so the
+  certificate still reaches the runner in a throwaway keychain (§4.7).
 - **S11 — 2026-09-20: the update feed is signed from CI (D20).** The
   Sparkle EdDSA key moved from the maintainer's login keychain to the
   `release` GitHub environment — `v*` tags only, maintainer approval on

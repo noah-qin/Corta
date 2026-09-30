@@ -308,8 +308,8 @@ The Developer ID certificate and the notary key, which can sign and
 notarise *any* Mac program, had been repository secrets since
 2026-09-03, so GitHub was already the trust anchor for what ships; the
 Sparkle key added one more secret, not a new anchor. Since 1.1.0 (#134)
-both are replaced by one App Store Connect API key in the same
-environment, signing with a cloud-managed certificate.
+both are secrets of the same `release` environment, behind the same
+approval.
 
 **What it costs.** The Sparkle key is the one secret with no revocation:
 a leaked Developer ID certificate is revoked and replaced, but a new

@@ -22,24 +22,27 @@ name: Release
 # publishes the draft, `appcast.yml` signs it into the update feed (D20).
 #
 # Signing and notarisation run only when the `release` environment
-# carries the App Store Connect API key below. Without it — a fork, or a
-# repository that has not set it up — the workflow still produces an
-# ad-hoc signed build, and the release notes say so plainly rather than
-# handing users a download that Gatekeeper will silently refuse.
+# carries all five values below. Without them — a fork, or a repository
+# that has not set them up — the workflow still produces an ad-hoc signed
+# build, and the release notes say so plainly rather than handing users a
+# download that Gatekeeper will silently refuse.
 #
-#   ASC_KEY        secret   the team API key's .p8, as downloaded (Admin role)
-#   ASC_KEY_ID     variable its Key ID
-#   ASC_ISSUER_ID  variable the team's Issuer ID
+#   DEVELOPER_ID_P12           secret   Developer ID Application .p12, base64
+#   DEVELOPER_ID_P12_PASSWORD  secret   its password
+#   ASC_KEY                    secret   App Store Connect team API key (.p8)
+#   ASC_KEY_ID                 variable that key's Key ID
+#   ASC_ISSUER_ID              variable the team's Issuer ID
 #
-# The one key does both jobs: `xcodebuild -exportArchive` signs with the
-# team's cloud-managed Developer ID certificate, and `notarytool`
-# authenticates with it. No certificate or private key is ever on the
-# runner, so there is no keychain to create or tear down. Rotating the key
-# is in docs/RELEASING.md.
+# The certificate signs and the API key notarises. The key cannot sign:
+# cloud-managed Developer ID signing is refused to API keys whatever their
+# role ("Cloud signing permission error", #134), and a hosted runner cannot
+# sign in to an Xcode account, so the certificate has to reach the runner.
+# It lives in a throwaway keychain for the length of the job.
 #
 # The job runs in the `release` environment, so a build that can reach
-# the key waits for the maintainer's approval and runs only from a `v*`
-# tag — the same gate the Sparkle key sits behind (D20).
+# either secret waits for the maintainer's approval and runs only from a
+# `v*` tag — the same gate the Sparkle key sits behind (D20). Rotating
+# either is in docs/RELEASING.md.
 
 on:
   push:
@@ -120,18 +123,21 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Check whether the signing key is available
+      - name: Check whether signing secrets are available
         id: signing
         env:
+          P12: ${{ secrets.DEVELOPER_ID_P12 }}
+          P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
           ASC_KEY: ${{ secrets.ASC_KEY }}
           ASC_KEY_ID: ${{ vars.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ vars.ASC_ISSUER_ID }}
         run: |
-          if [ -n "$ASC_KEY" ] && [ -n "$ASC_KEY_ID" ] && [ -n "$ASC_ISSUER_ID" ]; then
+          if [ -n "$P12" ] && [ -n "$P12_PASSWORD" ] && [ -n "$ASC_KEY" ] && \
+             [ -n "$ASC_KEY_ID" ] && [ -n "$ASC_ISSUER_ID" ]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::No App Store Connect key. Producing an ad-hoc signed, un-notarised build."
+            echo "::warning::No signing secrets. Producing an ad-hoc signed, un-notarised build."
           fi
 
       - name: Run the tests before shipping anything
@@ -206,26 +212,34 @@ jobs:
       # so corta-exec came out universal while the app was arm64 (D21). A
       # command-line setting reaches every target. corta-release-check fails a
       # build where either executable carries another slice.
-      #
-      # The archive itself is signed ad hoc, and only the export signs for
-      # distribution. An automatically signed archive would ask the key
-      # for an Apple Development certificate, and a runner that starts
-      # empty every time would be issued a new one on every release until
-      # the team hit its certificate limit. The export, with
-      # `-allowProvisioningUpdates` and the key, signs every nested binary
-      # with the team's cloud-managed Developer ID certificate, whose
-      # private key never leaves Apple.
-      - name: Build (signed)
+      - name: Import the signing certificate
         if: steps.signing.outputs.available == 'true'
         env:
-          ASC_KEY: ${{ secrets.ASC_KEY }}
-          ASC_KEY_ID: ${{ vars.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ vars.ASC_ISSUER_ID }}
+          P12: ${{ secrets.DEVELOPER_ID_P12 }}
+          P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
         run: |
-          key="$RUNNER_TEMP/asc-key.p8"
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          certificate="$RUNNER_TEMP/certificate.p12"
+          trap 'rm -f "$certificate"' EXIT
+          password=$(uuidgen)
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security list-keychains -d user -s "$keychain" login.keychain-db
+          (umask 077 && printf '%s' "$P12" | base64 --decode > "$certificate")
+          security import "$certificate" -k "$keychain" \
+            -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$password" "$keychain" > /dev/null
+
+      # The identity is named by its kind and the team rather than stored
+      # as a secret: the keychain holds exactly one Developer ID
+      # Application certificate, so the name is unambiguous.
+      - name: Build (signed)
+        if: steps.signing.outputs.available == 'true'
+        run: |
           options="$RUNNER_TEMP/ExportOptions.plist"
-          trap 'rm -f "$key" "$options"' EXIT
-          (umask 077 && printf '%s\n' "$ASC_KEY" > "$key")
+          trap 'rm -f "$options"' EXIT
 
           xcodebuild archive \
             -project Corta.xcodeproj \
@@ -233,9 +247,11 @@ jobs:
             -configuration Release \
             -archivePath build/Corta.xcarchive \
             ARCHS=arm64 \
-            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_IDENTITY="Developer ID Application" \
             CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM=646VSJ9K5F \
             ENABLE_HARDENED_RUNTIME=YES \
+            OTHER_CODE_SIGN_FLAGS="--timestamp --options=runtime" \
             -quiet
 
           cat > "$options" <<PLIST
@@ -248,7 +264,9 @@ jobs:
             <key>teamID</key>
             <string>646VSJ9K5F</string>
             <key>signingStyle</key>
-            <string>automatic</string>
+            <string>manual</string>
+            <key>signingCertificate</key>
+            <string>Developer ID Application</string>
           </dict>
           </plist>
           PLIST
@@ -257,10 +275,7 @@ jobs:
             -archivePath build/Corta.xcarchive \
             -exportPath build/Build/Products/Release \
             -exportOptionsPlist "$options" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$key" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+            -quiet
 
       - name: Build (ad-hoc)
         if: steps.signing.outputs.available != 'true'
@@ -379,3 +394,14 @@ jobs:
             --notes-file release-notes.md \
             "${{ steps.package.outputs.zip }}" \
             "${{ steps.package.outputs.zip }}.sha256"
+
+      # Always, including when an earlier step failed: a signing keychain
+      # left on the runner outlives the job that needed it. The hosted
+      # runner is destroyed either way, which is why this is hygiene rather
+      # than a fix, but a workflow that only cleans up on success teaches
+      # the wrong habit to whatever runs it next.
+      - name: Remove the signing keychain
+        if: always() && steps.signing.outputs.available == 'true'
+        run: |
+          security list-keychains -d user -s login.keychain-db || true
+          security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
