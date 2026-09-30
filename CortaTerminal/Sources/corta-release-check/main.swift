@@ -38,8 +38,11 @@ import ReleaseCheck
 ///
 ///     --version V          V (a tag with its `v` stripped) must be the version.
 ///     --archive ZIP        ZIP is named Corta-V.zip, holds Corta.app, its
-///                          ZIP.sha256 sidecar matches it, and the feed and
-///                          V's signature verify (scripts/verify-appcast.swift).
+///                          ZIP.sha256 sidecar matches it, and the feed
+///                          verifies (scripts/verify-appcast.swift). With
+///                          --appcast, V's signature must verify over ZIP;
+///                          without it the archive is new, so the feed must
+///                          not publish V yet.
 ///     --appcast            appcast.xml has an item for this version and build
 ///                          whose enclosure length, with --archive, is the
 ///                          archive's; for an arm64-only app the item
@@ -366,21 +369,30 @@ if let archivePath {
 
     // The feed's own rules — every enclosure URL matching its version, build
     // numbers unique and newest-first, signatures well-formed — belong to
-    // `verify-appcast.swift`, which `ci.yml` and `nightly.yml` also run.
-    // What only this check can add is the archive in hand: presence is not
-    // validity, and a signature made with a key whose public half is not the
-    // shipped SUPublicEDKey is well-formed and rejected by every installed
-    // Corta. It runs whenever there is an archive, with or without
-    // `--appcast`, so a packaging run never reports success without it.
+    // `verify-appcast.swift`, which `ci.yml` and `nightly.yml` also run, and
+    // it runs whenever there is an archive.
+    //
+    // What only this check can add depends on where in the release it runs.
+    // With `--appcast` (appcast.yml, after the feed is signed) it is the
+    // archive in hand: presence is not validity, and a signature made with a
+    // key whose public half is not the shipped SUPublicEDKey is well-formed
+    // and rejected by every installed Corta. Without it (packaging, in
+    // release.yml or locally) the feed is signed only after this archive is
+    // published (D20), so there is no signature to check yet — what can be
+    // checked is that the feed does not already publish this version, whose
+    // signed bytes a rebuild would never match.
+    let feedArguments = checkAppcast ? ["--archive", archive, "--version", bundleVersion] : []
     let verify = run("/usr/bin/xcrun", ["swift", "\(root)/scripts/verify-appcast.swift",
-                                        "\(root)/appcast.xml", "\(root)/Sparkle-Info.plist",
-                                        "--archive", archive, "--version", bundleVersion])
+                                        "\(root)/appcast.xml", "\(root)/Sparkle-Info.plist"]
+                                        + feedArguments)
     for line in ((verify?.stdout ?? "") + (verify?.stderr ?? "")).split(separator: "\n") {
         print("      \(line)")
     }
     switch verify?.status {
     case 0?:
-        pass("the feed verifies, and \(bundleVersion)'s signature verifies under SUPublicEDKey")
+        pass(checkAppcast
+            ? "the feed verifies, and \(bundleVersion)'s signature verifies under SUPublicEDKey"
+            : "the feed verifies")
     case nil, 2?, 126?, 127?:
         // Not a verdict on the signature: sending a maintainer after the
         // signing key when `swift` simply failed to start would be worse
@@ -388,6 +400,17 @@ if let archivePath {
         fail("verify-appcast could not run (status \(verify.map { String($0.status) } ?? "none")); the feed was not checked")
     case let status?:
         fail("verify-appcast reported \(status) failed check(s) — its output is above")
+    }
+    if !checkAppcast {
+        let feed = (try? Data(contentsOf: URL(fileURLWithPath: "\(root)/appcast.xml"))) ?? Data()
+        switch Result(catching: { try ReleaseCheck.appcastItem(version: bundleVersion, in: feed) }) {
+        case .success(nil):
+            pass("appcast.xml does not publish \(bundleVersion) yet")
+        case .success(.some):
+            fail("appcast.xml already publishes \(bundleVersion); an archive built now is not the one it signed")
+        case .failure(let error):
+            fail("appcast.xml does not parse: \(error.localizedDescription)")
+        }
     }
 }
 
