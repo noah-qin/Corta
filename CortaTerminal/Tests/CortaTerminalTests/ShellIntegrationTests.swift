@@ -86,7 +86,8 @@ import Testing
     @Test("a D with no status counts as success")
     func missingStatusIsSuccess() {
         var terminal = self.terminal()
-        terminal.feed(Array("\u{1B}]133;A\u{1B}\\\u{1B}]133;D\u{1B}\\".utf8))
+        // A shell that sends only A and D: the command line ends with Enter.
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\$ true\r\n\u{1B}]133;D\u{1B}\\".utf8))
         #expect(terminal.grid.line(0).mark == .promptSucceeded)
     }
 
@@ -112,6 +113,62 @@ import Testing
         var terminal = self.terminal()
         terminal.feed(Array("\u{1B}]133;A\u{1B}\\$ \u{1B}[J\u{1B}]133;C\u{1B}\\\u{1B}]133;D;1\u{1B}\\".utf8))
         #expect(terminal.grid.line(0).mark == .promptFailed)
+    }
+
+    /// fish 4 marks its own prompts, so with Corta's fish hook as well every
+    /// prompt carried two of each mark — the order below is fish 4.9's,
+    /// recorded. The hook's `D`, straight after fish's `A`, closed a phantom
+    /// command with the last one's status and coloured the waiting prompt.
+    @Test("a hook doubled with fish 4's own marks records each command once")
+    func doubledFishMarksRecordOneCommand() {
+        var terminal = self.terminal(rows: 8)
+        let fishA = "\u{1B}]133;A;click_events=1\u{7}"
+        func prompt(status: Int) -> String {
+            fishA + "\u{1B}]133;D;\(status)\u{7}\u{1B}]133;A\u{7}> \u{1B}]133;B\u{7}\u{1B}]133;B\u{7}"
+        }
+        func run(_ command: String, status: Int) -> String {
+            command + "\r\n\u{1B}]133;C;cmdline_url=\(command)\u{7}\u{1B}]133;C\u{7}"
+                + "out\r\n\u{1B}]133;D;\(status)\u{7}"
+        }
+        terminal.feed(Array((prompt(status: 0) + run("false", status: 1)).utf8))
+        terminal.feed(Array((prompt(status: 1) + run("true", status: 0)).utf8))
+        terminal.feed(Array(prompt(status: 0).utf8))
+
+        let records = terminal.commandRecords.records
+        #expect(records.map(\.exitStatus) == [1, 0, nil])
+        #expect(records.map(\.promptRow) == [0, 2, 4])
+        #expect(terminal.commandRecords.lastCompleted?.promptRow == 2)
+        #expect(terminal.grid.line(0).mark == .promptFailed)
+        #expect(terminal.grid.line(2).mark == .promptSucceeded)
+        // The waiting prompt: nothing has run there yet.
+        #expect(terminal.grid.line(4).mark == .prompt)
+        #expect(!terminal.isCommandRunning)
+    }
+
+    /// A second report for one command keeps the first, and is not a second
+    /// finished command for the long-task notification.
+    @Test("a second D for a finished command changes nothing")
+    func aSecondDIsIgnored() {
+        var terminal = self.terminal()
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\$ false\r\n\u{1B}]133;C\u{1B}\\\u{1B}]133;D;1\u{1B}\\".utf8))
+        #expect(terminal.takeFinishedCommand() == 1)
+        terminal.feed(Array("\u{1B}]133;D;0\u{1B}\\".utf8))
+        #expect(terminal.takeFinishedCommand() == nil)
+        #expect(terminal.grid.line(0).mark == .promptFailed)
+        #expect(terminal.commandRecords.last?.exitStatus == 1)
+    }
+
+    /// An empty line in fish draws a new prompt with no `D` for the old one.
+    /// That prompt never ran anything; it is not a command left running.
+    @Test("a prompt redrawn before anything ran is the same command")
+    func aPromptWithNothingRunIsReused() {
+        var terminal = self.terminal()
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\> \u{1B}]133;B\u{1B}\\\r\n".utf8))
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\> \u{1B}]133;B\u{1B}\\".utf8))
+        let records = terminal.commandRecords.records
+        #expect(records.count == 1)
+        #expect(records.first?.promptRow == 1)
+        #expect(records.first?.id == 0)
     }
 
     // MARK: - OSC 52

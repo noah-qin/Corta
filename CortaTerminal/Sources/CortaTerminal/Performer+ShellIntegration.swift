@@ -29,14 +29,25 @@ extension Performer {
         switch kind {
         case 0x41:  // 'A' — prompt start
             let row = grid.absoluteRow(ofScreenRow: grid.cursor.row)
+            // Nothing ran at the last prompt — no `C`, no `D` — so this is that
+            // prompt again: redrawn after an empty line, or fish 4's own mark
+            // beside a hook's. A new record here was a phantom command.
+            let nothingRan =
+                state.promptRow != nil && !state.isCommandRunning && state.commandExitStatus == nil
             state.promptRow = row
             state.commandExitStatus = nil
             // Until this prompt's own 'B', a `cd` must not read the last one's.
             state.promptEndColumn = nil
             grid.setMark(.prompt, atAbsoluteRow: row)
-            state.commandRecords.begin(
-                promptRow: row, workingDirectory: state.workingDirectory,
-                host: state.remoteContext?.host, at: Date())
+            if nothingRan {
+                state.commandRecords.movePrompt(
+                    to: row, workingDirectory: state.workingDirectory,
+                    host: state.remoteContext?.host, at: Date())
+            } else {
+                state.commandRecords.begin(
+                    promptRow: row, workingDirectory: state.workingDirectory,
+                    host: state.remoteContext?.host, at: Date())
+            }
         case 0x42:  // 'B' — command line starts
             // Only when 'B' is on the same row as 'A'; a multi-line prompt
             // under-estimates, the safe direction for an app-initiated `cd`.
@@ -55,6 +66,16 @@ extension Performer {
                 grid.setMark(.outputStart, atAbsoluteRow: outputRow)
             }
         case 0x44:  // 'D' — the command finished
+            // One outcome per prompt. A second `D`, or one on the prompt's own
+            // row before anything ran, is a doubled hook — fish 4 marks its
+            // prompts itself, and a hook's `D` after fish's `A` closed a phantom
+            // command with the last one's status.
+            let cursorRow = grid.absoluteRow(ofScreenRow: grid.cursor.row)
+            if state.commandExitStatus != nil
+                || (!state.isCommandRunning && state.promptRow == cursorRow)
+            {
+                break
+            }
             state.isCommandRunning = false
             let status = Self.exitStatus(payload)
             state.commandExitStatus = status
