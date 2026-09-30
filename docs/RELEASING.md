@@ -43,7 +43,10 @@ For the maintainer, cutting any release:
    it cannot wait for publication.
 4. Commit as `chore: release x.y.z`, then tag `vx.y.z` and push the tag.
    The release workflow builds from the tag and opens a **draft** release
-   for review — it is never published automatically.
+   for review — it is never published automatically. The run waits for
+   the maintainer's approval first (**Review deployments** → `release` →
+   **Approve and deploy**): it runs in the `release` environment because
+   it can reach the signing key (below).
 5. Review the draft's archive and **publish** the release. Publishing
    starts the `Update feed` workflow (`.github/workflows/appcast.yml`),
    which pauses for one approval: GitHub notifies the maintainer, and
@@ -69,3 +72,61 @@ For the maintainer, cutting any release:
    is the recovery (1.0.1 shipped that way).
    The workflow is the only route that signs the feed (D20); if it cannot
    run, fix it and re-run it rather than signing by hand.
+
+## The signing key
+
+`release.yml` signs and notarises with one App Store Connect API key and
+nothing else: no certificate, no `.p12`, no keychain on the runner.
+`xcodebuild -exportArchive -allowProvisioningUpdates` signs with the
+team's cloud-managed Developer ID certificate, whose private key stays
+with Apple, and `notarytool` authenticates with the same key. The key
+lives in the `release` GitHub environment, beside the Sparkle key, and
+no copy is kept anywhere else — a lost key is replaced, not restored:
+
+| Name            | Kind                 | Value                                   |
+| --------------- | -------------------- | --------------------------------------- |
+| `ASC_KEY`       | environment secret   | the `.p8` file, as downloaded           |
+| `ASC_KEY_ID`    | environment variable | its Key ID                              |
+| `ASC_ISSUER_ID` | environment variable | the team's Issuer ID                    |
+
+Without all three the workflow produces an ad-hoc build and its release
+notes say so; that is also what a fork gets.
+
+**Rotating the key**, when it may have leaked or once a year:
+
+1. In App Store Connect, **Users and Access → Integrations → Team Keys**,
+   generate a key with the **Admin** role. Cloud-managed Developer ID
+   signing needs Admin; the Account Holder may also have to allow access
+   to cloud-managed Developer ID certificates.
+2. Store it without letting it touch the command line, then delete the
+   download:
+
+   ```sh
+   gh secret set ASC_KEY --env release < AuthKey_KEYID.p8
+   gh variable set ASC_KEY_ID --env release --body KEYID
+   rm AuthKey_KEYID.p8
+   ```
+
+   `ASC_ISSUER_ID` only changes if the team does.
+3. Rehearse (below). Once it passes, **Revoke** the old key in App Store
+   Connect.
+
+Revoking the key stops nothing that already shipped. Revoking a
+Developer ID *certificate* is a different matter — Gatekeeper can then
+refuse software signed with it — so an old certificate is left to expire.
+A new certificate from the same team satisfies the designated requirement
+of every earlier build, so Sparkle updates and the user's privacy grants
+carry over.
+
+**Rehearsing** a signing change without a release:
+
+```sh
+gh workflow run release.yml --ref <branch> -f dry_run=true
+```
+
+A dry run builds the ref at the version the project carries, signs,
+notarises and runs `corta-release-check --require-notarized`, then keeps
+the archive as a workflow artifact for a week instead of drafting a
+release. The `release` environment only admits `v*` tags, so add the
+branch to its deployment policy for the rehearsal and remove it after,
+as for `appcast.yml`'s dry run.

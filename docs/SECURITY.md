@@ -250,7 +250,7 @@ needs no Accessibility permission (rule 7) and, unlike an `NSEvent`
 global monitor, keeps working under Secure Keyboard Entry. Terminal
 transcripts are never indexed for Spotlight.
 
-### 4.7 The update feed is signed, and the key is the release's fourth secret
+### 4.7 The update feed is signed, and its key sits behind an approval
 
 An installed Corta accepts an update only when `appcast.xml` on `main`
 carries an EdDSA signature that the public key baked into the app
@@ -265,9 +265,13 @@ feed item is then held to `corta-release-check --appcast
 signature, Developer ID, staple, Gatekeeper — before a pull request
 carries it to `main` through the ordinary checks. The key has no
 revocation path (a new public key is unknown to every copy that has not
-updated), which is why it lives behind an approval rather than beside the
-certificate as a plain repository secret, and why every third-party
-action and Sparkle's own tools in that workflow are pinned by hash.
+updated), which is why it lives behind an approval rather than as a plain
+repository secret, and why every third-party action and Sparkle's own
+tools in that workflow are pinned by hash. The only other release secret
+is the App Store Connect API key `release.yml` signs and notarises with;
+it sits in the same environment behind the same approval, and the
+Developer ID certificate it signs with is cloud-managed, so no
+certificate or private key reaches the runner.
 
 ## 5. Data at Rest
 
@@ -323,6 +327,13 @@ which records S01–S04 and S07 in full); the entries below are the ones
 whose write-up belongs with the design rather than with the release that
 made them.
 
+- **S12 — 2026-09-30: releases are signed with an App Store Connect API
+  key (#134).** The Developer ID `.p12`, its password and the notary key
+  were repository secrets that any workflow on any branch could read.
+  They are replaced by one API key in the `release` environment, so
+  signing now waits for the same approval as the Sparkle key, and the
+  export signs with the team's cloud-managed Developer ID certificate:
+  there is no certificate to leak and no keychain on the runner (§4.7).
 - **S11 — 2026-09-20: the update feed is signed from CI (D20).** The
   Sparkle EdDSA key moved from the maintainer's login keychain to the
   `release` GitHub environment — `v*` tags only, maintainer approval on
