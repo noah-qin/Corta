@@ -25,7 +25,9 @@ extension Performer {
             switch parameters[0] {
             case 0: grid.eraseDisplay(.toEnd)
             case 1: grid.eraseDisplay(.toStart)
-            case 2: grid.eraseDisplay(.all)
+            case 2:
+                grid.eraseDisplay(.all)
+                promptErased()
             // ED 3 (xterm): erase the scrollback, and the images anchored in
             // it. Not in ECMA-48, but tmux and clear(1) both send it.
             case 3: grid.clearScrollback()

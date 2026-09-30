@@ -36,6 +36,8 @@ extension Performer {
                 state.promptRow != nil && !state.isCommandRunning && state.commandExitStatus == nil
             state.promptRow = row
             state.commandExitStatus = nil
+            state.promptAwaitsRepaint = false
+            state.sawPromptEnd = false
             // Until this prompt's own 'B', a `cd` must not read the last one's.
             state.promptEndColumn = nil
             grid.setMark(.prompt, atAbsoluteRow: row)
@@ -49,6 +51,12 @@ extension Performer {
                     host: state.remoteContext?.host, at: Date())
             }
         case 0x42:  // 'B' — command line starts
+            // The prompt an erase wiped, repainted: it is where its `B` lands.
+            if state.promptAwaitsRepaint {
+                state.promptAwaitsRepaint = false
+                movePromptToCursor()
+            }
+            state.sawPromptEnd = true
             // Only when 'B' is on the same row as 'A'; a multi-line prompt
             // under-estimates, the safe direction for an app-initiated `cd`.
             if state.promptRow == grid.absoluteRow(ofScreenRow: grid.cursor.row) {
@@ -58,6 +66,7 @@ extension Performer {
         case 0x43:  // 'C' — the command is running, and its output starts here
             state.isCommandRunning = true
             state.shellMarksOutputStart = true
+            state.promptAwaitsRepaint = false
             let outputRow = grid.absoluteRow(ofScreenRow: grid.cursor.row)
             state.outputStartRow = outputRow
             state.commandRecords.markOutputStart(outputRow)
@@ -81,6 +90,7 @@ extension Performer {
                 break
             }
             state.isCommandRunning = false
+            state.promptAwaitsRepaint = false
             let status = Self.exitStatus(payload)
             state.commandExitStatus = status
             state.finishedCommandExitStatus = status
@@ -94,6 +104,42 @@ extension Performer {
         default:
             break
         }
+    }
+
+    /// Nothing has run at the current prompt: no `C`, no `D` since its `A`.
+    private var promptIsWaiting: Bool {
+        !grid.isAlternateScreenActive && state.promptRow != nil && !state.isCommandRunning
+            && state.commandExitStatus == nil
+    }
+
+    /// ED 2 at a waiting prompt — zsh's and bash's ⌃L — erases its mark, and
+    /// the shell repaints it with no new `A`, so the next command's outcome
+    /// had nowhere to land. The prompt moves on the repaint's `B`, not now:
+    /// `ESC[2J ESC[H` erases before the cursor reaches the row the prompt is
+    /// redrawn on. Only a repainting prompt sends `B`, never a running
+    /// command, so this needs no sign that the shell sends `C`.
+    mutating func promptErased() {
+        if promptIsWaiting { state.promptAwaitsRepaint = true }
+    }
+
+    /// Clear Screen at a waiting prompt: nothing is repainted, and the next
+    /// command is typed where Corta left the cursor, at the top. Moved now,
+    /// for a shell that shows the prompt is waiting — it has sent `C` before,
+    /// or this prompt's `B` — since without either a running command looks
+    /// the same.
+    mutating func screenClearedByUser() {
+        guard promptIsWaiting, state.shellMarksOutputStart || state.sawPromptEnd else { return }
+        movePromptToCursor()
+    }
+
+    private mutating func movePromptToCursor() {
+        let row = grid.absoluteRow(ofScreenRow: grid.cursor.row)
+        state.promptRow = row
+        state.promptEndColumn = nil
+        grid.setMark(.prompt, atAbsoluteRow: row)
+        state.commandRecords.movePrompt(
+            to: row, workingDirectory: state.workingDirectory,
+            host: state.remoteContext?.host, at: Date())
     }
 
     /// A missing status is 0: "finished", not "failed".
