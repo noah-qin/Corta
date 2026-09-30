@@ -206,7 +206,16 @@ extension Performer {
             row += 1
         }
         if grid.cursor.row <= grid.marginBottom, row > grid.marginBottom {
-            grid.scrollUp(row - grid.marginBottom)
+            // The whole distance, as kitty's `screen_scroll` does: `scrollUp`
+            // stops at one region's height, which would leave the cursor
+            // inside an image taller than the screen.
+            let regionHeight = grid.marginBottom - grid.marginTop + 1
+            var remaining = row - grid.marginBottom
+            while remaining > 0 {
+                let step = min(remaining, regionHeight)
+                grid.scrollUp(step)
+                remaining -= step
+            }
             row = grid.marginBottom
         }
         grid.moveCursor(row: row, column: column)

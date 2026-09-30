@@ -69,12 +69,7 @@ public struct ImagePlacementTable: Sendable {
     /// change, so a same-size re-transmission always fits. `nil` on success.
     @discardableResult
     mutating func store(_ id: KittyGraphics.ImageID, data: KittyGraphics.ImageData) -> StoreRefusal? {
-        if data.format != .png, data.width > 0, data.height > 0 {
-            guard data.width <= KittyGraphics.maximumImageDimension,
-                data.height <= KittyGraphics.maximumImageDimension,
-                data.width <= KittyGraphics.maximumImagePixels / data.height
-            else { return .dimensionsExceedCaps }
-        }
+        guard Self.dimensionsFit(data) else { return .dimensionsExceedCaps }
         guard images[id] != nil || images.count < KittyGraphics.maximumTrackedImages
         else { return .tooManyImages }
         let replacedBytes = images[id]?.bytes.count ?? 0
@@ -98,6 +93,16 @@ public struct ImagePlacementTable: Sendable {
         _ data: KittyGraphics.ImageData
     ) -> (id: KittyGraphics.ImageID, refusal: StoreRefusal?) {
         anonymousOrder.removeAll { images[$0] == nil }
+        // Refused whatever gives way: then nothing may, or a rejected image
+        // would still take every earlier `icat` picture off the screen.
+        guard Self.dimensionsFit(data) else { return (KittyGraphics.ImageID(rawValue: 0), .dimensionsExceedCaps) }
+        let anonymousBytes = anonymousOrder.reduce(0) { $0 + (images[$1]?.bytes.count ?? 0) }
+        guard images.count - anonymousOrder.count < KittyGraphics.maximumTrackedImages else {
+            return (KittyGraphics.ImageID(rawValue: 0), .tooManyImages)
+        }
+        guard storedImageBytes - anonymousBytes + data.bytes.count <= maximumStoredBytes else {
+            return (KittyGraphics.ImageID(rawValue: 0), .byteBudgetExceeded)
+        }
         while !anonymousOrder.isEmpty,
             images.count >= KittyGraphics.maximumTrackedImages
                 || storedImageBytes + data.bytes.count > maximumStoredBytes
@@ -112,6 +117,13 @@ public struct ImagePlacementTable: Sendable {
         if let refusal = store(id, data: data) { return (id, refusal) }
         anonymousOrder.append(id)
         return (id, nil)
+    }
+
+    private static func dimensionsFit(_ data: KittyGraphics.ImageData) -> Bool {
+        guard data.format != .png, data.width > 0, data.height > 0 else { return true }
+        return data.width <= KittyGraphics.maximumImageDimension
+            && data.height <= KittyGraphics.maximumImageDimension
+            && data.width <= KittyGraphics.maximumImagePixels / data.height
     }
 
     /// Public: the app decodes it; the core has no ImageIO.

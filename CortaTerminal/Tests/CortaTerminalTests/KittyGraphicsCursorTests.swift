@@ -133,6 +133,19 @@ struct KittyGraphicsCursorTests {
         #expect(top == 5, "the whole image still on screen, its last row the cursor's")
     }
 
+    @Test("an image taller than the screen scrolls the whole way, leaving the cursor on its last row")
+    func tallerThanScreenScrollsFully() {
+        var terminal = Self.terminal(rows: 10)
+        terminal.feed(Array("\u{1B}[9;1H".utf8))  // row 8
+        terminal.feed(Self.place(width: 10, height: 400))  // 20 rows: 8–27
+        #expect(Self.cursor(terminal) == [9, 1])
+        #expect(terminal.grid.scrollback.totalPushed == 18, "more than one screen's height")
+        let placement = terminal.grid.imagePlacements.orderedPlacements()[0]
+        let top = ScrollbackCoordinates.reanchoredRow(
+            placement.row, from: placement.baseScrollbackTotal, to: terminal.grid.scrollback.totalPushed)
+        #expect(top + 20 - 1 == 9, "its last row is the cursor's, not below it")
+    }
+
     @Test("inside a scroll region, the region scrolls and the rows below it stay")
     func scrollRegionScrollsOnlyTheRegion() {
         var terminal = Self.terminal(rows: 10)
@@ -172,5 +185,35 @@ struct KittyGraphicsCursorTests {
         let payload = Self.pngLike(width: 30, height: 60, count: 64).base64EncodedString()
         terminal.feed(Self.apc("a=T,q=2,f=100", payload: payload))
         #expect(Self.cursor(terminal) == [2, 3])
+    }
+
+    private static func rgba(_ width: Int, _ height: Int) -> KittyGraphics.ImageData {
+        KittyGraphics.ImageData(
+            format: .rgba, width: width, height: height, bytes: Array(repeating: 0xFF, count: width * height * 4))
+    }
+
+    @Test("an id-less image refused for its size evicts nothing")
+    func refusedForDimensionsEvictsNothing() {
+        var table = ImagePlacementTable()
+        let first = table.storeAnonymous(Self.rgba(1, 1))
+        #expect(first.refusal == nil)
+        let huge = KittyGraphics.ImageData(
+            format: .rgba, width: KittyGraphics.maximumImageDimension + 1, height: 1, bytes: [])
+        #expect(table.storeAnonymous(huge).refusal == .dimensionsExceedCaps)
+        #expect(table.image(first.id) != nil)
+    }
+
+    @Test("an id-less image that named images leave no room for evicts nothing")
+    func refusedForBudgetEvictsNothing() {
+        var table = ImagePlacementTable()
+        table.maximumStoredBytes = 1000
+        #expect(table.store(KittyGraphics.ImageID(rawValue: 1), data: Self.rgba(15, 15)) == nil)  // 900 bytes
+        let small = table.storeAnonymous(Self.rgba(2, 2))  // 16 bytes
+        #expect(small.refusal == nil)
+        #expect(table.storeAnonymous(Self.rgba(5, 6)).refusal == .byteBudgetExceeded)  // 120: no room even without it
+        #expect(table.image(small.id) != nil)
+        let fits = table.storeAnonymous(Self.rgba(2, 11))  // 88: fits only once the 16 give way
+        #expect(fits.refusal == nil)
+        #expect(table.image(small.id) == nil)
     }
 }
