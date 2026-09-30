@@ -149,6 +149,24 @@ import Testing
         #expect(!terminal.isCommandRunning)
     }
 
+    /// The known limit in `FEATURES.md`, pinned: marks are not nested. Inside
+    /// `ssh` to a shell that marks its own prompts, the remote commands are
+    /// recorded, the `ssh` command itself never finishes, and its status
+    /// lands on the last remote prompt.
+    @Test("a remote shell's marks inside ssh are recorded as local commands")
+    func nestedMarksAreFlattened() {
+        var terminal = self.terminal(rows: 8)
+        terminal.feed(Array("\u{1B}]133;A\u{7}$ ssh h\r\n\u{1B}]133;C\u{7}".utf8))
+        terminal.feed(Array("\u{1B}]133;A\u{7}h> false\r\n\u{1B}]133;C\u{7}\u{1B}]133;D;1\u{7}".utf8))
+        terminal.feed(Array("\u{1B}]133;A\u{7}h> exit\r\n\u{1B}]133;C\u{7}".utf8))
+        terminal.feed(Array("\u{1B}]133;D;0\u{7}\u{1B}]133;A\u{7}$ ".utf8))
+        let records = terminal.commandRecords.records
+        #expect(records.map(\.promptRow) == [0, 1, 2, 3])
+        #expect(records.map(\.exitStatus) == [nil, 1, 0, nil])
+        #expect(records[0].isRunning)
+        #expect(terminal.grid.line(2).mark == .promptSucceeded)
+    }
+
     /// A shell that sends only `A` and `D` gives no sign of a command having
     /// run. `clear` there puts the cursor back on a top-row prompt, and its
     /// `D` must still count.
