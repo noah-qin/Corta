@@ -441,9 +441,11 @@ class ViewController: NSViewController {
         view.shouldRenderFrame = { [weak self] in
             self?.prepareFrame() ?? false
         }
-        view.onKeyBytes = { [weak self] bytes in
+        // `view` weakly too: the closure is stored on it, and a strong capture
+        // kept every closed pane's view — and its drawables — alive.
+        view.onKeyBytes = { [weak self, weak view] bytes in
             guard let self else { return }
-            if bytes.contains(0x0D) { taskNotifier.noteCommandSubmitted(in: view.window) }
+            if bytes.contains(0x0D) { taskNotifier.noteCommandSubmitted(in: view?.window) }
             returnToBottomOnInput()
             session.write(bytes)
         }

@@ -19,13 +19,12 @@ import Testing
 
 @testable import Corta
 
-/// Found by opening and closing windows in a measured run: each closed
-/// window left about 32 MB behind. A closed window keeps its view tree, so
-/// `viewDidMoveToWindow` never sees `nil` and never tears the display link
-/// down; the link stays on the main run loop and, through the scheduler's
-/// render callbacks, holds the whole pane — view controller, drawables,
-/// scrollback. `ViewController.teardown` now calls `stopRendering`; this
-/// pins that it takes the link down while the view is still in its window.
+/// A closed window keeps its view tree, so `viewDidMoveToWindow` never sees
+/// `nil` and never tears the display link down; the link would stay on the
+/// main run loop, referencing the pane's layer. `ViewController.teardown`
+/// calls `stopRendering`; this pins that it takes the link down while the
+/// view is still in its window. What actually kept closed panes alive was a
+/// retain cycle through `onKeyBytes` — `PaneTeardownTests` pins that.
 @MainActor
 @Suite("Closed window release")
 struct ClosedWindowReleaseTests {
