@@ -113,6 +113,38 @@ struct ShellIntegrationInstallerTests {
         #expect(installer.status() == .notInstalled)
     }
 
+    /// A block another version wrote is never rewritten behind the user's
+    /// back, so a fix to the hooks would never reach it; the status says so,
+    /// and `update()` replaces the hooks where they sit.
+    @Test("an earlier version's block is outdated, and update replaces it in place")
+    func anEarlierBlockIsOutdatedAndUpdatesInPlace() throws {
+        defer { removeDirectory() }
+        let block = "# >>> Corta shell integration >>>\n# older hooks\n# <<< Corta shell integration <<<\n"
+        try writeFile("export EDITOR=vim\n\n" + block + "alias ll='ls -l'\n")
+        #expect(installer.status() == .outdated)
+
+        #expect(installer.update())
+        #expect(installer.status() == .installed)
+        let text = try String(contentsOf: file, encoding: .utf8)
+        #expect(!text.contains("# older hooks"))
+        #expect(text.hasPrefix("export EDITOR=vim\n\n# >>> Corta shell integration >>>\n"))
+        #expect(text.hasSuffix("# <<< Corta shell integration <<<\nalias ll='ls -l'\n"))
+
+        #expect(installer.uninstall())
+        #expect(try String(contentsOf: file, encoding: .utf8) == "export EDITOR=vim\nalias ll='ls -l'\n")
+    }
+
+    /// Without its end marker there is no whole block to replace: an Update
+    /// offered there would report success and change nothing.
+    @Test("a block missing its end marker is not offered an update")
+    func aBrokenBlockIsNotOutdated() throws {
+        defer { removeDirectory() }
+        try writeFile("# >>> Corta shell integration >>>\n# older hooks\n")
+        #expect(installer.status() == .installed)
+        #expect(!installer.update())
+        #expect(try String(contentsOf: file, encoding: .utf8) == "# >>> Corta shell integration >>>\n# older hooks\n")
+    }
+
     @Test("uninstalling when nothing is installed is a no-op that still succeeds")
     func uninstallOfNothingSucceeds() throws {
         defer { removeDirectory() }

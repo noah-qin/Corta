@@ -111,10 +111,11 @@ enum ShellIntegrationScript {
 
           function fish_prompt
             set -l __corta_status $status
+            set -l __corta_prompt (__corta_original_fish_prompt | string collect -N)
             set -q __corta_fish_marks_prompt; or printf '\e]133;D;%s\a' $__corta_status
             printf '\e]7;file://%s%s\e\\' (hostname) "$PWD"
             set -q __corta_fish_marks_prompt; or printf '\e]133;A\a'
-            __corta_original_fish_prompt
+            printf '%s' $__corta_prompt
             printf '\e]133;B\a'
           end
         end
