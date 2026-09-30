@@ -377,12 +377,14 @@ swift scripts/verify-appcast.swift --download            # every item, against t
   base64 64-byte signature; each enclosure URL being exactly the GitHub
   release URL for its own version; build numbers unique and newest-first,
   since Sparkle offers whichever item has the highest one.
-- The **archive** layer is what `corta-release-check` adds whenever it
-  is given an `--archive`, offline, against the archive it already holds.
-  It deliberately does *not* require `--appcast`: `corta-release-check
-  package` passes `--archive` alone, and a packaging run that reported "all checks
-  passed" without having verified a signature was the reassurance this
-  exists to stop giving.
+- The **archive** layer is what `corta-release-check check --archive`
+  adds, offline, against the archive it already holds, with or without
+  `--appcast` — `appcast.yml` runs it once the feed is signed. `corta-release-check
+  package` cannot: it runs in `release.yml` before the release is
+  published, and the feed is signed only after that (D20), so there is no
+  signature yet. It verifies the feed alone and checks that the feed does
+  not already publish the version, whose signed bytes a rebuild would
+  never match; `--rehearsal` skips only that rule, for a dry run.
 - The **`--download`** layer runs nightly and covers *every* item, not
   only the newest — an update nobody can install is equally broken
   whichever release it belongs to, and the older entries are the ones no
