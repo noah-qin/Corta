@@ -107,6 +107,47 @@ import Testing
         }
     }
 
+    /// zsh's and bash's ⌃L erase the screen and repaint the prompt at the top
+    /// without a new `A`. The erase took the prompt's mark, so before this the
+    /// next command's outcome was drawn nowhere.
+    @Test("after ⌃L the next command is marked on the repainted prompt")
+    func aPromptRepaintedByCtrlLIsMarked() {
+        var terminal = self.terminal(rows: 6)
+        terminal.feed(Array("\u{1B}]133;A\u{7}$ true\r\n\u{1B}]133;C\u{7}\u{1B}]133;D;0\u{7}".utf8))
+        terminal.feed(Array("\u{1B}]133;A\u{7}$ \u{1B}]133;B\u{7}".utf8))
+        terminal.feed(Array("\u{1B}[H\u{1B}[2J$ \u{1B}]133;B\u{7}".utf8))
+        terminal.feed(Array("false\r\n\u{1B}]133;C\u{7}\u{1B}]133;D;1\u{7}".utf8))
+        #expect(terminal.grid.line(0).mark == .promptFailed)
+        let last = try! #require(terminal.commandRecords.lastCompleted)
+        #expect(last.promptRow == 0)
+        #expect(last.exitStatus == 1)
+        #expect(last.promptEndColumn == 2)
+    }
+
+    /// Clear Screen erases the waiting prompt and leaves the cursor at the
+    /// top, where the next command is typed and its outcome drawn.
+    @Test("after Clear Screen the next command is marked where it was typed")
+    func clearScreenMovesTheWaitingPrompt() {
+        var terminal = self.terminal(rows: 6)
+        terminal.feed(Array("\u{1B}]133;A\u{7}$ true\r\n\u{1B}]133;C\u{7}\u{1B}]133;D;0\u{7}".utf8))
+        terminal.feed(Array("\u{1B}]133;A\u{7}$ \u{1B}]133;B\u{7}".utf8))
+        terminal.clearScreen()
+        terminal.feed(Array("ls\r\n\u{1B}]133;C\u{7}\u{1B}]133;D;0\u{7}".utf8))
+        #expect(terminal.grid.line(0).mark == .promptSucceeded)
+        #expect(terminal.grid.promptRows == [0])
+    }
+
+    /// A command that clears the screen while it runs is not a prompt
+    /// repainted: its prompt stays where it was.
+    @Test("an erase while a command runs leaves the prompt alone")
+    func anEraseDuringACommandDoesNotMoveThePrompt() {
+        var terminal = self.terminal(rows: 6)
+        terminal.feed(Array("\u{1B}]133;A\u{7}$ true\r\n\u{1B}]133;C\u{7}\u{1B}]133;D;0\u{7}".utf8))
+        terminal.feed(Array("\u{1B}]133;A\u{7}$ top\r\n\u{1B}]133;C\u{7}\u{1B}[H\u{1B}[2J".utf8))
+        #expect(terminal.commandRecords.last?.promptRow == 1)
+        #expect(terminal.grid.line(0).mark == .none)
+    }
+
     /// Erasing part of the screen keeps the rows it did not touch.
     @Test("an erase below the cursor keeps the prompt's mark")
     func eraseBelowKeepsTheCursorRowsMark() {

@@ -382,7 +382,7 @@ public final class TerminalSession: @unchecked Sendable {
         registerStateWaiter {
             state.withLock {
                 switch command {
-                case .clearScreen: $0.terminal.grid.clearScreen()
+                case .clearScreen: $0.terminal.clearScreen()
                 case .clearHistory: $0.terminal.grid.clearScrollback()
                 case .reset: $0.terminal.reset()
                 }

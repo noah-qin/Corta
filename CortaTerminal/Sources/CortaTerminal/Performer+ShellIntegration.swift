@@ -96,6 +96,24 @@ extension Performer {
         }
     }
 
+    /// After the screen is erased at a prompt where nothing has run — zsh's
+    /// and bash's ⌃L, Clear Screen — the prompt goes on at the cursor with no
+    /// new `A`: the erase took its mark, and the next command's outcome had
+    /// nowhere to land. It moves there with its record. Only for a shell that
+    /// sends `C`, the one sign a command is running rather than waiting.
+    mutating func promptFollowsErase() {
+        guard !grid.isAlternateScreenActive, state.shellMarksOutputStart,
+            state.promptRow != nil, !state.isCommandRunning, state.commandExitStatus == nil
+        else { return }
+        let row = grid.absoluteRow(ofScreenRow: grid.cursor.row)
+        state.promptRow = row
+        state.promptEndColumn = nil
+        grid.setMark(.prompt, atAbsoluteRow: row)
+        state.commandRecords.movePrompt(
+            to: row, workingDirectory: state.workingDirectory,
+            host: state.remoteContext?.host, at: Date())
+    }
+
     /// A missing status is 0: "finished", not "failed".
     private static func exitStatus(_ payload: ArraySlice<UInt8>) -> Int {
         guard let separator = payload.firstIndex(of: 0x3B) else { return 0 }  // ';'

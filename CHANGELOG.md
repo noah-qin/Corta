@@ -103,7 +103,9 @@ what to edit.
   empty row it had been typed on. Clearing the screen now removes the
   marks with the text. The grey rule on the current prompt — and on the
   row a command's output starts — is gone too: a mark now appears only
-  once a command reports, green for success and red for failure.
+  once a command reports, green for success and red for failure. After
+  zsh's or bash's ⌃L, or Clear Screen (⌘K), the next command is marked on
+  the prompt it was typed at.
 
 - Closing a window or a pane now frees its memory. The terminal view held
   on to itself through its own keyboard handler, so every closed pane

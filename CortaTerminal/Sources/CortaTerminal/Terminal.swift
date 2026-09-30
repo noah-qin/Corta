@@ -45,6 +45,13 @@ public struct Terminal: Sendable {
         set { performer.grid = newValue }
     }
 
+    /// Clear Screen: the grid's, and the waiting prompt follows the cursor to
+    /// the top, where the next command is typed.
+    public mutating func clearScreen() {
+        performer.grid.clearScreen()
+        performer.promptFollowsErase()
+    }
+
     /// `RIS`, applied here rather than written to the child's input, which
     /// carries only what the user typed (`SECURITY.md` §6).
     public mutating func reset() {
