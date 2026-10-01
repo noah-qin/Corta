@@ -124,6 +124,9 @@ class ViewController: NSViewController {
     private var resizeDebouncer: ResizeDebouncer!
     private var cachedProcessName: String?
     private var cachedDirectory: String?
+    /// `cachedDirectory` if it was a directory when it last changed: the
+    /// title bar's proxy icon.
+    private var representedDirectory: URL?
     private var cachedRemoteState: PaneRemoteState = .local
     /// Shared by both readers so they supersede the same report.
     private var remoteReportTracker = PaneRemoteState.ReportTracker()
@@ -796,8 +799,10 @@ class ViewController: NSViewController {
         }
         if let title = Self.sanitizedTitleComponent(session.windowTitle) {
             parts.append(title)
-        } else if let directory = cachedDirectory {
-            parts.append(Self.abbreviated(directory))
+        } else if let directory = Self.sanitizedTitleComponent(cachedDirectory.map(Self.abbreviated)) {
+            // OSC 7 text too: a directory named with a newline or a bidi
+            // override would otherwise reach the title as it is.
+            parts.append(directory)
         }
         if let process = Self.sanitizedTitleComponent(cachedProcessName) {
             parts.append(process)
@@ -835,16 +840,20 @@ class ViewController: NSViewController {
         let title = composedWindowTitle
         if window.title != title { window.title = title }
 
-        var isDirectory: ObjCBool = false
-        if let path = cachedDirectory,
-            FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
-            isDirectory.boolValue
-        {
-            let url = URL(fileURLWithPath: path)
-            if window.representedURL != url { window.representedURL = url }
-        } else if window.representedURL != nil {
-            window.representedURL = nil
+        if window.representedURL != representedDirectory {
+            window.representedURL = representedDirectory
         }
+    }
+
+    /// `path` as a URL if it names a directory now. A `stat`: on a network
+    /// volume it waits on the server, so it runs when the directory changes,
+    /// not on every title rebuild — which is every output batch.
+    private static func existingDirectoryURL(_ path: String?) -> URL? {
+        var isDirectory: ObjCBool = false
+        guard let path, FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
+            isDirectory.boolValue
+        else { return nil }
+        return URL(fileURLWithPath: path)
     }
 
     /// Shows the grid size in the title for a moment after a resize, then
@@ -887,7 +896,11 @@ class ViewController: NSViewController {
         }
         lastProcessFactsRefresh = now
         cachedProcessName = session.activeProcessName
-        cachedDirectory = session.currentDirectory
+        let directory = session.currentDirectory
+        if directory != cachedDirectory {
+            cachedDirectory = directory
+            representedDirectory = Self.existingDirectoryURL(directory)
+        }
         cachedRemoteState = resolveRemoteState()
     }
 

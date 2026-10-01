@@ -103,8 +103,11 @@ extension Performer {
         // they reset along with everything else — only `defaults` survives.
         let colors = state.dynamicColors
         let paletteDefaults = state.indexedPalette.defaults
+        // A fact about the session's shell, not terminal state.
+        let hostnames = state.hostnamesAtStart
         grid.resetToInitialState()
         state = PerformerState()
+        state.hostnamesAtStart = hostnames
         state.dynamicColors = colors
         state.indexedPalette = IndexedPalette(defaults: paletteDefaults)
     }

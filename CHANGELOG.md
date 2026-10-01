@@ -96,6 +96,53 @@ what to edit.
 
 ### Fixed
 
+- Shell integration reports directories with unusual names correctly. The
+  directory went out unencoded, so `C# projects` was taken to be `C` and
+  `what?` to be `what` — new tabs and splits opened in the wrong place —
+  and a directory whose name holds escape sequences, as one unpacked from
+  an archive can, injected them into the terminal on every prompt. The
+  zsh, bash and fish hooks now percent-encode the path; **Settings ▸
+  Terminal ▸ Shell Integration** shows **Update** for an integration
+  installed before this change.
+
+- Changing to the parent or project directory, or dropping a file, in
+  fish can no longer run a command hidden in the name. The quoting was
+  correct for sh, bash and zsh, but fish reads a backslash inside single
+  quotes differently, so a name such as `x\'; cmd; \'` ran `cmd`.
+
+- A directory name in the window title has its control characters removed,
+  as every other part of the title already did; a newline or a
+  right-to-left override no longer reaches the title or the tab.
+
+- The window title no longer checks the current directory on disk with
+  every burst of output. In a directory on a network volume, a program
+  printing steadily — a build, an AI assistant — made each check wait on
+  the server, dropping frames and slowing typing.
+
+- A local pane stays local after the Mac's network name changes. Corta
+  compared the name a shell reported when it started with the name the Mac
+  has now, so after joining another network a local pane could show a
+  remote host in its title, open new tabs in your home folder and ask to
+  connect to your own Mac over SFTP to open a file.
+
+- Opening the Shell menu no longer checks the current directory on disk.
+  A directory reported on an unreachable automount (`/net/…`) froze Corta
+  until the mount timed out. **Change to Project Root** and **Open Project
+  Root in New Pane** are enabled whenever the directory is known, look for
+  the project after you choose them, and say so when there is none.
+
+- Directory history keeps at most 1 000 directories besides favourites,
+  dropping the least visited. The directories come from what the shell
+  reports, so output that reported a new one on every prompt grew the
+  history file, and the work of saving it, without limit.
+
+- The warning before a multi-line paste is no longer switched off by what a
+  program prints. Bracketed paste mode — under which the warning is not
+  needed — could be turned on by any output, `cat` of a file included, and
+  stayed on under a shell that does not support it, such as the bash that
+  ships with macOS. Each finished command now turns it off; shells that
+  support it turn it back on for the next prompt.
+
 - Shell integration for bash works when bash starts as a login shell,
   which is how Corta starts it. The hooks were only in `~/.bashrc`, which
   a login bash never reads, so unless your `~/.bash_profile` sourced it,

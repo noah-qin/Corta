@@ -76,6 +76,13 @@ extension Performer {
                 grid.setMark(.outputStart, atAbsoluteRow: outputRow)
             }
         case 0x44:  // 'D' — the command finished
+            // Bracketed paste is the shell's to turn on, and only its line
+            // editor does it, after `D` — zsh and bash after `A`, fish before
+            // it. A command's own output can turn it on as well (`cat` of a
+            // file holding `ESC [ ? 2004 h`), which silences the multi-line
+            // paste warning under a shell that never reads the markers, such
+            // as macOS's bash 3.2. Each finished command clears it.
+            state.bracketedPasteEnabled = false
             // One outcome per prompt. A second `D`, or one on the prompt's own
             // row before anything ran, is a doubled hook — fish 4 marks its
             // prompts itself, and a hook's `D` after fish's `A` closed a phantom

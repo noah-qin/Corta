@@ -56,7 +56,14 @@ struct DirectoryHistory: Equatable {
         return Double(entry.visitCount) * pow(0.5, age / halfLife)
     }
 
-    /// Records a visit; ignores an empty path.
+    /// Directories kept beyond the favourites. The paths are child-reported
+    /// (OSC 7, never checked to exist), so output that reports a fresh one
+    /// per prompt would otherwise grow the file, and every save's encode,
+    /// without bound — and fill the switcher with them.
+    static let maximumEntries = 1_000
+
+    /// Records a visit; ignores an empty path. Past `maximumEntries`, the
+    /// lowest-ranked directory that is not a favourite goes.
     mutating func record(_ path: String, at date: Date = Date()) {
         guard !path.isEmpty else { return }
         if var entry = entries[path] {
@@ -65,7 +72,20 @@ struct DirectoryHistory: Equatable {
             entries[path] = entry
         } else {
             entries[path] = Entry(path: path, visitCount: 1, lastVisit: date, isFavorite: false)
+            evictPastLimit(now: date, keeping: path)
         }
+    }
+
+    private mutating func evictPastLimit(now: Date, keeping path: String) {
+        let ordinary = entries.values.filter { !$0.isFavorite && $0.path != path }
+        guard ordinary.count > Self.maximumEntries else { return }
+        let lowest = ordinary.min { a, b in
+            let scoreA = Self.frecency(a, now: now)
+            let scoreB = Self.frecency(b, now: now)
+            if scoreA != scoreB { return scoreA < scoreB }
+            return a.path > b.path
+        }
+        if let lowest { entries[lowest.path] = nil }
     }
 
     /// Pins or unpins; pinning an unvisited path creates a zero-score entry.

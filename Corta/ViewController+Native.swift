@@ -51,15 +51,27 @@ extension ViewController {
             .joined(separator: " ")
     }
 
-    /// POSIX single-quoting, `'` written as `'\''`. Filenames can carry `;`,
-    /// backticks or `$(…)`, and this text goes to a shell, so quoting makes
-    /// the printable remainder inert (controls are already gone).
+    /// Single-quoted for any shell the pane may be running. Filenames can
+    /// carry `;`, backticks or `$(…)`, and this text goes to a shell, so
+    /// quoting makes the printable remainder inert (controls are already
+    /// gone). Not POSIX's `'\''`: inside fish's single quotes `\'` and `\\`
+    /// are escapes, so `x\'; cmd; \'` broke out and ran `cmd`. `'` and `\`
+    /// are each written double-quoted between single-quoted runs — `"'"` and
+    /// `"\\"` read the same in sh, bash, zsh and fish.
     static func shellQuoted(_ path: String) -> String {
         // A deliberately narrow set may go unquoted.
         let safe = CharacterSet(charactersIn:
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-/@:+")
         if !path.isEmpty, path.unicodeScalars.allSatisfy({ safe.contains($0) }) { return path }
-        return "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        var quoted = "'"
+        for character in path {
+            switch character {
+            case "'": quoted += #"'"'"'"#
+            case "\\": quoted += #"'"\\"'"#
+            default: quoted.append(character)
+            }
+        }
+        return quoted + "'"
     }
 
     /// Drops and Services go down the ⌘V path (`SECURITY.md` §2.3): C0

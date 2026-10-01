@@ -344,12 +344,15 @@ extension ViewController: NSMenuItemValidation {
         case #selector(changeDirectoryToParent(_:)):
             // `shellDirectory` is nil exactly when there is no honest answer.
             return shellDirectory != nil && canChangeDirectorySafely
+        // Not whether a root exists: finding one walks the path with a `stat`
+        // per level, and the path is the child's — `/net/<host>/…` mounts on
+        // first touch, and validation runs on the main thread each time a
+        // menu opens. The action looks, off the main thread, and says so
+        // when there is none.
         case #selector(changeDirectoryToProjectRoot(_:)):
             return hasKnownWorkingDirectory && canChangeDirectorySafely
-                && session.workingDirectory.flatMap { DirectoryHistory.projectRoot(for: $0) } != nil
         case #selector(openProjectRootInNewPane(_:)):
             return hasKnownWorkingDirectory
-                && session.workingDirectory.flatMap { DirectoryHistory.projectRoot(for: $0) } != nil
         default:
             return true
         }

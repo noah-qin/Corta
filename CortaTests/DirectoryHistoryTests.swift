@@ -77,6 +77,22 @@ struct DirectoryHistoryTests {
         #expect(history.ranked().isEmpty)
     }
 
+    @Test("the history keeps at most its limit of ordinary entries, and every favourite")
+    func historyIsBounded() {
+        var history = DirectoryHistory()
+        let start = Date(timeIntervalSince1970: 1_000_000)
+        history.setFavorite(true, for: "/favourite")
+        for index in 0..<(DirectoryHistory.maximumEntries + 50) {
+            history.record("/fake/\(index)", at: start.addingTimeInterval(TimeInterval(index)))
+        }
+        let ordinary = history.entries.values.filter { !$0.isFavorite }
+        #expect(ordinary.count <= DirectoryHistory.maximumEntries + 1)
+        #expect(history.entries["/favourite"]?.isFavorite == true)
+        // The newest survive; the oldest went first.
+        #expect(history.entries["/fake/\(DirectoryHistory.maximumEntries + 49)"] != nil)
+        #expect(history.entries["/fake/0"] == nil)
+    }
+
     @Test("an empty path is never recorded")
     func emptyPathIsIgnored() {
         var history = DirectoryHistory()
