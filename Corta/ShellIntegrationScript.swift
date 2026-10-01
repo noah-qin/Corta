@@ -58,25 +58,40 @@ enum ShellIntegrationScript {
 
     /// bash: a `DEBUG` trap and `PROMPT_COMMAND`. The trap fires for
     /// `PROMPT_COMMAND` too; the `$BASH_COMMAND` guard stops a second `C`.
+    /// It also fires for every part of `PROMPT_COMMAND` and the rest of the
+    /// startup files, so preexec is armed by the last part of the prompt
+    /// command and disarmed by the first command after it: one `C` per
+    /// command line, and none before the first prompt.
+    ///
+    /// The block also sits in the login file, which `~/.profile` may be — read
+    /// by `sh` and `dash` as well, and by a non-interactive `bash -lc` whose
+    /// output must not gain escape sequences. So the opening test is POSIX
+    /// and asks for an interactive bash; the rest only parses elsewhere.
     static let bash = #"""
-        if [[ -n "$BASH_VERSION" && -z "$CORTA_SHELL_INTEGRATION_ACTIVE" ]]; then
+        if [ -n "$BASH_VERSION" ] && [ -z "$CORTA_SHELL_INTEGRATION_ACTIVE" ] && case $- in *i*) true ;; *) false ;; esac; then
           CORTA_SHELL_INTEGRATION_ACTIVE=1
 
           __corta_preexec() {
             [[ -n "$COMP_LINE" ]] && return
-            [[ "$BASH_COMMAND" == "$PROMPT_COMMAND" ]] && return
+            [[ -z "$__corta_armed" ]] && return
+            __corta_armed=
             printf '\e]133;C\a'
+          }
+
+          __corta_arm() {
+            __corta_armed=1
           }
 
           __corta_precmd() {
             local __corta_status=$?
+            __corta_armed=
             printf '\e]133;D;%s\a' "$__corta_status"
             printf '\e]7;file://%s%s\e\\' "$HOSTNAME" "$PWD"
             printf '\e]133;A\a'
           }
 
           trap '__corta_preexec' DEBUG
-          PROMPT_COMMAND="__corta_precmd${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
+          PROMPT_COMMAND="__corta_precmd${PROMPT_COMMAND:+; $PROMPT_COMMAND}; __corta_arm"
 
           if [[ "$PS1" != *'\e]133;B\a'* ]]; then
             PS1="${PS1}\[\e]133;B\a\]"

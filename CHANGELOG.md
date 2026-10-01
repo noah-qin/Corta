@@ -96,6 +96,20 @@ what to edit.
 
 ### Fixed
 
+- Shell integration for bash works when bash starts as a login shell,
+  which is how Corta starts it. The hooks were only in `~/.bashrc`, which
+  a login bash never reads, so unless your `~/.bash_profile` sourced it,
+  prompt marks, command jumps and notifications never started. They now
+  also go into the file a login bash reads — `~/.bash_profile`,
+  `~/.bash_login` or `~/.profile` — and Settings shows **Update** for an
+  integration installed only in `~/.bashrc`. The hooks run only in an
+  interactive bash, so `bash -lc` output is untouched and other shells
+  reading `~/.profile` skip them. A command no longer appears to start
+  while the startup files run, or once per part of a `PROMPT_COMMAND` you
+  set yourself, and `a; b` is one command. **Remove** clears the hooks
+  from every file bash may have been given them in, and deletes a file
+  only if Install created it.
+
 - Emoji are sharp and fill their two cells. They were drawn at the text
   size and then scaled down on the GPU to fit, which left them smaller than
   the text around them and slightly soft. An emoji written with the emoji

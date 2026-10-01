@@ -192,4 +192,110 @@ struct ShellIntegrationInstallerTests {
         #expect(Set(scripts).count == ShellKind.allCases.count)
         #expect(scripts.allSatisfy { !$0.isEmpty })
     }
+
+    // MARK: - bash's two files
+
+    private func url(_ name: String) -> URL { directory.appendingPathComponent(name) }
+
+    private func bashIntegration(login: String = ".bash_profile", others: [String] = []) throws
+        -> ShellIntegration
+    {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return ShellIntegration(
+            targets: [".bashrc", login].map { ShellIntegrationInstaller(shell: .bash, rcFileURL: url($0)) },
+            others: others.map { ShellIntegrationInstaller(shell: .bash, rcFileURL: url($0)) })
+    }
+
+    private func read(_ name: String) throws -> String { try String(contentsOf: url(name), encoding: .utf8) }
+
+    @Test("a login bash's file is the first that exists, as bash picks it")
+    func bashLoginFileFollowsBash() {
+        let home = URL(fileURLWithPath: "/home/test")
+        func file(_ existing: Set<String>) -> String {
+            ShellKind.bashLoginFile(in: home) { existing.contains($0) }.lastPathComponent
+        }
+        #expect(file([]) == ".bash_profile")
+        #expect(file(["/home/test/.profile"]) == ".profile")
+        #expect(file(["/home/test/.bash_login", "/home/test/.profile"]) == ".bash_login")
+        #expect(file(["/home/test/.bash_profile", "/home/test/.profile"]) == ".bash_profile")
+        #expect(file(["/home/test/.bashrc"]) == ".bash_profile")
+    }
+
+    @Test("bash installs into ~/.bashrc and the login file, and reports both")
+    func bashInstallsIntoBothFiles() throws {
+        defer { removeDirectory() }
+        let integration = try bashIntegration()
+        #expect(integration.status() == .notInstalled)
+        #expect(integration.install().isEmpty)
+        #expect(integration.status() == .installed)
+        #expect(try read(".bashrc").contains(ShellKind.bash.script))
+        #expect(try read(".bash_profile").contains(ShellKind.bash.script))
+    }
+
+    @Test("a block in ~/.bashrc alone is outdated, names the missing file, and Update adds it once")
+    func bashrcOnlyInstallIsCompleted() throws {
+        defer { removeDirectory() }
+        let integration = try bashIntegration()
+        #expect(integration.targets[0].install())
+        #expect(integration.status() == .outdated)
+        #expect(integration.pathsNeedingUpdate.hasSuffix(".bash_profile"))
+        #expect(integration.install().isEmpty)
+        #expect(integration.status() == .installed)
+        #expect(try read(".bashrc").components(separatedBy: "Corta shell integration >>>").count == 2)
+    }
+
+    @Test("another terminal's integration in the login file is reported before an outdated block")
+    func conflictIsReportedFirst() throws {
+        defer { removeDirectory() }
+        let integration = try bashIntegration()
+        #expect(integration.targets[0].install())
+        try "source ~/.iterm2_shell_integration.bash\n".write(to: url(".bash_profile"), atomically: true, encoding: .utf8)
+        #expect(integration.status() == .conflicting("iTerm2"))
+    }
+
+    @Test("Remove clears a block left in a login file bash no longer reads")
+    func uninstallClearsEarlierLoginFiles() throws {
+        defer { removeDirectory() }
+        let before = try bashIntegration(login: ".profile")
+        try "export PATH=$PATH:/opt/bin\n".write(to: url(".profile"), atomically: true, encoding: .utf8)
+        #expect(before.install().isEmpty)
+        // A .bash_profile appears later: bash now reads it instead.
+        let after = try bashIntegration(login: ".bash_profile", others: [".bash_login", ".profile"])
+        #expect(after.status() == .outdated)
+        #expect(after.uninstall().isEmpty)
+        #expect(after.status() == .notInstalled)
+        #expect(try read(".profile") == "export PATH=$PATH:/opt/bin\n")
+    }
+
+    @Test("Remove deletes a file Install created, and keeps one the user made, even empty")
+    func uninstallDeletesOnlyFilesItCreated() throws {
+        defer { removeDirectory() }
+        let integration = try bashIntegration()
+        try "".write(to: url(".bashrc"), atomically: true, encoding: .utf8)
+        #expect(integration.install().isEmpty)
+        #expect(try read(".bash_profile").hasPrefix("# Created by Corta"))
+        #expect(integration.uninstall().isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: url(".bash_profile").path), "an empty login file would hide ~/.profile")
+        #expect(FileManager.default.fileExists(atPath: url(".bashrc").path), "the user's own empty file was deleted")
+    }
+
+    @Test("the bash block runs only in an interactive bash, and parses in a POSIX shell")
+    func bashBlockIsSafeInTheLoginFile() throws {
+        let script = ShellKind.bash.script
+        let firstLine = try #require(script.split(separator: "\n").first)
+        #expect(firstLine.hasPrefix("if [ -n \"$BASH_VERSION\" ]"))
+        #expect(firstLine.contains("*i*"))
+        guard FileManager.default.isExecutableFile(atPath: "/bin/dash") else { return }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/dash")
+        process.arguments = ["-c", script + "\necho ok"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        try process.run()
+        process.waitUntilExit()
+        let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        #expect(process.terminationStatus == 0)
+        #expect(output == "ok\n", "dash printed: \(output)")
+    }
 }

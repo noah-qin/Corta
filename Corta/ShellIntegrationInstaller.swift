@@ -38,6 +38,112 @@ enum ShellKind: String, CaseIterable {
     }
 
     var script: String { ShellIntegrationScript.script(for: self) }
+
+    /// Every file the hooks go into. bash needs two: Corta starts the shell
+    /// with `-l`, and a login bash reads its login file and never `~/.bashrc`,
+    /// while a bash started inside the session reads only `~/.bashrc`. The
+    /// block guards itself against running twice when one sources the other.
+    var rcFileURLs: [URL] {
+        switch self {
+        case .zsh, .fish: return [defaultRCFileURL]
+        case .bash: return [defaultRCFileURL, Self.bashLoginFile(in: AppPaths.userHomeDirectory)]
+        }
+    }
+
+    /// Files an earlier install may have used that are not targets now:
+    /// bash's other login candidates, since which one bash reads changes as
+    /// the user creates them. Checked by `status()` and cleared by Remove.
+    var otherRCFileURLs: [URL] {
+        guard self == .bash else { return [] }
+        let targets = Set(rcFileURLs.map(\.path))
+        return Self.bashLoginCandidates(in: AppPaths.userHomeDirectory).filter {
+            !targets.contains($0.path)
+        }
+    }
+
+    /// The file a login bash reads: the first of `~/.bash_profile`,
+    /// `~/.bash_login` and `~/.profile` that exists — bash moves on only from
+    /// a missing one; an unreadable one ends its search — or a new
+    /// `~/.bash_profile` when none does. Read at each use: the answer changes
+    /// when the user creates one of them.
+    static func bashLoginFile(
+        in home: URL, exists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }
+    ) -> URL {
+        let candidates = bashLoginCandidates(in: home)
+        return candidates.first { exists($0.path) } ?? candidates[0]
+    }
+
+    private static func bashLoginCandidates(in home: URL) -> [URL] {
+        [".bash_profile", ".bash_login", ".profile"].map { home.appendingPathComponent($0) }
+    }
+}
+
+/// Shell integration across every file a shell needs it in: one
+/// installer per file, reported and changed as one.
+struct ShellIntegration {
+    /// Where the hooks go now (`ShellKind.rcFileURLs`).
+    let targets: [ShellIntegrationInstaller]
+    /// Where an earlier install may have put them (`otherRCFileURLs`).
+    let others: [ShellIntegrationInstaller]
+
+    init(targets: [ShellIntegrationInstaller], others: [ShellIntegrationInstaller] = []) {
+        self.targets = targets
+        self.others = others
+    }
+
+    init(shell: ShellKind) {
+        self.init(
+            targets: shell.rcFileURLs.map { ShellIntegrationInstaller(shell: shell, rcFileURL: $0) },
+            others: shell.otherRCFileURLs.map { ShellIntegrationInstaller(shell: shell, rcFileURL: $0) })
+    }
+
+    /// The login shell's, with its files worked out now.
+    static var current: ShellIntegration { ShellIntegration(shell: .loginShell) }
+
+    var displayPath: String { Self.paths(targets) }
+
+    /// The targets still to be brought to this version's block.
+    var pathsNeedingUpdate: String { Self.paths(targets.filter { $0.status() != .installed }) }
+
+    private static func paths(_ installers: [ShellIntegrationInstaller]) -> String {
+        installers.map(\.displayPath).joined(separator: ", ")
+    }
+
+    /// Installed when every target holds this version's block. Otherwise
+    /// another terminal's integration anywhere is reported first — adding
+    /// hooks beside it should be the user's decision — then a block in some
+    /// file is outdated, since `update()` completes it.
+    func status() -> ShellIntegrationStatus {
+        let each = targets.map { $0.status() }
+        if each.allSatisfy({ $0 == .installed }) { return .installed }
+        let all = each + others.map { $0.status() }
+        for status in all {
+            if case .conflicting = status { return status }
+        }
+        if all.contains(where: { $0 == .installed || $0 == .outdated }) { return .outdated }
+        return .notInstalled
+    }
+
+    /// Brings every target to this version's block — replaced where it
+    /// differs, added where it is missing. Returns the files it could not
+    /// write.
+    @discardableResult
+    func install() -> [String] {
+        targets.filter { installer in
+            switch installer.status() {
+            case .installed: false
+            case .outdated: !installer.update()
+            case .notInstalled, .conflicting: !installer.install()
+            }
+        }.map(\.displayPath)
+    }
+
+    /// Removes the block from every file that may hold one. Returns the
+    /// files it could not write.
+    @discardableResult
+    func uninstall() -> [String] {
+        (targets + others).filter { !$0.uninstall() }.map(\.displayPath)
+    }
 }
 
 /// Whether Corta's block is in the rc file.
@@ -77,8 +183,6 @@ struct ShellIntegrationInstaller {
         self.init(shell: shell, rcFileURL: shell.defaultRCFileURL)
     }
 
-    static let shared = ShellIntegrationInstaller(shell: .loginShell)
-
     /// `rcFileURL` with the user's home as `~`. A staged build's rc file is
     /// shown in full, making plain it isn't the one real shells read (D22).
     var displayPath: String {
@@ -117,11 +221,19 @@ struct ShellIntegrationInstaller {
         return .notInstalled
     }
 
-    /// Appends the block; idempotent, never doubling the hooks.
+    /// The first line of a file `install()` created, which is how
+    /// `uninstall()` knows it may delete the file again.
+    private static let createdHeader =
+        "# Created by Corta for its shell integration; removing it in Settings deletes this file."
+
+    /// Appends the block; idempotent, never doubling the hooks. A file that
+    /// does not exist yet is created with `createdHeader` above the block.
     @discardableResult
     func install() -> Bool {
+        let created = !FileManager.default.fileExists(atPath: rcFileURL.path)
         var existing = (try? String(contentsOf: rcFileURL, encoding: .utf8)) ?? ""
         guard !existing.contains(Self.beginMarker) else { return true }
+        if created { existing = Self.createdHeader + "\n" }
         if !existing.isEmpty, !existing.hasSuffix("\n") { existing += "\n" }
         let block = "\n\(Self.beginMarker)\n\(shell.script)\n\(Self.endMarker)\n"
         return write(existing + block)
@@ -155,6 +267,10 @@ struct ShellIntegrationInstaller {
 
     /// Removes exactly the block `install()` wrote, with its separator line,
     /// and nothing the user added; succeeds when there is nothing to remove.
+    /// A file `install()` created, left with nothing but its header, is
+    /// deleted — an empty `~/.bash_profile` would hide `~/.profile` from
+    /// bash for good. A file the user made, even an empty one, is kept, and
+    /// a symbolic link is never deleted.
     @discardableResult
     func uninstall() -> Bool {
         guard let existing = try? String(contentsOf: rcFileURL, encoding: .utf8) else {
@@ -163,7 +279,15 @@ struct ShellIntegrationInstaller {
         guard let range = blockRange(in: existing) else { return true }
         var updated = existing
         updated.removeSubrange(range)
+        let remainder = updated.trimmingCharacters(in: .whitespacesAndNewlines)
+        if remainder == Self.createdHeader, !isSymbolicLink {
+            return (try? FileManager.default.removeItem(at: rcFileURL)) != nil
+        }
         return write(updated)
+    }
+
+    private var isSymbolicLink: Bool {
+        (try? rcFileURL.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true
     }
 
     private func blockRange(in text: String) -> Range<String.Index>? {
