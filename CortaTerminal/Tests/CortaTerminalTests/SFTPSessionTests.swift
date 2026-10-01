@@ -287,4 +287,85 @@ struct SFTPSessionTests {
             }
         }
     }
+
+    @Test("senders blocked on a full channel park no cooperative thread")
+    func blockedWritesLeaveTheCooperativePoolFree() async throws {
+        let connection = SFTPLoopbackConnection()
+        let fileSystem = FakeRemoteFileSystem()
+        let server = FakeSFTPServer(connection: connection, fileSystem: fileSystem)
+        server.start()
+        let transport = StallingTransport(connection.clientTransport())
+        let session = SFTPSession(transport: transport)
+        _ = try await session.connect()
+        defer {
+            transport.release()
+            session.close()
+            connection.close()
+        }
+
+        // Every write from here blocks, like ssh behind a slow network.
+        // More senders than the pool has threads: if each held one while
+        // blocked, nothing else in the process could run.
+        transport.stall()
+        let senders = ProcessInfo.processInfo.activeProcessorCount + 2
+        for index in 0..<senders {
+            Task.detached { _ = try? await session.stat(path: "/\(index)") }
+        }
+        // Blocking, not `Task.sleep`: a starved pool would never resume us.
+        blockThisThread(seconds: 0.3)
+
+        let probe = DispatchSemaphore(value: 0)
+        Task.detached { probe.signal() }
+        #expect(
+            waitBlocking(probe, seconds: testTimeoutInterval(5)),
+            "an unrelated task could not run while SFTP writes were blocked")
+    }
+}
+
+private func blockThisThread(seconds: TimeInterval) {
+    Thread.sleep(forTimeInterval: seconds)
+}
+
+private func waitBlocking(_ semaphore: DispatchSemaphore, seconds: TimeInterval) -> Bool {
+    semaphore.wait(timeout: .now() + seconds) == .success
+}
+
+/// Passes writes through until `stall()`, then blocks each until `release()`.
+private final class StallingTransport: SFTPChannelTransport, @unchecked Sendable {
+    private let base: SFTPChannelTransport
+    private let condition = NSCondition()
+    private var stalled = false
+
+    init(_ base: SFTPChannelTransport) {
+        self.base = base
+    }
+
+    func stall() {
+        condition.lock()
+        stalled = true
+        condition.unlock()
+    }
+
+    func release() {
+        condition.lock()
+        stalled = false
+        condition.broadcast()
+        condition.unlock()
+    }
+
+    func read(into buffer: UnsafeMutableRawBufferPointer) throws(SFTPTransportError) -> Int {
+        try base.read(into: buffer)
+    }
+
+    func write(_ bytes: UnsafeRawBufferPointer) throws(SFTPTransportError) {
+        condition.lock()
+        while stalled { condition.wait() }
+        condition.unlock()
+        try base.write(bytes)
+    }
+
+    func close() {
+        release()
+        base.close()
+    }
 }

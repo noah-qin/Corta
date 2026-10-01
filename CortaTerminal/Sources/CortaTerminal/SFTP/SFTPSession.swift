@@ -182,8 +182,10 @@ public struct SFTPVolumeInfo: Equatable, Sendable {
 ///
 /// Threading mirrors `TerminalSession` (`DECISIONS.md` D04): a dedicated
 /// reader `Thread` blocks in the transport's `read` and dispatches replies
-/// by request-id; sending is serialised through a lock so two requests'
-/// frames can never interleave on the wire. Everything else is async —
+/// by request-id; sending is a serial queue of its own, so two requests'
+/// frames can never interleave on the wire and a `write(2)` blocked on a
+/// full pipe parks that queue's thread, never one of the cooperative pool's.
+/// Everything else is async —
 /// each request is a continuation the reader resumes — and nothing is
 /// isolated to any actor.
 ///
@@ -249,8 +251,10 @@ public final class SFTPSession: @unchecked Sendable {
 
     private let state = Mutex(State())
     /// Serialises frame writes; two senders must never interleave bytes
-    /// of their frames on the wire.
-    private let writeLock = Mutex(())
+    /// of their frames on the wire. Its own thread: a write blocks while ssh
+    /// is slower than the window, and the cooperative pool has one thread
+    /// per core for the whole process.
+    private let writerQueue = DispatchQueue(label: "dev.corta.sftp.writer", qos: .utility)
     private var readerThread: Thread?
 
     public init(transport: SFTPChannelTransport, configuration: Configuration = .init()) {
@@ -294,13 +298,7 @@ public final class SFTPSession: @unchecked Sendable {
                     returning: .failure(.protocolViolation("connect() called on a used session")))
                 return
             }
-            do {
-                try writeFrame(frame)
-            } catch let error as SFTPError {
-                finishHandshake(.failure(error))
-            } catch {
-                finishHandshake(.failure(.protocolViolation("\(error)")))
-            }
+            sendFrame(frame) { [self] error in finishHandshake(.failure(error)) }
         }
 
         let reply = try result.get()
@@ -550,13 +548,7 @@ public final class SFTPSession: @unchecked Sendable {
                 }
                 let frame = SFTPCodec.encodeFrame(
                     SFTPMessage(requestID: ticket.id, request: payload(ticket.id)))
-                do {
-                    try writeFrame(frame)
-                } catch let error as SFTPError {
-                    failRequest(ticket, with: error)
-                } catch {
-                    failRequest(ticket, with: .protocolViolation("\(error)"))
-                }
+                sendFrame(frame) { [self] error in failRequest(ticket, with: error) }
             }
         } onCancel: {
             cancelRequest(ticket)
@@ -661,20 +653,24 @@ public final class SFTPSession: @unchecked Sendable {
         state.windowWaiters.removeFirst().continuation.resume(returning: true)
     }
 
-    private func writeFrame(_ frame: [UInt8]) throws(SFTPError) {
-        // `Mutex.withLock` is untyped-rethrows on this toolchain, so the
-        // typed error is smuggled out instead of thrown through it.
-        var failure: SFTPError?
-        writeLock.withLock { _ in
-            do {
-                try frame.withUnsafeBytes { try transport.write($0) }
-            } catch let error as SFTPTransportError {
-                failure = .transport(error)
-            } catch {
-                failure = .protocolViolation("\(error)")
+    /// Queues `frame` behind every frame sent before it; `onFailure` runs on
+    /// the writer queue if the transport refuses it. The queue holds at most
+    /// a window's worth: a sender queues only after `acquireRequestSlot`.
+    private func sendFrame(
+        _ frame: [UInt8], onFailure: @escaping @Sendable (SFTPError) -> Void
+    ) {
+        writerQueue.async { [transport] in
+            // `withUnsafeBytes` rethrows untyped; the typed error is carried out.
+            let failure = frame.withUnsafeBytes { bytes -> SFTPTransportError? in
+                do throws(SFTPTransportError) {
+                    try transport.write(bytes)
+                    return nil
+                } catch {
+                    return error
+                }
             }
+            if let failure { onFailure(.transport(failure)) }
         }
-        if let failure { throw failure }
     }
 
     private func finishHandshake(_ result: Result<SFTPMessage, SFTPError>) {

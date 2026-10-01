@@ -115,6 +115,29 @@ what to edit.
   screen. A placement number belongs to its image, but the second image
   replaced the first one's placement.
 
+- A shell no longer inherits files Corta has open. Every descriptor Corta
+  held without close-on-exec — the pipes of an open SFTP connection, a file
+  in the middle of a transfer, a watched file — was open in every shell
+  started after it, so a program in that shell could write into the SFTP
+  stream, and closing the connection did not end ssh's input.
+
+- A file transfer whose remote file cannot be opened leaves nothing behind:
+  the local file stayed open until Corta quit, and a download left an
+  empty partial file. A transfer that failed after its local file was
+  closed could close an unrelated file Corta had opened since.
+
+- Closing an SFTP connection whose ssh had already exited no longer sends
+  `SIGKILL` to that process ID, which the system may have given to another
+  program by then.
+
+- A slow SFTP upload no longer stalls the rest of the app. Every pending
+  write to ssh held one of the few threads Swift concurrency shares
+  across the whole process.
+
+- Closing a pane never waits on its shell, and a read or write on a pane
+  being closed can no longer reach a file another pane opened in the
+  same instant.
+
 - Shell integration for bash works when bash starts as a login shell,
   which is how Corta starts it. The hooks were only in `~/.bashrc`, which
   a login bash never reads, so unless your `~/.bash_profile` sourced it,

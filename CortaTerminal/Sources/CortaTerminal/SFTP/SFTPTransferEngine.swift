@@ -379,14 +379,21 @@ public final class SFTPTransferEngine: @unchecked Sendable {
             if sourceUnchanged { offset = partial.size }
         }
 
+        // Remote first: a refused OPEN must leave no local partial behind,
+        // and nothing open to leak.
+        let handle = try await session.open(path: remotePath, flags: .read)
         let descriptor = Darwin.open(
-            partialPath, O_WRONLY | O_CREAT | (offset == 0 ? O_TRUNC : 0), 0o644)
+            partialPath, O_WRONLY | O_CREAT | O_CLOEXEC | (offset == 0 ? O_TRUNC : 0), 0o644)
         guard descriptor >= 0 else {
-            throw SFTPError.localIOFailed(operation: "open", code: errno)
+            let code = errno
+            _ = await Task { [session] in try? await session.close(handle) }.value
+            throw SFTPError.localIOFailed(operation: "open", code: code)
         }
 
-        let handle = try await session.open(path: remotePath, flags: .read)
         let abort = AbortFlag()
+        // Closed exactly once: a failure after the success path's close
+        // must not close the number again — by then it may be another file's.
+        var descriptorOpen = true
         do {
             let receipt = try await withTaskCancellationHandler {
                 try await self.pipeDownload(
@@ -398,6 +405,7 @@ public final class SFTPTransferEngine: @unchecked Sendable {
                 abort.set()
             }
             Darwin.close(descriptor)
+            descriptorOpen = false
             try await session.close(handle)
             // Commit: rename over the destination atomically.
             guard Darwin.rename(partialPath, destinationPath) == 0 else {
@@ -407,7 +415,7 @@ public final class SFTPTransferEngine: @unchecked Sendable {
             return SFTPTransferReceipt(
                 bytesTransferred: receipt, resumedFromOffset: offset, attempts: 0)
         } catch {
-            Darwin.close(descriptor)
+            if descriptorOpen { Darwin.close(descriptor) }
             // Cleanup must survive the caller's cancellation: the server
             // is owed the CLOSE regardless, so it runs in a fresh,
             // uncancelled task.
@@ -525,20 +533,27 @@ public final class SFTPTransferEngine: @unchecked Sendable {
             if sourceUnchanged { offset = partialSize }
         }
 
-        let descriptor = Darwin.open(sourcePath, O_RDONLY)
+        let descriptor = Darwin.open(sourcePath, O_RDONLY | O_CLOEXEC)
         guard descriptor >= 0 else {
             throw SFTPError.localIOFailed(operation: "open", code: errno)
         }
 
         var flags: SFTPOpenFlags = [.write, .create]
         if offset == 0 { flags.insert(.truncate) }
-        let handle = try await session.open(path: partialPath, flags: flags)
+        let handle: SFTPHandle
+        do {
+            handle = try await session.open(path: partialPath, flags: flags)
+        } catch {
+            Darwin.close(descriptor)
+            throw error
+        }
         // Record the source's mtime on the partial now — an interruption
         // after this point leaves a resumable, self-validating partial.
         try? await session.fsetStat(
             handle: handle, attributes: SFTPAttributes(modificationTime: sourceMTime))
 
         let abort = AbortFlag()
+        var descriptorOpen = true
         do {
             let moved = try await withTaskCancellationHandler {
                 try await self.pipeUpload(
@@ -548,6 +563,7 @@ public final class SFTPTransferEngine: @unchecked Sendable {
                 abort.set()
             }
             Darwin.close(descriptor)
+            descriptorOpen = false
             try await session.close(handle)
             try await commitUpload(
                 session: session, partialPath: partialPath, destinationPath: remotePath,
@@ -555,7 +571,7 @@ public final class SFTPTransferEngine: @unchecked Sendable {
             return SFTPTransferReceipt(
                 bytesTransferred: moved, resumedFromOffset: offset, attempts: 0)
         } catch {
-            Darwin.close(descriptor)
+            if descriptorOpen { Darwin.close(descriptor) }
             _ = await Task { [session] in try? await session.close(handle) }.value
             await cleanUpPartialAsync(
                 partialPath, disposition: partialDisposition,

@@ -105,8 +105,8 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
     public let processIdentifier: pid_t
     public let host: String
 
-    private let stdinWrite: Int32
-    private let stdoutRead: Int32
+    private let stdinWrite: GuardedDescriptor
+    private let stdoutRead: GuardedDescriptor
 
     private struct State {
         var exit: ChildExit?
@@ -211,6 +211,12 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
         Darwin.close(stdinPipe[0])
         Darwin.close(stdoutPipe[1])
         Darwin.close(stderrPipe[1])
+        // The parent's ends stay out of every other child — a shell spawned
+        // later must not be able to write frames into this stream, or hold
+        // ssh's stdin open past `close()`.
+        for fd in [stdinPipe[1], stdoutPipe[0], stderrPipe[0]] {
+            _ = fcntl(fd, F_SETFD, FD_CLOEXEC)
+        }
         guard spawnResult == 0 else {
             Darwin.close(stdinPipe[1])
             Darwin.close(stdoutPipe[0])
@@ -228,8 +234,8 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
     private init(pid: pid_t, host: String, stdinWrite: Int32, stdoutRead: Int32, stderrRead: Int32) {
         self.processIdentifier = pid
         self.host = host
-        self.stdinWrite = stdinWrite
-        self.stdoutRead = stdoutRead
+        self.stdinWrite = GuardedDescriptor(stdinWrite)
+        self.stdoutRead = GuardedDescriptor(stdoutRead)
         // EPIPE, never SIGPIPE: its default action kills the whole app.
         _ = fcntl(stdinWrite, F_SETNOSIGPIPE, 1)
         self.exitQueue = DispatchQueue(label: "dev.corta.sftp.channel.\(pid)")
@@ -275,32 +281,43 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
     public func read(
         into buffer: UnsafeMutableRawBufferPointer
     ) throws(SFTPTransportError) -> Int {
-        guard !state.withLock({ $0.isClosed }) else { throw .closed }
-        guard let base = buffer.baseAddress, !buffer.isEmpty else { return 0 }
-        while true {
-            let count = Darwin.read(stdoutRead, base, buffer.count)
-            if count >= 0 { return count }
-            if errno == EINTR { continue }
-            // A dead child is EOF here, not EIO — no PTY.
-            throw .ioFailed(code: errno)
+        guard let base = buffer.baseAddress, !buffer.isEmpty else {
+            guard !stdoutRead.isClosed else { throw .closed }
+            return 0
         }
+        let result = try stdoutRead.withNumber { fd throws(SFTPTransportError) -> Int in
+            while true {
+                let count = Darwin.read(fd, base, buffer.count)
+                if count >= 0 { return count }
+                if errno == EINTR { continue }
+                // A dead child is EOF here, not EIO — no PTY.
+                throw .ioFailed(code: errno)
+            }
+        }
+        guard let result else { throw .closed }
+        return result
     }
 
     public func write(_ bytes: UnsafeRawBufferPointer) throws(SFTPTransportError) {
-        guard !state.withLock({ $0.isClosed }) else { throw .closed }
-        guard let base = bytes.baseAddress, !bytes.isEmpty else { return }
-        var written = 0
-        while written < bytes.count {
-            let count = Darwin.write(stdinWrite, base + written, bytes.count - written)
-            if count > 0 {
-                written += count
-                continue
-            }
-            if count < 0, errno == EINTR { continue }
-            // EPIPE is the far end gone: `.closed`, one meaning.
-            if count < 0, errno == EPIPE { throw .closed }
-            throw .ioFailed(code: errno)
+        guard let base = bytes.baseAddress, !bytes.isEmpty else {
+            guard !stdinWrite.isClosed else { throw .closed }
+            return
         }
+        let finished: Void? = try stdinWrite.withNumber { fd throws(SFTPTransportError) in
+            var written = 0
+            while written < bytes.count {
+                let count = Darwin.write(fd, base + written, bytes.count - written)
+                if count > 0 {
+                    written += count
+                    continue
+                }
+                if count < 0, errno == EINTR { continue }
+                // EPIPE is the far end gone: `.closed`, one meaning.
+                if count < 0, errno == EPIPE { throw .closed }
+                throw .ioFailed(code: errno)
+            }
+        }
+        guard finished != nil else { throw .closed }
     }
 
     /// Idempotent.
@@ -312,11 +329,18 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
         }
         guard shouldClose else { return }
         // SIGKILL: this is cancellation, and a politely asked child may be stuck
-        // in a socket read.
-        kill(processIdentifier, SIGKILL)
-        _ = reap(blocking: true)
-        Darwin.close(stdinWrite)
-        Darwin.close(stdoutRead)
+        // in a socket read. Only while unreaped, and decided under the lock
+        // `reap` claims: once `waitpid` has run the id is free for the system
+        // to give a stranger.
+        // A reap in progress means the exit source saw the child go.
+        let killed = state.withLock { state -> Bool in
+            guard state.exit == nil, !state.isReaping else { return false }
+            kill(processIdentifier, SIGKILL)
+            return true
+        }
+        if killed { _ = reap(blocking: true) }
+        stdinWrite.close()
+        stdoutRead.close()
     }
 
     /// Only one `waitpid` ever runs for this child, as in `PTY.reap`.

@@ -21,8 +21,14 @@ import Synchronization
 /// A pseudoterminal and the process running on it. Off the main thread
 /// (D04) and owned by a session, never a singleton (D07).
 public final class PTY: @unchecked Sendable {
-    /// Owned by this object; do not close it.
-    public let fileDescriptor: Int32
+    /// Owned by this object; do not close it. A bare number: after `close()`
+    /// it may name another file, so a caller that polls it directly must
+    /// stop once the session has.
+    public var fileDescriptor: Int32 { descriptor.number }
+
+    /// Every system call on the primary goes through this, so a `close()` on
+    /// another thread can never hand an in-flight call a recycled number.
+    private let descriptor: GuardedDescriptor
 
     /// Also the group and session id (`POSIX_SPAWN_SETSID`).
     public let processIdentifier: pid_t
@@ -33,7 +39,6 @@ public final class PTY: @unchecked Sendable {
         var exit: ChildExit?
         /// Two reapers never race for one status.
         var isReaping = false
-        var isClosed = false
     }
 
     private let state = Mutex(State())
@@ -97,7 +102,7 @@ public final class PTY: @unchecked Sendable {
         replicaPath: String,
         terminationHandler: (@Sendable (ChildExit) -> Void)?
     ) {
-        self.fileDescriptor = fileDescriptor
+        self.descriptor = GuardedDescriptor(fileDescriptor)
         self.processIdentifier = processIdentifier
         self.replicaPath = replicaPath
         self.terminationHandler = terminationHandler
@@ -120,7 +125,7 @@ public final class PTY: @unchecked Sendable {
 
     deinit {
         exitSource.cancel()
-        if !state.withLock({ $0.isClosed }) { Darwin.close(fileDescriptor) }
+        descriptor.close()
         if state.withLock({ $0.exit == nil }) { exited.leave() }
     }
 
@@ -164,28 +169,56 @@ public final class PTY: @unchecked Sendable {
     /// 0 at end of file — including Darwin's `EIO` once the replica closes.
     /// `.closed` after `close()`: the number may already be another file's.
     public func read(into buffer: UnsafeMutableRawBufferPointer) throws(PTYError) -> Int {
-        guard !state.withLock({ $0.isClosed }) else { throw .closed }
-        guard let base = buffer.baseAddress, !buffer.isEmpty else { return 0 }
-        while true {
-            let count = Darwin.read(fileDescriptor, base, buffer.count)
-            if count >= 0 { return count }
-            switch errno {
-            case EINTR: continue
-            case EIO: return 0
-            case let code: throw .ioFailed(code: code)
+        guard let base = buffer.baseAddress, !buffer.isEmpty else {
+            guard !descriptor.isClosed else { throw .closed }
+            return 0
+        }
+        let result = try descriptor.withNumber { fd throws(PTYError) -> Int in
+            while true {
+                let count = Darwin.read(fd, base, buffer.count)
+                if count >= 0 { return count }
+                switch errno {
+                case EINTR: continue
+                case EIO: return 0
+                case let code: throw .ioFailed(code: code)
+                }
             }
         }
+        guard let result else { throw .closed }
+        return result
+    }
+
+    /// Whether a read would return without blocking, waiting up to
+    /// `timeoutMilliseconds` (`-1`: no limit). End of file and errors count as
+    /// readable — the read reports them. `.closed` after `close()`.
+    public func waitUntilReadable(timeoutMilliseconds: Int32) throws(PTYError) -> Bool {
+        let result = descriptor.withNumber { fd -> Bool in
+            while true {
+                var request = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+                let ready = poll(&request, 1, timeoutMilliseconds)
+                if ready >= 0 { return request.revents != 0 }
+                if errno != EINTR { return true }
+            }
+        }
+        guard let result else { throw .closed }
+        return result
     }
 
     public func write(_ bytes: UnsafeRawBufferPointer) throws(PTYError) -> Int {
-        guard !state.withLock({ $0.isClosed }) else { throw .closed }
-        guard let base = bytes.baseAddress, !bytes.isEmpty else { return 0 }
-        while true {
-            let count = Darwin.write(fileDescriptor, base, bytes.count)
-            if count >= 0 { return count }
-            if errno == EINTR { continue }
-            throw .ioFailed(code: errno)
+        guard let base = bytes.baseAddress, !bytes.isEmpty else {
+            guard !descriptor.isClosed else { throw .closed }
+            return 0
         }
+        let result = try descriptor.withNumber { fd throws(PTYError) -> Int in
+            while true {
+                let count = Darwin.write(fd, base, bytes.count)
+                if count >= 0 { return count }
+                if errno == EINTR { continue }
+                throw .ioFailed(code: errno)
+            }
+        }
+        guard let result else { throw .closed }
+        return result
     }
 
     @discardableResult
@@ -201,19 +234,21 @@ public final class PTY: @unchecked Sendable {
 
     /// The kernel raises `SIGWINCH` on the foreground group.
     public func resize(to size: TerminalSize) throws(PTYError) {
-        guard !state.withLock({ $0.isClosed }) else { throw .closed }
         var windowSize = size.winsize
-        guard ioctl(fileDescriptor, TIOCSWINSZ, &windowSize) == 0 else {
-            throw .resizeFailed(code: errno)
+        let code = descriptor.withNumber { fd -> Int32 in
+            ioctl(fd, TIOCSWINSZ, &windowSize) == 0 ? 0 : errno
         }
+        guard let code else { throw .closed }
+        guard code == 0 else { throw .resizeFailed(code: code) }
     }
 
     public func size() throws(PTYError) -> TerminalSize {
-        guard !state.withLock({ $0.isClosed }) else { throw .closed }
         var windowSize = Darwin.winsize()
-        guard ioctl(fileDescriptor, TIOCGWINSZ, &windowSize) == 0 else {
-            throw .resizeFailed(code: errno)
+        let code = descriptor.withNumber { fd -> Int32 in
+            ioctl(fd, TIOCGWINSZ, &windowSize) == 0 ? 0 : errno
         }
+        guard let code else { throw .closed }
+        guard code == 0 else { throw .resizeFailed(code: code) }
         return TerminalSize(windowSize)
     }
 
@@ -225,8 +260,7 @@ public final class PTY: @unchecked Sendable {
     /// group and the terminal, so a foreground group that is not the shell is a
     /// command. `nil` once the child exited or the descriptor closed.
     public var foregroundProcessGroup: pid_t? {
-        guard !state.withLock({ $0.isClosed }) else { return nil }
-        let group = tcgetpgrp(fileDescriptor)
+        let group = descriptor.withNumber { tcgetpgrp($0) } ?? -1
         return group > 0 ? group : nil
     }
 
@@ -332,14 +366,11 @@ public final class PTY: @unchecked Sendable {
         return exit
     }
 
-    /// Idempotent. The child sees EOF; `terminate()` first to also hang up.
+    /// Idempotent, and never waits. The child sees EOF; `terminate()` first to
+    /// also hang up. A call still in flight on another thread keeps the
+    /// descriptor until it returns — so it can never reach a recycled number —
+    /// and the last one out closes it.
     public func close() {
-        let shouldClose = state.withLock { state -> Bool in
-            guard !state.isClosed else { return false }
-            state.isClosed = true
-            return true
-        }
-        guard shouldClose else { return }
-        Darwin.close(fileDescriptor)
+        descriptor.close()
     }
 }

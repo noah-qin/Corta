@@ -162,7 +162,7 @@ final class ConfigurationStore {
     private func watch(_ url: URL, mask: DispatchSource.FileSystemEvent)
         -> DispatchSourceFileSystemObject?
     {
-        let descriptor = open(url.path, O_EVTONLY)
+        let descriptor = open(url.path, O_EVTONLY | O_CLOEXEC)
         guard descriptor >= 0 else { return nil }
         let source = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: descriptor, eventMask: mask, queue: .main)

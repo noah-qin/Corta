@@ -66,10 +66,15 @@ enum Spawn {
         var attributes: posix_spawnattr_t?
         posix_spawnattr_init(&attributes)
         defer { posix_spawnattr_destroy(&attributes) }
+        // `CLOEXEC_DEFAULT`: only the file actions' descriptors reach the
+        // child — 0–2 and the inherited `writeEnd`. Without it every
+        // descriptor this process opened without `FD_CLOEXEC` (an SFTP pipe,
+        // a file mid-transfer) would be the shell's too.
         posix_spawnattr_setflags(
             &attributes,
             Int16(
-                POSIX_SPAWN_SETSID | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK)
+                POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSID | POSIX_SPAWN_SETSIGDEF
+                    | POSIX_SPAWN_SETSIGMASK)
         )
         // Default signal actions, nothing blocked (`SECURITY.md` §4.3).
         var allSignals = sigset_t()
@@ -78,7 +83,6 @@ enum Spawn {
         var noSignals = sigset_t()
         sigemptyset(&noSignals)
         posix_spawnattr_setsigmask(&attributes, &noSignals)
-        // Everything else this process has open stays out of the child.
 
         var childArguments = [helperPath, String(writeEnd), workingDirectory ?? "", executable]
         childArguments.append(contentsOf: arguments)

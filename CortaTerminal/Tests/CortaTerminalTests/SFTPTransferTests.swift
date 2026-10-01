@@ -557,6 +557,46 @@ struct SFTPTransferTests {
         #expect(rig.server.log.maxOutstandingReads <= 2 * 4)  // 2 transfers × pipeline depth
     }
 
+    @Test("a refused remote open leaves no local partial and no descriptor behind")
+    func refusedOpenLeaksNothing() async throws {
+        let rig = try await makeRig()
+        defer { teardown(rig) }
+        rig.fileSystem.createFile("/refused", data: [1, 2, 3])
+        rig.server.refusedPaths = ["/refused", "/up.bin" + rig.partialName]
+
+        let destination = rig.directory.appendingPathComponent("down.bin")
+        let partial = rig.directory.appendingPathComponent("down.bin" + rig.partialName)
+        await #expect(throws: SFTPError.self) {
+            try await rig.engine.download(
+                remotePath: "/refused", to: destination, policy: .overwrite)
+        }
+        #expect(!FileManager.default.fileExists(atPath: partial.path))
+        #expect(descriptorsNaming(partial.path).isEmpty)
+
+        let source = try localFile(rig, "up.bin", contents: [4, 5, 6])
+        await #expect(throws: SFTPError.self) {
+            try await rig.engine.upload(from: source, to: "/up.bin", policy: .overwrite)
+        }
+        #expect(
+            descriptorsNaming(source.path).isEmpty,
+            "the upload's local source stayed open after the remote open failed")
+    }
+
+    /// This process's descriptors whose file is at `path`.
+    private func descriptorsNaming(_ path: String) -> [Int32] {
+        let wanted = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+        var found: [Int32] = []
+        var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        for fd in Int32(0)..<Int32(getdtablesize()) where fcntl(fd, F_GETPATH, &buffer) == 0 {
+            let name = String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) },
+                as: UTF8.self)
+            if URL(fileURLWithPath: name).resolvingSymlinksInPath().path == wanted {
+                found.append(fd)
+            }
+        }
+        return found
+    }
+
     // MARK: - Transport retry
 
     @Test("a server status is definitive: never retried")

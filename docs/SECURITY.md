@@ -207,7 +207,8 @@ async-signal-safe between `fork` and `exec`). The security requirements
 alongside it:
 
 - Reset the signal mask and dispositions in the child.
-- Close all inherited descriptors except the PTY replica.
+- Close all inherited descriptors except the PTY replica
+  (`POSIX_SPAWN_CLOEXEC_DEFAULT`; `DescriptorHygieneTests` pins it).
 - Establish a new session and controlling terminal (`POSIX_SPAWN_SETSID`
   / `TIOCSCTTY`) so job control and signals are correctly scoped.
 - Sanitise the environment; do not leak internal variables to the child.

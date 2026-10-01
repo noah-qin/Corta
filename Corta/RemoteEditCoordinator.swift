@@ -233,7 +233,7 @@ final class RemoteEditCoordinator {
         if digests[copy.id] == nil {
             digests[copy.id] = RemoteEditStore.sha256Hex(ofFile: url)
         }
-        let descriptor = Darwin.open(url.path, O_EVTONLY)
+        let descriptor = Darwin.open(url.path, O_EVTONLY | O_CLOEXEC)
         guard descriptor >= 0 else { return }
         let source = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: descriptor, eventMask: [.write, .extend, .rename, .delete],
