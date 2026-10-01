@@ -27,6 +27,9 @@ import SwiftUI
 /// no local key-event monitor is needed: a text field never consumes
 /// vertical arrow keys, and intercepting them at the field is enough.
 struct CommandPaletteView: View {
+    /// The panel's content size; the controller creates the panel from it.
+    static let size = CGSize(width: 520, height: 360)
+
     @Bindable var model: CommandPaletteModel
     @FocusState private var searchFocused: Bool
 
@@ -83,7 +86,9 @@ struct CommandPaletteView: View {
             }
         }
         .padding(16)
-        .frame(width: 520, height: 360)
+        // The panel's size is `CommandPaletteView.size`, title bar strip
+        // included: the view fills whatever the panel is.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { searchFocused = true }
     }
 }

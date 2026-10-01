@@ -181,8 +181,9 @@ import Testing
 
     /// Renderer half of ZWJ clusters: a ZWJ family emoji drawn as the wide
     /// cluster the grid references inks its two-cell box and nothing beyond
-    /// it. This builds the quad by hand — it exercises the atlas's cluster
-    /// shaping plus the scale-and-centre quad math, not the
+    /// it. This builds the quad through `colorGlyphPlacement`, the renderer's
+    /// own placement — it exercises the atlas's cluster shaping plus that
+    /// math, not the
     /// `appendRowInstances` colour routing; the full feed→grid→draw path is
     /// covered by `ColorEmojiRenderTests.zwjClusterRendersInColorThroughTheRenderer`.
     @Test func zwjFamilyEmojiRendersInOneDoubleWidthCell() throws {
@@ -203,13 +204,11 @@ import Testing
 
         let cellWidth = Float(renderer.metrics.cellWidth)
         let cellHeight = Float(renderer.metrics.cellHeight)
-        let baseline = Float(renderer.metrics.baselineOffset)
         let boxWidth = cellWidth * 2
-        let fit = min(1, boxWidth / info.size.x, cellHeight / info.size.y)
-        let size = info.size * fit
-        let origin = SIMD2<Float>(
-            (boxWidth - size.x) / 2, baseline - (info.bearing.y + info.size.y) * fit)
-        let instance = QuadInstance(origin: origin, size: size, color: .init(1, 1, 1, 1), uvRect: info.uvRect)
+        let placed = TerminalRenderer.colorGlyphPlacement(
+            info, cellOrigin: .zero, boxWidth: boxWidth, cellHeight: cellHeight)
+        let instance = QuadInstance(
+            origin: placed.origin, size: placed.size, color: .init(1, 1, 1, 1), uvRect: info.uvRect)
 
         // Three cells wide: the pair's box plus one neighbour.
         let width = Int(cellWidth) * 3

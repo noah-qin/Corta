@@ -128,6 +128,9 @@ class ViewController: NSViewController {
     /// Shared by both readers so they supersede the same report.
     private var remoteReportTracker = PaneRemoteState.ReportTracker()
     private var lastProcessFactsRefresh: CFTimeInterval = 0
+    /// A title rebuild waiting out `processFactsInterval`; at most one, and
+    /// cancelled by `teardown`.
+    private var trailingTitleRefresh: DispatchWorkItem?
     private var isShowingTransientSize = false
     private var transientSizeReset: DispatchWorkItem?
 
@@ -564,6 +567,8 @@ class ViewController: NSViewController {
     func teardown() {
         guard !didTeardown else { return }
         didTeardown = true
+        trailingTitleRefresh?.cancel()
+        trailingTitleRefresh = nil
         closeSearchBar()
         largeTextTask?.cancel()
         largeTextTask = nil
@@ -630,6 +635,12 @@ class ViewController: NSViewController {
             terminalView?.noteAccessibilityValueChanged()
             drainClipboardRequests()
             let finished = session.takeFinishedCommand()
+            // The prompt's return is the moment the program left: the title
+            // names the shell again now, not an interval later.
+            if finished != nil, isFocusedPane {
+                invalidateProcessFacts()
+                applyWindowTitle()
+            }
             if session.hasShellIntegration {
                 taskNotifier.noteCommandRunning(
                     session.isCommandRunning, exitStatus: finished,
@@ -869,7 +880,11 @@ class ViewController: NSViewController {
     /// interval, with no timer of its own.
     private func refreshProcessFactsIfStale() {
         let now = CACurrentMediaTime()
-        guard now - lastProcessFactsRefresh >= Self.processFactsInterval else { return }
+        let elapsed = now - lastProcessFactsRefresh
+        guard elapsed >= Self.processFactsInterval else {
+            scheduleTrailingTitleRefresh(after: Self.processFactsInterval - elapsed)
+            return
+        }
         lastProcessFactsRefresh = now
         cachedProcessName = session.activeProcessName
         cachedDirectory = session.currentDirectory
@@ -887,6 +902,23 @@ class ViewController: NSViewController {
             hasForegroundJob: session.hasForegroundJob,
             foregroundProcessName: session.foregroundProcessName,
             childIsRemoteLauncher: childIsLiveRemoteLauncher)
+    }
+
+    /// One more title rebuild once the interval has passed. A skipped refresh
+    /// is only stale if nothing follows it, and a program that exits and hands
+    /// back the prompt within the interval is followed by nothing: without
+    /// this, `kitten icat` left "— kitten" in the title until the next output.
+    private func scheduleTrailingTitleRefresh(after delay: CFTimeInterval) {
+        guard trailingTitleRefresh == nil else { return }
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            trailingTitleRefresh = nil
+            // An unfocused pane's title applies on focus.
+            guard !didTeardown, isFocusedPane else { return }
+            applyWindowTitle()
+        }
+        trailingTitleRefresh = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
     /// On focus and command boundaries, where waiting out the interval would

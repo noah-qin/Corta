@@ -96,6 +96,22 @@ what to edit.
 
 ### Fixed
 
+- Emoji are sharp and fill their two cells. They were drawn at the text
+  size and then scaled down on the GPU to fit, which left them smaller than
+  the text around them and slightly soft. An emoji written with the emoji
+  variation selector after a character that is text by default — 🖼️, ✍️,
+  ❤️ — is still counted as one column, as `wcwidth` and the shell count it,
+  but now draws at full size into a blank cell after it instead of
+  shrinking into its own.
+
+- The command palette's search field sits at the top of the panel. It was
+  a whole title bar height lower, leaving an empty band above it.
+
+- The window title stops naming a program once it has exited. A program
+  that finished and returned to the prompt within half a second of the
+  title's last update — `kitten icat`, say — stayed in the title until the
+  next output.
+
 - `kitten icat` shows images again. kitty's own client sends an image in
   128 KiB pieces, far past the 6 KiB a single piece was allowed, so any
   image above about 4 KB was silently discarded — in 1.0.0 and 1.0.1 too.

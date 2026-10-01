@@ -88,6 +88,9 @@ public nonisolated final class TerminalRenderer {
     /// other check.
     private var cachedIndexedOverridesGeneration: UInt64 = 0
     private var indexedOverrides: IndexedColorOverrides = [:]
+    /// The cursor's viewport cell while it is drawn, set per frame: a
+    /// one-column emoji does not overflow into it.
+    private var cursorCell: (row: Int, column: Int)?
     /// The delta is how far a whole-screen scroll shifted: shift the cache
     /// instead of rebuilding (`applyScrollShift`).
     private var cachedLinesRotated: UInt64 = 0
@@ -198,6 +201,7 @@ public nonisolated final class TerminalRenderer {
     ) -> Bool {
         self.indexedOverrides = indexedOverrides
         let offset = min(max(0, scrollOffset), grid.scrollback.count)
+        cursorCell = cursorVisible && offset == 0 ? (grid.cursor.row, grid.cursor.column) : nil
         let fullRebuild =
             needsFullRebuild
             || cachedLines.count != grid.rows
@@ -680,9 +684,11 @@ public nonisolated final class TerminalRenderer {
                 bold: attributes.contains(.bold), italic: attributes.contains(.italic))
             let isWide = attributes.contains(.wide)
             let info: GlyphAtlas.GlyphInfo
+            var hasEmojiSelector = false
             if !cell.grapheme.isNone,
                 let scalars = graphemes.scalars(for: cell.grapheme)
             {
+                hasEmojiSelector = scalars.contains(0xFE0F)
                 // Even on a space base: a combining mark can attach to one.
                 guard let shaped = glyphAtlas.glyph(forCluster: scalars, style: style)
                 else { continue }
@@ -712,13 +718,30 @@ public nonisolated final class TerminalRenderer {
                 origin.y + baseline - info.bearing.y - info.size.y
             )
             var glyphSize = info.size
-            let boxWidth = isWide ? cellWidth * 2 : cellWidth
+            var boxWidth = isWide ? cellWidth * 2 : cellWidth
+            // An emoji the grid holds in one column — a text-default base with
+            // VS16, which wcwidth still counts as one — draws at full size into
+            // a following blank cell instead of shrinking into its own. Only the
+            // drawing grows; the width applications count on is unchanged. Never
+            // into the cursor's cell: at a prompt it would cover the cursor and
+            // shrink back with the next keystroke.
+            if info.isColor, !isWide, hasEmojiSelector, column + 1 < line.count,
+                Self.isBlankForOverflow(line[column + 1]),
+                cursorCell.map({ $0.row != row || $0.column != column + 1 }) ?? true
+            {
+                boxWidth = cellWidth * 2
+            }
             // Fit every glyph's ink to its box, not just wide ones: a bold face a
             // shade wider, or a font monospaced for letters only, spills into the
             // next column and nothing clips it. One device pixel of tolerance keeps
             // ordinary text on the fast path.
             let ink = info.size.x - 2 * GlyphAtlas.bitmapPadding
-            if isWide || ink > boxWidth + 1 {
+            if info.isColor {
+                let placed = Self.colorGlyphPlacement(
+                    info, cellOrigin: origin, boxWidth: boxWidth, cellHeight: cellHeight)
+                glyphOrigin = placed.origin
+                glyphSize = placed.size
+            } else if isWide || ink > boxWidth + 1 {
                 // Down, never up; centred; the baseline keeps it on the line.
                 let fit = min(1, boxWidth / info.size.x, cellHeight / info.size.y)
                 glyphSize = info.size * fit
@@ -726,7 +749,7 @@ public nonisolated final class TerminalRenderer {
                     origin.x + (boxWidth - glyphSize.x) / 2,
                     origin.y + baseline - (info.bearing.y + info.size.y) * fit
                 )
-            } else if !info.isColor {
+            } else {
                 // Pixel-aligned: sampling at a fractional origin filters Core Text's
                 // antialiasing twice and softens 12pt text.
                 glyphOrigin.x = glyphOrigin.x.rounded()
@@ -740,6 +763,29 @@ public nonisolated final class TerminalRenderer {
                 glyphs.append(instance)
             }
         }
+    }
+
+    /// Where a color glyph's quad goes in its box. The atlas drew it to fit
+    /// two cells, so in a two-cell box it maps texel for texel; only a box
+    /// the grid narrowed to one cell scales it down. Centred, on whole pixels:
+    /// a bitmap sampled at a fractional origin blurs.
+    static func colorGlyphPlacement(
+        _ info: GlyphAtlas.GlyphInfo, cellOrigin: SIMD2<Float>, boxWidth: Float, cellHeight: Float
+    ) -> (origin: SIMD2<Float>, size: SIMD2<Float>) {
+        let scale = min(1, boxWidth / max(info.size.x, 1), cellHeight / max(info.size.y, 1))
+        let size = info.size * scale
+        return (
+            SIMD2<Float>(
+                (cellOrigin.x + (boxWidth - size.x) / 2).rounded(.down),
+                (cellOrigin.y + (cellHeight - size.y) / 2).rounded(.down)),
+            size
+        )
+    }
+
+    /// A cell a one-column emoji may draw into: a space or an empty cell,
+    /// with no cluster of its own.
+    private static func isBlankForOverflow(_ cell: Cell) -> Bool {
+        cell.grapheme.isNone && (cell.scalar == 0x20 || cell.scalar == 0)
     }
 
     /// Inset so a run of them reads as boxes, not a grid.

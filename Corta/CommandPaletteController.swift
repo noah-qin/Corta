@@ -36,7 +36,7 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
 
     private init() {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 520, height: 360),
+            contentRect: NSRect(origin: .zero, size: CommandPaletteView.size),
             styleMask: [.titled, .fullSizeContentView, .nonactivatingPanel],
             backing: .buffered, defer: false)
         panel.titlebarAppearsTransparent = true
@@ -96,6 +96,10 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
     private static func buildContentView(model: CommandPaletteModel) -> NSView {
         let hosting = NSHostingView(rootView: CommandPaletteView(model: model))
         hosting.translatesAutoresizingMaskIntoConstraints = false
+        // The panel is titled, for key status, with its titlebar hidden under
+        // the content; left in, the titlebar's safe area pushed the search
+        // field a whole titlebar height down from the top edge.
+        hosting.safeAreaRegions = []
 
         let content = NSGlassEffectView()
         content.style = .regular

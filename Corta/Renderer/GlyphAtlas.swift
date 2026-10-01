@@ -164,6 +164,8 @@ nonisolated final class GlyphAtlas {
     /// Indexed by `Style.rawValue`, with whether each bold is synthetic.
     private var fonts: [CTFont]
     private var isSyntheticBold: [Bool]
+    /// The two-cell box a color glyph is rasterised to fit, in pixels.
+    private var colorBox: CGSize
 
     /// Top half of the grayscale texture.
     private var asciiPage: AtlasPage
@@ -196,6 +198,7 @@ nonisolated final class GlyphAtlas {
         // Pinned here too, so the atlas is the one choke point for the cascade.
         let base = TerminalFont.pinningCascadeList(font, size: CTFontGetSize(font))
         (self.fonts, self.isSyntheticBold) = Self.faces(of: base)
+        self.colorBox = Self.colorBox(for: base)
 
         let allocate = makeTexture ?? { device.makeTexture(descriptor: $0) }
         // Halve and retry down to `minimumAtlasPixelSize`; the trap below it is
@@ -234,6 +237,14 @@ nonisolated final class GlyphAtlas {
             region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: &white, bytesPerRow: 1)
     }
 
+    /// Two cells of `font`, which is already in pixels: the renderer's box
+    /// for a wide glyph, so an emoji drawn to fit it is never scaled on the
+    /// GPU.
+    private static func colorBox(for font: CTFont) -> CGSize {
+        let metrics = CellMetrics(font: font)
+        return CGSize(width: metrics.cellWidth * 2, height: metrics.cellHeight)
+    }
+
     /// The three pages' fixed regions, fresh each call so `init` and `reset`
     /// never rewind them by hand.
     private static func makePages(atlasPixelSize: Int) -> (ascii: AtlasPage, shaped: AtlasPage, color: AtlasPage) {
@@ -253,6 +264,7 @@ nonisolated final class GlyphAtlas {
     func reset(font newFont: CTFont) {
         let base = TerminalFont.pinningCascadeList(newFont, size: CTFontGetSize(newFont))
         (fonts, isSyntheticBold) = Self.faces(of: base)
+        colorBox = Self.colorBox(for: base)
         (asciiPage, shapedPage, colorPage) = Self.makePages(atlasPixelSize: atlasPixelSize)
         evictionCount += 1
         generation += 1
@@ -480,7 +492,13 @@ nonisolated final class GlyphAtlas {
     ///
     /// `CTRunDraw` is the only Core Text call that draws bitmaps, and
     /// `CTRunGetImageBounds` knows their real extent; the text position is set
-    /// to `-bbox.origin`. A grayscale run in a mixed cluster draws by outline
+    /// to `-bbox.origin`. The glyph is drawn scaled so its image, padding
+    /// included, fits `colorBox` exactly, and the renderer draws the bitmap
+    /// texel for texel. Drawn at the text size and scaled on the GPU instead,
+    /// a bitmap emoji came out smaller than its two cells and soft. For a
+    /// bitmap emoji the image bounds are the whole design square, so a small
+    /// design (🔸) keeps its size against a large one (🔶). Scaling the
+    /// context lets Core Text pick the strike for the size drawn. A grayscale run in a mixed cluster draws by outline
     /// in white. Texels upload premultiplied, matching the color pipeline's
     /// blend (`sourceRGB = .one`).
     private func rasterizeColor(_ runs: [ShapedRun]) -> GlyphInfo {
@@ -500,7 +518,14 @@ nonisolated final class GlyphAtlas {
             }
         }
         guard !bounds.isNull, !bounds.isEmpty else { return empty }
-        let bbox = bounds.insetBy(dx: -CGFloat(Self.bitmapPadding), dy: -CGFloat(Self.bitmapPadding))
+        let pad = CGFloat(Self.bitmapPadding)
+        let fill = min(
+            (colorBox.width - 2 * pad) / bounds.width,
+            (colorBox.height - 2 * pad) / bounds.height)
+        let scaled = CGRect(
+            x: bounds.minX * fill, y: bounds.minY * fill,
+            width: bounds.width * fill, height: bounds.height * fill)
+        let bbox = scaled.insetBy(dx: -pad, dy: -pad)
         let width = max(1, Int(bbox.width.rounded(.up)))
         let height = max(1, Int(bbox.height.rounded(.up)))
         var allocation = colorPage.allocate(width: width, height: height)
@@ -520,15 +545,18 @@ nonisolated final class GlyphAtlas {
         context.setShouldAntialias(true)
         context.setShouldSmoothFonts(false)  // no subpixel AA since Mojave
         context.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
-        // No CTM flip, as in the grayscale path.
+        // No CTM flip, as in the grayscale path. Positions are in the
+        // unscaled space the scale maps onto the bitmap.
+        context.scaleBy(x: fill, y: fill)
+        let offset = CGPoint(x: bbox.minX / fill, y: bbox.minY / fill)
         for run in runs {
             if let ctRun = run.ctRun {
-                context.textPosition = CGPoint(x: -bbox.minX, y: -bbox.minY)
+                context.textPosition = CGPoint(x: -offset.x, y: -offset.y)
                 CTRunDraw(ctRun, context, CFRange(location: 0, length: 0))
             } else {
                 var glyphs = run.glyphs
                 var positions = run.positions.map {
-                    CGPoint(x: $0.x - bbox.minX, y: $0.y - bbox.minY)
+                    CGPoint(x: $0.x - offset.x, y: $0.y - offset.y)
                 }
                 CTFontDrawGlyphs(run.font, &glyphs, &positions, glyphs.count, context)
             }
