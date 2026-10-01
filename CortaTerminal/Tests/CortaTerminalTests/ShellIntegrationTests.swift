@@ -665,4 +665,18 @@ import Testing
         #expect(store.records(exitStatus: 1, host: "build-box").map(\.promptRow) == [4])
         #expect(store.records(onHost: "elsewhere").isEmpty)
     }
+
+    @Test("a finished command clears bracketed paste a command's output turned on")
+    func commandEndClearsBracketedPaste() {
+        var terminal = Terminal(rows: 4, columns: 20)
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\$ cat x\r\n\u{1B}]133;C\u{1B}\\".utf8))
+        // The file's bytes, under a shell that never enables it itself.
+        terminal.feed(Array("\u{1B}[?2004h".utf8))
+        #expect(terminal.isBracketedPasteEnabled)
+        terminal.feed(Array("\u{1B}]133;D;0\u{1B}\\\u{1B}]133;A\u{1B}\\$ ".utf8))
+        #expect(!terminal.isBracketedPasteEnabled)
+        // A line editor that supports it turns it back on after D.
+        terminal.feed(Array("\u{1B}[?2004h".utf8))
+        #expect(terminal.isBracketedPasteEnabled)
+    }
 }

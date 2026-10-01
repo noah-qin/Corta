@@ -54,6 +54,10 @@ public final class TerminalSession: @unchecked Sendable {
     /// Per `read`; internal so lifecycle tests can feed exact boundaries.
     static let readChunkSize = 64 * 1024
     private static let batchByteCap = 1024 * 1024
+    /// How long an idle reader waits before looking again at whether the
+    /// session stopped: `PTY.close()` defers its close to an in-flight call,
+    /// and a child that ignores `SIGHUP` would otherwise never let one return.
+    private static let stopCheckMilliseconds: Int32 = 250
 
     public let pty: PTY
 
@@ -295,7 +299,7 @@ public final class TerminalSession: @unchecked Sendable {
                 }
                 // Fixed-format only (`SECURITY.md` §2.1); same queue as input.
                 if !responses.isEmpty {
-                    enqueueWrite(responses)
+                    enqueueWrite([responses])
                 }
                 if let episode {
                     scheduleSynchronizedOutputTimeout(episode: episode)
@@ -328,16 +332,19 @@ public final class TerminalSession: @unchecked Sendable {
 
     private var liveReaderSource: ReaderSource {
         ReaderSource(
-            read: { [pty] in try pty.read(into: $0) },
+            read: { [pty] buffer in
+                // Bounded, not a bare blocking read: after `stop()` the timed
+                // wait throws `.closed`, and the descriptor is released even if
+                // the child never speaks or hangs up.
+                while true {
+                    if try pty.waitUntilReadable(timeoutMilliseconds: Self.stopCheckMilliseconds) {
+                        return try pty.read(into: buffer)
+                    }
+                }
+            },
             isReadable: { [pty] in
                 // Any revents count; the read observes end of file.
-                while true {
-                    var descriptor = pollfd(
-                        fd: pty.fileDescriptor, events: Int16(POLLIN), revents: 0)
-                    let ready = poll(&descriptor, 1, 0)
-                    if ready >= 0 { return descriptor.revents != 0 }
-                    if errno != EINTR { return true }  // let the read report it
-                }
+                (try? pty.waitUntilReadable(timeoutMilliseconds: 0)) ?? true
             }
         )
     }
@@ -405,18 +412,29 @@ public final class TerminalSession: @unchecked Sendable {
     /// returns; a blocking `write(2)` measured 43 ms per MB once the PTY filled.
     @discardableResult
     public func write(_ bytes: [UInt8]) -> WriteOutcome {
-        enqueueWrite(bytes)
+        enqueueWrite([bytes])
+    }
+
+    /// Every chunk or none, under one backlog check: a paste cut off between
+    /// `ESC[200~` and `ESC[201~` leaves the shell in paste mode, reading
+    /// Return and Ctrl-C as pasted text until reset. Admitted while the
+    /// backlog is under the cap, however large — the cap pushes back on a
+    /// child that stopped reading, and a paste is the user's own size.
+    @discardableResult
+    public func write(chunks: [[UInt8]]) -> WriteOutcome {
+        enqueueWrite(chunks)
     }
 
     /// One queue for input and replies keeps them ordered.
     @discardableResult
-    private func enqueueWrite(_ bytes: [UInt8]) -> WriteOutcome {
-        guard !bytes.isEmpty else { return .accepted }
+    private func enqueueWrite(_ chunks: [[UInt8]]) -> WriteOutcome {
+        let chunks = chunks.filter { !$0.isEmpty }
+        guard !chunks.isEmpty else { return .accepted }
         guard !stopped.withLock({ $0 }) else { return .stopped }
         var shouldSchedule = false
         let outcome = pendingWrites.withLock { pending -> WriteOutcome in
             guard pending.bytes <= Self.maxPendingWriteBytes else { return .backpressured }
-            pending.push(bytes)
+            for chunk in chunks { pending.push(chunk) }
             if !pending.isDraining {
                 pending.isDraining = true
                 shouldSchedule = true
@@ -493,6 +511,11 @@ public final class TerminalSession: @unchecked Sendable {
 
     public var isNewLineModeEnabled: Bool {
         registerStateWaiter { state.withLock { $0.terminal.isNewLineModeEnabled } }
+    }
+
+    /// `Terminal.wheelSendsArrowKeys`, read per wheel event.
+    public var wheelSendsArrowKeys: Bool {
+        registerStateWaiter { state.withLock { $0.terminal.wheelSendsArrowKeys } }
     }
 
     public var applicationCursorKeysEnabled: Bool {
@@ -613,13 +636,11 @@ public final class TerminalSession: @unchecked Sendable {
             // Registered: `SIGWINCH` waits on this commit.
             registerStateWaiter {
                 state.withLock { current in
-                    var grid = current.terminal.grid
-                    grid.resize(rows: Int(size.rows), columns: Int(size.columns))
+                    current.terminal.resize(rows: Int(size.rows), columns: Int(size.columns))
                     // Set after, and even with rows and columns unchanged:
                     // a font change alters only the pixels.
-                    grid.cellPixelHeight = size.cellPixelHeight
-                    grid.cellPixelWidth = size.cellPixelWidth
-                    current.terminal.grid = grid
+                    current.terminal.grid.cellPixelHeight = size.cellPixelHeight
+                    current.terminal.grid.cellPixelWidth = size.cellPixelWidth
                 }
             }
             try? pty.resize(to: size)

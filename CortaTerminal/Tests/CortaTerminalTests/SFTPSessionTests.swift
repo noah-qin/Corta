@@ -287,4 +287,133 @@ struct SFTPSessionTests {
             }
         }
     }
+
+    @Test("senders blocked on a full channel park no cooperative thread")
+    func blockedWritesLeaveTheCooperativePoolFree() async throws {
+        let connection = SFTPLoopbackConnection()
+        let fileSystem = FakeRemoteFileSystem()
+        let server = FakeSFTPServer(connection: connection, fileSystem: fileSystem)
+        server.start()
+        let transport = StallingTransport(connection.clientTransport())
+        let session = SFTPSession(transport: transport)
+        _ = try await session.connect()
+        defer {
+            transport.release()
+            session.close()
+            connection.close()
+        }
+
+        // Every write from here blocks, like ssh behind a slow network.
+        // More senders than the pool has threads: if each held one while
+        // blocked, nothing else in the process could run.
+        transport.stall()
+        let senders = ProcessInfo.processInfo.activeProcessorCount + 2
+        for index in 0..<senders {
+            Task.detached { _ = try? await session.stat(path: "/\(index)") }
+        }
+        // Blocking, not `Task.sleep`: a starved pool would never resume us.
+        blockThisThread(seconds: 0.3)
+
+        let probe = DispatchSemaphore(value: 0)
+        Task.detached { probe.signal() }
+        #expect(
+            waitBlocking(probe, seconds: testTimeoutInterval(5)),
+            "an unrelated task could not run while SFTP writes were blocked")
+    }
+}
+
+extension SFTPSessionTests {
+    @Test("cancelled requests cannot grow the writer queue past the window")
+    func cancellationKeepsTheWriterQueueBounded() async throws {
+        let connection = SFTPLoopbackConnection()
+        let server = FakeSFTPServer(connection: connection, fileSystem: FakeRemoteFileSystem())
+        server.start()
+        let transport = StallingTransport(connection.clientTransport())
+        let session = SFTPSession(transport: transport)
+        _ = try await session.connect()
+        defer {
+            transport.release()
+            session.close()
+            connection.close()
+        }
+
+        transport.stall()
+        // Each request gives its slot back the moment it is cancelled, while
+        // its frame stays queued behind the stalled write.
+        for round in 0..<200 {
+            let task = Task.detached { _ = try? await session.stat(path: "/\(round)") }
+            blockThisThread(seconds: 0.002)
+            task.cancel()
+        }
+        blockThisThread(seconds: 0.3)
+        #expect(session.unwrittenFrameCount <= session.configuration.maxInFlightRequests)
+
+        // Senders waiting behind the full queue; then one write completes.
+        for round in 0..<40 {
+            Task.detached { _ = try? await session.stat(path: "/waiting/\(round)") }
+        }
+        blockThisThread(seconds: 0.2)
+        transport.permit(1)
+        blockThisThread(seconds: 0.3)
+        // One place freed admits one sender, not every waiter at once.
+        #expect(session.unwrittenFrameCount <= session.configuration.maxInFlightRequests)
+    }
+}
+
+private func blockThisThread(seconds: TimeInterval) {
+    Thread.sleep(forTimeInterval: seconds)
+}
+
+private func waitBlocking(_ semaphore: DispatchSemaphore, seconds: TimeInterval) -> Bool {
+    semaphore.wait(timeout: .now() + seconds) == .success
+}
+
+/// Passes writes through until `stall()`, then blocks each until `release()`.
+private final class StallingTransport: SFTPChannelTransport, @unchecked Sendable {
+    private let base: SFTPChannelTransport
+    private let condition = NSCondition()
+    private var stalled = false
+    private var permits = 0
+
+    init(_ base: SFTPChannelTransport) {
+        self.base = base
+    }
+
+    func stall() {
+        condition.lock()
+        stalled = true
+        condition.unlock()
+    }
+
+    func release() {
+        condition.lock()
+        stalled = false
+        condition.broadcast()
+        condition.unlock()
+    }
+
+    /// Lets `count` writes through while still stalled.
+    func permit(_ count: Int) {
+        condition.lock()
+        permits += count
+        condition.broadcast()
+        condition.unlock()
+    }
+
+    func read(into buffer: UnsafeMutableRawBufferPointer) throws(SFTPTransportError) -> Int {
+        try base.read(into: buffer)
+    }
+
+    func write(_ bytes: UnsafeRawBufferPointer) throws(SFTPTransportError) {
+        condition.lock()
+        while stalled, permits == 0 { condition.wait() }
+        if stalled { permits -= 1 }
+        condition.unlock()
+        try base.write(bytes)
+    }
+
+    func close() {
+        release()
+        base.close()
+    }
 }

@@ -40,9 +40,16 @@ public struct Terminal: Sendable {
             capacity: performer.state.commandRecords.capacity)
     }
 
+    /// A grid resized through this setter (`terminal.grid.resize(…)`) has its
+    /// reflow's row remaps applied on the way in, as `resize(rows:columns:)`
+    /// does: records must never wait in the old coordinates while marks
+    /// arrive in the new.
     public var grid: Grid {
         get { performer.grid }
-        set { performer.grid = newValue }
+        set {
+            performer.grid = newValue
+            performer.applyRowRemaps()
+        }
     }
 
     /// Clear Screen: the grid's, and the waiting prompt follows the cursor to
@@ -74,6 +81,14 @@ public struct Terminal: Sendable {
         parser.parse(bytes, performer: &performer)
     }
 
+    /// `Grid.resize`, keeping command records on their rows through a reflow.
+    /// Resize through this, not `grid`, or the records point where the rows
+    /// used to be.
+    public mutating func resize(rows: Int, columns: Int) {
+        performer.grid.resize(rows: rows, columns: columns)
+        performer.applyRowRemaps()
+    }
+
     public var hasPendingOutput: Bool { !performer.state.outputBuffer.isEmpty }
 
     public var isBracketedPasteEnabled: Bool { performer.state.bracketedPasteEnabled }
@@ -93,6 +108,13 @@ public struct Terminal: Sendable {
     }
 
     public var isFocusReportingEnabled: Bool { performer.state.focusReportingEnabled }
+
+    /// The wheel should send arrow keys (`?1007`): on the alternate screen,
+    /// alternate scroll on, mouse reporting off.
+    public var wheelSendsArrowKeys: Bool {
+        performer.grid.isAlternateScreenActive && performer.state.alternateScrollEnabled
+            && performer.state.mouseTrackingMode == .off
+    }
 
     public var isNewLineModeEnabled: Bool { performer.state.newLineModeEnabled }
 

@@ -182,8 +182,10 @@ public struct SFTPVolumeInfo: Equatable, Sendable {
 ///
 /// Threading mirrors `TerminalSession` (`DECISIONS.md` D04): a dedicated
 /// reader `Thread` blocks in the transport's `read` and dispatches replies
-/// by request-id; sending is serialised through a lock so two requests'
-/// frames can never interleave on the wire. Everything else is async —
+/// by request-id; sending is a serial queue of its own, so two requests'
+/// frames can never interleave on the wire and a `write(2)` blocked on a
+/// full pipe parks that queue's thread, never one of the cooperative pool's.
+/// Everything else is async —
 /// each request is a continuation the reader resumes — and nothing is
 /// isolated to any actor.
 ///
@@ -235,6 +237,14 @@ public final class SFTPSession: @unchecked Sendable {
         /// all passed the `inFlight.count` check while none had registered
         /// yet, and the window bounded nothing.
         var windowUsed = 0
+        /// Writer-queue places taken: one per admitted sender, from admission
+        /// until its frame is written (or it turns out not to send one), plus
+        /// the handshake's. Counted apart from the window: a cancelled request
+        /// gives its window slot back at once, but its frame is still queued
+        /// behind a blocked write, and cancel-and-retry would grow the queue
+        /// without bound. Reserved at admission, never after, so admitting
+        /// cannot outrun it.
+        var unwrittenFrames = 0
         /// Senders suspended on the window, FIFO by token.
         var windowWaiters: [(token: UInt64, continuation: CheckedContinuation<Bool, Never>)] = []
         var nextWindowToken: UInt64 = 0
@@ -249,14 +259,19 @@ public final class SFTPSession: @unchecked Sendable {
 
     private let state = Mutex(State())
     /// Serialises frame writes; two senders must never interleave bytes
-    /// of their frames on the wire.
-    private let writeLock = Mutex(())
+    /// of their frames on the wire. Its own thread: a write blocks while ssh
+    /// is slower than the window, and the cooperative pool has one thread
+    /// per core for the whole process.
+    private let writerQueue = DispatchQueue(label: "dev.corta.sftp.writer", qos: .utility)
     private var readerThread: Thread?
 
     public init(transport: SFTPChannelTransport, configuration: Configuration = .init()) {
         self.transport = transport
         self.configuration = configuration
     }
+
+    /// Frames queued for the writer and not yet written; for tests.
+    var unwrittenFrameCount: Int { state.withLock { $0.unwrittenFrames } }
 
     /// The server's capabilities, from its VERSION answer. `nil` until
     /// `connect()` completes.
@@ -294,13 +309,7 @@ public final class SFTPSession: @unchecked Sendable {
                     returning: .failure(.protocolViolation("connect() called on a used session")))
                 return
             }
-            do {
-                try writeFrame(frame)
-            } catch let error as SFTPError {
-                finishHandshake(.failure(error))
-            } catch {
-                finishHandshake(.failure(.protocolViolation("\(error)")))
-            }
+            sendFrame(frame, reserved: false) { [self] error in finishHandshake(.failure(error)) }
         }
 
         let reply = try result.get()
@@ -540,9 +549,12 @@ public final class SFTPSession: @unchecked Sendable {
                     return true
                 }
                 guard registered else {
-                    // The slot was acquired and will never be used.
+                    // The slot was acquired and will never be used, nor its
+                    // writer place.
                     let failure = state.withLock { state -> SFTPError in
+                        state.unwrittenFrames -= 1
                         releaseWindowSlot(&state)
+                        admitWaiters(&state)
                         return state.closed ?? SFTPError.cancelled
                     }
                     continuation.resume(returning: .failure(failure))
@@ -550,13 +562,7 @@ public final class SFTPSession: @unchecked Sendable {
                 }
                 let frame = SFTPCodec.encodeFrame(
                     SFTPMessage(requestID: ticket.id, request: payload(ticket.id)))
-                do {
-                    try writeFrame(frame)
-                } catch let error as SFTPError {
-                    failRequest(ticket, with: error)
-                } catch {
-                    failRequest(ticket, with: .protocolViolation("\(error)"))
-                }
+                sendFrame(frame, reserved: true) { [self] error in failRequest(ticket, with: error) }
             }
         } onCancel: {
             cancelRequest(ticket)
@@ -571,10 +577,9 @@ public final class SFTPSession: @unchecked Sendable {
         if let closed = state.withLock({ $0.closed }) { throw closed }
         // Fast path: the window has room.
         let fastTicket = state.withLock { state -> SFTPRequestIDLedger.Ticket? in
-            guard state.closed == nil,
-                state.windowUsed < configuration.maxInFlightRequests
-            else { return nil }
+            guard state.closed == nil, admits(state) else { return nil }
             state.windowUsed += 1
+            state.unwrittenFrames += 1
             return state.ids.allocate()
         }
         if let fastTicket { return fastTicket }
@@ -591,12 +596,20 @@ public final class SFTPSession: @unchecked Sendable {
         // never stranded by a late cancellation.
         let admitted = await withTaskCancellationHandler {
             await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
-                let queued = state.withLock { state -> Bool in
+                // Re-checked here: room may have opened since the fast path,
+                // and a frame draining finds no waiter to admit until this
+                // one is queued.
+                let outcome = state.withLock { state -> Bool? in
                     guard state.closed == nil else { return false }
+                    if admits(state) {
+                        state.windowUsed += 1
+                        state.unwrittenFrames += 1
+                        return true
+                    }
                     state.windowWaiters.append((token: token, continuation: continuation))
-                    return true
+                    return nil
                 }
-                if !queued { continuation.resume(returning: false) }
+                if let outcome { continuation.resume(returning: outcome) }
             }
         } onCancel: {
             state.withLock { state in
@@ -650,31 +663,62 @@ public final class SFTPSession: @unchecked Sendable {
         }
     }
 
-    /// Gives a slot back: to the next FIFO waiter if there is one — the
-    /// slot passes to it and `windowUsed` does not move — otherwise to the
-    /// window.
+    /// Gives a slot back: to the next FIFO waiter if there is one and the
+    /// writer queue has a place for it — the slot passes to it and
+    /// `windowUsed` does not move — otherwise to the window.
     private func releaseWindowSlot(_ state: inout State) {
-        guard !state.windowWaiters.isEmpty else {
+        guard !state.windowWaiters.isEmpty,
+            state.unwrittenFrames < configuration.maxInFlightRequests
+        else {
             state.windowUsed -= 1
             return
         }
+        state.unwrittenFrames += 1
         state.windowWaiters.removeFirst().continuation.resume(returning: true)
     }
 
-    private func writeFrame(_ frame: [UInt8]) throws(SFTPError) {
-        // `Mutex.withLock` is untyped-rethrows on this toolchain, so the
-        // typed error is smuggled out instead of thrown through it.
-        var failure: SFTPError?
-        writeLock.withLock { _ in
-            do {
-                try frame.withUnsafeBytes { try transport.write($0) }
-            } catch let error as SFTPTransportError {
-                failure = .transport(error)
-            } catch {
-                failure = .protocolViolation("\(error)")
-            }
+    /// Room for one more sender: in the window, and in the writer queue.
+    private func admits(_ state: State) -> Bool {
+        state.windowUsed < configuration.maxInFlightRequests
+            && state.unwrittenFrames < configuration.maxInFlightRequests
+    }
+
+    /// After a frame leaves the writer queue: admits the waiters the queue
+    /// was holding back.
+    private func admitWaiters(_ state: inout State) {
+        while !state.windowWaiters.isEmpty, admits(state) {
+            state.windowUsed += 1
+            state.unwrittenFrames += 1
+            state.windowWaiters.removeFirst().continuation.resume(returning: true)
         }
-        if let failure { throw failure }
+    }
+
+    /// Queues `frame` behind every frame sent before it; `onFailure` runs on
+    /// the writer queue if the transport refuses it. Bounded: a request's
+    /// place was reserved when `acquireRequestSlot` admitted it (`reserved`);
+    /// the handshake, which precedes the window, takes one here.
+    private func sendFrame(
+        _ frame: [UInt8], reserved: Bool, onFailure: @escaping @Sendable (SFTPError) -> Void
+    ) {
+        if !reserved { state.withLock { $0.unwrittenFrames += 1 } }
+        writerQueue.async { [self, transport] in
+            defer {
+                state.withLock { state in
+                    state.unwrittenFrames -= 1
+                    admitWaiters(&state)
+                }
+            }
+            // `withUnsafeBytes` rethrows untyped; the typed error is carried out.
+            let failure = frame.withUnsafeBytes { bytes -> SFTPTransportError? in
+                do throws(SFTPTransportError) {
+                    try transport.write(bytes)
+                    return nil
+                } catch {
+                    return error
+                }
+            }
+            if let failure { onFailure(.transport(failure)) }
+        }
     }
 
     private func finishHandshake(_ result: Result<SFTPMessage, SFTPError>) {

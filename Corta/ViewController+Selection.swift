@@ -33,6 +33,17 @@ extension ViewController {
     }
 
     func scroll(_ gesture: ScrollGesture) {
+        // The wheel on the alternate screen — `less`, `man`, `git log` — is
+        // arrow keys (`?1007`); it has no scrollback to move through here.
+        if case .lines(let delta) = gesture, scrollOffset == 0, session.wheelSendsArrowKeys {
+            let arrow: [UInt8] =
+                session.applicationCursorKeysEnabled
+                ? [0x1B, 0x4F, delta > 0 ? 0x41 : 0x42]
+                : [0x1B, 0x5B, delta > 0 ? 0x41 : 0x42]
+            let count = min(abs(delta), TerminalView.maximumWheelRepeat)
+            session.write(Array(repeating: arrow, count: count).flatMap { $0 })
+            return
+        }
 
         let historyDepth = session.snapshot().scrollback.count
         switch gesture {

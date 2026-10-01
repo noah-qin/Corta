@@ -52,6 +52,7 @@ extension Performer {
         case 1006: return state.sgrMouseEncodingEnabled ? 1 : 2
         case 2026: return state.synchronizedOutputEnabled ? 1 : 2
         case 1004: return state.focusReportingEnabled ? 1 : 2
+        case 1007: return state.alternateScrollEnabled ? 1 : 2
         case 45: return grid.reverseWraparoundEnabled ? 1 : 2
         // Autowrap and a cursor are always present: permanently set.
         case 7, 25: return 3

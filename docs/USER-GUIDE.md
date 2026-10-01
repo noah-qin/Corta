@@ -143,6 +143,11 @@ installed when you say so.
   `open-file-command = /usr/local/bin/code --goto {file}:{line}:{column}`
   ([Following a file reference](CONFIGURATION.md#following-a-file-reference)).
 
+Remote editing requires a configured `open-file-command`. Corta never opens a
+downloaded copy in its system default application: some file types run code
+when opened. After a connection failure, the next editing or upload action
+connects again; failed uploads keep their pending decision.
+
 ## Shell integration
 
 Shell integration lets Corta see where each command starts and ends. Install

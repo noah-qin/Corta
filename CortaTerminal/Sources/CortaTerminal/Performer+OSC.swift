@@ -186,7 +186,10 @@ extension Performer {
         let host = url.host(percentEncoded: false) ?? ""
         let path = url.path(percentEncoded: false)
         guard !path.isEmpty else { return }
-        if Self.isLocalHost(host) {
+        // Also the names this machine had when the session began: a shell
+        // fixes `$HOST` at startup, while the kernel's hostname follows the
+        // network (DHCP, reverse DNS) when no HostName is set.
+        if Self.isLocalHost(host, localNames: Self.localHostnames().union(state.hostnamesAtStart)) {
             state.workingDirectory = path
             state.remoteContext = nil
         } else {

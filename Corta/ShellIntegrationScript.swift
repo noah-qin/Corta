@@ -29,6 +29,12 @@ enum ShellIntegrationScript {
     /// zsh (states per `Performer+ShellIntegration.swift`): `preexec` emits
     /// `C`; `precmd` emits `D` with `$?` read first, then `A`; `B` is appended
     /// to `$PS1`, so it fires where the prompt ends, however many lines.
+    ///
+    /// OSC 7's path is percent-encoded byte by byte in every shell: a URL
+    /// cuts a raw `C# projects` at the `#` and `what?` at the `?`, and a
+    /// directory named with ESC or BEL — from an archive, say — wrote its
+    /// own escape sequences on every prompt. zsh's `print -r`, because plain
+    /// `print` turns a `\e` in the name into ESC.
     /// `CORTA_SHELL_INTEGRATION_ACTIVE` keeps a double source from doubling
     /// hooks. A raw literal, so zsh's `\e` and `\a` aren't doubled.
     static let zsh = #"""
@@ -39,10 +45,17 @@ enum ShellIntegrationScript {
             print -n '\e]133;C\a'
           }
 
+          __corta_urlencode() {
+            emulate -L zsh
+            setopt extendedglob no_multibyte
+            typeset -g __corta_url=${1//(#m)[^A-Za-z0-9\/._~-]/%${(l:2::0:)$(( [##16] #MATCH ))}}
+          }
+
           __corta_precmd() {
             local __corta_status=$?
             print -n "\e]133;D;${__corta_status}\a"
-            print -n "\e]7;file://${HOST}${PWD}\e\\"
+            __corta_urlencode "$PWD"
+            print -rn -- $'\e]7;file://'"${HOST}${__corta_url}"$'\e\\'
             print -n '\e]133;A\a'
           }
 
@@ -82,11 +95,30 @@ enum ShellIntegrationScript {
             __corta_armed=1
           }
 
+          __corta_urlencode() {
+            local LC_ALL=C __corta_s=$1 __corta_c __corta_i=0
+            __corta_url=
+            # `while`, not `for ((…))`: this file may be `~/.profile`, and dash
+            # must still parse it.
+            while [ "$__corta_i" -lt "${#__corta_s}" ]; do
+              __corta_c=${__corta_s:__corta_i:1}
+              __corta_i=$((__corta_i + 1))
+              case $__corta_c in
+                [A-Za-z0-9/._~-]) __corta_url+=$__corta_c ;;
+                *)
+                  printf -v __corta_c '%d' "'$__corta_c"
+                  printf -v __corta_c '%%%02X' $(( __corta_c & 255 ))
+                  __corta_url+=$__corta_c ;;
+              esac
+            done
+          }
+
           __corta_precmd() {
             local __corta_status=$?
             __corta_armed=
             printf '\e]133;D;%s\a' "$__corta_status"
-            printf '\e]7;file://%s%s\e\\' "$HOSTNAME" "$PWD"
+            __corta_urlencode "$PWD"
+            printf '\e]7;file://%s%s\e\\' "$HOSTNAME" "$__corta_url"
             printf '\e]133;A\a'
           }
 
@@ -128,7 +160,7 @@ enum ShellIntegrationScript {
             set -l __corta_status $status
             set -l __corta_prompt (__corta_original_fish_prompt | string collect -N)
             set -q __corta_fish_marks_prompt; or printf '\e]133;D;%s\a' $__corta_status
-            printf '\e]7;file://%s%s\e\\' (hostname) "$PWD"
+            printf '\e]7;file://%s%s\e\\' (hostname) (string escape --style=url -- "$PWD")
             set -q __corta_fish_marks_prompt; or printf '\e]133;A\a'
             printf '%s' $__corta_prompt
             printf '\e]133;B\a'

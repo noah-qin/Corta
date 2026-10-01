@@ -108,6 +108,18 @@ public struct CommandRecordStore: Sendable, Equatable {
         records[last].endedAt = date
     }
 
+    mutating func remapRows(_ remap: RowRemap) {
+        for index in records.indices {
+            let oldPromptRow = records[index].promptRow
+            records[index].promptRow = remap.map(oldPromptRow)
+            records[index].promptEndColumn = records[index].promptEndColumn.flatMap {
+                remap.promptEndColumn(promptRow: oldPromptRow, column: $0)
+            }
+            records[index].outputStartRow = records[index].outputStartRow.map(remap.map)
+            records[index].endRow = records[index].endRow.map(remap.map)
+        }
+    }
+
     /// The command whose output covers `absoluteRow`, finished or not.
     public func record(before absoluteRow: Int) -> CommandRecord? {
         records.last { $0.promptRow <= absoluteRow }

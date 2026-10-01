@@ -96,6 +96,16 @@ what to edit.
 
 ### Fixed
 
+- Remote editing requires a configured editor command. A downloaded file
+  previously opened in its default application, which could execute
+  `.command` or `.terminal` files supplied by a remote host. Local file
+  references keep their default application.
+- Remote editing reconnects on the next operation after a broken SFTP
+  conversation, without restarting Corta. Failed uploads keep their
+  pending decision and are never silently replayed.
+- Starting the Quick Terminal more than once no longer leaves duplicate
+  notification observers, and releasing it removes its observers.
+
 - Output that costs a program a few bytes can no longer cost Corta far
   more. A letter followed by thousands of combining accents (about 130 KB)
   made Corta store several gigabytes; a character now keeps at most 32
@@ -114,6 +124,115 @@ what to edit.
 - Two Kitty images that use the same placement number both stay on
   screen. A placement number belongs to its image, but the second image
   replaced the first one's placement.
+
+- A shell no longer inherits files Corta has open. Every descriptor Corta
+  held without close-on-exec — the pipes of an open SFTP connection, a file
+  in the middle of a transfer, a watched file — was open in every shell
+  started after it, so a program in that shell could write into the SFTP
+  stream, and closing the connection did not end ssh's input.
+
+- A file transfer whose remote file cannot be opened leaves nothing behind:
+  the local file stayed open until Corta quit, and a download left an
+  empty partial file. A transfer that failed after its local file was
+  closed could close an unrelated file Corta had opened since.
+
+- Closing an SFTP connection whose ssh had already exited no longer sends
+  `SIGKILL` to that process ID, which the system may have given to another
+  program by then.
+
+- A slow SFTP upload no longer stalls the rest of the app. Every pending
+  write to ssh held one of the few threads Swift concurrency shares
+  across the whole process.
+
+- Closing a pane never waits on its shell, and a read or write on a pane
+  being closed can no longer reach a file another pane opened in the
+  same instant.
+- Changing a pane's width keeps its command marks. Any change in columns
+  — resizing the window, splitting, toggling the sidebar, changing the
+  font size, or leaving a full-screen program after one — erased every
+  prompt and success/failure mark, so the marks beside prompts vanished,
+  and once history had been re-wrapped, jumping between commands, copying
+  a command's output and opening a file it printed could land on the
+  wrong lines.
+- Shell integration reports directories with unusual names correctly. The
+  directory went out unencoded, so `C# projects` was taken to be `C` and
+  `what?` to be `what` — new tabs and splits opened in the wrong place —
+  and a directory whose name holds escape sequences, as one unpacked from
+  an archive can, injected them into the terminal on every prompt. The
+  zsh, bash and fish hooks now percent-encode the path; **Settings ▸
+  Terminal ▸ Shell Integration** shows **Update** for an integration
+  installed before this change.
+
+- Changing to the parent or project directory, or dropping a file, in
+  fish can no longer run a command hidden in the name. The quoting was
+  correct for sh, bash and zsh, but fish reads a backslash inside single
+  quotes differently, so a name such as `x\'; cmd; \'` ran `cmd`.
+
+- A directory name in the window title has its control characters removed,
+  as every other part of the title already did; a newline or a
+  right-to-left override no longer reaches the title or the tab.
+
+- The window title no longer checks the current directory on disk with
+  every burst of output. In a directory on a network volume, a program
+  printing steadily — a build, an AI assistant — made each check wait on
+  the server, dropping frames and slowing typing.
+
+- A local pane stays local after the Mac's network name changes. Corta
+  compared the name a shell reported when it started with the name the Mac
+  has now, so after joining another network a local pane could show a
+  remote host in its title, open new tabs in your home folder and ask to
+  connect to your own Mac over SFTP to open a file.
+
+- Opening the Shell menu no longer checks the current directory on disk.
+  A directory reported on an unreachable automount (`/net/…`) froze Corta
+  until the mount timed out. **Change to Project Root** and **Open Project
+  Root in New Pane** are enabled whenever the directory is known, look for
+  the project after you choose them, and say so when there is none.
+
+- Directory history keeps at most 1 000 directories besides favourites,
+  dropping the least visited. The directories come from what the shell
+  reports, so output that reported a new one on every prompt grew the
+  history file, and the work of saving it, without limit.
+
+- The warning before a multi-line paste is no longer switched off by what a
+  program prints. Bracketed paste mode — under which the warning is not
+  needed — could be turned on by any output, `cat` of a file included, and
+  stayed on under a shell that does not support it, such as the bash that
+  ships with macOS. Each finished command now turns it off; shells that
+  support it turn it back on for the next prompt.
+- A large paste no longer leaves the shell stuck in paste mode. A paste is
+  sent in pieces, and when a program was slow to read — Claude Code or zsh
+  with several megabytes on the clipboard — Corta stopped part-way, after
+  the marker that opens a paste and before the one that closes it, so
+  every key after it, Return included, was taken as more pasted text and
+  the pane looked frozen. A paste is now sent whole or, if the program has
+  stopped reading, not at all, with the same notice as before; a dropped
+  file or Services text, which was discarded without a word, gets the
+  notice too.
+
+- Ctrl-C, Esc and the other keys work again after a full-screen program
+  quits. A program that switched on the Kitty keyboard protocol and left
+  the alternate screen without switching it off — which the protocol
+  allows — or that crashed or was killed while it was on, left the shell
+  receiving its keys in that encoding until `reset`. Each screen now has
+  its own setting, as in kitty, and a finished command clears the main
+  screen's.
+
+- The scroll wheel scrolls `less`, `man` and `git log`. On the alternate
+  screen, with mouse reporting off, the wheel moved through Corta's own
+  history, which that screen does not have, so nothing happened; it now
+  sends arrow keys, as Terminal.app and iTerm2 do. A program can turn this
+  off with `ESC [ ? 1007 l`.
+
+- Scrolling with a trackpad in vim (`mouse=a`), tmux and other programs
+  that read the mouse moves at the right speed. Every trackpad event, the
+  tiniest movement and the momentum after a flick included, was sent as a
+  whole wheel notch; movement now adds up into notches as it does for
+  scrolling Corta's own history.
+
+- The window title no longer shows "remote?" while a pipeline such as
+  `git log | less` runs. The command naming the job had already finished,
+  and a job without a name was treated as a possible remote session.
 
 - Shell integration for bash works when bash starts as a login shell,
   which is how Corta starts it. The hooks were only in `~/.bashrc`, which

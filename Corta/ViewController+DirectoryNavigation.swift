@@ -62,14 +62,14 @@ extension ViewController {
     ///
     /// The path began as child-sent OSC 7 text, which `SECURITY.md` §6 says
     /// never to write back. It goes back only as the user's command: sent on
-    /// their own action to the shell on the path's machine, single-quoted
-    /// with `'` as `'\''`, and refused outright if it holds a control
-    /// character, the one shape another shell could read as two commands.
+    /// their own action to the shell on the path's machine, quoted for any
+    /// shell (`shellQuoted` — fish reads `'\''` differently), and refused
+    /// outright if it holds a control character, the one shape another shell
+    /// could read as two commands.
     @discardableResult
     func changeDirectory(to path: String) -> Bool {
         guard canChangeDirectorySafely, Self.isSendableDirectoryPath(path) else { return false }
-        let escaped = path.replacingOccurrences(of: "'", with: "'\\''")
-        session.write(Array("cd '\(escaped)'\r".utf8))
+        session.write(Array("cd \(Self.shellQuoted(path))\r".utf8))
         return true
     }
 

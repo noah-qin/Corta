@@ -45,6 +45,7 @@ measured. Priorities:
 | Bracketed paste (`?2004`)                               | P0   | A safety feature, not a convenience — see `SECURITY.md` §2.3 |
 | Mouse reporting (`?1000`/`?1002`/`?1003`, SGR `?1006`) | P1 | Press/release, wheel, cell-coalesced drag and motion; configurable local-selection override |
 | Focus reporting (`?1004`)                               | P2   | Implemented; Neovim autoread and tmux focus events                |
+| Alternate scroll (`?1007`)                              | P1   | The wheel sends arrow keys on the alternate screen when mouse reporting is off, so `less`, `man` and `git log` scroll; on by default, as in Terminal.app and iTerm2 (xterm's is off) |
 | OSC 8 — hyperlinks                                      | P2   | Implemented; display text and target may differ — see `SECURITY.md` §2.4 |
 | DCS and rare CSI sequences                              | P2   | The long tail                                           |
 
@@ -127,7 +128,7 @@ be **fixed-format and never echo attacker-controlled text** — see
 | Configurable key bindings                        | P1   | `bind.<command>` in the config file, one table for menus, palette and file — `CONFIGURATION.md` §5 |
 | Click-to-position, drag-to-select                | P1   | Drag selects; a TUI that owns the mouse is overridden with `mouse-override-modifier` |
 | ⌘-click to open a URL                            | P1   | Scheme allowlist required — `SECURITY.md` §2.4      |
-| Kitty keyboard protocol                          | P2   | Implemented; progressive enhancement flags and protocol stack                                        |
+| Kitty keyboard protocol                          | P2   | Implemented; progressive enhancement flags and protocol stack, one per screen (the alternate screen's is dropped when it closes), and the main screen's cleared when a command finishes (OSC 133 D) |
 | Tab / Shift-Tab through a candidate UI            | P0   | A completion menu or IME that resolves Tab as a command sends `insertTab(_:)` / `insertBacktab(_:)` to `doCommand(by:)`; both are forwarded to the child (B02) — `DESIGN.md` §7.1, `TerminalViewIMETests.doCommandForwardsTabAndBacktab` |
 
 The candidate-UI row is the one whose evidence is incomplete. The code gap

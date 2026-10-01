@@ -207,7 +207,8 @@ async-signal-safe between `fork` and `exec`). The security requirements
 alongside it:
 
 - Reset the signal mask and dispositions in the child.
-- Close all inherited descriptors except the PTY replica.
+- Close all inherited descriptors except the PTY replica
+  (`POSIX_SPAWN_CLOEXEC_DEFAULT`; `DescriptorHygieneTests` pins it).
 - Establish a new session and controlling terminal (`POSIX_SPAWN_SETSID`
   / `TIOCSCTTY`) so job control and signals are correctly scoped.
 - Sanitise the environment; do not leak internal variables to the child.
@@ -426,3 +427,9 @@ made them.
   `currentWorkingDirectory` fallback. Session state saved before this filter
   can still carry a remote path with the host already lost, so restore drops
   any saved directory that does not exist as a local directory.
+
+Remote editing requires an explicit `open-file-command`. Managed downloads,
+including reused copies, never use LaunchServices' default file handler:
+`.command`, `.terminal` and similar handlers can execute remote bytes locally.
+The configured command remains the user's trusted editor choice and receives
+separate arguments, never shell interpolation.

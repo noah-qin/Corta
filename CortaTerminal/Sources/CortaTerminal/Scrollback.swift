@@ -65,6 +65,13 @@ public struct Scrollback: Sendable {
         self.batchSize = self.limit == 0 ? 1 : max(1, min(256, self.limit))
     }
 
+    /// Empty, but counting on from `alreadyPushed`: a reflow rebuilds the
+    /// rows, and `totalPushed` must not run backwards under anchors.
+    init(limit: Int, alreadyPushed: Int) {
+        self.init(limit: limit)
+        totalPushed = alreadyPushed
+    }
+
     public var isEmpty: Bool { count == 0 }
     public var isFull: Bool { count == limit }
 

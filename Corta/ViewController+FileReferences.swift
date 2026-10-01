@@ -105,8 +105,22 @@ extension ViewController {
     /// metacharacters (`SECURITY.md` §2.3).
     @discardableResult
     static func openFileAt(url: URL, line: Int, column: Int?) -> Bool {
-        let template = ConfigurationStore.shared.configuration.openFileCommand
+        openFileAt(url: url, line: line, column: column, allowsDefaultApplication: true)
+    }
+
+    /// Remote bytes must go to an explicitly configured editor, never to a
+    /// LaunchServices handler that could execute a .command or .terminal file.
+    static func openRemoteFileAt(url: URL, line: Int, column: Int?) -> Bool {
+        openFileAt(url: url, line: line, column: column, allowsDefaultApplication: false)
+    }
+
+    static func openFileAt(
+        url: URL, line: Int, column: Int?, allowsDefaultApplication: Bool,
+        command: String? = nil
+    ) -> Bool {
+        let template = command ?? ConfigurationStore.shared.configuration.openFileCommand
         guard !template.isEmpty else {
+            guard allowsDefaultApplication else { return false }
             NSWorkspace.shared.open(url)
             return true
         }
