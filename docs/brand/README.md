@@ -44,17 +44,12 @@ The card is uploaded by hand: repository **Settings** ▸ **General** ▸
 
 ## Taking the screenshot
 
-Never point the app at the machine's real shell for this — a prompt carries a
-username and a hostname, and `launchctl setenv SHELL` would change the shell
-for every application the user launches afterwards (`CLAUDE.md`). Pass the demo
-shell in the environment of the one launch you control:
-
-```sh
-SHELL=/path/to/demo.zsh Corta.app/Contents/MacOS/Corta
-```
-
-The 1.1.0 screenshot was taken this way, with nothing outside one scratch
-directory touched:
+Never point the app at the machine's real shell or configuration for this —
+a prompt carries a username and a hostname, and `launchctl setenv SHELL`
+would change the shell for every application the user launches afterwards
+(`CLAUDE.md`). Everything goes in the environment of the one launch you
+control. The 1.1.0 screenshot was taken like this, with nothing outside one
+scratch directory touched:
 
 - **The development build** (`CortaDev`, D22), so the installed Corta and
   its configuration are never involved.

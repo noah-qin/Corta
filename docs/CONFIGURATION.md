@@ -104,7 +104,9 @@ into another application hides it without moving focus again.
 Not a config-file key — a file on disk, the login shell's startup file,
 that only Settings ▸ Terminal ▸ Shell Integration touches, and only inside
 one marked block. The shell is the one `$SHELL` names: `~/.zshrc` for zsh,
-`~/.bashrc` for bash, `~/.config/fish/config.fish` for fish, and zsh's for
+for bash the first of `~/.bash_profile`, `~/.bash_login` and `~/.profile`
+that exists (a login bash reads no other; a new `~/.bash_profile` when none
+does), `~/.config/fish/config.fish` for fish, and zsh's for
 anything else:
 
 ```
@@ -504,7 +506,7 @@ on itself.
 `export-command-output` is `copy-last-command-output` written to a file
 instead of the clipboard, for a build log too long to want pasted anywhere
 but still worth attaching to a bug report. `open-file-reference-in-command`
-opens the first `path:line[:column]` reference in that command's output
+opens the last `path:line[:column]` reference in that command's output
 through `open-file-command` (§2), without hunting through the scrollback for
 it by eye. Both act on the command a jump (or a notification's click) landed on,
 else the one whose prompt is nearest the top of the viewport, else the

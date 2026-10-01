@@ -263,7 +263,8 @@ for unsaved work before deleting application data:
    remove it there, or delete the block between
    `# >>> Corta shell integration >>>` and
    `# <<< Corta shell integration <<<` in your shell's startup file —
-   `~/.zshrc`, `~/.bashrc` or `~/.config/fish/config.fish`. Nothing else
+   `~/.zshrc`, `~/.bash_profile` (or `~/.bash_login` / `~/.profile`) or
+   `~/.config/fish/config.fish`. Nothing else
    in that file is Corta's.
 2. **Secure Keyboard Entry** releases itself when Corta quits. If Corta
    was force-quit while a window was key and typing elsewhere seems to be

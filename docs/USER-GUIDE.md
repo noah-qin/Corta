@@ -4,8 +4,8 @@
 
 Everything Corta does, and how to reach it. Each section says where the
 feature lives — a menu, a shortcut, a setting — and links to the reference
-that holds the details. Shortcuts are the defaults; every one of them can be
-changed ([Keyboard shortcuts](#keyboard-shortcuts)).
+that holds the details. Shortcuts are the defaults, and all but Find Next
+and Find Previous can be changed ([Keyboard shortcuts](#keyboard-shortcuts)).
 
 - [Install and update](#install-and-update)
 - [Windows, tabs and panes](#windows-tabs-and-panes)
@@ -110,9 +110,11 @@ installed when you say so.
   copies too. Inside a program that uses the mouse — `vim`, `htop` — hold
   ⌥ while you start dragging to select text anyway
   (`mouse-override-modifier`).
-- **Paste.** ⌘V. Pasted text is marked as a paste (bracketed paste), so
-  zsh, bash and fish insert a pasted command without running it until you
-  press Return.
+- **Paste.** ⌘V. Pasted text is marked as a paste (bracketed paste), so a
+  shell that supports it — zsh, fish, bash 5.1 or later — inserts a pasted
+  command without running it until you press Return. When the program has
+  not turned bracketed paste on (macOS's own `/bin/bash` 3.2 never does),
+  Corta warns before pasting text that contains a line break.
 - **Export Text…** (⇧⌘S) saves the selection — or, with nothing selected,
   the whole scrollback and screen — to a file.
 - **Clearing.** Three commands, because they discard different things:
@@ -124,26 +126,29 @@ installed when you say so.
   | Reset Terminal | erased | discarded | reset |
 
   Clear History and Reset Terminal ask first and say how many lines they
-  would discard.
+  would discard — unless the scrollback is empty, or `confirm-close = false`
+  turns the question off.
 
 ## Links and file references
 
 - **URLs** open with ⌘-click; set `link-activation = click` to open them
-  with a plain click instead. Links a program marks explicitly (OSC 8, as
-  `ls --hyperlink` prints) are underlined, and the real target is shown
-  before anything opens.
+  with a plain click instead. Hold ⌘ over a link — including one a program
+  marks explicitly (OSC 8, as `ls --hyperlink` prints) — to underline it
+  and see its real target as a tooltip before you click; the click itself
+  opens it at once.
 - **File references.** A `path:line:column` in program output — a compiler
   error, a test failure — opens in your editor with ⌘-click. Tell Corta
-  which editor with `open-file-command`, for example
-  `open-file-command = code --goto {file}:{line}:{column}`
+  which editor with `open-file-command`, starting with the editor's full
+  path, for example
+  `open-file-command = /usr/local/bin/code --goto {file}:{line}:{column}`
   ([Following a file reference](CONFIGURATION.md#following-a-file-reference)).
 
 ## Shell integration
 
 Shell integration lets Corta see where each command starts and ends. Install
 it from **Settings ▸ Terminal ▸ Shell Integration**: it adds one marked block
-to your login shell's startup file (`~/.zshrc`, `~/.bashrc` or
-`~/.config/fish/config.fish`), and **Remove** takes out exactly that block.
+to your shell's startup file — `~/.zshrc`, `~/.bash_profile` (or `~/.bash_login` / `~/.profile` if that is what bash reads) or
+`~/.config/fish/config.fish` — and **Remove** takes out exactly that block.
 Nothing is installed without you pressing the button.
 
 With it installed:
@@ -155,7 +160,7 @@ With it installed:
 - **A command's output.** From the command palette: **Copy Last Command
   Output**, **Snapshot Running Command's Output** (what a build has printed
   so far), **Export Command Output…** to a file, and **Open File Reference
-  in Command Output**, which opens the first `path:line` it finds.
+  in Command Output**, which opens the last `path:line` it printed.
 - **Command History.** **Search Command History…** lists every command
   with its time, exit status and directory; **Fill** puts one back at the
   prompt and **Run** runs it again (`command-history-limit`).
@@ -189,9 +194,10 @@ how many and clears them.
 Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
 `ProxyJump` all apply — and has no SSH implementation of its own.
 
-- **The host badge.** A pane connected to another machine shows the host
-  at the front of the window title, so you always know which computer a
-  command will run on.
+- **The host badge.** A pane connected to another machine shows a badge
+  at the front of the window title. It names the host when the remote shell
+  reports it (shell integration installed there); otherwise it says the
+  pane is remote without knowing which host.
 - **Reconnect.** When an `ssh` or `mosh` session ends, **Reconnect to Host**
   runs the same command again, as a new connection.
 - **Browse Remote Files…** opens an SFTP browser for the pane's host: list,
@@ -269,7 +275,7 @@ appearance = auto
 font-size = 14
 scrollback-lines = 20000
 notify-on-long-task = true
-bind.split-right = ctrl+s
+bind.equalize-panes = ctrl+cmd+e
 ```
 
 Most settings apply at once; a few (window size, scrollback length) apply
@@ -282,11 +288,13 @@ Change any shortcut with `bind.<command>` in the config file; an empty value
 removes it, and the keystroke then reaches the program in the terminal:
 
 ```ini
-bind.split-right = ctrl+cmd+d
+bind.equalize-panes = ctrl+cmd+e
 bind.close =
 ```
 
-**Help ▸ Keyboard Shortcuts** shows the ones in effect. The defaults:
+**Help ▸ Keyboard Shortcuts** shows the ones in effect. The defaults, as
+of this version — [Keyboard shortcuts](CONFIGURATION.md#5-keyboard-shortcuts)
+is the authoritative list:
 
 | Command | Shortcut |
 | --- | --- |
@@ -298,7 +306,7 @@ bind.close =
 | Zoom Pane | ⇧⌘↩ |
 | Reopen Closed Pane | ⇧⌘T |
 | Bigger / Smaller / Actual Size | ⌘= / ⌘− / ⌘0 |
-| Find… / Find Next / Find Previous | ⌘F / ⌘G / ⇧⌘G |
+| Find… / Find Next / Find Previous | ⌘F / ⌘G / ⇧⌘G (Find Next and Previous are fixed) |
 | Copy / Paste / Select All | ⌘C / ⌘V / ⌘A |
 | Scroll a page / to the top or bottom | ⇧PageUp, ⇧PageDown / ⇧Home, ⇧End |
 | Previous / Next Command | ⌘↑ / ⌘↓ |

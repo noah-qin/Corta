@@ -128,7 +128,7 @@ theme = midnight
 theme.midnight.inherit = solarized
 theme.midnight.dark.background = #101018
 
-bind.split-right = ctrl+s
+bind.equalize-panes = ctrl+cmd+e
 bind.command-palette = cmd+shift+p
 ```
 
