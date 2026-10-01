@@ -106,7 +106,7 @@ Settings ▸ Terminal ▸ Shell Integration touches, and only inside one
 marked block each. The shell is the one `$SHELL` names: `~/.zshrc` for
 zsh, `~/.config/fish/config.fish` for fish, and zsh's for anything else.
 bash takes two: Corta starts it as a login shell, which reads the first
-readable one of `~/.bash_profile`, `~/.bash_login` and `~/.profile` (a new
+of `~/.bash_profile`, `~/.bash_login` and `~/.profile` that exists (a new
 `~/.bash_profile` when there is none) and never `~/.bashrc`, while a bash
 started inside the session reads only `~/.bashrc` — so the block goes into
 both, and guards itself against running twice when one sources the other.
@@ -121,8 +121,9 @@ reading `~/.profile` are untouched.
 
 **Install** appends the block (creating the file first if it does not
 exist); **Remove** deletes exactly that block and nothing else a user wrote
-around or inside it, and deletes the file only if the block was all it
-held. Installing is reversible for the same reason: nothing
+around or inside it — for bash, from every login file it may have gone
+into — and deletes a file only if Install created it (its first line
+says so) and nothing else is left in it. Installing is reversible for the same reason: nothing
 outside those two lines is Corta's to change, so removing them undoes the
 whole thing. Installing twice changes nothing the second time, and the
 script itself guards its own hooks with `CORTA_SHELL_INTEGRATION_ACTIVE` in
