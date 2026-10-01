@@ -94,6 +94,13 @@ public struct Terminal: Sendable {
 
     public var isFocusReportingEnabled: Bool { performer.state.focusReportingEnabled }
 
+    /// The wheel should send arrow keys (`?1007`): on the alternate screen,
+    /// alternate scroll on, mouse reporting off.
+    public var wheelSendsArrowKeys: Bool {
+        performer.grid.isAlternateScreenActive && performer.state.alternateScrollEnabled
+            && performer.state.mouseTrackingMode == .off
+    }
+
     public var isNewLineModeEnabled: Bool { performer.state.newLineModeEnabled }
 
     public var applicationCursorKeysEnabled: Bool {

@@ -225,4 +225,19 @@ extension PrivateModeTests {
         #expect(terminal.mouseTrackingMode == .off)
         #expect(!terminal.isSgrMouseEncodingEnabled)
     }
+
+    @Test("the wheel sends arrow keys on the alternate screen unless ?1007 or mouse reporting says otherwise")
+    func alternateScroll() {
+        var terminal = Terminal(rows: 5, columns: 20)
+        #expect(!terminal.wheelSendsArrowKeys, "the main screen scrolls its history")
+        terminal.feed(Array("\u{1B}[?1049h".utf8))
+        #expect(terminal.wheelSendsArrowKeys)
+        terminal.feed(Array("\u{1B}[?1000h\u{1B}[?1006h".utf8))
+        #expect(!terminal.wheelSendsArrowKeys, "mouse reporting takes the wheel")
+        terminal.feed(Array("\u{1B}[?1000l\u{1B}[?1007l".utf8))
+        #expect(!terminal.wheelSendsArrowKeys)
+        terminal.feed(Array("\u{1B}[?1007h\u{1B}[?1007$p".utf8))
+        #expect(terminal.wheelSendsArrowKeys)
+        #expect(String(decoding: terminal.takeOutput(), as: UTF8.self) == "\u{1B}[?1007;1$y")
+    }
 }

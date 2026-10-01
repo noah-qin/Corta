@@ -184,17 +184,20 @@ struct TerminalViewScrollTests {
         var scrolled: ScrollGesture?
         view.onMouseBytes = { mouseBytes.append($0) }
         view.onScroll = { scrolled = $0 }
+        // A wheel notch is a line: one SGR 64 (up).
         view.scrollWheel(with: Self.scrollEvent(deltaY: 1, units: .line))
+        #expect(mouseBytes == [Array("\u{1B}[<64;6;4M".utf8)])
+        // A trackpad's points accumulate like local scrolling: 1pt is not a
+        // notch (one report per event made vim and tmux race), 10pt is one.
         view.scrollWheel(with: Self.scrollEvent(deltaY: -1, units: .pixel, momentumPhase: .begin))
-        // SGR 64/65 per event, no accumulation, scrollback untouched.
-        #expect(mouseBytes == [
-            Array("\u{1B}[<64;6;4M".utf8),
-            Array("\u{1B}[<65;6;4M".utf8),
-        ])
-        #expect(scrolled == nil)
-        // Reporting off again: the wheel belongs to the scrollback, and
-        // the precise accumulator starts clean rather than inheriting
-        // anything from the reported events above.
+        #expect(mouseBytes.count == 1)
+        view.scrollWheel(with: Self.scrollEvent(deltaY: -9, units: .pixel, momentumPhase: .end))
+        #expect(mouseBytes.last == Array("\u{1B}[<65;6;4M".utf8))
+        // Three lines' worth in one event: three reports, in one write.
+        view.scrollWheel(with: Self.scrollEvent(deltaY: 3, units: .line))
+        #expect(mouseBytes.last == Array(String(repeating: "\u{1B}[<64;6;4M", count: 3).utf8))
+        #expect(scrolled == nil, "scrollback untouched while reporting")
+        // Reporting off again: the wheel belongs to the scrollback.
         view.isMouseReportingEnabled = { false }
         view.scrollWheel(with: Self.scrollEvent(deltaY: -1, units: .line))
         #expect(Self.lineCount(of: scrolled) == -1)

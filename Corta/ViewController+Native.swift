@@ -79,10 +79,11 @@ extension ViewController {
             alert.addButton(withTitle: L10n.text("common.cancel"))
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
-        // A paste in every way that matters, as in `pasteFromClipboard`.
+        // A paste in every way that matters, as in `pasteFromClipboard` —
+        // including saying so when the child is not reading, rather than
+        // dropping the drop without a word.
         returnToBottomOnInput()
-        session.write(
-            Paste.bytes(for: sanitized, bracketedPasteEnabled: session.isBracketedPasteEnabled))
+        sendPaste(sanitized)
     }
 
     func selectedText() -> String? {

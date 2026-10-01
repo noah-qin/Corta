@@ -61,13 +61,17 @@ extension TerminalView {
     override func scrollWheel(with event: NSEvent) {
         noteScrollGesturePhase(event)
         guard event.scrollingDeltaY != 0 else { return }
-        // With mouse reporting on, the wheel goes to the child (SGR 64/65).
+        // With mouse reporting on, the wheel goes to the child (SGR 64/65):
+        // one report per line accumulated, as for local scrolling. One per
+        // event sent a trackpad's every point-sized delta, momentum included,
+        // as a whole notch — vim and tmux scrolled many times too fast.
         if effectiveMouseTrackingMode != .off, !overridesMouseReporting(event), cellSize.width > 0, cellSize.height > 0 {
+            let lines = scrollWheelAccumulator.lines(for: event)
+            guard lines != 0 else { return }
             let (column, row) = cellUnder(event)
-            onMouseBytes?(
-                SGRMouse.wheel(
-                    up: event.scrollingDeltaY > 0, column: column, row: row,
-                    modifiers: Self.mouseModifiers(of: event)))
+            let report = SGRMouse.wheel(
+                up: lines > 0, column: column, row: row, modifiers: Self.mouseModifiers(of: event))
+            onMouseBytes?(Array(repeating: report, count: min(abs(lines), Self.maximumWheelRepeat)).flatMap { $0 })
             return
         }
         // Follow the raw sign: AppKit already applied natural scrolling, and
@@ -77,6 +81,9 @@ extension TerminalView {
         guard lines != 0 else { return }
         onScroll?(.lines(lines))
     }
+
+    /// Reports or arrow keys sent for one wheel event, however fast the flick.
+    static let maximumWheelRepeat = 24
 
     private var scrollWheelAccumulator: ScrollWheelAccumulator {
         if let existing = scrollWheelAccumulators.object(forKey: self) { return existing }

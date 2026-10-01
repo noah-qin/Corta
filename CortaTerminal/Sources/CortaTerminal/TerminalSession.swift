@@ -295,7 +295,7 @@ public final class TerminalSession: @unchecked Sendable {
                 }
                 // Fixed-format only (`SECURITY.md` §2.1); same queue as input.
                 if !responses.isEmpty {
-                    enqueueWrite(responses)
+                    enqueueWrite([responses])
                 }
                 if let episode {
                     scheduleSynchronizedOutputTimeout(episode: episode)
@@ -405,18 +405,29 @@ public final class TerminalSession: @unchecked Sendable {
     /// returns; a blocking `write(2)` measured 43 ms per MB once the PTY filled.
     @discardableResult
     public func write(_ bytes: [UInt8]) -> WriteOutcome {
-        enqueueWrite(bytes)
+        enqueueWrite([bytes])
+    }
+
+    /// Every chunk or none, under one backlog check: a paste cut off between
+    /// `ESC[200~` and `ESC[201~` leaves the shell in paste mode, reading
+    /// Return and Ctrl-C as pasted text until reset. Admitted while the
+    /// backlog is under the cap, however large — the cap pushes back on a
+    /// child that stopped reading, and a paste is the user's own size.
+    @discardableResult
+    public func write(chunks: [[UInt8]]) -> WriteOutcome {
+        enqueueWrite(chunks)
     }
 
     /// One queue for input and replies keeps them ordered.
     @discardableResult
-    private func enqueueWrite(_ bytes: [UInt8]) -> WriteOutcome {
-        guard !bytes.isEmpty else { return .accepted }
+    private func enqueueWrite(_ chunks: [[UInt8]]) -> WriteOutcome {
+        let chunks = chunks.filter { !$0.isEmpty }
+        guard !chunks.isEmpty else { return .accepted }
         guard !stopped.withLock({ $0 }) else { return .stopped }
         var shouldSchedule = false
         let outcome = pendingWrites.withLock { pending -> WriteOutcome in
             guard pending.bytes <= Self.maxPendingWriteBytes else { return .backpressured }
-            pending.push(bytes)
+            for chunk in chunks { pending.push(chunk) }
             if !pending.isDraining {
                 pending.isDraining = true
                 shouldSchedule = true
@@ -493,6 +504,11 @@ public final class TerminalSession: @unchecked Sendable {
 
     public var isNewLineModeEnabled: Bool {
         registerStateWaiter { state.withLock { $0.terminal.isNewLineModeEnabled } }
+    }
+
+    /// `Terminal.wheelSendsArrowKeys`, read per wheel event.
+    public var wheelSendsArrowKeys: Bool {
+        registerStateWaiter { state.withLock { $0.terminal.wheelSendsArrowKeys } }
     }
 
     public var applicationCursorKeysEnabled: Bool {
