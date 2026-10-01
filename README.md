@@ -17,11 +17,12 @@ Metal rendering · AppKit input · A dependency-free terminal core
 [![License](https://img.shields.io/badge/license-Apache--2.0-2f81f7?style=flat-square)](LICENSE)
 
 **[↓ Download](https://github.com/noah-qin/Corta/releases/latest)** ·
+**[User guide](docs/USER-GUIDE.md)** ·
 [Documentation](docs/README.md) ·
 [Contribute](CONTRIBUTING.md) ·
 [Report a bug](https://github.com/noah-qin/Corta/issues/new?template=bug_report.yml)
 
-<img src="docs/brand/screenshot.png" width="960" alt="Corta displaying a coloured git graph, CJK and emoji column alignment, and terminal colour ramps">
+<img src="docs/brand/screenshot.png" width="960" alt="Corta with three split panes: a git log and a Chinese, Japanese, Korean and emoji alignment table; the pangolin mascot shown as an image in the terminal; and 24-bit colour ramps">
 
 </div>
 
@@ -127,13 +128,14 @@ theme = midnight
 theme.midnight.inherit = solarized
 theme.midnight.dark.background = #101018
 
-bind.split-right = ctrl+s
+bind.equalize-panes = ctrl+cmd+e
 bind.command-palette = cmd+shift+p
 ```
 
 The [configuration reference](docs/CONFIGURATION.md) lists every key, default
-and when changes take effect. Shell integration for zsh can be installed from
-**Settings ▸ Terminal**.
+and when changes take effect. Shell integration for zsh, bash and fish can be
+installed from **Settings ▸ Terminal**. The [user guide](docs/USER-GUIDE.md)
+walks through every feature and where to find it.
 
 ## Build and test
 
@@ -180,7 +182,7 @@ from 2026-09-17. Its historical 81.1% figure counts passes **plus known bugs**;
 it is not a pass rate. See [conformance](docs/CONFORMANCE.md) for interpretation.
 
 Known limitations include above-target input latency, incomplete VT
-conformance, zsh-only shell integration and direct-transmission-only Kitty
+conformance, bundled shell integration for zsh, bash and fish only, and direct-transmission-only Kitty
 graphics. Accessibility and input reports still need follow-up. The
 [limitations reference](docs/FEATURES.md#known-limits) and
 [interactive test records](docs/test-results/) preserve the details.
@@ -189,6 +191,7 @@ graphics. Accessibility and input reports still need follow-up. The
 
 | I want to… | Start here |
 | :--- | :--- |
+| Learn every feature and where it lives | [User guide](docs/USER-GUIDE.md) |
 | Configure Corta | [Configuration](docs/CONFIGURATION.md) |
 | Understand a feature or limitation | [Features](docs/FEATURES.md) |
 | Diagnose a problem | [Troubleshooting](docs/TROUBLESHOOTING.md) |

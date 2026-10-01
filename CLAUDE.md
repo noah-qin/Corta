@@ -30,6 +30,7 @@ source of truth; this file is an index. `docs/README.md` is the fuller one.
 
 | Document                   | Covers                                                     |
 | -------------------------- | ---------------------------------------------------------- |
+| `docs/USER-GUIDE.md`       | Every feature, where it lives and how to use it, for a user |
 | `docs/FEATURES.md`         | What the development tree does and its known limits, for a user |
 | `docs/CONFIGURATION.md`    | Every config-file key: settings, themes, keybindings, presets, and when each applies — `DocumentationDriftTests` pins it to the code |
 | `docs/DECISIONS.md`        | The settled decisions, one record each — read before proposing an architecture change |
