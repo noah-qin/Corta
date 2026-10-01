@@ -237,10 +237,13 @@ public final class SFTPSession: @unchecked Sendable {
         /// all passed the `inFlight.count` check while none had registered
         /// yet, and the window bounded nothing.
         var windowUsed = 0
-        /// Frames handed to the writer queue and not yet written. Counted
-        /// apart from the window: a cancelled request gives its slot back at
-        /// once, but its frame is still queued behind a blocked write, and
-        /// cancel-and-retry would grow the queue without bound.
+        /// Writer-queue places taken: one per admitted sender, from admission
+        /// until its frame is written (or it turns out not to send one), plus
+        /// the handshake's. Counted apart from the window: a cancelled request
+        /// gives its window slot back at once, but its frame is still queued
+        /// behind a blocked write, and cancel-and-retry would grow the queue
+        /// without bound. Reserved at admission, never after, so admitting
+        /// cannot outrun it.
         var unwrittenFrames = 0
         /// Senders suspended on the window, FIFO by token.
         var windowWaiters: [(token: UInt64, continuation: CheckedContinuation<Bool, Never>)] = []
@@ -306,7 +309,7 @@ public final class SFTPSession: @unchecked Sendable {
                     returning: .failure(.protocolViolation("connect() called on a used session")))
                 return
             }
-            sendFrame(frame) { [self] error in finishHandshake(.failure(error)) }
+            sendFrame(frame, reserved: false) { [self] error in finishHandshake(.failure(error)) }
         }
 
         let reply = try result.get()
@@ -546,9 +549,12 @@ public final class SFTPSession: @unchecked Sendable {
                     return true
                 }
                 guard registered else {
-                    // The slot was acquired and will never be used.
+                    // The slot was acquired and will never be used, nor its
+                    // writer place.
                     let failure = state.withLock { state -> SFTPError in
+                        state.unwrittenFrames -= 1
                         releaseWindowSlot(&state)
+                        admitWaiters(&state)
                         return state.closed ?? SFTPError.cancelled
                     }
                     continuation.resume(returning: .failure(failure))
@@ -556,7 +562,7 @@ public final class SFTPSession: @unchecked Sendable {
                 }
                 let frame = SFTPCodec.encodeFrame(
                     SFTPMessage(requestID: ticket.id, request: payload(ticket.id)))
-                sendFrame(frame) { [self] error in failRequest(ticket, with: error) }
+                sendFrame(frame, reserved: true) { [self] error in failRequest(ticket, with: error) }
             }
         } onCancel: {
             cancelRequest(ticket)
@@ -573,6 +579,7 @@ public final class SFTPSession: @unchecked Sendable {
         let fastTicket = state.withLock { state -> SFTPRequestIDLedger.Ticket? in
             guard state.closed == nil, admits(state) else { return nil }
             state.windowUsed += 1
+            state.unwrittenFrames += 1
             return state.ids.allocate()
         }
         if let fastTicket { return fastTicket }
@@ -596,6 +603,7 @@ public final class SFTPSession: @unchecked Sendable {
                     guard state.closed == nil else { return false }
                     if admits(state) {
                         state.windowUsed += 1
+                        state.unwrittenFrames += 1
                         return true
                     }
                     state.windowWaiters.append((token: token, continuation: continuation))
@@ -655,9 +663,9 @@ public final class SFTPSession: @unchecked Sendable {
         }
     }
 
-    /// Gives a slot back: to the next FIFO waiter if there is one — the
-    /// slot passes to it and `windowUsed` does not move — otherwise to the
-    /// window.
+    /// Gives a slot back: to the next FIFO waiter if there is one and the
+    /// writer queue has a place for it — the slot passes to it and
+    /// `windowUsed` does not move — otherwise to the window.
     private func releaseWindowSlot(_ state: inout State) {
         guard !state.windowWaiters.isEmpty,
             state.unwrittenFrames < configuration.maxInFlightRequests
@@ -665,6 +673,7 @@ public final class SFTPSession: @unchecked Sendable {
             state.windowUsed -= 1
             return
         }
+        state.unwrittenFrames += 1
         state.windowWaiters.removeFirst().continuation.resume(returning: true)
     }
 
@@ -679,18 +688,19 @@ public final class SFTPSession: @unchecked Sendable {
     private func admitWaiters(_ state: inout State) {
         while !state.windowWaiters.isEmpty, admits(state) {
             state.windowUsed += 1
+            state.unwrittenFrames += 1
             state.windowWaiters.removeFirst().continuation.resume(returning: true)
         }
     }
 
     /// Queues `frame` behind every frame sent before it; `onFailure` runs on
-    /// the writer queue if the transport refuses it. Bounded: a sender queues
-    /// only once `acquireRequestSlot` admits it, and admission counts the
-    /// frames still unwritten (`State.unwrittenFrames`).
+    /// the writer queue if the transport refuses it. Bounded: a request's
+    /// place was reserved when `acquireRequestSlot` admitted it (`reserved`);
+    /// the handshake, which precedes the window, takes one here.
     private func sendFrame(
-        _ frame: [UInt8], onFailure: @escaping @Sendable (SFTPError) -> Void
+        _ frame: [UInt8], reserved: Bool, onFailure: @escaping @Sendable (SFTPError) -> Void
     ) {
-        state.withLock { $0.unwrittenFrames += 1 }
+        if !reserved { state.withLock { $0.unwrittenFrames += 1 } }
         writerQueue.async { [self, transport] in
             defer {
                 state.withLock { state in

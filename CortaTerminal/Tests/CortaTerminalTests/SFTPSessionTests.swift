@@ -347,6 +347,16 @@ extension SFTPSessionTests {
         }
         blockThisThread(seconds: 0.3)
         #expect(session.unwrittenFrameCount <= session.configuration.maxInFlightRequests)
+
+        // Senders waiting behind the full queue; then one write completes.
+        for round in 0..<40 {
+            Task.detached { _ = try? await session.stat(path: "/waiting/\(round)") }
+        }
+        blockThisThread(seconds: 0.2)
+        transport.permit(1)
+        blockThisThread(seconds: 0.3)
+        // One place freed admits one sender, not every waiter at once.
+        #expect(session.unwrittenFrameCount <= session.configuration.maxInFlightRequests)
     }
 }
 
@@ -363,6 +373,7 @@ private final class StallingTransport: SFTPChannelTransport, @unchecked Sendable
     private let base: SFTPChannelTransport
     private let condition = NSCondition()
     private var stalled = false
+    private var permits = 0
 
     init(_ base: SFTPChannelTransport) {
         self.base = base
@@ -381,13 +392,22 @@ private final class StallingTransport: SFTPChannelTransport, @unchecked Sendable
         condition.unlock()
     }
 
+    /// Lets `count` writes through while still stalled.
+    func permit(_ count: Int) {
+        condition.lock()
+        permits += count
+        condition.broadcast()
+        condition.unlock()
+    }
+
     func read(into buffer: UnsafeMutableRawBufferPointer) throws(SFTPTransportError) -> Int {
         try base.read(into: buffer)
     }
 
     func write(_ bytes: UnsafeRawBufferPointer) throws(SFTPTransportError) {
         condition.lock()
-        while stalled { condition.wait() }
+        while stalled, permits == 0 { condition.wait() }
+        if stalled { permits -= 1 }
         condition.unlock()
         try base.write(bytes)
     }
