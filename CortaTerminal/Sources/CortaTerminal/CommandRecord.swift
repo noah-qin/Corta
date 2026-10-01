@@ -110,7 +110,11 @@ public struct CommandRecordStore: Sendable, Equatable {
 
     mutating func remapRows(_ remap: RowRemap) {
         for index in records.indices {
-            records[index].promptRow = remap.map(records[index].promptRow)
+            let oldPromptRow = records[index].promptRow
+            records[index].promptRow = remap.map(oldPromptRow)
+            records[index].promptEndColumn = records[index].promptEndColumn.flatMap {
+                remap.promptEndColumn(promptRow: oldPromptRow, column: $0)
+            }
             records[index].outputStartRow = records[index].outputStartRow.map(remap.map)
             records[index].endRow = records[index].endRow.map(remap.map)
         }

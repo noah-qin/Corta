@@ -112,4 +112,69 @@ struct ReflowMarksTests {
         #expect(terminal.grid.line(atAbsoluteRow: last.promptRow)?.mark.isPrompt == true)
         #expect(Self.text(terminal, atAbsoluteRow: try #require(last.outputStartRow))?.hasPrefix("out") == true)
     }
+
+    @Test("marks in the same chunk as leaving the alternate screen land on their own rows")
+    func marksAfterAlternateScreenExitInOneChunk() throws {
+        var terminal = Terminal(rows: 5, columns: 20, scrollbackLimit: 100)
+        terminal.feed(Self.commands(6))
+        terminal.feed(Array("\u{1B}[?1049h".utf8))
+        terminal.resize(rows: 5, columns: 4)
+        // One read: the exit reflows the main screen, then a command runs.
+        terminal.feed(
+            Array(
+                "\u{1B}[?1049l\r\n\u{1B}]133;A\u{1B}\\$ zz\r\n\u{1B}]133;C\u{1B}\\yy\r\n\u{1B}]133;D;0\u{1B}\\"
+                    .utf8))
+        let last = try #require(terminal.commandRecords.lastCompleted)
+        #expect(Self.text(terminal, atAbsoluteRow: last.promptRow) == "$ zz")
+        // The records from before the alternate screen moved with the reflow
+        // when it happened, not at some later remap.
+        for record in terminal.commandRecords.records.dropLast(2) {
+            #expect(
+                terminal.grid.line(atAbsoluteRow: record.promptRow)?.mark.isPrompt == true,
+                "record \(record.id)")
+        }
+        #expect(Self.text(terminal, atAbsoluteRow: try #require(last.outputStartRow)) == "yy")
+        // And a later resize moves every record exactly once.
+        terminal.resize(rows: 5, columns: 20)
+        let again = try #require(terminal.commandRecords.lastCompleted)
+        #expect(Self.text(terminal, atAbsoluteRow: again.promptRow) == "$ zz")
+        #expect(Self.text(terminal, atAbsoluteRow: try #require(again.outputStartRow)) == "yy")
+    }
+
+    @Test("a wrapped run of blank rows keeps every later row's remap in step")
+    func blankWrappedRowsKeepTheRemapAligned() throws {
+        // On screen, where rows keep their blanks (scrollback trims them):
+        // forty spaces are two wrapped rows that trim to nothing in a reflow.
+        var terminal = Terminal(rows: 12, columns: 20, scrollbackLimit: 100)
+        terminal.feed(Self.commands(1))
+        // On a row of their own, not after the open prompt's "$ ".
+        terminal.feed(Array(("\r\n" + String(repeating: " ", count: 40) + "\r\n").utf8))
+        terminal.feed(Self.commands(2))
+        #expect(terminal.grid.scrollback.count == 0)
+        terminal.resize(rows: 12, columns: 30)
+        for record in terminal.commandRecords.records where !record.isRunning {
+            #expect(
+                Self.text(terminal, atAbsoluteRow: record.promptRow)?.hasPrefix("$ cmd") == true,
+                "record \(record.id)")
+            #expect(terminal.grid.line(atAbsoluteRow: record.promptRow)?.mark.isPrompt == true)
+        }
+    }
+
+    @Test("a prompt's end column follows a reflow, or is dropped when it cannot")
+    func promptEndColumnFollowsOrIsDropped() throws {
+        var terminal = Terminal(rows: 5, columns: 30, scrollbackLimit: 100)
+        // A 19-column prompt, ended by B on its own row.
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\long-prompt-text-> \u{1B}]133;B\u{1B}\\".utf8))
+        #expect(terminal.promptEndPosition?.column == 19)
+
+        terminal.resize(rows: 5, columns: 40)
+        let wide = try #require(terminal.promptEndPosition)
+        #expect(wide.column == 19)
+        #expect(terminal.grid.line(atAbsoluteRow: wide.row)?.mark.isPrompt == true)
+
+        // At 10 columns the prompt wraps past its end: no column to trust.
+        terminal.resize(rows: 5, columns: 10)
+        #expect(terminal.promptEndPosition == nil)
+        #expect(terminal.commandRecords.last?.promptEndColumn == nil)
+    }
 }
