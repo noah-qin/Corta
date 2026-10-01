@@ -322,6 +322,34 @@ struct SFTPSessionTests {
     }
 }
 
+extension SFTPSessionTests {
+    @Test("cancelled requests cannot grow the writer queue past the window")
+    func cancellationKeepsTheWriterQueueBounded() async throws {
+        let connection = SFTPLoopbackConnection()
+        let server = FakeSFTPServer(connection: connection, fileSystem: FakeRemoteFileSystem())
+        server.start()
+        let transport = StallingTransport(connection.clientTransport())
+        let session = SFTPSession(transport: transport)
+        _ = try await session.connect()
+        defer {
+            transport.release()
+            session.close()
+            connection.close()
+        }
+
+        transport.stall()
+        // Each request gives its slot back the moment it is cancelled, while
+        // its frame stays queued behind the stalled write.
+        for round in 0..<200 {
+            let task = Task.detached { _ = try? await session.stat(path: "/\(round)") }
+            blockThisThread(seconds: 0.002)
+            task.cancel()
+        }
+        blockThisThread(seconds: 0.3)
+        #expect(session.unwrittenFrameCount <= session.configuration.maxInFlightRequests)
+    }
+}
+
 private func blockThisThread(seconds: TimeInterval) {
     Thread.sleep(forTimeInterval: seconds)
 }

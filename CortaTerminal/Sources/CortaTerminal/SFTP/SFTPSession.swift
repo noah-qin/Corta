@@ -237,6 +237,11 @@ public final class SFTPSession: @unchecked Sendable {
         /// all passed the `inFlight.count` check while none had registered
         /// yet, and the window bounded nothing.
         var windowUsed = 0
+        /// Frames handed to the writer queue and not yet written. Counted
+        /// apart from the window: a cancelled request gives its slot back at
+        /// once, but its frame is still queued behind a blocked write, and
+        /// cancel-and-retry would grow the queue without bound.
+        var unwrittenFrames = 0
         /// Senders suspended on the window, FIFO by token.
         var windowWaiters: [(token: UInt64, continuation: CheckedContinuation<Bool, Never>)] = []
         var nextWindowToken: UInt64 = 0
@@ -261,6 +266,9 @@ public final class SFTPSession: @unchecked Sendable {
         self.transport = transport
         self.configuration = configuration
     }
+
+    /// Frames queued for the writer and not yet written; for tests.
+    var unwrittenFrameCount: Int { state.withLock { $0.unwrittenFrames } }
 
     /// The server's capabilities, from its VERSION answer. `nil` until
     /// `connect()` completes.
@@ -563,9 +571,7 @@ public final class SFTPSession: @unchecked Sendable {
         if let closed = state.withLock({ $0.closed }) { throw closed }
         // Fast path: the window has room.
         let fastTicket = state.withLock { state -> SFTPRequestIDLedger.Ticket? in
-            guard state.closed == nil,
-                state.windowUsed < configuration.maxInFlightRequests
-            else { return nil }
+            guard state.closed == nil, admits(state) else { return nil }
             state.windowUsed += 1
             return state.ids.allocate()
         }
@@ -583,12 +589,19 @@ public final class SFTPSession: @unchecked Sendable {
         // never stranded by a late cancellation.
         let admitted = await withTaskCancellationHandler {
             await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
-                let queued = state.withLock { state -> Bool in
+                // Re-checked here: room may have opened since the fast path,
+                // and a frame draining finds no waiter to admit until this
+                // one is queued.
+                let outcome = state.withLock { state -> Bool? in
                     guard state.closed == nil else { return false }
+                    if admits(state) {
+                        state.windowUsed += 1
+                        return true
+                    }
                     state.windowWaiters.append((token: token, continuation: continuation))
-                    return true
+                    return nil
                 }
-                if !queued { continuation.resume(returning: false) }
+                if let outcome { continuation.resume(returning: outcome) }
             }
         } onCancel: {
             state.withLock { state in
@@ -646,20 +659,45 @@ public final class SFTPSession: @unchecked Sendable {
     /// slot passes to it and `windowUsed` does not move — otherwise to the
     /// window.
     private func releaseWindowSlot(_ state: inout State) {
-        guard !state.windowWaiters.isEmpty else {
+        guard !state.windowWaiters.isEmpty,
+            state.unwrittenFrames < configuration.maxInFlightRequests
+        else {
             state.windowUsed -= 1
             return
         }
         state.windowWaiters.removeFirst().continuation.resume(returning: true)
     }
 
+    /// Room for one more sender: in the window, and in the writer queue.
+    private func admits(_ state: State) -> Bool {
+        state.windowUsed < configuration.maxInFlightRequests
+            && state.unwrittenFrames < configuration.maxInFlightRequests
+    }
+
+    /// After a frame leaves the writer queue: admits the waiters the queue
+    /// was holding back.
+    private func admitWaiters(_ state: inout State) {
+        while !state.windowWaiters.isEmpty, admits(state) {
+            state.windowUsed += 1
+            state.windowWaiters.removeFirst().continuation.resume(returning: true)
+        }
+    }
+
     /// Queues `frame` behind every frame sent before it; `onFailure` runs on
-    /// the writer queue if the transport refuses it. The queue holds at most
-    /// a window's worth: a sender queues only after `acquireRequestSlot`.
+    /// the writer queue if the transport refuses it. Bounded: a sender queues
+    /// only once `acquireRequestSlot` admits it, and admission counts the
+    /// frames still unwritten (`State.unwrittenFrames`).
     private func sendFrame(
         _ frame: [UInt8], onFailure: @escaping @Sendable (SFTPError) -> Void
     ) {
-        writerQueue.async { [transport] in
+        state.withLock { $0.unwrittenFrames += 1 }
+        writerQueue.async { [self, transport] in
+            defer {
+                state.withLock { state in
+                    state.unwrittenFrames -= 1
+                    admitWaiters(&state)
+                }
+            }
             // `withUnsafeBytes` rethrows untyped; the typed error is carried out.
             let failure = frame.withUnsafeBytes { bytes -> SFTPTransportError? in
                 do throws(SFTPTransportError) {

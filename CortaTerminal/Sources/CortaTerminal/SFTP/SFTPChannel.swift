@@ -331,14 +331,23 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
         // SIGKILL: this is cancellation, and a politely asked child may be stuck
         // in a socket read. Only while unreaped, and decided under the lock
         // `reap` claims: once `waitpid` has run the id is free for the system
-        // to give a stranger.
-        // A reap in progress means the exit source saw the child go.
-        let killed = state.withLock { state -> Bool in
-            guard state.exit == nil, !state.isReaping else { return false }
-            kill(processIdentifier, SIGKILL)
-            return true
+        // to give a stranger. A reap in progress is waited out rather than
+        // trusted — it may be `awaitExit`'s `WNOHANG` probe of a live child —
+        // and neither kind blocks: the exit source reaps only an exited child.
+        while true {
+            let killed = state.withLock { state -> Bool? in
+                if state.exit != nil { return false }
+                if state.isReaping { return nil }
+                kill(processIdentifier, SIGKILL)
+                return true
+            }
+            guard let killed else {
+                Thread.sleep(forTimeInterval: 0.001)
+                continue
+            }
+            if killed { _ = reap(blocking: true) }
+            break
         }
-        if killed { _ = reap(blocking: true) }
         stdinWrite.close()
         stdoutRead.close()
     }
