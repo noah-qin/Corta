@@ -39,6 +39,38 @@ struct InputAmplificationTests {
         #expect(terminal.grid.graphemes.count < GraphemeTable.maximumClusterScalars)
     }
 
+    @Test("a full cluster ending in a joiner does not swallow the characters after it")
+    func fullJoinerClusterLetsTextContinue() throws {
+        var terminal = Terminal(rows: 4, columns: 40)
+        // 👩‍ repeated: alternating emoji and ZWJ, 32 scalars ending in ZWJ.
+        var cluster = ""
+        for _ in 0..<(GraphemeTable.maximumClusterScalars / 2) { cluster += "\u{1F469}\u{200D}" }
+        terminal.feed(Array((cluster + "\u{1F600}é").utf8))
+
+        let first = try #require(terminal.grid.graphemes.scalars(for: terminal.grid.line(0)[0].grapheme))
+        #expect(first.count == GraphemeTable.maximumClusterScalars)
+        #expect(first.last == 0x200D)
+        // The emoji after it is its own wide cell, and é follows it.
+        #expect(terminal.grid.line(0)[2].scalar == 0x1F600)
+        #expect(terminal.grid.line(0)[4].scalar == 0xE9)
+    }
+
+    @Test("a full cluster ending in a lone regional indicator does not swallow the ones after it")
+    func fullIndicatorClusterLetsTextContinue() {
+        var terminal = Terminal(rows: 4, columns: 40)
+        // x, an accent, then 15 × (ZWJ, indicator): 32 scalars ending in one
+        // indicator — reachable only through joiners, since a flag pair ends
+        // a run at two.
+        var input = "x\u{0301}"
+        for _ in 0..<15 { input += "\u{200D}\u{1F1FA}" }
+        input += "\u{1F1FA}\u{1F1F8}"  // then a flag
+        terminal.feed(Array(input.utf8))
+        let indicators = terminal.grid.rowText(0).unicodeScalars.filter {
+            (0x1F1E6...0x1F1FF).contains($0.value)
+        }.count
+        #expect(indicators == 17, "the flag after a full cluster was dropped")
+    }
+
     @Test("a hyperlink table full of live links is not rescanned for every new link")
     func futileHyperlinkSweepsAreRationed() {
         // Every link on its own scrollback row, so all stay live.

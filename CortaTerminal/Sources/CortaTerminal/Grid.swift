@@ -346,10 +346,15 @@ public struct Grid: Sendable {
     }
 
     /// Plain cells answer without a table lookup, so CJK pays a bounds check.
+    /// A full cluster (`GraphemeTable.maximumClusterScalars`) continues
+    /// nothing: the next character starts its own cell. Joined instead, it
+    /// would be dropped at the cap, and so would every character after it.
     private func clusterEndsWithZWJ(_ target: (row: Int, column: Int)) -> Bool {
         let cell = lines[target.row][target.column]
-        guard !cell.grapheme.isNone else { return false }
-        return graphemes.scalars(for: cell.grapheme)?.last == 0x200D
+        guard !cell.grapheme.isNone, let cluster = graphemes.scalars(for: cell.grapheme),
+            cluster.count < GraphemeTable.maximumClusterScalars
+        else { return false }
+        return cluster.last == 0x200D
     }
 
     private static func isRegionalIndicator(_ scalar: UInt32) -> Bool {
@@ -363,6 +368,8 @@ public struct Grid: Sendable {
         guard !cell.grapheme.isNone, let cluster = graphemes.scalars(for: cell.grapheme) else {
             return Self.isRegionalIndicator(cell.scalar)
         }
+        // Full: as for a ZWJ, the next indicator starts its own cell.
+        guard cluster.count < GraphemeTable.maximumClusterScalars else { return false }
         var trailing = 0
         for scalar in cluster.reversed() {
             guard Self.isRegionalIndicator(scalar) else { break }
