@@ -17,6 +17,7 @@ Metal rendering · AppKit input · A dependency-free terminal core
 [![License](https://img.shields.io/badge/license-Apache--2.0-2f81f7?style=flat-square)](LICENSE)
 
 **[↓ Download](https://github.com/noah-qin/Corta/releases/latest)** ·
+**[User guide](docs/USER-GUIDE.md)** ·
 [Documentation](docs/README.md) ·
 [Contribute](CONTRIBUTING.md) ·
 [Report a bug](https://github.com/noah-qin/Corta/issues/new?template=bug_report.yml)
