@@ -62,11 +62,9 @@ extension ViewController {
         guard let directory = hasKnownWorkingDirectory ? session.workingDirectory : nil else {
             return
         }
-        guard let root = DirectoryHistory.projectRoot(for: directory) else {
-            terminalView?.showToast(L10n.text("toast.noProjectRoot"), kind: .warning)
-            return
+        withProjectRoot(of: directory) { controller, root in
+            controller.changeDirectory(to: root)
         }
-        changeDirectory(to: root)
     }
 
     /// Splits with a new pane rooted at the parent directory.
@@ -83,10 +81,29 @@ extension ViewController {
         guard let directory = hasKnownWorkingDirectory ? session.workingDirectory : nil else {
             return
         }
-        guard let root = DirectoryHistory.projectRoot(for: directory) else {
-            terminalView?.showToast(L10n.text("toast.noProjectRoot"), kind: .warning)
-            return
+        withProjectRoot(of: directory) { controller, root in
+            controller.splitController?.splitFocusedPane(orientation: .columns, workingDirectory: root)
         }
-        splitController?.splitFocusedPane(orientation: .columns, workingDirectory: root)
+    }
+
+    /// Finds `directory`'s project root off the main thread — the walk
+    /// `stat`s a child-reported path, which can sit on an unreachable
+    /// automount — then runs `body` on it, or reports that there is none.
+    private func withProjectRoot(
+        of directory: String, _ body: @escaping @MainActor (ViewController, String) -> Void
+    ) {
+        Task { [weak self] in
+            let root = await Task.detached(priority: .userInitiated) {
+                DirectoryHistory.projectRoot(for: directory)
+            }.value
+            // The lookup can outlast a change of focus; the toast or split
+            // would then land on another pane.
+            guard let self, !didTeardown, isFocusedPane else { return }
+            guard let root else {
+                terminalView?.showToast(L10n.text("toast.noProjectRoot"), kind: .warning)
+                return
+            }
+            body(self, root)
+        }
     }
 }

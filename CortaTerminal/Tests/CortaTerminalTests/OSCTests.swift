@@ -30,6 +30,17 @@ struct OSCTests {
         return terminal
     }
 
+    @Test("OSC 7 naming this machine's hostname at session start stays local after it changes")
+    func hostnameAtStartStaysLocal() {
+        // A shell fixes `$HOST` when it starts; the kernel's name can move on.
+        var performer = Performer(grid: Grid(rows: 4, columns: 20))
+        performer.state.hostnamesAtStart = ["corta-earlier-name"]
+        var parser = Parser()
+        parser.parse(Array("\u{1B}]7;file://corta-earlier-name/tmp\u{07}".utf8), performer: &performer)
+        #expect(performer.state.workingDirectory == "/tmp")
+        #expect(performer.state.remoteContext == nil)
+    }
+
     @Test("OSC 0 and OSC 2 set the window title, BEL or ST terminated")
     func windowTitle() throws {
         #expect(try terminal("\\e]2;first\\a").windowTitle == "first")

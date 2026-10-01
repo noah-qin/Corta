@@ -41,6 +41,8 @@ public struct PerformerState: Sendable {
     public internal(set) var windowTitle: String?
     /// Local only; a report naming another host goes to `remoteContext`.
     public internal(set) var workingDirectory: String?
+    /// This machine's names when the session started (`Performer.localHostnames`).
+    var hostnamesAtStart = Performer.localHostnames()
     /// Informational only — nothing that spawns a process may read it.
     public internal(set) var remoteContext: RemoteContext?
     public internal(set) var focusReportingEnabled = false

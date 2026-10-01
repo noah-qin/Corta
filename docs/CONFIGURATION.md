@@ -528,8 +528,11 @@ last reported through `OSC 7`, and are disabled until it has reported one.
 `change-directory-to-parent` and `change-directory-to-project-root` write a
 `cd` to the shell under the same safety gate every app-initiated directory
 change uses (§2, History): only when no command is running and the prompt is
-empty. The project root is the nearest ancestor containing `.git`, and the
-two project-root commands are disabled when there is none.
+empty. The project root is the nearest ancestor containing `.git`. The two
+project-root commands look for it after you choose them — off the main
+thread, since the path is the shell's and may sit on a slow or unreachable
+volume — and show "No project root" when there is none, rather than being
+disabled ahead of time.
 `open-parent-directory-in-new-pane` and `open-project-root-in-new-pane`
 split the pane with a new local one rooted there instead. In a remote pane
 only `change-directory-to-parent` works — the `cd` goes to the remote shell,

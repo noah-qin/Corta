@@ -69,12 +69,44 @@ struct NativeIntegrationTests {
         #expect(inserted == "selected text")
     }
 
-    @Test("dropped shell paths quote metacharacters and apostrophes")
+    @Test("dropped shell paths quote metacharacters, apostrophes and backslashes")
     func shellQuoting() {
         #expect(ViewController.shellQuoted("/tmp/plain-file") == "/tmp/plain-file")
         #expect(ViewController.shellQuoted("/tmp/a b") == "'/tmp/a b'")
-        #expect(ViewController.shellQuoted("/tmp/a'b") == "'/tmp/a'\\''b'")
+        #expect(ViewController.shellQuoted("/tmp/a'b") == #"'/tmp/a'"'"'b'"#)
+        #expect(ViewController.shellQuoted(#"/tmp/a\b"#) == #"'/tmp/a'"\\"'b'"#)
         #expect(ViewController.shellQuoted("/tmp/$(touch hacked)") == "'/tmp/$(touch hacked)'")
+    }
+
+    /// The quoting is read by whatever shell the pane runs. fish's single
+    /// quotes treat `\'` and `\\` as escapes, so POSIX's `'\''` let
+    /// `x\'; cmd; \'` out of the quotes there. Each installed shell must
+    /// read every name back exactly.
+    @Test("every shell reads a quoted path back exactly", arguments: [
+        "/bin/sh", "/bin/bash", "/bin/zsh", "/opt/homebrew/bin/fish", "/usr/local/bin/fish",
+    ])
+    func quotingRoundTripsThroughShells(shell: String) throws {
+        // sh, bash and zsh ship with macOS; fish is checked where installed.
+        let installed = FileManager.default.isExecutableFile(atPath: shell)
+        try #require(installed || shell.hasSuffix("fish"), "\(shell) ships with macOS")
+        guard installed else { return }
+        let names = [
+            #"/tmp/x\'; echo CORTA-PWNED; echo \'/sub"#, #"a\"#, "John's Folder",
+            "$(echo CORTA-PWNED)", "tick`echo CORTA-PWNED`", #"double"quote"#, "😀 中文",
+        ]
+        for name in names {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: shell)
+            let script = "printf '%s\\n' " + ViewController.shellQuoted(name)
+            process.arguments = (shell.hasSuffix("fish") ? ["--no-config"] : []) + ["-c", script]
+            let output = Pipe()
+            process.standardOutput = output
+            process.standardError = FileHandle.nullDevice
+            try process.run()
+            process.waitUntilExit()
+            let printed = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+            #expect(printed == name + "\n", "\(shell) read \(name.debugDescription) as \(printed.debugDescription)")
+        }
     }
 
     @Test("dropped paths are sanitised before quoting")
