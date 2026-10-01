@@ -104,9 +104,11 @@ what to edit.
   `~/.bash_login` or `~/.profile` — and Settings shows **Update** for an
   integration installed only in `~/.bashrc`. The hooks run only in an
   interactive bash, so `bash -lc` output is untouched and other shells
-  reading `~/.profile` skip them; a command no longer appears to start
-  while the startup files are still running; and **Remove** deletes a
-  file that held nothing but the hooks.
+  reading `~/.profile` skip them. A command no longer appears to start
+  while the startup files run, or once per part of a `PROMPT_COMMAND` you
+  set yourself, and `a; b` is one command. **Remove** clears the hooks
+  from every file bash may have been given them in, and deletes a file
+  only if Install created it.
 
 - Emoji are sharp and fill their two cells. They were drawn at the text
   size and then scaled down on the GPU to fit, which left them smaller than
