@@ -33,6 +33,13 @@ public struct GraphemeID: Equatable, Hashable, Sendable {
 public struct GraphemeTable: Sendable {
     public static let capacity = Int(UInt16.max) - 1
 
+    /// Scalars one cell keeps. Unicode's stream-safe format allows 30
+    /// non-starters in a row (UAX #15 §13); a ZWJ family emoji is under a
+    /// dozen. Uncapped, each mark copied the whole cluster into a new entry:
+    /// 65 534 combining accents on one letter, 130 KB of output, interned
+    /// about 8.6 GB.
+    public static let maximumClusterScalars = 32
+
     /// `nil` is a reclaimed slot; a live id never moves, which makes reuse safe.
     private var clusters: ContiguousArray<[UInt32]?> = []
     private var ids: [[UInt32]: GraphemeID] = [:]

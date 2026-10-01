@@ -68,6 +68,16 @@ public struct Scrollback: Sendable {
     public var isEmpty: Bool { count == 0 }
     public var isFull: Bool { count == limit }
 
+    /// `self[index].wrapped` without copying the row's cells out.
+    public func isWrapped(at index: Int) -> Bool {
+        guard index >= 0, index < count else { return false }
+        let global = index + headSkip
+        let batchIndex = global / batchSize
+        let rowIndex = global % batchSize
+        guard batchIndex < batches.count, rowIndex < batches[batchIndex].rows.count else { return false }
+        return batches[batchIndex].rows[rowIndex].wrapped
+    }
+
     /// Oldest first: index 0 is the line furthest back in history.
     public subscript(index: Int) -> Line {
         guard index >= 0, index < count else { return Line() }

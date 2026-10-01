@@ -25,9 +25,25 @@
 /// which frees every image no placement shows, as kitty does.
 public struct ImagePlacementTable: Sendable {
     private var images: [KittyGraphics.ImageID: KittyGraphics.ImageData] = [:]
-    private var placements: [KittyGraphics.PlacementID: KittyGraphics.Placement] = [:]
+    /// A placement id names a placement *of an image* (kitty's
+    /// `graphics.c` keeps refs per image): `i=1,p=1` and `i=2,p=1` are two.
+    private struct PlacementKey: Hashable {
+        var imageID: KittyGraphics.ImageID
+        var placementID: KittyGraphics.PlacementID
+
+        init(_ imageID: KittyGraphics.ImageID, _ placementID: KittyGraphics.PlacementID) {
+            self.imageID = imageID
+            self.placementID = placementID
+        }
+
+        init(_ placement: KittyGraphics.Placement) {
+            self.init(placement.imageID, placement.id)
+        }
+    }
+
+    private var placements: [PlacementKey: KittyGraphics.Placement] = [:]
     /// Oldest first: equal z-indices draw in transmission order.
-    private var placementOrder: [KittyGraphics.PlacementID] = []
+    private var placementOrder: [PlacementKey] = []
     /// Per instance: the table is copied into the renderer's frame cache.
     private var storedImageBytes = 0
     /// A `var` so tests need not send hundreds of megabytes.
@@ -135,13 +151,14 @@ public struct ImagePlacementTable: Sendable {
         _ header: KittyGraphics.DisplayHeader, row: Int, column: Int, baseScrollbackTotal: Int
     ) -> Bool {
         guard images[header.imageID] != nil else { return false }
-        guard placements[header.placementID] != nil
+        let key = PlacementKey(header.imageID, header.placementID)
+        guard placements[key] != nil
             || placements.count < KittyGraphics.maximumTrackedPlacements
         else { return false }
-        if placements[header.placementID] == nil {
-            placementOrder.append(header.placementID)
+        if placements[key] == nil {
+            placementOrder.append(key)
         }
-        placements[header.placementID] = KittyGraphics.Placement(
+        placements[key] = KittyGraphics.Placement(
             id: header.placementID, imageID: header.imageID, row: row, column: column,
             columns: header.columns, rows: header.rows, baseScrollbackTotal: baseScrollbackTotal,
             zIndex: header.zIndex)
@@ -165,9 +182,9 @@ public struct ImagePlacementTable: Sendable {
             storeGenerations[imageID] = nil
             removePlacements(matching: imageID)
         case .placement(let imageID, let placementID):
-            if placements[placementID]?.imageID == imageID {
-                placements[placementID] = nil
-                placementOrder.removeAll { $0 == placementID }
+            let key = PlacementKey(imageID, placementID)
+            if placements.removeValue(forKey: key) != nil {
+                placementOrder.removeAll { $0 == key }
             }
         case .unrecognised:
             break  // See `KittyGraphics.DeleteTarget`'s doc comment.
@@ -176,7 +193,7 @@ public struct ImagePlacementTable: Sendable {
     }
 
     private mutating func removePlacements(matching imageID: KittyGraphics.ImageID) {
-        let toRemove = Set(placements.values.filter { $0.imageID == imageID }.map(\.id))
+        let toRemove = Set(placements.keys.filter { $0.imageID == imageID })
         guard !toRemove.isEmpty else { return }
         for id in toRemove { placements[id] = nil }
         placementOrder.removeAll { toRemove.contains($0) }
@@ -202,7 +219,7 @@ public struct ImagePlacementTable: Sendable {
                 return false
             }
             return top + rows > 0
-        }.map(\.id)
+        }.map(PlacementKey.init)
         remove(Set(toRemove))
         freeUnplacedImages()
     }
@@ -223,7 +240,7 @@ public struct ImagePlacementTable: Sendable {
                 return true
             }
             return top + rows <= 0
-        }.map(\.id)
+        }.map(PlacementKey.init)
         remove(Set(toRemove))
         freeUnplacedImages()
     }
@@ -252,7 +269,7 @@ public struct ImagePlacementTable: Sendable {
         return max(1, (height + cellPixelHeight - 1) / cellPixelHeight)
     }
 
-    private mutating func remove(_ ids: Set<KittyGraphics.PlacementID>) {
+    private mutating func remove(_ ids: Set<PlacementKey>) {
         guard !ids.isEmpty else { return }
         for id in ids { placements[id] = nil }
         placementOrder.removeAll { ids.contains($0) }
