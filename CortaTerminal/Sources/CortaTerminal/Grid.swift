@@ -83,6 +83,13 @@ public struct Grid: Sendable {
     /// (`internHyperlink`).
     public var hyperlinks: HyperlinkTable
 
+    /// Failed interns left before the next futile sweep may run
+    /// (`internHyperlink`, `combine`).
+    private var hyperlinkSweepDeferral = 0
+    private var graphemeSweepDeferral = 0
+    /// Full-grid scans run by the two sweeps, for tests.
+    private(set) var sideTableSweeps = 0
+
     /// Cleared on a column resize, kept across a row-only one.
     public var imagePlacements = ImagePlacementTable()
     /// The pty's pixel height per row (`ws_ypixel / ws_row`), which the app
@@ -339,10 +346,15 @@ public struct Grid: Sendable {
     }
 
     /// Plain cells answer without a table lookup, so CJK pays a bounds check.
+    /// A full cluster (`GraphemeTable.maximumClusterScalars`) continues
+    /// nothing: the next character starts its own cell. Joined instead, it
+    /// would be dropped at the cap, and so would every character after it.
     private func clusterEndsWithZWJ(_ target: (row: Int, column: Int)) -> Bool {
         let cell = lines[target.row][target.column]
-        guard !cell.grapheme.isNone else { return false }
-        return graphemes.scalars(for: cell.grapheme)?.last == 0x200D
+        guard !cell.grapheme.isNone, let cluster = graphemes.scalars(for: cell.grapheme),
+            cluster.count < GraphemeTable.maximumClusterScalars
+        else { return false }
+        return cluster.last == 0x200D
     }
 
     private static func isRegionalIndicator(_ scalar: UInt32) -> Bool {
@@ -356,6 +368,8 @@ public struct Grid: Sendable {
         guard !cell.grapheme.isNone, let cluster = graphemes.scalars(for: cell.grapheme) else {
             return Self.isRegionalIndicator(cell.scalar)
         }
+        // Full: as for a ZWJ, the next indicator starts its own cell.
+        guard cluster.count < GraphemeTable.maximumClusterScalars else { return false }
         var trailing = 0
         for scalar in cluster.reversed() {
             guard Self.isRegionalIndicator(scalar) else { break }
@@ -367,11 +381,17 @@ public struct Grid: Sendable {
     private mutating func combine(_ scalar: UInt32, row: Int, column: Int) {
         let cell = lines[row][column]
         var cluster = graphemes.scalars(for: cell.grapheme) ?? [cell.scalar]
+        // Past the cap the mark is dropped, as when the table is full.
+        guard cluster.count < GraphemeTable.maximumClusterScalars else { return }
         cluster.append(scalar)
         var id = graphemes.intern(cluster)
-        if id == nil, graphemes.count >= GraphemeTable.capacity {
+        if id == nil, graphemes.count >= GraphemeTable.capacity,
+            Self.sideTableSweepAllowed(&graphemeSweepDeferral)
+        {
             // Full: sweep, retry once; still full means the mark is dropped.
-            graphemes.reclaim(keeping: liveGraphemeIDs())
+            sideTableSweeps += 1
+            let freed = graphemes.reclaim(keeping: liveGraphemeIDs())
+            Self.deferSideTableSweep(&graphemeSweepDeferral, freed: freed, capacity: GraphemeTable.capacity)
             id = graphemes.intern(cluster)
         }
         guard let id else { return }
@@ -627,9 +647,31 @@ public struct Grid: Sendable {
     /// `capacity` URLs would never link again.
     public mutating func internHyperlink(_ url: String) -> HyperlinkID? {
         if let id = hyperlinks.intern(url) { return id }
-        guard hyperlinks.count >= HyperlinkTable.capacity else { return nil }
-        hyperlinks.reclaim(keeping: liveHyperlinkIDs())
+        guard hyperlinks.count >= HyperlinkTable.capacity,
+            Self.sideTableSweepAllowed(&hyperlinkSweepDeferral)
+        else { return nil }
+        sideTableSweeps += 1
+        let freed = hyperlinks.reclaim(keeping: liveHyperlinkIDs())
+        Self.deferSideTableSweep(&hyperlinkSweepDeferral, freed: freed, capacity: HyperlinkTable.capacity)
         return hyperlinks.intern(url)
+    }
+
+    /// A sweep scans every cell on screen and in scrollback under the session
+    /// lock. When the table is full of entries still in use it frees nothing,
+    /// and sweeping again on every new link or mark — `ls --hyperlink -R`
+    /// over a big tree — froze the pane. So a sweep that freed under a quarter
+    /// of the table skips the next quarter-table's worth of failed interns:
+    /// at most one scan per that many, and what fails meanwhile goes unlinked
+    /// or unmarked, as when full.
+    private static func sideTableSweepAllowed(_ deferral: inout Int) -> Bool {
+        guard deferral > 0 else { return true }
+        deferral -= 1
+        return false
+    }
+
+    private static func deferSideTableSweep(_ deferral: inout Int, freed: Int, capacity: Int) {
+        let quarter = capacity / 4
+        deferral = freed < quarter ? quarter : 0
     }
 
     /// Cells on screen and in scrollback, plus both pens (a saved pen restores

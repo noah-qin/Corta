@@ -198,6 +198,12 @@ extension Performer {
     /// `kitten icat` ends with a newline that relies on exactly this. A cursor
     /// already below the region only clamps: scrolling a region it is not in
     /// would move text it never touched.
+    ///
+    /// The scroll is capped at a region plus a screen: `a=p,r=4096` is twenty
+    /// bytes, and uncapped it pushed 4096 lines under the session lock — a
+    /// few kilobytes of it froze the pane for seconds. A real image taller
+    /// than that (icat fits images to the screen) leaves its excess below
+    /// the cursor.
     private mutating func moveCursorPast(columns: Int, rows: Int) {
         var column = grid.cursor.column + columns
         var row = grid.cursor.row + rows - 1
@@ -210,7 +216,7 @@ extension Performer {
             // stops at one region's height, which would leave the cursor
             // inside an image taller than the screen.
             let regionHeight = grid.marginBottom - grid.marginTop + 1
-            var remaining = row - grid.marginBottom
+            var remaining = min(row - grid.marginBottom, regionHeight + grid.rows)
             while remaining > 0 {
                 let step = min(remaining, regionHeight)
                 grid.scrollUp(step)

@@ -96,6 +96,25 @@ what to edit.
 
 ### Fixed
 
+- Output that costs a program a few bytes can no longer cost Corta far
+  more. A letter followed by thousands of combining accents (about 130 KB)
+  made Corta store several gigabytes; a character now keeps at most 32
+  code points, and the marks past that are dropped. A Kitty image
+  placement asking for thousands of rows scrolled every one of them,
+  freezing the pane for seconds over a few kilobytes; it now scrolls at
+  most the scroll region plus one screen. Once more than 2 047 links were
+  on screen and in history at once, every new link searched the whole
+  scrollback before giving up — `ls --hyperlink -R` over a large tree
+  stalled the pane — and now searches at most once per 511 links.
+
+- Hovering a very long wrapped line — a minified file printed as a single
+  line — no longer stutters: finding where the line starts and ends no
+  longer copies every row of it on each mouse move.
+
+- Two Kitty images that use the same placement number both stay on
+  screen. A placement number belongs to its image, but the second image
+  replaced the first one's placement.
+
 - Shell integration for bash works when bash starts as a login shell,
   which is how Corta starts it. The hooks were only in `~/.bashrc`, which
   a login bash never reads, so unless your `~/.bash_profile` sourced it,

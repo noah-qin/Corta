@@ -126,12 +126,22 @@ extension Grid {
     }
 
     /// Lets a per-mouse-move caller skip the join for chains over budget.
+    /// Reads only each row's wrap flag: a 2 MB single-line file is one chain
+    /// through the whole scrollback, and copying every row out on each mouse
+    /// move made hovering it stutter.
     func logicalLineRowSpan(containing row: Int) -> (first: Int, last: Int) {
         var top = row
-        while documentLine(top - 1).wrapped { top -= 1 }
+        while isDocumentLineWrapped(top - 1) { top -= 1 }
         var bottom = row
-        while documentLine(bottom).wrapped, bottom < rows - 1 { bottom += 1 }
+        while isDocumentLineWrapped(bottom), bottom < rows - 1 { bottom += 1 }
         return (top, bottom)
+    }
+
+    /// `documentLine(row).wrapped`, without the copy.
+    func isDocumentLineWrapped(_ row: Int) -> Bool {
+        if row < 0 { return scrollback.isWrapped(at: scrollback.count + row) }
+        guard row < rows else { return false }
+        return lines[row].wrapped
     }
 
     /// Not re-joined: accessibility reads by screen line, as a person reading
