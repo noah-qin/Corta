@@ -40,9 +40,16 @@ public struct Terminal: Sendable {
             capacity: performer.state.commandRecords.capacity)
     }
 
+    /// A grid resized through this setter (`terminal.grid.resize(…)`) has its
+    /// reflow's row remaps applied on the way in, as `resize(rows:columns:)`
+    /// does: records must never wait in the old coordinates while marks
+    /// arrive in the new.
     public var grid: Grid {
         get { performer.grid }
-        set { performer.grid = newValue }
+        set {
+            performer.grid = newValue
+            performer.applyRowRemaps()
+        }
     }
 
     /// Clear Screen: the grid's, and the waiting prompt follows the cursor to
@@ -72,6 +79,14 @@ public struct Terminal: Sendable {
     /// Contiguous, and fed without a copy: the reader's lock slices.
     public mutating func feed(_ bytes: ArraySlice<UInt8>) {
         parser.parse(bytes, performer: &performer)
+    }
+
+    /// `Grid.resize`, keeping command records on their rows through a reflow.
+    /// Resize through this, not `grid`, or the records point where the rows
+    /// used to be.
+    public mutating func resize(rows: Int, columns: Int) {
+        performer.grid.resize(rows: rows, columns: columns)
+        performer.applyRowRemaps()
     }
 
     public var hasPendingOutput: Bool { !performer.state.outputBuffer.isEmpty }

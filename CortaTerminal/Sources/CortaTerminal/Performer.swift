@@ -242,4 +242,23 @@ public struct Performer: ParserPerformer, Sendable {
             return nil
         }
     }
+
+    /// A reflow renumbers rows — a resize, or leaving the alternate screen
+    /// after one reflowed the parked main screen. Every absolute row held
+    /// outside the grid follows its row, before anything else reads them.
+    mutating func applyRowRemaps() {
+        guard !grid.rowRemaps.isEmpty else { return }
+        let remaps = grid.rowRemaps
+        grid.rowRemaps.removeAll()
+        for remap in remaps {
+            state.commandRecords.remapRows(remap)
+            if let row = state.promptRow {
+                state.promptEndColumn = state.promptEndColumn.flatMap {
+                    remap.promptEndColumn(promptRow: row, column: $0)
+                }
+            }
+            state.promptRow = state.promptRow.map(remap.map)
+            state.outputStartRow = state.outputStartRow.map(remap.map)
+        }
+    }
 }

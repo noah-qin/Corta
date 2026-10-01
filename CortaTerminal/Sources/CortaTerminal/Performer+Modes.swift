@@ -80,7 +80,14 @@ extension Performer {
         var handled = false
         for index in 0..<parameters.count {
             if parameters[index] == 1049 {
-                if set { grid.enterAlternateScreen() } else { grid.exitAlternateScreen() }
+                if set {
+                    grid.enterAlternateScreen()
+                } else {
+                    grid.exitAlternateScreen()
+                    // At once: the rest of this chunk may be OSC 133 marks,
+                    // and they must not mix the old rows with the new.
+                    applyRowRemaps()
+                }
                 handled = true
             }
         }

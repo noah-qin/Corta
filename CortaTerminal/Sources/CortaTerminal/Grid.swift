@@ -89,6 +89,10 @@ public struct Grid: Sendable {
     private var graphemeSweepDeferral = 0
     /// Full-grid scans run by the two sweeps, for tests.
     private(set) var sideTableSweeps = 0
+    /// Reflows since the owner last drained them (`Terminal.applyRowRemaps`):
+    /// a column change, or leaving the alternate screen after one, renumbers
+    /// rows that command records point at.
+    var rowRemaps: [RowRemap] = []
 
     /// Cleared on a column resize, kept across a row-only one.
     public var imagePlacements = ImagePlacementTable()
