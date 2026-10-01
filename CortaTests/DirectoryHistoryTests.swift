@@ -86,11 +86,30 @@ struct DirectoryHistoryTests {
             history.record("/fake/\(index)", at: start.addingTimeInterval(TimeInterval(index)))
         }
         let ordinary = history.entries.values.filter { !$0.isFavorite }
-        #expect(ordinary.count <= DirectoryHistory.maximumEntries + 1)
+        #expect(ordinary.count == DirectoryHistory.maximumEntries)
         #expect(history.entries["/favourite"]?.isFavorite == true)
         // The newest survive; the oldest went first.
         #expect(history.entries["/fake/\(DirectoryHistory.maximumEntries + 49)"] != nil)
         #expect(history.entries["/fake/0"] == nil)
+    }
+
+    @Test("a loaded history past the limit, or one a favourite left, is trimmed to it")
+    func loadedAndUnpinnedHistoryIsTrimmed() {
+        let start = Date(timeIntervalSince1970: 1_000_000)
+        let oversized = (0..<(DirectoryHistory.maximumEntries + 10)).map { index in
+            DirectoryHistory.Entry(
+                path: "/loaded/\(index)", visitCount: 1,
+                lastVisit: start.addingTimeInterval(TimeInterval(index)), isFavorite: false)
+        }
+        var history = DirectoryHistory(entries: oversized, now: start.addingTimeInterval(5_000))
+        #expect(history.entries.count == DirectoryHistory.maximumEntries)
+        #expect(history.entries["/loaded/0"] == nil)
+
+        history.setFavorite(true, for: "/pinned")
+        history.record("/pinned")
+        history.setFavorite(false, for: "/pinned")
+        #expect(history.entries.values.filter { !$0.isFavorite }.count == DirectoryHistory.maximumEntries)
+        #expect(history.entries["/pinned"] != nil, "the directory just unpinned stays")
     }
 
     @Test("an empty path is never recorded")

@@ -96,7 +96,9 @@ extension ViewController {
             let root = await Task.detached(priority: .userInitiated) {
                 DirectoryHistory.projectRoot(for: directory)
             }.value
-            guard let self, !didTeardown else { return }
+            // The lookup can outlast a change of focus; the toast or split
+            // would then land on another pane.
+            guard let self, !didTeardown, isFocusedPane else { return }
             guard let root else {
                 terminalView?.showToast(L10n.text("toast.noProjectRoot"), kind: .warning)
                 return
