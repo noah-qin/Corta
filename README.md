@@ -21,7 +21,7 @@ Metal rendering · AppKit input · A dependency-free terminal core
 [Contribute](CONTRIBUTING.md) ·
 [Report a bug](https://github.com/noah-qin/Corta/issues/new?template=bug_report.yml)
 
-<img src="docs/brand/screenshot.png" width="960" alt="Corta displaying a coloured git graph, CJK and emoji column alignment, and terminal colour ramps">
+<img src="docs/brand/screenshot.png" width="960" alt="Corta with three split panes: a git log and a Chinese, Japanese, Korean and emoji alignment table; the pangolin mascot shown as an image in the terminal; and 24-bit colour ramps">
 
 </div>
 
