@@ -62,16 +62,41 @@ public struct Terminal: Sendable {
     /// lives in the terminal.
     public mutating func feed(_ bytes: some Sequence<UInt8>) {
         parser.parse(bytes, performer: &performer)
+        applyRowRemaps()
     }
 
     /// Contiguous, so `Parser` can batch printable ASCII.
     public mutating func feed(_ bytes: [UInt8]) {
         parser.parse(bytes, performer: &performer)
+        applyRowRemaps()
     }
 
     /// Contiguous, and fed without a copy: the reader's lock slices.
     public mutating func feed(_ bytes: ArraySlice<UInt8>) {
         parser.parse(bytes, performer: &performer)
+        applyRowRemaps()
+    }
+
+    /// `Grid.resize`, keeping command records on their rows through a reflow.
+    /// Resize through this, not `grid`, or the records point where the rows
+    /// used to be.
+    public mutating func resize(rows: Int, columns: Int) {
+        performer.grid.resize(rows: rows, columns: columns)
+        applyRowRemaps()
+    }
+
+    /// A reflow renumbers rows (leaving the alternate screen reflows the
+    /// parked main screen, so output can too); every absolute row held
+    /// outside the grid follows its row.
+    private mutating func applyRowRemaps() {
+        guard !performer.grid.rowRemaps.isEmpty else { return }
+        let remaps = performer.grid.rowRemaps
+        performer.grid.rowRemaps.removeAll()
+        for remap in remaps {
+            performer.state.commandRecords.remapRows(remap)
+            performer.state.promptRow = performer.state.promptRow.map(remap.map)
+            performer.state.outputStartRow = performer.state.outputStartRow.map(remap.map)
+        }
     }
 
     public var hasPendingOutput: Bool { !performer.state.outputBuffer.isEmpty }

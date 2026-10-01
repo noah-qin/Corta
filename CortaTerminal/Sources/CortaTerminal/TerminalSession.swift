@@ -613,13 +613,11 @@ public final class TerminalSession: @unchecked Sendable {
             // Registered: `SIGWINCH` waits on this commit.
             registerStateWaiter {
                 state.withLock { current in
-                    var grid = current.terminal.grid
-                    grid.resize(rows: Int(size.rows), columns: Int(size.columns))
+                    current.terminal.resize(rows: Int(size.rows), columns: Int(size.columns))
                     // Set after, and even with rows and columns unchanged:
                     // a font change alters only the pixels.
-                    grid.cellPixelHeight = size.cellPixelHeight
-                    grid.cellPixelWidth = size.cellPixelWidth
-                    current.terminal.grid = grid
+                    current.terminal.grid.cellPixelHeight = size.cellPixelHeight
+                    current.terminal.grid.cellPixelWidth = size.cellPixelWidth
                 }
             }
             try? pty.resize(to: size)

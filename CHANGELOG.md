@@ -96,6 +96,14 @@ what to edit.
 
 ### Fixed
 
+- Changing a pane's width keeps its command marks. Any change in columns
+  — resizing the window, splitting, toggling the sidebar, changing the
+  font size, or leaving a full-screen program after one — erased every
+  prompt and success/failure mark, so the marks beside prompts vanished,
+  and once history had been re-wrapped, jumping between commands, copying
+  a command's output and opening a file it printed could land on the
+  wrong lines.
+
 - Shell integration for bash works when bash starts as a login shell,
   which is how Corta starts it. The hooks were only in `~/.bashrc`, which
   a login bash never reads, so unless your `~/.bash_profile` sourced it,
