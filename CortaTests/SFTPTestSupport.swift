@@ -40,6 +40,7 @@ final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
     var listingErrors: [String: SFTPError] = [:]
     var volumeInfoResult: SFTPVolumeInfo?
     var lstatResults: [String: SFTPAttributes] = [:]
+    var lstatErrors: [String: SFTPError] = [:]
     var madeDirectories: [String] = []
     var removed: [String] = []
     var removedDirectories: [String] = []
@@ -75,6 +76,7 @@ final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
     }
 
     func lstat(path: String) async throws(SFTPError) -> SFTPAttributes {
+        if let error = lstatErrors[path] { throw error }
         if let attributes = lstatResults[path] { return attributes }
         throw .server(SFTPStatus(code: .noSuchFile))
     }

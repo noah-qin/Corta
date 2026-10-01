@@ -96,6 +96,16 @@ what to edit.
 
 ### Fixed
 
+- Remote editing requires a configured editor command. A downloaded file
+  previously opened in its default application, which could execute
+  `.command` or `.terminal` files supplied by a remote host. Local file
+  references keep their default application.
+- Remote editing reconnects on the next operation after a broken SFTP
+  conversation, without restarting Corta. Failed uploads keep their
+  pending decision and are never silently replayed.
+- Starting the Quick Terminal more than once no longer leaves duplicate
+  notification observers, and releasing it removes its observers.
+
 - Output that costs a program a few bytes can no longer cost Corta far
   more. A letter followed by thousands of combining accents (about 130 KB)
   made Corta store several gigabytes; a character now keeps at most 32

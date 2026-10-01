@@ -41,6 +41,19 @@ final class QuickTerminalController {
     private var controller: TerminalWindowController?
     private lazy var hotKey = GlobalHotKey { [weak self] in self?.toggle() }
     private var observers: [NSObjectProtocol] = []
+    private var windowObserver: NSObjectProtocol?
+    private let notificationCenter: NotificationCenter
+
+    init(notificationCenter: NotificationCenter = .default) {
+        self.notificationCenter = notificationCenter
+    }
+
+    isolated deinit {
+        for observer in observers { notificationCenter.removeObserver(observer) }
+        if let windowObserver { notificationCenter.removeObserver(windowObserver) }
+    }
+
+    var observerCount: Int { observers.count + (windowObserver == nil ? 0 : 1) }
     /// A slide is in flight. Display changes wait for it: `show()` animates to
     /// a frame captured before the change, and `hide()` undoes a fixed
     /// offset, so a reposition mid-slide would be overwritten.
@@ -62,7 +75,13 @@ final class QuickTerminalController {
     private static let animationDuration: TimeInterval = 0.16
 
     func start() {
-        let center = NotificationCenter.default
+        observeNotifications()
+        applyConfiguration()
+    }
+
+    func observeNotifications() {
+        guard observers.isEmpty else { return }
+        let center = notificationCenter
         observers = [
             center.addObserver(forName: ConfigurationStore.didChange, object: nil, queue: .main) {
                 [weak self] _ in
@@ -80,7 +99,6 @@ final class QuickTerminalController {
                 MainActor.assumeIsolated { self?.screenParametersDidChange() }
             },
         ]
-        applyConfiguration()
     }
 
     private func applyConfiguration() {
@@ -197,6 +215,10 @@ final class QuickTerminalController {
     /// At quit: drops the hotkey; `AppDelegate` tears the window down.
     func teardown() {
         hotKey.unregister()
+        for observer in observers { notificationCenter.removeObserver(observer) }
+        observers.removeAll()
+        if let windowObserver { notificationCenter.removeObserver(windowObserver) }
+        windowObserver = nil
     }
 
     // MARK: - The window
@@ -230,12 +252,22 @@ final class QuickTerminalController {
         // Placed by screen geometry; a moved panel would reopen wrong.
         window.isMovable = false
         window.animationBehavior = .none
-        NotificationCenter.default.addObserver(
+        observeClose(of: window)
+        return controller
+    }
+
+    func observeClose(of window: NSWindow) {
+        if let windowObserver { notificationCenter.removeObserver(windowObserver) }
+        windowObserver = notificationCenter.addObserver(
             forName: NSWindow.willCloseNotification, object: window, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.controller = nil }
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if let token = self.windowObserver { self.notificationCenter.removeObserver(token) }
+                self.windowObserver = nil
+                self.controller = nil
+            }
         }
-        return controller
     }
 
     private func animate(_ changes: @escaping () -> Void, completion: (() -> Void)? = nil) {

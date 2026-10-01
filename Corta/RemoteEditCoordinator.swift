@@ -112,6 +112,11 @@ final class RemoteEditCoordinator {
     private var presenter: RemoteEditPresenter
 
     private var clients: [String: any SFTPClient] = [:]
+    private struct ConnectionAttempt {
+        let id = UUID()
+        let task: Task<any SFTPClient, any Error>
+    }
+    private var connections: [String: ConnectionAttempt] = [:]
 
     private(set) var pendingUploads: [PendingUpload] = []
     private(set) var pendingConflicts: [UploadConflict] = []
@@ -137,7 +142,7 @@ final class RemoteEditCoordinator {
     ) {
         self.store = store
         self.makeClient = makeClient ?? { SFTPConnection.forApp(host: $0) }
-        self.opener = opener ?? ViewController.openFileAt(url:line:column:)
+        self.opener = opener ?? ViewController.openRemoteFileAt(url:line:column:)
         self.presenter = presenter ?? RemoteEditPresenter(
             promptUpload: { _ in }, promptConflict: { _ in }, showError: { _ in })
         // The default presenter needs to call back into the coordinator,
@@ -150,14 +155,16 @@ final class RemoteEditCoordinator {
     isolated deinit {
         for (_, watch) in watches { watch.source.cancel() }
         for (_, check) in pendingChecks { check.cancel() }
+        for (_, connection) in connections { connection.task.cancel() }
+        for (_, client) in clients { client.close() }
     }
 
     // MARK: - Open for editing
 
     /// Downloads (or reuses) the managed copy of a remote file, records the
     /// open, starts watching, and opens the editor at `line`/`column`.
-    /// Returns whether the editor was actually launched — `false` means a
-    /// bad `open-file-command`, exactly the local path's failure.
+    /// Returns whether the editor was actually launched. A missing or invalid
+    /// editor command refuses remote copies instead of using a file handler.
     @discardableResult
     func open(
         host: String, remotePath: String, line: Int, column: Int?
@@ -173,9 +180,16 @@ final class RemoteEditCoordinator {
             RemoteHostConsent.confirm(host)
         }
         let copy = try await materialize(host: host, remotePath: remotePath)
-        store.recordOpen(copy)
+        let alreadyWatched = watches[copy.id] != nil
         watch(copy)
-        return opener(store.localURL(for: copy), line, column)
+        guard opener(store.localURL(for: copy), line, column) else {
+            if !alreadyWatched { unwatch(copy.id) }
+            return false
+        }
+        store.recordOpen(copy)
+        // A synchronous editor save may precede delivery of the file event.
+        noteLocalWrite(copyID: copy.id)
+        return true
     }
 
     /// The managed copy, downloading when there is no manifest entry or the
@@ -191,38 +205,76 @@ final class RemoteEditCoordinator {
         {
             return copy
         }
-        let client = try await client(for: host)
-        // lstat first: a missing remote file fails here as the server's own
-        // answer, before any local file is created.
-        let attributes = try await client.lstat(path: remotePath)
-        let relative = RemoteEditStore.localRelativePath(host: host, remotePath: remotePath)
-        let url = store.rootURL.appendingPathComponent(relative)
-        try? FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        // `.fail` + `.remove`: a conflicted or interrupted download leaves
-        // nothing at the copy path and no partial, so a later open never
-        // mistakes a fragment for the file.
-        try await client.download(
-            remotePath: remotePath, to: url,
-            policy: .fail, partialDisposition: .remove, progress: nil)
-        let copy = store.recordDownload(
-            host: host, remotePath: remotePath,
-            remoteSize: attributes.size, remoteMTime: attributes.modificationTime)
-        digests[copy.id] = RemoteEditStore.sha256Hex(ofFile: url)
-        return copy
+        return try await withClient(for: host) { client in
+            let attributes = try await client.lstat(path: remotePath)
+            let relative = RemoteEditStore.localRelativePath(host: host, remotePath: remotePath)
+            let url = store.rootURL.appendingPathComponent(relative)
+            try? FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try await client.download(
+                remotePath: remotePath, to: url,
+                policy: .fail, partialDisposition: .remove, progress: nil)
+            let copy = store.recordDownload(
+                host: host, remotePath: remotePath,
+                remoteSize: attributes.size, remoteMTime: attributes.modificationTime)
+            digests[copy.id] = RemoteEditStore.sha256Hex(ofFile: url)
+            return copy
+        }
     }
 
     private func client(for host: String) async throws(SFTPError) -> any SFTPClient {
         if let client = clients[host] { return client }
-        let client = makeClient(host)
-        clients[host] = client
+        let connection: ConnectionAttempt
+        if let pending = connections[host] {
+            connection = pending
+        } else {
+            let client = makeClient(host)
+            connection = ConnectionAttempt(task: Task {
+                do {
+                    try await client.connect()
+                    try Task.checkCancellation()
+                    return client
+                } catch {
+                    client.close()
+                    throw error
+                }
+            })
+            connections[host] = connection
+        }
         do {
-            try await client.connect()
+            let client = try await connection.task.value
+            if connections[host]?.id == connection.id {
+                clients[host] = client
+                connections[host] = nil
+            }
+            return client
         } catch {
-            clients[host] = nil
+            if connections[host]?.id == connection.id { connections[host] = nil }
+            throw Self.sftpError(error)
+        }
+    }
+
+    /// A failed conversation is retired, not replayed. The next explicit
+    /// operation reconnects; uploads still require their original decision.
+    private func withClient<T>(
+        for host: String,
+        operation: (any SFTPClient) async throws -> T
+    ) async throws(SFTPError) -> T {
+        let client = try await client(for: host)
+        do {
+            return try await operation(client)
+        } catch {
+            let error = Self.sftpError(error)
+            switch error {
+            case .transport, .protocolViolation:
+                if clients[host] === client {
+                    clients[host] = nil
+                    client.close()
+                }
+            default: break
+            }
             throw error
         }
-        return client
     }
 
     // MARK: - Local change detection
@@ -319,12 +371,13 @@ final class RemoteEditCoordinator {
     private func checkRemoteAndUpload(_ copy: RemoteEditStore.RemoteCopy) async {
         defer { uploadsInFlight.remove(copy.id) }
         do {
-            let client = try await client(for: copy.host)
-            let current = try await client.lstat(path: copy.remotePath)
+            let current = try await withClient(for: copy.host) { client in
+                try await client.lstat(path: copy.remotePath)
+            }
             if current.size == copy.remoteSize,
                 current.modificationTime == copy.remoteMTime
             {
-                await performUpload(copy, client: client)
+                await performUpload(copy)
             } else {
                 presentConflict(copy, remote: current)
             }
@@ -374,13 +427,7 @@ final class RemoteEditCoordinator {
             pendingConflicts.removeAll { $0.id == conflictID }
             Task { [weak self] in
                 guard let self else { return }
-                do {
-                    let client = try await self.client(for: copy.host)
-                    await self.performUpload(copy, client: client)
-                } catch {
-                    self.presenter.showError(
-                        SFTPBrowserModel.errorMessage(Self.sftpError(error), host: copy.host))
-                }
+                await self.performUpload(copy)
             }
         case .redownload:
             pendingConflicts.removeAll { $0.id == conflictID }
@@ -397,7 +444,7 @@ final class RemoteEditCoordinator {
     }
 
     private func performUpload(
-        _ copy: RemoteEditStore.RemoteCopy, client: any SFTPClient
+        _ copy: RemoteEditStore.RemoteCopy
     ) async {
         let url = store.localURL(for: copy)
         do {
@@ -405,10 +452,14 @@ final class RemoteEditCoordinator {
             // updated); `.remove` means a failed upload leaves no partial
             // next to it — the remote holds either the old file or the new
             // one, never a fragment.
-            try await client.upload(
-                from: url, to: copy.remotePath,
-                policy: .overwrite, partialDisposition: .remove, progress: nil)
-            let stamp = try? await client.lstat(path: copy.remotePath)
+            try await withClient(for: copy.host) { client in
+                try await client.upload(
+                    from: url, to: copy.remotePath,
+                    policy: .overwrite, partialDisposition: .remove, progress: nil)
+            }
+            let stamp = try? await withClient(for: copy.host) { client in
+                try await client.lstat(path: copy.remotePath)
+            }
             store.updateRemoteStamp(
                 copy, size: stamp?.size, mtime: stamp?.modificationTime)
             digests[copy.id] = RemoteEditStore.sha256Hex(ofFile: url)
@@ -426,12 +477,14 @@ final class RemoteEditCoordinator {
 
     private func redownload(_ copy: RemoteEditStore.RemoteCopy) async {
         do {
-            let client = try await client(for: copy.host)
-            let attributes = try await client.lstat(path: copy.remotePath)
             let url = store.localURL(for: copy)
-            try await client.download(
-                remotePath: copy.remotePath, to: url,
-                policy: .overwrite, partialDisposition: .remove, progress: nil)
+            let attributes = try await withClient(for: copy.host) { client in
+                let attributes = try await client.lstat(path: copy.remotePath)
+                try await client.download(
+                    remotePath: copy.remotePath, to: url,
+                    policy: .overwrite, partialDisposition: .remove, progress: nil)
+                return attributes
+            }
             store.updateRemoteStamp(
                 copy, size: attributes.size, mtime: attributes.modificationTime)
             digests[copy.id] = RemoteEditStore.sha256Hex(ofFile: url)

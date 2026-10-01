@@ -67,6 +67,62 @@ struct GlobalHotKeyTests {
 }
 
 struct QuickTerminalGeometryTests {
+    private final class ObserverCenter: NotificationCenter, @unchecked Sendable {
+        var removals = 0
+        override func removeObserver(_ observer: Any) {
+            removals += 1
+            super.removeObserver(observer)
+        }
+    }
+    @Test("Quick Terminal observers are installed once and released with the controller")
+    @MainActor
+    func observerLifetime() {
+        let center = ObserverCenter()
+        weak var released: QuickTerminalController?
+        do {
+            let controller = QuickTerminalController(notificationCenter: center)
+            released = controller
+            controller.observeNotifications()
+            controller.observeNotifications()
+            #expect(controller.observerCount == 3)
+        }
+        #expect(released == nil)
+        #expect(center.removals == 3)
+    }
+
+    @Test("Quick Terminal teardown releases observers and can restart")
+    @MainActor
+    func observerTeardown() {
+        let center = ObserverCenter()
+        let controller = QuickTerminalController(notificationCenter: center)
+        controller.observeNotifications()
+        controller.teardown()
+        #expect(controller.observerCount == 0 && center.removals == 3)
+        controller.observeNotifications()
+        #expect(controller.observerCount == 3)
+        controller.teardown()
+        #expect(center.removals == 6)
+    }
+
+    @Test("each Quick Terminal close removes its window observer")
+    @MainActor
+    func windowObserverLifetime() {
+        let center = ObserverCenter()
+        let controller = QuickTerminalController(notificationCenter: center)
+        let window = NSWindow(contentRect: .zero, styleMask: [], backing: .buffered, defer: true)
+        for _ in 0..<4 {
+            controller.observeClose(of: window)
+            #expect(controller.observerCount == 1)
+            center.post(name: NSWindow.willCloseNotification, object: window)
+            #expect(controller.observerCount == 0)
+        }
+        #expect(center.removals == 4)
+        controller.observeClose(of: window)
+        controller.observeClose(of: window)
+        #expect(controller.observerCount == 1)
+        #expect(center.removals == 5)
+    }
+
     let visible = NSRect(x: 100, y: 50, width: 1000, height: 800)
 
     @Test("the top band spans the screen width and hangs from the visible frame's top edge")

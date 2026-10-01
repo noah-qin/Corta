@@ -427,3 +427,9 @@ made them.
   `currentWorkingDirectory` fallback. Session state saved before this filter
   can still carry a remote path with the host already lost, so restore drops
   any saved directory that does not exist as a local directory.
+
+Remote editing requires an explicit `open-file-command`. Managed downloads,
+including reused copies, never use LaunchServices' default file handler:
+`.command`, `.terminal` and similar handlers can execute remote bytes locally.
+The configured command remains the user's trusted editor choice and receives
+separate arguments, never shell interpolation.

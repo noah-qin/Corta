@@ -217,6 +217,183 @@ struct RemoteEditCoordinatorTests {
             root: root, store: store, fake: fake, recorder: recorder, coordinator: coordinator)
     }
 
+    @Test("remote copies never reach a default handler without a configured editor")
+    func remoteDefaultHandlerRefused() async throws {
+        let root = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = RemoteEditStore(rootURL: root)
+        let fake = FakeSFTPClient()
+        var opened = 0
+        let coordinator = RemoteEditCoordinator(
+            store: store, makeClient: { _ in fake },
+            opener: { url, line, column in
+                opened += 1
+                return ViewController.openFileAt(
+                    url: url, line: line, column: column,
+                    allowsDefaultApplication: false, command: "")
+            },
+            presenter: .init(promptUpload: { _ in }, promptConflict: { _ in }, showError: { _ in }))
+        for name in ["evil.command", "evil.terminal", "evil.app", "script", "source.swift"] {
+            let path = "/srv/" + name
+            fake.lstatResults[path] = SFTPAttributes(size: 1)
+            fake.onTransfer = { call, _ in
+                try "echo SHOULD_NOT_RUN".write(toFile: call.localPath, atomically: true, encoding: .utf8)
+            }
+            #expect(try await !coordinator.open(host: "build-box", remotePath: path, line: 2, column: nil))
+            #expect(try await !coordinator.open(host: "build-box", remotePath: path, line: 3, column: nil))
+            #expect(store.copy(host: "build-box", remotePath: path)?.openCount == 0)
+        }
+        #expect(opened == 10)
+        #expect(fake.transferCalls.count == 5, "cached copies pass the same guard")
+    }
+
+    @Test("an explicitly configured remote editor receives the file as data")
+    func configuredRemoteEditorAllowed() {
+        for name in ["file.swift", "evil.command", "semi;$(echo evil).terminal"] {
+            #expect(ViewController.openFileAt(
+                url: URL(fileURLWithPath: "/tmp/" + name), line: 42, column: 7,
+                allowsDefaultApplication: false, command: "/usr/bin/true {file} {line} {column}"))
+        }
+    }
+
+    @Test("a failed stat retires a connection and the next action reconnects")
+    func disconnectedClientIsReplaced() async throws {
+        let root = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let first = FakeSFTPClient()
+        let replacement = FakeSFTPClient()
+        let path = "/srv/main.rs"
+        first.lstatErrors[path] = .transport(.connectionLost)
+        replacement.lstatResults[path] = SFTPAttributes(size: 2)
+        replacement.onTransfer = { call, _ in
+            try "ok".write(toFile: call.localPath, atomically: true, encoding: .utf8)
+        }
+        var made = 0
+        let coordinator = RemoteEditCoordinator(
+            store: RemoteEditStore(rootURL: root),
+            makeClient: { _ in made += 1; return made == 1 ? first : replacement },
+            opener: { _, _, _ in true },
+            presenter: .init(promptUpload: { _ in }, promptConflict: { _ in }, showError: { _ in }))
+        await #expect(throws: SFTPError.transport(.connectionLost)) {
+            try await coordinator.materialize(host: "build-box", remotePath: path)
+        }
+        #expect(first.closed)
+        #expect(try await coordinator.open(host: "build-box", remotePath: path, line: 1, column: nil))
+        #expect(made == 2 && !replacement.closed)
+    }
+
+    @Test("server errors preserve a connection; failed downloads retire it")
+    func failedDownloadReconnectsButMissingFileDoesNot() async throws {
+        let root = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let first = FakeSFTPClient()
+        let replacement = FakeSFTPClient()
+        let path = "/srv/main.rs"
+        for client in [first, replacement] { client.lstatResults[path] = SFTPAttributes(size: 2) }
+        first.onTransfer = { _, _ in throw SFTPError.transport(.connectionLost) }
+        replacement.onTransfer = { call, _ in
+            try "ok".write(toFile: call.localPath, atomically: true, encoding: .utf8)
+        }
+        var made = 0
+        let coordinator = RemoteEditCoordinator(
+            store: RemoteEditStore(rootURL: root),
+            makeClient: { _ in made += 1; return made == 1 ? first : replacement },
+            opener: { _, _, _ in true },
+            presenter: .init(promptUpload: { _ in }, promptConflict: { _ in }, showError: { _ in }))
+        do { _ = try await coordinator.materialize(host: "build-box", remotePath: "/missing") }
+        catch { #expect(error == .server(SFTPStatus(code: .noSuchFile))) }
+        #expect(made == 1 && !first.closed)
+        await #expect(throws: SFTPError.transport(.connectionLost)) {
+            try await coordinator.materialize(host: "build-box", remotePath: path)
+        }
+        #expect(first.closed)
+        #expect(try await coordinator.open(host: "build-box", remotePath: path, line: 1, column: nil))
+        #expect(made == 2)
+    }
+
+    @Test("failed upload stays pending and reconnects only when retried")
+    func failedUploadRetainsDecision() async throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        #expect(try await fixture.coordinator.open(
+            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil))
+        try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
+        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        let pending = try #require(fixture.coordinator.pendingUploads.first)
+        fixture.fake.onTransfer = { _, _ in throw SFTPError.transport(.connectionLost) }
+        fixture.coordinator.upload(pending)
+        await waitUntil("failed upload reported") { !fixture.recorder.errors.isEmpty }
+        #expect(fixture.fake.closed)
+        #expect(fixture.coordinator.pendingUploads.count == 1)
+        #expect(fixture.fake.transferCalls.filter(\.isUpload).count == 1)
+    }
+
+    @Test("an upload retry gets a fresh client without losing the pending edit")
+    func uploadRetryReplacesClient() async throws {
+        let root = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = RemoteEditStore(rootURL: root)
+        let first = FakeSFTPClient()
+        let second = FakeSFTPClient()
+        let path = "/srv/main.rs"
+        for client in [first, second] {
+            client.lstatResults[path] = SFTPAttributes(size: 2, modificationTime: 1000)
+        }
+        first.onTransfer = { call, _ in
+            if call.isUpload { throw SFTPError.transport(.connectionLost) }
+            try "ok".write(toFile: call.localPath, atomically: true, encoding: .utf8)
+        }
+        var made = 0
+        var errors: [String] = []
+        let coordinator = RemoteEditCoordinator(
+            store: store, makeClient: { _ in made += 1; return made == 1 ? first : second },
+            opener: { _, _, _ in true },
+            presenter: .init(promptUpload: { _ in }, promptConflict: { _ in }, showError: { errors.append($0) }))
+        #expect(try await coordinator.open(host: "build-box", remotePath: path, line: 1, column: nil))
+        let copy = try #require(store.copy(host: "build-box", remotePath: path))
+        try "edited".write(to: store.localURL(for: copy), atomically: true, encoding: .utf8)
+        coordinator.noteLocalWrite(copyID: copy.id)
+        let pending = try #require(coordinator.pendingUploads.first)
+        coordinator.upload(pending)
+        await waitUntil("first upload failed") { !errors.isEmpty }
+        #expect(first.closed && made == 1)
+        #expect(coordinator.pendingUploads.count == 1)
+        coordinator.upload(pending)
+        await waitUntil("retry finished") { coordinator.pendingUploads.isEmpty }
+        #expect(made == 2)
+        #expect(second.transferCalls.filter(\.isUpload).count == 1)
+        #expect(!second.closed)
+    }
+
+    @Test("an editor that saves immediately is still watched")
+    func immediateEditorSaveIsDetected() async throws {
+        let root = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let fake = FakeSFTPClient()
+        let path = "/srv/main.rs"
+        fake.lstatResults[path] = SFTPAttributes(size: 2)
+        fake.onTransfer = { call, _ in
+            try "original".write(toFile: call.localPath, atomically: true, encoding: .utf8)
+        }
+        let store = RemoteEditStore(rootURL: root)
+        let coordinator = RemoteEditCoordinator(
+            store: store, makeClient: { _ in fake },
+            opener: { url, _, _ in
+                try! "editor save".write(to: url, atomically: true, encoding: .utf8)
+                return true
+            },
+            presenter: .init(promptUpload: { _ in }, promptConflict: { _ in }, showError: { _ in }))
+        // A reused copy after a coordinator restart has no in-memory digest.
+        let relative = RemoteEditStore.localRelativePath(host: "build-box", remotePath: path)
+        let url = root.appendingPathComponent(relative)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "original".write(to: url, atomically: true, encoding: .utf8)
+        _ = store.recordDownload(host: "build-box", remotePath: path, remoteSize: 2, remoteMTime: nil)
+        #expect(try await coordinator.open(host: "build-box", remotePath: path, line: 1, column: nil))
+        #expect(coordinator.pendingUploads.count == 1)
+        #expect(fake.transferCalls.isEmpty)
+    }
+
     @Test("open downloads once, reuses the copy, and opens it at the reference's position")
     func openDownloadsAndReuses() async throws {
         let fixture = try makeFixture()
