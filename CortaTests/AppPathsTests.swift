@@ -94,6 +94,9 @@ struct AppPathsTests {
         #expect(AppPaths.applicationSupportDirectory.path.hasPrefix(stage.path + "/"))
         for shell in ShellKind.allCases {
             #expect(shell.defaultRCFileURL.path.hasPrefix(stage.path + "/"))
+            for url in shell.rcFileURLs {
+                #expect(url.path.hasPrefix(stage.path + "/"))
+            }
         }
     }
 

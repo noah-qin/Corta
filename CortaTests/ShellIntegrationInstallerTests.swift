@@ -192,4 +192,86 @@ struct ShellIntegrationInstallerTests {
         #expect(Set(scripts).count == ShellKind.allCases.count)
         #expect(scripts.allSatisfy { !$0.isEmpty })
     }
+
+    // MARK: - bash's two files
+
+    private func bashIntegration() throws -> (ShellIntegration, bashrc: URL, login: URL) {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let bashrc = directory.appendingPathComponent(".bashrc")
+        let login = ShellKind.bashLoginFile(in: directory)
+        return (
+            ShellIntegration(installers: [
+                ShellIntegrationInstaller(shell: .bash, rcFileURL: bashrc),
+                ShellIntegrationInstaller(shell: .bash, rcFileURL: login),
+            ]), bashrc, login
+        )
+    }
+
+    @Test("a login bash's file is the first readable one bash would read")
+    func bashLoginFileFollowsBash() {
+        let home = URL(fileURLWithPath: "/home/test")
+        func file(_ readable: Set<String>) -> String {
+            ShellKind.bashLoginFile(in: home) { readable.contains($0) }.lastPathComponent
+        }
+        #expect(file([]) == ".bash_profile")
+        #expect(file(["/home/test/.profile"]) == ".profile")
+        #expect(file(["/home/test/.bash_login", "/home/test/.profile"]) == ".bash_login")
+        #expect(file(["/home/test/.bash_profile", "/home/test/.profile"]) == ".bash_profile")
+        #expect(file(["/home/test/.bashrc"]) == ".bash_profile")
+    }
+
+    @Test("bash installs into ~/.bashrc and the login file, and reports both")
+    func bashInstallsIntoBothFiles() throws {
+        defer { removeDirectory() }
+        let (integration, bashrc, login) = try bashIntegration()
+        #expect(integration.status() == .notInstalled)
+        #expect(integration.install())
+        #expect(integration.status() == .installed)
+        #expect(try String(contentsOf: bashrc, encoding: .utf8).contains(ShellKind.bash.script))
+        #expect(try String(contentsOf: login, encoding: .utf8).contains(ShellKind.bash.script))
+    }
+
+    @Test("a block in ~/.bashrc alone, from an earlier version, is outdated and Update adds the other")
+    func bashrcOnlyInstallIsCompletedByUpdate() throws {
+        defer { removeDirectory() }
+        let (integration, bashrc, login) = try bashIntegration()
+        #expect(integration.installers[0].install())
+        #expect(!FileManager.default.fileExists(atPath: login.path))
+        #expect(integration.status() == .outdated)
+        #expect(integration.update())
+        #expect(integration.status() == .installed)
+        #expect(try String(contentsOf: bashrc, encoding: .utf8).components(separatedBy: "Corta shell integration >>>").count == 2)
+    }
+
+    @Test("removing deletes a file the block was alone in, and keeps one the user wrote in")
+    func uninstallDeletesAFileLeftEmpty() throws {
+        defer { removeDirectory() }
+        let (integration, bashrc, login) = try bashIntegration()
+        try "alias ll='ls -l'\n".write(to: bashrc, atomically: true, encoding: .utf8)
+        #expect(integration.install())
+        #expect(integration.uninstall())
+        #expect(integration.status() == .notInstalled)
+        #expect(!FileManager.default.fileExists(atPath: login.path), "an empty login file would hide ~/.profile")
+        #expect(try String(contentsOf: bashrc, encoding: .utf8) == "alias ll='ls -l'\n")
+    }
+
+    @Test("the bash block runs only in an interactive bash, and parses in a POSIX shell")
+    func bashBlockIsSafeInTheLoginFile() throws {
+        let script = ShellKind.bash.script
+        let firstLine = try #require(script.split(separator: "\n").first)
+        #expect(firstLine.hasPrefix("if [ -n \"$BASH_VERSION\" ]"))
+        #expect(firstLine.contains("*i*"))
+        guard FileManager.default.isExecutableFile(atPath: "/bin/dash") else { return }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/dash")
+        process.arguments = ["-c", script + "\necho ok"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        try process.run()
+        process.waitUntilExit()
+        let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        #expect(process.terminationStatus == 0)
+        #expect(output == "ok\n", "dash printed: \(output)")
+    }
 }

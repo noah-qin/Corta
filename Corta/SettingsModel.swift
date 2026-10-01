@@ -547,13 +547,13 @@ final class SettingsModel {
 
     // MARK: - Shell integration
 
-    /// Reflects `ShellIntegrationInstaller`'s three states as an icon,
+    /// Reflects `ShellIntegration`'s states as an icon,
     /// a sentence and the one action that changes it. Read from disk on
     /// every refresh rather than cached: unlike every other row on this
     /// page, the ground truth here is `~/.zshrc`, which the user can edit
     /// outside Corta at any time.
     private func refreshShellIntegrationStatus() {
-        switch ShellIntegrationInstaller.shared.status() {
+        switch ShellIntegration.current.status() {
         case .notInstalled:
             shellIntegrationStatus = RowStatus(
                 kind: .adjusted,
@@ -569,14 +569,14 @@ final class SettingsModel {
                 kind: .adjusted,
                 message: L10n.format(
                     "settings.status.shellIntegrationInstalled",
-                    ShellIntegrationInstaller.shared.displayPath),
+                    ShellIntegration.current.displayPath),
                 actionTitle: L10n.text("settings.action.remove"))
         case .outdated:
             shellIntegrationStatus = RowStatus(
                 kind: .adjusted,
                 message: L10n.format(
                     "settings.status.shellIntegrationOutdated",
-                    ShellIntegrationInstaller.shared.displayPath),
+                    ShellIntegration.current.displayPath),
                 actionTitle: L10n.text("settings.action.update"),
                 // Removing must not first require writing the new hooks in.
                 secondaryActionTitle: L10n.text("settings.action.remove"))
@@ -586,7 +586,7 @@ final class SettingsModel {
     /// One dispatch point for the row's first button, whichever state put
     /// it there.
     func toggleShellIntegration() {
-        let installer = ShellIntegrationInstaller.shared
+        let installer = ShellIntegration.current
         switch installer.status() {
         case .notInstalled, .conflicting: applyShellIntegration(installer.install())
         case .outdated: applyShellIntegration(installer.update())
@@ -596,7 +596,7 @@ final class SettingsModel {
 
     /// The second button, offered only beside Update.
     func removeShellIntegration() {
-        applyShellIntegration(ShellIntegrationInstaller.shared.uninstall())
+        applyShellIntegration(ShellIntegration.current.uninstall())
     }
 
     private func applyShellIntegration(_ succeeded: Bool) {
@@ -605,7 +605,7 @@ final class SettingsModel {
                 kind: .failed,
                 message: L10n.format(
                     "settings.status.shellIntegrationWriteFailed",
-                    ShellIntegrationInstaller.shared.displayPath))
+                    ShellIntegration.current.displayPath))
             return
         }
         refreshShellIntegrationStatus()
