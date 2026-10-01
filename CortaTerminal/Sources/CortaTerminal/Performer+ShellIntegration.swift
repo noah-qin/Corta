@@ -83,6 +83,14 @@ extension Performer {
             // paste warning under a shell that never reads the markers, such
             // as macOS's bash 3.2. Each finished command clears it.
             state.bracketedPasteEnabled = false
+            // A program that pushed keyboard-protocol flags on the main
+            // screen and died (a crash, SIGKILL) never popped them, and the
+            // shell's line editor would get `CSI 99;5u` for Ctrl-C. Shells
+            // that use the protocol push again for their next prompt, after
+            // `D`.
+            if !grid.isAlternateScreenActive {
+                state.keyboardProtocol = KeyboardProtocolStack()
+            }
             // One outcome per prompt. A second `D`, or one on the prompt's own
             // row before anything ran, is a doubled hook — fish 4 marks its
             // prompts itself, and a hook's `D` after fish's `A` closed a phantom

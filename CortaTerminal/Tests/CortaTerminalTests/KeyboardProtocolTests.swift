@@ -27,6 +27,35 @@ struct KeyboardProtocolTests {
         return String(decoding: terminal.takeOutput(), as: UTF8.self)
     }
 
+    @Test("a program that pushes on the alternate screen and leaves with ?1049l alone restores the shell's keys")
+    func alternateScreenHasItsOwnStack() {
+        var terminal = Terminal(rows: 5, columns: 20)
+        terminal.feed(Array("\u{1B}[?1049h\u{1B}[>1u".utf8))
+        #expect(terminal.keyboardEnhancements == .disambiguate)
+        // No pop: kitty's rule makes leaving the screen enough.
+        terminal.feed(Array("\u{1B}[?1049l".utf8))
+        #expect(terminal.keyboardEnhancements.isEmpty)
+    }
+
+    @Test("the main screen's flags survive a trip to the alternate screen")
+    func mainStackIsParked() {
+        var terminal = Terminal(rows: 5, columns: 20)
+        terminal.feed(Array("\u{1B}[>1u\u{1B}[?1049h".utf8))
+        #expect(terminal.keyboardEnhancements.isEmpty, "the alternate screen starts fresh")
+        terminal.feed(Array("\u{1B}[?1049l".utf8))
+        #expect(terminal.keyboardEnhancements == .disambiguate)
+    }
+
+    @Test("a finished command clears flags a program left pushed on the main screen")
+    func commandEndClearsTheMainStack() {
+        var terminal = Terminal(rows: 5, columns: 20)
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\$ ai\r\n\u{1B}]133;C\u{1B}\\\u{1B}[>1u".utf8))
+        #expect(terminal.keyboardEnhancements == .disambiguate)
+        // The program was killed without popping; the shell reports D.
+        terminal.feed(Array("\u{1B}]133;D;137\u{1B}\\".utf8))
+        #expect(terminal.keyboardEnhancements.isEmpty)
+    }
+
     @Test("a fresh terminal reports the legacy encoding")
     func startsAtLegacy() {
         #expect(response(to: "\u{1B}[?u") == "\u{1B}[?0u")

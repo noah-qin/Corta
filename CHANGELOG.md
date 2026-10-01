@@ -190,6 +190,39 @@ what to edit.
   stayed on under a shell that does not support it, such as the bash that
   ships with macOS. Each finished command now turns it off; shells that
   support it turn it back on for the next prompt.
+- A large paste no longer leaves the shell stuck in paste mode. A paste is
+  sent in pieces, and when a program was slow to read — Claude Code or zsh
+  with several megabytes on the clipboard — Corta stopped part-way, after
+  the marker that opens a paste and before the one that closes it, so
+  every key after it, Return included, was taken as more pasted text and
+  the pane looked frozen. A paste is now sent whole or, if the program has
+  stopped reading, not at all, with the same notice as before; a dropped
+  file or Services text, which was discarded without a word, gets the
+  notice too.
+
+- Ctrl-C, Esc and the other keys work again after a full-screen program
+  quits. A program that switched on the Kitty keyboard protocol and left
+  the alternate screen without switching it off — which the protocol
+  allows — or that crashed or was killed while it was on, left the shell
+  receiving its keys in that encoding until `reset`. Each screen now has
+  its own setting, as in kitty, and a finished command clears the main
+  screen's.
+
+- The scroll wheel scrolls `less`, `man` and `git log`. On the alternate
+  screen, with mouse reporting off, the wheel moved through Corta's own
+  history, which that screen does not have, so nothing happened; it now
+  sends arrow keys, as Terminal.app and iTerm2 do. A program can turn this
+  off with `ESC [ ? 1007 l`.
+
+- Scrolling with a trackpad in vim (`mouse=a`), tmux and other programs
+  that read the mouse moves at the right speed. Every trackpad event, the
+  tiniest movement and the momentum after a flick included, was sent as a
+  whole wheel notch; movement now adds up into notches as it does for
+  scrolling Corta's own history.
+
+- The window title no longer shows "remote?" while a pipeline such as
+  `git log | less` runs. The command naming the job had already finished,
+  and a job without a name was treated as a possible remote session.
 
 - Shell integration for bash works when bash starts as a login shell,
   which is how Corta starts it. The hooks were only in `~/.bashrc`, which

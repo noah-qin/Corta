@@ -39,6 +39,8 @@ extension Performer {
                 state.synchronizedOutputEnabled = enabled
             case 1004:  // focus reporting
                 state.focusReportingEnabled = enabled
+            case 1007:  // alternate scroll
+                state.alternateScrollEnabled = enabled
             case 45:  // reverse-wraparound mode — not DECBKM, which is ?67
                 grid.reverseWraparoundEnabled = enabled
             default:
@@ -81,11 +83,17 @@ extension Performer {
         for index in 0..<parameters.count {
             if parameters[index] == 1049 {
                 if set {
+                    if !grid.isAlternateScreenActive {
+                        state.parkedMainKeyboardProtocol = state.keyboardProtocol
+                        state.keyboardProtocol = KeyboardProtocolStack()
+                    }
                     grid.enterAlternateScreen()
                 } else {
+                    if let main = state.parkedMainKeyboardProtocol {
+                        state.keyboardProtocol = main
+                        state.parkedMainKeyboardProtocol = nil
+                    }
                     grid.exitAlternateScreen()
-                    // At once: the rest of this chunk may be OSC 133 marks,
-                    // and they must not mix the old rows with the new.
                     applyRowRemaps()
                 }
                 handled = true

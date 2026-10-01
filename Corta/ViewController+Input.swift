@@ -35,20 +35,25 @@ extension ViewController {
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
         returnToBottomOnInput()
+        sendPaste(sanitized)
+    }
+
+    /// Queues a sanitised paste whole, or not at all. In pieces, a backlog
+    /// that filled part-way stopped it after `ESC[200~` and before
+    /// `ESC[201~`, and the shell — Claude Code, zsh — stayed in paste mode,
+    /// taking every later Return as pasted text: the pane looked frozen.
+    func sendPaste(_ sanitized: String) {
         let payload = Paste.bytes(for: sanitized, bracketedPasteEnabled: bracketedPasteEnabled())
-        // Chunks, so a keystroke mid-paste waits behind one, not all of it.
-        for chunk in Paste.chunked(payload) {
-            switch session.write(chunk) {
-            case .accepted:
-                continue
-            case .backpressured:
-                // The child stopped reading; stop feeding and say why.
-                terminalView?.showToast(L10n.text("toast.pasteStopped"), kind: .warning)
-                return
-            case .stopped:
-                // The session is gone; nobody would read the toast.
-                return
-            }
+        // Chunks, so the writer hands the child one at a time.
+        switch session.write(chunks: Paste.chunked(payload)) {
+        case .accepted:
+            break
+        case .backpressured:
+            // The child stopped reading; nothing was sent. Say why.
+            terminalView?.showToast(L10n.text("toast.pasteStopped"), kind: .warning)
+        case .stopped:
+            // The session is gone; nobody would read the toast.
+            break
         }
     }
 

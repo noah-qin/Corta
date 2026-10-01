@@ -217,6 +217,22 @@ struct PTYLifecycleTests {
         #expect(exit != nil)
     }
 
+    @Test("a pipeline whose first process exited is named by the process still running")
+    func pipelineNamedByALiveMember() throws {
+        let pty = try PTY.spawn(executable: "/bin/bash", arguments: ["--norc", "-i"])
+        defer {
+            pty.terminate()
+            // Draining: bash blocks writing its farewell to an unread pty.
+            _ = waitForExitDraining(pty)
+            pty.close()
+        }
+        _ = pty.readOutput(containing: "$ ")
+        // `true` leads the job's group and exits at once; `sleep` holds it.
+        try pty.write(text: "true | sleep 30\n")
+        #expect(waitForCondition { pty.hasForegroundJob })
+        #expect(waitForCondition { pty.foregroundProcessName == "sleep" })
+    }
+
     @Test("a background job does not own the terminal")
     func backgroundJobDoesNotOwnTheTerminal() throws {
         let pty = try PTY.spawn(executable: "/bin/bash", arguments: ["--norc", "-i"])

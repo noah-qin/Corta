@@ -46,13 +46,24 @@ public struct PerformerState: Sendable {
     /// Informational only — nothing that spawns a process may read it.
     public internal(set) var remoteContext: RemoteContext?
     public internal(set) var focusReportingEnabled = false
+    /// `?1007`: on the alternate screen, with mouse reporting off, the wheel
+    /// sends arrow keys — the alternate screen has no scrollback of its own,
+    /// so `less`, `man` and `git log` would not scroll at all. On by
+    /// default, as in Terminal.app and iTerm2 (xterm's is off).
+    public internal(set) var alternateScrollEnabled = true
     /// DECSCL; gates which sequences may answer (DECRQM above all).
     public internal(set) var conformanceLevel = 65
     /// LNM — implemented, or a program relying on it prints a staircase.
     public internal(set) var newLineModeEnabled = false
     public internal(set) var applicationCursorKeysEnabled = false
     public internal(set) var applicationKeypadEnabled = false
+    /// The active screen's stack. kitty keeps one per screen: a program on
+    /// the alternate screen pushes onto its own, which is dropped when it
+    /// leaves, so one that exits with `?1049l` alone — legal — cannot leave
+    /// the shell's keys encoded as `CSI u` (Ctrl-C, Esc and all).
     public internal(set) var keyboardProtocol = KeyboardProtocolStack()
+    /// The main screen's stack, parked while the alternate screen is up.
+    var parkedMainKeyboardProtocol: KeyboardProtocolStack?
     public internal(set) var dynamicColors = DynamicColors()
     public internal(set) var indexedPalette = IndexedPalette()
     public internal(set) var specialColors = SpecialColors()

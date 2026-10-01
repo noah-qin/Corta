@@ -282,11 +282,27 @@ public final class PTY: @unchecked Sendable {
         return Self.processName(ofGroup: group)
     }
 
+    /// The group leader's name, else a live member's: in `seq 1 500 | less`
+    /// the leader is `seq`, gone at once while `less` holds the terminal, and
+    /// a nameless foreground job read as "remote?" in the title.
+    private static func processName(ofGroup group: pid_t) -> String? {
+        if let name = processName(of: group) { return name }
+        var members = [pid_t](repeating: 0, count: 64)
+        let count = proc_listpgrppids(
+            group, &members, Int32(members.count * MemoryLayout<pid_t>.size))
+        guard count > 0 else { return nil }
+        // The last listed is the newest — the pipeline's reader, usually.
+        for member in members.prefix(Int(min(count, Int32(members.count)))).reversed() {
+            if let name = processName(of: member) { return name }
+        }
+        return nil
+    }
+
     /// Trusts the length `proc_name` returns; `String(cString:)` on `[CChar]`
     /// is deprecated.
-    private static func processName(ofGroup group: pid_t) -> String? {
+    private static func processName(of pid: pid_t) -> String? {
         var buffer = [CChar](repeating: 0, count: 256)
-        let length = proc_name(group, &buffer, UInt32(buffer.count))
+        let length = proc_name(pid, &buffer, UInt32(buffer.count))
         guard length > 0 else { return nil }
         let bytes = buffer.prefix(Int(length)).map { UInt8(bitPattern: $0) }
         let name = String(decoding: bytes, as: UTF8.self)

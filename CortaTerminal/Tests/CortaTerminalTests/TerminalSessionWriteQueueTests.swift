@@ -255,6 +255,41 @@ import Testing
         #expect(session.write([1]) == .stopped)
     }
 
+    /// A paste is queued whole or not at all: cut short after `ESC[200~`, the
+    /// shell would wait in paste mode for an `ESC[201~` that never comes.
+    @Test func aChunkedPasteIsQueuedWholeOrNotAtAll() throws {
+        let session = try TerminalSession(executable: "/bin/cat")
+        defer { session.stop() }
+
+        let gateOpen = Mutex(false)
+        let sinkEntered = Mutex(false)
+        let recorded = Mutex<[[UInt8]]>([])
+        session.writerSink = { chunk in
+            sinkEntered.withLock { $0 = true }
+            while !gateOpen.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.001) }
+            recorded.withLock { $0.append(chunk) }
+        }
+        session.start()
+
+        let megabyte = 1024 * 1024
+        session.write([UInt8](repeating: 0, count: megabyte))
+        #expect(
+            awaitCondition { sinkEntered.withLock { $0 } },
+            "precondition: the drain should be parked inside the gated sink")
+
+        // Six 1 MB chunks: piecewise, the backlog crossed the cap part-way.
+        let paste = (1...6).map { [UInt8](repeating: UInt8($0), count: megabyte) }
+        #expect(session.write(chunks: paste) == .accepted)
+        // Now over the cap: the next paste is refused entire.
+        #expect(session.write(chunks: [[9], [9]]) == .backpressured)
+
+        gateOpen.withLock { $0 = true }
+        let drained = awaitRecording(recorded, count: 7)
+        #expect(drained, "expected the whole paste to drain")
+        let markers = recorded.withLock { $0.map { $0.first ?? 0xFF } }
+        #expect(markers == [0, 1, 2, 3, 4, 5, 6])
+    }
+
     /// End to end, with the real pty as the sink: queued writes reach the
     /// child in FIFO order.
     @Test func queuedWritesReachTheChildInOrder() throws {
