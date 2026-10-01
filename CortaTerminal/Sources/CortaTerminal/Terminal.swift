@@ -40,9 +40,16 @@ public struct Terminal: Sendable {
             capacity: performer.state.commandRecords.capacity)
     }
 
+    /// A grid resized through this setter (`terminal.grid.resize(…)`) has its
+    /// reflow's row remaps applied on the way in, as `resize(rows:columns:)`
+    /// does: records must never wait in the old coordinates while marks
+    /// arrive in the new.
     public var grid: Grid {
         get { performer.grid }
-        set { performer.grid = newValue }
+        set {
+            performer.grid = newValue
+            performer.applyRowRemaps()
+        }
     }
 
     /// Clear Screen: the grid's, and the waiting prompt follows the cursor to

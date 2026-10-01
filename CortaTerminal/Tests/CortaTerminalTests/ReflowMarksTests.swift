@@ -177,4 +177,16 @@ struct ReflowMarksTests {
         #expect(terminal.promptEndPosition == nil)
         #expect(terminal.commandRecords.last?.promptEndColumn == nil)
     }
+
+    @Test("a resize through the grid property moves the records too")
+    func gridPropertyResizeAppliesRemaps() throws {
+        var terminal = Terminal(rows: 5, columns: 20, scrollbackLimit: 100)
+        terminal.feed(Self.commands(6))
+        terminal.grid.resize(rows: 5, columns: 4)
+        for record in terminal.commandRecords.records where !record.isRunning {
+            #expect(
+                terminal.grid.line(atAbsoluteRow: record.promptRow)?.mark.isPrompt == true,
+                "record \(record.id)")
+        }
+    }
 }
