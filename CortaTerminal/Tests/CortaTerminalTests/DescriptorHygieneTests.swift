@@ -98,13 +98,18 @@ struct DescriptorHygieneTests {
     func sessionEndsWhenTheShellExitsUnderABackgroundJob() throws {
         let session = try TerminalSession(
             executable: "/bin/sh",
-            arguments: ["-c", "nohup sleep 30 >/dev/tty 2>&1 </dev/tty & sleep 0.2; exit 3"])
+            // `nohup` would write `nohup.out` into the working directory.
+            arguments: [
+                "-c", "(trap '' HUP; exec sleep 10) </dev/tty >/dev/tty 2>&1 & sleep 0.2; exit 3",
+            ])
         defer { session.stop() }
         let exited = Mutex<ChildExit?>(nil)
         session.onChildExit = { exit in exited.withLock { $0 = exit } }
         session.start()
 
-        let deadline = ContinuousClock.now + testTimeout(10)
+        // Well inside the job's 10 s, which ends it on its own afterwards
+        // (it ignores the hangup `stop()` sends).
+        let deadline = ContinuousClock.now + .seconds(5)
         while exited.withLock({ $0 }) == nil, ContinuousClock.now < deadline {
             Thread.sleep(forTimeInterval: 0.02)
         }
