@@ -101,13 +101,17 @@ into another application hides it without moving focus again.
 
 #### Shell integration
 
-Not a config-file key — a file on disk, the login shell's startup file,
-that only Settings ▸ Terminal ▸ Shell Integration touches, and only inside
-one marked block. The shell is the one `$SHELL` names: `~/.zshrc` for zsh,
-for bash the first of `~/.bash_profile`, `~/.bash_login` and `~/.profile`
-that exists (a login bash reads no other; a new `~/.bash_profile` when none
-does), `~/.config/fish/config.fish` for fish, and zsh's for
-anything else:
+Not a config-file key — the login shell's startup files, which only
+Settings ▸ Terminal ▸ Shell Integration touches, and only inside one
+marked block each. The shell is the one `$SHELL` names: `~/.zshrc` for
+zsh, `~/.config/fish/config.fish` for fish, and zsh's for anything else.
+bash takes two: Corta starts it as a login shell, which reads the first
+readable one of `~/.bash_profile`, `~/.bash_login` and `~/.profile` (a new
+`~/.bash_profile` when there is none) and never `~/.bashrc`, while a bash
+started inside the session reads only `~/.bashrc` — so the block goes into
+both, and guards itself against running twice when one sources the other.
+It only acts in an interactive bash, so `bash -lc` output and other shells
+reading `~/.profile` are untouched.
 
 ```
 # >>> Corta shell integration >>>
@@ -117,13 +121,14 @@ anything else:
 
 **Install** appends the block (creating the file first if it does not
 exist); **Remove** deletes exactly that block and nothing else a user wrote
-around or inside it. Installing is reversible for the same reason: nothing
+around or inside it, and deletes the file only if the block was all it
+held. Installing is reversible for the same reason: nothing
 outside those two lines is Corta's to change, so removing them undoes the
 whole thing. Installing twice changes nothing the second time, and the
 script itself guards its own hooks with `CORTA_SHELL_INTEGRATION_ACTIVE` in
 case something else sources it again.
 
-The row reports one of four states, read fresh from that file every time
+The row reports one of four states, read fresh from those files every time
 Settings opens — the file, not a cached flag, is the ground truth, the same
 rule the config file itself follows (§1):
 
@@ -131,7 +136,7 @@ rule the config file itself follows (§1):
 | --- | --- |
 | Not installed | No Corta block. Offers **Install**. |
 | Installed | The block is present and holds this version's hooks. Offers **Remove**. |
-| Installed hooks differ | The block is present, but what sits between its marker lines is not this version's hooks — an earlier version's, or edited by hand. Corta never rewrites the block on its own, so a fix to the hooks waits here. Offers **Update**, which replaces everything between the two marker lines, edits included, and leaves the block where it is; and **Remove**. A block whose end marker is missing reads as Installed, since there is nothing whole to update. |
+| Installed hooks differ | The block is present, but what sits between its marker lines is not this version's hooks — an earlier version's, or edited by hand — or, for bash, it is in one of its two files and not the other. Corta never rewrites the block on its own, so a fix to the hooks waits here. Offers **Update**, which replaces everything between the two marker lines, edits included, and leaves the block where it is; and **Remove**. A block whose end marker is missing reads as Installed, since there is nothing whole to update. |
 | Possible conflict | No Corta block, but the file already sources another terminal's own integration (iTerm2, Starship, VS Code or WezTerm's are recognised by name). Offers **Install Anyway** — installing alongside another integration is not refused, only flagged, since only the user knows whether that is what they want. |
 
 The installed script emits `OSC 133 ; A/B/C/D` and `OSC 7` for the working

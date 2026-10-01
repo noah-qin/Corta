@@ -147,7 +147,8 @@ installed when you say so.
 
 Shell integration lets Corta see where each command starts and ends. Install
 it from **Settings ▸ Terminal ▸ Shell Integration**: it adds one marked block
-to your shell's startup file — `~/.zshrc`, `~/.bash_profile` (or `~/.bash_login` / `~/.profile` if that is what bash reads) or
+to your shell's startup file — `~/.zshrc`; for bash both `~/.bashrc` and
+`~/.bash_profile` (or whichever login file bash reads); or
 `~/.config/fish/config.fish` — and **Remove** takes out exactly that block.
 Nothing is installed without you pressing the button.
 
