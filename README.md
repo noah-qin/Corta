@@ -93,7 +93,7 @@ standards they helped set. It makes a different set of bets.
 <table>
 <tr>
 <td width="50%"><img src="docs/brand/sftp-browser.png" alt="The SFTP browser: Back and Forward, a breadcrumb path, a sortable file list and the transfers popover with a progress bar, speed and time left"></td>
-<td width="50%"><img src="docs/brand/settings.png" alt="The Settings window: a sidebar of eight categories on coloured tiles, beside the Terminal page's grouped form"></td>
+<td width="50%"><img src="docs/brand/settings.png" alt="The Settings window: a sidebar of eight categories on coloured tiles, beside the Appearance page's grouped form, with a font preview"></td>
 </tr>
 <tr>
 <td align="center"><sub>The SFTP browser, with a transfer in progress</sub></td>
