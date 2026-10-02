@@ -120,7 +120,10 @@ final class RemoteConnectController: NSWindowController {
         case .ssh:
             guard let preset = SSHDestination.preset(host: host, port: port) else { return false }
             close()
-            RecentHostsStore.shared.record(host)
+            // Recent hosts are names, and picking one connects on port 22 or
+            // the alias's own: a connection on a typed port is not offered
+            // again, where it would quietly reach a different port.
+            if port == nil { RecentHostsStore.shared.record(host) }
             (NSApp.delegate as? AppDelegate)?.launchPreset(preset, inNewWindow: true)
         case .sftp:
             guard SSHDestination.preset(host: host) != nil else { return false }

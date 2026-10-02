@@ -126,7 +126,10 @@ nonisolated enum SSHConfigHosts {
         }
 
         mutating func read(_ file: URL, depth: Int) {
-            let path = file.standardizedFileURL.path
+            // Followed, because dotfile managers (stow, home-manager, chezmoi)
+            // make `~/.ssh/config` a link; the checks below apply to the
+            // file it points at.
+            let path = file.resolvingSymlinksInPath().standardizedFileURL.path
             guard depth <= SSHConfigHosts.maximumDepth,
                 visitedFiles.count < SSHConfigHosts.maximumFiles,
                 visitedFiles.insert(path).inserted,

@@ -122,6 +122,42 @@ struct SFTPBrowserHistoryTests {
         #expect(!model.canGoForward)
     }
 
+    @Test("a step back that no longer opens is dropped, not retried forever")
+    func deadStepIsDropped() async {
+        let fake = FakeSFTPClient()
+        fake.listings["/srv"] = [entry("gone", directory: true)]
+        fake.listings["/srv/gone"] = [entry("deeper", directory: true)]
+        fake.listings["/srv/gone/deeper"] = []
+        let model = await connected(fake)
+        model.navigateInto(model.entries[0])
+        await waitUntil("in gone") { model.currentPath == "/srv/gone" }
+        model.navigateInto(model.entries[0])
+        await waitUntil("in deeper") { model.currentPath == "/srv/gone/deeper" }
+        fake.listingErrors["/srv/gone"] = .server(SFTPStatus(code: .noSuchFile))
+        model.navigateBack()
+        await waitUntil("error shown") { model.listingError != nil }
+        #expect(model.backStack == ["/srv"], "the dead step is gone; the one before it is next")
+        model.navigateBack()
+        await waitUntil("back at srv") { model.currentPath == "/srv" }
+    }
+
+    @Test("another host, or a reconnect, starts a new history")
+    func historyIsPerConnection() async {
+        let fake = FakeSFTPClient()
+        fake.listings["/srv"] = [entry("app", directory: true)]
+        fake.listings["/srv/app"] = []
+        let model = await connected(fake)
+        model.navigateInto(model.entries[0])
+        await waitUntil("in app") { model.currentPath == "/srv/app" }
+        #expect(model.canGoBack)
+        model.changeHost()
+        #expect(!model.canGoBack && !model.canGoForward)
+        model.hostField = "other-box"
+        model.connect()
+        await waitUntil("reconnected") { model.connectionState == .connected }
+        #expect(!model.canGoBack)
+    }
+
     @Test("a directory that fails to open is not a step to go back to")
     func failedVisitLeavesHistory() async {
         let fake = FakeSFTPClient()

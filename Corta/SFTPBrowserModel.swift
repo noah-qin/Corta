@@ -315,6 +315,10 @@ final class SFTPBrowserModel {
             let listing = try await client.listDirectory(path: path)
             guard generation == connectionGeneration else { client.close(); return }
             connectionState = .connected
+            // A new connection starts a new walk: folders visited on another
+            // host, or before a reconnect, are not steps back on this one.
+            backStack.removeAll()
+            forwardStack.removeAll()
             currentPath = Self.normalized(path: path)
             pathField = currentPath
             applyEntries(listing)
@@ -345,6 +349,8 @@ final class SFTPBrowserModel {
 
     func changeHost() {
         disconnect()
+        backStack.removeAll()
+        forwardStack.removeAll()
         hostField = host ?? hostField
         if let host { onHostAbandoned?(host) }
         host = nil
@@ -463,6 +469,12 @@ final class SFTPBrowserModel {
             } catch {
                 guard generation == directoryGeneration else { return }
                 listingError = Self.errorMessage(Self.sftpError(error), host: host ?? "")
+                // A step that no longer opens (deleted, or its permissions
+                // changed) is dropped, so Back and Forward do not stick on it
+                // and what lies beyond stays reachable.
+                let failed = Self.normalized(path: path)
+                if history == .back, backStack.last == failed { backStack.removeLast() }
+                if history == .forward, forwardStack.last == failed { forwardStack.removeLast() }
             }
             guard generation == directoryGeneration else { return }
             isLoading = false

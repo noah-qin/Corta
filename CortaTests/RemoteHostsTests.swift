@@ -66,6 +66,23 @@ struct SSHConfigHostsTests {
         #expect(aliases == ["main-box", "team-a", "team-b"])
     }
 
+    @Test("a config that is a link, as dotfile managers make it, is followed")
+    func symlinkedConfig() throws {
+        let home = FileManager.default.temporaryDirectory
+            .appendingPathComponent("corta-ssh-link-\(UUID().uuidString)")
+        let dotfiles = home.appendingPathComponent("dotfiles")
+        let ssh = home.appendingPathComponent(".ssh")
+        try FileManager.default.createDirectory(at: dotfiles, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: ssh, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+        try "Host linked-box\n".write(
+            to: dotfiles.appendingPathComponent("ssh_config"), atomically: true, encoding: .utf8)
+        try FileManager.default.createSymbolicLink(
+            at: ssh.appendingPathComponent("config"),
+            withDestinationURL: dotfiles.appendingPathComponent("ssh_config"))
+        #expect(SSHConfigHosts.aliases(home: home) == ["linked-box"])
+    }
+
     @Test("an absent configuration is simply no aliases")
     func absent() {
         let home = FileManager.default.temporaryDirectory
