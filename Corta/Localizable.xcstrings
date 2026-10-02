@@ -11747,9 +11747,21 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$lld lines of scrollback will be discarded. This cannot be undone."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld line of scrollback will be discarded. This cannot be undone."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld lines of scrollback will be discarded. This cannot be undone."
+                }
+              }
+            }
           }
         },
         "zh-Hans": {
@@ -11777,27 +11789,75 @@
           }
         },
         "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "%1$lld Zeilen des Verlaufs werden verworfen. Dies kann nicht widerrufen werden."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%1$lld Zeile des Verlaufs wird verworfen. Dies kann nicht widerrufen werden."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%1$lld Zeilen des Verlaufs werden verworfen. Dies kann nicht widerrufen werden."
+                }
+              }
+            }
           }
         },
         "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "%1$lld lignes d’historique seront supprimées. Cette action est irréversible."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%1$lld ligne d’historique sera supprimée. Cette action est irréversible."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%1$lld lignes d’historique seront supprimées. Cette action est irréversible."
+                }
+              }
+            }
           }
         },
         "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Se descartarán %1$lld líneas del historial. Esta acción no se puede deshacer."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "Se descartará %1$lld línea del historial. Esta acción no se puede deshacer."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "Se descartarán %1$lld líneas del historial. Esta acción no se puede deshacer."
+                }
+              }
+            }
           }
         },
         "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "%1$lld linhas do histórico serão descartadas. Esta ação não pode ser desfeita."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%1$lld linha do histórico será descartada. Esta ação não pode ser desfeita."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%1$lld linhas do histórico serão descartadas. Esta ação não pode ser desfeita."
+                }
+              }
+            }
           }
         }
       }
@@ -13517,9 +13577,21 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld directories remembered"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld directory remembered"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld directories remembered"
+                }
+              }
+            }
           }
         },
         "zh-Hans": {
@@ -13547,27 +13619,75 @@
           }
         },
         "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "%lld Verzeichnisse gemerkt"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld Verzeichnis gemerkt"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld Verzeichnisse gemerkt"
+                }
+              }
+            }
           }
         },
         "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "%lld répertoires mémorisés"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld répertoire mémorisé"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld répertoires mémorisés"
+                }
+              }
+            }
           }
         },
         "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "%lld directorios recordados"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld directorio recordado"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld directorios recordados"
+                }
+              }
+            }
           }
         },
         "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "%lld diretórios lembrados"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld diretório lembrado"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld diretórios lembrados"
+                }
+              }
+            }
           }
         }
       }
@@ -14697,9 +14817,21 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld commands"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld command"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld commands"
+                }
+              }
+            }
           }
         },
         "zh-Hans": {
@@ -14727,27 +14859,75 @@
           }
         },
         "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "%lld Befehle"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld Befehl"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld Befehle"
+                }
+              }
+            }
           }
         },
         "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "%lld commandes"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld commande"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld commandes"
+                }
+              }
+            }
           }
         },
         "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "%lld comandos"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld comando"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld comandos"
+                }
+              }
+            }
           }
         },
         "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "%lld comandos"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld comando"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld comandos"
+                }
+              }
+            }
           }
         }
       }
@@ -17590,7 +17770,29 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Delete the folder “%1$@” on %2$@? It contains %3$ld entries. A folder must be empty before it can be deleted, and deletion cannot be undone."
+            "value": "Delete the folder “%1$@” on %2$@? It contains %#@entries@. A folder must be empty before it can be deleted, and deletion cannot be undone."
+          },
+          "substitutions": {
+            "entries": {
+              "argNum": 3,
+              "formatSpecifier": "ld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg entry"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg entries"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "zh-Hans": {
@@ -17620,25 +17822,113 @@
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Den Ordner „%1$@“ auf %2$@ löschen? Er enthält %3$ld Einträge. Ein Ordner muss leer sein, um gelöscht werden zu können, und das Löschen kann nicht rückgängig gemacht werden."
+            "value": "Den Ordner „%1$@“ auf %2$@ löschen? Er enthält %#@entries@. Ein Ordner muss leer sein, um gelöscht werden zu können, und das Löschen kann nicht rückgängig gemacht werden."
+          },
+          "substitutions": {
+            "entries": {
+              "argNum": 3,
+              "formatSpecifier": "ld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg Eintrag"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg Einträge"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Supprimer le dossier « %1$@ » sur %2$@ ? Il contient %3$ld éléments. Un dossier doit être vide pour pouvoir être supprimé, et la suppression est irréversible."
+            "value": "Supprimer le dossier « %1$@ » sur %2$@ ? Il contient %#@entries@. Un dossier doit être vide pour pouvoir être supprimé, et la suppression est irréversible."
+          },
+          "substitutions": {
+            "entries": {
+              "argNum": 3,
+              "formatSpecifier": "ld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg élément"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg éléments"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "¿Eliminar la carpeta «%1$@» en %2$@? Contiene %3$ld elementos. Una carpeta debe estar vacía para poder eliminarla, y la eliminación no se puede deshacer."
+            "value": "¿Eliminar la carpeta «%1$@» en %2$@? Contiene %#@entries@. Una carpeta debe estar vacía para poder eliminarla, y la eliminación no se puede deshacer."
+          },
+          "substitutions": {
+            "entries": {
+              "argNum": 3,
+              "formatSpecifier": "ld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg elemento"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg elementos"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Apagar a pasta “%1$@” em %2$@? Ela contém %3$ld itens. Uma pasta precisa estar vazia para ser apagada, e a exclusão não pode ser desfeita."
+            "value": "Apagar a pasta “%1$@” em %2$@? Ela contém %#@entries@. Uma pasta precisa estar vazia para ser apagada, e a exclusão não pode ser desfeita."
+          },
+          "substitutions": {
+            "entries": {
+              "argNum": 3,
+              "formatSpecifier": "ld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg item"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg itens"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -20776,7 +21066,29 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$d item(s) were not transferred (symbolic links or special files): %2$@"
+            "value": "%#@items@ (symbolic links or special files): %2$@"
+          },
+          "substitutions": {
+            "items": {
+              "argNum": 1,
+              "formatSpecifier": "d",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg item was not transferred"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg items were not transferred"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "zh-Hans": {
@@ -20806,25 +21118,113 @@
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%1$d Objekt(e) wurden nicht übertragen (symbolische Links oder Spezialdateien): %2$@"
+            "value": "%#@items@ (symbolische Links oder Spezialdateien): %2$@"
+          },
+          "substitutions": {
+            "items": {
+              "argNum": 1,
+              "formatSpecifier": "d",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg Objekt wurde nicht übertragen"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg Objekte wurden nicht übertragen"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%1$d élément(s) non transféré(s) (liens symboliques ou fichiers spéciaux) : %2$@"
+            "value": "%#@items@ (liens symboliques ou fichiers spéciaux) : %2$@"
+          },
+          "substitutions": {
+            "items": {
+              "argNum": 1,
+              "formatSpecifier": "d",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg élément non transféré"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg éléments non transférés"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%1$d elemento(s) no se transfirieron (enlaces simbólicos o archivos especiales): %2$@"
+            "value": "%#@items@ (enlaces simbólicos o archivos especiales): %2$@"
+          },
+          "substitutions": {
+            "items": {
+              "argNum": 1,
+              "formatSpecifier": "d",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg elemento no se transfirió"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg elementos no se transfirieron"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%1$d item(ns) não foram transferidos (links simbólicos ou arquivos especiais): %2$@"
+            "value": "%#@items@ (links simbólicos ou arquivos especiais): %2$@"
+          },
+          "substitutions": {
+            "items": {
+              "argNum": 1,
+              "formatSpecifier": "d",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg item não foi transferido"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg itens não foram transferidos"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -20835,7 +21235,29 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$d of %2$d files"
+            "value": "%1$d of %#@files@"
+          },
+          "substitutions": {
+            "files": {
+              "argNum": 2,
+              "formatSpecifier": "d",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg file"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg files"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "zh-Hans": {
@@ -20865,25 +21287,113 @@
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%1$d von %2$d Dateien"
+            "value": "%1$d von %#@files@"
+          },
+          "substitutions": {
+            "files": {
+              "argNum": 2,
+              "formatSpecifier": "d",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg Datei"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg Dateien"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%1$d fichiers sur %2$d"
+            "value": "%#@files@ sur %2$d"
+          },
+          "substitutions": {
+            "files": {
+              "argNum": 1,
+              "formatSpecifier": "d",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg fichier"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg fichiers"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%1$d de %2$d archivos"
+            "value": "%1$d de %#@files@"
+          },
+          "substitutions": {
+            "files": {
+              "argNum": 2,
+              "formatSpecifier": "d",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg archivo"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg archivos"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%1$d de %2$d arquivos"
+            "value": "%1$d de %#@files@"
+          },
+          "substitutions": {
+            "files": {
+              "argNum": 2,
+              "formatSpecifier": "d",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg arquivo"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg arquivos"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -20894,7 +21404,29 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Done — %1$d files, %2$@"
+            "value": "Done — %#@files@, %2$@"
+          },
+          "substitutions": {
+            "files": {
+              "argNum": 1,
+              "formatSpecifier": "d",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg file"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg files"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "zh-Hans": {
@@ -20924,25 +21456,113 @@
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Fertig – %1$d Dateien, %2$@"
+            "value": "Fertig – %#@files@, %2$@"
+          },
+          "substitutions": {
+            "files": {
+              "argNum": 1,
+              "formatSpecifier": "d",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg Datei"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg Dateien"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Terminé — %1$d fichiers, %2$@"
+            "value": "Terminé — %#@files@, %2$@"
+          },
+          "substitutions": {
+            "files": {
+              "argNum": 1,
+              "formatSpecifier": "d",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg fichier"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg fichiers"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Listo: %1$d archivos, %2$@"
+            "value": "Listo: %#@files@, %2$@"
+          },
+          "substitutions": {
+            "files": {
+              "argNum": 1,
+              "formatSpecifier": "d",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg archivo"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg archivos"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Concluído — %1$d arquivos, %2$@"
+            "value": "Concluído — %#@files@, %2$@"
+          },
+          "substitutions": {
+            "files": {
+              "argNum": 1,
+              "formatSpecifier": "d",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg arquivo"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg arquivos"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -27323,9 +27943,21 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%ld items"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%ld item"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%ld items"
+                }
+              }
+            }
           }
         },
         "zh-Hans": {
@@ -27353,27 +27985,75 @@
           }
         },
         "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "%ld Objekte"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%ld Objekt"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%ld Objekte"
+                }
+              }
+            }
           }
         },
         "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "%ld éléments"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%ld élément"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%ld éléments"
+                }
+              }
+            }
           }
         },
         "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "%ld elementos"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%ld elemento"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%ld elementos"
+                }
+              }
+            }
           }
         },
         "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "%ld itens"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%ld item"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%ld itens"
+                }
+              }
+            }
           }
         }
       }
@@ -28303,21 +28983,57 @@
           }
         },
         "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "%lld masqué(s)"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld masqué"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld masqués"
+                }
+              }
+            }
           }
         },
         "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "%lld ocultos"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld oculto"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld ocultos"
+                }
+              }
+            }
           }
         },
         "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "%lld ocultos"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld oculto"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld ocultos"
+                }
+              }
+            }
           }
         }
       }
@@ -29211,9 +29927,21 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld hosts remembered"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld host remembered"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld hosts remembered"
+                }
+              }
+            }
           }
         },
         "zh-Hans": {
@@ -29241,27 +29969,75 @@
           }
         },
         "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "%lld Hosts gespeichert"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld Host gespeichert"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld Hosts gespeichert"
+                }
+              }
+            }
           }
         },
         "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "%lld hôtes mémorisés"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld hôte mémorisé"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld hôtes mémorisés"
+                }
+              }
+            }
           }
         },
         "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "%lld hosts recordados"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld host recordado"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld hosts recordados"
+                }
+              }
+            }
           }
         },
         "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "%lld hosts lembrados"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld host lembrado"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "needs_review",
+                  "value": "%lld hosts lembrados"
+                }
+              }
+            }
           }
         }
       }

@@ -175,6 +175,31 @@ struct LocalizationCoverageTests {
         #expect(incomplete.isEmpty, "untranslated: \(incomplete.sorted { $0.key < $1.key })")
     }
 
+    /// Counts read as English does: "1 item", "2 items". The same two calls
+    /// `L10n.format` makes — the bundle's string, then `String(format:)` —
+    /// against one language's bundle, so the system's language does not
+    /// decide what is checked.
+    @Test("counts take the singular for one and the plural otherwise")
+    func pluralsFollowTheCount() throws {
+        func format(_ language: String, _ key: String, _ arguments: CVarArg...) throws -> String {
+            let path = try #require(Bundle.main.path(forResource: language, ofType: "lproj"))
+            let bundle = try #require(Bundle(path: path))
+            let template = bundle.localizedString(forKey: key, value: nil, table: "Localizable")
+            return String(format: template, arguments: arguments)
+        }
+        #expect(try format("en", "ui.sftp.itemCount", 1) == "1 item")
+        #expect(try format("en", "ui.sftp.itemCount", 7) == "7 items")
+        #expect(try format("en", "settings.recentHosts.count", 1) == "1 host remembered")
+        #expect(try format("en", "sftp.transfer.files", 1, 1) == "1 of 1 file")
+        #expect(try format("en", "sftp.transfer.files", 2, 3) == "2 of 3 files")
+        #expect(try format("en", "sftp.transfer.doneDirectory", 1, "2 KB") == "Done — 1 file, 2 KB")
+        #expect(try format("fr", "sftp.transfer.files", 1, 4) == "1 fichier sur 4")
+        #expect(try format("fr", "sftp.transfer.files", 3, 4) == "3 fichiers sur 4")
+        #expect(try format("de", "ui.sftp.itemCount", 1) == "1 Objekt")
+        // Languages without a plural are unchanged.
+        #expect(try format("zh-Hans", "ui.sftp.itemCount", 1).contains("1"))
+    }
+
     /// A translation that drops or reorders a format specifier is a crash
     /// rather than a typo, and it crashes only for the reader whose language
     /// it is.
@@ -195,23 +220,77 @@ struct LocalizationCoverageTests {
         }
 
         var mismatched: [String] = []
+        var strayInForms: [String] = []
         for (key, value) in strings {
             let entry = value as? [String: Any] ?? [:]
             let localizations = entry["localizations"] as? [String: Any] ?? [:]
-            func text(_ language: String) -> String? {
-                ((localizations[language] as? [String: Any])?["stringUnit"]
-                    as? [String: Any])?["value"] as? String
+            // The arguments a language consumes: the visible specifiers, plus
+            // each plural substitution's own (`%#@name@` names one, at the
+            // `argNum` it declares); for a whole-string plural, the "other"
+            // form's. Languages may move the plural to a different argument
+            // (French says "3 fichiers sur 5"), so these are compared as a set
+            // of positions, not as text.
+            func consumed(_ language: String) -> [String]? {
+                guard let localization = localizations[language] as? [String: Any] else { return nil }
+                if let unit = localization["stringUnit"] as? [String: Any],
+                    let value = unit["value"] as? String
+                {
+                    var found = specifiers(in: value)
+                    let substitutions = localization["substitutions"] as? [String: Any] ?? [:]
+                    for case let substitution as [String: Any] in substitutions.values {
+                        if let argument = substitution["argNum"] as? Int,
+                            let format = substitution["formatSpecifier"] as? String
+                        {
+                            found.append("%\(argument)$\(format)")
+                        }
+                    }
+                    return found.sorted()
+                }
+                let plural =
+                    ((localization["variations"] as? [String: Any])?["plural"] as? [String: Any])
+                let other =
+                    ((plural?["other"] as? [String: Any])?["stringUnit"] as? [String: Any])?["value"]
+                    as? String
+                return other.map(specifiers(in:))
             }
-            guard let source = text("en") else { continue }
-            let expected = specifiers(in: source)
+            // Every plural form's own text: a whole-string form may use only
+            // what the "other" form uses (a stray `%@` crashes for that
+            // count alone), and a substitution's forms only `%arg`.
+            for (language, value) in localizations {
+                guard let localization = value as? [String: Any] else { continue }
+                func forms(_ plural: [String: Any]?) -> [String] {
+                    (plural ?? [:]).values.compactMap {
+                        (($0 as? [String: Any])?["stringUnit"] as? [String: Any])?["value"] as? String
+                    }
+                }
+                let whole = (localization["variations"] as? [String: Any])?["plural"] as? [String: Any]
+                if let whole {
+                    let other =
+                        Set(specifiers(in: ((whole["other"] as? [String: Any])?["stringUnit"]
+                            as? [String: Any])?["value"] as? String ?? ""))
+                    for form in forms(whole) where !Set(specifiers(in: form)).isSubset(of: other) {
+                        strayInForms.append("\(key) [\(language)]: \(form)")
+                    }
+                }
+                let substitutions = localization["substitutions"] as? [String: Any] ?? [:]
+                for case let substitution as [String: Any] in substitutions.values {
+                    let plural =
+                        (substitution["variations"] as? [String: Any])?["plural"] as? [String: Any]
+                    for form in forms(plural) where !specifiers(in: form).isEmpty {
+                        strayInForms.append("\(key) [\(language)]: \(form)")
+                    }
+                }
+            }
+            guard let expected = consumed("en") else { continue }
             for language in Self.shippedLanguages where language != "en" {
-                guard let translated = text(language) else { continue }
-                if specifiers(in: translated) != expected {
+                guard let translated = consumed(language) else { continue }
+                if translated != expected {
                     mismatched.append("\(key) [\(language)]")
                 }
             }
         }
         #expect(mismatched.isEmpty, "format specifiers differ: \(mismatched.sorted())")
+        #expect(strayInForms.isEmpty, "plural forms with stray specifiers: \(strayInForms.sorted())")
     }
 
     /// Mechanical, not linguistic: this cannot judge whether a

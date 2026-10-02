@@ -58,9 +58,29 @@ struct SettingsSidebar: View {
                 get: { navigation.selection },
                 set: { if let category = $0 { navigation.selection = category } })
         ) { category in
-            Label(category.title, systemImage: category.symbol).tag(category)
+            SettingsSidebarRow(category: category).tag(category)
         }
         .listStyle(.sidebar)
+    }
+}
+
+/// A sidebar row the way System Settings draws one: the symbol white on a
+/// coloured rounded tile, then the name. Explicit colours rather than a
+/// `Label`'s accent tint — the tinted icons disappeared and came back for a
+/// few frames each time the window opened and became key.
+private struct SettingsSidebarRow: View {
+    let category: SettingsView.Category
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: category.symbol)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white)
+                .frame(width: 22, height: 22)
+                .background(category.tileColor.gradient, in: .rect(cornerRadius: 6))
+                .accessibilityHidden(true)
+            Text(category.title)
+        }
     }
 }
 
@@ -86,17 +106,31 @@ struct SettingsView: View {
             }
         }
 
+        /// The sidebar tile behind the symbol, in System Settings' palette.
+        var tileColor: Color {
+            switch self {
+            case .general: .gray
+            case .appearance: .indigo
+            case .terminal: Color(white: 0.25)
+            case .keyboardMouse: .blue
+            case .shortcuts: .orange
+            case .quickTerminal: .teal
+            case .connections: .green
+            case .privacy: .blue
+            }
+        }
+
         /// SF Symbols, so the sidebar follows the user's icon weight.
         var symbol: String {
             switch self {
-            case .general: "gearshape"
-            case .appearance: "paintpalette"
-            case .terminal: "terminal"
-            case .keyboardMouse: "keyboard"
+            case .general: "gearshape.fill"
+            case .appearance: "paintpalette.fill"
+            case .terminal: "terminal.fill"
+            case .keyboardMouse: "keyboard.fill"
             case .shortcuts: "command"
             case .quickTerminal: "rectangle.topthird.inset.filled"
             case .connections: "network"
-            case .privacy: "hand.raised"
+            case .privacy: "hand.raised.fill"
             }
         }
     }

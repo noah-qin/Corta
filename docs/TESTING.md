@@ -332,6 +332,24 @@ development build silently stopped recording command history.
 separate process, which XCTest does not mark, so they keep the
 development stage unless they set `CORTA_STAGE_DIR` themselves.
 
+### Downloads to a volume without ACLs
+
+exFAT, FAT and some SMB shares answer `ENOTSUP` when a download clears its
+inherited ACL. The real-server test for it is opt-in, because it needs such
+a volume mounted; a scratch disk image, mounted out of sight and removed
+afterwards, is enough:
+
+```sh
+dir=$(mktemp -d)
+hdiutil create -size 64m -fs ExFAT -volname CortaNoACL -o "$dir/noacl.dmg" -quiet
+hdiutil attach "$dir/noacl.dmg" -nobrowse -mountpoint "$dir/mnt" -quiet
+CORTA_NOACL_VOLUME="$dir/mnt" swift test --package-path CortaTerminal \
+  --filter downloadToVolumeWithoutACLs
+hdiutil detach "$dir/mnt" -quiet && rm -rf "$dir"
+```
+
+On 2026-10-02 it passed with the fix and failed with `errno 45` without it.
+
 ### The application under the thread sanitizer
 
 ```sh

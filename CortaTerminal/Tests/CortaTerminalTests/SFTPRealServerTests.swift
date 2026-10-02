@@ -87,6 +87,32 @@ struct SFTPRealServerTests {
             atPath: realFolder.appendingPathComponent("app/README.md").path))
     }
 
+    /// exFAT, FAT and some SMB shares have no ACLs: clearing one answers
+    /// ENOTSUP, which once failed every download to them. Opt-in, because
+    /// the volume has to be mounted for it — `TESTING.md` has the recipe,
+    /// which mounts a scratch disk image and detaches it afterwards.
+    @Test(
+        "a download lands on a volume without ACL support",
+        .enabled(if: ProcessInfo.processInfo.environment["CORTA_NOACL_VOLUME"] != nil))
+    func downloadToVolumeWithoutACLs() async throws {
+        let volume = URL(
+            fileURLWithPath: try #require(ProcessInfo.processInfo.environment["CORTA_NOACL_VOLUME"]))
+        let root = try Self.makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let client = try await Self.connect(root: root)
+        defer { client.close() }
+        let folder = volume.appendingPathComponent("corta-noacl-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let destination = folder.appendingPathComponent("README.md")
+        _ = try await client.download(
+            remotePath: root.appendingPathComponent("srv/app/README.md").path, to: destination,
+            policy: .overwrite, partialDisposition: .remove, progress: nil)
+        #expect(
+            try Data(contentsOf: destination)
+                == Data(contentsOf: root.appendingPathComponent("srv/app/README.md")))
+    }
+
     @Test("spawn returns, INIT/VERSION completes, and a listing comes back")
     func connectAndList() async throws {
         let root = try Self.makeRoot()

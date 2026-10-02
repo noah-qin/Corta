@@ -65,6 +65,14 @@ what to edit.
   a finished download, and Clear. The window is titled with the host; the
   toolbar no longer overflows at the size it opens at; a connection can be
   cancelled while it is being made, and a failed one corrected in place.
+  The connect sheets' suggestions sit in a rounded well, Settings' sidebar
+  draws each category on a coloured tile (its icons no longer flicker as
+  the window opens), and the browser opens at a smaller default size.
+
+- Counts read as English, German, French, Spanish and Portuguese write
+  them: "1 item" rather than "1 items", "1 of 1 file", "1 host remembered",
+  and the same in the status line, Settings, Command History, the Clear
+  History question and the SFTP transfer rows.
 
 - The find bar has a visible edge and shadow on any background, shrinks
   with a narrow split pane instead of covering it, and moves to the bottom
