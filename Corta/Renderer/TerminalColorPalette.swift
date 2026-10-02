@@ -16,23 +16,29 @@
 
 import CortaTerminal
 import simd
+import Synchronization
 
 /// Maps a `CortaTerminal.Color` to sRGB RGBA floats: the low 16 from the
 /// theme, the 6×6×6 cube and grey ramp from xterm's numbers (never themed:
 /// colour 137 means one colour). 24-bit colours bypass this. The drawable
 /// is tagged sRGB in `TerminalView`, or P3 screens oversaturate.
 nonisolated enum TerminalColorPalette {
-    /// The live variant. Written by `apply(_:)` and read by the renderer, both
-    /// on the main thread; `nonisolated(unsafe)` because the renderer is
-    /// nonisolated. A plain value, so no read sees half a theme.
-    private nonisolated(unsafe) static var active: Theme.Variant = Theme.corta.dark
+    /// The live variant. Written by `apply(_:)` on the main thread; read by
+    /// renderers and by `FrameScheduler`'s display-link callback, which are
+    /// not. A variant is several words plus an array reference, so an
+    /// unsynchronised read could see half of one — TSAN caught a settings
+    /// change racing a renderer. The lock is uncontended in practice: a
+    /// write per theme change, a read per row.
+    private static let storage = Mutex<Theme.Variant>(Theme.corta.dark)
 
     /// On a theme or appearance change; panes then redraw.
-    static func apply(_ variant: Theme.Variant) { active = variant }
+    static func apply(_ variant: Theme.Variant) { storage.withLock { $0 = variant } }
 
-    /// For per-frame callers: one global read, then a local, is measurably
-    /// cheaper across tens of thousands of cells.
-    static var activeVariant: Theme.Variant { active }
+    /// For per-frame callers: one read, then a local, is measurably cheaper
+    /// across tens of thousands of cells.
+    static var activeVariant: Theme.Variant { storage.withLock { $0 } }
+
+    private static var active: Theme.Variant { activeVariant }
 
     static var defaultForeground: SIMD4<Float> { active.foreground }
     static var defaultBackground: SIMD4<Float> { active.background }

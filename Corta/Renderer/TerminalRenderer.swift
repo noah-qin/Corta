@@ -138,6 +138,11 @@ public nonisolated final class TerminalRenderer {
     /// was rendering whatever another suite had just applied.
     var themeVariant: Theme.Variant?
 
+    /// The theme this frame's rows are built with, read once per
+    /// `updateInstances` — one lock on the shared palette per frame rather
+    /// than per row, and no frame half in one theme and half in the next.
+    private var framePalette: Theme.Variant = Theme.corta.dark
+
     /// Rows in the cached frame: the grid height `draw` lays out.
     var cachedRowCount: Int { cachedLines.count }
 
@@ -200,6 +205,7 @@ public nonisolated final class TerminalRenderer {
         indexedOverrides: IndexedColorOverrides = [:], indexedOverridesGeneration: UInt64 = 0
     ) -> Bool {
         self.indexedOverrides = indexedOverrides
+        framePalette = themeVariant ?? TerminalColorPalette.activeVariant
         let offset = min(max(0, scrollOffset), grid.scrollback.count)
         cursorCell = cursorVisible && offset == 0 ? (grid.cursor.row, grid.cursor.column) : nil
         let fullRebuild =
@@ -576,7 +582,7 @@ public nonisolated final class TerminalRenderer {
             // Blinking styles draw steady: a blink timer would force frames on an
             // idle screen. An eighth of a cell, at least 2 device pixels.
             let stroke = max(2, (cellHeight / 8).rounded(.down))
-            let cursorColor = (themeVariant ?? TerminalColorPalette.activeVariant).cursor
+            let cursorColor = framePalette.cursor
             switch grid.cursorStyle {
             case .block, .blinkingBlock:
                 overlayScratch.append(
@@ -610,8 +616,8 @@ public nonisolated final class TerminalRenderer {
         let cellWidth = Float(metrics.cellWidth)
         let cellHeight = Float(metrics.cellHeight)
         let baseline = Float(metrics.baselineOffset)
-        // Once per row: the accessor retains the ANSI array on every touch.
-        let palette = themeVariant ?? TerminalColorPalette.activeVariant
+        // Once per row: the property retains the ANSI array on every touch.
+        let palette = framePalette
         // The mark: a rule down a prompt row's left edge, coloured by outcome —
         // which of the last twenty failed, at a glance. Inside the first cell:
         // the inset is outside this renderer's rect.
