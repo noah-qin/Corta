@@ -3,7 +3,7 @@
 A native macOS terminal emulator in pure Swift. Metal rendering, Core
 Text shaping, AppKit shell, a hand-written VT parser.
 
-**Status (2026-10-01): 1.0.1 is the current release; 1.1.0 is in
+**Status (2026-10-02): 1.0.1 is the current release; 1.1.0 is in
 progress, and its GitHub milestone is the working list.** A release is a
 tag, a reviewed draft and a publish; CI then signs `appcast.xml` (D20) —
 `docs/RELEASING.md` has the steps. The tag's build and the feed each wait
@@ -148,6 +148,23 @@ libFuzzer does not link on macOS with the current Xcode, so a seeded
 mutation driver runs instead). A test never registers a real global
 hotkey or flips the machine's secure-input mode; `GlobalHotKey` is tested
 at its key-code mapping and `SecureInput` through an injected `System`.
+The unit-test host gets a throwaway stage of its own
+(`$TMPDIR/Corta-Tests-<pid>`, D22 amended), so the suite never reads or
+writes the `Corta Dev/config` a developer runs with; a test that seems to
+see odd settings is reading its own stage, not yours.
+
+**SwiftUI where AppKit decides.** Settings' sidebar is an AppKit
+`NSSplitViewItem(sidebarWithViewController:)` with SwiftUI pages beside it:
+SwiftUI's split view in a hosting controller drew a flat sidebar, and
+`Label` icons there flickered as the window became key — tiles with
+explicit colours do not. A field in a toolbar item takes focus through
+AppKit (`makeFirstResponder`), not `@FocusState`. In UI tests, a toolbar
+`Menu` is a menu button whose *title*, not label, is its name.
+
+**Screenshots follow the UI.** A change to what a window looks like
+updates `docs/brand/` — `screenshot.png`, `sftp-browser.png`,
+`settings.png` — by the recipe in `docs/brand/README.md`: the development
+build, a scratch `CORTA_STAGE_DIR` and `ZDOTDIR`, public content only.
 
 **Window setup is staged, not assigned.** `instantiateInitialController`
 loads the content view and spawns the root pane before it returns. A

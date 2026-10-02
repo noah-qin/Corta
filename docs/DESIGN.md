@@ -235,7 +235,10 @@ Explicitly out of scope. Each has been considered and rejected.
 | Terminal title *query* responses              | Command injection vector; see `SECURITY.md` §2.2            |
 
 The native Settings window edits the same text configuration file as a
-manual edit; it is not a separate settings store.
+manual edit; it is not a separate settings store. It is an AppKit split
+view — a system sidebar item listing the categories, and SwiftUI grouped
+forms beside it — because SwiftUI's own split view inside a hosting
+controller drew neither the system sidebar nor steady sidebar icons.
 
 ### Deferred, not rejected
 
@@ -393,6 +396,11 @@ event monitor makes that easy to get wrong:
 - **No refresh is lost.** An output-triggered refresh that arrives while
   a sweep is in flight sets `search.needsRefresh` instead of being
   dropped; the tail of a burst is searched once the sweep lands.
+- **The bar keeps off what it searches.** It sits top-right and moves to
+  the bottom-right while the cursor or the current match would be under it
+  (`placeSearchBarClearOfContent`, on output, scroll, layout and match
+  changes — a few rect tests, only while a bar is open); its field narrows
+  with a split pane instead of the bar covering the pane.
 - **Closing restores the text, not the row count.**
   `search.previousScrollOffset` is shifted by the growth in
   `Scrollback.totalPushed` since `search.previousTotalPushed`, recorded

@@ -29,10 +29,12 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
 - Split panes, pane zoom, font zoom and restoration of window arrangements
   and working directories. Reopening a closed pane restores its arrangement,
   not the terminated process.
-- Scrollback search with case-sensitive and regular-expression modes, text
-  selection, copy and export. Clear Screen, Clear History and Reset Terminal
+- Scrollback search with case-sensitive and regular-expression modes, in a
+  find bar that narrows with a split pane and moves to the bottom while the
+  cursor or the current match is under it; text selection, copy and export. Clear Screen, Clear History and Reset Terminal
   are separate commands with different effects.
-- A command palette (⇧⌘P), configurable shortcuts, themes and native Settings
+- A command palette (⇧⌘P), configurable shortcuts, themes and a native
+  Settings window — a sidebar of eight categories, System Settings style —
   backed by `~/.config/corta/config`.
 - Directory navigation and history, shell/directory/environment presets, and
   local `path:line:column` references that can open in an editor.
@@ -46,9 +48,15 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
 - Remote context reported by shell integration, a host indicator and reconnect
   action. SSH connections use system OpenSSH, including its configuration,
   agent and `ProxyJump`; Corta does not provide its own SSH implementation.
+- A connect sheet for SSH and SFTP that suggests recently connected hosts and
+  the `Host` names in `~/.ssh/config` (read, never executed). SFTP's port comes
+  from a `Host` alias; the sheet has no port field for it.
 - An SFTP browser for listing, transferring, renaming and deleting remote files
-  and directories, with managed local copies for editing. The first connection
-  to a host in a run requires confirmation; a remote report alone cannot open it.
+  and directories, with managed local copies for editing: Back and Forward, a
+  breadcrumb path, sortable columns, hidden files on request, a row menu, drag
+  and drop to upload and to Finder, and transfers in a toolbar popover with
+  speed and time left. The first connection to a host in a run requires
+  confirmation; a remote report alone cannot open it.
 - Optional OSC 52 clipboard writes, disabled by default. Clipboard reads from
   terminal output are not implemented.
 
