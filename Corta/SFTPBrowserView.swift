@@ -256,7 +256,11 @@ struct SFTPBrowserView: View {
             }
             // Numbers line up on the right, as Finder sets them.
             TableColumn(L10n.text("sftp.column.size"), value: \.sortSize) { entry in
-                Text(entry.size.map { SFTPBrowserModel.formattedByteCount($0) } ?? "--")
+                // A folder's size is its directory entry's, which says nothing
+                // about what it holds; Finder shows "--" there too.
+                Text(
+                    entry.kind == .directory
+                        ? "--" : entry.size.map { SFTPBrowserModel.formattedByteCount($0) } ?? "--")
                     .monospacedDigit()
                     .foregroundStyle(entry.kind == .directory ? .secondary : .primary)
                     .frame(maxWidth: .infinity, alignment: .trailing)

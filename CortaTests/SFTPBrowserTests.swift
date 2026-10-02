@@ -331,8 +331,27 @@ struct SFTPBrowserModelTests {
         info.blocksAvailable = .max
         #expect(SFTPBrowserModel.volumeStatus(for: info) == .unknown)
         info.blockSize = 1
+        info.fragmentSize = 1
         info.blocks = .max
         #expect(SFTPBrowserModel.volumeStatus(for: info) == .available(free: .max, total: .max))
+    }
+
+    /// What macOS's `sftp-server` reports for an APFS volume: counts in
+    /// 4 KiB fragments, beside a 1 MiB block size that is not their unit.
+    @Test("free space is counted in fragments, not blocks")
+    func volumeCountsAreFragments() {
+        var info = SFTPVolumeInfo(
+            blockSize: 1_048_576, fragmentSize: 4096, blocks: 242_824_745, blocksFree: 160_265_340,
+            blocksAvailable: 160_265_340, files: 0, filesFree: 0, filesAvailable: 0,
+            filesystemID: 0, flags: 0, nameMaximum: 255)
+        let expected: SFTPBrowserModel.VolumeStatus = .available(
+            free: UInt64(160_265_340) * 4096, total: UInt64(242_824_745) * 4096)
+        #expect(SFTPBrowserModel.volumeStatus(for: info) == expected)
+        // No fragment size reported: the block size is the unit.
+        info.fragmentSize = 0
+        let fallback: SFTPBrowserModel.VolumeStatus = .available(
+            free: UInt64(160_265_340) * 1_048_576, total: UInt64(242_824_745) * 1_048_576)
+        #expect(SFTPBrowserModel.volumeStatus(for: info) == fallback)
     }
 
     @Test("an authentication failure is named as one, with a way back")
