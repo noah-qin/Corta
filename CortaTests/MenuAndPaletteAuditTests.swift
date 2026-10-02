@@ -220,6 +220,7 @@ struct LocalizationCoverageTests {
         }
 
         var mismatched: [String] = []
+        var strayInForms: [String] = []
         for (key, value) in strings {
             let entry = value as? [String: Any] ?? [:]
             let localizations = entry["localizations"] as? [String: Any] ?? [:]
@@ -252,6 +253,34 @@ struct LocalizationCoverageTests {
                     as? String
                 return other.map(specifiers(in:))
             }
+            // Every plural form's own text: a whole-string form may use only
+            // what the "other" form uses (a stray `%@` crashes for that
+            // count alone), and a substitution's forms only `%arg`.
+            for (language, value) in localizations {
+                guard let localization = value as? [String: Any] else { continue }
+                func forms(_ plural: [String: Any]?) -> [String] {
+                    (plural ?? [:]).values.compactMap {
+                        (($0 as? [String: Any])?["stringUnit"] as? [String: Any])?["value"] as? String
+                    }
+                }
+                let whole = (localization["variations"] as? [String: Any])?["plural"] as? [String: Any]
+                if let whole {
+                    let other =
+                        Set(specifiers(in: ((whole["other"] as? [String: Any])?["stringUnit"]
+                            as? [String: Any])?["value"] as? String ?? ""))
+                    for form in forms(whole) where !Set(specifiers(in: form)).isSubset(of: other) {
+                        strayInForms.append("\(key) [\(language)]: \(form)")
+                    }
+                }
+                let substitutions = localization["substitutions"] as? [String: Any] ?? [:]
+                for case let substitution as [String: Any] in substitutions.values {
+                    let plural =
+                        (substitution["variations"] as? [String: Any])?["plural"] as? [String: Any]
+                    for form in forms(plural) where !specifiers(in: form).isEmpty {
+                        strayInForms.append("\(key) [\(language)]: \(form)")
+                    }
+                }
+            }
             guard let expected = consumed("en") else { continue }
             for language in Self.shippedLanguages where language != "en" {
                 guard let translated = consumed(language) else { continue }
@@ -261,6 +290,7 @@ struct LocalizationCoverageTests {
             }
         }
         #expect(mismatched.isEmpty, "format specifiers differ: \(mismatched.sorted())")
+        #expect(strayInForms.isEmpty, "plural forms with stray specifiers: \(strayInForms.sorted())")
     }
 
     /// Mechanical, not linguistic: this cannot judge whether a

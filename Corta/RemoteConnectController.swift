@@ -223,6 +223,10 @@ struct RemoteConnectForm: View {
                 TextField(L10n.text("ui.ssh.host"), text: $host, prompt: Text(verbatim: "user@hostname"))
                     .focused($hostFocused)
                     .onSubmit(onConnect)
+                    // ↓ and ↑ walk the suggestions from the field, the way an
+                    // address bar's do; Return then connects to the one picked.
+                    .onKeyPress(.downArrow) { stepSuggestion(by: 1) }
+                    .onKeyPress(.upArrow) { stepSuggestion(by: -1) }
                 if let port {
                     TextField(L10n.text("ui.ssh.port"), text: port, prompt: Text(verbatim: "22"))
                         .frame(width: 90)
@@ -287,6 +291,18 @@ struct RemoteConnectForm: View {
         Self.matching(aliases.filter { !recents.contains($0) }, filter)
     }
 
+    /// Moves the pick through the visible suggestions, recents first.
+    private func stepSuggestion(by delta: Int) -> KeyPress.Result {
+        let names = visibleRecents + visibleAliases
+        guard !names.isEmpty else { return .ignored }
+        let current = picked.flatMap { names.firstIndex(of: $0) }
+        let next = current.map { min(max($0 + delta, 0), names.count - 1) }
+            ?? (delta > 0 ? 0 : names.count - 1)
+        picked = names[next]
+        host = names[next]
+        return .handled
+    }
+
     static func matching(_ names: [String], _ filter: String) -> [String] {
         guard !filter.isEmpty else { return names }
         return names.filter { $0.localizedCaseInsensitiveContains(filter) }
@@ -341,6 +357,7 @@ struct RemoteConnectForm: View {
                 .contentShape(.rect)
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isPicked ? .isSelected : [])
         .simultaneousGesture(TapGesture(count: 2).onEnded {
             picked = name
             host = name
