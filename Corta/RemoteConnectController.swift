@@ -292,54 +292,93 @@ struct RemoteConnectForm: View {
         return names.filter { $0.localizedCaseInsensitiveContains(filter) }
     }
 
+    /// The suggestions, in a rounded well like the fields above: a click
+    /// fills the field, a double-click connects, the menu forgets a recent
+    /// host. Drawn as plain rows — a `List` brought a square frame or its
+    /// own insets, and either sat badly in a rounded sheet.
     private var suggestions: some View {
-        List(selection: Binding(
-            get: { picked },
-            set: { name in
-                guard let name else { return }
-                picked = name
-                host = name
-            })
-        ) {
-            if !visibleRecents.isEmpty {
-                Section(L10n.text("ui.connect.recent")) {
-                    ForEach(visibleRecents, id: \.self) { name in
-                        Label(name, systemImage: "clock").tag(name)
-                    }
-                }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 1) {
+                suggestionSection(L10n.text("ui.connect.recent"), visibleRecents, symbol: "clock")
+                suggestionSection(L10n.text("ui.connect.sshConfig"), visibleAliases, symbol: "doc.text")
             }
-            if !visibleAliases.isEmpty {
-                Section(L10n.text("ui.connect.sshConfig")) {
-                    ForEach(visibleAliases, id: \.self) { name in
-                        Label(name, systemImage: "doc.text").tag(name)
-                    }
-                }
+            .padding(6)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .frame(height: suggestionHeight)
+        .background(.quaternary.opacity(0.4), in: .rect(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.separator))
+    }
+
+    @ViewBuilder
+    private func suggestionSection(_ title: String, _ names: [String], symbol: String) -> some View {
+        if !names.isEmpty {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 8)
+                .frame(height: Self.headerHeight, alignment: .bottomLeading)
+            ForEach(names, id: \.self) { name in
+                suggestionRow(name, symbol: symbol)
             }
         }
-        // Double-click or Return connects to the row; the menu forgets a
-        // recent one.
-        .contextMenu(forSelectionType: String.self) { names in
-            if let name = names.first, recents.contains(name) {
+    }
+
+    private func suggestionRow(_ name: String, symbol: String) -> some View {
+        let isPicked = picked == name && host == name
+        return Button {
+            picked = name
+            host = name
+        } label: {
+            Label(name, systemImage: symbol)
+                .labelStyle(SuggestionLabelStyle(isPicked: isPicked))
+                .foregroundStyle(isPicked ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+                .padding(.horizontal, 8)
+                .frame(maxWidth: .infinity, minHeight: Self.rowHeight, alignment: .leading)
+                .background(
+                    isPicked ? AnyShapeStyle(.tint) : AnyShapeStyle(.clear),
+                    in: .rect(cornerRadius: 6))
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .simultaneousGesture(TapGesture(count: 2).onEnded {
+            picked = name
+            host = name
+            onConnect()
+        })
+        .contextMenu {
+            if recents.contains(name) {
                 Button(L10n.text("ui.connect.removeRecent")) {
                     RecentHostsStore.shared.remove(name)
                     recents = RecentHostsStore.shared.hosts
                 }
             }
-        } primaryAction: { names in
-            guard let name = names.first else { return }
-            picked = name
-            host = name
-            onConnect()
         }
-        .listStyle(.bordered)
-        .frame(height: suggestionHeight)
     }
 
-    /// Tall enough for what there is, up to about six rows.
+    private struct SuggestionLabelStyle: LabelStyle {
+        let isPicked: Bool
+
+        func makeBody(configuration: LabelStyleConfiguration) -> some View {
+            HStack(spacing: 8) {
+                // White on the selection, or it vanished into the tint.
+                configuration.icon
+                    .foregroundStyle(isPicked ? AnyShapeStyle(.white) : AnyShapeStyle(.tint))
+                    .frame(width: 16)
+                configuration.title.lineLimit(1).truncationMode(.middle)
+            }
+        }
+    }
+
+    private static let rowHeight: CGFloat = 26
+    private static let headerHeight: CGFloat = 20
+
+    /// Exactly what there is, up to about six rows; then it scrolls.
     private var suggestionHeight: CGFloat {
         let rows = visibleRecents.count + visibleAliases.count
         let headers = (visibleRecents.isEmpty ? 0 : 1) + (visibleAliases.isEmpty ? 0 : 1)
-        return min(170, CGFloat(rows) * 24 + CGFloat(headers) * 26 + 8)
+        let content = CGFloat(rows) * (Self.rowHeight + 1) + CGFloat(headers) * (Self.headerHeight + 1) + 12
+        return min(190, content)
     }
 }
 
