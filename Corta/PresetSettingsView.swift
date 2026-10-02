@@ -25,7 +25,7 @@ struct PresetSettingsView: View {
         Form {
             Section {
                 Text(L10n.text("ui.presets.help")).foregroundStyle(.secondary)
-                Button { SSHConnectionController.shared.show(nil) } label: {
+                Button { RemoteConnectController.shared.show(.ssh, sender: nil) } label: {
                     Label(L10n.text("ui.ssh.title"), systemImage: "network")
                 }
             }

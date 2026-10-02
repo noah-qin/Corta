@@ -64,6 +64,19 @@ final class SFTPBrowserModel {
         /// The `drwxr-xr-x` rendering of the mode bits, when the server
         /// sent any.
         let permissions: String?
+
+        /// Sort keys for the table's columns: a missing size or date sorts
+        /// as the smallest, never as a crash or an arbitrary position.
+        var sortSize: UInt64 { size ?? 0 }
+        var sortModified: Date { modified ?? .distantPast }
+        /// A dot file, hidden unless the browser is told to show them.
+        var isHidden: Bool { name.hasPrefix(".") }
+    }
+
+    /// The table's sort: a column and a direction. Folders stay above
+    /// files whichever column is chosen, the way Finder lists them.
+    nonisolated enum SortColumn: Equatable, Sendable {
+        case name, size, modified
     }
 
     // MARK: - Connection state
@@ -140,8 +153,27 @@ final class SFTPBrowserModel {
     /// successful navigation; only its commit navigates, so half-typed
     /// paths never fire listings.
     var pathField = "/"
+    /// Every entry the server listed, in listing order; `entries` is what
+    /// the table shows.
+    private var allEntries: [Entry] = []
     private(set) var entries: [Entry] = []
     var selection: Set<String> = []
+    /// The table's sort, applied on every listing and whenever it changes.
+    var sortColumn: SortColumn = .name { didSet { applyVisibleEntries() } }
+    var sortAscending = true { didSet { applyVisibleEntries() } }
+    /// Dot files are listed only on request; the toggle is per window.
+    var showsHiddenFiles = false { didSet { applyVisibleEntries() } }
+    /// How many dot files the current directory holds while they are hidden,
+    /// so the status line can say so instead of the listing looking short.
+    var hiddenEntryCount: Int {
+        showsHiddenFiles ? 0 : allEntries.count(where: \.isHidden)
+    }
+    /// Directories visited before and after this one, newest last; Back and
+    /// Forward walk them the way a browser's do.
+    private(set) var backStack: [String] = []
+    private(set) var forwardStack: [String] = []
+    var canGoBack: Bool { !backStack.isEmpty }
+    var canGoForward: Bool { !forwardStack.isEmpty }
     var isLoading = false
     /// A failed listing/mkdir/rename/delete: shown inline, leaving the
     /// current directory's contents in place.
@@ -173,6 +205,9 @@ final class SFTPBrowserModel {
     var onConnected: ((String) -> Void)?
     /// Lets the window registry reuse a host before a second client starts.
     var shouldStartConnection: ((String) -> Bool)?
+    /// The window gave up on a host — Cancel while connecting, or a retry
+    /// under a different name — so the registry stops routing it here.
+    var onHostAbandoned: ((String) -> Void)?
 
     private let makeClient: @Sendable (String) -> any SFTPClient
     private var client: (any SFTPClient)?
@@ -214,16 +249,14 @@ final class SFTPBrowserModel {
         updateTitle()
     }
 
+    /// The window's title: the host once there is one — the path is the
+    /// breadcrumb's to show, not repeated here.
     private func updateTitle() {
         let title: String
         switch connectionState {
         case .needsHost:
             title = L10n.text("sftp.window.untitled")
-        case .connecting:
-            title = L10n.format("sftp.connecting", host ?? hostField)
-        case .connected:
-            title = "\(host ?? ""):\(currentPath)"
-        case .failed:
+        case .connecting, .connected, .failed:
             title = host ?? L10n.text("sftp.window.untitled")
         }
         onTitleChange?(title)
@@ -282,6 +315,10 @@ final class SFTPBrowserModel {
             let listing = try await client.listDirectory(path: path)
             guard generation == connectionGeneration else { client.close(); return }
             connectionState = .connected
+            // A new connection starts a new walk: folders visited on another
+            // host, or before a reconnect, are not steps back on this one.
+            backStack.removeAll()
+            forwardStack.removeAll()
             currentPath = Self.normalized(path: path)
             pathField = currentPath
             applyEntries(listing)
@@ -291,6 +328,8 @@ final class SFTPBrowserModel {
             guard generation == connectionGeneration else { return }
             let error = Self.sftpError(error)
             connectionState = .failed(message: Self.errorMessage(error, host: name))
+            // Left in the field, so the name that failed can be corrected.
+            hostField = name
             client.close()
             self.client = nil
         }
@@ -310,10 +349,38 @@ final class SFTPBrowserModel {
 
     func changeHost() {
         disconnect()
+        backStack.removeAll()
+        forwardStack.removeAll()
         hostField = host ?? hostField
+        if let host { onHostAbandoned?(host) }
         host = nil
         connectionState = .needsHost
         updateTitle()
+    }
+
+    /// Connect again after a failure — under the name now in the field,
+    /// which the user may have corrected.
+    func retry() {
+        guard isFailed else { return }
+        let typed = hostField.trimmingCharacters(in: .whitespaces)
+        if !typed.isEmpty, typed != host {
+            changeHost()
+            hostField = typed
+        }
+        connect()
+    }
+
+    /// Cancel while connecting, or Edit after a failure: back to the host
+    /// field, with the name that was tried left in it to correct. A hung
+    /// host is never a window the user can only close.
+    func cancelConnect() {
+        guard connectionState == .connecting || isFailed else { return }
+        changeHost()
+    }
+
+    var isFailed: Bool {
+        if case .failed = connectionState { return true }
+        return false
     }
 
     // MARK: - Navigation
@@ -340,12 +407,31 @@ final class SFTPBrowserModel {
         load(Self.parentPath(of: currentPath))
     }
 
-    func refresh() {
-        guard connectionState == .connected else { return }
-        load(currentPath)
+    func navigateBack() {
+        guard connectionState == .connected, let previous = backStack.last else { return }
+        load(previous, history: .back)
     }
 
-    private func load(_ path: String) {
+    func navigateForward() {
+        guard connectionState == .connected, let next = forwardStack.last else { return }
+        load(next, history: .forward)
+    }
+
+    func refresh() {
+        guard connectionState == .connected else { return }
+        load(currentPath, history: .none)
+    }
+
+    /// How a listing moves the history: a new visit clears Forward, Back
+    /// and Forward trade one entry between the stacks, a refresh does
+    /// neither. Applied only once the listing succeeds, so a directory
+    /// that failed to open is never a step to go back to.
+    private enum HistoryMove { case visit, back, forward, none }
+
+    /// At most this many steps back; a long session's walk is not kept whole.
+    private static let historyLimit = 50
+
+    private func load(_ path: String, history: HistoryMove = .visit) {
         guard let client else { return }
         isLoading = true
         listingError = nil
@@ -355,7 +441,26 @@ final class SFTPBrowserModel {
             do {
                 let listing = try await client.listDirectory(path: path)
                 guard generation == directoryGeneration else { return }
-                currentPath = Self.normalized(path: path)
+                let destination = Self.normalized(path: path)
+                if destination != currentPath {
+                    switch history {
+                    case .visit:
+                        backStack.append(currentPath)
+                        forwardStack.removeAll()
+                    case .back:
+                        backStack.removeLast()
+                        forwardStack.append(currentPath)
+                    case .forward:
+                        forwardStack.removeLast()
+                        backStack.append(currentPath)
+                    case .none:
+                        break
+                    }
+                    if backStack.count > Self.historyLimit {
+                        backStack.removeFirst(backStack.count - Self.historyLimit)
+                    }
+                }
+                currentPath = destination
                 pathField = currentPath
                 applyEntries(listing)
                 selection = []
@@ -364,6 +469,12 @@ final class SFTPBrowserModel {
             } catch {
                 guard generation == directoryGeneration else { return }
                 listingError = Self.errorMessage(Self.sftpError(error), host: host ?? "")
+                // A step that no longer opens (deleted, or its permissions
+                // changed) is dropped, so Back and Forward do not stick on it
+                // and what lies beyond stays reachable.
+                let failed = Self.normalized(path: path)
+                if history == .back, backStack.last == failed { backStack.removeLast() }
+                if history == .forward, forwardStack.last == failed { forwardStack.removeLast() }
             }
             guard generation == directoryGeneration else { return }
             isLoading = false
@@ -413,7 +524,7 @@ final class SFTPBrowserModel {
     }
 
     private func applyEntries(_ listing: [SFTPEntry]) {
-        entries =
+        allEntries =
             listing
             // `.` and `..` are the server's bookkeeping, not content; a
             // name that is not one component is not content either.
@@ -429,12 +540,41 @@ final class SFTPBrowserModel {
                     },
                     permissions: attributes.permissions.map(Self.permissionString))
             }
-            .sorted { lhs, rhs in
-                if (lhs.kind == .directory) != (rhs.kind == .directory) {
-                    return lhs.kind == .directory
-                }
+        applyVisibleEntries()
+    }
+
+    /// Filters and sorts `allEntries` into what the table shows, and drops
+    /// a selection the filter just hid.
+    private func applyVisibleEntries() {
+        let visible = showsHiddenFiles ? allEntries : allEntries.filter { !$0.isHidden }
+        entries = Self.sorted(visible, by: sortColumn, ascending: sortAscending)
+        let shown = Set(entries.map(\.id))
+        if !selection.isSubset(of: shown) { selection.formIntersection(shown) }
+    }
+
+    /// Folders first, then the column; ties fall back to the name, so the
+    /// order is total and the same listing always lands the same way.
+    nonisolated static func sorted(
+        _ entries: [Entry], by column: SortColumn, ascending: Bool
+    ) -> [Entry] {
+        entries.sorted { lhs, rhs in
+            if (lhs.kind == .directory) != (rhs.kind == .directory) {
+                return lhs.kind == .directory
+            }
+            let order: ComparisonResult
+            switch column {
+            case .name: order = lhs.name.localizedStandardCompare(rhs.name)
+            case .size:
+                order =
+                    lhs.sortSize == rhs.sortSize
+                    ? .orderedSame : (lhs.sortSize < rhs.sortSize ? .orderedAscending : .orderedDescending)
+            case .modified: order = lhs.sortModified.compare(rhs.sortModified)
+            }
+            if order == .orderedSame {
                 return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
             }
+            return ascending ? order == .orderedAscending : order == .orderedDescending
+        }
     }
 
     // MARK: - Directory operations
@@ -548,22 +688,35 @@ final class SFTPBrowserModel {
     /// nothing.
     func requestUpload() {
         guard connectionState == .connected, let pickUploadFiles else { return }
-        Task {
-            let urls = await pickUploadFiles()
-            for url in urls {
-                // A chosen folder is a directory transfer — the whole tree,
-                // one atomic file at a time, symbolic links skipped and
-                // reported (`SFTPTransferEngine.uploadDirectory`).
-                let isDirectory =
-                    (try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]))
-                    .map { $0.isDirectory == true && $0.isSymbolicLink != true } ?? false
-                transferQueue.enqueue(
-                    SFTPTransferQueue.Plan(
-                        isUpload: true, isDirectory: isDirectory,
-                        remotePath: Self.joinPath(currentPath, url.lastPathComponent),
-                        localURL: url))
-            }
+        Task { upload(await pickUploadFiles()) }
+    }
+
+    /// Uploads local files and folders into `directory` (the current one by
+    /// default) — the picker's answer, or what was dropped on the listing or
+    /// on a folder row. Only file URLs are taken; a dropped link or text
+    /// is not a file. Returns whether anything was queued.
+    @discardableResult
+    func upload(_ urls: [URL], into directory: String? = nil) -> Bool {
+        guard connectionState == .connected else { return false }
+        let target = directory ?? currentPath
+        var queued = false
+        for url in urls where url.isFileURL {
+            // A chosen folder is a directory transfer — the whole tree,
+            // one atomic file at a time, symbolic links skipped and
+            // reported (`SFTPTransferEngine.uploadDirectory`).
+            let isDirectory =
+                (try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]))
+                .map { $0.isDirectory == true && $0.isSymbolicLink != true } ?? false
+            let name = url.lastPathComponent
+            guard Self.isPlainEntryName(name) else { continue }
+            transferQueue.enqueue(
+                SFTPTransferQueue.Plan(
+                    isUpload: true, isDirectory: isDirectory,
+                    remotePath: Self.joinPath(target, name),
+                    localURL: url))
+            queued = true
         }
+        return queued
     }
 
     /// Download via the injected destination picker (save panel for one
@@ -598,6 +751,56 @@ final class SFTPBrowserModel {
                         sourceModified: entry.modified))
             }
         }
+    }
+
+    /// Staging folders made for drags to Finder; the controller removes
+    /// them when the window closes.
+    private(set) var dragStagingDirectories: [URL] = []
+
+    /// A drag to Finder: downloads `entry` through the queue — so it has a
+    /// progress row like any download — into a fresh private folder, and
+    /// answers the file once it has landed. The system then copies it to
+    /// wherever it was dropped. Files only; a folder is downloaded with
+    /// Download, where its destination is chosen.
+    func exportForDrag(_ entry: Entry) async throws -> URL {
+        guard connectionState == .connected, entry.kind == .file,
+            Self.isPlainEntryName(entry.name)
+        else { throw SFTPTransferQueue.TransferFailure(message: L10n.text("sftp.drag.unavailable")) }
+        let staging = try Self.makeDragStagingDirectory()
+        dragStagingDirectories.append(staging)
+        let remotePath = Self.joinPath(currentPath, entry.name)
+        let local = staging.appendingPathComponent(entry.name)
+        return try await withCheckedThrowingContinuation { continuation in
+            transferQueue.enqueue(
+                SFTPTransferQueue.Plan(
+                    isUpload: false, remotePath: remotePath, localURL: local,
+                    sourceSize: entry.size, sourceModified: entry.modified)
+            ) { result in
+                continuation.resume(with: result.mapError { $0 as any Error })
+            }
+        }
+    }
+
+    /// A new folder only this user can enter, under the temporary directory.
+    nonisolated static func makeDragStagingDirectory() throws -> URL {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Corta-SFTP-Drag", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: root, withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700])
+        let folder = root.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: folder, withIntermediateDirectories: false,
+            attributes: [.posixPermissions: 0o700])
+        return folder
+    }
+
+    /// Removes the drag staging folders; the window is closing.
+    func removeDragStaging() {
+        for folder in dragStagingDirectories {
+            try? FileManager.default.removeItem(at: folder)
+        }
+        dragStagingDirectories.removeAll()
     }
 
     var selectedEntries: [Entry] {
@@ -733,6 +936,45 @@ final class SFTPBrowserModel {
 
     /// Preserve values outside the signed formatter's range without a trap
     /// or a misleading wrapped/clamped size.
+    /// A running transfer's line: files for a folder, bytes of the total,
+    /// speed, and time left — each part only once it is known, so a fresh
+    /// transfer never shows a made-up rate.
+    static func progressDetail(
+        completed: UInt64, total: UInt64?, bytesPerSecond: Double?, remainingSeconds: Double?,
+        files: (completed: Int, total: Int)? = nil
+    ) -> String {
+        var parts: [String] = []
+        if let files {
+            parts.append(L10n.format("sftp.transfer.files", files.completed, files.total))
+        }
+        if let total, total > 0 {
+            parts.append(
+                L10n.format(
+                    "sftp.transfer.progressOf", formattedByteCount(min(completed, total)),
+                    formattedByteCount(total)))
+        } else {
+            parts.append(formattedByteCount(completed))
+        }
+        if let bytesPerSecond, bytesPerSecond.isFinite, bytesPerSecond >= 1 {
+            parts.append(
+                L10n.format("sftp.transfer.rate", formattedByteCount(UInt64(bytesPerSecond))))
+        }
+        if let remainingSeconds, remainingSeconds.isFinite, remainingSeconds >= 0,
+            let text = remainingFormatter.string(from: max(1, remainingSeconds.rounded(.up)))
+        {
+            parts.append(L10n.format("sftp.transfer.remaining", text))
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private static let remainingFormatter: DateComponentsFormatter = {
+        let formatter = DateComponentsFormatter()
+        formatter.unitsStyle = .abbreviated
+        formatter.allowedUnits = [.hour, .minute, .second]
+        formatter.maximumUnitCount = 2
+        return formatter
+    }()
+
     static func formattedByteCount(_ bytes: UInt64) -> String {
         guard let signed = Int64(exactly: bytes) else { return "\(bytes) B" }
         return ByteCountFormatter.string(fromByteCount: signed, countStyle: .file)

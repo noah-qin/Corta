@@ -19,28 +19,62 @@ import SwiftUI
 
 /// The settings window.
 ///
-/// A thin AppKit shell hosting `SettingsView` (SwiftUI), which owns the
-/// three-tab layout and every control; `SettingsModel` owns the state. See
-/// those types' doc comments for what and why — this class only creates the
-/// window and forwards `show(_:)`.
+/// A thin AppKit shell: a split view whose sidebar item hosts
+/// `SettingsSidebar` and whose detail hosts `SettingsView` (SwiftUI), which
+/// owns every control; `SettingsModel` owns the state. See those types' doc
+/// comments for what and why — this class only creates the window, names it
+/// after the selected page and forwards `show(_:)`.
 @MainActor
 final class SettingsWindowController: NSWindowController {
     static let shared = SettingsWindowController()
 
     let model = SettingsModel()
+    private let navigation = SettingsNavigation()
 
     private init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 360),
-            styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
-        window.title = L10n.text("settings.title")
+            contentRect: NSRect(x: 0, y: 0, width: 760, height: 540),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
+        // The sidebar runs up under the titlebar, as System Settings' does;
+        // an empty toolbar is what gives the titlebar its unified height.
+        window.toolbar = NSToolbar(identifier: "Corta.Settings")
+        window.toolbarStyle = .unified
+        // Found by tests and Accessibility whatever page names the window.
+        window.identifier = NSUserInterfaceItemIdentifier("Corta.Settings")
         super.init(window: window)
-        window.contentViewController = NSHostingController(rootView: SettingsView(model: model))
+
+        let split = NSSplitViewController()
+        let sidebar = NSSplitViewItem(
+            sidebarWithViewController: NSHostingController(
+                rootView: SettingsSidebar(navigation: navigation)))
+        sidebar.minimumThickness = 210
+        sidebar.maximumThickness = 280
+        sidebar.canCollapse = false
+        let detail = NSSplitViewItem(
+            viewController: NSHostingController(
+                rootView: SettingsView(model: model, navigation: navigation)))
+        split.addSplitViewItem(sidebar)
+        split.addSplitViewItem(detail)
+        window.contentViewController = split
+        window.setContentSize(NSSize(width: 760, height: 540))
+        window.minSize = NSSize(width: 680, height: 440)
         window.center()
+        trackSelection()
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    /// The window is named after the page, the way System Settings is.
+    private func trackSelection() {
+        window?.title = navigation.selection.title
+        withObservationTracking {
+            _ = navigation.selection
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.trackSelection() }
+        }
+    }
 
     @objc func show(_ sender: Any?) {
         model.windowWillShow()

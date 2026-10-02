@@ -188,7 +188,7 @@ false` turns the question off everywhere.
 
 Three possibilities, in order. `quick-terminal` is `false` (the default):
 no key is claimed until you set it to `true`. Another application already
-holds the key: Settings ▸ General ▸ Quick Terminal says so, and
+holds the key: Settings ▸ Quick Terminal says so, and
 `quick-terminal-key` takes any other combination with at least one
 modifier. Or the key is one Corta cannot map to a key position (`é`, a
 two-character spelling): the line is preserved in the config file

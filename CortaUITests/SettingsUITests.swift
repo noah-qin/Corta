@@ -44,38 +44,44 @@ final class SettingsUITests: XCTestCase {
         XCTAssertTrue(item.waitForExistence(timeout: 3))
         item.click()
 
-        let settings = app.windows["Corta Settings"]
+        // Found by identifier: the window is named after the selected page.
+        let settings = app.windows["Corta.Settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 5), "the settings page must open")
-        // Three tabs in a native `TabView` — SwiftUI's own tab chrome
-        // replaced the AppKit page's `NSToolbar` (a deliberate visual
-        // change; see the PR that introduced this file's rewrite). On
-        // macOS 26 the tab bar is a `tabGroup` labelled "Navigation Tab
-        // Bar" whose items are `tab` elements (not buttons — the earlier
-        // best-effort port of this file assumed buttons and never passed).
-        let tabGroup = settings.tabGroups.firstMatch
-        XCTAssertTrue(tabGroup.waitForExistence(timeout: 3), "the settings page must have a tab view")
-        for tab in ["Appearance", "Terminal", "General"] {
+        // A sidebar of categories (an outline), the System Settings layout
+        // that replaced the three-tab `TabView` once General outgrew a tab.
+        let sidebar = settings.outlines.firstMatch
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 3), "the settings page must have a sidebar")
+        for category in [
+            "General", "Appearance", "Terminal", "Keyboard & Mouse", "Shortcuts",
+            "Quick Terminal", "Connections", "Privacy & Security",
+        ] {
             XCTAssertTrue(
-                tabGroup.tabs[tab].waitForExistence(timeout: 3), "the \(tab) tab must exist")
+                sidebar.staticTexts[category].waitForExistence(timeout: 3),
+                "the \(category) category must exist")
         }
 
-        // The Appearance pane: light-or-dark, the font family (a label, not
-        // a picker — Corta ships one font) and the size field. The theme
-        // pop-up is hidden while only one theme is offered.
+        // The Appearance pane: light-or-dark, the font family and the size
+        // field. The theme pop-up is hidden while only one theme is offered.
         // The catalog's string, letter for letter ("Light or dark"); whether
         // SwiftUI exposes a `Picker`'s label as a static text or as the
         // pop-up's own label varies by release, so any element will do.
+        sidebar.staticTexts["Appearance"].click()
         XCTAssertTrue(
             settings.descendants(matching: .any)["Light or dark"].waitForExistence(timeout: 3),
             "the Appearance pane must show the light-or-dark picker")
 
-        tabGroup.tabs["Terminal"].click()
-        // Bell and link activation are pop-up-style pickers; copy-on-select
-        // and the clipboard-write toggle are switches; scrollback is a
-        // field.
+        // Terminal: the bell is a pop-up-style picker, the search defaults
+        // are switches, scrollback is a field.
+        sidebar.staticTexts["Terminal"].click()
         XCTAssertTrue(settings.switches.firstMatch.waitForExistence(timeout: 3))
-        XCTAssertGreaterThanOrEqual(settings.popUpButtons.count, 2)
+        XCTAssertGreaterThanOrEqual(settings.popUpButtons.count, 1)
         XCTAssertGreaterThanOrEqual(settings.switches.count, 2)
+
+        // Keyboard & Mouse: link activation and the mouse-override modifier
+        // are pickers.
+        sidebar.staticTexts["Keyboard & Mouse"].click()
+        XCTAssertTrue(settings.popUpButtons.firstMatch.waitForExistence(timeout: 3))
+        XCTAssertGreaterThanOrEqual(settings.popUpButtons.count, 2)
     }
 
     /// The theme and appearance choices live under View — where "what the

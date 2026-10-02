@@ -76,6 +76,7 @@ class ViewController: NSViewController {
                 scrollAnchorTotalPushed = session?.scrollbackTotalPushed
             }
             updateScrollPositionIndicator()
+            if search.bar != nil { placeSearchBarClearOfContent() }
         }
     }
 
@@ -594,6 +595,7 @@ class ViewController: NSViewController {
         invalidateDisplay()
         resizeSessionToFitView()
         updateFocusRingLayout()
+        if search.bar != nil { placeSearchBarClearOfContent() }
     }
 
     /// Tab bar changes are all layout passes, so `viewDidLayout` suffices.
@@ -639,6 +641,8 @@ class ViewController: NSViewController {
         }
         if hasOutput, search.bar != nil {
             scheduleBackgroundSearchRefresh()
+            // The cursor may have moved under the bar.
+            placeSearchBarClearOfContent()
         }
         if hasOutput {
             // Rate-limited and gated on VoiceOver inside the call.

@@ -99,6 +99,7 @@ final class SettingsModel {
     var fontStatus = RowStatus()
     var shellIntegrationStatus = RowStatus()
     var directoryHistoryStatus = RowStatus()
+    var recentHostsStatus = RowStatus()
     var notificationPermissionNotice = RowStatus()
     /// Which key summons the Quick Terminal, or why none does.
     var quickTerminalStatus = RowStatus()
@@ -221,12 +222,13 @@ final class SettingsModel {
     }
 
     /// The rows whose ground truth is a file this page does not own —
-    /// `~/.zshrc` and the directory history. Read on open and on demand,
-    /// not on every keystroke: a control change writes the config file,
-    /// and nothing about that moves either of these.
+    /// `~/.zshrc`, the directory history and the recent hosts. Read on open
+    /// and on demand, not on every keystroke: a control change writes the
+    /// config file, and nothing about that moves any of these.
     func refreshExternalState() {
         refreshShellIntegrationStatus()
         refreshDirectoryHistoryStatus()
+        refreshRecentHostsStatus()
     }
 
     // MARK: - Derived display
@@ -649,6 +651,22 @@ final class SettingsModel {
     func clearDirectoryHistory() {
         DirectoryHistoryStore.shared.clear()
         refreshDirectoryHistoryStatus()
+    }
+
+    // MARK: - Recent hosts
+
+    /// How many hosts the connect dialogs remember, with a Clear action —
+    /// app state like the directory history, re-read on every refresh.
+    private func refreshRecentHostsStatus() {
+        let count = RecentHostsStore.shared.hosts.count
+        recentHostsStatus = RowStatus(
+            kind: .adjusted, message: L10n.format("settings.recentHosts.count", count),
+            actionTitle: count > 0 ? L10n.text("settings.action.clear") : nil)
+    }
+
+    func clearRecentHosts() {
+        RecentHostsStore.shared.clear()
+        refreshRecentHostsStatus()
     }
 
     // MARK: - Notification permission

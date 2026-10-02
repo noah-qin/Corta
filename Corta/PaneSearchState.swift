@@ -22,6 +22,10 @@ import CortaTerminal
 final class PaneSearchState {
     var bar: NSGlassEffectView?
     var container: NSGlassEffectContainerView?
+    /// The bar sits top-right; it moves to the bottom-right while the cursor
+    /// or the current match would sit under it. One of the pair is active.
+    var topConstraint: NSLayoutConstraint?
+    var bottomConstraint: NSLayoutConstraint?
     var field: NSTextField?
     var matches: [SelectionRange] = []
     var currentMatchIndex: Int?

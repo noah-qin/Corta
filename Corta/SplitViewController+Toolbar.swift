@@ -57,10 +57,12 @@ extension SplitViewController: NSToolbarDelegate {
         item.action = action
         return item
     }
-    @objc private func connectSSH(_ sender: Any?) { SSHConnectionController.shared.show(sender) }
+    @objc private func connectSSH(_ sender: Any?) { RemoteConnectController.shared.show(.ssh, sender: sender) }
+    /// A remote pane's own browser; from a local pane, the same connect
+    /// sheet as SSH, asking which host.
     @objc private func openRemoteFiles(_ sender: Any?) {
         guard let pane = focusedPane else { return }
         if pane.canBrowseRemoteFiles { pane.browseRemoteFiles(sender); return }
-        SFTPBrowserController.showConnection()
+        RemoteConnectController.shared.show(.sftp, sender: sender)
     }
 }

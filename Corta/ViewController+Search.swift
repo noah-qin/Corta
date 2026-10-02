@@ -116,7 +116,7 @@ extension ViewController {
         let glass = NSImageView(
             image: NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: nil)!)
         glass.symbolConfiguration = symbols
-        glass.contentTintColor = SystemAccessibility.secondaryLabelColor
+        glass.contentTintColor = .labelColor
 
         let field = NSSearchField()
         field.placeholderString = L10n.text("search.placeholder")
@@ -132,7 +132,13 @@ extension ViewController {
         (field.cell as? NSSearchFieldCell)?.searchButtonCell = nil
         (field.cell as? NSSearchFieldCell)?.cancelButtonCell = nil
         field.translatesAutoresizingMaskIntoConstraints = false
-        field.widthAnchor.constraint(equalToConstant: 180).isActive = true
+        // 200pt when the pane has room; a narrow split pane squeezes the field
+        // first, so the bar never runs past the pane's leading edge.
+        let preferredWidth = field.widthAnchor.constraint(equalToConstant: 200)
+        preferredWidth.priority = .defaultHigh
+        preferredWidth.isActive = true
+        field.widthAnchor.constraint(greaterThanOrEqualToConstant: 64).isActive = true
+        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         // Monospaced digits, so the buttons don't twitch as the count changes.
         let countLabel = NSTextField(labelWithString: "")
@@ -193,12 +199,10 @@ extension ViewController {
         let container = NSGlassEffectContainerView()
         let bar = NSGlassEffectView()
         bar.style = .regular
-        // A theme tint keeps the pill readable over any output. Reduce
-        // Transparency means nothing shows through, so the tint goes opaque.
-        bar.tintColor =
-            SystemAccessibility.reduceTransparency
-            ? .windowBackgroundColor
-            : .windowBackgroundColor.withAlphaComponent(0.55)
+        // Untinted: a window-background tint matched the terminal's own
+        // background and the pill vanished into it. Reduce Transparency means
+        // nothing shows through, so the fill goes opaque there.
+        bar.tintColor = SystemAccessibility.reduceTransparency ? .windowBackgroundColor : nil
         let content = NSView()
         content.addSubview(stack)
         NSLayoutConstraint.activate([
@@ -222,24 +226,46 @@ extension ViewController {
         container.contentView = wrapper
         container.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(container)
+        // `topInset`, not `windowChrome`: only a top pane sits under the chrome.
+        let top = container.topAnchor.constraint(equalTo: view.topAnchor, constant: topInset + 2)
+        let bottom = container.bottomAnchor.constraint(
+            equalTo: view.bottomAnchor, constant: -Self.searchBarBottomMargin)
+        // A narrow pane squeezes the field rather than pushing the pill off
+        // the pane's leading edge; below its minimum, the edge gives.
+        let leading = container.leadingAnchor.constraint(
+            greaterThanOrEqualTo: view.leadingAnchor, constant: 14)
+        leading.priority = .init(999)
         NSLayoutConstraint.activate([
             container.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -14),
-            // `topInset`, not `windowChrome`: only a top pane sits under the chrome.
-            container.topAnchor.constraint(
-                equalTo: view.topAnchor, constant: topInset + 2),
+            leading, top,
         ])
+        search.topConstraint = top
+        search.bottomConstraint = bottom
         // A pill: half the laid-out height.
         view.layoutSubtreeIfNeeded()
         bar.cornerRadius = bar.bounds.height / 2
 
-        // An opaque or high-contrast pill needs a drawn edge.
-        if SystemAccessibility.increaseContrast || SystemAccessibility.reduceTransparency {
-            let border = SystemAccessibility.panelBorder
-            wrapper.wantsLayer = true
-            wrapper.layer?.cornerRadius = bar.cornerRadius
-            wrapper.layer?.borderColor = border.color.cgColor
-            wrapper.layer?.borderWidth = border.width
+        // Glass over a flat terminal background has nothing to refract, so on
+        // its own it read as no bar at all: a hairline and a soft shadow lift
+        // it off the output. Increase Contrast gets the stronger edge.
+        let border =
+            SystemAccessibility.increaseContrast || SystemAccessibility.reduceTransparency
+            ? SystemAccessibility.panelBorder : (color: NSColor.separatorColor, width: 1)
+        wrapper.wantsLayer = true
+        wrapper.layer?.cornerRadius = bar.cornerRadius
+        wrapper.layer?.borderColor = border.color.cgColor
+        wrapper.layer?.borderWidth = border.width
+        if let layer = wrapper.layer {
+            // An explicit path (kept in step by `placeSearchBarClearOfContent`):
+            // the wrapper draws nothing, so a derived shadow traced only the hairline.
+            layer.shadowColor = NSColor.black.cgColor
+            layer.shadowOpacity = 0.16
+            layer.shadowRadius = 10
+            layer.shadowOffset = CGSize(width: 0, height: -3)
+            layer.masksToBounds = false
         }
+        container.wantsLayer = true
+        container.layer?.masksToBounds = false
 
         // Ease in, or appear at once under Reduce Motion.
         container.alphaValue = 0
@@ -252,6 +278,7 @@ extension ViewController {
         search.bar = bar
         search.container = container
         search.field = field
+        placeSearchBarClearOfContent()
         search.keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             self?.handleGlobalSearchEscape(event) ?? event
         }
@@ -262,6 +289,8 @@ extension ViewController {
     func closeSearchBar() {
         search.container?.removeFromSuperview()
         search.container = nil
+        search.topConstraint = nil
+        search.bottomConstraint = nil
         search.bar = nil
         search.field = nil
         if let searchKeyMonitor = search.keyMonitor {
@@ -294,6 +323,100 @@ extension ViewController {
         }
         invalidateDisplay()
         view.window?.makeFirstResponder(terminalView)
+    }
+
+    // MARK: - Placement
+
+    /// Gap between a bottom-placed bar and the pane's bottom edge.
+    private static let searchBarBottomMargin: CGFloat = 10
+
+    /// Keeps the bar off what the user is looking at. Top-right is home; while
+    /// the cursor or the current match would sit under it there, it moves to
+    /// the bottom-right, and comes back once the top is clear. A pane too short
+    /// for either to be clear stays where it is.
+    ///
+    /// Called when the bar opens, when output arrives, when the viewport
+    /// scrolls and when the current match changes — a few rect comparisons,
+    /// on the main thread, only while a bar is open.
+    func placeSearchBarClearOfContent() {
+        guard let container = search.container, let top = search.topConstraint,
+            let bottom = search.bottomConstraint, let terminalView
+        else { return }
+        // A tab bar appearing moves the chrome; keep the top slot under it.
+        if top.constant != topInset + 2 { top.constant = topInset + 2 }
+        let size = container.frame.size
+        guard size.width > 0, size.height > 0 else { return }
+        if let wrapper = search.bar?.superview, let layer = wrapper.layer,
+            layer.shadowPath?.boundingBox.size != wrapper.bounds.size
+        {
+            let radius = size.height / 2
+            layer.shadowPath = CGPath(
+                roundedRect: wrapper.bounds, cornerWidth: radius, cornerHeight: radius,
+                transform: nil)
+        }
+        let bounds = view.bounds
+        let x = bounds.maxX - 14 - size.width
+        // In `view`'s own coordinates, whichever way up it is.
+        func frame(distanceFromTop: CGFloat) -> CGRect {
+            let y =
+                view.isFlipped ? distanceFromTop : bounds.height - distanceFromTop - size.height
+            return CGRect(x: x, y: y, width: size.width, height: size.height)
+        }
+        let topFrame = frame(distanceFromTop: topInset + 2)
+        let bottomFrame = frame(
+            distanceFromTop: bounds.height - Self.searchBarBottomMargin - size.height)
+
+        var obstacles: [CGRect] = []
+        if scrollOffset == 0, let cursor = terminalView.cursorRectProvider?() {
+            obstacles.append(terminalView.convert(cursor, to: view))
+        }
+        if let match = currentMatchRect() {
+            obstacles.append(terminalView.convert(match, to: view))
+        }
+        func isClear(_ frame: CGRect) -> Bool {
+            // A little slack, so a row brushing the pill's shadow counts.
+            let padded = frame.insetBy(dx: -4, dy: -4)
+            return !obstacles.contains { $0.intersects(padded) }
+        }
+        let wantsBottom: Bool
+        if isClear(topFrame) {
+            wantsBottom = false
+        } else if isClear(bottomFrame) {
+            wantsBottom = true
+        } else {
+            return
+        }
+        guard wantsBottom != bottom.isActive else { return }
+        top.isActive = !wantsBottom
+        bottom.isActive = wantsBottom
+        // A fade, not a slide across the output; at once under Reduce Motion.
+        container.alphaValue = 0
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = SystemAccessibility.duration(0.15)
+            container.animator().alphaValue = 1
+        }
+    }
+
+    /// The current match's first visible row, in terminal-view coordinates;
+    /// `nil` when there is none or it is scrolled out of view.
+    private func currentMatchRect() -> CGRect? {
+        guard let index = search.currentMatchIndex, search.matches.indices.contains(index),
+            let terminalRenderer, session != nil
+        else { return nil }
+        let match = search.matches[index]
+        let metrics = terminalRenderer.pointMetrics
+        let grid = session.snapshot()
+        let screenRow = match.start.row + scrollOffset
+        guard screenRow >= 0, screenRow < grid.rows else { return nil }
+        // A match that wraps covers the rest of its first row.
+        let endColumn =
+            match.end.row == match.start.row
+            ? match.end.column + 1 : grid.columns
+        return CGRect(
+            x: TerminalLayout.insets.left + CGFloat(match.start.column) * metrics.cellWidth,
+            y: topInset + CGFloat(screenRow) * metrics.cellHeight,
+            width: CGFloat(max(1, endColumn - match.start.column)) * metrics.cellWidth,
+            height: metrics.cellHeight)
     }
 
     // MARK: - Matching
@@ -436,6 +559,7 @@ extension ViewController {
             noteCurrentMatchAnchor(totalPushed: totalPushed)
         }
         updateSearchCountLabel()
+        placeSearchBarClearOfContent()
         invalidateDisplay()
         // Catch up on output that arrived during this sweep.
         if search.needsRefresh {
@@ -502,6 +626,7 @@ extension ViewController {
         noteCurrentMatchAnchor(totalPushed: session.snapshot().scrollback.totalPushed)
         scrollToCurrentMatch()
         updateSearchCountLabel()
+        placeSearchBarClearOfContent()
         invalidateDisplay()
     }
 
