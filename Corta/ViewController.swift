@@ -852,6 +852,8 @@ class ViewController: NSViewController {
         }
     }
 
+    static let directoryProbeRetryDelay: TimeInterval = 2
+
     /// OSC 7 paths can point at an unresponsive network mount. Never stat on
     /// the main actor, and never publish a result for a superseded path.
     func probeRepresentedDirectory(_ path: String?) {
@@ -864,7 +866,18 @@ class ViewController: NSViewController {
             active += 1
             return true
         }
-        guard admitted else { return }
+        // Two probes are already stuck on a slow mount. Try again shortly,
+        // rather than leave this pane without its proxy icon until the next
+        // `cd`; a newer path in the meantime supersedes the retry.
+        guard admitted else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.directoryProbeRetryDelay) {
+                [weak self] in
+                guard let self, !self.didTeardown, generation == self.directoryProbeGeneration
+                else { return }
+                self.probeRepresentedDirectory(path)
+            }
+            return
+        }
         let checker = directoryCheckerForTesting
         Task.detached(priority: .utility) { [weak self] in
             let exists: Bool

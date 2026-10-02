@@ -429,8 +429,12 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         }
 
         // Resumed partials from older builds also become private before use.
+        // A volume without ACLs (exFAT, FAT, some SMB shares) answers
+        // ENOTSUP: it has no inherited ACL to clear, and refusing it would
+        // make every download to a USB stick fail.
         let emptyACL = acl_init(0)
-        let aclResult = emptyACL.map { acl_set_fd_np(descriptor, $0, ACL_TYPE_EXTENDED) } ?? -1
+        var aclResult = emptyACL.map { acl_set_fd_np(descriptor, $0, ACL_TYPE_EXTENDED) } ?? -1
+        if aclResult != 0, errno == ENOTSUP || errno == EOPNOTSUPP { aclResult = 0 }
         if let emptyACL { acl_free(UnsafeMutableRawPointer(emptyACL)) }
         guard aclResult == 0, Darwin.fchmod(descriptor, 0o600) == 0 else {
             let code = errno

@@ -67,12 +67,19 @@ final class RemoteEditStore {
     /// Copies by `RemoteCopy.id`.
     private(set) var copies: [String: RemoteCopy] = [:]
 
+    /// Where approved-upload snapshots and pre-upload probes are written.
+    var approvalsURL: URL { rootURL.appendingPathComponent("Approvals", isDirectory: true) }
+
     static var defaultRootURL: URL {
         AppPaths.applicationSupportDirectory.appendingPathComponent("RemoteEdit", isDirectory: true)
     }
 
     init(rootURL: URL) {
         self.rootURL = rootURL
+        // Approval snapshots and content probes belong to one run: the
+        // decisions they back are in memory and do not survive a relaunch,
+        // so whatever a quit left behind is only a stale copy of a file.
+        try? FileManager.default.removeItem(at: approvalsURL)
         load()
         try? secureCopy(at: manifestURL)
         for copy in copies.values { try? secureCopy(at: localURL(for: copy)) }
@@ -196,10 +203,13 @@ final class RemoteEditStore {
         }
     }
 
+    /// Clears any extended ACL. A volume without ACL support (ENOTSUP) has
+    /// none to inherit, so that counts as cleared rather than as a failure.
     private static func removeACL(at url: URL) -> Bool {
         guard let acl = acl_init(0) else { return false }
         defer { acl_free(UnsafeMutableRawPointer(acl)) }
-        return acl_set_file(url.path, ACL_TYPE_EXTENDED, acl) == 0
+        if acl_set_file(url.path, ACL_TYPE_EXTENDED, acl) == 0 { return true }
+        return errno == ENOTSUP || errno == EOPNOTSUPP
     }
 
     // MARK: - Persistence

@@ -426,7 +426,10 @@ struct SearchDebounceTests {
     }
 }
 
+/// Serialized: the directory-probe tests share the process-wide admission of
+/// two, and one of them deliberately fills it.
 @MainActor
+@Suite(.serialized)
 struct SearchResultGenerationTests {
     @Test("a stale or closed search cannot change its successor's status")
     func staleStatusIsDiscarded() {
@@ -441,6 +444,49 @@ struct SearchResultGenerationTests {
         pane.applySearchResults(.init(matches: [], status: .patternTooSlow),
             generation: 2, scrollsToMatch: false, totalPushed: 0)
         #expect(pane.search.status == .invalidPattern)
+    }
+
+    /// Two probes stuck on a slow mount fill the admission; a third pane's
+    /// probe is retried once there is room rather than dropped, so the pane
+    /// gets its proxy icon without waiting for its next `cd`.
+    @Test("a probe refused while two are stuck is retried, not dropped")
+    func refusedProbeIsRetried() async {
+        let release = DispatchSemaphore(value: 0)
+        let entered = Mutex(0)
+        let stuck = [ViewController(), ViewController()]
+        for pane in stuck {
+            pane.directoryCheckerForTesting = { _ in
+                entered.withLock { $0 += 1 }
+                release.wait()
+                return true
+            }
+            pane.probeRepresentedDirectory("/slow-mount")
+        }
+        var deadline = ContinuousClock.now + .seconds(3) * testTimeoutScale
+        while entered.withLock({ $0 }) < 2, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(entered.withLock { $0 } == 2)
+
+        let third = ViewController()
+        let asked = Mutex(false)
+        third.directoryCheckerForTesting = { _ in
+            asked.withLock { $0 = true }
+            return true
+        }
+        third.probeRepresentedDirectory("/fine")
+        try? await Task.sleep(for: .milliseconds(200))
+        #expect(!asked.withLock { $0 }, "no room yet: two probes hold the admission")
+
+        release.signal()
+        release.signal()
+        deadline = ContinuousClock.now
+            + .seconds(ViewController.directoryProbeRetryDelay + 3) * testTimeoutScale
+        while !asked.withLock({ $0 }), ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(asked.withLock { $0 }, "the refused probe ran once there was room")
+        for pane in stuck + [third] { pane.teardown() }
     }
 
     @Test("a blocked directory probe does not block the main actor")

@@ -364,7 +364,7 @@ final class RemoteEditCoordinator {
     func upload(_ pending: PendingUpload) {
         let copy = pending.copy
         guard !uploadsInFlight.contains(copy.id) else { return }
-        let snapshot = store.rootURL.appendingPathComponent("Approvals/\(UUID().uuidString)")
+        let snapshot = store.approvalsURL.appendingPathComponent(UUID().uuidString)
         var retained = false
         defer { if !retained { try? FileManager.default.removeItem(at: snapshot) } }
         do {
@@ -405,9 +405,15 @@ final class RemoteEditCoordinator {
                 try await client.lstat(path: copy.remotePath)
             }
             let matchesContent: Bool
-            if current.size == copy.remoteSize, current.modificationTime == copy.remoteMTime,
-                let baseline = copy.remoteDigest {
-                let probe = store.rootURL.appendingPathComponent("Approvals/\(UUID().uuidString)")
+            let metadataMatches =
+                current.size == copy.remoteSize && current.modificationTime == copy.remoteMTime
+            if metadataMatches, copy.remoteDigest == nil {
+                // A copy downloaded before digests were recorded (1.0.x) has
+                // no content baseline; size and time are all there is, as
+                // they were then. The upload records a digest for next time.
+                matchesContent = true
+            } else if metadataMatches, let baseline = copy.remoteDigest {
+                let probe = store.approvalsURL.appendingPathComponent(UUID().uuidString)
                 try store.secureCopy(at: probe)
                 defer { try? FileManager.default.removeItem(at: probe) }
                 _ = try await withClient(for: copy.host) { client in

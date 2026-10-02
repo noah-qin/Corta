@@ -752,6 +752,39 @@ struct RemoteEditCoordinatorTests {
         #expect(!fixture.fake.transferCalls.contains { $0.isUpload })
     }
 
+    /// Remote editing shipped in 1.0.0, before digests were recorded: such a
+    /// copy has only size and time to compare, as it did then, and the
+    /// upload records a digest for the next one.
+    @Test("a copy from before content digests uploads when size and time still match")
+    func legacyCopyWithoutDigestUploads() async throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        _ = try await fixture.coordinator.open(host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
+        let copy = try #require(fixture.store.copies[fixture.copyID])
+        fixture.store.updateRemoteStamp(copy, size: copy.remoteSize, mtime: copy.remoteMTime, digest: nil)
+        #expect(fixture.store.copies[fixture.copyID]?.remoteDigest == nil)
+        try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
+        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        let pending = try #require(fixture.coordinator.pendingUploads.first)
+        fixture.coordinator.upload(pending)
+        await waitUntil("uploaded") { fixture.fake.transferCalls.contains { $0.isUpload } }
+        #expect(fixture.coordinator.pendingConflicts.isEmpty)
+    }
+
+    @Test("approval snapshots a quit left behind are removed when the store opens")
+    func staleApprovalSnapshotsAreRemoved() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("corta-remote-edit-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let approvals = root.appendingPathComponent("Approvals")
+        try FileManager.default.createDirectory(at: approvals, withIntermediateDirectories: true)
+        try Data("a whole copy of a remote file".utf8)
+            .write(to: approvals.appendingPathComponent(UUID().uuidString))
+        let store = RemoteEditStore(rootURL: root)
+        #expect(store.approvalsURL.standardizedFileURL.path == approvals.standardizedFileURL.path)
+        #expect(!FileManager.default.fileExists(atPath: approvals.path))
+    }
+
     @Test("an edit after the prompt requires a fresh approval")
     func staleApprovalIsRejected() async throws {
         let fixture = try makeFixture()

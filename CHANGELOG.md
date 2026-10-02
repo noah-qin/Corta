@@ -25,6 +25,11 @@ what to edit.
 - Synchronize the live color palette between settings changes and the
   renderers that read it; the unit tests no longer read or write the
   development build's own configuration.
+- Downloads to volumes without ACL support (exFAT, FAT, some SMB shares) and
+  into a download folder that is itself a link work again; remote-edit
+  copies from 1.0.x no longer report a conflict on every upload; a pane whose
+  directory probe waited on a slow mount gets its proxy icon once there is
+  room; approval snapshots left by a quit are removed at the next launch.
 
 ### Added
 

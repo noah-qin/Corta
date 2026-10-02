@@ -67,6 +67,26 @@ struct SFTPRealServerTests {
         #expect(try FileManager.default.contentsOfDirectory(atPath: outside.path).isEmpty)
     }
 
+    /// The folder the user chose — and anything above it — may itself be a
+    /// link (a `~/Downloads` on another volume); only what the transfer
+    /// creates or merges into is held to the no-link rule.
+    @Test("a linked folder the user chose is a valid destination")
+    func linkedChosenFolderAccepted() async throws {
+        let root = try Self.makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let client = try await Self.connect(root: root)
+        defer { client.close() }
+        let realFolder = root.appendingPathComponent("volume/Downloads")
+        try FileManager.default.createDirectory(at: realFolder, withIntermediateDirectories: true)
+        let linkedFolder = root.appendingPathComponent("Downloads")
+        try FileManager.default.createSymbolicLink(at: linkedFolder, withDestinationURL: realFolder)
+        try await client.downloadDirectory(
+            remotePath: root.appendingPathComponent("srv/app").path,
+            to: linkedFolder.appendingPathComponent("app"), policy: .overwrite, progress: nil)
+        #expect(FileManager.default.fileExists(
+            atPath: realFolder.appendingPathComponent("app/README.md").path))
+    }
+
     @Test("spawn returns, INIT/VERSION completes, and a listing comes back")
     func connectAndList() async throws {
         let root = try Self.makeRoot()
