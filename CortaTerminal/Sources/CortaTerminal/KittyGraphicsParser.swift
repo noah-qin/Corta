@@ -104,9 +104,17 @@ enum KittyGraphicsParser {
         let width = intValue(fields, "s").map { min(max(0, $0), 8192) }
         let height = intValue(fields, "v").map { min(max(0, $0), 8192) }
         let quiet = min(max(0, intValue(fields, "q") ?? 0), 2)
+        // `o=z` is the one compression the protocol defines. Any other value
+        // names an encoding this terminal cannot read, and bytes taken as
+        // pixels when they are not would be garbage at best: refused whole.
+        var compressed = false
+        if let compression = fields[UInt8(ascii: "o")] {
+            guard compression.elementsEqual("z".utf8) else { return nil }
+            compressed = true
+        }
         return KittyGraphics.TransmitHeader(
             imageID: KittyGraphics.ImageID(rawValue: rawImageID), format: format, width: width,
-            height: height, quiet: quiet)
+            height: height, quiet: quiet, compressed: compressed)
     }
 
     private static func displayHeader(

@@ -12,6 +12,11 @@ what to edit.
 
 ### Security and reliability follow-up
 
+- `kitten icat` shows images it has to scale: a picture wider than the pane,
+  or one placed with `--place`. It sends those zlib-compressed (`o=z`), which
+  was ignored, so they never appeared. They are inflated now, bounded to the
+  declared size, with the zlib header and checksum checked.
+
 - The SFTP browser's free space counts in the server's fragment size: a Mac
   with 650 GB free was shown as 168 TB, because APFS reports a 1 MiB block
   beside the 4 KiB unit its counts are in. Folders show "--" for their size,

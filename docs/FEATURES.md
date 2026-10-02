@@ -16,7 +16,9 @@ the [user guide](USER-GUIDE.md) says where each feature lives and how to use it.
   font fallback. AppKit IME composition is drawn outside the terminal grid.
 - Metal 4 rendering — one render pass per frame — with a glyph atlas, instanced quads and line damage tracking. Needs a GPU with Metal 4: every Apple silicon Mac; not a virtual machine's paravirtual GPU.
 - OSC 8 hyperlinks, focus reporting and the Kitty keyboard protocol.
-- Kitty graphics with direct RGB, RGBA and PNG transmission and placement. Erasing
+- Kitty graphics with direct RGB, RGBA and PNG transmission and placement,
+  zlib-compressed or not (`o=z`, what `kitten icat` sends for an image it
+  scales to fit). Erasing
   the screen (`clear`, ⌃L, Clear Screen) removes the images on it; erasing the
   scrollback (`clear`'s `ED 3`, Clear History) removes the ones in history — as
   kitty does.
@@ -75,10 +77,6 @@ files, remote connections and child-process input.
 
 ## Known limits
 
-- **Compressed Kitty images are not decoded.** An image sent zlib-compressed
-  (`o=z`) shows nothing. `kitten icat` compresses when it scales an image
-  down to fit — a picture wider than the pane, or `--place` — and sends a
-  PNG that already fits as it is, which displays.
 - **VT conformance is incomplete.** The 2026-09-17 esctest2 run recorded
   126 passed, 334 known bugs and 107 failed out of 567. The historical 81.1%
   figure combines passes and known bugs; it is not a pass rate.

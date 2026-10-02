@@ -132,6 +132,10 @@ public enum KittyGraphics {
         /// `q=`: 0 answers everything, 1 errors only, 2 nothing. Read off the
         /// first chunk and carried to the one that finishes.
         var quiet: Int = 0
+        /// `o=z`: the payload is a zlib stream, inflated once the last chunk
+        /// is in (`inflateZlib`). `kitten icat` sends this for any image it
+        /// had to scale to fit.
+        var compressed = false
     }
 
     struct DisplayHeader {
