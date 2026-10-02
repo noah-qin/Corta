@@ -194,17 +194,26 @@ extension ViewController: NSMenuItemValidation {
     /// (integration present, nothing typed). Returns whether it wrote.
     @discardableResult
     func fillPrompt(with text: String) -> Bool {
-        guard canChangeDirectorySafely else { return false }
-        session.write(Array(text.utf8))
-        return true
+        writeHistory(text, run: false)
     }
 
     /// `fillPrompt(with:)` then Return, as if the user typed it.
     @discardableResult
     func fillAndRunPrompt(with text: String) -> Bool {
-        guard fillPrompt(with: text) else { return false }
-        session.write(Array("\r".utf8))
-        return true
+        writeHistory(text, run: true)
+    }
+
+    private func writeHistory(_ text: String, run: Bool) -> Bool {
+        guard canChangeDirectorySafely,
+            var bytes = Paste.historyBytes(for: text, bracketedPasteEnabled: bracketedPasteEnabled())
+        else { return false }
+        if run { bytes.append(0x0D) }
+        // Admit the closing paste marker and optional Return together, so
+        // backpressure cannot execute a partially inserted command.
+        switch session.write(chunks: Paste.chunked(bytes)) {
+        case .accepted: return true
+        case .backpressured, .stopped: return false
+        }
     }
 
     /// The last completed command at or before the viewport top, pure.

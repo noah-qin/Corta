@@ -28,6 +28,15 @@ import Testing
 /// an `ssh` would open a different file that happens to share a name.
 @MainActor
 struct FileReferenceResolutionTests {
+    @Test("local output references require an editor, including executable handler files")
+    func localReferenceNeverFallsBackToDefaultHandler() {
+        for path in ["/tmp/attack.command", "/tmp/attack.terminal", "/tmp/ordinary.txt"] {
+            #expect(!ViewController.openFileAt(url: URL(fileURLWithPath: path), line: 1, column: nil, command: ""))
+        }
+        #expect(ViewController.openFileAt(
+            url: URL(fileURLWithPath: "/tmp/space ;$(echo).swift"), line: 3, column: 4,
+            allowsDefaultApplication: false, command: "/usr/bin/true {file} {line} {column}"))
+    }
     private static func reference(_ path: String, line: Int = 12) -> FileReferenceDetection.Reference {
         FileReferenceDetection.Reference(
             path: path, line: line,

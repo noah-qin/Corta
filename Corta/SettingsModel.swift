@@ -51,6 +51,16 @@ struct RowStatus: Equatable {
 final class SettingsModel {
     // MARK: - Config mirrors
 
+    var commandHistoryLimit = 512
+    var mouseOverrideModifier: Configuration.MouseOverrideModifier = .option
+    var searchCaseSensitive = false
+    var searchRegex = false
+    var updateAutoCheck = true
+    var suggestApplicationsFolder = true
+    var presets: [Preset] = []
+    var keybindings = Keybindings()
+    var availableFonts: [String] = []
+
     var theme: String = Theme.corta.name
     var appearance: Configuration.Appearance = .auto
     var fontFamily: String = Configuration.systemFontFamily
@@ -94,6 +104,7 @@ final class SettingsModel {
     var quickTerminalStatus = RowStatus()
 
     private var clearTask: Task<Void, Never>?
+    private var notificationObservers: [NSObjectProtocol] = []
 
     /// What the page last mirrored. `commit` refreshes directly, and the
     /// store's `didChange` for that same write then arrives here too;
@@ -114,26 +125,31 @@ final class SettingsModel {
     init() {
         refresh()
         refreshExternalState()
-        NotificationCenter.default.addObserver(
+        notificationObservers.append(NotificationCenter.default.addObserver(
             forName: ConfigurationStore.didChange, object: nil, queue: .main
         ) { [weak self] _ in
             Task { @MainActor in self?.storeDidChange() }
-        }
-        NotificationCenter.default.addObserver(
+        })
+        notificationObservers.append(NotificationCenter.default.addObserver(
             forName: ConfigurationStore.writeStatusDidChange, object: nil, queue: .main
         ) { [weak self] _ in
             Task { @MainActor in self?.handleWriteStatusChanged() }
-        }
-        NotificationCenter.default.addObserver(
+        })
+        notificationObservers.append(NotificationCenter.default.addObserver(
             forName: TaskNotifier.permissionDidChange, object: nil, queue: .main
         ) { [weak self] _ in
             Task { @MainActor in self?.refreshNotificationPermissionNotice() }
-        }
-        NotificationCenter.default.addObserver(
+        })
+        notificationObservers.append(NotificationCenter.default.addObserver(
             forName: QuickTerminalController.hotKeyStatusDidChange, object: nil, queue: .main
         ) { [weak self] _ in
             Task { @MainActor in self?.refreshQuickTerminalStatus() }
-        }
+        })
+    }
+
+    isolated deinit {
+        clearTask?.cancel()
+        for observer in notificationObservers { NotificationCenter.default.removeObserver(observer) }
     }
 
     /// The file may not exist until something writes it, and System Settings
@@ -159,6 +175,14 @@ final class SettingsModel {
         let configuration = ConfigurationStore.shared.configuration
         mirrored = configuration
         listedThemes = Theme.all(in: configuration)
+        commandHistoryLimit = configuration.commandHistoryLimit
+        mouseOverrideModifier = configuration.mouseOverrideModifier
+        searchCaseSensitive = configuration.searchCaseSensitive
+        searchRegex = configuration.searchRegex
+        updateAutoCheck = configuration.updateAutoCheck
+        suggestApplicationsFolder = configuration.suggestApplicationsFolder
+        presets = configuration.presets
+        keybindings = configuration.keybindings
         theme = configuration.theme
         appearance = configuration.appearance
         fontFamily = configuration.fontFamily
@@ -645,5 +669,90 @@ final class SettingsModel {
 
     func openSystemNotificationSettings() {
         TaskNotifier.openSystemNotificationSettings()
+    }
+}
+
+// Editors share the existing config-file write and rollback path.
+extension SettingsModel {
+    func editConfigFile() {
+        if ConfigurationStore.shared.write() { NSWorkspace.shared.open(ConfigurationStore.fileURL) }
+        else { reportWriteFailure() }
+    }
+
+    func loadFonts() async {
+        let families = await Task.detached { MonospacedFontCatalog.families() }.value
+        availableFonts = families
+    }
+
+    func setFontFamily(_ value: String) {
+        commit { configuration in
+            guard value == Configuration.systemFontFamily || MonospacedFontCatalog.isUsable(family: value) else {
+                return L10n.text("ui.font.invalid")
+            }
+            configuration.fontFamily = value
+            return nil
+        }
+    }
+
+    func setCommandHistoryLimit(_ value: Int) {
+        commit { configuration in
+            let (limit, message) = Self.clamp(value, 0, 10_000, label: L10n.text("ui.history.commands"))
+            configuration.commandHistoryLimit = limit
+            return message
+        }
+    }
+
+    func setMouseOverrideModifier(_ value: Configuration.MouseOverrideModifier) {
+        commit { $0.mouseOverrideModifier = value; return nil }
+    }
+    func setSearchCaseSensitive(_ value: Bool) {
+        commit { $0.searchCaseSensitive = value; return nil }
+    }
+    func setSearchRegex(_ value: Bool) {
+        commit { $0.searchRegex = value; return nil }
+    }
+    func setUpdateAutoCheck(_ value: Bool) {
+        commit { $0.updateAutoCheck = value; return nil }
+    }
+    func setSuggestApplicationsFolder(_ value: Bool) {
+        commit { $0.suggestApplicationsFolder = value; return nil }
+    }
+    func setQuickTerminalKey(_ value: Shortcut?) {
+        commit { configuration in
+            guard value == nil || !value!.modifiers.intersection([.command, .control, .option, .shift]).isEmpty else {
+                return L10n.text("ui.shortcut.modifierRequired")
+            }
+            configuration.quickTerminalKey = value
+            return nil
+        }
+    }
+    func setShortcut(_ value: Shortcut?, for command: TerminalCommand) {
+        commit { configuration in
+            if let value, TerminalCommand.allCases.contains(where: { $0 != command && configuration.keybindings[$0] == value }) {
+                return L10n.text("ui.shortcut.conflict")
+            }
+            configuration.keybindings[command] = value
+            return nil
+        }
+    }
+    func resetShortcut(_ command: TerminalCommand) {
+        commit { $0.keybindings.reset(command); return nil }
+    }
+    func savePreset(_ preset: Preset, replacing originalName: String?) -> Bool {
+        guard Self.validPresetName(preset.name), preset.isUsable,
+            !presets.contains(where: { $0.name == preset.name && $0.name != originalName }) else { return false }
+        commit { configuration in
+            if let index = configuration.presets.firstIndex(where: { $0.name == originalName }) {
+                configuration.presets[index] = preset
+            } else { configuration.presets.append(preset) }
+            return nil
+        }
+        return presets.contains(preset)
+    }
+    nonisolated static func validPresetName(_ name: String) -> Bool {
+        !name.isEmpty && !name.contains(where: { $0.isWhitespace || $0 == "." || $0 == "=" || $0 == "#" || $0.isNewline || $0 == "\0" })
+    }
+    func removePreset(_ name: String) {
+        commit { $0.presets.removeAll { $0.name == name }; return nil }
     }
 }

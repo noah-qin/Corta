@@ -237,6 +237,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             }
         }
         restoreWindowsIfConfigured()
+        #if DEBUG
+        if CommandLine.arguments.contains("--sftp-preview") { SFTPBrowserController.showDevelopmentPreview() }
+        #endif
         // A notification click jumps back to its command
         // (`AppDelegate+Notifications.swift`).
         UNUserNotificationCenter.current().delegate = self

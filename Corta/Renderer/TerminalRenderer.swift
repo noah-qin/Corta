@@ -325,7 +325,11 @@ public nonisolated final class TerminalRenderer {
                 scrollbackTotalPushed: cachedScrollbackTotalPushed, rect: rect,
                 drawableSize: drawableSize, backend: backend)
         }
-        backend.endFrame(presenting: drawable, onCompleted: onCompleted)
+        let images = kittyImageRenderer
+        backend.endFrame(presenting: drawable) { error in
+            if error == nil { images.noteGPUCompletion() }
+            onCompleted?(error)
+        }
         return drawing
     }
 

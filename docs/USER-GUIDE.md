@@ -143,9 +143,9 @@ installed when you say so.
   `open-file-command = /usr/local/bin/code --goto {file}:{line}:{column}`
   ([Following a file reference](CONFIGURATION.md#following-a-file-reference)).
 
-Remote editing requires a configured `open-file-command`. Corta never opens a
-downloaded copy in its system default application: some file types run code
-when opened. After a connection failure, the next editing or upload action
+Opening any file reference requires a configured `open-file-command`. Corta
+never opens output-derived files in their system default application: some
+file types run code when opened. After a connection failure, the next editing or upload action
 connects again; failed uploads keep their pending decision.
 
 ## Shell integration
@@ -275,6 +275,18 @@ All settings live in one text file, `~/.config/corta/config`. **Corta ▸
 Settings…** (⌘,) edits the same file, and editing the file by hand is just
 as supported:
 
+Settings retains Appearance, Terminal, and General tabs. Appearance offers
+verified installed fonts; Terminal includes command-history limits, mouse
+override, and search defaults. General records app shortcuts and the Quick
+Terminal hotkey, and opens preset management. These controls edit the same
+config file. Custom theme colors remain configurable through the file.
+
+The window toolbar adds SSH and SFTP. SSH accepts `user@host` or a config
+alias; an empty port respects OpenSSH configuration. SFTP opens the remote
+pane's browser, or asks for a host when the pane is local. The SFTP toolbar
+contains navigation and uploads/downloads. More Actions contains file
+management and a toggle for detailed columns; transfer history can be folded.
+
 ```ini
 theme = corta
 appearance = auto
@@ -335,3 +347,12 @@ fails and how to fix it — a download macOS will not open, a font that is
 refused, a shortcut that does nothing. [Features and limitations](FEATURES.md)
 lists what Corta does not do yet. Report anything else on
 [GitHub Issues](https://github.com/noah-qin/Corta/issues/new/choose).
+
+### Development preview
+
+Debug builds offer **Help ▸ SFTP Development Preview**, or launch with
+`./script/build_and_run.sh --sftp-preview`. It opens the real file-browser
+view with read-only fixtures and example transfer rows. Navigate `/home/demo`,
+`src`, `docs`, and `empty` to inspect connected and empty listings. No server,
+credentials, or local file staging is used. The preview menu and fixture
+client are excluded from Release builds.

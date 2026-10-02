@@ -28,6 +28,57 @@ import CortaTerminal
 /// when the last placement disappears.
 @Suite("Image decode pipeline", .serialized, .metalSerialized)
 struct ImageDecodePipelineTests {
+    @Test("replacements and deletions do not orphan queued jobs")
+    func replacementBacklogIsBoundedAndCoalesced() throws {
+        let device = try #require(Self.makeDevice())
+        let count = Counter()
+        var work: [@Sendable () -> Void] = []
+        let renderer = Self.makeRenderer(device: device, decodeCount: count) { work.append($0) }
+        var terminal = Terminal(rows: 10, columns: 40)
+        func update() {
+            renderer.update(table: Self.table(of: terminal), rows: 10, offset: 0,
+                scrollbackTotalPushed: 0, cellWidth: 10, cellHeight: 20)
+        }
+        for byte in UInt8(0)..<100 {
+            Self.placeRGBA(&terminal, id: 1, byte: byte)
+            update()
+        }
+        #expect(work.count == 1)
+        work.removeFirst()()
+        #expect(count.value == 0, "superseded bytes must not decode")
+        update()
+        #expect(work.count == 1)
+        work.removeFirst()()
+        #expect(count.value == 1)
+        #expect(renderer.textureCount == 1)
+
+        Self.placeRGBA(&terminal, id: 2, byte: 0)
+        update()
+        terminal.feed(Array("\u{1B}_Ga=d,d=i,i=2\u{1B}\\".utf8))
+        update()
+        work.removeFirst()()
+        #expect(count.value == 1, "deleted queued image must not decode")
+    }
+
+    @Test("actual scheduled jobs are bounded across panes")
+    func globalDecodeAdmissionIsBounded() throws {
+        let device = try #require(Self.makeDevice())
+        var work: [@Sendable () -> Void] = []
+        let a = Self.makeRenderer(device: device, decodeCount: Counter()) { work.append($0) }
+        let b = Self.makeRenderer(device: device, decodeCount: Counter()) { work.append($0) }
+        var terminal = Terminal(rows: 10, columns: 40)
+        for id in UInt32(1)...8 { Self.placeRGBA(&terminal, id: id, byte: 255) }
+        for renderer in [a, b] {
+            renderer.update(table: Self.table(of: terminal), rows: 10, offset: 0,
+                scrollbackTotalPushed: 0, cellWidth: 10, cellHeight: 20)
+        }
+        #expect(work.count == 2)
+        while !work.isEmpty { work.removeFirst()() }
+        b.update(table: Self.table(of: terminal), rows: 10, offset: 0,
+            scrollbackTotalPushed: 0, cellWidth: 10, cellHeight: 20)
+        #expect(work.count == 2, "another pane retries after admission is released")
+        while !work.isEmpty { work.removeFirst()() }
+    }
     private static func makeDevice() -> MTLDevice? { MTLCreateSystemDefaultDevice() }
 
     /// Escaping closures mutate counters, so they need a reference — with a

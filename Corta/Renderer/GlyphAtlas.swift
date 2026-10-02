@@ -123,6 +123,7 @@ nonisolated final class GlyphAtlas {
         }
 
         func allocate(width: Int, height: Int) -> (x: Int, y: Int)? {
+            guard width <= regionSize.width, height <= regionSize.height else { return nil }
             if nextOrigin.x + width > regionOrigin.x + regionSize.width {
                 nextOrigin = (regionOrigin.x, nextOrigin.y + rowHeight)
                 rowHeight = 0
@@ -327,13 +328,15 @@ nonisolated final class GlyphAtlas {
     /// Non-ASCII single scalars, shaped once per key.
     func glyph(shaping scalar: UInt32, style: Style) -> GlyphInfo? {
         let key = GlyphKey(scalar: scalar, style: style)
-        if let cached = shapedPage.cache[key] { return cached }
+        if let cached = shapedPage.cache[key] ?? colorPage.cache[key] { return cached }
         guard let scalarValue = Unicode.Scalar(scalar) else { return nil }
         shapingHits += 1
         let shaped = shape(String(Character(scalarValue)), style: style)
+        let page = cachePage(for: shaped.runs)
+        prepareCache(page)
         var info = rasterize(shaped.runs, style: style, page: shapedPage)
         if shaped.runs.isEmpty, shaped.sawNotdef { info.isMissing = true }
-        shapedPage.cache[key] = info
+        page.cache[key] = info
         return info
     }
 
@@ -341,7 +344,7 @@ nonisolated final class GlyphAtlas {
     /// marks come out as the font defines them.
     func glyph(forCluster scalars: [UInt32], style: Style) -> GlyphInfo? {
         let key = ClusterKey(scalars: scalars, style: style)
-        if let cached = shapedPage.clusterCache[key] { return cached }
+        if let cached = shapedPage.clusterCache[key] ?? colorPage.clusterCache[key] { return cached }
         var view = String.UnicodeScalarView()
         for scalar in scalars {
             guard let value = Unicode.Scalar(scalar) else { return nil }
@@ -350,10 +353,21 @@ nonisolated final class GlyphAtlas {
         guard !view.isEmpty else { return nil }
         shapingHits += 1
         let shaped = shape(String(view), style: style)
+        let page = cachePage(for: shaped.runs)
+        prepareCache(page)
         var info = rasterize(shaped.runs, style: style, page: shapedPage)
         if shaped.runs.isEmpty, shaped.sawNotdef { info.isMissing = true }
-        shapedPage.clusterCache[key] = info
+        page.clusterCache[key] = info
         return info
+    }
+
+    /// Inkless/notdef results consume no shelf space, so also bound keys.
+    private func prepareCache(_ page: AtlasPage) {
+        if page.cache.count + page.clusterCache.count >= 4096 { evict(page) }
+    }
+
+    private func cachePage(for runs: [ShapedRun]) -> AtlasPage {
+        runs.contains(where: { $0.isColor }) ? colorPage : shapedPage
     }
 
     /// One shaped run and the font it actually used; `ctRun` for color runs.

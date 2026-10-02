@@ -28,6 +28,9 @@ import SwiftUI
 /// truth the tests cannot reach.
 struct SFTPBrowserView: View {
     @Bindable var model: SFTPBrowserModel
+    @State private var showDetails = false
+    @State private var showTransfers = true
+    @State private var transferContentHeight: CGFloat = 150
 
     var body: some View {
         VStack(spacing: 0) {
@@ -43,6 +46,7 @@ struct SFTPBrowserView: View {
             }
         }
         .frame(minWidth: 560, minHeight: 360)
+        .toolbar { browserToolbar }
         .sheet(item: conflictBinding) { prompt in
             ConflictSheet(prompt: prompt, model: model)
         }
@@ -85,25 +89,31 @@ struct SFTPBrowserView: View {
     // MARK: - Host entry (the `.remoteUnknown` launch)
 
     private var hostEntry: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(spacing: 16) {
+            Label("SFTP", systemImage: "folder.badge.gearshape")
+                .font(.title2.weight(.semibold))
             // A reported host is a suggestion with its provenance stated;
             // an unknown one is a blank to fill in.
             Text(
                 model.suggestedHost.map { L10n.format("sftp.host.suggestedMessage", $0) }
-                    ?? L10n.text("sftp.host.message")
+                    ?? L10n.text("ui.sftp.connectHelp")
             )
+            .multilineTextAlignment(.center)
+            .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
-            HStack {
+            HStack(spacing: 10) {
                 TextField(L10n.text("sftp.host.field"), text: $model.hostField)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { model.connect() }
                 Button(L10n.text("sftp.host.connect")) { model.connect() }
+                    .buttonStyle(.glassProminent)
                     .keyboardShortcut(.defaultAction)
                     .disabled(model.hostField.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: 380)
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 
     private var connecting: some View {
@@ -134,8 +144,6 @@ struct SFTPBrowserView: View {
 
     private var browser: some View {
         VStack(spacing: 0) {
-            pathBar
-            Divider()
             listing
             if let listingError = model.listingError {
                 Divider()
@@ -155,23 +163,38 @@ struct SFTPBrowserView: View {
         }
     }
 
-    private var pathBar: some View {
-        HStack(spacing: 8) {
-            Button { model.navigateUp() } label: {
-                Image(systemName: "arrow.turn.left.up")
+    @ToolbarContentBuilder private var browserToolbar: some ToolbarContent {
+        if model.connectionState == .connected {
+            ToolbarItemGroup(placement: .navigation) {
+                Button { model.navigateUp() } label: { Label(L10n.text("sftp.action.up"), systemImage: "arrow.turn.left.up") }
+                    .disabled(model.currentPath == "/" || model.isLoading)
+                Button { model.refresh() } label: { Label(L10n.text("sftp.action.refresh"), systemImage: "arrow.clockwise") }
+                    .disabled(model.isLoading)
             }
-            .disabled(model.currentPath == "/")
-            .help(L10n.text("sftp.action.up"))
-            TextField("/", text: $model.pathField)
-                .textFieldStyle(.roundedBorder)
-                .font(.system(size: 12, design: .monospaced))
-                .onSubmit { model.navigate(to: model.pathField) }
-            Button { model.refresh() } label: {
-                Image(systemName: "arrow.clockwise")
+            ToolbarItem(placement: .principal) {
+                TextField("/", text: $model.pathField)
+                    .font(.system(size: 12, design: .monospaced))
+                    .frame(minWidth: 120, idealWidth: 280, maxWidth: 440)
+                    .onSubmit { model.navigate(to: model.pathField) }
             }
-            .help(L10n.text("sftp.action.refresh"))
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button { model.requestUpload() } label: { Label(L10n.text("sftp.action.upload"), systemImage: "square.and.arrow.up").labelStyle(.titleAndIcon) }
+                Button { model.requestDownload() } label: { Label(L10n.text("sftp.action.download"), systemImage: "square.and.arrow.down").labelStyle(.titleAndIcon) }
+                    .disabled(!model.canDownloadSelection)
+                Menu {
+                    Button(L10n.text("sftp.action.newDirectory")) { model.requestNewDirectory() }
+                    Button(L10n.text("sftp.action.rename")) {
+                        if let entry = model.selectedEntries.first { model.requestRename(entry) }
+                    }.disabled(model.selectedEntries.count != 1)
+                    Button(L10n.text("sftp.action.edit")) { model.requestEdit() }.disabled(!model.canEditSelection)
+                    Button(L10n.text("sftp.action.delete"), role: .destructive) { model.requestDelete(model.selectedEntries) }
+                        .disabled(model.selectedEntries.isEmpty)
+                    Divider()
+                    Toggle(L10n.text("ui.sftp.details"), isOn: $showDetails)
+                    Toggle(L10n.text("sftp.transfers.title"), isOn: transferExpansion)
+                } label: { Label(L10n.text("ui.common.more"), systemImage: "ellipsis").labelStyle(.titleAndIcon) }
+            }
         }
-        .padding(8)
     }
 
     private var listing: some View {
@@ -179,33 +202,36 @@ struct SFTPBrowserView: View {
             TableColumn(L10n.text("sftp.column.name")) { entry in
                 HStack(spacing: 6) {
                     Image(systemName: entry.kind.symbolName)
+                        .font(.system(size: 14))
                         .foregroundStyle(.secondary)
                         .accessibilityHidden(true)
                     Text(entry.name)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
+                .frame(minHeight: 26)
                 .contentShape(Rectangle())
                 .onTapGesture(count: 2) { model.navigateInto(entry) }
             }
-            TableColumn(L10n.text("sftp.column.kind")) { entry in
-                Text(entry.kind.title)
+            if showDetails {
+                TableColumn(L10n.text("sftp.column.kind")) { entry in Text(entry.kind.title) }.width(60)
             }
-            .width(60)
             TableColumn(L10n.text("sftp.column.size")) { entry in
-                Text(entry.size.map { Self.byteCount.string(fromByteCount: Int64($0)) } ?? "—")
+                Text(entry.size.map { SFTPBrowserModel.formattedByteCount($0) } ?? "—")
             }
             .width(80)
-            TableColumn(L10n.text("sftp.column.permissions")) { entry in
-                Text(entry.permissions ?? "—")
-                    .font(.system(size: 11, design: .monospaced))
+            if showDetails {
+                TableColumn(L10n.text("sftp.column.permissions")) { entry in
+                    Text(entry.permissions ?? "—").font(.system(size: 11, design: .monospaced))
+                }.width(100)
             }
-            .width(100)
             TableColumn(L10n.text("sftp.column.modified")) { entry in
                 Text(entry.modified.map { Self.modified.string(from: $0) } ?? "—")
             }
-            .width(140)
+            .width(156)
         }
+        .font(.system(size: 12))
+        .alternatingRowBackgrounds(.disabled)
     }
 
     private static let byteCount: ByteCountFormatter = {
@@ -225,25 +251,14 @@ struct SFTPBrowserView: View {
 
     private var statusBar: some View {
         HStack(spacing: 12) {
-            Button(L10n.text("sftp.action.newDirectory")) { model.requestNewDirectory() }
-            Button(L10n.text("sftp.action.rename")) {
-                if let entry = model.selectedEntries.first { model.requestRename(entry) }
-            }
-            .disabled(model.selectedEntries.count != 1)
-            Button(L10n.text("sftp.action.delete")) {
-                model.requestDelete(model.selectedEntries)
-            }
-            .disabled(model.selectedEntries.isEmpty)
-            Button(L10n.text("sftp.action.edit")) { model.requestEdit() }
-                .disabled(!model.canEditSelection)
+            Text(L10n.format("ui.sftp.itemCount", model.entries.count))
+            #if DEBUG
+            if model.isDevelopmentPreview { Text(verbatim: "DEBUG").help(L10n.text("ui.demo.hint")) }
+            #endif
             Spacer()
-            Button(L10n.text("sftp.action.upload")) { model.requestUpload() }
-            Button(L10n.text("sftp.action.download")) { model.requestDownload() }
-                .disabled(!model.canDownloadSelection)
             volumeText
-        }
-        .padding(8)
-        .font(.system(size: 12))
+        }.padding(.horizontal, 12).padding(.vertical, 8)
+            .font(.caption).foregroundStyle(.secondary)
     }
 
     @ViewBuilder
@@ -257,23 +272,34 @@ struct SFTPBrowserView: View {
         case .available(let free, _):
             Text(L10n.format(
                 "sftp.volume.free",
-                Self.byteCount.string(fromByteCount: Int64(free))))
+                SFTPBrowserModel.formattedByteCount(free)))
             .foregroundStyle(.secondary)
         }
     }
 
     // MARK: - Transfers
 
-    private var transfersSection: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(L10n.text("sftp.transfers.title"))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            ForEach(model.transfers) { transfer in
-                TransferRow(transfer: transfer, model: model)
+    private var transferExpansion: Binding<Bool> {
+        Binding(get: { showTransfers }, set: { expanded in
+            withAnimation(SystemAccessibility.reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                showTransfers = expanded
             }
-        }
-        .padding(8)
+        })
+    }
+
+    private var transfersSection: some View {
+        DisclosureGroup(L10n.text("sftp.transfers.title"), isExpanded: transferExpansion) {
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(model.transfers) { transfer in TransferRow(transfer: transfer, model: model) }
+                }
+                .padding(.top, 6)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                    if abs(height - transferContentHeight) > 0.5 { transferContentHeight = height }
+                }
+            }
+            .frame(height: min(150, max(1, transferContentHeight)))
+        }.padding(16).font(.system(size: 12))
     }
 
     private struct TransferRow: View {
@@ -281,19 +307,25 @@ struct SFTPBrowserView: View {
         let model: SFTPBrowserModel
 
         var body: some View {
-            HStack(spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
                 Image(systemName: transfer.isUpload ? "arrow.up.doc" : "arrow.down.doc")
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(transfer.label)
+                    Text(transfer.name)
+                        .help(transfer.label)
                         .font(.system(size: 12))
                         .lineLimit(1)
                         .truncationMode(.middle)
-                    stateView
-                }
-                Spacer()
-                actions
+                    if case .active = transfer.state {
+                        stateView
+                    } else {
+                        HStack(alignment: .center, spacing: 12) {
+                            stateView.frame(maxWidth: .infinity, alignment: .leading)
+                            actions.controlSize(.regular)
+                        }
+                    }
+                }.frame(maxWidth: .infinity, alignment: .leading)
             }
         }
 
@@ -306,12 +338,16 @@ struct SFTPBrowserView: View {
                     .foregroundStyle(.secondary)
             case .active(let completed, let total):
                 VStack(alignment: .leading, spacing: 2) {
-                    if let total, total > 0 {
-                        ProgressView(value: Double(completed), total: Double(total))
-                            .progressViewStyle(.linear)
-                    } else {
-                        ProgressView()
-                            .progressViewStyle(.linear)
+                    HStack(alignment: .center, spacing: 12) {
+                        Group {
+                            if let total, total > 0 {
+                                ProgressView(value: Double(completed), total: Double(total))
+                                    .progressViewStyle(.linear)
+                            } else {
+                                ProgressView().progressViewStyle(.linear)
+                            }
+                        }.frame(maxWidth: .infinity)
+                        actions.controlSize(.regular)
                     }
                     // A directory transfer says where in the tree it is.
                     if transfer.isDirectory, transfer.filesTotal > 0 {
@@ -331,10 +367,10 @@ struct SFTPBrowserView: View {
                     transfer.isDirectory
                         ? L10n.format(
                             "sftp.transfer.doneDirectory", transfer.filesTotal,
-                            SFTPBrowserView.byteCount.string(fromByteCount: Int64(bytes)))
+                            SFTPBrowserModel.formattedByteCount(bytes))
                         : L10n.format(
                             "sftp.transfer.doneBytes",
-                            SFTPBrowserView.byteCount.string(fromByteCount: Int64(bytes)))
+                            SFTPBrowserModel.formattedByteCount(bytes))
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)

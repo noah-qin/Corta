@@ -33,6 +33,20 @@ import Testing
 @Suite(.serialized, .metalSerialized) struct ImageMemoryAndTextureTests {
     private static func makeDevice() -> MTLDevice? { MTLCreateSystemDefaultDevice() }
 
+    @Test("another pane's retired textures do not redraw an idle pane")
+    func otherPaneRetirementDoesNotScheduleFrame() throws {
+        let device = try #require(Self.makeDevice())
+        let global = GlobalTextureBudget(limit: 16)
+        #expect(global.tryReserve(16))
+        global.markRetired(16)
+        defer { global.release(16, retired: true) }
+        let renderer = KittyImageRenderer(device: device, globalBudget: global)
+        var redraws = 0
+        renderer.onImagesReady = { redraws += 1 }
+        renderer.noteGPUCompletion()
+        #expect(redraws == 0)
+    }
+
     /// Transmits `payload` over the wire exactly like a real client and
     /// pulls the stored `ImageData` back out of the table — the renderer's
     /// cache is driven with what the protocol layer actually accepted, not
@@ -128,6 +142,48 @@ import Testing
     }
 
     // MARK: - GPU byte budgets
+
+    @Test("retained texture ownership keeps quota after cache eviction and pane closure")
+    func retainedTextureKeepsQuota() throws {
+        let device = try #require(Self.makeDevice())
+        let global = GlobalTextureBudget(limit: 16)
+        var renderer: KittyImageRenderer? = KittyImageRenderer(device: device, textureByteBudget: 16, globalBudget: global)
+        let data = try #require(Self.rgbaImage(id: 1, width: 2, height: 2))
+        var retained: MTLTexture? = renderer?.texture(for: KittyGraphics.ImageID(rawValue: 1), data: data)
+        #expect(retained != nil)
+        renderer = nil
+        #expect(global.reservedBytes == 16, "a backend retaining the texture still owns its bytes")
+        #expect(!global.tryReserve(1))
+        retained = nil
+        #expect(global.reservedBytes == 0)
+        #expect(global.tryReserve(16))
+        global.release(16)
+    }
+
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func backendRetirementKeepsTextureChargedUntilRelease() throws {
+        let device = try #require(Self.makeDevice())
+        let global = GlobalTextureBudget(limit: 16)
+        let backend = try Metal4Backend(device: device)
+        let target = MetalRenderTarget.make(device: device, width: 20, height: 20)
+        var renderer: KittyImageRenderer? = KittyImageRenderer(device: device, textureByteBudget: 16, globalBudget: global)
+        let data = try #require(Self.rgbaImage(id: 1, width: 2, height: 2))
+        var image = renderer?.texture(for: KittyGraphics.ImageID(rawValue: 1), data: data)
+        let rect = CGRect(x: 0, y: 0, width: 20, height: 20)
+        #expect(backend.renderFrameAndWait(into: target) { backend in
+            if let image {
+                backend.drawColorQuads(
+                    [QuadInstance(origin: .zero, size: .init(20, 20), color: .one, uvRect: .init(0, 0, 1, 1))],
+                    atlas: image, rect: rect, drawableSize: rect.size, transient: true)
+            }
+        })
+        image = nil
+        renderer = nil
+        #expect(global.reservedBytes == 16, "retired GPU texture remains charged")
+        #expect(!global.tryReserve(1))
+        #expect(backend.renderFrameAndWait(into: target) { _ in })
+        #expect(global.reservedBytes == 0, "GPU retirement returns quota")
+    }
 
     @Test("over the per-pane texture budget, the least-recently-used texture is evicted")
     func perPaneTextureBudgetEvictsLeastRecentlyUsed() throws {

@@ -151,19 +151,21 @@ file could carry. A key added to `Configuration` without a row in
 arrangement, directory history) lives in its own files and is not a
 setting — `CONFIGURATION.md` §8 draws the line.
 
-## D11 — Corta offers one theme and one font; it resolves several
+## D11 — Curated themes and verified font families
 
-**Decision.** The Settings page and the View menu list `Theme.builtIn`
-(just `corta`) and no font family picker. `Theme.known` still resolves
-`solarized` and `mono`, and `font-family` accepts any family
-`MonospacedFontCatalog` vouches for, so a config file naming either keeps
-working.
+**Decision.** The Settings page and View menu offer `Theme.builtIn`
+(just `corta`) and user-defined themes. `Theme.known` also resolves
+`solarized` and `mono` from the config file. Settings offers installed font
+families only after `MonospacedFontCatalog` verifies all four faces and
+ASCII advances; the system monospaced family remains the default.
 
-**Why.** Offering a palette or a face means having read text in it for a
-working day; passing a mechanical check is not the same claim.
+**Why.** A font picker makes an existing config capability discoverable.
+Mechanical verification protects terminal cell geometry; it does not
+imply editorial endorsement of every installed face.
 
-**Consequence.** Add to the offered list only after that, not because the
-code supports it.
+**Consequence.** Keep the validation of D12 and show a preview of the
+selected family and appearance. New bundled themes still need a working-day
+readability review before joining the offered list.
 
 ## D12 — A font family is verified, never trusted
 

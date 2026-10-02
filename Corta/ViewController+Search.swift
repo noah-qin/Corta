@@ -446,7 +446,7 @@ extension ViewController {
 
     /// The match nearest a remembered absolute row: the exact line may be
     /// evicted or rewritten, and a neighbour beats losing the place.
-    static func index(
+    nonisolated static func index(
         closestTo anchor: Int?, in matches: [SelectionRange], totalPushed: Int
     ) -> Int? {
         guard !matches.isEmpty else { return nil }

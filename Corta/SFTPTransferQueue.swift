@@ -501,3 +501,20 @@ final class SFTPTransferQueue {
     }
 
 }
+
+#if DEBUG
+extension SFTPTransferQueue {
+    /// Display-only rows: no jobs, filesystem staging, or transfer tasks.
+    func installDevelopmentPreview() {
+        let samples: [(String, Bool, TransferState)] = [
+            ("archive.zip", false, .active(completed: 4_194_304, total: 10_485_760)),
+            ("README.md", true, .done(bytes: 2048)),
+            ("backup.tar.gz", false, .failed(message: L10n.text("ui.demo.error"), retryable: false))
+        ]
+        transfers = samples.map { name, upload, state in
+            Transfer(id: UUID(), isUpload: upload, name: name, remotePath: "/home/demo/" + name,
+                     localURL: URL(fileURLWithPath: "/development-preview/" + name), host: "demo.invalid", state: state)
+        }
+    }
+}
+#endif

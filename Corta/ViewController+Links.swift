@@ -90,8 +90,7 @@ extension ViewController {
         } else if armed, session != nil,
             let reference = fileReferenceUnder(event, in: terminalView)
         {
-            // The tooltip names the resolved path, and says when the line will be
-            // lost (no `open-file-command`).
+            // The tooltip names the path and the required editor setting.
             if !hoveringLink {
                 NSCursor.pointingHand.set()
                 hoveringLink = true

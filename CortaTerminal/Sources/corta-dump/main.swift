@@ -146,6 +146,9 @@ while true {
     }
     if count == 0 { break }
     terminal.feed(buffer[0..<count])
+    // Dump mode has no child to answer. Bound retained reply bytes per read,
+    // while leaving grid and --report state untouched.
+    _ = terminal.takeOutput()
 }
 
 FileHandle.write(

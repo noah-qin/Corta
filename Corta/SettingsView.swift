@@ -40,6 +40,7 @@ import SwiftUI
 struct SettingsView: View {
     @Bindable var model: SettingsModel
     @State private var selectedTab = Tab.appearance
+    @State private var showingPresets = false
 
     private enum Tab: String, CaseIterable, Identifiable {
         case appearance, terminal, general
@@ -80,6 +81,15 @@ struct SettingsView: View {
             footer
         }
         .frame(minWidth: 460, minHeight: 360)
+        .task { await model.loadFonts() }
+        .sheet(isPresented: $showingPresets) {
+            VStack(spacing: 0) {
+                PresetSettingsView(model: model).formStyle(.grouped)
+                Divider()
+                HStack { Spacer(); Button(L10n.text("common.close")) { showingPresets = false } }
+                    .padding(12)
+            }.frame(width: 540, height: 460)
+        }
     }
 
     /// One tab's page. `isSelected` is what `SettingsPage` watches to put
@@ -113,8 +123,12 @@ struct SettingsView: View {
             }
             .onChange(of: model.appearance) { _, value in model.setAppearance(value) }
 
-            LabeledContent(L10n.text("settings.label.font")) {
-                Text(model.fontFamilyDisplay).help(L10n.text("settings.font.tooltip"))
+            Picker(L10n.text("settings.label.font"), selection: bind(model.fontFamily, model.setFontFamily)) {
+                Text(L10n.text("settings.font.systemMonospaced")).tag(Configuration.systemFontFamily)
+                if model.fontFamily != Configuration.systemFontFamily && !model.availableFonts.contains(model.fontFamily) {
+                    Text(model.fontFamily).tag(model.fontFamily)
+                }
+                ForEach(model.availableFonts, id: \.self) { Text($0).tag($0) }
             }
             .help(L10n.text("settings.help.font"))
             // Only when there is something to say: a resolved font used to
@@ -134,7 +148,7 @@ struct SettingsView: View {
                 }
             }
             LabeledContent(L10n.text("settings.label.preview")) {
-                FontPreviewSwiftUIView(theme: model.previewTheme, font: model.previewFont)
+                FontPreviewSwiftUIView(theme: model.previewTheme, font: model.previewFont, isDark: AppearanceController.shared.isDark)
             }
         }
     }
@@ -148,6 +162,10 @@ struct SettingsView: View {
                     numberField(bind(model.scrollbackLines, model.setScrollbackLines), width: 92)
                 }
                 .help(L10n.text("settings.help.scrollback"))
+                LabeledContent(L10n.text("ui.history.commands")) {
+                    numberField(bind(model.commandHistoryLimit, model.setCommandHistoryLimit), width: 92)
+                }
+                .help(L10n.text("ui.history.newSessions"))
                 Picker(L10n.text("settings.label.bell"), selection: $model.bell) {
                     ForEach(SettingsModel.bellModes, id: \.self) { mode in
                         Text(mode.displayName).tag(mode)
@@ -164,6 +182,11 @@ struct SettingsView: View {
                 Toggle(
                     L10n.text("settings.label.copyOnSelect"),
                     isOn: bind(model.copyOnSelect, model.setCopyOnSelect))
+                Picker(L10n.text("ui.mouse.override"), selection: bind(model.mouseOverrideModifier, model.setMouseOverrideModifier)) {
+                    ForEach(Configuration.MouseOverrideModifier.allCases, id: \.self) { value in
+                        Text(verbatim: value == .option ? "⌥ Option" : value == .shift ? "⇧ Shift" : "⌃ Control").tag(value)
+                    }
+                }
                 Picker(
                     L10n.text("settings.label.openLinksWith"), selection: $model.linkActivation
                 ) {
@@ -183,6 +206,10 @@ struct SettingsView: View {
                     isOn: bind(model.secureKeyboardEntry, model.setSecureKeyboardEntry)
                 )
                 .help(L10n.text("settings.help.secureKeyboardEntry"))
+            }
+            Section(L10n.text("ui.section.search")) {
+                Toggle(L10n.text("ui.search.case"), isOn: bind(model.searchCaseSensitive, model.setSearchCaseSensitive))
+                Toggle(L10n.text("ui.search.regex"), isOn: bind(model.searchRegex, model.setSearchRegex))
             }
             Section(L10n.text("settings.section.shell")) {
                 LabeledContent(L10n.text("settings.label.openFileCommand")) {
@@ -214,6 +241,27 @@ struct SettingsView: View {
             }
             notificationsSection
             historySection
+            Section(L10n.text("ui.section.shortcuts")) {
+                DisclosureGroup(L10n.text("ui.section.shortcuts")) {
+                    ForEach(TerminalCommand.allCases, id: \.self) { command in
+                        LabeledContent(command.title) {
+                            HStack(spacing: 6) {
+                                ShortcutRecorder(value: model.keybindings[command], onChange: { model.setShortcut($0, for: command) })
+                                Button(L10n.text("ui.shortcut.reset")) { model.resetShortcut(command) }.controlSize(.small)
+                            }
+                        }
+                    }
+                }
+            }
+            Section(L10n.text("ui.category.connections")) {
+                Button(L10n.text("ui.category.connections")) { showingPresets = true }
+            }
+            if UpdateController.isAvailable {
+                Section(L10n.text("ui.section.updates")) {
+                    Toggle(L10n.text("ui.update.auto"), isOn: bind(model.updateAutoCheck, model.setUpdateAutoCheck))
+                    Toggle(L10n.text("ui.update.applications"), isOn: bind(model.suggestApplicationsFolder, model.setSuggestApplicationsFolder))
+                }
+            }
         }
     }
 
@@ -240,6 +288,9 @@ struct SettingsView: View {
                 isOn: bind(model.quickTerminal, model.setQuickTerminal)
             )
             .help(L10n.text("settings.help.quickTerminal"))
+            LabeledContent(L10n.text("ui.shortcut.global")) {
+                ShortcutRecorder(value: model.quickTerminalKey, onChange: model.setQuickTerminalKey)
+            }
             // The switch already says "off"; the row is for which key, or
             // why none.
             if model.quickTerminalStatus.kind != .none {

@@ -107,6 +107,7 @@ final class SplitViewController: NSViewController {
             return
         }
         window.title = "Corta"
+        installToolbar(on: window)
         window.tabbingMode = .automatic
         // Chrome follows the system appearance; the terminal surface stays dark.
         window.appearance = nil

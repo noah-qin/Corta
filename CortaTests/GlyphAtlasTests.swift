@@ -25,6 +25,24 @@ import Testing
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
 @Suite(.serialized, .metalSerialized) struct GlyphAtlasTests {
+    @Test("color-page eviction invalidates emoji keys and preserves shaped keys")
+    func emojiCacheFollowsOwningPage() throws {
+        let device = try #require(Self.makeDevice())
+        let atlas = GlyphAtlas(device: device, font: CTFontCreateWithName("Menlo" as CFString, 14, nil), atlasPixelSize: 64)
+        _ = atlas.glyph(shaping: 0x4E00, style: .regular)
+        let first = try #require(atlas.glyph(shaping: 0x1F600, style: .regular))
+        #expect(first.isColor)
+        for scalar in UInt32(0x1F601)...UInt32(0x1F64F) {
+            _ = atlas.glyph(shaping: scalar, style: .regular)
+            if atlas.evictionCount > 0 { break }
+        }
+        #expect(atlas.evictionCount > 0)
+        let hits = atlas.shapingHits
+        _ = atlas.glyph(shaping: 0x4E00, style: .regular)
+        #expect(atlas.shapingHits == hits)
+        _ = atlas.glyph(shaping: 0x1F600, style: .regular)
+        #expect(atlas.shapingHits == hits + 1, "evicted color texels must not have a cache hit")
+    }
 
     /// The cold-startup measurement
     /// (`docs/history/2026-09-13-B12-RENDER-DIAGNOSTICS.md`): records

@@ -34,7 +34,9 @@ nonisolated enum Paste {
 
     /// A newline (LF or CR) without bracketed paste would execute.
     static func needsWarning(text: String, bracketedPasteEnabled: Bool) -> Bool {
-        !bracketedPasteEnabled && (text.contains("\n") || text.contains("\r"))
+        // CRLF is one Swift Character; matching individual Characters misses
+        // it. The child receives bytes, so inspect the scalar representation.
+        !bracketedPasteEnabled && text.unicodeScalars.contains { $0.value == 10 || $0.value == 13 }
     }
 
     /// Wrapped in the ?2004 markers when bracketed, so it reads as data.
@@ -42,6 +44,16 @@ nonisolated enum Paste {
         let payload = Array(text.utf8)
         guard bracketedPasteEnabled else { return payload }
         return bracketStart + payload + bracketEnd
+    }
+
+    /// Output-derived history is inserted as data; only explicit Run adds
+    /// Return. Without bracketed paste, multiline insertion cannot be safe.
+    static func historyBytes(for text: String, bracketedPasteEnabled: Bool) -> [UInt8]? {
+        let text = sanitized(text)
+        guard !text.isEmpty,
+            !needsWarning(text: text, bracketedPasteEnabled: bracketedPasteEnabled)
+        else { return nil }
+        return bytes(for: text, bracketedPasteEnabled: bracketedPasteEnabled)
     }
 
     /// Write-call size for a wrapped paste; the child sees one stream. Chunks

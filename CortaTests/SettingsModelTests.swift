@@ -175,3 +175,31 @@ struct SettingsModelTests {
         #expect((model.directoryHistoryStatus.actionTitle != nil) == hasHistory)
     }
 }
+
+
+extension SettingsModelTests {
+    @Test func commandHistoryBounds() {
+        let model = SettingsModel()
+        let original = model.commandHistoryLimit
+        defer { model.setCommandHistoryLimit(original) }
+        model.setCommandHistoryLimit(-1)
+        #expect(model.commandHistoryLimit == 0)
+        model.setCommandHistoryLimit(20_000)
+        #expect(model.commandHistoryLimit == 10_000)
+    }
+    @Test func presetEditorRejectsDuplicatesAndRoundTrips() {
+        let model = SettingsModel()
+        var preset = Preset(name: "ui-test-unique-preset")
+        preset.shell = "/bin/sh"
+        preset.arguments = ["-l"]
+        preset.environment = ["EDITOR": "vim"]
+        defer { model.removePreset(preset.name) }
+        #expect(model.savePreset(preset, replacing: nil))
+        #expect(!model.savePreset(preset, replacing: nil))
+        preset.directory = "/tmp"
+        #expect(model.savePreset(preset, replacing: preset.name))
+        #expect(model.presets.first { $0.name == preset.name } == preset)
+        #expect(!SettingsModel.validPresetName("a.b"))
+        #expect(!SettingsModel.validPresetName("a b"))
+    }
+}

@@ -99,13 +99,13 @@ extension ViewController {
 
     /// Opens a local file, at the line if the configured command takes one;
     /// shared by local references and `RemoteEditCoordinator`'s managed
-    /// copies. Without `open-file-command` it is `NSWorkspace.open`, which
-    /// loses the line (the tooltip says so). A command runs via `Process` with
+    /// copies. Output-derived files require `open-file-command`: a default
+    /// application can execute a .command or .terminal file. Runs via `Process` with
     /// separate arguments, **never a shell**, which would revive the path's
     /// metacharacters (`SECURITY.md` §2.3).
     @discardableResult
-    static func openFileAt(url: URL, line: Int, column: Int?) -> Bool {
-        openFileAt(url: url, line: line, column: column, allowsDefaultApplication: true)
+    static func openFileAt(url: URL, line: Int, column: Int?, command: String? = nil) -> Bool {
+        openFileAt(url: url, line: line, column: column, allowsDefaultApplication: false, command: command)
     }
 
     /// Remote bytes must go to an explicitly configured editor, never to a

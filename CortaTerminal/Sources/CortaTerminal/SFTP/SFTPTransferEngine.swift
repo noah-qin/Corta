@@ -78,6 +78,17 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         public var initialBackoff: Duration = .milliseconds(200)
         public var maximumBackoff: Duration = .seconds(2)
 
+        /// Aggregate bounds, in addition to the codec's per-frame limit.
+        /// A limit failure returns an error, never a partial listing/tree.
+        public var maximumDirectoryEntries = 100_000
+        public var maximumDirectoryBytes = 32 * 1024 * 1024
+        public var maximumTreeEntries = 100_000
+        public var maximumTreePathBytes = 16 * 1024 * 1024
+        public var maximumTreeDepth = 128
+
+        /// Failed/cancelled transfers cannot wait forever for peer cleanup.
+        public var cleanupTimeout: Duration = .seconds(1)
+
         public init() {}
     }
 
@@ -177,6 +188,10 @@ public final class SFTPTransferEngine: @unchecked Sendable {
 
     private let queue = Mutex(QueueState())
 
+    /// Test barrier between a full admission window and waiter registration.
+    /// Configure before starting transfers.
+    var transferAdmissionGate: (@Sendable () -> Void)?
+
     public init(
         session: SFTPSession,
         reconnect: ReconnectHandler? = nil,
@@ -211,17 +226,40 @@ public final class SFTPTransferEngine: @unchecked Sendable {
 
     /// The whole directory: READDIR batches until the server answers EOF.
     public func listDirectory(path: String) async throws(SFTPError) -> [SFTPEntry] {
+        let session = self.session
         let handle = try await session.openDirectory(path: path)
         var entries: [SFTPEntry] = []
-        do {
+        var retainedBytes = 0
+        do throws(SFTPError) {
             while true {
                 let batch = try await session.readDirectory(handle: handle)
                 if batch.isEmpty { break }
+                guard entries.count <= configuration.maximumDirectoryEntries,
+                    batch.count <= configuration.maximumDirectoryEntries - entries.count
+                else { throw SFTPError.protocolViolation("directory entry limit exceeded") }
+                // Charge retained strings and extension objects before append.
+                // The count cap also bounds empty entries and array overhead.
+                for entry in batch {
+                    func charge(_ count: Int) throws(SFTPError) {
+                        guard retainedBytes <= configuration.maximumDirectoryBytes,
+                            count <= configuration.maximumDirectoryBytes - retainedBytes
+                        else { throw .protocolViolation("directory byte limit exceeded") }
+                        retainedBytes += count
+                    }
+                    try charge(128)
+                    try charge(entry.filename.count)
+                    try charge(entry.longname.count)
+                    for item in entry.attributes.extended {
+                        try charge(32)
+                        try charge(item.name.count)
+                        try charge(item.data.count)
+                    }
+                }
                 entries.append(contentsOf: batch)
             }
         } catch {
             // A listing that failed mid-way still owes the server a CLOSE.
-            try? await session.close(handle)
+            await cleanUpRemote { try? await session.close(handle) }
             throw error
         }
         try await session.close(handle)
@@ -386,7 +424,7 @@ public final class SFTPTransferEngine: @unchecked Sendable {
             partialPath, O_WRONLY | O_CREAT | O_CLOEXEC | (offset == 0 ? O_TRUNC : 0), 0o644)
         guard descriptor >= 0 else {
             let code = errno
-            _ = await Task { [session] in try? await session.close(handle) }.value
+            await cleanUpRemote { try? await session.close(handle) }
             throw SFTPError.localIOFailed(operation: "open", code: code)
         }
 
@@ -416,10 +454,9 @@ public final class SFTPTransferEngine: @unchecked Sendable {
                 bytesTransferred: receipt, resumedFromOffset: offset, attempts: 0)
         } catch {
             if descriptorOpen { Darwin.close(descriptor) }
-            // Cleanup must survive the caller's cancellation: the server
-            // is owed the CLOSE regardless, so it runs in a fresh,
-            // uncancelled task.
-            _ = await Task { [session] in try? await session.close(handle) }.value
+            // Attempt CLOSE independently of caller cancellation, with a
+            // deadline so an uncooperative peer cannot retain this slot.
+            await cleanUpRemote { try? await session.close(handle) }
             cleanUpPartial(
                 partialPath, disposition: partialDisposition,
                 keepForResume: resolution == .resume)
@@ -447,6 +484,7 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         var endOfFile = false
         var pending: [(offset: UInt64, length: Int, task: Task<[UInt8], any Error>)] = []
         pending.reserveCapacity(configuration.pipelineDepth)
+        defer { for item in pending { item.task.cancel() } }
 
         while !endOfFile {
             if abort.isSet || Task.isCancelled {
@@ -572,7 +610,7 @@ public final class SFTPTransferEngine: @unchecked Sendable {
                 bytesTransferred: moved, resumedFromOffset: offset, attempts: 0)
         } catch {
             if descriptorOpen { Darwin.close(descriptor) }
-            _ = await Task { [session] in try? await session.close(handle) }.value
+            await cleanUpRemote { try? await session.close(handle) }
             await cleanUpPartialAsync(
                 partialPath, disposition: partialDisposition,
                 keepForResume: resolution == .resume, session: session)
@@ -597,6 +635,7 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         var sourceDrained = offset >= total
         var pending: [(offset: UInt64, length: Int, task: Task<Void, any Error>)] = []
         pending.reserveCapacity(configuration.pipelineDepth)
+        defer { for item in pending { item.task.cancel() } }
 
         while !sourceDrained || !pending.isEmpty {
             if abort.isSet || Task.isCancelled {
@@ -711,8 +750,21 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         if !keep {
             // Uncancelled, like the CLOSE above: a cancelled transfer's
             // cleanup must still reach the server.
-            _ = await Task { [session] in try? await session.remove(path: path) }.value
+            await cleanUpRemote { try? await session.remove(path: path) }
         }
+    }
+
+    /// Only failure cleanup ignores the parent cancellation. The deadline
+    /// cancels the request itself; SFTPSession resumes cancelled waiters.
+    private func cleanUpRemote(_ operation: @escaping @Sendable () async -> Void) async {
+        let cleanup = Task { await operation() }
+        let timeout = configuration.cleanupTimeout
+        let timer = Task {
+            do { try await Task.sleep(for: timeout) } catch { return }
+            cleanup.cancel()
+        }
+        await cleanup.value
+        timer.cancel()
     }
 
     // MARK: - Local filesystem helpers
@@ -739,7 +791,11 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         _ task: Task<Success, any Error>
     ) async throws(SFTPError) -> Success {
         do {
-            return try await task.value
+            return try await withTaskCancellationHandler {
+                try await task.value
+            } onCancel: {
+                task.cancel()
+            }
         } catch let error as SFTPError {
             throw error
         } catch is CancellationError {
@@ -813,15 +869,25 @@ public final class SFTPTransferEngine: @unchecked Sendable {
             return false
         }
         if fast { return }
+        transferAdmissionGate?()
         let token = queue.withLock { state -> UInt64 in
             defer { state.nextToken += 1 }
             return state.nextToken
         }
         let admitted = await withTaskCancellationHandler {
             await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
-                queue.withLock { state in
+                let outcome = queue.withLock { state -> Bool? in
+                    // Cancellation may precede registration; release may have
+                    // opened room since the fast path. Check both atomically.
+                    guard !Task.isCancelled else { return false }
+                    if state.running < configuration.maxConcurrentTransfers {
+                        state.running += 1
+                        return true
+                    }
                     state.waiters.append((token: token, continuation: continuation))
+                    return nil
                 }
+                if let outcome { continuation.resume(returning: outcome) }
             }
         } onCancel: {
             queue.withLock { state in
