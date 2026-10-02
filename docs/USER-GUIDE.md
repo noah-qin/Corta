@@ -104,7 +104,10 @@ installed when you say so.
 - **Search.** ⌘F opens the search bar over the scrollback; ⌘G and ⇧⌘G go
   to the next and previous match. **Match Case** and **`*`** (regular
   expression) toggle there, and remember their state in the config file
-  (`search-case-sensitive`, `search-regex`).
+  (`search-case-sensitive`, `search-regex`). The bar sits at the top right
+  of the pane and moves to the bottom while the cursor or the current match
+  would be under it; in a narrow split it narrows rather than covering the
+  pane. Each pane has its own bar.
 - **Selecting.** Drag to select, double-click for a word, triple-click for
   a line. A finished selection is copied at once (`copy-on-select`); ⌘C
   copies too. Inside a program that uses the mouse — `vim`, `htop` — hold
@@ -209,7 +212,8 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
 - **Connecting.** The toolbar's globe and folder buttons open a sheet for an
   SSH terminal or an SFTP browser. It lists the hosts you connected to
   recently and the `Host` names in your `~/.ssh/config`; type to narrow the
-  list, click one to fill the field, double-click to connect. Settings ▸
+  list, click one (or use ↑ and ↓ from the field) to fill it, double-click
+  or press Return to connect. Settings ▸
   Privacy & Security ▸ Recent Hosts clears the recent ones.
 - **Browse Remote Files…** opens an SFTP browser for the pane's host: list,
   upload, download, rename and delete. The first connection to a host asks
@@ -243,7 +247,9 @@ Images scroll with the text, stay in the scrollback, and are removed by
 Clear Screen or Clear History along with the text around them. Other tools
 that support the protocol, such as `timg` or `chafa`, can use it too, as
 long as they send the image itself: Corta refuses by design to read a file
-path a program names, and animation is not supported.
+path a program names, and animation is not supported. An image `kitten icat`
+has to shrink to fit the pane is sent compressed, which Corta does not yet
+decode, so it shows nothing; one that already fits displays.
 
 ## The command palette
 

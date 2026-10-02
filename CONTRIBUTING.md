@@ -45,6 +45,10 @@ launching the app. App-layer changes do. Changes to the render loop also need
 a frame-CPU baseline measured under Release
 (`-testPlan Release -configuration Benchmark`, [Performance](docs/PERFORMANCE.md) §5.8).
 
+A change to what a window looks like also refreshes the images in
+`docs/brand/` that show it; [the brand guide](docs/brand/README.md) has the
+recipe, which never touches your own shell or configuration.
+
 Keep public guides in English and use relative links within the repository.
 Document defaults, units, prerequisites and limitations alongside examples.
 Keep release snapshots dated; do not present planned behaviour as shipped.
@@ -213,6 +217,15 @@ and pt-BR.
 For a new string, provide the English source, preserve format specifiers in
 translations, and mark unreviewed non-English entries `needs_review`. This
 state is an editorial marker: the translation still ships at runtime.
+
+A string with a count takes plural forms where a language has them ("1
+item", "2 items"): a plural *variation* when the count is the only argument,
+a plural *substitution* (`%#@files@`) when there are others — a language
+may put the plural on a different argument, as French does. Chinese,
+Japanese and Korean keep a single form. The catalog compiler refuses a
+string whose specifiers differ between languages, and
+`LocalizationCoverageTests` checks every plural form and renders a few
+through the same calls `L10n.format` makes.
 
 Prefer a native speaker's review in the running app before marking a
 translation `translated`. The zh-Hans catalog is an explicit exception: its

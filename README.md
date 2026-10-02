@@ -39,6 +39,7 @@ for updates.
 | Core Text font fallback | Reflow and scrollback search | Command palette and custom shortcuts |
 | Quick Terminal and Shortcuts | Bracketed paste and OSC 8 links | Shell integration and command history |
 | Secure Keyboard Entry | Kitty keyboard and direct graphics protocols | OpenSSH, SFTP and remote editing |
+| A System Settings–style Settings window | Kitty images in the scrollback | A Finder-like SFTP browser with drag and drop |
 
 The table describes `main`; a release may trail it by a row or two. The
 [feature reference](docs/FEATURES.md) has the details, requirements and
@@ -76,15 +77,29 @@ standards they helped set. It makes a different set of bets.
   [the reference](docs/CONFIGURATION.md) documents key by key; a test fails
   when the documentation drifts from the code.
 - **Remote work stays in the terminal.** SSH sessions use the system
-  OpenSSH and carry their host and directory context, an SFTP browser sits
-  beside the shell, and a remote file opens in your local editor as a
-  managed copy that uploads only when you say so — with a conflict check
+  OpenSSH and carry their host and directory context. The toolbar's connect
+  sheet suggests your recent hosts and the `Host` names in `~/.ssh/config`;
+  the SFTP browser works the way Finder does — Back and Forward, a
+  breadcrumb path, sortable columns, drag and drop both ways, transfers with
+  speed and time left — and a remote file opens in your local editor as a
+  managed copy that uploads only when you say so, with a conflict check
   against the remote first.
 - **The numbers are published, including the bad ones.** Frame CPU, idle
   CPU, throughput, keypress-to-glass latency and the esctest2 result are
   measured, dated and recorded [below](#quality-with-evidence), with the
   method for each — the latency figure is above target and the README says
   so rather than leaving the row out.
+
+<table>
+<tr>
+<td width="50%"><img src="docs/brand/sftp-browser.png" alt="The SFTP browser: Back and Forward, a breadcrumb path, a sortable file list and the transfers popover with a progress bar, speed and time left"></td>
+<td width="50%"><img src="docs/brand/settings.png" alt="The Settings window: a sidebar of eight categories on coloured tiles, beside the Appearance page's grouped form, with a font preview"></td>
+</tr>
+<tr>
+<td align="center"><sub>The SFTP browser, with a transfer in progress</sub></td>
+<td align="center"><sub>Settings — every key of the config file, in eight categories</sub></td>
+</tr>
+</table>
 
 If you need tmux control mode, a Linux build or a scripting API, iTerm2 or
 Ghostty is the better choice today; those are

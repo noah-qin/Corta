@@ -12,6 +12,9 @@ repository root.
 | `corta-pangolin-mascot.png` | Transparent mascot master, 1254 × 1254                           |
 | `corta-pangolin-loop.gif`   | Looping README animation, 360 × 360                              |
 | `screenshot.png`            | The README screenshot — light theme, a clean demo shell          |
+| `sftp-browser.png`          | The SFTP browser with an upload in its transfers popover         |
+| `settings.png`              | The Settings window, Appearance page                             |
+| `compose-screenshot.swift`  | Adds the shadow, margin and poster type to a window capture      |
 | `social-preview.png`        | GitHub social preview card, 1280 × 640                            |
 | `social-preview.swift`      | Renders the card above                                           |
 
@@ -48,8 +51,9 @@ Never point the app at the machine's real shell or configuration for this —
 a prompt carries a username and a hostname, and `launchctl setenv SHELL`
 would change the shell for every application the user launches afterwards
 (`CLAUDE.md`). Everything goes in the environment of the one launch you
-control. The 1.1.0 screenshot was taken like this, with nothing outside one
-scratch directory touched:
+control. The images here, and the social posters made from the same
+captures, were taken like this, with nothing outside one scratch directory
+touched:
 
 - **The development build** (`CortaDev`, D22), so the installed Corta and
   its configuration are never involved.
@@ -64,4 +68,28 @@ scratch directory touched:
   the mascot for `kitten icat`, a demo table for wide characters.
 - **`screencapture -o -l <window id>`** for the window without its shadow,
   found by the process id; the shadow and the margin are added afterwards,
-  so every image matches.
+  so every image matches. A popover and an attached sheet are child
+  windows and come with their window; the command palette is a window of
+  its own, laid on with `compose-screenshot.swift overlay`.
+- **The SFTP browser** connects through `CORTA_SFTP_SSH` to a stand-in
+  `ssh` that runs `/usr/libexec/sftp-server -d <scratch tree>`, so the
+  listing and the upload are real and no server is involved. Move the
+  window to the right edge of the screen before opening the transfers
+  popover: macOS keeps a popover on screen, not inside its window, and
+  one that hangs past the window shows the desktop through its glass.
+- **A short stage path.** Settings prints the config file's path in its
+  footer; a symbolic link such as `/tmp/corta-demo` to the scratch stage
+  keeps the scratch directory's name out of the picture. Remove it after.
+- **An image that needs no scaling.** `kitten icat` sends a PNG that fits
+  as it is, but scales a larger one and sends it zlib-compressed (`o=z`),
+  which Corta does not decode. Resize the mascot to fit the pane first.
+- **Keys by code.** Synthetic typing goes through the active input
+  method — Pinyin turns `[` into `【` — so shortcuts are sent as key codes
+  (`key code 33 using command down`), and text goes in by pasting.
+
+```sh
+swiftc -O docs/brand/compose-screenshot.swift -o /tmp/compose
+/tmp/compose plain window.png docs/brand/screenshot.png
+/tmp/compose overlay window.png palette.png 350 184 with-palette.png
+/tmp/compose poster with-palette.png card.png "Every command, one search away" "⇧⌘P opens the command palette"
+```
