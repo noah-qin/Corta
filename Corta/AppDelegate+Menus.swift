@@ -108,6 +108,11 @@ extension AppDelegate {
         item.target = self
         help.addItem(.separator())
         help.addItem(item)
+        #if DEBUG
+        let preview = NSMenuItem(title: L10n.text("ui.demo.title"), action: #selector(showSFTPDevelopmentPreview(_:)), keyEquivalent: "")
+        preview.target = self
+        help.addItem(preview)
+        #endif
     }
 
     /// "Corta Help" (⌘?) opens the README, which links on to `docs/`.
@@ -421,3 +426,9 @@ extension AppDelegate: NSMenuDelegate {
         rebuildThemeMenu(menu)
     }
 }
+
+#if DEBUG
+extension AppDelegate {
+    @objc func showSFTPDevelopmentPreview(_ sender: Any?) { SFTPBrowserController.showDevelopmentPreview() }
+}
+#endif

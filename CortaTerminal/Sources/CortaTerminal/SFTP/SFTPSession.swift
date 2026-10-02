@@ -32,9 +32,8 @@ public enum SFTPError: Error, Equatable {
     /// retries, and only against a fresh channel.
     case transport(SFTPTransportError)
     /// The peer sent bytes that are not SFTPv3: an undecodable frame, a
-    /// reply to a request-id nothing sent, a wrong-shaped response. The
-    /// conversation cannot continue because framing can no longer be
-    /// trusted.
+    /// reply to a request-id nothing sent, or a wrong-shaped response.
+    /// Also used when peer data exceeds an aggregate resource limit.
     case protocolViolation(String)
     /// The caller cancelled; in-flight requests were abandoned and the
     /// server was told nothing more.
@@ -574,6 +573,7 @@ public final class SFTPSession: @unchecked Sendable {
     /// allocates its id. FIFO: a burst of pipelined READs cannot starve a
     /// CLOSE queued behind them.
     private func acquireRequestSlot() async throws(SFTPError) -> SFTPRequestIDLedger.Ticket {
+        if Task.isCancelled { throw .cancelled }
         if let closed = state.withLock({ $0.closed }) { throw closed }
         // Fast path: the window has room.
         let fastTicket = state.withLock { state -> SFTPRequestIDLedger.Ticket? in
@@ -600,7 +600,7 @@ public final class SFTPSession: @unchecked Sendable {
                 // and a frame draining finds no waiter to admit until this
                 // one is queued.
                 let outcome = state.withLock { state -> Bool? in
-                    guard state.closed == nil else { return false }
+                    guard state.closed == nil, !Task.isCancelled else { return false }
                     if admits(state) {
                         state.windowUsed += 1
                         state.unwrittenFrames += 1

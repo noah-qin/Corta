@@ -238,7 +238,12 @@ extension SFTPTransferEngine {
 
         mutating func addFile(_ relativePath: String, size: UInt64?) {
             files.append(PlannedFile(relativePath: relativePath, size: size))
-            if let size, let total = totalBytes { totalBytes = total + size } else { totalBytes = nil }
+            if let size, let total = totalBytes {
+                let sum = total.addingReportingOverflow(size)
+                totalBytes = sum.overflow ? nil : sum.partialValue
+            } else {
+                totalBytes = nil
+            }
         }
     }
 
@@ -249,6 +254,8 @@ extension SFTPTransferEngine {
         var plan = TreePlan()
         var pending = [""]
         var nextDirectory = 0
+        var entryCount = 0
+        var pathBytes = 0
         while nextDirectory < pending.count {
             if Task.isCancelled { throw .cancelled }
             let directory = pending[nextDirectory]
@@ -257,6 +264,14 @@ extension SFTPTransferEngine {
             for entry in try await listDirectory(path: path) {
                 let name = entry.filenameUTF8
                 if name == "." || name == ".." { continue }
+                // Budget the whole tree, including skipped entries. A peer
+                // can otherwise evade a per-directory cap with small listings.
+                let relativeBytes = directory.utf8.count + (directory.isEmpty ? 0 : 1) + name.utf8.count
+                guard entryCount < configuration.maximumTreeEntries,
+                    relativeBytes <= configuration.maximumTreePathBytes - pathBytes
+                else { throw .protocolViolation("directory tree resource limit exceeded") }
+                entryCount += 1
+                pathBytes += relativeBytes
                 let relative = directory.isEmpty ? name : "\(directory)/\(name)"
                 guard Self.isPlainComponent(name) else {
                     plan.skipped.append(.init(relativePath: relative, reason: .unsafeName))
@@ -264,6 +279,9 @@ extension SFTPTransferEngine {
                 }
                 switch Self.fileType(of: entry.attributes.permissions) {
                 case .directory:
+                    guard relative.split(separator: "/").count <= configuration.maximumTreeDepth else {
+                        throw .protocolViolation("directory tree depth limit exceeded")
+                    }
                     plan.directories.append(relative)
                     pending.append(relative)
                 case .regular:

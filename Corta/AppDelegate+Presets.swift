@@ -139,7 +139,10 @@ extension AppDelegate {
         guard let item = sender as? NSMenuItem else { return }
         let presets = ConfigurationStore.shared.configuration.presets
         guard item.tag >= 0, item.tag < presets.count else { return }
-        let preset = presets[item.tag]
+        launchPreset(presets[item.tag], inNewWindow: inNewWindow)
+    }
+
+    func launchPreset(_ preset: Preset, inNewWindow: Bool) {
         if !inNewWindow,
             let split = NSApp.keyWindow?.contentViewController as? SplitViewController
         {

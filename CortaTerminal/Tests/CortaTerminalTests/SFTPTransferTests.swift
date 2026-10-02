@@ -96,6 +96,155 @@ struct SFTPTransferTests {
 
     // MARK: - Download
 
+    @Test("remote file sizes can overflow the aggregate without crashing")
+    func oversizedDirectoryTotals() async throws {
+        let rig = try await makeRig()
+        defer { teardown(rig) }
+        rig.fileSystem.createFile("/dir/a", data: [])
+        let answered = Mutex(false)
+        rig.server.interceptor = { message in
+            if case .readdir = message.payload {
+                let first = answered.withLock { seen in
+                    defer { seen = true }
+                    return !seen
+                }
+                if !first { return .reply(.name([])) }
+                return .reply(.name([
+                    SFTPEntry(filename: [97], attributes: .init(size: .max)),
+                    SFTPEntry(filename: [98], attributes: .init(size: 1)),
+                ]))
+            }
+            return .proceed
+        }
+        // A direct plan exercises the same metadata aggregate without
+        // attempting a physically impossible transfer.
+        var plan = SFTPTransferEngine.TreePlan()
+        plan.addFile("a", size: .max)
+        plan.addFile("b", size: 1)
+        #expect(plan.totalBytes == nil)
+        plan.addFile("c", size: 0)
+        #expect(plan.totalBytes == nil)
+        var ordinary = SFTPTransferEngine.TreePlan()
+        ordinary.addFile("a", size: 2)
+        ordinary.addFile("b", size: 3)
+        #expect(ordinary.totalBytes == 5)
+        let remotePlan = try await rig.engine.enumerateRemote(root: "/dir")
+        #expect(remotePlan.files.count == 2)
+        #expect(remotePlan.totalBytes == nil)
+    }
+
+    @Test("nonempty directory batches stop at the aggregate entry cap")
+    func endlessDirectoryListingIsBounded() async throws {
+        let rig = try await makeRig(configureEngine: { $0.maximumDirectoryEntries = 3 })
+        defer { teardown(rig) }
+        rig.fileSystem.createFile("/dir/a", data: [])
+        rig.server.interceptor = { message in
+            if case .readdir = message.payload {
+                return .reply(.name([SFTPEntry(filename: [97])]))
+            }
+            return .proceed
+        }
+        await #expect(throws: SFTPError.protocolViolation("directory entry limit exceeded")) {
+            try await rig.engine.listDirectory(path: "/dir")
+        }
+        #expect(rig.server.log.operations.filter { $0 == "readdir" }.count == 4)
+        #expect(rig.server.log.closeCount == 1)
+    }
+
+    @Test("longnames and extended attributes consume the listing byte budget")
+    func listingMetadataIsBudgeted() async throws {
+        for extended in [false, true] {
+            let rig = try await makeRig(configureEngine: { $0.maximumDirectoryBytes = 256 })
+            defer { teardown(rig) }
+            rig.fileSystem.createFile("/dir/a", data: [])
+            let entry = SFTPEntry(
+                filename: [97], longname: extended ? [] : [UInt8](repeating: 98, count: 256),
+                attributes: .init(extended: extended
+                    ? [.init(name: [], data: [UInt8](repeating: 99, count: 256))] : []))
+            rig.server.interceptor = { message in
+                if case .readdir = message.payload { return .reply(.name([entry])) }
+                return .proceed
+            }
+            await #expect(throws: SFTPError.protocolViolation("directory byte limit exceeded")) {
+                try await rig.engine.listDirectory(path: "/dir")
+            }
+            #expect(rig.server.log.closeCount == 1)
+        }
+    }
+
+    @Test("tree entry, depth and path budgets fail before destination writes")
+    func remoteTreeIsBounded() async throws {
+        for limit in 0..<3 {
+            let rig = try await makeRig(configureEngine: {
+                if limit == 0 { $0.maximumTreeEntries = 1 }
+                if limit == 1 { $0.maximumTreeDepth = 1 }
+                if limit == 2 { $0.maximumTreePathBytes = 1 }
+            })
+            defer { teardown(rig) }
+            rig.fileSystem.createFile("/tree/a/b/file", data: [1])
+            let target = rig.directory.appendingPathComponent("destination")
+            await #expect(throws: SFTPError.self) {
+                try await rig.engine.downloadDirectory(remotePath: "/tree", to: target)
+            }
+            #expect(!FileManager.default.fileExists(atPath: target.path))
+        }
+    }
+
+    @Test("cancel aborts silent READ/WRITE and CLOSE without retaining a transfer slot")
+    func cancellationWithSilentPeer() async throws {
+        for uploading in [false, true] {
+            let rig = try await makeRig(configureEngine: {
+                $0.maxConcurrentTransfers = 1
+                $0.cleanupTimeout = .milliseconds(20)
+            })
+            defer { teardown(rig) }
+            rig.fileSystem.createFile("/file", data: [UInt8](repeating: 1, count: 4096))
+            let source = try localFile(rig, "source", contents: [UInt8](repeating: 2, count: 4096))
+            let destination = rig.directory.appendingPathComponent("download")
+            let observedRequest = Mutex(false)
+            rig.server.interceptor = { message in
+                switch message.payload {
+                case .read, .write:
+                    observedRequest.withLock { $0 = true }
+                    return .ignore
+                case .close, .remove: return .ignore
+                default: return .proceed
+                }
+            }
+            let completed = Mutex(false)
+            let transfer = Task {
+                defer { completed.withLock { $0 = true } }
+                if uploading {
+                    return try await rig.engine.upload(from: source, to: "/upload", policy: .overwrite)
+                }
+                return try await rig.engine.download(remotePath: "/file", to: destination, policy: .overwrite)
+            }
+            let deadline = ContinuousClock.now + .seconds(3)
+            while !observedRequest.withLock({ $0 }), ContinuousClock.now < deadline {
+                try await Task.sleep(for: .milliseconds(1))
+            }
+            #expect(observedRequest.withLock { $0 })
+            transfer.cancel()
+            while !completed.withLock({ $0 }), ContinuousClock.now < deadline {
+                try await Task.sleep(for: .milliseconds(1))
+            }
+            #expect(completed.withLock { $0 }, "cancellation must not need a remote response")
+            if !completed.withLock({ $0 }) { rig.session.close() }
+            do {
+                _ = try await transfer.value
+                Issue.record("cancelled transfer unexpectedly succeeded")
+            } catch {
+                #expect(error as? SFTPError == .cancelled)
+            }
+            #expect(descriptorsNaming(uploading ? source.path : SFTPTransferEngine.partialPath(for: destination.path)).isEmpty)
+            if completed.withLock({ $0 }) {
+                rig.server.interceptor = nil
+                try await rig.engine.download(
+                    remotePath: "/file", to: rig.directory.appendingPathComponent("next"), policy: .overwrite)
+            }
+        }
+    }
+
     @Test("a download lands atomically: the destination never holds partial bytes")
     func downloadIsAtomic() async throws {
         let rig = try await makeRig()
@@ -472,9 +621,9 @@ struct SFTPTransferTests {
 
     @Test("listDirectory assembles entries across multiple READDIR batches")
     func listingAcrossBatches() async throws {
-        let rig = try await makeRig(configureServer: { server in
-            server.readDirBatchSize = 2
-        })
+        let rig = try await makeRig(
+            configureEngine: { $0.maximumDirectoryEntries = 5 },
+            configureServer: { $0.readDirBatchSize = 2 })
         defer { teardown(rig) }
         for index in 0..<5 {
             rig.fileSystem.createFile("/dir/file-\(index).txt", data: [UInt8(index)])
@@ -525,6 +674,71 @@ struct SFTPTransferTests {
     }
 
     // MARK: - Concurrency queue
+
+    @Test("admission rechecks capacity and cancellation before registering a waiter")
+    func admissionRegistrationRaces() async throws {
+        for cancelBeforeRegistration in [false, true] {
+            let rig = try await makeRig(configureEngine: {
+                $0.maxConcurrentTransfers = 1
+                $0.pipelineDepth = 1
+            })
+            defer { teardown(rig) }
+            rig.fileSystem.createFile("/file", data: [1])
+            let firstAtProgress = Mutex(false)
+            let secondAtAdmission = Mutex(false)
+            let releaseFirst = DispatchSemaphore(value: 0)
+            let releaseSecond = DispatchSemaphore(value: 0)
+            rig.engine.transferAdmissionGate = {
+                secondAtAdmission.withLock { $0 = true }
+                _ = releaseSecond.wait(timeout: .now() + 5)
+            }
+            let first = Task {
+                try await rig.engine.download(
+                    remotePath: "/file", to: rig.directory.appendingPathComponent("first")) { _ in
+                    firstAtProgress.withLock { $0 = true }
+                    _ = releaseFirst.wait(timeout: .now() + 5)
+                }
+            }
+            #expect(try await waitForFlag(firstAtProgress))
+            let secondFinished = Mutex(false)
+            let second = Task {
+                defer { secondFinished.withLock { $0 = true } }
+                return try await rig.engine.download(
+                    remotePath: "/file", to: rig.directory.appendingPathComponent("second"))
+            }
+            #expect(try await waitForFlag(secondAtAdmission))
+            if cancelBeforeRegistration {
+                second.cancel()
+                releaseSecond.signal()
+            } else {
+                releaseFirst.signal()
+                _ = try await first.value  // Last running slot released before registration.
+                releaseSecond.signal()
+            }
+            let completed = try await waitForFlag(secondFinished)
+            #expect(completed, "registration must not lose a release or earlier cancellation")
+            if !completed { second.cancel() }
+            do {
+                _ = try await second.value
+                #expect(!cancelBeforeRegistration)
+            } catch {
+                #expect(cancelBeforeRegistration)
+                #expect(error as? SFTPError == .cancelled)
+            }
+            if cancelBeforeRegistration {
+                releaseFirst.signal()
+                _ = try await first.value
+            }
+        }
+    }
+
+    private func waitForFlag(_ flag: borrowing Mutex<Bool>) async throws -> Bool {
+        let deadline = ContinuousClock.now + .seconds(3)
+        while !flag.withLock({ $0 }), ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        return flag.withLock { $0 }
+    }
 
     @Test("at most the configured number of transfers run at once, FIFO")
     func queueBound() async throws {

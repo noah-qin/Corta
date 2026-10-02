@@ -568,6 +568,8 @@ nonisolated struct Keybindings: Equatable, Sendable {
         set { overrides[command] = .some(newValue) }
     }
 
+    mutating func reset(_ command: TerminalCommand) { overrides.removeValue(forKey: command) }
+
     /// The overrides, in `TerminalCommand.allCases` order, for serialisation.
     var overriddenCommands: [(TerminalCommand, Shortcut?)] {
         TerminalCommand.allCases.compactMap { command in

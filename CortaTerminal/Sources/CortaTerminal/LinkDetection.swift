@@ -37,7 +37,7 @@ public enum LinkDetection {
     public static let maxPatternScanCells = 100_000
 
     /// Prose punctuation: `See https://example.com.`, `(https://…)`.
-    private static let trailingTrim: Set<Character> = [".", ",", ";", ":", "!", "?", "'", "\""]
+    private static let trailingTrim: Set<UInt16> = [46, 44, 59, 58, 33, 63, 39, 34]
 
     /// OSC 8 wins: the program named the target.
     public static func link(at point: SelectionPoint, in grid: Grid) -> Link? {
@@ -93,22 +93,32 @@ public enum LinkDetection {
         var links: [Link] = []
         for match in pattern.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
             var url = match.range
+            // Count ASCII delimiters once. Re-scanning on each removed
+            // closer made a hostile suffix quadratic on the hover path.
+            var counts: [UInt16: Int] = [:]
+            for index in url.location..<(url.location + url.length) {
+                let unit = nsText.character(at: index)
+                if unit == 40 || unit == 41 || unit == 91 || unit == 93 || unit == 123 || unit == 125 {
+                    counts[unit, default: 0] += 1
+                }
+            }
             // An unbalanced `)` is prose too.
             while url.length > 0 {
-                let last = Character(nsText.substring(with: NSRange(location: url.length - 1 + url.location, length: 1)))
+                let last = nsText.character(at: url.length - 1 + url.location)
                 if trailingTrim.contains(last) {
                     url.length -= 1
-                } else if last == ")" || last == "]" || last == "}" {
-                    let body = nsText.substring(with: url)
-                    let opener: Character = last == ")" ? "(" : last == "]" ? "[" : "{"
-                    if body.filter({ $0 == opener }).count < body.filter({ $0 == last }).count {
+                } else if last == 41 || last == 93 || last == 125 {
+                    let opener: UInt16 = last == 41 ? 40 : last == 93 ? 91 : 123
+                    if counts[opener, default: 0] < counts[last, default: 0] {
+                        counts[last, default: 0] -= 1
                         url.length -= 1
                     } else { break }
                 } else { break }
             }
             guard url.length > 0,
                 let startOffset = characterOffset(atUTF16Offset: url.location),
-                let endOffset = characterOffset(atUTF16Offset: url.location + url.length - 1),
+                let endOffset = characterOffset(atUTF16Offset:
+                    nsText.rangeOfComposedCharacterSequence(at: url.location + url.length - 1).location),
                 let startPosition = line.position(at: startOffset),
                 let endPosition = line.position(at: endOffset)
             else { continue }

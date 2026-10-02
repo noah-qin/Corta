@@ -37,6 +37,10 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     private var secureInputIndicator: NSTitlebarAccessoryViewController?
     private var secureInputObserver: NSObjectProtocol?
 
+    isolated deinit {
+        if let secureInputObserver { NotificationCenter.default.removeObserver(secureInputObserver) }
+    }
+
     override func windowDidLoad() {
         super.windowDidLoad()
         installSecureInputIndicator()

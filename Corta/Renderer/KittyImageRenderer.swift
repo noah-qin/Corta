@@ -19,6 +19,7 @@ import CortaTerminal
 import Foundation
 import ImageIO
 import Metal
+import ObjectiveC
 import simd
 
 /// Decodes Kitty graphics images into textures and draws each placement as
@@ -66,6 +67,12 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     private let decodeScheduler: (@escaping @Sendable () -> Void) -> Void
     private let textureByteBudget: Int
     private let globalBudget: GlobalTextureBudget
+    private let paneBudget: GlobalTextureBudget
+    private static let decodeBudget = GlobalTextureBudget(limit: 2)
+    private static let decodeFinished = Notification.Name("Corta.imageDecodeFinished")
+    private var decodeObserver: NSObjectProtocol?
+    private final class TextureLeaseKey: @unchecked Sendable {}
+    private static let textureLeaseKey = TextureLeaseKey()
 
     /// A background decode installed a texture; schedule a frame. Called on
     /// the installing thread.
@@ -77,7 +84,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     private var textureBytes: [KittyGraphics.ImageID: Int] = [:]
     /// Least-recently-used first: the eviction order.
     private var textureAccessOrder: [KittyGraphics.ImageID] = []
-    /// Sum of `textureBytes`: this renderer's global-budget reservation.
+    /// Sum of cached sizes; leases also charge textures retained after eviction.
     private var textureBytesCached = 0
     /// The store generation each texture was decoded from; a mismatch means a
     /// re-transmission. The test seam uses 0, real transmissions start at 1.
@@ -88,10 +95,11 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     /// Images skipped for a full global budget, with the budget generation
     /// seen; retried once it moves, since another pane's release is otherwise
     /// invisible here.
-    private var budgetBlocked: [KittyGraphics.ImageID: (storeGeneration: UInt64, budgetGeneration: Int)] = [:]
+    private var budgetBlocked: [KittyGraphics.ImageID: (storeGeneration: UInt64, globalGeneration: Int, paneGeneration: Int)] = [:]
     /// Running decodes and their store generation; a stale completion
     /// discards its result.
     private var inFlight: [KittyGraphics.ImageID: UInt64] = [:]
+    private var desiredGenerations: [KittyGraphics.ImageID: UInt64] = [:]
 
     var textureCount: Int {
         lock.lock()
@@ -116,18 +124,21 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     ) {
         self.textureByteBudget = textureByteBudget
         self.globalBudget = globalBudget
+        self.paneBudget = GlobalTextureBudget(limit: textureByteBudget)
         self.makeTextureImpl = makeTexture ?? { device.makeTexture(descriptor: $0) }
         self.decodeImageImpl = decodeImage ?? Self.decode
         self.decodeScheduler = decodeScheduler ?? {
             DispatchQueue.global(qos: .userInitiated).async(execute: $0)
         }
+        decodeObserver = NotificationCenter.default.addObserver(
+            forName: Self.decodeFinished, object: nil, queue: nil
+        ) { [weak self] _ in self?.onImagesReady?() }
     }
 
     deinit {
-        lock.lock()
-        let bytes = textureBytesCached
-        lock.unlock()
-        globalBudget.release(bytes)
+        if let decodeObserver { NotificationCenter.default.removeObserver(decodeObserver) }
+        for texture in textures.values { Self.lease(of: texture)?.retire() }
+        // Reservations belong to textures, including those retained by Metal.
     }
 
     /// The per-frame entry point (never from `draw`, and never decodes
@@ -139,7 +150,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     ) {
         let placements = table.orderedPlacements()
         let liveIDs = Set(placements.map(\.imageID))
-        var toSchedule: [(KittyGraphics.ImageID, UInt64, KittyGraphics.ImageData)] = []
+        var toSchedule: [(KittyGraphics.ImageID, UInt64, KittyGraphics.ImageData, DecodePermit)] = []
 
         lock.lock()
         for id in textures.keys where !liveIDs.contains(id) {
@@ -148,9 +159,9 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         // The table keeps the bytes, so a later re-placement re-decodes.
         failedGenerations = failedGenerations.filter { liveIDs.contains($0.key) }
         budgetBlocked = budgetBlocked.filter { liveIDs.contains($0.key) }
-        for id in inFlight.keys where !liveIDs.contains(id) {
-            inFlight[id] = nil
-        }
+        desiredGenerations = Dictionary(uniqueKeysWithValues: liveIDs.compactMap { id in
+            table.storeGeneration(for: id).map { (id, $0) }
+        })
 
         for placement in placements {
             let id = placement.imageID
@@ -162,26 +173,30 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
                 releaseTextureLocked(id)
             }
             guard failedGenerations[id] != generation else { continue }
-            if let inFlightGeneration = inFlight[id] {
-                if inFlightGeneration == generation { continue }
-                // Superseded mid-decode: orphan the old completion.
-                inFlight[id] = nil
-            }
+            // A replacement cannot orphan an actual queued/running job.
+            guard inFlight[id] == nil else { continue }
             if let blocked = budgetBlocked[id], blocked.storeGeneration == generation {
-                guard blocked.budgetGeneration != globalBudget.generation else { continue }
+                guard blocked.globalGeneration != globalBudget.generation
+                    || blocked.paneGeneration != paneBudget.generation else { continue }
                 budgetBlocked[id] = nil
             }
             guard Self.isPotentiallyVisible(
                 placement, data: data, rows: rows, offset: offset,
                 scrollbackTotalPushed: scrollbackTotalPushed, cellHeight: cellHeight)
             else { continue }
+            guard data.bytes.count <= 64 * 1024 * 1024 else {
+                failedGenerations[id] = generation
+                continue
+            }
+            guard Self.decodeBudget.tryReserve(1) else { continue }
             inFlight[id] = generation
-            toSchedule.append((id, generation, data))
+            toSchedule.append((id, generation, data, DecodePermit()))
         }
         lock.unlock()
 
-        for (id, generation, data) in toSchedule {
+        for (id, generation, data, permit) in toSchedule {
             decodeScheduler { [weak self] in
+                defer { permit.release() }
                 self?.decodeAndInstall(id: id, generation: generation, data: data)
             }
         }
@@ -215,6 +230,13 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     private func decodeAndInstall(
         id: KittyGraphics.ImageID, generation: UInt64, data: KittyGraphics.ImageData
     ) {
+        if generation != 0 {
+            lock.lock()
+            let relevant = desiredGenerations[id] == generation
+            if !relevant { inFlight[id] = nil }
+            lock.unlock()
+            guard relevant else { return }
+        }
         let decoded = decodeImageImpl(data)
         var installed = false
         lock.lock()
@@ -222,13 +244,15 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
             installed = installLocked(id: id, generation: generation, decoded: decoded)
         } else if inFlight[id] == generation {
             inFlight[id] = nil
-            installed = installLocked(id: id, generation: generation, decoded: decoded)
+            if desiredGenerations[id] == generation {
+                installed = installLocked(id: id, generation: generation, decoded: decoded)
+            }
         }
         // Otherwise this generation went away mid-decode; discard. Only the
         // matching branch may clear `inFlight`, or a stale completion would
         // clear a newer decode's entry.
         lock.unlock()
-        if installed { onImagesReady?() }
+        if installed, generation == 0 { onImagesReady?() }
     }
 
     /// Installs a decoded image; caller holds `lock`. Returns whether it did.
@@ -246,20 +270,32 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
             failedGenerations[id] = generation
             return false
         }
-        while textureBytesCached + bytes > textureByteBudget, let oldest = textureAccessOrder.first {
+        releaseTextureLocked(id)
+        while paneBudget.reservedBytes + bytes > textureByteBudget, let oldest = textureAccessOrder.first {
             releaseTextureLocked(oldest)
         }
+        guard paneBudget.tryReserve(bytes) else {
+            budgetBlocked[id] = (generation, globalBudget.generation, paneBudget.generation)
+            return false
+        }
         guard globalBudget.tryReserve(bytes) else {
+            paneBudget.release(bytes)
             // The global budget is transient: retry when its generation moves.
-            budgetBlocked[id] = (generation, globalBudget.generation)
+            budgetBlocked[id] = (generation, globalBudget.generation, paneBudget.generation)
             return false
         }
         guard let texture = makeTexture(from: decoded) else {
             globalBudget.release(bytes)
+            paneBudget.release(bytes)
             failedGenerations[id] = generation
             return false
         }
-        releaseTextureLocked(id)
+        // MTL4 retains textures after cache eviction. Associate the lease
+        // with the actual texture so every holder remains quota-accounted.
+        let lease = TextureLease(bytes: bytes, pane: paneBudget, global: globalBudget)
+        objc_setAssociatedObject(
+            texture, Unmanaged.passUnretained(Self.textureLeaseKey).toOpaque(), lease,
+            .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         textures[id] = texture
         textureBytes[id] = bytes
         textureGenerations[id] = generation
@@ -268,15 +304,25 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         return true
     }
 
-    /// Drops one texture, returning its bytes to both budgets; caller holds
-    /// `lock`.
+    /// Drops cache ownership; the texture's final owner returns quota.
+    /// Caller holds `lock`.
     private func releaseTextureLocked(_ id: KittyGraphics.ImageID) {
-        guard textures.removeValue(forKey: id) != nil, let bytes = textureBytes.removeValue(forKey: id)
+        guard let texture = textures.removeValue(forKey: id), let bytes = textureBytes.removeValue(forKey: id)
         else { return }
+        Self.lease(of: texture)?.retire()
         textureGenerations[id] = nil
         textureAccessOrder.removeAll { $0 == id }
         textureBytesCached -= bytes
-        globalBudget.release(bytes)
+    }
+
+    private static func lease(of texture: MTLTexture) -> TextureLease? {
+        objc_getAssociatedObject(texture, Unmanaged.passUnretained(textureLeaseKey).toOpaque()) as? TextureLease
+    }
+
+    /// Retry while evicted textures await retirement; cached images alone
+    /// must not create a completion/redraw loop on idle panes.
+    func noteGPUCompletion() {
+        if globalBudget.retiredBytes > 0 { onImagesReady?() }
     }
 
     /// Draws visible placements in z-index then transmission order, placed
@@ -293,7 +339,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
             offset: offset, scrollbackTotalPushed: scrollbackTotalPushed
         ) { instance, texture in
             backend.drawColorQuads(
-                [instance], atlas: texture, rect: rect, drawableSize: drawableSize)
+                [instance], atlas: texture, rect: rect, drawableSize: drawableSize, transient: true)
         }
     }
 
@@ -351,7 +397,8 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
             return nil
         }
         if let blocked = budgetBlocked[id], blocked.storeGeneration == 0 {
-            guard blocked.budgetGeneration != globalBudget.generation else {
+            guard blocked.globalGeneration != globalBudget.generation
+                || blocked.paneGeneration != paneBudget.generation else {
                 lock.unlock()
                 return nil
             }
@@ -368,6 +415,45 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         var width: Int
         var height: Int
         var bgra: [UInt8]
+    }
+
+    private final class TextureLease {
+        let bytes: Int
+        let pane: GlobalTextureBudget
+        let global: GlobalTextureBudget
+        private var retired = false
+        init(bytes: Int, pane: GlobalTextureBudget, global: GlobalTextureBudget) {
+            self.bytes = bytes
+            self.pane = pane
+            self.global = global
+        }
+        func retire() {
+            guard !retired else { return }
+            retired = true
+            pane.markRetired(bytes)
+            global.markRetired(bytes)
+        }
+        deinit {
+            pane.release(bytes, retired: retired)
+            global.release(bytes, retired: retired)
+            NotificationCenter.default.post(name: KittyImageRenderer.decodeFinished, object: nil)
+        }
+    }
+
+    /// Scheduler abandonment and renderer teardown return admission too.
+    private final class DecodePermit: @unchecked Sendable {
+        private let lock = NSLock()
+        private var released = false
+        func release() {
+            lock.lock()
+            let shouldRelease = !released
+            released = true
+            lock.unlock()
+            guard shouldRelease else { return }
+            KittyImageRenderer.decodeBudget.release(1)
+            NotificationCenter.default.post(name: KittyImageRenderer.decodeFinished, object: nil)
+        }
+        deinit { release() }
     }
 
     static func decode(_ data: KittyGraphics.ImageData) -> DecodedImage? {
@@ -448,14 +534,15 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
 }
 
 /// The app-wide image texture budget: VRAM is shared, and per-pane caps
-/// don't stop N panes exhausting it. Renderers reserve on cache and
-/// release on eviction, prune and `deinit`.
+/// don't stop N panes exhausting it. Texture leases release reservations
+/// only when the last texture owner disappears, including GPU retention.
 nonisolated final class GlobalTextureBudget: @unchecked Sendable {
     static let shared = GlobalTextureBudget(limit: KittyGraphics.maximumGlobalTextureBytes)
 
     let limit: Int
     private let lock = NSLock()
     private var reserved = 0
+    private var retired = 0
     private var releaseCount = 0
 
     /// Bumped on every release, so a renderer that skipped an image learns
@@ -464,6 +551,24 @@ nonisolated final class GlobalTextureBudget: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return releaseCount
+    }
+
+    var reservedBytes: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return reserved
+    }
+
+    var retiredBytes: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return retired
+    }
+
+    func markRetired(_ bytes: Int) {
+        lock.lock()
+        retired += bytes
+        lock.unlock()
     }
 
     init(limit: Int) {
@@ -478,10 +583,11 @@ nonisolated final class GlobalTextureBudget: @unchecked Sendable {
         return true
     }
 
-    func release(_ bytes: Int) {
+    func release(_ bytes: Int, retired wasRetired: Bool = false) {
         lock.lock()
         defer { lock.unlock() }
         reserved -= bytes
+        if wasRetired { retired -= bytes }
         releaseCount &+= 1
     }
 }

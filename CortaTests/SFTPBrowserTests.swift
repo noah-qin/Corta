@@ -291,6 +291,30 @@ struct SFTPBrowserModelTests {
         #expect(model.volumeStatus == expected)
     }
 
+    @Test("remote unsigned sizes remain displayable across the signed boundary")
+    func oversizedByteCounts() {
+        #expect(!SFTPBrowserModel.formattedByteCount(0).isEmpty)
+        #expect(!SFTPBrowserModel.formattedByteCount(UInt64(Int64.max)).isEmpty)
+        let oversized = UInt64(Int64.max) + 1
+        #expect(SFTPBrowserModel.formattedByteCount(oversized) == "\(oversized) B")
+        #expect(SFTPBrowserModel.describe(size: UInt64.max, modified: nil) == "\(UInt64.max) B")
+    }
+
+    @Test("overflowing statvfs counters are unknown instead of trapping")
+    func overflowingVolumeCounters() {
+        var info = SFTPVolumeInfo(
+            blockSize: 2, fragmentSize: 2, blocks: .max, blocksFree: 1,
+            blocksAvailable: 1, files: 0, filesFree: 0, filesAvailable: 0,
+            filesystemID: 0, flags: 0, nameMaximum: 255)
+        #expect(SFTPBrowserModel.volumeStatus(for: info) == .unknown)
+        info.blocks = 2
+        info.blocksAvailable = .max
+        #expect(SFTPBrowserModel.volumeStatus(for: info) == .unknown)
+        info.blockSize = 1
+        info.blocks = .max
+        #expect(SFTPBrowserModel.volumeStatus(for: info) == .available(free: .max, total: .max))
+    }
+
     @Test("an authentication failure is named as one, with a way back")
     func connectAuthenticationFailure() async {
         let fake = FakeSFTPClient()

@@ -168,9 +168,9 @@ public nonisolated final class Metal4Backend {
 
     /// Textures bound by resource ID, with their last binding frame. Retained
     /// and resident, since MTL4 does neither for `gpuResourceID` bindings;
-    /// `dropRetired` releases them `textureRetentionFrames` after that frame
-    /// completes.
-    private var boundTextures: [ObjectIdentifier: (texture: MTLTexture, lastFrame: UInt64)] = [:]
+    /// `dropRetired` releases image textures once that frame completes;
+    /// persistent atlases retain a `textureRetentionFrames` grace period.
+    private var boundTextures: [ObjectIdentifier: (texture: MTLTexture, lastFrame: UInt64, retentionFrames: UInt64)] = [:]
     /// Grace frames before an unbound texture leaves the residency set. Zero
     /// would be correct but would commit the residency set twice a frame for
     /// an atlas bound every frame.
@@ -385,11 +385,12 @@ public nonisolated final class Metal4Backend {
 
     /// Untinted premultiplied sampling: colour glyphs and Kitty images.
     func drawColorQuads(
-        _ instances: [QuadInstance], atlas: MTLTexture, rect: CGRect, drawableSize: CGSize
+        _ instances: [QuadInstance], atlas: MTLTexture, rect: CGRect, drawableSize: CGSize,
+        transient: Bool = false
     ) {
         draw(
             instances, ring: colorGlyphRing, pipeline: colorGlyphPipeline, atlas: atlas,
-            rect: rect, drawableSize: drawableSize, label: "Corta.colorGlyph")
+            rect: rect, drawableSize: drawableSize, label: "Corta.colorGlyph", transientTexture: transient)
     }
 
     /// Commits and presents `drawable` (nil offscreen). `onCompleted` runs
@@ -454,7 +455,8 @@ public nonisolated final class Metal4Backend {
         atlas: MTLTexture?,
         rect: CGRect,
         drawableSize: CGSize,
-        label: String
+        label: String,
+        transientTexture: Bool = false
     ) {
         // The pass (and its clear) opened in `beginFrame`.
         guard let encoder, !instances.isEmpty else { return }
@@ -488,7 +490,7 @@ public nonisolated final class Metal4Backend {
         argumentTable.setAddress(addresses.0, index: 0)
         argumentTable.setAddress(addresses.1, index: 1)
         if let atlas {
-            makeResident(atlas)
+            makeResident(atlas, transient: transientTexture)
             argumentTable.setTexture(atlas.gpuResourceID, index: 0)
             argumentTable.setSamplerState(sampler.gpuResourceID, index: 0)
         }
@@ -530,13 +532,14 @@ public nonisolated final class Metal4Backend {
     }
 
     /// See `boundTextures`.
-    private func makeResident(_ texture: MTLTexture) {
+    private func makeResident(_ texture: MTLTexture, transient: Bool) {
         let id = ObjectIdentifier(texture)
         if boundTextures[id] == nil {
             residencySet.addAllocation(texture)
             residencySet.commit()
         }
-        boundTextures[id] = (texture: texture, lastFrame: frameNumber)
+        boundTextures[id] = (texture: texture, lastFrame: frameNumber,
+            retentionFrames: transient ? 0 : Self.textureRetentionFrames)
     }
 
     /// Releases retired resources whose retiring frame has completed.
@@ -552,7 +555,7 @@ public nonisolated final class Metal4Backend {
             }
         }
         let expiredTextures = boundTextures.filter {
-            $0.value.lastFrame + Self.textureRetentionFrames <= completed
+            $0.value.lastFrame + $0.value.retentionFrames <= completed
         }
         for (id, entry) in expiredTextures {
             residencySet.removeAllocation(entry.texture)

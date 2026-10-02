@@ -24,6 +24,10 @@ import Observation
 @MainActor
 @Observable
 final class SFTPBrowserModel {
+    #if DEBUG
+    var isDevelopmentPreview = false
+    #endif
+
     // MARK: - Entry model
 
     /// What one row of the listing is, decided from the ATTRS permission
@@ -127,6 +131,9 @@ final class SFTPBrowserModel {
     /// typed in (`.needsHost`).
     private(set) var host: String?
     var hostField = ""
+    private var connectionGeneration = 0
+    private var directoryGeneration = 0
+
     private(set) var connectionState: ConnectionState
     private(set) var currentPath = "/"
     /// The path field's text, kept in sync with `currentPath` on every
@@ -252,10 +259,12 @@ final class SFTPBrowserModel {
         transferQueue.host = name
         transferQueue.onUploadFinished = { [weak self] in self?.refresh() }
         transferQueue.onListingError = { [weak self] in self?.listingError = $0 }
-        Task { await self.performConnect(client: client, host: name) }
+        connectionGeneration += 1
+        let generation = connectionGeneration
+        Task { await self.performConnect(client: client, host: name, generation: generation) }
     }
 
-    private func performConnect(client: any SFTPClient, host name: String) async {
+    private func performConnect(client: any SFTPClient, host name: String, generation: Int) async {
         do {
             _ = try await client.connect()
             // The pane's reported directory when there is one; otherwise
@@ -268,6 +277,7 @@ final class SFTPBrowserModel {
                 path = try await client.realPath(path: ".")
             }
             let listing = try await client.listDirectory(path: path)
+            guard generation == connectionGeneration else { client.close(); return }
             connectionState = .connected
             currentPath = Self.normalized(path: path)
             pathField = currentPath
@@ -275,6 +285,7 @@ final class SFTPBrowserModel {
             onConnected?(name)
             await refreshVolume()
         } catch {
+            guard generation == connectionGeneration else { return }
             let error = Self.sftpError(error)
             connectionState = .failed(message: Self.errorMessage(error, host: name))
             client.close()
@@ -286,9 +297,20 @@ final class SFTPBrowserModel {
     /// Closes the session and abandons every transfer. Called by the
     /// controller when the window closes.
     func disconnect() {
+        connectionGeneration += 1
+        directoryGeneration += 1
+        isLoading = false
         transferQueue.disconnect()
         client?.close()
         client = nil
+    }
+
+    func changeHost() {
+        disconnect()
+        hostField = host ?? hostField
+        host = nil
+        connectionState = .needsHost
+        updateTitle()
     }
 
     // MARK: - Navigation
@@ -324,9 +346,12 @@ final class SFTPBrowserModel {
         guard let client else { return }
         isLoading = true
         listingError = nil
+        directoryGeneration += 1
+        let generation = directoryGeneration
         Task {
             do {
                 let listing = try await client.listDirectory(path: path)
+                guard generation == directoryGeneration else { return }
                 currentPath = Self.normalized(path: path)
                 pathField = currentPath
                 applyEntries(listing)
@@ -334,28 +359,43 @@ final class SFTPBrowserModel {
                 updateTitle()
                 await refreshVolume()
             } catch {
+                guard generation == directoryGeneration else { return }
                 listingError = Self.errorMessage(Self.sftpError(error), host: host ?? "")
             }
+            guard generation == directoryGeneration else { return }
             isLoading = false
         }
     }
 
     private func refreshVolume() async {
         guard let client else { return }
+        let connection = connectionGeneration
+        let directory = directoryGeneration
         do {
-            if let info = try await client.volumeInfo(path: currentPath) {
-                let total = info.blocks * info.blockSize
-                let free = info.blocksAvailable * info.blockSize
-                volumeStatus = .available(free: free, total: total)
+            let info = try await client.volumeInfo(path: currentPath)
+            guard connection == connectionGeneration, directory == directoryGeneration else { return }
+            if let info {
+                volumeStatus = Self.volumeStatus(for: info)
             } else {
                 volumeStatus = .unsupported
             }
         } catch {
+            guard connection == connectionGeneration, directory == directoryGeneration else { return }
             // Capacity is a nicety, not the listing: a failed statvfs
             // leaves the status line silent rather than replacing the
             // directory with an error.
             volumeStatus = .unknown
         }
+    }
+
+    /// Peer counters may use all 64 bits; invalid aggregates are unknown.
+    static func volumeStatus(for info: SFTPVolumeInfo) -> VolumeStatus {
+        let total = info.blocks.multipliedReportingOverflow(by: info.blockSize)
+        let free = info.blocksAvailable.multipliedReportingOverflow(by: info.blockSize)
+        guard !total.overflow, !free.overflow, free.partialValue <= total.partialValue else {
+            return .unknown
+        }
+        return .available(free: free.partialValue, total: total.partialValue)
     }
 
     /// Whether a name the server listed is one plain path component — the
@@ -680,12 +720,19 @@ final class SFTPBrowserModel {
     static func describe(size: UInt64?, modified: Date?) -> String {
         let sizeText =
             size.map {
-                ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file)
+                formattedByteCount($0)
             } ?? L10n.text("sftp.size.unknown")
         guard let modified else { return sizeText }
         return L10n.format(
             "sftp.conflict.sizeAndTime", sizeText,
             Self.modificationFormatter.string(from: modified))
+    }
+
+    /// Preserve values outside the signed formatter's range without a trap
+    /// or a misleading wrapped/clamped size.
+    static func formattedByteCount(_ bytes: UInt64) -> String {
+        guard let signed = Int64(exactly: bytes) else { return "\(bytes) B" }
+        return ByteCountFormatter.string(fromByteCount: signed, countStyle: .file)
     }
 
     private static let modificationFormatter: DateFormatter = {

@@ -159,7 +159,7 @@ public enum KittyGraphics {
     // grow any of these without limit.
 
     /// Decoded bytes per image — about two 4K RGBA frames.
-    static let maximumImageBytes = 64 * 1024 * 1024
+    public static let maximumImageBytes = 64 * 1024 * 1024
 
     /// Per axis; every Metal feature set on macOS supports 8192² textures.
     public static let maximumImageDimension = 8192

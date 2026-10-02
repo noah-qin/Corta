@@ -22,6 +22,21 @@ import Testing
 /// punctuation trimming, soft-wrap joining and hit-testing by cell.
 @Suite("LinkDetection")
 struct LinkDetectionTests {
+    @Test("large unmatched bracket suffix is trimmed in one pass")
+    func hostileBracketSuffix() {
+        var terminal = Terminal(rows: 900, columns: 120)
+        terminal.feed(Array(("https://x.y/a" + String(repeating: ")]}", count: 25_000)).utf8))
+        #expect(LinkDetection.link(at: SelectionPoint(row: 0, column: 2), in: terminal.grid)?.url
+            == "https://x.y/a")
+    }
+
+    @Test("balanced delimiters and final Unicode graphemes survive")
+    func unicodeAndMixedDelimiters() {
+        for text in ["https://x.y/(a)[b]{c}", "https://x.y/世界", "https://x.y/🎉", "https://x.y/e\u{301}"] {
+            let terminal = self.terminal(feeding: text)
+            #expect(LinkDetection.link(at: SelectionPoint(row: 0, column: 2), in: terminal.grid)?.url == text)
+        }
+    }
     private func terminal(columns: Int = 40, feeding text: String) -> Terminal {
         var terminal = Terminal(rows: 5, columns: columns)
         terminal.feed(Array(text.utf8))

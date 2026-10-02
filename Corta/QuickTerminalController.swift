@@ -270,7 +270,7 @@ final class QuickTerminalController {
         }
     }
 
-    private func animate(_ changes: @escaping () -> Void, completion: (() -> Void)? = nil) {
+    private func animate(_ changes: @escaping () -> Void, completion: (@MainActor @Sendable () -> Void)? = nil) {
         isAnimating = true
         NSAnimationContext.runAnimationGroup { context in
             context.duration =
@@ -278,8 +278,8 @@ final class QuickTerminalController {
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             changes()
         } completionHandler: { [weak self] in
-            completion?()
             MainActor.assumeIsolated {
+                completion?()
                 guard let self else { return }
                 self.isAnimating = false
                 // Apply a display change deferred during the slide.

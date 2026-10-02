@@ -78,21 +78,48 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    private init(host: String?, startDirectory: String?, suggestedHost: String? = nil) {
-        model = SFTPBrowserModel(
+    /// Explicit toolbar entry: ask for a host before connecting.
+    static func showConnection() {
+        let controller = SFTPBrowserController(host: nil, startDirectory: nil)
+        unconnected[ObjectIdentifier(controller)] = controller
+        controller.present()
+    }
+
+    #if DEBUG
+    static func showDevelopmentPreview() {
+        let model = SFTPBrowserModel(host: "demo.invalid", startDirectory: "/home/demo") { _ in
+            SFTPPreviewClient()
+        }
+        model.isDevelopmentPreview = true
+        model.transferQueue.installDevelopmentPreview()
+        let controller = SFTPBrowserController(host: nil, startDirectory: nil, previewModel: model)
+        controller.window?.setContentSize(NSSize(width: 820, height: 560))
+        unconnected[ObjectIdentifier(controller)] = controller
+        controller.present()
+    }
+    #endif
+
+    private init(host: String?, startDirectory: String?, suggestedHost: String? = nil, previewModel: SFTPBrowserModel? = nil) {
+        model = previewModel ?? SFTPBrowserModel(
             host: host, startDirectory: startDirectory, suggestedHost: suggestedHost)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 640, height: 440),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
-        window.minSize = NSSize(width: 480, height: 280)
+        window.minSize = NSSize(width: 560, height: 360)
+        window.toolbarStyle = .unified
         super.init(window: window)
         window.delegate = self
         window.contentViewController = NSHostingController(
             rootView: SFTPBrowserView(model: model))
-        model.onTitleChange = { [weak window] title in window?.title = title }
+        let isPreview = previewModel != nil
+        model.onTitleChange = { [weak window, weak model] _ in
+            window?.title = isPreview ? L10n.text("ui.demo.windowTitle") : "SFTP"
+            window?.subtitle = model?.host ?? ""
+        }
         model.publishTitle()
+        if isPreview { return }
         model.onConnected = { [weak self] host in
             guard let self else { return }
             Self.unconnected.removeValue(forKey: ObjectIdentifier(self))
@@ -134,6 +161,7 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
         // consent — has its field prefilled, and `connect()` would take
         // that text as the answer; the user's Connect is the answer.
         if model.host != nil { model.connect() }
+        if window?.isVisible != true { window?.center() }
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
     }

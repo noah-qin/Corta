@@ -212,6 +212,8 @@ final class FakeRemoteFileSystem: @unchecked Sendable {
 
 /// How the fake server answers one request when its interceptor speaks.
 enum FakeServerAction {
+    /// Keep the channel open without answering, for cancellation tests.
+    case ignore
     /// Fall through to the filesystem's default handling.
     case proceed
     /// Reply with this payload instead.
@@ -386,6 +388,8 @@ final class FakeSFTPServer: @unchecked Sendable {
             switch action {
             case .proceed:
                 break
+            case .ignore:
+                return
             case .reply(let payload):
                 send(payload, requestID: message.requestID)
                 return

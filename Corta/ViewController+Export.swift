@@ -160,11 +160,11 @@ extension ViewController {
         return Selection.text(of: whole, in: grid)
     }
 
-    static func exportFilename(hasSelection: Bool, date: Date = Date()) -> String {
+    nonisolated static func exportFilename(hasSelection: Bool, date: Date = Date()) -> String {
         exportFilename(kind: hasSelection ? "Selection" : "History", date: date)
     }
 
-    static func exportFilename(kind: String, date: Date = Date()) -> String {
+    nonisolated static func exportFilename(kind: String, date: Date = Date()) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"

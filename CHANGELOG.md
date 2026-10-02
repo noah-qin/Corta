@@ -12,11 +12,22 @@ what to edit.
 
 ### Added
 
+- Debug-only SFTP connected-state preview with sample files and transfer rows;
+  the connection window opens centered, with a centered host form.
+
+- SSH and SFTP toolbar entries. Settings keeps its original three tabs and
+  adds verified font selection, command-history limits, mouse override,
+  search defaults, shortcut recording, and preset management.
+
 - About ▸ Acknowledgements shows the license of Sparkle, the updater Corta
   ships with, and the notices of the code Sparkle bundles — terms that
   require the notice to travel with the app.
 
 ### Changed
+
+- SFTP uses a native glass toolbar, three default columns, optional detailed
+  columns, and a collapsible transfer section. The host-entry title and
+  explanation are centered.
 
 - **Intel Macs are no longer supported.** Corta now runs only on Macs
   with Apple silicon (M1 or later); the minimum macOS stays 26.0. 1.0.1 is

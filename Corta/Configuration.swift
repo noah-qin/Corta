@@ -119,7 +119,7 @@ nonisolated struct Configuration: Equatable, Sendable {
     var searchRegex: Bool = false
 
     /// Opens a `path:line` reference, substituting `{file}`, `{line}` and
-    /// `{column}`. Empty means the default application, which takes no line.
+    /// `{column}`. Empty disables opening output-derived files.
     var openFileCommand: String = ""
 
     /// Whether an `open-file-command` template can run: empty, or an absolute

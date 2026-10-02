@@ -23,6 +23,18 @@ import Testing
 /// stream — ESC and C0 controls are stripped, and a paste containing a
 /// newline warns unless the application enabled bracketed paste.
 struct PasteTests {
+    @Test func historyRejectsUnbracketedMultilineAndStripsControlSequences() {
+        for text in ["safe\necho evil", "safe\recho evil", "safe\r\necho evil"] {
+            #expect(Paste.historyBytes(for: text, bracketedPasteEnabled: false) == nil)
+            #expect(Paste.historyBytes(for: text, bracketedPasteEnabled: true)
+                == Array("\u{1B}[200~\(text)\u{1B}[201~".utf8))
+        }
+        #expect(Paste.historyBytes(for: "echo 世界", bracketedPasteEnabled: false)
+            == Array("echo 世界".utf8))
+        #expect(Paste.historyBytes(for: "\u{1B}[201~\u{3}hello", bracketedPasteEnabled: true)
+            == Array("\u{1B}[200~[201~hello\u{1B}[201~".utf8))
+        #expect(Paste.historyBytes(for: "\u{3}", bracketedPasteEnabled: true) == nil)
+    }
     @Test func escapeAndC0ControlsAreStripped() {
         let malicious = "rm -rf ~\u{1B}[2J\u{7}\u{1}\u{1B}[200~echo hi"
         #expect(Paste.sanitized(malicious) == "rm -rf ~[2J[200~echo hi")
@@ -53,6 +65,7 @@ struct PasteTests {
     @Test func carriageReturnAlsoNeedsWarning() {
         // CR runs the line just like LF does.
         #expect(Paste.needsWarning(text: "ls\rrm -rf ~", bracketedPasteEnabled: false))
+        #expect(Paste.needsWarning(text: "ls\r\nrm -rf ~", bracketedPasteEnabled: false))
     }
 
     @Test func bracketedPasteWrapsIn2004Markers() {
