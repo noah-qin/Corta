@@ -10,6 +10,19 @@ what to edit.
 
 ## [Unreleased]
 
+### Security and reliability follow-up
+
+- Reject stale search status and repeated/concurrent SFTP handshakes; cancel
+  pending handshakes and keep slow directory mounts off the UI thread.
+- Bind remote-edit upload approval to a private content snapshot and compare
+  remote content digests, including changes with identical size/timestamp.
+- Create private download partials, tighten managed copies and manifest modes,
+  and refuse existing directory-download destination symlinks.
+- Bound glyph clusters before shaping and reject oversized ink before eviction;
+  build Unicode row strings once and reuse reflow scratch buffers.
+- Correct restoration/export privacy documentation and add regression,
+  sanitizer and isolated SSH/SFTP validation evidence.
+
 ### Added
 
 - Debug-only SFTP connected-state preview with sample files and transfer rows;

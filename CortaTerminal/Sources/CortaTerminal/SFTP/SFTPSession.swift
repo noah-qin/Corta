@@ -253,6 +253,7 @@ public final class SFTPSession: @unchecked Sendable {
         /// with this, and it is the error in-flight requests died with.
         var closed: SFTPError?
         /// Set once VERSION has been consumed.
+        var connectStarted = false
         var serverInfo: SFTPServerCapabilities?
     }
 
@@ -262,7 +263,6 @@ public final class SFTPSession: @unchecked Sendable {
     /// is slower than the window, and the cooperative pool has one thread
     /// per core for the whole process.
     private let writerQueue = DispatchQueue(label: "dev.corta.sftp.writer", qos: .utility)
-    private var readerThread: Thread?
 
     public init(transport: SFTPChannelTransport, configuration: Configuration = .init()) {
         self.transport = transport
@@ -270,6 +270,8 @@ public final class SFTPSession: @unchecked Sendable {
     }
 
     /// Frames queued for the writer and not yet written; for tests.
+    var handshakePending: Bool { state.withLock { $0.handshake != nil } }
+
     var unwrittenFrameCount: Int { state.withLock { $0.unwrittenFrames } }
 
     /// The server's capabilities, from its VERSION answer. `nil` until
@@ -285,34 +287,51 @@ public final class SFTPSession: @unchecked Sendable {
     /// the transport.
     @discardableResult
     public func connect() async throws(SFTPError) -> SFTPServerCapabilities {
-        let thread = Thread { [weak self] in self?.readerLoop() }
-        thread.name = "dev.corta.sftp.reader"
-        thread.qualityOfService = .utility
-        readerThread = thread
-        thread.start()
+        // Reserve the entire lifecycle before starting any reader. Rejecting a
+        // second caller must neither start a reader nor cancel the first caller.
+        let admissionError = state.withLock { state -> SFTPError? in
+            if let closed = state.closed { return closed }
+            guard !state.connectStarted else {
+                return .protocolViolation("connect() called on a used session")
+            }
+            state.connectStarted = true
+            return nil
+        }
+        if let admissionError { throw admissionError }
 
         let message = SFTPMessage(
             type: SFTPCodec.MessageType.initialize, requestID: 0,
             payload: .initialize(version: SFTPCodec.protocolVersion))
         let frame = SFTPCodec.encodeFrame(message)
 
-        let result = await withCheckedContinuation {
-            (continuation: CheckedContinuation<Result<SFTPMessage, SFTPError>, Never>) in
-            let installed = state.withLock { state -> Bool in
-                if state.closed != nil || state.handshake != nil { return false }
-                state.handshake = continuation
-                return true
+        let result = await withTaskCancellationHandler {
+            await withCheckedContinuation {
+                (continuation: CheckedContinuation<Result<SFTPMessage, SFTPError>, Never>) in
+                let failure = state.withLock { state -> SFTPError? in
+                    if let closed = state.closed { return closed }
+                    if Task.isCancelled { return .cancelled }
+                    state.handshake = continuation
+                    return nil
+                }
+                if let failure {
+                    continuation.resume(returning: .failure(failure))
+                    return
+                }
+                let thread = Thread { [weak self] in self?.readerLoop() }
+                thread.name = "dev.corta.sftp.reader"
+                thread.qualityOfService = .utility
+                thread.start()
+                sendFrame(frame, reserved: false) { [self] error in
+                    tearDown(with: error, closingTransport: true)
+                }
             }
-            guard installed else {
-                continuation.resume(
-                    returning: .failure(.protocolViolation("connect() called on a used session")))
-                return
-            }
-            sendFrame(frame, reserved: false) { [self] error in finishHandshake(.failure(error)) }
+        } onCancel: {
+            self.close()
         }
 
         let reply = try result.get()
         guard case .version(let version, let extensions) = reply.payload else {
+            close()
             throw .protocolViolation("the server's first message was not VERSION")
         }
         // This client speaks version 3; a server answering lower predates
@@ -320,6 +339,7 @@ public final class SFTPSession: @unchecked Sendable {
         // to a client that announced 3 (§4: the server replies with the
         // lower of the two).
         guard version >= SFTPCodec.protocolVersion else {
+            close()
             throw .protocolViolation("the server speaks SFTP version \(version), below 3")
         }
         var byName: [String: [UInt8]] = [:]
@@ -329,7 +349,12 @@ public final class SFTPSession: @unchecked Sendable {
             extensions: byName,
             supportsStatVFS: byName[SFTPCodec.statVFSExtensionName] != nil,
             supportsPosixRename: byName[SFTPCodec.posixRenameExtensionName] != nil)
-        state.withLock { $0.serverInfo = info }
+        let completionError = state.withLock { state -> SFTPError? in
+            if let closed = state.closed { return closed }
+            state.serverInfo = info
+            return nil
+        }
+        if let completionError { throw completionError }
         return info
     }
 

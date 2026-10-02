@@ -444,3 +444,36 @@ private data. Dated manual records belong in [test-results/](test-results/).
 The historical esctest2 number that includes “known bugs” is a compatibility
 classification, not an automated-test pass rate. Always report all three
 counts: passed, known bugs and failed.
+
+## Security follow-up fixtures
+
+`script/verify_ssh_integration.py` runs `SFTPSSHIntegrationTests` through
+real OpenSSH on encrypted localhost TCP. It creates temporary host/client
+keys, known_hosts and client/server configs, disables agent use and
+forwarding, and reaps the test sshd and deletes credentials afterwards.
+Run it from the repository root with `python3 script/verify_ssh_integration.py`.
+It does not alter the installed SSH service or the user's SSH configuration.
+The suite is explicitly skipped without the fixture environment. A failed
+fixture setup must not be counted as a successful authentication rejection.
+
+The SFTP protocol fake and real `sftp-server` tests complement that fixture:
+they cover hostile replies, silent-peer cancellation, request admission,
+list/tree budgets, atomic transfer and local destination symlinks. They do
+not reproduce every external server, proxy, authentication method or network.
+
+Run both full core sanitizers and the full application Unit plan for lifecycle
+changes. The October 2 TSAN investigation found an unsynchronized mutable
+interceptor in the test server; its storage is now a Mutex. New tests pin stale
+search status, a blocked directory probe, private copy modes, approval snapshots,
+same-metadata remote replacement and rejected glyphs without atlas thrashing.
+See the [dated results](test-results/2026-10-02-follow-up.md) for actual evidence.
+
+Development builds isolate Corta-owned storage only. A stage path does not
+isolate HOME, SSH_AUTH_SOCK, credentials or external editors. Use the fixture
+configuration or an independent account for credential-sensitive checks.
+
+For extended GPU lifetime checks set `TEST_RUNNER_CORTA_STRESS_SECONDS=300`
+and run the entire `CortaTests/ImageMemoryAndTextureTests` suite. Verify the
+printed cycle count; a method-only filter can select zero Swift Testing cases.
+For stable mixed-history/reflow comparisons, use `corta-bench --history`
+without simultaneous builds or sanitizer workloads.

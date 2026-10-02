@@ -80,7 +80,8 @@ extension Grid {
         firstRow: Int, lastRow: Int,
         text: inout ContiguousArray<UInt8>,
         rows: inout ContiguousArray<Int32>,
-        columns: inout ContiguousArray<Int32>
+        columns: inout ContiguousArray<Int32>,
+        nonASCIIIsOpaque: (UInt32) -> Bool = { _ in false }
     ) -> Bool {
         text.removeAll(keepingCapacity: true)
         rows.removeAll(keepingCapacity: true)
@@ -96,8 +97,15 @@ extension Grid {
                 // Parity with `joinedLogicalLine`: reflow can leave a lone spacer.
                 if cell.attributes.contains(.wideSpacer) { continue }
                 // A field test, not a lookup — the per-cell cost must stay here.
-                guard cell.grapheme.isNone, cell.scalar < 0x80 else { return false }
-                text.append(UInt8(truncatingIfNeeded: cell.scalar))
+                guard cell.grapheme.isNone else { return false }
+                if cell.scalar < 0x80 {
+                    text.append(UInt8(truncatingIfNeeded: cell.scalar))
+                } else {
+                    guard nonASCIIIsOpaque(cell.scalar) else { return false }
+                    // A nonmatching separator preserves positions and prevents
+                    // an ASCII query from spanning an intervening Unicode cell.
+                    text.append(0x80)
+                }
                 rows.append(Int32(row))
                 columns.append(Int32(column))
             }

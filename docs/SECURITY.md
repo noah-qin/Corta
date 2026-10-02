@@ -277,21 +277,21 @@ and deletes.
 
 ## 5. Data at Rest
 
-**Scrollback is never persisted to disk.** It routinely contains
-credentials — `export API_KEY=…`, connection strings, tokens echoed by a
-tool that should not have echoed them.
+**Terminal contents are not automatically persisted.** Scrollback routinely
+contains credentials. Copy/export commands are explicit exceptions: a user
+can save selected text, command output, or the whole terminal through a
+Save panel. The destination and any later sharing are the user's choice.
 
-macOS state restoration is a specific case:
-`applicationSupportsSecureRestorableState` returns `true`, but restored
-state must contain **window geometry only**. Terminal contents are never
-written to the restoration store.
+**Custom session restoration saves plaintext metadata, not terminal text.**
+`restore-windows` defaults to `true`. `state.json` can contain window geometry,
+split layout, focused pane, working directories, preset identifiers and
+launch metadata. Setting `restore-windows = false` disables restoration.
+Saved directories and host/preset metadata may themselves be sensitive.
 
-Terminal windows now set `isRestorable = false` outright. Nothing about a
-terminal window is restorable — its content is a live child process, not
-a document — so there is no geometry worth saving either, and the one
-thing restoration actually did was re-apply a stale frame *after* the
-deliberate sizing. Off is both the correct behaviour and one fewer store
-that could ever hold something it should not.
+This is separate from AppKit restoration. Terminal windows set
+`isRestorable = false` to prevent macOS restoring stale frames or retaining
+terminal content; `applicationSupportsSecureRestorableState` is not the
+policy switch for Corta's own JSON metadata.
 
 **Notifications carry no terminal content.** The long-task notification
 (M6.3) reports a duration and the window title, never the command or any
@@ -302,8 +302,31 @@ own retention — and the grid is full of things that must not go there.
 at `~/.config/corta/config` with no credential-shaped field, and nothing
 from the terminal stream is ever written into it.
 
-If session persistence is ever added, it is opt-in, documented as storing
-plaintext, and off by default.
+**Remote editing deliberately creates local files.** Managed copies and
+approval snapshots live under Application Support/RemoteEdit. Directories
+are restricted to mode 0700 and files to 0600; reused copies are tightened
+when opened. Downloads create partials with 0600 and refuse a partial-file
+symlink. Download files and managed directories/files have inherited ACLs
+cleared before use. This does not exclude administrators or backups; parent
+storage policy and intentionally shared export destinations still matter.
+
+Upload prompts bind to a SHA-256 digest of the edit. Upload sends a private
+snapshot matching that digest, so an edit after the prompt needs another
+approval and an edit during transfer cannot replace the approved bytes.
+Remote preflight compares size/mtime and downloaded content with the stored
+SHA-256 baseline. Older entries without a digest require a conflict decision.
+This detects same-size/same-mtime changes, but SFTP does not supply an atomic
+compare-and-swap: a remote writer can still race the preflight and rename.
+
+Directory downloads reject existing destination symlink components. This
+is protection against pre-existing local state, not a filesystem sandbox
+against a local process deliberately swapping directories during a transfer.
+
+**Development storage routing is not credential isolation.** `.dev` and
+`CORTA_STAGE_DIR` redirect Corta-owned settings/state/cache. They inherit
+HOME and SSH_AUTH_SOCK. Tests needing isolated authentication use temporary
+keys, an explicit SSH configuration, `IdentityAgent none`, no forwarding,
+and a separate known_hosts; never alter the user's SSH files.
 
 ## 6. Rules Summary
 
@@ -317,7 +340,7 @@ For quick reference during implementation and review:
 6. Every parser input has an explicit cap; unknown sequences are ignored
    cleanly.
 7. Request no TCC permission Corta does not itself need.
-8. Scrollback never touches the disk.
+8. Never automatically persist terminal text; document explicit export exceptions.
 
 ---
 
@@ -433,3 +456,26 @@ including reused copies, never use LaunchServices' default file handler:
 `.command`, `.terminal` and similar handlers can execute remote bytes locally.
 The configured command remains the user's trusted editor choice and receives
 separate arguments, never shell interpolation.
+
+## 8. Resource accounting and validation boundaries
+
+For every resource influenced by PTY or peer data, reviews must identify:
+input and decoded limits, retained bytes/entries, ownership lifetime,
+per-session and process-wide budgets, cancellation/teardown, and behaviour
+when a limit is exhausted. A per-frame limit does not bound accumulated
+state. Charge retained resources until release; return reservations on
+failure, cancellation, replacement and owner teardown. Test both rejection
+and recovery, including work finishing after cancellation.
+
+The implementation has parser, cluster, image, texture, SFTP frame,
+request/writer, directory-list and tree limits. New paths must name their
+budget explicitly rather than assuming another layer accounts for them.
+Glyph clusters are rejected before shaping beyond the core's 32-scalar
+limit; oversized/non-finite ink is rejected before atlas eviction.
+Directory proxy probes run away from the main actor, with at most two
+filesystem checks process-wide and no pending queue. Under a hung mount the
+proxy icon can remain absent; cancellation cannot interrupt a kernel stat.
+
+The dated [follow-up verification record](test-results/2026-10-02-follow-up.md)
+separates repairs from available runtime evidence and environment limits.
+It is not a claim that every supported machine or dependency path was tested.

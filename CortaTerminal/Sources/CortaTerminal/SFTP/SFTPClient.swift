@@ -130,6 +130,9 @@ public final class SFTPConnection: SFTPClient, @unchecked Sendable {
         var channel: SFTPSubprocessChannel?
         var engine: SFTPTransferEngine?
         var capabilities: SFTPServerCapabilities?
+        var connecting = false
+        var closed = false
+        var pendingSession: SFTPSession?
     }
 
     private let state = Mutex(State())
@@ -155,7 +158,17 @@ public final class SFTPConnection: SFTPClient, @unchecked Sendable {
 
     @discardableResult
     public func connect() async throws(SFTPError) -> SFTPServerCapabilities {
-        if let existing = state.withLock({ $0.capabilities }) { return existing }
+        let admission = state.withLock { state -> Result<SFTPServerCapabilities?, SFTPError> in
+            if state.closed { return .failure(.cancelled) }
+            if let existing = state.capabilities { return .success(existing) }
+            guard !state.connecting else {
+                return .failure(.protocolViolation("connect() already in progress"))
+            }
+            state.connecting = true
+            return .success(nil)
+        }
+        if let existing = try admission.get() { return existing }
+        defer { state.withLock { $0.connecting = false } }
         let (channel, session) = try await openSession()
         let engine = SFTPTransferEngine(session: session) { [weak self] in
             // The engine calls this between attempts, after a transport
@@ -163,18 +176,26 @@ public final class SFTPConnection: SFTPClient, @unchecked Sendable {
             // channel pointer moved to the live child.
             guard let self else { throw SFTPError.cancelled }
             let (channel, session) = try await self.openSession()
-            self.state.withLock { $0.channel = channel }
+            let installed = self.state.withLock { state in
+                guard !state.closed else { return false }
+                state.channel = channel
+                return true
+            }
+            guard installed else { session.close(); throw SFTPError.cancelled }
             return session
         }
         // connect() inside openSession() already stored the capabilities.
         guard let capabilities = session.capabilities else {
             throw SFTPError.protocolViolation("connected session reported no capabilities")
         }
-        state.withLock { state in
+        let installed = state.withLock { state in
+            guard !state.closed else { return false }
             state.channel = channel
             state.engine = engine
             state.capabilities = capabilities
+            return true
         }
+        guard installed else { session.close(); throw .cancelled }
         return capabilities
     }
 
@@ -191,6 +212,17 @@ public final class SFTPConnection: SFTPClient, @unchecked Sendable {
             throw .transport(error)
         }
         let session = SFTPSession(transport: channel)
+        let admitted = state.withLock { state in
+            guard !state.closed else { return false }
+            state.pendingSession = session
+            return true
+        }
+        guard admitted else { session.close(); throw .cancelled }
+        defer {
+            state.withLock { state in
+                if state.pendingSession === session { state.pendingSession = nil }
+            }
+        }
         do {
             _ = try await session.connect()
         } catch {
@@ -297,6 +329,8 @@ public final class SFTPConnection: SFTPClient, @unchecked Sendable {
                 state.channel = nil
                 state.engine = nil
                 state.capabilities = nil
+                state.pendingSession = nil
+                state.closed = true
             }
             return state
         }
@@ -304,6 +338,7 @@ public final class SFTPConnection: SFTPClient, @unchecked Sendable {
         // whose channel this object never held; closing it covers that
         // case, and closing the tracked channel covers the rest. Both are
         // idempotent.
+        drained.pendingSession?.close()
         drained.engine?.session.close()
         drained.channel?.close()
     }

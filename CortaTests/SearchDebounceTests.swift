@@ -425,3 +425,42 @@ struct SearchDebounceTests {
         #expect(pane.scrollOffset == 0, "expected to stay at the bottom, not shift into history")
     }
 }
+
+@MainActor
+struct SearchResultGenerationTests {
+    @Test("a stale or closed search cannot change its successor's status")
+    func staleStatusIsDiscarded() {
+        let pane = ViewController()
+        pane.search.bar = NSGlassEffectView()
+        pane.search.generation = 2
+        pane.search.status = .invalidPattern
+        pane.applySearchResults(.init(matches: [], status: .complete),
+            generation: 1, scrollsToMatch: false, totalPushed: 0)
+        #expect(pane.search.status == .invalidPattern)
+        pane.search.bar = nil
+        pane.applySearchResults(.init(matches: [], status: .patternTooSlow),
+            generation: 2, scrollsToMatch: false, totalPushed: 0)
+        #expect(pane.search.status == .invalidPattern)
+    }
+
+    @Test("a blocked directory probe does not block the main actor")
+    func slowDirectoryProbeIsBackgroundWork() async {
+        let pane = ViewController()
+        let entered = Mutex(false)
+        let release = DispatchSemaphore(value: 0)
+        pane.directoryCheckerForTesting = { _ in
+            entered.withLock { $0 = true }
+            release.wait()
+            return true
+        }
+        defer { release.signal() }
+        pane.probeRepresentedDirectory("/slow-mount")
+        let deadline = ContinuousClock.now + .seconds(3)
+        while !entered.withLock({ $0 }), ContinuousClock.now < deadline {
+            await Task.yield()
+        }
+        #expect(entered.withLock { $0 })
+        pane.probeRepresentedDirectory(nil)
+        pane.teardown()
+    }
+}

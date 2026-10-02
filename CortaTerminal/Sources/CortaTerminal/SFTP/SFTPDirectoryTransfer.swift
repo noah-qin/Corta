@@ -120,6 +120,7 @@ extension SFTPTransferEngine {
         for directory in plan.directories {
             let url = directory.isEmpty
                 ? localDirectory : localDirectory.appendingPathComponent(directory)
+            try Self.rejectLocalSymlinkComponents(url)
             if !FileManager.default.fileExists(atPath: url.path) {
                 do {
                     try FileManager.default.createDirectory(
@@ -140,6 +141,7 @@ extension SFTPTransferEngine {
                     filesCompleted: index, filesTotal: plan.files.count,
                     completedBytes: completedSoFar, totalBytes: plan.totalBytes,
                     currentFile: file.relativePath))
+            try Self.rejectLocalSymlinkComponents(localDirectory.appendingPathComponent(file.relativePath))
             let fileReceipt = try await download(
                 remotePath: Self.join(remotePath, file.relativePath),
                 to: localDirectory.appendingPathComponent(file.relativePath),
@@ -163,6 +165,29 @@ extension SFTPTransferEngine {
                 filesCompleted: plan.files.count, filesTotal: plan.files.count,
                 completedBytes: completedBytes, totalBytes: plan.totalBytes, currentFile: ""))
         return receipt
+    }
+
+    /// Refuse existing symlink components, including the destination itself.
+    /// This hardens pre-existing local state; it is not a race-proof sandbox
+    /// against another process deliberately replacing directories mid-transfer.
+    private static func rejectLocalSymlinkComponents(_ url: URL) throws(SFTPError) {
+        var current = url.standardizedFileURL
+        while current.path != "/" {
+            var info = Darwin.stat()
+            if Darwin.lstat(current.path, &info) == 0 {
+                if info.st_mode & S_IFMT == S_IFLNK {
+                    // macOS /tmp and /var are system aliases, not tree entries.
+                    if current.path != "/tmp" && current.path != "/var" {
+                        throw .localIOFailed(operation: "symlink destination", code: ELOOP)
+                    }
+                } else if current != url.standardizedFileURL && info.st_mode & S_IFMT != S_IFDIR {
+                    throw .localIOFailed(operation: "directory destination", code: ENOTDIR)
+                }
+            } else if errno != ENOENT {
+                throw .localIOFailed(operation: "lstat destination", code: errno)
+            }
+            current.deleteLastPathComponent()
+        }
     }
 
     // MARK: - Upload

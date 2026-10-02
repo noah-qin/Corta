@@ -523,7 +523,8 @@ alone:
    depend on, and need a dedicated session on an idle machine, not a
    CI-style script (D13).
 9. **Restoration** — force-quit or crash Corta with a multi-pane layout and
-   scrollback, relaunch, confirm the arrangement and content return (U07).
+   scrollback, relaunch, confirm the arrangement and directories return (U07).
+   Terminal text and running child processes must not return.
    Partly scriptable: a staged `CORTA_STAGE_DIR` with `restore-windows =
    true` and a written `state.json` drives the mechanism without touching
    global machine state — but a human still has to judge whether what came

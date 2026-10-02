@@ -272,6 +272,38 @@ import Testing
             "once another pane frees global space, the skipped image must be retried")
     }
 
+    @Test("extended multi-pane texture retransmission, eviction and release",
+        .enabled(if: ProcessInfo.processInfo.environment["CORTA_STRESS_SECONDS"] != nil,
+            "Set TEST_RUNNER_CORTA_STRESS_SECONDS for the extended GPU workload"))
+    func extendedTextureLifetimeStress() throws {
+        let device = try #require(Self.makeDevice())
+        let seconds = min(3600, max(1, Double(ProcessInfo.processInfo.environment["CORTA_STRESS_SECONDS"] ?? "1") ?? 1))
+        let global = GlobalTextureBudget(limit: 128 * 1024)
+        let deadline = ContinuousClock.now + .seconds(seconds)
+        var cycles = 0
+        while ContinuousClock.now < deadline {
+            try autoreleasepool {
+                let renderers = (0..<4).map { _ in
+                    KittyImageRenderer(device: device, textureByteBudget: 32 * 1024, globalBudget: global)
+                }
+                for generation in 0..<8 {
+                    for (pane, renderer) in renderers.enumerated() {
+                        let id = UInt32(pane * 16 + generation + 1)
+                        let data = try #require(Self.rgbaImage(id: id, width: 64, height: 64))
+                        _ = renderer.texture(for: KittyGraphics.ImageID(rawValue: id), data: data)
+                        #expect(global.reservedBytes <= 128 * 1024)
+                        #expect(renderer.cachedTextureBytes <= 32 * 1024)
+                    }
+                }
+            }
+            #expect(global.reservedBytes == 0, "closing all panes must return every texture reservation")
+            cycles += 1
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        print("texture lifetime stress: \(cycles) four-pane create/retransmit/evict/close cycles in \(seconds)s")
+        #expect(cycles > 0)
+    }
+
     // MARK: - PNG crafting helpers
 
     /// CRC-32 (zlib polynomial), for rewriting the crafted PNG's IHDR CRC

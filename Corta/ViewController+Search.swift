@@ -411,12 +411,12 @@ extension ViewController {
 
     /// Applies a sweep only if it is still current; a newer query or a
     /// closed bar may have made `session` or `search.field` stale.
-    private func applySearchResults(
+    func applySearchResults(
         _ outcome: SweepOutcome, generation: Int, scrollsToMatch: Bool, totalPushed: Int
     ) {
         let matches = outcome.matches
-        search.status = outcome.status
         guard generation == search.generation, search.bar != nil else { return }
+        search.status = outcome.status
         // The generation matched, so `search.task` is this finished task.
         search.task = nil
         search.matches = matches

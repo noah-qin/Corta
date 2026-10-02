@@ -97,3 +97,11 @@ files, remote connections and child-process input.
 Built-in multiplexing, cross-platform support, tmux control mode, built-in AI,
 RTL text and terminal title queries are outside the current scope. The rationale
 is maintained in [Design](DESIGN.md#6-non-goals) and [Decisions](DECISIONS.md).
+
+Remote-edit uploads check the remote content as well as size and modification
+time. Each upload sends the version approved in the prompt. If the local copy
+changes after that prompt, Corta asks for a new decision; further saves during
+an upload remain pending edits. Managed copies remain on disk with private
+file modes. Restored sessions retain arrangement and directory metadata,
+with `restore-windows = true` by default, and start fresh processes without
+restoring terminal text. See [data-at-rest policy](SECURITY.md#5-data-at-rest).

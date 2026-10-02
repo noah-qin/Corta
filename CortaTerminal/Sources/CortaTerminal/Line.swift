@@ -62,6 +62,8 @@ public struct Line: Equatable, Sendable {
         self.mark = mark
     }
 
+    mutating func reserveCapacity(_ capacity: Int) { cells.reserveCapacity(capacity) }
+
     public var count: Int { cells.count }
 
     public var isEmpty: Bool { cells.isEmpty }

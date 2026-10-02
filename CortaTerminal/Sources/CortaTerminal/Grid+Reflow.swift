@@ -180,10 +180,14 @@ extension Grid {
         var index = 0
         var globalOffset = 0
         var foundTarget = false
+        // Reuse scratch storage across logical lines instead of allocating
+        // two arrays for each of hundreds of thousands of history lines.
+        var cells: [Cell] = []
+        var rowStarts: [Int] = []
         while index < rows.count {
             let chainStart = index
-            var cells: [Cell] = []
-            var rowStarts: [Int] = []
+            cells.removeAll(keepingCapacity: true)
+            rowStarts.removeAll(keepingCapacity: true)
             while true {
                 let line = rows[index]
                 rowStarts.append(cells.count)
@@ -245,6 +249,7 @@ extension Grid {
     ) -> (rows: [Line], cursorRow: Int, cursorColumn: Int, rowOfStart: [(row: Int, column: Int)]) {
         var rows: [Line] = []
         var current = Line()
+        current.reserveCapacity(min(newColumns, cells.count))
         var column = 0
         var cursorRow = 0
         var cursorColumn = 0
@@ -280,6 +285,7 @@ extension Grid {
                     current.wrapped = true
                     rows.append(current)
                     current = Line()
+                    current.reserveCapacity(min(newColumns, cells.count - i))
                     column = 0
                 }
                 record(i)
@@ -292,6 +298,7 @@ extension Grid {
                 current.wrapped = true
                 rows.append(current)
                 current = Line()
+                current.reserveCapacity(min(newColumns, cells.count - i))
                 column = 0
             }
             record(i)

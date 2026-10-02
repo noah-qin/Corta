@@ -78,3 +78,7 @@ The completed v1 implementation plan is recorded in the
 [v1.0.0 milestone](https://github.com/noah-qin/Corta/milestone/1).
 [Open issues](https://github.com/noah-qin/Corta/issues) track follow-up work;
 release availability is recorded on [GitHub Releases](https://github.com/noah-qin/Corta/releases).
+
+The [October 2 follow-up](test-results/2026-10-02-follow-up.md) consolidates
+remaining audit work and records the evidence for this round. Historical
+reports remain unchanged; current security and testing documents govern.

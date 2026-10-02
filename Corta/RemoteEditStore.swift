@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import CryptoKit
+import Darwin
 import Foundation
 
 /// Remote editing — the managed local copies of remote files, and the
@@ -46,6 +47,7 @@ final class RemoteEditStore {
         /// the baseline "remote changed?" compares against.
         var remoteSize: UInt64?
         var remoteMTime: UInt32?
+        var remoteDigest: String? = nil
         var lastOpenedAt: Date
         var openCount: Int
 
@@ -72,6 +74,8 @@ final class RemoteEditStore {
     init(rootURL: URL) {
         self.rootURL = rootURL
         load()
+        try? secureCopy(at: manifestURL)
+        for copy in copies.values { try? secureCopy(at: localURL(for: copy)) }
     }
 
     // MARK: - Naming (pure)
@@ -110,8 +114,15 @@ final class RemoteEditStore {
     /// This is the local-change signal: compared against the digest
     /// approved at download/upload time, a difference is an edit.
     nonisolated static func sha256Hex(ofFile url: URL) -> String? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return sha256Hex(data)
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        var hash = SHA256()
+        do {
+            while let chunk = try handle.read(upToCount: 64 * 1024), !chunk.isEmpty {
+                hash.update(data: chunk)
+            }
+            return hash.finalize().map { String(format: "%02x", $0) }.joined()
+        } catch { return nil }
     }
 
     // MARK: - Queries and updates
@@ -129,7 +140,7 @@ final class RemoteEditStore {
     /// up-to-date copy.
     @discardableResult
     func recordDownload(
-        host: String, remotePath: String, remoteSize: UInt64?, remoteMTime: UInt32?
+        host: String, remotePath: String, remoteSize: UInt64?, remoteMTime: UInt32?, remoteDigest: String? = nil
     ) -> RemoteCopy {
         let id = RemoteCopy.key(host: host, remotePath: remotePath)
         var copy = copies[id]
@@ -140,6 +151,7 @@ final class RemoteEditStore {
                 lastOpenedAt: .distantPast, openCount: 0)
         copy.remoteSize = remoteSize
         copy.remoteMTime = remoteMTime
+        copy.remoteDigest = remoteDigest
         copies[id] = copy
         save()
         return copy
@@ -148,10 +160,11 @@ final class RemoteEditStore {
     /// Re-stamps the remote baseline after a successful upload: what the
     /// server reports now is what the next "remote changed?" compares
     /// against.
-    func updateRemoteStamp(_ copy: RemoteCopy, size: UInt64?, mtime: UInt32?) {
+    func updateRemoteStamp(_ copy: RemoteCopy, size: UInt64?, mtime: UInt32?, digest: String? = nil) {
         guard var current = copies[copy.id] else { return }
         current.remoteSize = size
         current.remoteMTime = mtime
+        current.remoteDigest = digest
         copies[copy.id] = current
         save()
     }
@@ -162,6 +175,31 @@ final class RemoteEditStore {
         current.lastOpenedAt = date
         copies[copy.id] = current
         save()
+    }
+
+    /// Private directories and files, including copies downloaded by older
+    /// builds. Mode checks do not make promises about administrator access.
+    func secureCopy(at url: URL) throws {
+        var directory = url.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700])
+        while directory.path.hasPrefix(rootURL.path), directory.path != "/" {
+            guard Self.removeACL(at: directory), chmod(directory.path, 0o700) == 0 else {
+                throw CocoaError(.fileWriteNoPermission)
+            }
+            if directory.standardizedFileURL == rootURL.standardizedFileURL { break }
+            directory.deleteLastPathComponent()
+        }
+        if FileManager.default.fileExists(atPath: url.path),
+            !Self.removeACL(at: url) || chmod(url.path, 0o600) != 0 {
+            throw CocoaError(.fileWriteNoPermission)
+        }
+    }
+
+    private static func removeACL(at url: URL) -> Bool {
+        guard let acl = acl_init(0) else { return false }
+        defer { acl_free(UnsafeMutableRawPointer(acl)) }
+        return acl_set_file(url.path, ACL_TYPE_EXTENDED, acl) == 0
     }
 
     // MARK: - Persistence
@@ -188,7 +226,8 @@ final class RemoteEditStore {
     private func save() {
         let persisted = Persisted(version: Persisted.currentVersion, copies: Array(copies.values))
         guard let data = try? JSONEncoder().encode(persisted) else { return }
-        try? FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+        try? secureCopy(at: manifestURL)
         try? data.write(to: manifestURL, options: .atomic)
+        try? secureCopy(at: manifestURL)
     }
 }

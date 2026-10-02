@@ -121,7 +121,7 @@ final class RemoteWorkflowUITests: XCTestCase {
         XCTAssertTrue(browse.waitForExistence(timeout: 2))
         XCTAssertTrue(browse.isEnabled, "a remote pane must offer the browser")
         browse.click()
-        let browser = app.windows["Remote Files"]
+        let browser = app.windows.element(matching: NSPredicate(format: "title BEGINSWITH 'SFTP'"))
         let spawnedAtOpen = FileManager.default.fileExists(atPath: stage.appendingPathComponent("sftp-ssh.log").path)
         XCTAssertTrue(
             browser.waitForExistence(timeout: 5),
@@ -146,8 +146,8 @@ final class RemoteWorkflowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["src"].exists)
         XCTAssertTrue(
             waitUntil(timeout: 5) {
-                app.windows.element(matching: NSPredicate(format: "title BEGINSWITH 'fakebox:'")).exists
-            }, "the window title must read host:path once connected")
+                app.windows.element(matching: NSPredicate(format: "title BEGINSWITH 'SFTP'")).exists
+            }, "the native browser title must include its host once connected")
         XCTAssertTrue(
             (try? String(contentsOf: stage.appendingPathComponent("sftp-ssh.log"), encoding: .utf8))?
                 .contains("-s -- fakebox sftp") == true, "the channel's argv")
@@ -192,8 +192,8 @@ final class RemoteWorkflowUITests: XCTestCase {
         // Back to the terminal: the fake remote shell exits, the pane goes
         // local (no badge), Reconnect is offered and starts a new
         // connection whose far end reports again.
-        // The browser is titled `host:path` now (asserted above).
-        let connectedBrowser = app.windows.element(matching: NSPredicate(format: "title BEGINSWITH 'fakebox:'"))
+        // AppKit combines the title and host subtitle in accessibility.
+        let connectedBrowser = app.windows.element(matching: NSPredicate(format: "title BEGINSWITH 'SFTP'"))
         connectedBrowser.buttons[XCUIIdentifierCloseWindow].click()
         XCTAssertTrue(waitUntil(timeout: 5) { app.windows.count == 1 }, "the browser must close")
         let terminal = app.windows.firstMatch

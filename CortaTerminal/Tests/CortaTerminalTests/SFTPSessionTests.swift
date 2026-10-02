@@ -39,6 +39,46 @@ struct SFTPSessionTests {
         return (session, server, fileSystem)
     }
 
+    @Test("a silent VERSION wait is cancelled without an external close")
+    func handshakeCancellation() async throws {
+        let connection = SFTPLoopbackConnection()
+        let session = SFTPSession(transport: connection.clientTransport())
+        defer { session.close() }
+        let task = Task { try await session.connect() }
+        let deadline = ContinuousClock.now + .seconds(testTimeoutInterval(3))
+        while !session.handshakePending, ContinuousClock.now < deadline {
+            await Task.yield()
+        }
+        #expect(session.handshakePending)
+        task.cancel()
+        do {
+            _ = try await task.value
+            Issue.record("cancelled handshake succeeded")
+        } catch { #expect(error as? SFTPError == .cancelled) }
+        #expect(session.capabilities == nil)
+    }
+
+    @Test("a concurrent or repeated connect cannot steal the reader")
+    func connectIsSingleUse() async throws {
+        let connection = SFTPLoopbackConnection()
+        let server = FakeSFTPServer(connection: connection, fileSystem: FakeRemoteFileSystem())
+        let session = SFTPSession(transport: connection.clientTransport())
+        defer { session.close() }
+        let first = Task { try await session.connect() }
+        let deadline = ContinuousClock.now + .seconds(testTimeoutInterval(3))
+        while !session.handshakePending, ContinuousClock.now < deadline { await Task.yield() }
+        #expect(session.handshakePending)
+        await #expect(throws: SFTPError.protocolViolation("connect() called on a used session")) {
+            try await session.connect()
+        }
+        server.start()
+        #expect(try await first.value.version == 3)
+        await #expect(throws: SFTPError.protocolViolation("connect() called on a used session")) {
+            try await session.connect()
+        }
+        #expect(try await session.realPath(path: "/") == Array("/".utf8))
+    }
+
     @Test("connect negotiates version 3 and reports advertised capabilities")
     func handshakeCapabilities() async throws {
         let (session, _, _) = try await makePair { server in
