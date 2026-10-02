@@ -110,7 +110,8 @@ what to edit.
 - Remote editing requires a configured editor command. A downloaded file
   previously opened in its default application, which could execute
   `.command` or `.terminal` files supplied by a remote host. Local file
-  references keep their default application.
+  references also require `open-file-command` instead of launching their
+  default application.
 - Remote editing reconnects on the next operation after a broken SFTP
   conversation, without restarting Corta. Failed uploads keep their
   pending decision and are never silently replayed.

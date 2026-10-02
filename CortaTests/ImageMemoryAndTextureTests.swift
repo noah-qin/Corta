@@ -33,6 +33,20 @@ import Testing
 @Suite(.serialized, .metalSerialized) struct ImageMemoryAndTextureTests {
     private static func makeDevice() -> MTLDevice? { MTLCreateSystemDefaultDevice() }
 
+    @Test("another pane's retired textures do not redraw an idle pane")
+    func otherPaneRetirementDoesNotScheduleFrame() throws {
+        let device = try #require(Self.makeDevice())
+        let global = GlobalTextureBudget(limit: 16)
+        #expect(global.tryReserve(16))
+        global.markRetired(16)
+        defer { global.release(16, retired: true) }
+        let renderer = KittyImageRenderer(device: device, globalBudget: global)
+        var redraws = 0
+        renderer.onImagesReady = { redraws += 1 }
+        renderer.noteGPUCompletion()
+        #expect(redraws == 0)
+    }
+
     /// Transmits `payload` over the wire exactly like a real client and
     /// pulls the stored `ImageData` back out of the table — the renderer's
     /// cache is driven with what the protocol layer actually accepted, not

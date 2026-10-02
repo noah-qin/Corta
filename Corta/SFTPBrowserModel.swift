@@ -171,6 +171,8 @@ final class SFTPBrowserModel {
     /// Called once the connection succeeded, with the host actually
     /// connected to — how a user-entered host becomes the registry key.
     var onConnected: ((String) -> Void)?
+    /// Lets the window registry reuse a host before a second client starts.
+    var shouldStartConnection: ((String) -> Bool)?
 
     private let makeClient: @Sendable (String) -> any SFTPClient
     private var client: (any SFTPClient)?
@@ -250,6 +252,7 @@ final class SFTPBrowserModel {
             host = trimmed
             name = trimmed
         }
+        guard shouldStartConnection?(name) != false else { return }
         connectionState = .connecting
         listingError = nil
         updateTitle()

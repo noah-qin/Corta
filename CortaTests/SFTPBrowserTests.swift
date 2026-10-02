@@ -183,6 +183,26 @@ struct SFTPBrowserFormattingTests {
 
 @MainActor
 struct SFTPBrowserModelTests {
+    @Test("reusing an existing host does not create a second client")
+    func reuseHostBeforeConnecting() async {
+        let fake = FakeSFTPClient()
+        let model = SFTPBrowserModel(host: nil, startDirectory: nil) { host in
+            fake.connectedHosts.append(host)
+            return fake
+        }
+        var requestedHost: String?
+        model.shouldStartConnection = { host in
+            requestedHost = host
+            return false
+        }
+        model.hostField = " build-box "
+        model.connect()
+        await Task.yield()
+        #expect(requestedHost == "build-box")
+        #expect(fake.connectedHosts.isEmpty)
+        #expect(model.connectionState == .needsHost)
+    }
+
     /// A host the pane *reported* is a suggestion: the window opens on the
     /// host-entry step with the name prefilled, connects to nothing until
     /// Connect is pressed, and then connects to whatever the field holds

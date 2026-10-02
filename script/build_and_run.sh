@@ -21,6 +21,8 @@ TASK_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TASK_MODE="${1:-run}"
 TASK_APP="$TASK_ROOT/.build/ui/Build/Products/Debug/CortaDev.app"
 TASK_BINARY="$TASK_APP/Contents/MacOS/CortaDev"
+# pgrep uses an extended regular expression; match the checkout literally.
+TASK_PATTERN="$(printf '%s' "$TASK_BINARY" | sed 's/[][(){}.^$*+?|\\]/\\&/g')"
 case "$TASK_MODE" in
   run|--debug|--logs|--telemetry|--verify|--sftp-preview) ;;
   *) echo "usage: $0 [--debug|--logs|--telemetry|--verify|--sftp-preview]" >&2; exit 2 ;;
@@ -28,7 +30,7 @@ esac
 # Match the executable path, so another checkout or installed app stays open.
 while read -r task_pid; do
   [[ -n "$task_pid" ]] && kill -TERM "$task_pid"
-done < <(pgrep -f "^$TASK_BINARY([[:space:]]|$)" || true)
+done < <(pgrep -f "^$TASK_PATTERN([[:space:]]|$)" || true)
 xcodebuild -project "$TASK_ROOT/Corta.xcodeproj" -scheme 'Corta (Dev)' \
   -configuration Debug -derivedDataPath "$TASK_ROOT/.build/ui" build
 case "$TASK_MODE" in
@@ -37,7 +39,7 @@ case "$TASK_MODE" in
   *) /usr/bin/open -n "$TASK_APP" ;;
 esac
 case "$TASK_MODE" in
-  --verify) sleep 2; pgrep -f "^$TASK_BINARY([[:space:]]|$)" ;;
+  --verify) sleep 2; pgrep -f "^$TASK_PATTERN([[:space:]]|$)" ;;
   --logs) exec /usr/bin/log stream --info --style compact --predicate 'process == "CortaDev"' ;;
   --telemetry) exec /usr/bin/log stream --info --style compact --predicate 'subsystem == "dev.noahqin.Corta.dev"' ;;
 esac

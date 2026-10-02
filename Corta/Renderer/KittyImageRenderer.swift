@@ -322,7 +322,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     /// Retry while evicted textures await retirement; cached images alone
     /// must not create a completion/redraw loop on idle panes.
     func noteGPUCompletion() {
-        if globalBudget.retiredBytes > 0 { onImagesReady?() }
+        if paneBudget.retiredBytes > 0 { onImagesReady?() }
     }
 
     /// Draws visible placements in z-index then transmission order, placed

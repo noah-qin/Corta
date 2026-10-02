@@ -120,6 +120,17 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
         }
         model.publishTitle()
         if isPreview { return }
+        model.shouldStartConnection = { [weak self] host in
+            guard let self else { return false }
+            if let existing = Self.byHost[host], existing !== self {
+                self.close()
+                existing.present()
+                return false
+            }
+            // Reserve ownership before the async connection begins.
+            Self.byHost[host] = self
+            return true
+        }
         model.onConnected = { [weak self] host in
             guard let self else { return }
             Self.unconnected.removeValue(forKey: ObjectIdentifier(self))
