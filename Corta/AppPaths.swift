@@ -42,13 +42,48 @@ nonisolated enum AppPaths {
         bundleIdentifier: Bundle.main.bundleIdentifier)
 
     /// Pure, so tests need no second bundle (D13).
-    static func stageDirectory(environment: [String: String], bundleIdentifier: String?) -> URL? {
+    ///
+    /// A unit-test host (XCTest sets `XCTestConfigurationFilePath` in it)
+    /// with no explicit stage gets a throwaway one of its own. Without it the
+    /// suite read and wrote the development build's real `config` — the one
+    /// the person running the tests uses — and a sanitizer abort between a
+    /// test's write and its `defer` left `command-history-limit = 0` there,
+    /// which then failed every later run that recorded a command (D13).
+    static func stageDirectory(
+        environment: [String: String], bundleIdentifier: String?,
+        temporaryDirectory: String = NSTemporaryDirectory(),
+        processID: Int32 = ProcessInfo.processInfo.processIdentifier
+    ) -> URL? {
         if let raw = environment["CORTA_STAGE_DIR"], raw.hasPrefix("/") {
             return URL(fileURLWithPath: raw, isDirectory: true)
+        }
+        if environment["XCTestConfigurationFilePath"] != nil {
+            return URL(fileURLWithPath: temporaryDirectory, isDirectory: true)
+                .appendingPathComponent("Corta-Tests-\(processID)", isDirectory: true)
         }
         guard bundleIdentifier?.hasSuffix(developmentBundleSuffix) == true else { return nil }
         return systemApplicationSupportDirectory
             .appendingPathComponent(developmentStageName, isDirectory: true)
+    }
+
+    /// Removes test-host stages left by earlier runs whose process is gone.
+    /// Only under a test host, only `Corta-Tests-<pid>` folders in the
+    /// temporary directory, and never this process's own.
+    static func pruneStaleTestStages(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) {
+        guard environment["XCTestConfigurationFilePath"] != nil,
+            environment["CORTA_STAGE_DIR"] == nil
+        else { return }
+        let temporary = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        let own = ProcessInfo.processInfo.processIdentifier
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: temporary.path)) ?? []
+        for name in names where name.hasPrefix("Corta-Tests-") {
+            guard let pid = Int32(name.dropFirst("Corta-Tests-".count)), pid != own,
+                kill(pid, 0) != 0, errno == ESRCH
+            else { continue }
+            try? FileManager.default.removeItem(at: temporary.appendingPathComponent(name))
+        }
     }
 
     /// `~/.config/corta/config`, or the stage's `config`.

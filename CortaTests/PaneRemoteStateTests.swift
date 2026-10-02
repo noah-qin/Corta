@@ -355,7 +355,9 @@ struct CommandHistoryHostScopeTests {
         _ = pane.view
         defer { pane.teardown() }
         let session = try #require(pane.session)
-        #expect(
+        // `#require`: the indexing below would crash the whole test host
+        // (as it did under TSAN) rather than fail this one test.
+        try #require(
             await waitUntilTrue { session.commandRecords.records.count == 2 },
             "both staged commands should be recorded")
         let records = session.commandRecords.records

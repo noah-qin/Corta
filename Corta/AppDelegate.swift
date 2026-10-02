@@ -231,6 +231,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// Runs before the first window exists, so it opens with the right theme
     /// rather than re-theming a frame later.
     func applicationWillFinishLaunching(_ notification: Notification) {
+        AppPaths.pruneStaleTestStages()
         _ = ConfigurationStore.shared
         _ = UpdateController.shared
         AppearanceController.shared.start()
