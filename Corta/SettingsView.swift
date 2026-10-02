@@ -18,12 +18,13 @@ import SwiftUI
 
 /// The settings page, in SwiftUI.
 ///
-/// **Shape.** A native `TabView`, the way macOS's own preference windows are
-/// built when they are not hand-rolling a toolbar. `Form`/`LabeledContent`
-/// give correct label-control accessibility pairing and localization-aware
-/// wrapping *natively* — the `measuredLabelColumnWidth`/two-line-wrap
-/// machinery the AppKit page needed existed only because `NSStackView` and
-/// explicit constraints have no such thing built in.
+/// **Shape.** A sidebar of categories beside one grouped form, the way
+/// System Settings is built on macOS 26: the sidebar is the Liquid Glass
+/// layer, the form is content. Three tabs had grown to eight sections under
+/// General alone; a sidebar holds as many categories as the settings need
+/// without a tab bar outgrowing the window. `Form`/`LabeledContent` give
+/// correct label-control accessibility pairing and localization-aware
+/// wrapping natively.
 ///
 /// **Form style.** Grouped, the System Settings look. A row is as tall as
 /// its control plus the style's own inset; an empty `TextField` title
@@ -37,72 +38,115 @@ import SwiftUI
 /// and the two directions cannot disagree. The one exception is the
 /// open-file command's draft (`OpenFileCommandField`), which is validated
 /// on commit rather than per keystroke.
+/// The sidebar's selection, shared by the sidebar, the page and the window
+/// controller (which names the window after it).
+@MainActor @Observable
+final class SettingsNavigation {
+    var selection: SettingsView.Category = .general
+}
+
+/// The category list. AppKit hosts it as the split view's sidebar item, which
+/// is what gives it the floating Liquid Glass sidebar; SwiftUI's own
+/// `NavigationSplitView` inside a hosting controller drew a flush, opaque one.
+struct SettingsSidebar: View {
+    @Bindable var navigation: SettingsNavigation
+
+    var body: some View {
+        List(
+            SettingsView.Category.allCases,
+            selection: Binding(
+                get: { navigation.selection },
+                set: { if let category = $0 { navigation.selection = category } })
+        ) { category in
+            Label(category.title, systemImage: category.symbol).tag(category)
+        }
+        .listStyle(.sidebar)
+    }
+}
+
 struct SettingsView: View {
     @Bindable var model: SettingsModel
-    @State private var selectedTab = Tab.appearance
-    @State private var showingPresets = false
+    let navigation: SettingsNavigation
 
-    private enum Tab: String, CaseIterable, Identifiable {
-        case appearance, terminal, general
+    enum Category: String, CaseIterable, Identifiable {
+        case general, appearance, terminal, keyboardMouse, shortcuts, quickTerminal
+        case connections, privacy
         var id: String { rawValue }
 
         var title: String {
             switch self {
+            case .general: L10n.text("settings.tab.general")
             case .appearance: L10n.text("settings.tab.appearance")
             case .terminal: L10n.text("settings.tab.terminal")
-            case .general: L10n.text("settings.tab.general")
+            case .keyboardMouse: L10n.text("settings.tab.keyboardMouse")
+            case .shortcuts: L10n.text("settings.tab.shortcuts")
+            case .quickTerminal: L10n.text("settings.section.quickTerminal")
+            case .connections: L10n.text("ui.category.connections")
+            case .privacy: L10n.text("settings.tab.privacy")
             }
         }
 
-        /// SF Symbols, so the tab bar matches every other preference window
-        /// on the system and follows the user's icon weight.
+        /// SF Symbols, so the sidebar follows the user's icon weight.
         var symbol: String {
             switch self {
+            case .general: "gearshape"
             case .appearance: "paintpalette"
             case .terminal: "terminal"
-            case .general: "gearshape"
+            case .keyboardMouse: "keyboard"
+            case .shortcuts: "command"
+            case .quickTerminal: "rectangle.topthird.inset.filled"
+            case .connections: "network"
+            case .privacy: "hand.raised"
             }
         }
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            TabView(selection: $selectedTab) {
-                tab(.appearance) { appearanceTab }
-                tab(.terminal) { terminalTab }
-                tab(.general) { generalTab }
-            }
-            StatusRowView(
-                status: model.saveStatus,
-                action: Self.action(if: model.saveStatus.kind == .failed) { model.retryWrite() }
-            )
-            .padding(EdgeInsets(top: 10, leading: 16, bottom: 0, trailing: 16))
-            Divider().padding(.top, 10)
-            footer
-        }
-        .frame(minWidth: 460, minHeight: 360)
-        .task { await model.loadFonts() }
-        .sheet(isPresented: $showingPresets) {
-            VStack(spacing: 0) {
-                PresetSettingsView(model: model).formStyle(.grouped)
-                Divider()
-                HStack { Spacer(); Button(L10n.text("common.close")) { showingPresets = false } }
-                    .padding(12)
-            }.frame(width: 540, height: 460)
+        let category = navigation.selection
+        // A new identity per category, so each one opens at its top: a kept
+        // page kept its scroll position too.
+        page(category)
+            .formStyle(.grouped)
+            .id(category)
+            .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
+            .frame(minWidth: 460, minHeight: 400)
+            .task { await model.loadFonts() }
+    }
+
+    @ViewBuilder
+    private func page(_ category: Category) -> some View {
+        switch category {
+        case .general: generalPage
+        case .appearance: appearancePage
+        case .terminal: terminalPage
+        case .keyboardMouse: keyboardMousePage
+        case .shortcuts: shortcutsPage
+        case .quickTerminal: Form { quickTerminalSection }
+        case .connections: PresetSettingsView(model: model)
+        case .privacy: privacyPage
         }
     }
 
-    /// One tab's page. `isSelected` is what `SettingsPage` watches to put
-    /// the page back at its top.
-    private func tab<Content: View>(_ tab: Tab, @ViewBuilder content: () -> Content) -> some View {
-        SettingsPage(isSelected: selectedTab == tab, content: content)
-            .tabItem { Label(tab.title, systemImage: tab.symbol) }
-            .tag(tab)
+    /// Under every page: a failed write, said where it will be seen, and
+    /// where the settings live.
+    private var bottomBar: some View {
+        VStack(spacing: 0) {
+            if model.saveStatus.kind != .none {
+                StatusRowView(
+                    status: model.saveStatus,
+                    action: Self.action(if: model.saveStatus.kind == .failed) { model.retryWrite() }
+                )
+                .padding(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+            }
+            Divider()
+            footer
+        }
+        .background(.bar)
     }
 
     // MARK: - Appearance
 
-    private var appearanceTab: some View {
+    private var appearancePage: some View {
         Form {
             if model.listedThemes.count >= 2 {
                 Picker(L10n.text("settings.label.theme"), selection: $model.theme) {
@@ -155,7 +199,7 @@ struct SettingsView: View {
 
     // MARK: - Terminal
 
-    private var terminalTab: some View {
+    private var terminalPage: some View {
         Form {
             Section(L10n.text("settings.section.output")) {
                 LabeledContent(L10n.text("settings.label.scrollback")) {
@@ -172,40 +216,6 @@ struct SettingsView: View {
                     }
                 }
                 .onChange(of: model.bell) { _, value in model.setBell(value) }
-            }
-            Section(L10n.text("settings.section.input")) {
-                Toggle(
-                    L10n.text("settings.label.optionAsMeta"),
-                    isOn: bind(model.optionAsMeta, model.setOptionAsMeta)
-                )
-                .help(L10n.text("settings.help.optionAsMeta"))
-                Toggle(
-                    L10n.text("settings.label.copyOnSelect"),
-                    isOn: bind(model.copyOnSelect, model.setCopyOnSelect))
-                Picker(L10n.text("ui.mouse.override"), selection: bind(model.mouseOverrideModifier, model.setMouseOverrideModifier)) {
-                    ForEach(Configuration.MouseOverrideModifier.allCases, id: \.self) { value in
-                        Text(verbatim: value == .option ? "⌥ Option" : value == .shift ? "⇧ Shift" : "⌃ Control").tag(value)
-                    }
-                }
-                Picker(
-                    L10n.text("settings.label.openLinksWith"), selection: $model.linkActivation
-                ) {
-                    Text(L10n.text("settings.linkActivation.commandClick"))
-                        .tag(Configuration.LinkActivation.command)
-                    Text(L10n.text("settings.linkActivation.click"))
-                        .tag(Configuration.LinkActivation.click)
-                }
-                .onChange(of: model.linkActivation) { _, value in model.setLinkActivation(value) }
-                Toggle(
-                    L10n.text("settings.label.allowClipboardCopy"),
-                    isOn: bind(model.allowClipboardWrite, model.setAllowClipboardWrite)
-                )
-                .help(L10n.text("settings.help.allowClipboardCopy"))
-                Toggle(
-                    L10n.text("command.secureKeyboardEntry"),
-                    isOn: bind(model.secureKeyboardEntry, model.setSecureKeyboardEntry)
-                )
-                .help(L10n.text("settings.help.secureKeyboardEntry"))
             }
             Section(L10n.text("ui.section.search")) {
                 Toggle(L10n.text("ui.search.case"), isOn: bind(model.searchCaseSensitive, model.setSearchCaseSensitive))
@@ -226,12 +236,68 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Keyboard & Mouse
+
+    private var keyboardMousePage: some View {
+        Form {
+            Section(L10n.text("settings.section.keyboard")) {
+                Toggle(
+                    L10n.text("settings.label.optionAsMeta"),
+                    isOn: bind(model.optionAsMeta, model.setOptionAsMeta)
+                )
+                .help(L10n.text("settings.help.optionAsMeta"))
+            }
+            Section(L10n.text("settings.section.mouse")) {
+                Picker(
+                    L10n.text("settings.label.openLinksWith"), selection: $model.linkActivation
+                ) {
+                    Text(L10n.text("settings.linkActivation.commandClick"))
+                        .tag(Configuration.LinkActivation.command)
+                    Text(L10n.text("settings.linkActivation.click"))
+                        .tag(Configuration.LinkActivation.click)
+                }
+                .onChange(of: model.linkActivation) { _, value in model.setLinkActivation(value) }
+                Picker(L10n.text("ui.mouse.override"), selection: bind(model.mouseOverrideModifier, model.setMouseOverrideModifier)) {
+                    ForEach(Configuration.MouseOverrideModifier.allCases, id: \.self) { value in
+                        Text(verbatim: value == .option ? "⌥ Option" : value == .shift ? "⇧ Shift" : "⌃ Control").tag(value)
+                    }
+                }
+                Toggle(
+                    L10n.text("settings.label.copyOnSelect"),
+                    isOn: bind(model.copyOnSelect, model.setCopyOnSelect))
+            }
+        }
+    }
+
+    // MARK: - Privacy & Security
+
+    /// What can reach beyond the terminal: the clipboard, other apps'
+    /// view of the keyboard, and what Corta remembers on disk.
+    private var privacyPage: some View {
+        Form {
+            Section(L10n.text("settings.section.clipboard")) {
+                Toggle(
+                    L10n.text("settings.label.allowClipboardCopy"),
+                    isOn: bind(model.allowClipboardWrite, model.setAllowClipboardWrite)
+                )
+                .help(L10n.text("settings.help.allowClipboardCopy"))
+            }
+            Section(L10n.text("settings.section.keyboard")) {
+                Toggle(
+                    L10n.text("command.secureKeyboardEntry"),
+                    isOn: bind(model.secureKeyboardEntry, model.setSecureKeyboardEntry)
+                )
+                .help(L10n.text("settings.help.secureKeyboardEntry"))
+            }
+            historySection
+        }
+    }
+
     // MARK: - General
 
-    private var generalTab: some View {
+    private var generalPage: some View {
         Form {
             windowSection
-            quickTerminalSection
             Section(L10n.text("settings.section.closing")) {
                 Toggle(
                     L10n.text("settings.label.confirmClose"),
@@ -240,26 +306,41 @@ struct SettingsView: View {
                 .help(L10n.text("settings.help.confirmClose"))
             }
             notificationsSection
-            historySection
-            Section(L10n.text("ui.section.shortcuts")) {
-                DisclosureGroup(L10n.text("ui.section.shortcuts")) {
-                    ForEach(TerminalCommand.allCases, id: \.self) { command in
-                        LabeledContent(command.title) {
-                            HStack(spacing: 6) {
-                                ShortcutRecorder(value: model.keybindings[command], onChange: { model.setShortcut($0, for: command) })
-                                Button(L10n.text("ui.shortcut.reset")) { model.resetShortcut(command) }.controlSize(.small)
-                            }
-                        }
-                    }
-                }
-            }
-            Section(L10n.text("ui.category.connections")) {
-                Button(L10n.text("ui.category.connections")) { showingPresets = true }
-            }
             if UpdateController.isAvailable {
                 Section(L10n.text("ui.section.updates")) {
                     Toggle(L10n.text("ui.update.auto"), isOn: bind(model.updateAutoCheck, model.setUpdateAutoCheck))
                     Toggle(L10n.text("ui.update.applications"), isOn: bind(model.suggestApplicationsFolder, model.setSuggestApplicationsFolder))
+                }
+            }
+        }
+    }
+
+    // MARK: - Shortcuts
+
+    /// Every command's key, in the menu order; written as `bind.` keys.
+    private var shortcutsPage: some View {
+        Form {
+            Section(L10n.text("settings.section.commands")) {
+                ForEach(TerminalCommand.allCases, id: \.self) { command in
+                    LabeledContent(command.title) {
+                        HStack(spacing: 6) {
+                            ShortcutRecorder(value: model.keybindings[command], onChange: { model.setShortcut($0, for: command) })
+                            // Only where there is something to restore; the
+                            // slot stays, so the recorders line up.
+                            let isDefault = model.keybindings[command] == command.defaultShortcut
+                            Button {
+                                model.resetShortcut(command)
+                            } label: {
+                                Image(systemName: "arrow.counterclockwise")
+                            }
+                            .buttonStyle(.borderless)
+                            .help(L10n.text("ui.shortcut.reset"))
+                            .accessibilityLabel(L10n.text("ui.shortcut.reset"))
+                            .opacity(isDefault ? 0 : 1)
+                            .disabled(isDefault)
+                            .accessibilityHidden(isDefault)
+                        }
+                    }
                 }
             }
         }
@@ -281,8 +362,9 @@ struct SettingsView: View {
         }
     }
 
+    /// Untitled: it is the whole page, and the page already says its name.
     private var quickTerminalSection: some View {
-        Section(L10n.text("settings.section.quickTerminal")) {
+        Section {
             Toggle(
                 L10n.text("settings.label.quickTerminalHotkey"),
                 isOn: bind(model.quickTerminal, model.setQuickTerminal)
@@ -360,6 +442,14 @@ struct SettingsView: View {
                         model.clearDirectoryHistory()
                     })
             }
+            // The hosts the connect dialogs offer under Recent.
+            LabeledContent(L10n.text("settings.label.recentHosts")) {
+                StatusRowView(
+                    status: model.recentHostsStatus,
+                    action: Self.action(if: model.recentHostsStatus.actionTitle != nil) {
+                        model.clearRecentHosts()
+                    })
+            }
         }
     }
 
@@ -429,36 +519,6 @@ struct SettingsView: View {
         .padding(EdgeInsets(top: 8, leading: 16, bottom: 11, trailing: 16))
     }
 }
-
-/// One tab's page.
-///
-/// The tab view keeps every page alive, and a page's scroll position lived
-/// on with it — scroll the Terminal tab down, visit General, come back, and
-/// the Terminal tab was still scrolled. A page is put back at its top
-/// whenever its selection changes, so it is at the top both when it is
-/// left and when it is returned to.
-private struct SettingsPage<Content: View>: View {
-    let isSelected: Bool
-    let content: Content
-    /// Bumped on every selection change; a new identity is a new list,
-    /// and a new list starts at its top. `scrollTo` on the first section
-    /// stopped short of that by the form's own top padding.
-    @State private var generation = 0
-
-    init(isSelected: Bool, @ViewBuilder content: () -> Content) {
-        self.isSelected = isSelected
-        self.content = content()
-    }
-
-    var body: some View {
-        content
-            .formStyle(.grouped)
-            .id(generation)
-            .onChange(of: isSelected) { _, _ in generation += 1 }
-    }
-}
-
-
 
 /// The open-file command, validated when the edit is *finished*.
 ///
