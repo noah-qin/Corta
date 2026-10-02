@@ -22,6 +22,9 @@ what to edit.
   build Unicode row strings once and reuse reflow scratch buffers.
 - Correct restoration/export privacy documentation and add regression,
   sanitizer and isolated SSH/SFTP validation evidence.
+- Synchronize the live color palette between settings changes and the
+  renderers that read it; the unit tests no longer read or write the
+  development build's own configuration.
 
 ### Added
 

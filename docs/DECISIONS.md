@@ -410,6 +410,13 @@ check (`CONFORMANCE.md` §4.4). A new piece of state Corta owns goes under
 `AppPaths`, not under a path derived from the home directory —
 `AppPathsTests` and the release check are what catch the exceptions.
 
+**Amended 2026-10-02.** The development stage is also the configuration a
+developer runs Corta Dev with every day, so a unit-test host — which XCTest
+marks with `XCTestConfigurationFilePath` — gets a per-process throwaway
+stage instead (`TESTING.md`, "The test host cannot reach your own
+configuration"). A test that wrote a setting and was killed before its
+`defer` had left that value in the developer's file.
+
 ## D23 — Sparkle is the one accepted third-party runtime dependency
 
 **Decision.** Corta updates itself with Sparkle, and Sparkle is the only

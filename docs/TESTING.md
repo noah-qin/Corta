@@ -310,14 +310,41 @@ kind and were rewritten instead.
 
 The Debug configuration builds a separate application — `CortaDev.app`,
 bundle identifier `dev.noahqin.Corta.dev` (D22) — and `AppPaths` gives any
-bundle whose identifier ends in `.dev` a stage directory. So the test host
-reads and writes `~/Library/Application Support/Corta Dev/` and nothing
-else: not `~/.config/corta/config`, not
-`~/Library/Application Support/Corta/`, not `~/.zshrc`. Nothing has to be
-set on the command line for that to hold.
+bundle whose identifier ends in `.dev` a stage directory. A *unit-test
+host* goes one step further: XCTest sets `XCTestConfigurationFilePath` in
+it, and with no explicit stage `AppPaths` gives it a throwaway one,
+`$TMPDIR/Corta-Tests-<pid>`. So the suite reads and writes nothing of
+yours — not `~/.config/corta/config`, not
+`~/Library/Application Support/Corta/`, not the development build's own
+`Corta Dev/` (the one you run day to day), not `~/.zshrc`. Nothing has to
+be set on the command line for that to hold, and the next test host
+removes the stages of earlier runs whose process has gone.
+
+That last step is new on 2026-10-02. Before it the test host used the
+development build's stage, and a sanitizer abort between
+`commandHistoryBounds`' write and its `defer` left
+`command-history-limit = 0` in the developer's `Corta Dev/config`; every
+later run that expected a command record then failed, and the
+development build silently stopped recording command history.
 
 `CORTA_STAGE_DIR` still overrides the choice, which is what stages a
-*Release* build for a launched-app check.
+*Release* build for a launched-app check. UI tests launch the app as a
+separate process, which XCTest does not mark, so they keep the
+development stage unless they set `CORTA_STAGE_DIR` themselves.
+
+### The application under the thread sanitizer
+
+```sh
+TEST_RUNNER_CORTA_TEST_TIMEOUT_SCALE=3 TEST_RUNNER_TSAN_OPTIONS=halt_on_error=0 \
+  xcodebuild test -project Corta.xcodeproj -scheme Corta -testPlan Unit \
+  -enableThreadSanitizer YES -only-testing:CortaTests
+grep -c 'WARNING: ThreadSanitizer' <log>
+```
+
+`halt_on_error=0` collects every report in one run instead of stopping at
+the first; the scale gives the sanitizer's slowdown the same headroom CI
+gets. A test that indexes into a result after a wait must `#require` the
+wait, or a slow run crashes the whole host instead of failing one test.
 
 ### Launching the app in isolation
 

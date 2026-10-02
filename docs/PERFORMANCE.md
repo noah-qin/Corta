@@ -882,3 +882,27 @@ than stable comparative baselines. A 924 MB peak for the long benchmark
 process is not proof of an application leak. Repeat A/B measurements with
 one machine/toolchain and no concurrent builds; record traces and remaining
 limits in the [follow-up record](test-results/2026-10-02-follow-up.md).
+
+**The A/B, 2026-10-02.** `origin/main` (`0af9fa9`) against the follow-up
+branch, alternating, on a quiet machine — no build or sanitizer run beside
+them. `corta-bench` release build, two rounds each:
+
+| Benchmark | main | follow-up |
+| --- | --- | --- |
+| Reflow, 100k lines, 120 → 80 columns | 92.7 / 92.3 ms | 48.1 / 48.4 ms |
+| Search, 100k lines, ASCII scrollback, warmed p50 | 25.7 / 25.1 ms | 25.5 / 25.8 ms |
+| Search, 100k lines, non-ASCII scrollback, ASCII query, p50 | 450.9 / 449.1 ms | 27.4 / 27.6 ms |
+
+The D17 plan (`-testPlan Release -configuration Benchmark`), three rounds
+each, after the palette moved behind a lock read once per frame (§ the
+follow-up record):
+
+| Figure | main | follow-up |
+| --- | --- | --- |
+| Frame CPU, avg (§5.8) | 0.913 / 0.871 / 0.840 ms | 0.850 / 0.875 / 0.767 ms |
+| Full rebuild, p50 | 0.130 / 0.146 / 0.180 ms | 0.132 / 0.157 / 0.152 ms |
+| Typing (one row), p50 | 0.023 / 0.023 / 0.023 ms | 0.022 / 0.022 / 0.023 ms |
+
+The render figures are inside each other's spread: no change to the frame
+path is measurable. Apple silicon MacBook Air, macOS 27.0.1, Xcode 27.0
+(27A266a), on the same machine and toolchain for both sides.
