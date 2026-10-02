@@ -75,6 +75,10 @@ files, remote connections and child-process input.
 
 ## Known limits
 
+- **Compressed Kitty images are not decoded.** An image sent zlib-compressed
+  (`o=z`) shows nothing. `kitten icat` compresses when it scales an image
+  down to fit — a picture wider than the pane, or `--place` — and sends a
+  PNG that already fits as it is, which displays.
 - **VT conformance is incomplete.** The 2026-09-17 esctest2 run recorded
   126 passed, 334 known bugs and 107 failed out of 567. The historical 81.1%
   figure combines passes and known bugs; it is not a pass rate.

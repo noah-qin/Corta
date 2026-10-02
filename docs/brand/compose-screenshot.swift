@@ -140,17 +140,22 @@ func poster(_ windowPath: String, _ out: String, title: String, subtitle: String
 func overlay(_ windowPath: String, _ floatingPath: String, dx: CGFloat, dy: CGFloat, _ out: String) {
     let window = load(windowPath)
     let floating = load(floatingPath)
-    let size = NSSize(width: window.pixelsWide, height: window.pixelsHigh)
+    let ww = CGFloat(window.pixelsWide), wh = CGFloat(window.pixelsHigh)
+    let fw = CGFloat(floating.pixelsWide), fh = CGFloat(floating.pixelsHigh)
+    // A popover may hang past the window's edge, as it does on screen: the
+    // canvas grows to hold it, transparent where neither is.
+    let extra: CGFloat = 40
+    let width = max(ww, dx + fw + extra), height = max(wh, dy + fh + extra)
+    let size = NSSize(width: width, height: height)
     let image = NSImage(size: size, flipped: false) { _ in
-        window.draw(in: NSRect(origin: .zero, size: size))
-        let fh = CGFloat(floating.pixelsHigh), fw = CGFloat(floating.pixelsWide)
+        window.draw(in: NSRect(x: 0, y: height - wh, width: ww, height: wh))
         NSGraphicsContext.saveGraphicsState()
         let shadow = NSShadow()
         shadow.shadowColor = NSColor.black.withAlphaComponent(0.22)
         shadow.shadowBlurRadius = 36
         shadow.shadowOffset = NSSize(width: 0, height: -10)
         shadow.set()
-        floating.draw(in: NSRect(x: dx, y: size.height - dy - fh, width: fw, height: fh))
+        floating.draw(in: NSRect(x: dx, y: height - dy - fh, width: fw, height: fh))
         NSGraphicsContext.restoreGraphicsState()
         return true
     }
