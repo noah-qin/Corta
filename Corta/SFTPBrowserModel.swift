@@ -67,7 +67,7 @@ final class SFTPBrowserModel {
 
         /// Sort keys for the table's columns: a missing size or date sorts
         /// as the smallest, never as a crash or an arbitrary position.
-        var sortSize: UInt64 { size ?? 0 }
+        var sortSize: UInt64 { kind == .directory ? 0 : size ?? 0 }
         var sortModified: Date { modified ?? .distantPast }
         /// A dot file, hidden unless the browser is told to show them.
         var isHidden: Bool { name.hasPrefix(".") }
@@ -503,9 +503,14 @@ final class SFTPBrowserModel {
     }
 
     /// Peer counters may use all 64 bits; invalid aggregates are unknown.
+    /// `struct statvfs` counts blocks in units of `f_frsize`, not `f_bsize`.
+    /// They differ on APFS — a 1 MiB block, a 4 KiB fragment — and reading
+    /// the counts in blocks put a 650 GB Mac's free space at 168 TB. A
+    /// server that reports no fragment size gets the block size.
     static func volumeStatus(for info: SFTPVolumeInfo) -> VolumeStatus {
-        let total = info.blocks.multipliedReportingOverflow(by: info.blockSize)
-        let free = info.blocksAvailable.multipliedReportingOverflow(by: info.blockSize)
+        let unit = info.fragmentSize > 0 ? info.fragmentSize : info.blockSize
+        let total = info.blocks.multipliedReportingOverflow(by: unit)
+        let free = info.blocksAvailable.multipliedReportingOverflow(by: unit)
         guard !total.overflow, !free.overflow, free.partialValue <= total.partialValue else {
             return .unknown
         }

@@ -12,6 +12,11 @@ what to edit.
 
 ### Security and reliability follow-up
 
+- The SFTP browser's free space counts in the server's fragment size: a Mac
+  with 650 GB free was shown as 168 TB, because APFS reports a 1 MiB block
+  beside the 4 KiB unit its counts are in. Folders show "--" for their size,
+  as Finder does, instead of their directory entry's bytes.
+
 - Reject stale search status and repeated/concurrent SFTP handshakes; cancel
   pending handshakes and keep slow directory mounts off the UI thread.
 - Bind remote-edit upload approval to a private content snapshot and compare
