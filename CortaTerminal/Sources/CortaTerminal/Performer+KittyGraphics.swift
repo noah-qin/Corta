@@ -102,7 +102,7 @@ extension Performer {
             respond(imageID: imageID, placementID: nil, quiet: quiet, error: "EINVAL:bad base64")
             return
         }
-        let bytes = [UInt8](decoded)
+        var bytes = [UInt8](decoded)
         guard bytes.count <= KittyGraphics.maximumImageBytes else {
             respond(imageID: imageID, placementID: nil, quiet: quiet, error: "EINVAL:too large")
             return
@@ -110,6 +110,24 @@ extension Performer {
         let format = pending.header.format ?? .rgba
         let width = pending.header.width ?? 0
         let height = pending.header.height ?? 0
+        if pending.header.compressed {
+            // Pixels inflate to exactly their declared size, so that is the
+            // ceiling; a PNG's size is unknown until decoded, so it gets the
+            // per-image cap. Either way the expansion stops at the ceiling.
+            let limit: Int
+            switch format {
+            case .rgb: limit = width * height * 3
+            case .rgba: limit = width * height * 4
+            case .png: limit = KittyGraphics.maximumImageBytes
+            }
+            guard limit > 0, limit <= KittyGraphics.maximumImageBytes,
+                let inflated = KittyGraphics.inflateZlib(bytes, limit: limit)
+            else {
+                respond(imageID: imageID, placementID: nil, quiet: quiet, error: "EINVAL:bad compressed data")
+                return
+            }
+            bytes = inflated
+        }
         // Exactly `width * height * bytesPerPixel`, or dropped — never padded.
         switch format {
         case .rgb:

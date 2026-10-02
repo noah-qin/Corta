@@ -156,6 +156,7 @@ allocating without bound. These caps are asserted in the fuzz harness
 | -------------------------- | ----------------------------------------------------- |
 | OSC / DCS string length    | Hard limit; discard the sequence on overflow and resynchronise |
 | APC (Kitty graphics) chunk | 132 KiB — one `kitten icat` chunk plus its header; discard the sequence on overflow and resynchronise. A whole image is capped separately, as is a pane's image memory |
+| Compressed Kitty image (`o=z`) | Inflates to exactly its declared pixels (RGB, RGBA) or at most the 64 MB image cap (PNG); the stream stops at the ceiling and the image is refused, so the expansion is never allocated. The zlib header and Adler-32 must check out; any other `o=` value is refused |
 | CSI parameter count        | 16 (xterm's limit); ignore the remainder               |
 | CSI parameter value        | Clamp to a sane maximum before use                     |
 | Repeat counts (e.g. `REP`) | Clamp to the screen or scrollback dimension            |
@@ -352,6 +353,16 @@ which records S01–S04 and S07 in full); the entries below are the ones
 whose write-up belongs with the design rather than with the release that
 made them.
 
+- **S14 — 2026-10-03: compressed Kitty images inflate under a ceiling.**
+  `kitten icat` sends an image it scaled to fit as zlib-compressed pixels
+  (`o=z`); the key was ignored, the compressed bytes failed the size check,
+  and the image never showed. The payload is inflated now, and a few
+  kilobytes that claim gigabytes are the reason it is bounded: output stops
+  at the declared `s × v × bytes-per-pixel` (or the 64 MB per-image cap for
+  PNG), checked in 64 KiB slices of input, and the header and checksum must
+  be zlib's. DEFLATE is Apple's Compression framework, a system library
+  like Darwin, not a bound C dependency (D02). Fuzz seeds cover a valid
+  stream and a bomb.
 - **S13 — 2026-09-30: release signing secrets moved behind the approval
   (#134).** The Developer ID `.p12`, its password and the notary key
   were repository secrets that any workflow on any branch could read.

@@ -80,9 +80,9 @@ touched:
 - **A short stage path.** Settings prints the config file's path in its
   footer; a symbolic link such as `/tmp/corta-demo` to the scratch stage
   keeps the scratch directory's name out of the picture. Remove it after.
-- **An image that needs no scaling.** `kitten icat` sends a PNG that fits
-  as it is, but scales a larger one and sends it zlib-compressed (`o=z`),
-  which Corta does not decode. Resize the mascot to fit the pane first.
+- **A mascot sized for the pane.** `kitten icat` scales a larger picture
+  to the pane's width; resizing it first keeps it the size the layout
+  wants.
 - **Keys by code.** Synthetic typing goes through the active input
   method — Pinyin turns `[` into `【` — so shortcuts are sent as key codes
   (`key code 33 using command down`), and text goes in by pasting.

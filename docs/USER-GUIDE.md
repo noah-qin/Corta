@@ -247,9 +247,8 @@ Images scroll with the text, stay in the scrollback, and are removed by
 Clear Screen or Clear History along with the text around them. Other tools
 that support the protocol, such as `timg` or `chafa`, can use it too, as
 long as they send the image itself: Corta refuses by design to read a file
-path a program names, and animation is not supported. An image `kitten icat`
-has to shrink to fit the pane is sent compressed, which Corta does not yet
-decode, so it shows nothing; one that already fits displays.
+path a program names, and animation is not supported. A picture larger than the
+pane is scaled to fit it.
 
 ## The command palette
 
