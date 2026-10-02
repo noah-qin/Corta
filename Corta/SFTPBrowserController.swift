@@ -78,10 +78,17 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    /// Explicit toolbar entry: ask for a host before connecting.
-    static func showConnection() {
-        let controller = SFTPBrowserController(host: nil, startDirectory: nil)
-        unconnected[ObjectIdentifier(controller)] = controller
+    /// The connect sheet's SFTP answer: a host the user typed or picked,
+    /// which is consent to connect to it. An open window for the host is
+    /// brought forward rather than a second session started.
+    static func open(host: String) {
+        if let open = byHost[host] {
+            open.present()
+            return
+        }
+        RemoteHostConsent.confirm(host)
+        let controller = SFTPBrowserController(host: host, startDirectory: nil)
+        byHost[host] = controller
         controller.present()
     }
 
@@ -103,20 +110,25 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
         model = previewModel ?? SFTPBrowserModel(
             host: host, startDirectory: startDirectory, suggestedHost: suggestedHost)
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 640, height: 440),
+            contentRect: NSRect(x: 0, y: 0, width: 760, height: 480),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
-        window.minSize = NSSize(width: 560, height: 360)
+        // Wide enough that the toolbar — Back and Forward, the title, the
+        // path, the transfer actions and More — never overflows into a
+        // chevron at the size the window opens at.
+        window.minSize = NSSize(width: 720, height: 360)
         window.toolbarStyle = .unified
         super.init(window: window)
         window.delegate = self
         window.contentViewController = NSHostingController(
             rootView: SFTPBrowserView(model: model))
         let isPreview = previewModel != nil
-        model.onTitleChange = { [weak window, weak model] _ in
-            window?.title = isPreview ? L10n.text("ui.demo.windowTitle") : "SFTP"
-            window?.subtitle = model?.host ?? ""
+        // The host is the title — it is what the window is about — and the
+        // path is the breadcrumb's, not repeated here.
+        model.onTitleChange = { [weak window] title in
+            window?.title = isPreview ? L10n.text("ui.demo.windowTitle") : title
+            window?.subtitle = isPreview ? "demo.invalid" : "SFTP"
         }
         model.publishTitle()
         if isPreview { return }
@@ -138,6 +150,12 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
             // Connected means the user pressed Connect with this name in
             // front of them (or the name was confirmed earlier this run).
             RemoteHostConsent.confirm(host)
+            RecentHostsStore.shared.record(host)
+        }
+        model.onHostAbandoned = { [weak self] host in
+            guard let self else { return }
+            if Self.byHost[host] === self { Self.byHost.removeValue(forKey: host) }
+            Self.unconnected[ObjectIdentifier(self)] = self
         }
         model.pickUploadFiles = { [weak self] in await self?.pickUploadFiles() ?? [] }
         model.pickDownloadDestination = { [weak self] entries in
@@ -179,6 +197,7 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         model.disconnect()
+        model.removeDragStaging()
         Self.unconnected.removeValue(forKey: ObjectIdentifier(self))
         if let host = model.host, Self.byHost[host] === self {
             Self.byHost.removeValue(forKey: host)

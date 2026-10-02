@@ -60,6 +60,30 @@ final class SFTPTransferQueue {
         var localURL: URL
         let host: String
         var state: TransferState
+        /// Smoothed throughput while active, for the row's speed and time
+        /// left; `nil` until two samples far enough apart have arrived.
+        var bytesPerSecond: Double?
+        /// The last sample the rate was taken from.
+        var sampleTime: TimeInterval?
+        var sampleBytes: UInt64 = 0
+
+        /// Seconds left at the current rate, when both the total and a rate
+        /// are known.
+        var remainingSeconds: Double? {
+            guard case .active(let completed, let total?) = state, let bytesPerSecond,
+                bytesPerSecond > 0, total >= completed
+            else { return nil }
+            return Double(total - completed) / bytesPerSecond
+        }
+
+        /// Finished one way or another: nothing more will happen to the row
+        /// unless a retry is asked for.
+        var isFinished: Bool {
+            switch state {
+            case .done, .cancelled, .failed, .skipped: return true
+            case .queued, .active, .cancelling: return false
+            }
+        }
 
         var label: String {
             L10n.format(
@@ -122,6 +146,41 @@ final class SFTPTransferQueue {
     var onListingError: ((String) -> Void)?
     private(set) var transfers: [Transfer] = []
     private(set) var conflictPrompts: [ConflictPrompt] = []
+    /// The clock rates are measured on; a test supplies its own.
+    var now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
+    /// Called once when a transfer reaches a terminal state — how a drag to
+    /// Finder waits for the download it started, through the same queue
+    /// (and the same progress row) as any other.
+    private var finishHandlers: [UUID: (Result<URL, TransferFailure>) -> Void] = [:]
+
+    nonisolated struct TransferFailure: Error, Equatable {
+        let message: String
+    }
+
+    /// Transfers still queued or moving — the toolbar button's badge.
+    var activeCount: Int { transfers.count(where: { !$0.isFinished }) }
+
+    /// All running byte counts as one fraction, for the toolbar's ring;
+    /// `nil` while nothing with a known size is moving.
+    var overallProgress: Double? {
+        var completed: UInt64 = 0
+        var total: UInt64 = 0
+        for transfer in transfers {
+            guard case .active(let done, let size?) = transfer.state, size > 0 else { continue }
+            completed += min(done, size)
+            total += size
+        }
+        return total > 0 ? Double(completed) / Double(total) : nil
+    }
+
+    /// Clears the rows that are over — done, cancelled, skipped or failed —
+    /// the way Safari's Downloads list does. Running ones stay.
+    func clearFinished() {
+        for transfer in transfers where transfer.isFinished {
+            jobs[transfer.id] = nil
+        }
+        transfers.removeAll(where: \.isFinished)
+    }
 
     /// Everything needed to start a queued transfer once its conflict
     /// question is answered.
@@ -160,8 +219,19 @@ final class SFTPTransferQueue {
     // MARK: - Transfers: queue
 
     func enqueue(_ plan: Plan) {
-        guard let host, client != nil else { return }
+        enqueue(plan, onFinish: nil)
+    }
+
+    /// `onFinish` hears the outcome once: the local file for a finished
+    /// download (or the source for an upload), a failure otherwise. Without
+    /// a connection it hears the failure at once.
+    func enqueue(_ plan: Plan, onFinish: ((Result<URL, TransferFailure>) -> Void)?) {
+        guard let host, client != nil else {
+            onFinish?(.failure(TransferFailure(message: L10n.format("sftp.error.connectionLost", host ?? ""))))
+            return
+        }
         let id = UUID()
+        if let onFinish { finishHandlers[id] = onFinish }
         let name =
             plan.isUpload
             ? plan.localURL.lastPathComponent
@@ -392,6 +462,8 @@ final class SFTPTransferQueue {
             }
             transfers[index].state = .active(
                 completed: progress.completedBytes, total: progress.totalBytes)
+            transfers[index] = Self.updatedRate(
+                transfers[index], completed: progress.completedBytes, now: now())
         default:
             return
         }
@@ -412,6 +484,8 @@ final class SFTPTransferQueue {
             transfers[index].filesTotal = progress.filesTotal
             transfers[index].state = .active(
                 completed: progress.completedBytes, total: progress.totalBytes)
+            transfers[index] = Self.updatedRate(
+                transfers[index], completed: progress.completedBytes, now: now())
         default:
             return
         }
@@ -465,6 +539,46 @@ final class SFTPTransferQueue {
     private func setState(_ id: UUID, _ state: TransferState) {
         guard let index = transfers.firstIndex(where: { $0.id == id }) else { return }
         transfers[index].state = state
+        if case .active = state {} else { transfers[index].bytesPerSecond = nil }
+        guard transfers[index].isFinished, let handler = finishHandlers.removeValue(forKey: id)
+        else { return }
+        switch state {
+        case .done:
+            let transfer = transfers[index]
+            handler(.success(transfer.localURL))
+        case .failed(let message, _):
+            handler(.failure(TransferFailure(message: message)))
+        default:
+            handler(.failure(TransferFailure(message: L10n.text("sftp.transfer.cancelled"))))
+        }
+    }
+
+    /// Folds a progress sample into the transfer's rate: a sample is taken
+    /// at most every half second, and each moves the rate a third of the
+    /// way towards the latest, so the shown speed neither jitters nor lags.
+    nonisolated static func updatedRate(
+        _ transfer: Transfer, completed: UInt64, now: TimeInterval
+    ) -> Transfer {
+        var transfer = transfer
+        guard let last = transfer.sampleTime else {
+            transfer.sampleTime = now
+            transfer.sampleBytes = completed
+            return transfer
+        }
+        let elapsed = now - last
+        guard elapsed >= 0.5 else { return transfer }
+        guard completed >= transfer.sampleBytes else {
+            // A retry or resume restarted the count: start sampling over.
+            transfer.sampleTime = now
+            transfer.sampleBytes = completed
+            transfer.bytesPerSecond = nil
+            return transfer
+        }
+        let instant = Double(completed - transfer.sampleBytes) / elapsed
+        transfer.bytesPerSecond = transfer.bytesPerSecond.map { $0 + (instant - $0) / 3 } ?? instant
+        transfer.sampleTime = now
+        transfer.sampleBytes = completed
+        return transfer
     }
 
     /// Cancels one transfer — queued ones never reach the engine, running
@@ -478,7 +592,7 @@ final class SFTPTransferQueue {
             guard let task = jobs[id]?.task else {
                 jobs[id] = nil
                 conflictPrompts.removeAll { $0.transferID == id }
-                transfers[index].state = .cancelled(partialKept: false)
+                setState(id, .cancelled(partialKept: false))
                 return
             }
             transfers[index].state = .cancelling
@@ -497,6 +611,8 @@ final class SFTPTransferQueue {
             let resolution = jobs[id]?.resolution
         else { return }
         transfers[index].state = .queued
+        transfers[index].sampleTime = nil
+        transfers[index].bytesPerSecond = nil
         start(id: id, resolution: resolution)
     }
 
