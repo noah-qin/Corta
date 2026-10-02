@@ -24,6 +24,30 @@ import Testing
 /// the model's terms and records what it was asked, plus the small helpers
 /// both the browser and the remote-edit suites build on. No ssh, no
 /// network; filesystem staging stays inside per-test temp directories.
+/// One value behind a lock. The fake's methods run on the cooperative
+/// pool while the tests read and stub it from the main actor; TSAN caught
+/// `rename` writing `renamed` while a `waitUntil` condition read it. Each
+/// access is atomic, and the fake's own read-modify-writes go through
+/// `mutate`, so a concurrent append is never lost either.
+@propertyWrapper
+final class Guarded<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: Value
+
+    init(wrappedValue: Value) { value = wrappedValue }
+
+    var wrappedValue: Value {
+        get { lock.withLock { value } }
+        set { lock.withLock { value = newValue } }
+    }
+
+    var projectedValue: Guarded<Value> { self }
+
+    func mutate<Result>(_ body: (inout Value) -> Result) -> Result {
+        lock.withLock { body(&value) }
+    }
+}
+
 final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
     struct TransferCall {
         var isUpload: Bool
@@ -33,23 +57,23 @@ final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
         var disposition: SFTPTransferEngine.PartialDisposition
     }
 
-    var connectError: SFTPError?
-    var realPathResult = "/home/tester"
-    var connectedHosts: [String] = []
-    var listings: [String: [SFTPEntry]] = [:]
-    var listingErrors: [String: SFTPError] = [:]
-    var volumeInfoResult: SFTPVolumeInfo?
-    var lstatResults: [String: SFTPAttributes] = [:]
-    var lstatErrors: [String: SFTPError] = [:]
-    var madeDirectories: [String] = []
-    var removed: [String] = []
-    var removedDirectories: [String] = []
-    var renamed: [(from: String, to: String)] = []
-    var transferCalls: [TransferCall] = []
-    var onTransfer: ((TransferCall, SFTPTransferEngine.ProgressHandler?) async throws -> Void)?
-    var closed = false
+    @Guarded var connectError: SFTPError? = nil
+    @Guarded var realPathResult = "/home/tester"
+    @Guarded var connectedHosts: [String] = []
+    @Guarded var listings: [String: [SFTPEntry]] = [:]
+    @Guarded var listingErrors: [String: SFTPError] = [:]
+    @Guarded var volumeInfoResult: SFTPVolumeInfo? = nil
+    @Guarded var lstatResults: [String: SFTPAttributes] = [:]
+    @Guarded var lstatErrors: [String: SFTPError] = [:]
+    @Guarded var madeDirectories: [String] = []
+    @Guarded var removed: [String] = []
+    @Guarded var removedDirectories: [String] = []
+    @Guarded var renamed: [(from: String, to: String)] = []
+    @Guarded var transferCalls: [TransferCall] = []
+    @Guarded var onTransfer: ((TransferCall, SFTPTransferEngine.ProgressHandler?) async throws -> Void)? = nil
+    @Guarded var closed = false
 
-    var capabilities: SFTPServerCapabilities?
+    @Guarded var capabilities: SFTPServerCapabilities? = nil
 
     func connect() async throws(SFTPError) -> SFTPServerCapabilities {
         if let connectError { throw connectError }
@@ -67,12 +91,12 @@ final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
         return listings[path] ?? []
     }
 
-    func makeDirectory(path: String) async throws(SFTPError) { madeDirectories.append(path) }
-    func remove(path: String) async throws(SFTPError) { removed.append(path) }
-    func removeDirectory(path: String) async throws(SFTPError) { removedDirectories.append(path) }
+    func makeDirectory(path: String) async throws(SFTPError) { $madeDirectories.mutate { $0.append(path) } }
+    func remove(path: String) async throws(SFTPError) { $removed.mutate { $0.append(path) } }
+    func removeDirectory(path: String) async throws(SFTPError) { $removedDirectories.mutate { $0.append(path) } }
 
     func rename(from oldPath: String, to newPath: String) async throws(SFTPError) {
-        renamed.append((oldPath, newPath))
+        $renamed.mutate { $0.append((oldPath, newPath)) }
     }
 
     func lstat(path: String) async throws(SFTPError) -> SFTPAttributes {
@@ -116,7 +140,7 @@ final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
         let call = TransferCall(
             isUpload: isUpload, remotePath: remotePath, localPath: localPath,
             policy: Self.policyName(policy), disposition: disposition)
-        transferCalls.append(call)
+        $transferCalls.mutate { $0.append(call) }
         if let onTransfer {
             do {
                 try await onTransfer(call, progress)
@@ -143,9 +167,9 @@ final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
         var localPath: String
         var policy: String
     }
-    var directoryCalls: [DirectoryCall] = []
-    var onDirectoryTransfer:
-        ((DirectoryCall, SFTPTransferEngine.DirectoryProgressHandler?) async throws -> Void)?
+    @Guarded var directoryCalls: [DirectoryCall] = []
+    @Guarded var onDirectoryTransfer:
+        ((DirectoryCall, SFTPTransferEngine.DirectoryProgressHandler?) async throws -> Void)? = nil
 
     func downloadDirectory(
         remotePath: String, to localDirectory: URL,
@@ -175,7 +199,7 @@ final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
         let call = DirectoryCall(
             isUpload: isUpload, remotePath: remotePath, localPath: localPath,
             policy: Self.policyName(policy))
-        directoryCalls.append(call)
+        $directoryCalls.mutate { $0.append(call) }
         if let onDirectoryTransfer {
             do {
                 try await onDirectoryTransfer(call, progress)

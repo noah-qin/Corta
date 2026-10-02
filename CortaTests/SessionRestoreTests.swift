@@ -365,7 +365,7 @@ struct RestoreCrashRecoveryTests {
     /// **A crash during a restore.** The marker is still there, so the layout
     /// that was being applied is the suspect and is not applied again.
     @Test func aLaunchAfterACrashDuringRestoreStartsFresh() throws {
-        try withTemporaryStateDirectory {
+        withTemporaryStateDirectory {
             SessionRestore.save([state])
             SessionRestore.beginRestore()  // and then the process dies here
             #expect(SessionRestore.decideRestore() == .skipAfterFailure)
@@ -376,7 +376,7 @@ struct RestoreCrashRecoveryTests {
     /// the arrangement on disk — which is the case the whole feature exists
     /// for and the one the old delete-at-launch made impossible.
     @Test func aLaunchAfterACrashElsewhereRestores() throws {
-        try withTemporaryStateDirectory {
+        withTemporaryStateDirectory {
             SessionRestore.save([state])
             SessionRestore.beginRestore()
             SessionRestore.endRestore()  // the restore finished; later, a crash
@@ -386,7 +386,7 @@ struct RestoreCrashRecoveryTests {
 
     /// A clean first run.
     @Test func nothingSavedMeansNothingToRestore() throws {
-        try withTemporaryStateDirectory {
+        withTemporaryStateDirectory {
             #expect(SessionRestore.decideRestore() == .nothingToRestore)
         }
     }
@@ -394,7 +394,7 @@ struct RestoreCrashRecoveryTests {
     /// The skip is once, not forever: the next launch after it restores
     /// normally, because the marker was cleared on the way past.
     @Test func theSkipHappensOnce() throws {
-        try withTemporaryStateDirectory {
+        withTemporaryStateDirectory {
             SessionRestore.save([state])
             SessionRestore.beginRestore()
             #expect(SessionRestore.decideRestore() == .skipAfterFailure)

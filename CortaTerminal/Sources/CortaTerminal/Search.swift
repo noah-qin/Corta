@@ -197,7 +197,6 @@ public enum Search {
         lineLoop: for logicalLine in grid.reversedLogicalLines() {
             let text = logicalLine.text
             guard !text.isEmpty else { continue }
-            if shouldStop() { break }
             // Here too: a line with no match never calls the block.
             if ContinuousClock.now >= deadline {
                 result.timedOut = true
@@ -309,11 +308,30 @@ public enum Search {
         var haystackRows = ContiguousArray<Int32>()
         var haystackColumns = ContiguousArray<Int32>()
 
+        // Cache per scalar, rather than shaping the entire mixed-text line
+        // after an ASCII walk has already visited it. Combining/format scalars
+        // and scalars folding into ASCII retain the full String implementation.
+        var opaqueScalars: [UInt32: Bool] = [:]
+        func nonASCIIIsOpaque(_ value: UInt32) -> Bool {
+            if let cached = opaqueScalars[value] { return cached }
+            guard let scalar = Unicode.Scalar(value) else { return false }
+            let opaque: Bool
+            switch scalar.properties.generalCategory {
+            case .nonspacingMark, .spacingMark, .enclosingMark, .format:
+                opaque = false
+            default:
+                opaque = !String(scalar).folding(options: .caseInsensitive, locale: nil)
+                    .utf8.contains { $0 < 0x80 }
+            }
+            opaqueScalars[value] = opaque
+            return opaque
+        }
         lineLoop: for span in grid.reversedLogicalLineSpans() {
             if let needle,
                 grid.fillWithASCIILogicalLine(
                     firstRow: span.firstRow, lastRow: span.lastRow,
-                    text: &haystack, rows: &haystackRows, columns: &haystackColumns)
+                    text: &haystack, rows: &haystackRows, columns: &haystackColumns,
+                    nonASCIIIsOpaque: nonASCIIIsOpaque)
             {
                 guard !haystack.isEmpty else { continue }
                 if shouldStop() { break }

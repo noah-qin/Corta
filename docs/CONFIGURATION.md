@@ -676,3 +676,11 @@ the *entire* file the moment it fails to decode. `Configuration` has never
 needed one: unknown keys are preserved verbatim (§1) and an unparsed line
 is simply skipped, so it already degrades one line at a time rather than as
 a whole file.
+
+Remote-edit uploads check the remote content as well as size and modification
+time. Each upload sends the version approved in the prompt. If the local copy
+changes after that prompt, Corta asks for a new decision; further saves during
+an upload remain pending edits. Managed copies remain on disk with private
+file modes. Restored sessions retain arrangement and directory metadata,
+with `restore-windows = true` by default, and start fresh processes without
+restoring terminal text. See [data-at-rest policy](SECURITY.md#5-data-at-rest).

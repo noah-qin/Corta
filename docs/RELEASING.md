@@ -173,3 +173,25 @@ gh workflow run release.yml --ref vX.Y.Z
 
 It runs the workflow as that tag has it, so a tag cut before a signing
 change re-runs with the old signing steps.
+
+## Platform protection evidence
+
+Verified through GitHub's API on 2026-10-02: the active main ruleset requires
+`Terminal core (SwiftPM)` and `App, tests and the update feed`, blocks deletion
+and non-fast-forward pushes, and has an administrator bypass. The `release`
+environment requires maintainer review, permits `v*` tags only, and stores
+ASC_KEY, DEVELOPER_ID_P12, DEVELOPER_ID_P12_PASSWORD and SPARKLE_PRIVATE_KEY;
+no repository-level Actions secrets were listed. The sole listed collaborator
+is the maintainer/admin. Environment administrators may bypass review and
+self-review is allowed. These are actual boundaries, not a promise of
+independent approval or protection from a compromised maintainer account.
+Recheck platform settings before releases because they can change separately
+from this repository. Do not expose or download secret values to verify them.
+
+Sparkle 2.10.0 is pinned to revision
+eef1a539a373c1f1a320624b1130fc5de7b2e100. Follow-up source review covered
+`SUSignatureVerifier`, `SUUpdateValidator` and their code-signing calls:
+missing/invalid Ed25519 signatures are rejected when the installed app has
+an Ed25519 key, the downloaded bytes are verified, and update validation
+also considers code signing and key changes. This is a scoped source review,
+not an exhaustive dependency or cryptographic implementation audit.

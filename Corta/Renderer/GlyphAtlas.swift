@@ -14,6 +14,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import AppKit
+import CortaTerminal
 import CoreGraphics
 import CoreText
 import Metal
@@ -343,6 +345,7 @@ nonisolated final class GlyphAtlas {
     /// Shapes the whole cluster as one string, so ZWJ sequences and combining
     /// marks come out as the font defines them.
     func glyph(forCluster scalars: [UInt32], style: Style) -> GlyphInfo? {
+        guard scalars.count <= GraphemeTable.maximumClusterScalars else { return nil }
         let key = ClusterKey(scalars: scalars, style: style)
         if let cached = shapedPage.clusterCache[key] ?? colorPage.clusterCache[key] { return cached }
         var view = String.UnicodeScalarView()
@@ -391,8 +394,9 @@ nonisolated final class GlyphAtlas {
     {
         let requested = fonts[Int(style.rawValue)]
         var sawNotdef = false
-        let attributed = CFAttributedStringCreate(
-            nil, string as CFString, [kCTFontAttributeName: requested] as CFDictionary)!
+        // Use the typed Foundation key instead of bridging a CFString-keyed
+        // Swift dictionary (the historical nil-attribute exception site).
+        let attributed = NSAttributedString(string: string, attributes: [.font: requested])
         let line = CTLineCreateWithAttributedString(attributed)
         guard let glyphRuns = CTLineGetGlyphRuns(line) as? [CTRun] else { return ([], false) }
         var runs: [ShapedRun] = []
@@ -452,6 +456,11 @@ nonisolated final class GlyphAtlas {
         // Pad by a texel against bleed, plus half the synthetic stroke.
         let pad = CGFloat(Self.bitmapPadding) + strokeWidth / 2
         let bbox = bounds.insetBy(dx: -pad, dy: -pad)
+        guard bbox.width.isFinite, bbox.height.isFinite,
+            bbox.width > 0, bbox.height > 0,
+            bbox.width.rounded(.up) <= CGFloat(atlasPixelSize),
+            bbox.height.rounded(.up) <= CGFloat(atlasPixelSize - 1)
+        else { return GlyphInfo(uvRect: .zero, size: .zero, bearing: .zero, isMissing: true) }
         let width = max(1, Int(bbox.width.rounded(.up)))
         let height = max(1, Int(bbox.height.rounded(.up)))
         var allocation = page.allocate(width: width, height: height)
@@ -531,17 +540,22 @@ nonisolated final class GlyphAtlas {
                 }
             }
         }
-        guard !bounds.isNull, !bounds.isEmpty else { return empty }
+        guard !bounds.isNull, !bounds.isEmpty, bounds.width.isFinite, bounds.height.isFinite else { return empty }
         let pad = CGFloat(Self.bitmapPadding)
         let fill = min(
             (colorBox.width - 2 * pad) / bounds.width,
             (colorBox.height - 2 * pad) / bounds.height)
+        guard fill.isFinite, fill > 0 else { return empty }
         let scaled = CGRect(
             x: bounds.minX * fill, y: bounds.minY * fill,
             width: bounds.width * fill, height: bounds.height * fill)
         let bbox = scaled.insetBy(dx: -pad, dy: -pad)
+        guard bbox.width.isFinite, bbox.height.isFinite,
+            bbox.width.rounded(.up) <= CGFloat(atlasPixelSize),
+            bbox.height.rounded(.up) <= CGFloat(atlasPixelSize) else { return empty }
         let width = max(1, Int(bbox.width.rounded(.up)))
         let height = max(1, Int(bbox.height.rounded(.up)))
+        guard width <= atlasPixelSize, height <= atlasPixelSize else { return empty }
         var allocation = colorPage.allocate(width: width, height: height)
         if allocation == nil {
             // Full: reset this page and retry once.

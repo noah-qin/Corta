@@ -45,6 +45,7 @@ final class SplitViewController: NSViewController {
     /// The chrome height at the last layout, for absorbing tab-bar changes
     /// into the frame.
     private var lastChromeHeight: CGFloat?
+    var isJoiningTabGroup = false
 
     var panes: [ViewController] { children.compactMap { $0 as? ViewController } }
     var hasMultiplePanes: Bool { tree?.leafCount ?? 1 > 1 }
@@ -194,7 +195,7 @@ final class SplitViewController: NSViewController {
     func absorbChromeChange() {
         // Before setup is over `contentLayoutRect` is still the pre-sizing area
         // (observed at origin -302), and absorbing it jumps the window.
-        guard let window = view.window, didSetUpWindow, sizeSettled, window.isVisible
+        guard !isJoiningTabGroup, let window = view.window, didSetUpWindow, sizeSettled, window.isVisible
         else { return }
         let chrome = window.frame.height - window.contentLayoutRect.height
         let last = lastChromeHeight

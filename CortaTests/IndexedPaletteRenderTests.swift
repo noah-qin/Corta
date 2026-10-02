@@ -71,7 +71,7 @@ import Testing
     }
 
     @Test func untouchedIndexPaintsXtermsCubeColour() throws {
-        guard let device = MTLCreateSystemDefaultDevice() else {
+        guard MTLCreateSystemDefaultDevice() != nil else {
             Issue.record("No Metal device available in this environment")
             return
         }
@@ -87,7 +87,7 @@ import Testing
     }
 
     @Test func oscOverriddenIndexPaintsTheOverrideNotTheDefault() throws {
-        guard let device = MTLCreateSystemDefaultDevice() else {
+        guard MTLCreateSystemDefaultDevice() != nil else {
             Issue.record("No Metal device available in this environment")
             return
         }
@@ -105,7 +105,7 @@ import Testing
     }
 
     @Test func resettingAnOverrideRepaintsTheDefault() throws {
-        guard let device = MTLCreateSystemDefaultDevice() else {
+        guard MTLCreateSystemDefaultDevice() != nil else {
             Issue.record("No Metal device available in this environment")
             return
         }

@@ -79,15 +79,35 @@ struct AppPathsTests {
         #expect(AppPaths.stageDirectory(environment: [:], bundleIdentifier: nil) == nil)
     }
 
-    /// The test host must not resolve to the developer's own files. Under
-    /// Debug it is the development build, so the stage follows from its
-    /// identity; any other configuration has to be given `CORTA_STAGE_DIR`.
-    /// The `#require` is the assertion — a host with neither is a host that
-    /// would read the developer's config and write into their `~/.zshrc`.
+    /// A unit-test host gets a stage of its own, per process — not the
+    /// development build's, which is the one a developer runs day to day.
+    @Test func aTestHostGetsAThrowawayStage() throws {
+        let environment = ["XCTestConfigurationFilePath": "/tmp/x.xctestconfiguration"]
+        for identifier in [installed, development] {
+            let stage = try #require(
+                AppPaths.stageDirectory(
+                    environment: environment, bundleIdentifier: identifier,
+                    temporaryDirectory: "/tmp/fixture-tmp", processID: 4242))
+            #expect(stage.path == "/tmp/fixture-tmp/Corta-Tests-4242")
+        }
+        // An explicit stage still wins: CI and staged checks name their own.
+        var explicit = environment
+        explicit["CORTA_STAGE_DIR"] = "/tmp/corta-stage-fixture"
+        #expect(
+            AppPaths.stageDirectory(environment: explicit, bundleIdentifier: development)?.path
+                == "/tmp/corta-stage-fixture")
+    }
+
+    /// The test host must not resolve to the developer's own files — neither
+    /// the installed build's nor the development build's. The `#require` and
+    /// the prefix checks are the assertion: a host that resolved to either
+    /// would read that config and write into its `~/.zshrc`.
     @Test func theTestHostNeverResolvesToTheDevelopersOwnFiles() throws {
         let stage = try #require(
             AppPaths.stageDirectory,
-            "the test host must be the development build, or run with CORTA_STAGE_DIR set")
+            "the test host must run with a stage of its own")
+        #expect(stage.lastPathComponent != AppPaths.developmentStageName
+            || ProcessInfo.processInfo.environment["CORTA_STAGE_DIR"] != nil)
         let cache = try #require(AppPaths.cacheDirectory)
         #expect(cache.path.hasPrefix(stage.path + "/"))
         #expect(AppPaths.configFileURL.path.hasPrefix(stage.path + "/"))

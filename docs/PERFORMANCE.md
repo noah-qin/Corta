@@ -48,7 +48,7 @@ rather than filled in with a guess.
 | Memory         | §1's scrollback figure holds, and closing panes/windows returns memory rather than leaking it | `corta-bench`'s scrollback-footprint and peak-RSS benchmarks; `MeasurementUITests.testOpenAndCloseWindowReturnsMemory` |
 | Energy         | An idle pane draws no more power than idle CPU (§1) implies; a flooding pane does not keep the GPU busier than the frames it is actually producing require | An *Activity Monitor* `xctrace` recording (per-process CPU, idle wakeups, App Nap) across `MeasurementUITests`' idle, occluded and flood scenarios; machine-wide watts need `sudo powermetrics`, a person's call (`TESTING.md`, *Measuring the app*) — §5.6 has the figures. Thermal pressure is not forced and stays *not judged* |
 | Compatibility  | The real-program and esctest pass rates `CONFORMANCE.md` already tracks | `CONFORMANCE.md` §4.2 (esctest), §4.4.2 (real-program table), §4.6 (manual scenario pass) — cross-referenced here rather than duplicated |
-| Recovery       | A crashed or force-quit Corta restores its window/split/scrollback state on next launch without asking the user to rebuild it by hand | `SessionRestore`'s crash marker and its tests; the manual scenario in `CONFORMANCE.md` §4.6 |
+| Recovery       | A crashed or force-quit Corta restores its window/split/directory metadata on next launch without asking the user to rebuild the arrangement by hand; terminal text and child processes are not restored | `SessionRestore`'s crash marker and its tests; the manual scenario in `CONFORMANCE.md` §4.6 |
 
 Startup, memory and energy inherit their machine dependency from §5.2 below —
 a number recorded here is only comparable to another run that held the same
@@ -865,3 +865,44 @@ between runs is several times the CPU change, so, as §5.8 says, the
 CPU-only rows are where this change is read.
 
 Apple M5, macOS 27.0 (26A428), Xcode 27.0 (27A266a), on battery.
+
+## Follow-up performance checks
+
+ASCII queries now retain a cell-based path for Unicode scalars whose case
+folding cannot match ASCII; combining/format scalars and ASCII folds retain
+the full Unicode matching path. Reflow reserves row capacity and reuses scratch
+cell/row-start arrays across logical lines. Search generation is checked
+before any status mutation. These changes require Unicode/coordinate and
+reflow regression tests as well as measurements; code changes alone do not
+establish a speedup.
+
+The original October 1 figures (mixed-history search p50 763 ms / p99
+1,293 ms, reflow 223 ms) ran alongside builds and are observations rather
+than stable comparative baselines. A 924 MB peak for the long benchmark
+process is not proof of an application leak. Repeat A/B measurements with
+one machine/toolchain and no concurrent builds; record traces and remaining
+limits in the [follow-up record](test-results/2026-10-02-follow-up.md).
+
+**The A/B, 2026-10-02.** `origin/main` (`0af9fa9`) against the follow-up
+branch, alternating, on a quiet machine — no build or sanitizer run beside
+them. `corta-bench` release build, two rounds each:
+
+| Benchmark | main | follow-up |
+| --- | --- | --- |
+| Reflow, 100k lines, 120 → 80 columns | 92.7 / 92.3 ms | 48.1 / 48.4 ms |
+| Search, 100k lines, ASCII scrollback, warmed p50 | 25.7 / 25.1 ms | 25.5 / 25.8 ms |
+| Search, 100k lines, non-ASCII scrollback, ASCII query, p50 | 450.9 / 449.1 ms | 27.4 / 27.6 ms |
+
+The D17 plan (`-testPlan Release -configuration Benchmark`), three rounds
+each, after the palette moved behind a lock read once per frame (§ the
+follow-up record):
+
+| Figure | main | follow-up |
+| --- | --- | --- |
+| Frame CPU, avg (§5.8) | 0.913 / 0.871 / 0.840 ms | 0.850 / 0.875 / 0.767 ms |
+| Full rebuild, p50 | 0.130 / 0.146 / 0.180 ms | 0.132 / 0.157 / 0.152 ms |
+| Typing (one row), p50 | 0.023 / 0.023 / 0.023 ms | 0.022 / 0.022 / 0.023 ms |
+
+The render figures are inside each other's spread: no change to the frame
+path is measurable. Apple silicon MacBook Air, macOS 27.0.1, Xcode 27.0
+(27A266a), on the same machine and toolchain for both sides.

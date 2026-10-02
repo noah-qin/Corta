@@ -25,6 +25,20 @@ import Testing
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
 @Suite(.serialized, .metalSerialized) struct GlyphAtlasTests {
+    @Test("oversized clusters are rejected before shaping and oversized ink never evicts")
+    func rejectedGlyphsDoNotThrash() throws {
+        let device = try #require(Self.makeDevice())
+        let font = CTFontCreateWithName("Menlo" as CFString, 10000, nil)
+        let atlas = GlyphAtlas(device: device, font: font)
+        let generation = atlas.generation
+        for _ in 0..<10 {
+            #expect(atlas.glyph(forCluster: Array(repeating: 0x301, count: 1000), style: .regular) == nil)
+            _ = atlas.glyph(forASCII: 0x57, style: .regular)
+        }
+        #expect(atlas.shapingHits == 0)
+        #expect(atlas.generation == generation)
+    }
+
     @Test("color-page eviction invalidates emoji keys and preserves shaped keys")
     func emojiCacheFollowsOwningPage() throws {
         let device = try #require(Self.makeDevice())

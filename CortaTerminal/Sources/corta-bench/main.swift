@@ -20,6 +20,8 @@ import Dispatch
 import Foundation
 import Synchronization
 
+let focusedHistoryBenchmarks = CommandLine.arguments.contains("--history")
+
 /// `corta-bench` — measures the numbers `docs/PERFORMANCE.md` §1 sets
 /// targets for, so they are recorded, not estimated. Run release for real numbers:
 ///
@@ -285,9 +287,9 @@ func benchmarkKeypressLatency() {
             + "(write -> PTY echo -> parse -> grid write; excludes vsync + display)")
 }
 
-benchmarkParseThroughput()
-benchmarkScrollbackMemory()
-benchmarkKeypressLatency()
+if !focusedHistoryBenchmarks { benchmarkParseThroughput() }
+if !focusedHistoryBenchmarks { benchmarkScrollbackMemory() }
+if !focusedHistoryBenchmarks { benchmarkKeypressLatency() }
 
 // MARK: - Where the 100k-line memory actually goes
 
@@ -307,7 +309,7 @@ func diagnoseScrollbackFootprint() {
     print("diagnostic: sizeof(Line) = \(MemoryLayout<Line>.stride)B, x100k => \(MemoryLayout<Line>.stride * 100_000 / 1_048_576)MB for the outer array alone")
 }
 
-diagnoseScrollbackFootprint()
+if !focusedHistoryBenchmarks { diagnoseScrollbackFootprint() }
 
 // MARK: - Reflow cost on a full scrollback
 
@@ -492,7 +494,7 @@ func benchmarkResizeStrategies() {
     dragPair("100k-line scrollback")
 }
 
-benchmarkResizeStrategies()
+if !focusedHistoryBenchmarks { benchmarkResizeStrategies() }
 
 // MARK: - Search cost over a full scrollback
 
@@ -515,7 +517,7 @@ func benchmarkSearchCost() {
             + "(should not be anywhere near a full-scrollback copy)")
 }
 
-benchmarkSearchCost()
+if !focusedHistoryBenchmarks { benchmarkSearchCost() }
 
 // MARK: - Snapshot latency under an output flood
 
@@ -596,7 +598,7 @@ func benchmarkSnapshotLatencyUnderFlood() {
             + "(same machine, same run — the ambient-preemption baseline)")
 }
 
-benchmarkSnapshotLatencyUnderFlood()
+if !focusedHistoryBenchmarks { benchmarkSnapshotLatencyUnderFlood() }
 
 // MARK: - Feed throughput under a 60 Hz snapshotter
 
@@ -642,8 +644,9 @@ func benchmarkFeedUnderSnapshotter() {
                 } else {
                     _ = state.withLock { $0.grid }
                 }
-                Thread.sleep(forTimeInterval: 1.0 / 60)
+                withExtendedLifetime(held) { Thread.sleep(forTimeInterval: 1.0 / 60) }
             }
+            withExtendedLifetime(held) {}
             held = nil
             finished.signal()
         }
@@ -715,7 +718,7 @@ extension Array where Element == UInt8 {
     }
 }
 
-benchmarkFeedUnderSnapshotter()
+if !focusedHistoryBenchmarks { benchmarkFeedUnderSnapshotter() }
 
 // MARK: - Main-actor wakes under a flood
 
@@ -765,7 +768,7 @@ func benchmarkOutputWakesUnderFlood() {
             + "(a `yes` flood, frames taken at 60 Hz)")
 }
 
-benchmarkOutputWakesUnderFlood()
+if !focusedHistoryBenchmarks { benchmarkOutputWakesUnderFlood() }
 
 // MARK: - Write-path backpressure
 
@@ -811,7 +814,7 @@ func benchmarkWriteBackpressure() {
     _ = session.pty.waitForExit(timeout: .seconds(5))
 }
 
-benchmarkWriteBackpressure()
+if !focusedHistoryBenchmarks { benchmarkWriteBackpressure() }
 
 // MARK: - Peak RSS for this run (P11)
 
@@ -854,7 +857,7 @@ func benchmarkSearchResponseDistribution() {
             + "then warmed \(warmed.description)")
 }
 
-benchmarkSearchResponseDistribution()
+if !focusedHistoryBenchmarks { benchmarkSearchResponseDistribution() }
 
 /// The case the ASCII fast path (#115) cannot take, and the one it could
 /// make *worse*: an ASCII query over a document whose lines are not ASCII,
@@ -975,7 +978,7 @@ func benchmarkSessionSpawnDecomposition() {
     measureFirstEvent(executable: "/bin/zsh", arguments: ["-l"], waitForExit: false, label: "(d) zsh -l -> first output (as the app spawns it)")
 }
 
-benchmarkSessionSpawnDecomposition()
+if !focusedHistoryBenchmarks { benchmarkSessionSpawnDecomposition() }
 
 // MARK: - Multi-pane fixed cost
 
@@ -1027,7 +1030,7 @@ func benchmarkMultiPaneFixedCost() {
     }
 }
 
-benchmarkMultiPaneFixedCost()
+if !focusedHistoryBenchmarks { benchmarkMultiPaneFixedCost() }
 
 // MARK: - Typing fairness with a flooding neighbour
 
@@ -1092,7 +1095,7 @@ func benchmarkKeypressFairnessUnderFlood() {
             + "[\(timedOut) timed out]")
 }
 
-benchmarkKeypressFairnessUnderFlood()
+if !focusedHistoryBenchmarks { benchmarkKeypressFairnessUnderFlood() }
 
 print("peak RSS across this run: \(String(format: "%.1f", megabytes(peakResidentBytes()))) MB")
 

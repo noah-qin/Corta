@@ -63,6 +63,12 @@ final class RemoteWorkflowUITests: XCTestCase {
     /// Edit (the "editor" rewrites the managed copy) → the upload prompt →
     /// the remote file changed, no partial left → the fake remote shell
     /// exits → Reconnect → the badge is back → the stage is removed.
+    /// The browser window once connected: its title starts with SFTP.
+    @MainActor
+    private func connectedBrowserWindow(_ app: XCUIApplication) -> XCUIElement {
+        app.windows.element(matching: NSPredicate(format: "title BEGINSWITH 'SFTP'"))
+    }
+
     @MainActor
     func testPresetBadgeBrowseEditUploadAndReconnect() throws {
         let stage = Self.stage
@@ -121,7 +127,7 @@ final class RemoteWorkflowUITests: XCTestCase {
         XCTAssertTrue(browse.waitForExistence(timeout: 2))
         XCTAssertTrue(browse.isEnabled, "a remote pane must offer the browser")
         browse.click()
-        let browser = app.windows["Remote Files"]
+        let browser = app.windows.element(matching: NSPredicate(format: "title BEGINSWITH 'SFTP'"))
         let spawnedAtOpen = FileManager.default.fileExists(atPath: stage.appendingPathComponent("sftp-ssh.log").path)
         XCTAssertTrue(
             browser.waitForExistence(timeout: 5),
@@ -146,8 +152,8 @@ final class RemoteWorkflowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["src"].exists)
         XCTAssertTrue(
             waitUntil(timeout: 5) {
-                app.windows.element(matching: NSPredicate(format: "title BEGINSWITH 'fakebox:'")).exists
-            }, "the window title must read host:path once connected")
+                app.windows.element(matching: NSPredicate(format: "title BEGINSWITH 'SFTP'")).exists
+            }, "the native browser title must include its host once connected")
         XCTAssertTrue(
             (try? String(contentsOf: stage.appendingPathComponent("sftp-ssh.log"), encoding: .utf8))?
                 .contains("-s -- fakebox sftp") == true, "the channel's argv")
@@ -156,7 +162,23 @@ final class RemoteWorkflowUITests: XCTestCase {
         // Application Support and the open-file-command runs on it; the
         // "editor" rewrites the copy, as a real one saving would.
         readme.click()
-        let edit = app.buttons["Edit"]
+        // Edit lives in the toolbar's More Actions menu. At the window's
+        // opening width the toolbar overflows and that menu sits behind the
+        // overflow chevron, as a submenu; at a wider one it is a button.
+        let toolbar = connectedBrowserWindow(app).toolbars.firstMatch
+        let more = toolbar.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == 'More actions'")).firstMatch
+        if more.exists {
+            more.click()
+        } else {
+            let overflow = toolbar.popUpButtons["more toolbar items"]
+            XCTAssertTrue(overflow.waitForExistence(timeout: 2), "the toolbar's overflow menu")
+            overflow.click()
+            let submenu = app.menuItems["More actions"]
+            XCTAssertTrue(submenu.waitForExistence(timeout: 2), "More Actions in the overflow")
+            submenu.hover()
+        }
+        let edit = app.menuItems["Edit"]
         XCTAssertTrue(edit.waitForExistence(timeout: 2))
         edit.click()
         let editorLog = stage.appendingPathComponent("editor.log")
@@ -192,8 +214,8 @@ final class RemoteWorkflowUITests: XCTestCase {
         // Back to the terminal: the fake remote shell exits, the pane goes
         // local (no badge), Reconnect is offered and starts a new
         // connection whose far end reports again.
-        // The browser is titled `host:path` now (asserted above).
-        let connectedBrowser = app.windows.element(matching: NSPredicate(format: "title BEGINSWITH 'fakebox:'"))
+        // AppKit combines the title and host subtitle in accessibility.
+        let connectedBrowser = app.windows.element(matching: NSPredicate(format: "title BEGINSWITH 'SFTP'"))
         connectedBrowser.buttons[XCUIIdentifierCloseWindow].click()
         XCTAssertTrue(waitUntil(timeout: 5) { app.windows.count == 1 }, "the browser must close")
         let terminal = app.windows.firstMatch

@@ -486,3 +486,16 @@ training logs — a full day of use produces no reason to switch back.**
 
 That is a finite, reachable target. Section 3 of `CONFORMANCE.md` states
 it as a checklist.
+
+## Follow-up lifecycle and storage boundaries
+
+SFTP sessions reserve their single-use connection lifecycle before starting
+one reader. Handshake cancellation closes the transport. The connection
+wrapper rejects concurrent connects, tracks the pending session so close
+can cancel a handshake, and refuses installing an engine after close.
+
+Directory proxy validation is asynchronous, bounded process-wide and rejects
+stale results. Search outcomes likewise check generation before updating any
+UI status. Remote editing persists a SHA-256 remote baseline, validates
+content before upload, and sends the approved private snapshot rather than
+a live editor file. See [Security](SECURITY.md) for race and ACL boundaries.

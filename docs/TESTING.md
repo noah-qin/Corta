@@ -310,14 +310,41 @@ kind and were rewritten instead.
 
 The Debug configuration builds a separate application — `CortaDev.app`,
 bundle identifier `dev.noahqin.Corta.dev` (D22) — and `AppPaths` gives any
-bundle whose identifier ends in `.dev` a stage directory. So the test host
-reads and writes `~/Library/Application Support/Corta Dev/` and nothing
-else: not `~/.config/corta/config`, not
-`~/Library/Application Support/Corta/`, not `~/.zshrc`. Nothing has to be
-set on the command line for that to hold.
+bundle whose identifier ends in `.dev` a stage directory. A *unit-test
+host* goes one step further: XCTest sets `XCTestConfigurationFilePath` in
+it, and with no explicit stage `AppPaths` gives it a throwaway one,
+`$TMPDIR/Corta-Tests-<pid>`. So the suite reads and writes nothing of
+yours — not `~/.config/corta/config`, not
+`~/Library/Application Support/Corta/`, not the development build's own
+`Corta Dev/` (the one you run day to day), not `~/.zshrc`. Nothing has to
+be set on the command line for that to hold, and the next test host
+removes the stages of earlier runs whose process has gone.
+
+That last step is new on 2026-10-02. Before it the test host used the
+development build's stage, and a sanitizer abort between
+`commandHistoryBounds`' write and its `defer` left
+`command-history-limit = 0` in the developer's `Corta Dev/config`; every
+later run that expected a command record then failed, and the
+development build silently stopped recording command history.
 
 `CORTA_STAGE_DIR` still overrides the choice, which is what stages a
-*Release* build for a launched-app check.
+*Release* build for a launched-app check. UI tests launch the app as a
+separate process, which XCTest does not mark, so they keep the
+development stage unless they set `CORTA_STAGE_DIR` themselves.
+
+### The application under the thread sanitizer
+
+```sh
+TEST_RUNNER_CORTA_TEST_TIMEOUT_SCALE=3 TEST_RUNNER_TSAN_OPTIONS=halt_on_error=0 \
+  xcodebuild test -project Corta.xcodeproj -scheme Corta -testPlan Unit \
+  -enableThreadSanitizer YES -only-testing:CortaTests
+grep -c 'WARNING: ThreadSanitizer' <log>
+```
+
+`halt_on_error=0` collects every report in one run instead of stopping at
+the first; the scale gives the sanitizer's slowdown the same headroom CI
+gets. A test that indexes into a result after a wait must `#require` the
+wait, or a slow run crashes the whole host instead of failing one test.
 
 ### Launching the app in isolation
 
@@ -444,3 +471,36 @@ private data. Dated manual records belong in [test-results/](test-results/).
 The historical esctest2 number that includes “known bugs” is a compatibility
 classification, not an automated-test pass rate. Always report all three
 counts: passed, known bugs and failed.
+
+## Security follow-up fixtures
+
+`script/verify_ssh_integration.py` runs `SFTPSSHIntegrationTests` through
+real OpenSSH on encrypted localhost TCP. It creates temporary host/client
+keys, known_hosts and client/server configs, disables agent use and
+forwarding, and reaps the test sshd and deletes credentials afterwards.
+Run it from the repository root with `python3 script/verify_ssh_integration.py`.
+It does not alter the installed SSH service or the user's SSH configuration.
+The suite is explicitly skipped without the fixture environment. A failed
+fixture setup must not be counted as a successful authentication rejection.
+
+The SFTP protocol fake and real `sftp-server` tests complement that fixture:
+they cover hostile replies, silent-peer cancellation, request admission,
+list/tree budgets, atomic transfer and local destination symlinks. They do
+not reproduce every external server, proxy, authentication method or network.
+
+Run both full core sanitizers and the full application Unit plan for lifecycle
+changes. The October 2 TSAN investigation found an unsynchronized mutable
+interceptor in the test server; its storage is now a Mutex. New tests pin stale
+search status, a blocked directory probe, private copy modes, approval snapshots,
+same-metadata remote replacement and rejected glyphs without atlas thrashing.
+See the [dated results](test-results/2026-10-02-follow-up.md) for actual evidence.
+
+Development builds isolate Corta-owned storage only. A stage path does not
+isolate HOME, SSH_AUTH_SOCK, credentials or external editors. Use the fixture
+configuration or an independent account for credential-sensitive checks.
+
+For extended GPU lifetime checks set `TEST_RUNNER_CORTA_STRESS_SECONDS=300`
+and run the entire `CortaTests/ImageMemoryAndTextureTests` suite. Verify the
+printed cycle count; a method-only filter can select zero Swift Testing cases.
+For stable mixed-history/reflow comparisons, use `corta-bench --history`
+without simultaneous builds or sanitizer workloads.

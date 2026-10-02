@@ -281,3 +281,17 @@ Then, if you are willing, open an issue with the **Went back to my old
 terminal** template and say what sent you back. A missing feature, a
 rendering bug and "it just felt slower" are all answers the project can
 act on.
+
+### A directory proxy icon is missing on a network mount
+
+Corta checks the reported local directory in the background. If the mount is
+slow or two checks are already waiting, it leaves the proxy icon absent so
+output and keyboard interaction can continue. Check the mount independently;
+changing directory after it recovers requests a new check.
+
+### Remote editing asks again after an upload prompt
+
+The local file changed after the version shown by the original prompt.
+Approve the new edit explicitly. An older managed entry without a remote
+content digest also needs a conflict decision once. A content comparison
+can identify remote changes even when file size and timestamp are unchanged.

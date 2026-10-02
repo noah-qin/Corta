@@ -77,24 +77,38 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// File > New Tab (⌘T): a full window joined to the key window's tab
     /// group, so it can be dragged out again.
     @objc func newTab(_ sender: Any?) {
+        let existing = NSApp.keyWindow
         guard let controller = instantiateWindowController(),
-            let window = controller.window
-        else { return }
+            let window = controller.window else { return }
         window.tabbingMode = .automatic
-        // The Quick Terminal takes no tabs; ⌘T from it opens a normal window.
-        if let keyWindow = NSApp.keyWindow, keyWindow !== window,
-            !QuickTerminalController.shared.owns(keyWindow)
-        {
-            // Join at the group's size rather than flash from the default.
-            window.setFrame(keyWindow.frame, display: false)
+        if let keyWindow = existing, keyWindow !== window,
+            !QuickTerminalController.shared.owns(keyWindow),
+            keyWindow.contentViewController is SplitViewController {
+            let members = keyWindow.tabbedWindows ?? [keyWindow]
+            let frame = keyWindow.frame
+            let oldChrome = frame.height - keyWindow.contentLayoutRect.height
+            let splits = (members + [window]).compactMap { $0.contentViewController as? SplitViewController }
+            for split in splits { split.isJoiningTabGroup = true }
+            window.setFrame(frame, display: false)
             keyWindow.addTabbedWindow(window, ordered: .above)
-            // The appearing tab bar would cost the covered window rows, and that
-            // window never lays out again, so tell it to absorb the chrome.
-            (keyWindow.contentViewController as? SplitViewController)?
-                .absorbChromeChange()
+            controller.showWindow(sender)
+            window.makeKeyAndOrderFront(sender)
+            // Only the first tab bar adds chrome. New tabs' setup/layout must
+            // not each absorb the same bar into the shared frame again.
+            let delta = members.count == 1
+                ? max(0, window.frame.height - window.contentLayoutRect.height - oldChrome) : 0
+            var target = frame
+            target.origin.y -= delta
+            target.size.height += delta
+            window.setFrame(target, display: true)
+            for split in splits {
+                split.adoptChromeWithoutAbsorbing()
+                split.isJoiningTabGroup = false
+            }
+        } else {
+            controller.showWindow(sender)
+            window.makeKeyAndOrderFront(sender)
         }
-        controller.showWindow(sender)
-        window.makeKeyAndOrderFront(sender)
     }
 
     /// The tab bar's "+" button; implementing this is also what shows it.
@@ -217,6 +231,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// Runs before the first window exists, so it opens with the right theme
     /// rather than re-theming a frame later.
     func applicationWillFinishLaunching(_ notification: Notification) {
+        AppPaths.pruneStaleTestStages()
         _ = ConfigurationStore.shared
         _ = UpdateController.shared
         AppearanceController.shared.start()

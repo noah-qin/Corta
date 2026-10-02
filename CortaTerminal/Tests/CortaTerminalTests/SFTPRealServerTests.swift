@@ -49,6 +49,44 @@ struct SFTPRealServerTests {
         return client
     }
 
+    @Test("directory downloads refuse existing destination symlinks")
+    func localDestinationLinkRejected() async throws {
+        let root = try Self.makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let client = try await Self.connect(root: root)
+        defer { client.close() }
+        let outside = root.appendingPathComponent("outside")
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        let target = root.appendingPathComponent("target")
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: target.appendingPathComponent("src"), withDestinationURL: outside)
+        await #expect(throws: SFTPError.self) {
+            try await client.downloadDirectory(remotePath: root.appendingPathComponent("srv/app").path,
+                to: target, policy: .overwrite, progress: nil)
+        }
+        #expect(try FileManager.default.contentsOfDirectory(atPath: outside.path).isEmpty)
+    }
+
+    /// The folder the user chose — and anything above it — may itself be a
+    /// link (a `~/Downloads` on another volume); only what the transfer
+    /// creates or merges into is held to the no-link rule.
+    @Test("a linked folder the user chose is a valid destination")
+    func linkedChosenFolderAccepted() async throws {
+        let root = try Self.makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let client = try await Self.connect(root: root)
+        defer { client.close() }
+        let realFolder = root.appendingPathComponent("volume/Downloads")
+        try FileManager.default.createDirectory(at: realFolder, withIntermediateDirectories: true)
+        let linkedFolder = root.appendingPathComponent("Downloads")
+        try FileManager.default.createSymbolicLink(at: linkedFolder, withDestinationURL: realFolder)
+        try await client.downloadDirectory(
+            remotePath: root.appendingPathComponent("srv/app").path,
+            to: linkedFolder.appendingPathComponent("app"), policy: .overwrite, progress: nil)
+        #expect(FileManager.default.fileExists(
+            atPath: realFolder.appendingPathComponent("app/README.md").path))
+    }
+
     @Test("spawn returns, INIT/VERSION completes, and a listing comes back")
     func connectAndList() async throws {
         let root = try Self.makeRoot()
@@ -82,12 +120,27 @@ struct SFTPRealServerTests {
         #expect(up.bytesTransferred == UInt64(payload.count))
         #expect(try Data(contentsOf: app.appendingPathComponent("payload.bin")) == payload)
 
+        // A permissive inherited ACL must not enlarge the downloaded copy.
+        let chmod = Process()
+        chmod.executableURL = URL(fileURLWithPath: "/bin/chmod")
+        chmod.arguments = ["+a", "everyone allow read,file_inherit,directory_inherit", root.path]
+        try chmod.run()
+        chmod.waitUntilExit()
+        #expect(chmod.terminationStatus == 0)
         let down = root.appendingPathComponent("payload-down.bin")
         let receipt = try await client.download(
             remotePath: app.appendingPathComponent("payload.bin").path, to: down,
             policy: .fail, partialDisposition: .remove, progress: nil)
         #expect(receipt.bytesTransferred == UInt64(payload.count))
         #expect(try Data(contentsOf: down) == payload)
+        let mode = try FileManager.default.attributesOfItem(atPath: down.path)[.posixPermissions] as? NSNumber
+        #expect(mode?.intValue == 0o600)
+        if let acl = acl_get_file(down.path, ACL_TYPE_EXTENDED) {
+            acl_free(UnsafeMutableRawPointer(acl))
+            Issue.record("download must not retain the inherited ACL")
+        } else {
+            #expect(errno == ENOENT)
+        }
         let leftovers = try FileManager.default.contentsOfDirectory(atPath: app.path)
         #expect(!leftovers.contains { $0.contains(".corta-part") }, "\(leftovers)")
     }

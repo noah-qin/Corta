@@ -17,6 +17,7 @@
 import AppKit
 import Carbon.HIToolbox
 import Testing
+import Synchronization
 
 @testable import Corta
 
@@ -282,16 +283,16 @@ struct SecureInputTests {
     @Test("a change in the engaged state is announced; a no-op is not")
     func announcesChanges() {
         let (input, _) = make()
-        var posts = 0
+        let posts = Mutex(0)
         let observer = NotificationCenter.default.addObserver(
             forName: SecureInput.didChange, object: input, queue: nil
-        ) { _ in posts += 1 }
+        ) { _ in posts.withLock { $0 += 1 } }
         defer { NotificationCenter.default.removeObserver(observer) }
         input.update(wanted: true)
         input.update(applicationIsActive: true, terminalWindowIsKey: true)
         input.update(applicationIsActive: true, terminalWindowIsKey: true)
         input.update(wanted: false)
-        #expect(posts == 2)
+        #expect(posts.withLock { $0 } == 2)
     }
 }
 

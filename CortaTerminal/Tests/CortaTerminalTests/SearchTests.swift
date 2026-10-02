@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import Foundation
 import Testing
 
 @testable import CortaTerminal
@@ -360,6 +361,20 @@ struct SearchTests {
             }
         }
         return expected
+    }
+
+    @Test("mixed Unicode ASCII path agrees with Foundation matching")
+    func mixedUnicodeParity() {
+        for text in ["fox ✓ fox", "fox 世界 FOX", "K k K", "ſ s S", "ﬀ ff", "e\u{301} e é", "foo\u{200D}bar foobar", "fox 🙂 fox"] {
+            var terminal = Terminal(rows: 5, columns: 9)
+            terminal.feed(Array(text.utf8))
+            for query in ["fox", "k", "s", "ff", "e", "foobar", " "] {
+                for sensitive in [false, true] {
+                    #expect(Search.find(query, in: terminal.grid, caseSensitive: sensitive)
+                        == referenceMatches(query, in: terminal.grid, caseSensitive: sensitive))
+                }
+            }
+        }
     }
 
     @Test("the byte path and the String path agree on plain ASCII")

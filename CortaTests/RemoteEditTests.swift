@@ -320,7 +320,10 @@ struct RemoteEditCoordinatorTests {
         try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
         fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
         let pending = try #require(fixture.coordinator.pendingUploads.first)
-        fixture.fake.onTransfer = { _, _ in throw SFTPError.transport(.connectionLost) }
+        fixture.fake.onTransfer = { call, _ in
+            if call.isUpload { throw SFTPError.transport(.connectionLost) }
+            try "remote v1".write(toFile: call.localPath, atomically: true, encoding: .utf8)
+        }
         fixture.coordinator.upload(pending)
         await waitUntil("failed upload reported") { !fixture.recorder.errors.isEmpty }
         #expect(fixture.fake.closed)
@@ -342,6 +345,9 @@ struct RemoteEditCoordinatorTests {
         first.onTransfer = { call, _ in
             if call.isUpload { throw SFTPError.transport(.connectionLost) }
             try "ok".write(toFile: call.localPath, atomically: true, encoding: .utf8)
+        }
+        second.onTransfer = { call, _ in
+            if !call.isUpload { try "ok".write(toFile: call.localPath, atomically: true, encoding: .utf8) }
         }
         var made = 0
         var errors: [String] = []
@@ -502,7 +508,7 @@ struct RemoteEditCoordinatorTests {
             _ = try await fixture.coordinator.open(
                 host: "build-box", remotePath: "/no/such/file.rs", line: 1, column: nil)
             Issue.record("expected a no-such-file failure")
-        } catch let error as SFTPError {
+        } catch {
             guard case .server(let status) = error, status.code == .noSuchFile else {
                 Issue.record("expected .server(noSuchFile), got \(error)")
                 return
@@ -566,6 +572,8 @@ struct RemoteEditCoordinatorTests {
             if call.isUpload {
                 fixture.fake.lstatResults["/srv/app/main.rs"] =
                     SFTPAttributes(size: 106, modificationTime: 2000)
+            } else {
+                try "remote v1".write(toFile: call.localPath, atomically: true, encoding: .utf8)
             }
         }
         fixture.coordinator.upload(pending)
@@ -713,6 +721,7 @@ struct RemoteEditCoordinatorTests {
 
         fixture.fake.onTransfer = { call, _ in
             if call.isUpload { throw SFTPError.transport(.connectionLost) }
+            try "remote v1".write(toFile: call.localPath, atomically: true, encoding: .utf8)
         }
         fixture.coordinator.upload(pending)
         await waitUntil("error presented") { !fixture.recorder.errors.isEmpty }
@@ -727,4 +736,103 @@ struct RemoteEditCoordinatorTests {
             fixture.coordinator.pendingUploads.count == 1,
             "the decision is still owed — the upload can be asked for again")
     }
+    @Test("same-size same-timestamp remote replacement requires a conflict decision")
+    func remoteContentReplacementIsDetected() async throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        _ = try await fixture.coordinator.open(host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
+        try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
+        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        let pending = try #require(fixture.coordinator.pendingUploads.first)
+        fixture.fake.onTransfer = { call, _ in
+            if !call.isUpload { try "remote v2".write(toFile: call.localPath, atomically: true, encoding: .utf8) }
+        }
+        fixture.coordinator.upload(pending)
+        await waitUntil("content conflict") { !fixture.coordinator.pendingConflicts.isEmpty }
+        #expect(!fixture.fake.transferCalls.contains { $0.isUpload })
+    }
+
+    /// Remote editing shipped in 1.0.0, before digests were recorded: such a
+    /// copy has only size and time to compare, as it did then, and the
+    /// upload records a digest for the next one.
+    @Test("a copy from before content digests uploads when size and time still match")
+    func legacyCopyWithoutDigestUploads() async throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        _ = try await fixture.coordinator.open(host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
+        let copy = try #require(fixture.store.copies[fixture.copyID])
+        fixture.store.updateRemoteStamp(copy, size: copy.remoteSize, mtime: copy.remoteMTime, digest: nil)
+        #expect(fixture.store.copies[fixture.copyID]?.remoteDigest == nil)
+        try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
+        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        let pending = try #require(fixture.coordinator.pendingUploads.first)
+        fixture.coordinator.upload(pending)
+        await waitUntil("uploaded") { fixture.fake.transferCalls.contains { $0.isUpload } }
+        #expect(fixture.coordinator.pendingConflicts.isEmpty)
+    }
+
+    @Test("approval snapshots a quit left behind are removed when the store opens")
+    func staleApprovalSnapshotsAreRemoved() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("corta-remote-edit-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let approvals = root.appendingPathComponent("Approvals")
+        try FileManager.default.createDirectory(at: approvals, withIntermediateDirectories: true)
+        try Data("a whole copy of a remote file".utf8)
+            .write(to: approvals.appendingPathComponent(UUID().uuidString))
+        let store = RemoteEditStore(rootURL: root)
+        #expect(store.approvalsURL.standardizedFileURL.path == approvals.standardizedFileURL.path)
+        #expect(!FileManager.default.fileExists(atPath: approvals.path))
+    }
+
+    @Test("an edit after the prompt requires a fresh approval")
+    func staleApprovalIsRejected() async throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        _ = try await fixture.coordinator.open(host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
+        try "first edit".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
+        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        let pending = try #require(fixture.coordinator.pendingUploads.first)
+        try "second edit".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
+        fixture.coordinator.upload(pending)
+        #expect(!fixture.fake.transferCalls.contains { $0.isUpload })
+        #expect(fixture.coordinator.pendingUploads.first?.contentDigest == RemoteEditStore.sha256Hex(Data("second edit".utf8)))
+    }
+
+    @Test("an edit during preflight cannot replace the approved upload bytes")
+    func uploadedBytesAreFrozen() async throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        _ = try await fixture.coordinator.open(host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
+        try "approved".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
+        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        let pending = try #require(fixture.coordinator.pendingUploads.first)
+        var uploaded: String?
+        fixture.fake.onTransfer = { call, _ in
+            if call.isUpload {
+                uploaded = try String(contentsOfFile: call.localPath, encoding: .utf8)
+            } else {
+                try "remote v1".write(toFile: call.localPath, atomically: true, encoding: .utf8)
+                try "later edit".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
+            }
+        }
+        fixture.coordinator.upload(pending)
+        await waitUntil("frozen upload") { uploaded != nil && fixture.coordinator.pendingUploads.first?.contentDigest != pending.contentDigest }
+        #expect(uploaded == "approved")
+        #expect(fixture.coordinator.pendingUploads.first?.contentDigest == RemoteEditStore.sha256Hex(Data("later edit".utf8)))
+    }
+
+    @Test("managed copies and their manifest use owner-only modes")
+    func managedCopyPermissions() async throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        _ = try await fixture.coordinator.open(host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
+        for url in [fixture.localCopyURL, fixture.root.appendingPathComponent("manifest.json")] {
+            let mode = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? NSNumber
+            #expect(mode?.intValue == 0o600)
+        }
+        let mode = try FileManager.default.attributesOfItem(atPath: fixture.root.path)[.posixPermissions] as? NSNumber
+        #expect(mode?.intValue == 0o700)
+    }
+
 }

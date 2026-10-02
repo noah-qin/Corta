@@ -70,7 +70,7 @@ import Testing
     }
 
     @Test func underlineCursorDrawsOnlyAtTheCellBottom() throws {
-        guard let device = MTLCreateSystemDefaultDevice() else {
+        guard MTLCreateSystemDefaultDevice() != nil else {
             Issue.record("No Metal device available in this environment")
             return
         }
@@ -87,7 +87,7 @@ import Testing
     }
 
     @Test func barCursorDrawsOnlyAtTheCellLeadingEdge() throws {
-        guard let device = MTLCreateSystemDefaultDevice() else {
+        guard MTLCreateSystemDefaultDevice() != nil else {
             Issue.record("No Metal device available in this environment")
             return
         }
@@ -103,7 +103,7 @@ import Testing
     }
 
     @Test func steadyBlockCursorFillsTheWholeCell() throws {
-        guard let device = MTLCreateSystemDefaultDevice() else {
+        guard MTLCreateSystemDefaultDevice() != nil else {
             Issue.record("No Metal device available in this environment")
             return
         }
@@ -122,7 +122,7 @@ import Testing
     /// in, for every style — the key was documented and parsed before it
     /// reached the renderer, which drew a fixed grey regardless.
     @Test func cursorIsPaintedInTheThemeCursorColour() throws {
-        guard let device = MTLCreateSystemDefaultDevice() else {
+        guard MTLCreateSystemDefaultDevice() != nil else {
             Issue.record("No Metal device available in this environment")
             return
         }

@@ -239,7 +239,11 @@ final class FakeSFTPServer: @unchecked Sendable {
     let fileSystem: FakeRemoteFileSystem
 
     /// Consulted before default handling for every request after INIT.
-    var interceptor: (@Sendable (SFTPMessage) -> FakeServerAction)?
+    private let interceptorStorage = Mutex<(@Sendable (SFTPMessage) -> FakeServerAction)?>(nil)
+    var interceptor: (@Sendable (SFTPMessage) -> FakeServerAction)? {
+        get { interceptorStorage.withLock { $0 } }
+        set { interceptorStorage.withLock { $0 = newValue } }
+    }
 
     /// Extensions advertised in VERSION, e.g. "statvfs@openssh.com".
     var advertisedExtensions: [String] = []

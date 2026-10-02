@@ -120,6 +120,7 @@ extension SFTPTransferEngine {
         for directory in plan.directories {
             let url = directory.isEmpty
                 ? localDirectory : localDirectory.appendingPathComponent(directory)
+            try Self.rejectLocalSymlinkComponents(url, within: localDirectory)
             if !FileManager.default.fileExists(atPath: url.path) {
                 do {
                     try FileManager.default.createDirectory(
@@ -140,6 +141,8 @@ extension SFTPTransferEngine {
                     filesCompleted: index, filesTotal: plan.files.count,
                     completedBytes: completedSoFar, totalBytes: plan.totalBytes,
                     currentFile: file.relativePath))
+            try Self.rejectLocalSymlinkComponents(
+                localDirectory.appendingPathComponent(file.relativePath), within: localDirectory)
             let fileReceipt = try await download(
                 remotePath: Self.join(remotePath, file.relativePath),
                 to: localDirectory.appendingPathComponent(file.relativePath),
@@ -163,6 +166,33 @@ extension SFTPTransferEngine {
                 filesCompleted: plan.files.count, filesTotal: plan.files.count,
                 completedBytes: completedBytes, totalBytes: plan.totalBytes, currentFile: ""))
         return receipt
+    }
+
+    /// Refuse existing symlink components from `url` up to and including
+    /// `root`, the folder the transfer creates or merges into. What lies
+    /// above `root` is the folder the user chose and its ancestors — a
+    /// `~/Downloads` that is a link to another volume is theirs to have.
+    /// This hardens pre-existing local state; it is not a race-proof sandbox
+    /// against another process deliberately replacing directories mid-transfer.
+    static func rejectLocalSymlinkComponents(_ url: URL, within root: URL) throws(SFTPError) {
+        let rootPath = root.standardizedFileURL.path
+        var current = url.standardizedFileURL
+        while current.path != "/", current.path.count >= rootPath.count {
+            var info = Darwin.stat()
+            if Darwin.lstat(current.path, &info) == 0 {
+                if info.st_mode & S_IFMT == S_IFLNK {
+                    // macOS /tmp and /var are system aliases, not tree entries.
+                    if current.path != "/tmp" && current.path != "/var" {
+                        throw .localIOFailed(operation: "symlink destination", code: ELOOP)
+                    }
+                } else if current != url.standardizedFileURL && info.st_mode & S_IFMT != S_IFDIR {
+                    throw .localIOFailed(operation: "directory destination", code: ENOTDIR)
+                }
+            } else if errno != ENOENT {
+                throw .localIOFailed(operation: "lstat destination", code: errno)
+            }
+            current.deleteLastPathComponent()
+        }
     }
 
     // MARK: - Upload

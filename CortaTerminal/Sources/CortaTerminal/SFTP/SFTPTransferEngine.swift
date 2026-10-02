@@ -421,11 +421,26 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         // and nothing open to leak.
         let handle = try await session.open(path: remotePath, flags: .read)
         let descriptor = Darwin.open(
-            partialPath, O_WRONLY | O_CREAT | O_CLOEXEC | (offset == 0 ? O_TRUNC : 0), 0o644)
+            partialPath, O_WRONLY | O_CREAT | O_CLOEXEC | O_NOFOLLOW | (offset == 0 ? O_TRUNC : 0), 0o600)
         guard descriptor >= 0 else {
             let code = errno
             await cleanUpRemote { try? await session.close(handle) }
             throw SFTPError.localIOFailed(operation: "open", code: code)
+        }
+
+        // Resumed partials from older builds also become private before use.
+        // A volume without ACLs (exFAT, FAT, some SMB shares) answers
+        // ENOTSUP: it has no inherited ACL to clear, and refusing it would
+        // make every download to a USB stick fail.
+        let emptyACL = acl_init(0)
+        var aclResult = emptyACL.map { acl_set_fd_np(descriptor, $0, ACL_TYPE_EXTENDED) } ?? -1
+        if aclResult != 0, errno == ENOTSUP || errno == EOPNOTSUPP { aclResult = 0 }
+        if let emptyACL { acl_free(UnsafeMutableRawPointer(emptyACL)) }
+        guard aclResult == 0, Darwin.fchmod(descriptor, 0o600) == 0 else {
+            let code = errno
+            Darwin.close(descriptor)
+            await cleanUpRemote { try? await session.close(handle) }
+            throw SFTPError.localIOFailed(operation: "private download permissions", code: code)
         }
 
         let abort = AbortFlag()

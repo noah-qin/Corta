@@ -19,6 +19,7 @@ import CoreText
 import CortaTerminal
 import Metal
 import QuartzCore
+import Synchronization
 
 /// One pane: a `TerminalSession` and the renderer and view that draw it.
 /// Knows no sibling panes beyond `splitController` (D07). This file owns
@@ -127,6 +128,11 @@ class ViewController: NSViewController {
     /// `cachedDirectory` if it was a directory when it last changed: the
     /// title bar's proxy icon.
     private var representedDirectory: URL?
+    private var directoryProbeGeneration = 0
+    // At most two blocked filesystem probes process-wide. Admission does not
+    // queue work: a hung mount must not grow a backlog of threads or closures.
+    nonisolated private static let directoryProbes = Mutex(0)
+    var directoryCheckerForTesting: (@Sendable (String) -> Bool)?
     private var cachedRemoteState: PaneRemoteState = .local
     /// Shared by both readers so they supersede the same report.
     private var remoteReportTracker = PaneRemoteState.ReportTracker()
@@ -570,6 +576,7 @@ class ViewController: NSViewController {
     func teardown() {
         guard !didTeardown else { return }
         didTeardown = true
+        directoryProbeGeneration += 1
         trailingTitleRefresh?.cancel()
         trailingTitleRefresh = nil
         closeSearchBar()
@@ -845,15 +852,50 @@ class ViewController: NSViewController {
         }
     }
 
-    /// `path` as a URL if it names a directory now. A `stat`: on a network
-    /// volume it waits on the server, so it runs when the directory changes,
-    /// not on every title rebuild — which is every output batch.
-    private static func existingDirectoryURL(_ path: String?) -> URL? {
-        var isDirectory: ObjCBool = false
-        guard let path, FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
-            isDirectory.boolValue
-        else { return nil }
-        return URL(fileURLWithPath: path)
+    static let directoryProbeRetryDelay: TimeInterval = 2
+
+    /// OSC 7 paths can point at an unresponsive network mount. Never stat on
+    /// the main actor, and never publish a result for a superseded path.
+    func probeRepresentedDirectory(_ path: String?) {
+        directoryProbeGeneration += 1
+        let generation = directoryProbeGeneration
+        representedDirectory = nil
+        guard let path else { return }
+        let admitted = Self.directoryProbes.withLock { active in
+            guard active < 2 else { return false }
+            active += 1
+            return true
+        }
+        // Two probes are already stuck on a slow mount. Try again shortly,
+        // rather than leave this pane without its proxy icon until the next
+        // `cd`; a newer path in the meantime supersedes the retry.
+        guard admitted else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.directoryProbeRetryDelay) {
+                [weak self] in
+                guard let self, !self.didTeardown, generation == self.directoryProbeGeneration
+                else { return }
+                self.probeRepresentedDirectory(path)
+            }
+            return
+        }
+        let checker = directoryCheckerForTesting
+        Task.detached(priority: .utility) { [weak self] in
+            let exists: Bool
+            if let checker {
+                exists = checker(path)
+            } else {
+                var isDirectory: ObjCBool = false
+                exists = FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
+                    && isDirectory.boolValue
+            }
+            Self.directoryProbes.withLock { $0 -= 1 }
+            await MainActor.run { [weak self] in
+                guard let self, !self.didTeardown,
+                    generation == self.directoryProbeGeneration else { return }
+                self.representedDirectory = exists ? URL(fileURLWithPath: path) : nil
+                self.applyWindowTitle()
+            }
+        }
     }
 
     /// Shows the grid size in the title for a moment after a resize, then
@@ -899,7 +941,7 @@ class ViewController: NSViewController {
         let directory = session.currentDirectory
         if directory != cachedDirectory {
             cachedDirectory = directory
-            representedDirectory = Self.existingDirectoryURL(directory)
+            probeRepresentedDirectory(directory)
         }
         cachedRemoteState = resolveRemoteState()
     }
