@@ -209,6 +209,33 @@ struct SFTPBrowserDropTests {
 }
 
 @MainActor
+struct SFTPDragExportTests {
+    @Test("a file dragged to Finder downloads into a private folder that closing removes")
+    func dragExport() async throws {
+        let fake = FakeSFTPClient()
+        fake.listings["/srv"] = [entry("notes.txt"), entry("logs", directory: true)]
+        fake.onTransfer = { call, _ in
+            try Data("remote".utf8).write(to: URL(fileURLWithPath: call.localPath))
+        }
+        let model = await connected(fake)
+        let file = try #require(model.entries.first { $0.name == "notes.txt" })
+        let url = try await model.exportForDrag(file)
+        #expect(url.lastPathComponent == "notes.txt")
+        #expect(try String(contentsOf: url, encoding: .utf8) == "remote")
+        let folder = url.deletingLastPathComponent()
+        let mode = try FileManager.default.attributesOfItem(atPath: folder.path)[.posixPermissions] as? Int
+        #expect(mode == 0o700)
+        #expect(model.transfers.count == 1, "the drag has a progress row like any download")
+
+        let directory = try #require(model.entries.first { $0.name == "logs" })
+        await #expect(throws: (any Error).self) { try await model.exportForDrag(directory) }
+
+        model.removeDragStaging()
+        #expect(!FileManager.default.fileExists(atPath: folder.path))
+    }
+}
+
+@MainActor
 struct SFTPTransferListTests {
     @Test("the rate needs two samples half a second apart, then follows a third of the way")
     func rateSmoothing() {

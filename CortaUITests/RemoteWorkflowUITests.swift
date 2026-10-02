@@ -63,10 +63,11 @@ final class RemoteWorkflowUITests: XCTestCase {
     /// Edit (the "editor" rewrites the managed copy) → the upload prompt →
     /// the remote file changed, no partial left → the fake remote shell
     /// exits → Reconnect → the badge is back → the stage is removed.
-    /// The browser window once connected: its title starts with SFTP.
+    /// The browser window, found by its identifier: its title is the host
+    /// once one is decided, and "Remote Files" before.
     @MainActor
     private func connectedBrowserWindow(_ app: XCUIApplication) -> XCUIElement {
-        app.windows.element(matching: NSPredicate(format: "title BEGINSWITH 'SFTP'"))
+        app.windows["Corta.SFTPBrowser"]
     }
 
     @MainActor
@@ -127,7 +128,7 @@ final class RemoteWorkflowUITests: XCTestCase {
         XCTAssertTrue(browse.waitForExistence(timeout: 2))
         XCTAssertTrue(browse.isEnabled, "a remote pane must offer the browser")
         browse.click()
-        let browser = app.windows.element(matching: NSPredicate(format: "title BEGINSWITH 'SFTP'"))
+        let browser = app.windows["Corta.SFTPBrowser"]
         let spawnedAtOpen = FileManager.default.fileExists(atPath: stage.appendingPathComponent("sftp-ssh.log").path)
         XCTAssertTrue(
             browser.waitForExistence(timeout: 5),
@@ -152,8 +153,8 @@ final class RemoteWorkflowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["src"].exists)
         XCTAssertTrue(
             waitUntil(timeout: 5) {
-                app.windows.element(matching: NSPredicate(format: "title BEGINSWITH 'SFTP'")).exists
-            }, "the native browser title must include its host once connected")
+                app.windows["Corta.SFTPBrowser"].title.contains("fakebox")
+            }, "the browser is titled with its host once connected")
         XCTAssertTrue(
             (try? String(contentsOf: stage.appendingPathComponent("sftp-ssh.log"), encoding: .utf8))?
                 .contains("-s -- fakebox sftp") == true, "the channel's argv")
@@ -167,12 +168,16 @@ final class RemoteWorkflowUITests: XCTestCase {
         // overflow chevron, as a submenu; at a wider one it is a button.
         let toolbar = connectedBrowserWindow(app).toolbars.firstMatch
         let more = toolbar.descendants(matching: .any)
-            .matching(NSPredicate(format: "label == 'More actions'")).firstMatch
-        if more.exists {
+            .matching(NSPredicate(format: "label == 'More actions' OR title == 'More actions'")).firstMatch
+        // The connected toolbar is rebuilt once the listing arrives; give
+        // it a moment before deciding the menu is in the overflow.
+        if more.waitForExistence(timeout: 3) {
             more.click()
         } else {
             let overflow = toolbar.popUpButtons["more toolbar items"]
-            XCTAssertTrue(overflow.waitForExistence(timeout: 2), "the toolbar's overflow menu")
+            XCTAssertTrue(
+                overflow.waitForExistence(timeout: 2),
+                "the toolbar's overflow menu; toolbar: \(toolbar.debugDescription); windows: \(app.windows.allElementsBoundByIndex.map { $0.identifier + "|" + $0.title })")
             overflow.click()
             let submenu = app.menuItems["More actions"]
             XCTAssertTrue(submenu.waitForExistence(timeout: 2), "More Actions in the overflow")
@@ -215,7 +220,7 @@ final class RemoteWorkflowUITests: XCTestCase {
         // local (no badge), Reconnect is offered and starts a new
         // connection whose far end reports again.
         // AppKit combines the title and host subtitle in accessibility.
-        let connectedBrowser = app.windows.element(matching: NSPredicate(format: "title BEGINSWITH 'SFTP'"))
+        let connectedBrowser = app.windows["Corta.SFTPBrowser"]
         connectedBrowser.buttons[XCUIIdentifierCloseWindow].click()
         XCTAssertTrue(waitUntil(timeout: 5) { app.windows.count == 1 }, "the browser must close")
         let terminal = app.windows.firstMatch

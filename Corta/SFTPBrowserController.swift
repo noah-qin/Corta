@@ -114,6 +114,8 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
+        // Found by tests and Accessibility whatever host names the window.
+        window.identifier = NSUserInterfaceItemIdentifier("Corta.SFTPBrowser")
         // Wide enough that the toolbar — Back and Forward, the title, the
         // path, the transfer actions and More — never overflows into a
         // chevron at the size the window opens at.
