@@ -192,7 +192,7 @@ integration does). From the command palette:
 
 The folder icon in the title bar is the directory too: drag it, or ⌘-click
 it to see the path. With `directory-history` on, Corta remembers the
-directories your commands ran in; **Settings ▸ General ▸ History** shows
+directories your commands ran in; **Settings ▸ Privacy & Security ▸ History** shows
 how many and clears them.
 
 ## Remote work: SSH and SFTP
@@ -206,10 +206,22 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
   pane is remote without knowing which host.
 - **Reconnect.** When an `ssh` or `mosh` session ends, **Reconnect to Host**
   runs the same command again, as a new connection.
+- **Connecting.** The toolbar's globe and folder buttons open a sheet for an
+  SSH terminal or an SFTP browser. It lists the hosts you connected to
+  recently and the `Host` names in your `~/.ssh/config`; type to narrow the
+  list, click one to fill the field, double-click to connect. Settings ▸
+  Privacy & Security ▸ Recent Hosts clears the recent ones.
 - **Browse Remote Files…** opens an SFTP browser for the pane's host: list,
   upload, download, rename and delete. The first connection to a host asks
   you to confirm the host name. Transfers resume after an interruption and
   never overwrite a file without asking.
+- **In the browser**, as in Finder: ⌘[ and ⌘] go back and forward, ⌘↑ to
+  the enclosing folder, ⌘R refreshes, ⇧⌘G (or a click on the path) types a
+  path, ⇧⌘N makes a folder and ⇧⌘. shows hidden files. Click a column title
+  to sort. Right-click a row for its actions; double-click a folder to open
+  it. Drop files from Finder on the listing — or on a folder row — to upload
+  them, and drag a file out to Finder to download it. Transfers are under
+  the toolbar's arrows button, with speed, time left and Show in Finder.
 - **Editing a remote file.** **Edit** in the browser — or ⌘-clicking a
   `path:line` in a remote pane — downloads a copy and opens it in your
   editor. Uploading your changes is a separate, explicit step, and Corta
@@ -275,17 +287,31 @@ All settings live in one text file, `~/.config/corta/config`. **Corta ▸
 Settings…** (⌘,) edits the same file, and editing the file by hand is just
 as supported:
 
-Settings retains Appearance, Terminal, and General tabs. Appearance offers
-verified installed fonts; Terminal includes command-history limits, mouse
-override, and search defaults. General records app shortcuts and the Quick
-Terminal hotkey, and opens preset management. These controls edit the same
-config file. Custom theme colors remain configurable through the file.
+Settings is a sidebar of categories, the way System Settings is laid out:
 
-The window toolbar adds SSH and SFTP. SSH accepts `user@host` or a config
-alias; an empty port respects OpenSSH configuration. SFTP opens the remote
-pane's browser, or asks for a host when the pane is local. The SFTP toolbar
-contains navigation and uploads/downloads. More Actions contains file
-management and a toggle for detailed columns; transfer history can be folded.
+- **General** — the new-window size, restoring windows, confirming close,
+  long-task notifications and updates.
+- **Appearance** — light or dark, verified installed fonts, size, and a
+  preview.
+- **Terminal** — scrollback, the command-history limit, the bell, search
+  defaults, the open-file command and shell integration.
+- **Keyboard & Mouse** — Option as Meta, how links open, the modifier that
+  selects text while a program owns the mouse, and copy on select.
+- **Shortcuts** — every command's key; a reset arrow appears beside one you
+  have changed.
+- **Quick Terminal** — the system-wide hotkey, position and screen.
+- **Connections** — Connect with SSH, and saved presets.
+- **Privacy & Security** — clipboard writes from programs (OSC 52), Secure
+  Keyboard Entry, and the directory history.
+
+These controls edit the same config file. Custom theme colors remain
+configurable through the file.
+
+The window toolbar adds SSH and SFTP. Both open a sheet on the window that
+accepts `user@host` or a config alias and suggests recent and configured
+hosts; an empty SSH port respects OpenSSH configuration, and SFTP takes its
+port from a `Host` alias. SFTP opens the remote pane's browser, or asks for a
+host when the pane is local ([Remote work](#remote-work-ssh-and-sftp)).
 
 ```ini
 theme = corta

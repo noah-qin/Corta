@@ -407,6 +407,20 @@ made them.
   `RemoteHostConsent`, in memory for the run, never persisted. Without
   that step, any bytes the far end printed could have pointed the next
   ⌘-click's download — and the agent's keys — at a host of their choosing.
+  The connect sheets' suggestions keep to the same rule. *Recent hosts* are
+  only names the user typed or picked and then connected to — never one a
+  pane reported — kept newest first, at most eight, in
+  `recent-hosts.json` in Application Support (owner-only, `0600`), and
+  cleared from Settings ▸ Privacy & Security. *SSH config aliases* are read
+  from `~/.ssh/config` and its `Include`s: only the names after `Host`,
+  patterns left out, never a `Match exec`, `ProxyCommand` or any other value,
+  nothing executed; at most 32 files of 256 KiB, four levels of `Include`
+  and 200 names. Both lists pass the same character check a typed host does
+  (`SSHDestination`), so neither file can put anything into `ssh`'s argv that
+  could not have been typed, and picking one only fills the field. A file
+  dragged from the SFTP browser to Finder is downloaded first into a fresh
+  `0700` folder under the temporary directory, which the browser removes
+  when its window closes.
 - **S08 — 2026-09-06: PTY operations refuse a closed descriptor, and a
   reaped child's group is never signalled.** A descriptor number is the
   kernel's to recycle the instant `close()` runs, but `PTY` kept using its

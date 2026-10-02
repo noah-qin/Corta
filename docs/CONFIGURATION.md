@@ -78,7 +78,7 @@ into another application hides it without moving focus again.
 | Key | Values | Default | Notes |
 | --- | --- | --- | --- |
 | `quick-terminal` | boolean | `false` | Whether Corta holds `quick-terminal-key` **system-wide**. Off by default: a global hotkey is claimed in every application, and the key a person would want is one their launcher may already own. The panel is always reachable from View ▸ Quick Terminal, the command palette and the *Toggle Quick Terminal* Shortcuts action — this key only adds the hotkey. |
-| `quick-terminal-key` | a shortcut, or empty | `alt+space` | In `bind.*` notation (§5). Needs at least one modifier — a bare key claimed everywhere would swallow ordinary typing. The key is matched by **position on the ANSI layout**, the way every Carbon hotkey is, so `t` names the key cap, not what the current input source types there. Empty means no hotkey. If the system refuses the registration (another app holds the key) Settings ▸ General says so; the panel then opens from the menu only. |
+| `quick-terminal-key` | a shortcut, or empty | `alt+space` | In `bind.*` notation (§5). Needs at least one modifier — a bare key claimed everywhere would swallow ordinary typing. The key is matched by **position on the ANSI layout**, the way every Carbon hotkey is, so `t` names the key cap, not what the current input source types there. Empty means no hotkey. If the system refuses the registration (another app holds the key) Settings ▸ Quick Terminal says so; the panel then opens from the menu only. |
 | `quick-terminal-position` | `top`, `bottom`, `center` | `top` | `top`/`bottom`: a band the width of the screen and 40% of its visible height, on that edge — under the menu bar and clear of the Dock. `center`: a panel 70% × 60% of the screen, centred. |
 | `quick-terminal-screen` | `mouse`, `main` | `mouse` | Which display the panel opens on: the one under the pointer when the hotkey is pressed, or `NSScreen.main` (the display holding the key window, else the primary). |
 
@@ -175,7 +175,7 @@ Not the config file's own state: `directory-history` only gates whether
 `DirectoryHistoryStore` reads and writes its file (Application Support, not
 `~/.config/corta/config` — the same split `SessionRestore` draws between
 settings and app-managed state). Turning the key off stops it being read
-*or* written; **Clear** in Settings ▸ General ▸ History empties it (and
+*or* written; **Clear** in Settings ▸ Privacy & Security ▸ History empties it (and
 deletes the file) regardless of the setting. Ranking is frecency — visit
 count that halves every three days — with favorites always sorted first;
 `DirectoryHistory.projectRoot(for:)` separately finds the nearest ancestor

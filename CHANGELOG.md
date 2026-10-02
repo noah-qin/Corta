@@ -36,9 +36,18 @@ what to edit.
 - Debug-only SFTP connected-state preview with sample files and transfer rows;
   the connection window opens centered, with a centered host form.
 
-- SSH and SFTP toolbar entries. Settings keeps its original three tabs and
+- SSH and SFTP toolbar entries, each opening a sheet on the window. The
+  sheet suggests the hosts you connected to recently and the `Host` names in
+  your `~/.ssh/config` (read, never run); typing narrows the list, a click
+  fills the field, a double-click connects. Recent hosts can be cleared in
+  Settings ▸ Privacy & Security.
+
+- Settings is a sidebar of eight categories — General, Appearance,
+  Terminal, Keyboard & Mouse, Shortcuts, Quick Terminal, Connections, and
+  Privacy & Security — where General alone used to hold eight sections. It
   adds verified font selection, command-history limits, mouse override,
-  search defaults, shortcut recording, and preset management.
+  search defaults, shortcut recording (a reset arrow beside a changed one)
+  and preset management in place.
 
 - About ▸ Acknowledgements shows the license of Sparkle, the updater Corta
   ships with, and the notices of the code Sparkle bundles — terms that
@@ -46,9 +55,20 @@ what to edit.
 
 ### Changed
 
-- SFTP uses a native glass toolbar, three default columns, optional detailed
-  columns, and a collapsible transfer section. The host-entry title and
-  explanation are centered.
+- The SFTP browser works the way Finder does: Back and Forward (⌘[ ⌘]), a
+  breadcrumb path that becomes a field on a click or ⇧⌘G, columns that sort,
+  sizes aligned right, dates such as "Yesterday at 20:00", hidden files on
+  request (⇧⌘.), and a right-click menu on rows. Drop files on the listing
+  or on a folder row to upload them; drag a file to Finder to download it.
+  Transfers moved from a section under the listing to a toolbar button with
+  a progress ring, whose list shows speed and time left, Show in Finder for
+  a finished download, and Clear. The window is titled with the host; the
+  toolbar no longer overflows at the size it opens at; a connection can be
+  cancelled while it is being made, and a failed one corrected in place.
+
+- The find bar has a visible edge and shadow on any background, shrinks
+  with a narrow split pane instead of covering it, and moves to the bottom
+  of the pane while the cursor or the current match is under it.
 
 - **Intel Macs are no longer supported.** Corta now runs only on Macs
   with Apple silicon (M1 or later); the minimum macOS stays 26.0. 1.0.1 is
