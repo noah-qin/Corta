@@ -347,8 +347,16 @@ bind.equalize-panes = ctrl+cmd+e
 bind.close =
 ```
 
-**Help ▸ Keyboard Shortcuts** shows the ones in effect. The defaults, as
-of this version — [Keyboard shortcuts](CONFIGURATION.md#5-keyboard-shortcuts)
+**Help ▸ Keyboard Shortcuts** shows the ones in effect in aligned columns;
+commands without a binding are labelled **Not Set**. The terminal context
+menu shows the same configured shortcuts.
+
+The **Shell** menu keeps splitting, reopening and Clear Screen directly
+available. Other tools are grouped under **Move Focus**, **Commands and
+Output**, **Working Directory**, **Pane Layout**, and **Terminal and
+Connection**.
+
+The defaults, as of this version — [Keyboard shortcuts](CONFIGURATION.md#5-keyboard-shortcuts)
 is the authoritative list:
 
 | Command | Shortcut |

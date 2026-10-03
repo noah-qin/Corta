@@ -122,7 +122,7 @@ struct TerminalStateCommandWiringTests {
             menu.items.first { $0.title == L10n.text("menu.shell") || $0.title == "Shell" }?.submenu)
         for command in [TerminalCommand.clearScreen, .clearHistory, .resetTerminal] {
             #expect(
-                shell.items.contains { $0.action == command.action },
+                shell.descendantItems.contains { $0.action == command.action },
                 "\(command.rawValue) is not in the Shell menu")
         }
     }

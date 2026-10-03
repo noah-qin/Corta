@@ -14,6 +14,8 @@ repository root.
 | `screenshot.png`            | The README screenshot — light theme, a clean demo shell          |
 | `sftp-browser.png`          | The SFTP browser with an upload in its transfers popover         |
 | `settings.png`              | The Settings window, Appearance page                             |
+| `shortcuts.png`             | Keyboard Shortcuts with aligned bindings and grouped sections    |
+| `about.png`                 | About with separated links (development build)                   |
 | `compose-screenshot.swift`  | Adds the shadow, margin and poster type to a window capture      |
 | `social-preview.png`        | GitHub social preview card, 1280 × 640                            |
 | `social-preview.swift`      | Renders the card above                                           |

@@ -24,26 +24,28 @@ extension ViewController {
 
     /// The right-click menu: editing and split actions, with explicit targets
     /// so it also works when shown programmatically.
-    func contextMenu(for terminalView: TerminalView) -> NSMenu {
+    func contextMenu(for terminalView: TerminalView, bindings suppliedBindings: Keybindings? = nil) -> NSMenu {
         let menu = NSMenu()
-        func item(_ title: String, _ action: Selector, _ target: AnyObject?, enabled: Bool = true) {
-            let menuItem = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        let bindings = suppliedBindings ?? ConfigurationStore.shared.configuration.keybindings
+        func item(_ command: TerminalCommand, _ target: AnyObject?, title: String? = nil, enabled: Bool = true) {
+            let shortcut = bindings[command]
+            let menuItem = NSMenuItem(
+                title: title ?? command.title, action: command.action,
+                keyEquivalent: shortcut?.menuKeyEquivalent ?? "")
+            menuItem.keyEquivalentModifierMask = shortcut?.menuModifierMask ?? []
             menuItem.target = target
             menuItem.isEnabled = enabled
             menu.addItem(menuItem)
         }
-        item("Copy", #selector(copy(_:)), self, enabled: selection != nil)
-        item("Paste", #selector(paste(_:)), self)
-        item("Select All", #selector(selectAll(_:)), self)
+        item(.copy, self, enabled: selection != nil)
+        item(.paste, self)
+        item(.selectAll, self)
         if let splitController {
             menu.addItem(.separator())
-            item("Split Pane Right", #selector(SplitViewController.splitRight(_:)), splitController)
-            item("Split Pane Down", #selector(SplitViewController.splitDown(_:)), splitController)
-            // With one pane, the close is the window's.
-            let hasSplits = splitController.hasMultiplePanes
-            item(
-                hasSplits ? "Close Pane" : "Close Window",
-                #selector(SplitViewController.performClose(_:)), splitController)
+            item(.splitRight, splitController)
+            item(.splitDown, splitController)
+            let closeTitle = L10n.text(splitController.hasMultiplePanes ? "menu.closePane" : "menu.closeWindow")
+            item(.close, splitController, title: closeTitle)
         }
         return menu
     }

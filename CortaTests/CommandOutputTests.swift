@@ -243,7 +243,7 @@ struct CommandOutputWiringTests {
         for command in [
             TerminalCommand.previousFailedCommand, .nextFailedCommand, .copyLastCommandOutput,
         ] {
-            #expect(shell.items.contains { $0.action == command.action })
+            #expect(shell.descendantItems.contains { $0.action == command.action })
         }
     }
 }

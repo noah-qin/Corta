@@ -45,7 +45,7 @@ struct CommandHistoryWiringTests {
             .changeDirectoryToParent, .changeDirectoryToProjectRoot,
             .openParentDirectoryInNewPane, .openProjectRootInNewPane, .searchCommandHistory,
         ] {
-            #expect(shell.items.contains { $0.action == command.action })
+            #expect(shell.descendantItems.contains { $0.action == command.action })
         }
     }
 

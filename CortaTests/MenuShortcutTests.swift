@@ -144,6 +144,30 @@ struct MenuShortcutTests {
         return result
     }
 
+    @Test("context menu shortcuts follow current bindings, including rebinds and unbinding")
+    func contextMenuUsesCurrentBindings() throws {
+        let original = ConfigurationStore.shared.configuration
+        let split = SplitViewController()
+        _ = split.view
+        defer { split.teardown() }
+        let pane = try #require(split.focusedPane)
+        let commands: [TerminalCommand] = [.copy, .paste, .selectAll, .splitRight, .splitDown, .close]
+        let rebound = Configuration.parse("bind.split-right = cmd+e\nbind.copy =").0
+        #expect(rebound.keybindings[.copy] == nil)
+        #expect(rebound.keybindings[.splitRight] == Shortcut.parse("cmd+e"))
+        // Hosted CI has no Metal 4 device, so the pane may show a fallback
+        // instead of installing terminalView. Menu construction needs no GPU.
+        let terminalView = TerminalView(frame: .zero)
+        for config in [original, rebound] {
+            let menu = pane.contextMenu(for: terminalView, bindings: config.keybindings)
+            for command in commands {
+                let item = try #require(menu.items.first { $0.action == command.action })
+                #expect(item.keyEquivalent == (config.keybindings[command]?.menuKeyEquivalent ?? ""))
+                #expect(item.keyEquivalentModifierMask == (config.keybindings[command]?.menuModifierMask ?? []))
+            }
+        }
+    }
+
     @Test func commandMinusIsTheViewMenusSmaller() throws {
         let menu = try #require(NSApp.mainMenu)
         let claims = Self.shortcuts(in: menu).filter {

@@ -73,7 +73,7 @@ struct SFTPBrowserWiringTests {
         let menu = try #require(NSApp.mainMenu)
         let shell = try #require(
             menu.items.first { $0.title == L10n.text("menu.shell") || $0.title == "Shell" }?.submenu)
-        let actions = shell.items.compactMap(\.action)
+        let actions = shell.descendantItems.compactMap(\.action)
         let browse = try #require(
             actions.firstIndex(of: #selector(ViewController.browseRemoteFiles(_:))))
         let directories = try #require(
