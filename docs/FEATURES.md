@@ -2,7 +2,7 @@
 
 [Documentation index](README.md) · [Project overview](../README.md)
 
-This reference describes **1.1.0** and the development tree on `main` since
+This reference describes **1.1.1** and the development tree on `main` since
 it; a feature added after the release is listed under `[Unreleased]` in the
 [changelog](../CHANGELOG.md).
 Configuration keys and defaults are maintained in [Configuration](CONFIGURATION.md);
@@ -43,7 +43,8 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
 
 ## Shell and remote work
 
-- OSC 133 shell integration: prompt marks, command history, command-output
+- OSC 133 shell integration: prompt marks (empty Return has no result mark
+  in 1.1.1), command history, command-output
   copy/export, navigation between commands and long-task notifications.
   Install or remove the bundled zsh, bash or fish hooks in **Settings ▸
   Terminal**; they go into the login shell's startup file.

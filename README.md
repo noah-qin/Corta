@@ -117,12 +117,12 @@ checksum, unzip the archive and move `Corta.app` to `/Applications`.
 
 ```sh
 # Run in the directory containing both downloaded files.
-shasum -a 256 -c Corta-1.1.0.zip.sha256
-unzip Corta-1.1.0.zip
+shasum -a 256 -c Corta-1.1.1.zip.sha256
+unzip Corta-1.1.1.zip
 ```
 
 > [!NOTE]
-> **Release status:** [1.1.0](https://github.com/noah-qin/Corta/releases/tag/v1.1.0),
+> **Release status:** [1.1.1](https://github.com/noah-qin/Corta/releases/tag/v1.1.1),
 > published on 2026-10-03, is the current release. Every release archive
 > is signed with a Developer ID and notarised, and updates reach an
 > installed Corta through a signed feed. Changes on `main` are recorded
@@ -130,6 +130,8 @@ unzip Corta-1.1.0.zip
 > release.
 
 For updates, use **Corta ▸ Check for Updates…** or download a newer release.
+After updating to 1.1.1, use **Settings ▸ Terminal ▸ Shell Integration ▸ Update**
+and open a new shell to apply the empty-Return fix to an existing integration.
 Installation help and uninstall instructions are in
 [Troubleshooting](docs/TROUBLESHOOTING.md).
 
@@ -192,6 +194,8 @@ are snapshots, not guarantees for every machine or workload.
 | Keypress to glass | 66.3 ms average, p95 78.7 ms; above target | [Method and limitations](docs/PERFORMANCE.md) |
 | esctest2 | 126 passed, 334 known bugs, 107 failed; 567 total | [Raw results](docs/esctest/2026-10-03-results.txt) |
 
+The 1.1.1 emergency patch re-ran the scripted core benchmarks; results and
+measurement limits are in [Performance](docs/PERFORMANCE.md#56-numbers-by-release).
 Performance was measured on Apple M5, macOS 27.0.1, for the 1.1.0 release
 on 2026-10-03; idle CPU and keypress to glass are the 1.0.0 run's
 (2026-09-18), not re-measured since. The cited report records power

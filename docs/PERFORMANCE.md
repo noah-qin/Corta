@@ -532,26 +532,27 @@ full run — machine state, every scenario, the energy tables and the
 reading of them — is its record under `history/`:
 [1.0.0](history/2026-09-18-V1.0.0-BENCHMARK-RUN.md),
 [1.0.1](history/2026-09-21-V1.0.1-BENCHMARK-RUN.md),
-[1.1.0](history/2026-10-03-V1.1.0-BENCHMARK-RUN.md).
+[1.1.0](history/2026-10-03-V1.1.0-BENCHMARK-RUN.md),
+[1.1.1](history/2026-10-03-V1.1.1-BENCHMARK-RUN.md).
 
-| Metric | 1.1.0 (2026-10-03) | 1.0.1 (2026-09-21) | 1.0.0 (2026-09-18) | How |
-| --- | --- | --- | --- | --- |
-| Core feed throughput | 144.1 MiB/s (one run) | 138.5 MiB/s (one run) | **144.2 MiB/s** (5-run mean; 141.2–146.6) | `corta-bench`, `-c release` |
-| Parser-only / parser + grid | 779.4 / 167.2 MiB/s | 766.9 / 161.4 MiB/s | 806.3 / 166.9 MiB/s | same run |
-| Memory @ 100k × 120 lines | 185.0 MB | 184.4 MB | **185.0 MB** | `corta-bench` |
-| Keypress → grid (core side) | p50 0.018 / p95 0.023 / p99 0.029 ms | p50 0.009 / p95 0.011 / p99 0.012 ms | p50 0.014 / p95 0.018 / p99 0.020 ms | `corta-bench`, 2000 samples; excludes vsync and display |
-| Frame CPU, 120×40 full rebuild, Debug | not comparable — now a Release figure, next row | **1.79 ms** avg (1.76 / 1.75 / 1.87) | **2.26 ms** avg (2.31 / 2.26 / 2.20) | `FrameCPUBaselineTests` (D17), Debug test action; from 1.1.0 a Release figure (§5.8) |
-| Frame CPU, 120×40 full rebuild, Release | **0.87 ms** avg (0.86 / 0.88 / 0.88); full rebuild CPU-only p50 0.13–0.15 ms | — | — | `FrameCPUBaselineTests` (D17), §5.8 command |
-| Live frame CPU, Release, 2 / 4 panes flooded | not re-measured | not re-measured | avg 0.60 / 0.14–0.49 ms; p99 2.59 / 0.38–0.45 | `MeasurementUITests` floods, `CORTA_RENDER_METRICS` |
-| GPU, 2 / 4 panes flooded | not re-measured | not re-measured | avg 0.49 / 0.47 ms | same |
-| Idle CPU, Release, 20 s | not re-measured | not re-measured | **0.05%**; occluded 0.0–0.1% | same |
-| Launch → first window | not re-measured | not re-measured | 208 ms (2-pane restore), 451 ms (4-pane) | same |
-| Spawn: `zsh -l` → first output | p50 41.2 ms | p50 46.8 ms | p50 44.5 ms | `corta-bench` |
-| Reflow, 100k lines, 120 → 80 columns | **51.2 ms** | 97.9 ms | 94.1 ms | `corta-bench` |
-| Search, 100k lines, one query | **25.6 ms** warm | ~400 ms warm | ~395 ms warm | `corta-bench` |
-| Keypress → glass, scripted | not re-measured | not re-measured | **61.9 ms** avg; p50 61.4 / p95 69.7 / p99 70.9 | §5.7 |
-| Keypress → glass, a person typing | not re-measured | not re-measured | **66.3 ms** avg; p50 67.0 / p95 78.7 / p99 84.5 | §5.7, `--manual` |
-| Energy, background flood (`yes`, occluded) | not re-measured | not re-measured | 10.2 W machine-wide on mains; 2.6 W in Low Power Mode; idle, occluded and a static image within the machine's noise floor | 1.0.0: a `powermetrics` script, since removed; now an *Activity Monitor* trace (§5.6 note) |
+| Metric | 1.1.1 (2026-10-03) | 1.1.0 (2026-10-03) | 1.0.1 (2026-09-21) | 1.0.0 (2026-09-18) | How |
+| --- | --- | --- | --- | --- | --- |
+| Core feed throughput | 137.8 MiB/s (one run) | 144.1 MiB/s (one run) | 138.5 MiB/s (one run) | **144.2 MiB/s** (5-run mean; 141.2–146.6) | `corta-bench`, `-c release` |
+| Parser-only / parser + grid | 751.7 / 155.4 MiB/s | 779.4 / 167.2 MiB/s | 766.9 / 161.4 MiB/s | 806.3 / 166.9 MiB/s | same run |
+| Memory @ 100k × 120 lines | 185.0 MB | 185.0 MB | 184.4 MB | **185.0 MB** | `corta-bench` |
+| Keypress → grid (core side) | p50 0.012 / p95 0.014 / p99 0.016 ms | p50 0.018 / p95 0.023 / p99 0.029 ms | p50 0.009 / p95 0.011 / p99 0.012 ms | p50 0.014 / p95 0.018 / p99 0.020 ms | `corta-bench`, 2000 samples; excludes vsync and display |
+| Frame CPU, 120×40 full rebuild, Debug | not re-measured | not comparable — now a Release figure, next row | **1.79 ms** avg (1.76 / 1.75 / 1.87) | **2.26 ms** avg (2.31 / 2.26 / 2.20) | `FrameCPUBaselineTests` (D17), Debug test action; from 1.1.0 a Release figure (§5.8) |
+| Frame CPU, 120×40 full rebuild, Release | not re-measured | **0.87 ms** avg (0.86 / 0.88 / 0.88); full rebuild CPU-only p50 0.13–0.15 ms | — | — | `FrameCPUBaselineTests` (D17), §5.8 command |
+| Live frame CPU, Release, 2 / 4 panes flooded | not re-measured | not re-measured | not re-measured | avg 0.60 / 0.14–0.49 ms; p99 2.59 / 0.38–0.45 | `MeasurementUITests` floods, `CORTA_RENDER_METRICS` |
+| GPU, 2 / 4 panes flooded | not re-measured | not re-measured | not re-measured | avg 0.49 / 0.47 ms | same |
+| Idle CPU, Release, 20 s | not re-measured | not re-measured | not re-measured | **0.05%**; occluded 0.0–0.1% | same |
+| Launch → first window | not re-measured | not re-measured | not re-measured | 208 ms (2-pane restore), 451 ms (4-pane) | same |
+| Spawn: `zsh -l` → first output | p50 40.3 ms | p50 41.2 ms | p50 46.8 ms | p50 44.5 ms | `corta-bench` |
+| Reflow, 100k lines, 120 → 80 columns | 58.9 ms | **51.2 ms** | 97.9 ms | 94.1 ms | `corta-bench` |
+| Search, 100k lines, one query | 25.8 ms warm | **25.6 ms** warm | ~400 ms warm | ~395 ms warm | `corta-bench` |
+| Keypress → glass, scripted | not re-measured | not re-measured | not re-measured | **61.9 ms** avg; p50 61.4 / p95 69.7 / p99 70.9 | §5.7 |
+| Keypress → glass, a person typing | not re-measured | not re-measured | not re-measured | **66.3 ms** avg; p50 67.0 / p95 78.7 / p99 84.5 | §5.7, `--manual` |
+| Energy, background flood (`yes`, occluded) | not re-measured | not re-measured | not re-measured | 10.2 W machine-wide on mains; 2.6 W in Low Power Mode; idle, occluded and a static image within the machine's noise floor | 1.0.0: a `powermetrics` script, since removed; now an *Activity Monitor* trace (§5.6 note) |
 
 The 1.0.0 and 1.0.1 runs were on battery for the core benchmarks, not the mains power
 §5.2 asks for; the 1.0.0 keypress and energy runs were on AC. Every

@@ -160,10 +160,16 @@ to your shell's startup file — `~/.zshrc`; for bash both `~/.bashrc` and
 `~/.config/fish/config.fish` — and **Remove** takes out exactly that block.
 Nothing is installed without you pressing the button.
 
+When Settings reports an outdated integration, choose **Update** and open a
+new shell. Updating the app alone does not replace a previously installed
+startup-file block. In 1.1.1 this loads the corrected command hooks: an empty
+Return has no command result and draws no green or red rule.
+
 With it installed:
 
 - **Prompt marks.** A thin rule at the left of each prompt, green when the
-  command succeeded and red when it failed.
+  command succeeded and red when it failed. An empty Return draws no rule
+  and creates no completed command-history entry.
 - **Jumping.** ⌘↑ / ⌘↓ move between commands; ⇧⌘↑ / ⇧⌘↓ move between
   the ones that failed.
 - **A command's output.** From the command palette: **Copy Last Command

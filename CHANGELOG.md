@@ -10,6 +10,19 @@ what to edit.
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-10-03
+
+### Fixed
+
+- Empty Return at a zsh, bash or legacy fish prompt no longer creates a
+  success marker or repeats the previous command's failure marker. Command
+  completion is emitted only after a command actually started. Existing
+  installations must update Shell Integration in Settings and open a new
+  shell to load the corrected hooks.
+- The update-feed workflow now requests squash auto-merge after CI passes,
+  so a brief delay in GitHub's merge eligibility refresh does not reject
+  the merge. The log includes the PR number, URL and merge state.
+
 ## [1.1.0] - 2026-10-03
 
 The Apple-silicon-only release (D21): Metal 4 is the one renderer, and
@@ -1138,7 +1151,8 @@ M1–M10.
   same-conditions end-to-end re-measurement against the 45.5 ms baseline
   is still open.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.1.0...main
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.1.1...main
+[1.1.1]: https://github.com/noah-qin/Corta/releases/tag/v1.1.1
 [1.1.0]: https://github.com/noah-qin/Corta/releases/tag/v1.1.0
 [1.0.1]: https://github.com/noah-qin/Corta/releases/tag/v1.0.1
 [1.0.0]: https://github.com/noah-qin/Corta/releases/tag/v1.0.0
