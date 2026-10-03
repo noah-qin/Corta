@@ -30,16 +30,22 @@ struct ShortcutsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 24) {
                 ForEach(CommandCategory.allCases, id: \.self) { category in
                     let commands = Self.commands(in: category)
                     if !commands.isEmpty {
-                        Text(category.title)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 6)
-                        ForEach(commands, id: \.self) { command in
-                            ShortcutRowView(title: command.title, shortcut: bindings[command]?.displayText)
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text(category.title)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                                .accessibilityAddTraits(.isHeader)
+                            Divider()
+                            Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 12) {
+                                ForEach(commands, id: \.self) { command in
+                                    ShortcutRowView(title: command.title, shortcut: bindings[command]?.displayText)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                 }
@@ -47,9 +53,8 @@ struct ShortcutsView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 12)
             }
-            .padding(EdgeInsets(top: 20, leading: 24, bottom: 20, trailing: 24))
+            .padding(24)
         }
         .frame(minWidth: 460, minHeight: 520)
         .onReceive(NotificationCenter.default.publisher(for: ConfigurationStore.didChange)) { _ in
@@ -69,9 +74,14 @@ private struct ShortcutRowView: View {
     let shortcut: String?
 
     var body: some View {
-        LabeledContent(title) {
-            Text(shortcut ?? "—")
-                .foregroundStyle(shortcut == nil ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.primary))
+        GridRow {
+            Text(title)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(shortcut ?? L10n.text("shortcuts.unbound"))
+                .monospaced()
+                .foregroundStyle(shortcut == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+                .gridColumnAlignment(.trailing)
+                .fixedSize()
         }
         .font(.system(size: 13))
         .accessibilityElement(children: .ignore)

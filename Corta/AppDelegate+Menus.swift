@@ -278,46 +278,41 @@ extension AppDelegate {
         appMenu.insertItem(item, at: aboutIndex + 1)
     }
 
-    /// Shell menu groups: create (the storyboard's splits), move (focus, then
-    /// command jumps), resize (grow/shrink by axis, then Equalize).
+    /// Keep frequent actions direct; related tools remain one submenu away.
     private func installShellMenuItems(in mainMenu: NSMenu) {
         guard let shell = mainMenu.items.first(where: { $0.title == "Shell" })?.submenu
         else { return }
-        shell.addItem(.separator())
-        for command in [
-            TerminalCommand.previousCommand, .nextCommand, .previousFailedCommand,
-            .nextFailedCommand, .copyLastCommandOutput, .snapshotRunningCommandOutput,
-            .exportCommandOutput, .openFileReferenceInCommand, .searchCommandHistory,
-        ] {
+        shell.removeAllItems()
+        for command in [TerminalCommand.splitRight, .splitDown, .reopenClosedPane] {
             shell.addItem(item(for: command))
         }
-        // Directory navigation; Browse Remote Files last, for remote panes.
         shell.addItem(.separator())
-        for command in [
-            TerminalCommand.revealWorkingDirectory, .copyWorkingDirectoryPath,
+        func group(_ key: String, _ commands: [TerminalCommand]) {
+            let title = L10n.text(key)
+            let parent = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            let submenu = NSMenu(title: title)
+            for command in commands { submenu.addItem(item(for: command)) }
+            parent.submenu = submenu
+            shell.addItem(parent)
+        }
+        group("menu.focus", [.focusLeft, .focusRight, .focusUp, .focusDown])
+        group("menu.commandsAndOutput", [
+            .previousCommand, .nextCommand, .previousFailedCommand, .nextFailedCommand,
+            .copyLastCommandOutput, .snapshotRunningCommandOutput, .exportCommandOutput,
+            .openFileReferenceInCommand, .searchCommandHistory,
+        ])
+        group("menu.workingDirectory", [
+            .revealWorkingDirectory, .copyWorkingDirectoryPath,
             .changeDirectoryToParent, .changeDirectoryToProjectRoot,
-            .openParentDirectoryInNewPane, .openProjectRootInNewPane,
-            .browseRemoteFiles,
-        ] {
-            shell.addItem(item(for: command))
-        }
-        // State commands, ordered by how much each throws away; Reconnect
-        // (whole session, dead remote launchers only) last.
-        shell.addItem(.separator())
-        for command in [
-            TerminalCommand.clearScreen, .clearHistory, .resetTerminal, .reconnectRemote,
-        ] {
-            shell.addItem(item(for: command))
-        }
-        shell.addItem(.separator())
-        for command in [
-            TerminalCommand.zoomPane, .reopenClosedPane, .growPaneHorizontally, .shrinkPaneHorizontally,
+            .openParentDirectoryInNewPane, .openProjectRootInNewPane, .browseRemoteFiles,
+        ])
+        group("menu.paneLayout", [
+            .zoomPane, .growPaneHorizontally, .shrinkPaneHorizontally,
             .growPaneVertically, .shrinkPaneVertically, .equalizePanes,
-        ] {
-            shell.addItem(item(for: command))
-        }
-        // Secure Keyboard Entry alone: it changes the machine's input mode, not a
-        // pane (as in Terminal.app).
+        ])
+        shell.addItem(.separator())
+        shell.addItem(item(for: .clearScreen))
+        group("menu.terminalState", [.clearHistory, .resetTerminal, .reconnectRemote])
         shell.addItem(.separator())
         shell.addItem(item(for: .secureKeyboardEntry))
     }

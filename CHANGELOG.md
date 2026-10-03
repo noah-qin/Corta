@@ -10,6 +10,18 @@ what to edit.
 
 ## [Unreleased]
 
+### Changed
+
+- Shell groups focus, command output, working-directory, pane-layout and
+  connection tools into submenus while keeping splitting and clearing direct.
+- Keyboard Shortcuts uses aligned columns, clearer section boundaries and
+  explicit labels for commands without bindings. About links have separators.
+
+### Fixed
+
+- The terminal context menu displays configured shortcuts for editing,
+  splitting and closing, including custom bindings and unbound commands.
+
 ## [1.1.1] - 2026-10-03
 
 ### Fixed

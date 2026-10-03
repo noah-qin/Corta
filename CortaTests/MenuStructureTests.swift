@@ -24,83 +24,32 @@ import Testing
 /// both the appearance choice and the theme list.
 @MainActor
 struct MenuStructureTests {
-    /// The Shell menu's item actions, split into groups at the separators.
-    private static func shellGroups() throws -> [[Selector?]] {
-        let mainMenu = try #require(NSApp.mainMenu)
-        let shell = try #require(
-            mainMenu.items.first(where: { $0.title == L10n.text("menu.shell") })?.submenu,
-            "the menu bar must carry a Shell menu")
-        var groups: [[Selector?]] = [[]]
-        for item in shell.items {
-            if item.isSeparatorItem {
-                groups.append([])
-            } else {
-                groups[groups.count - 1].append(item.action)
-            }
-        }
-        return groups.filter { !$0.isEmpty }
-    }
-
-    /// The Shell menu reads as eight groups, in the order of what each one is
-    /// *for*: open a terminal a particular way, create panes, go somewhere
-    /// else, throw terminal state away, change the geometry — and last, alone,
-    /// the one item that changes the machine rather than a pane.
-    ///
-    /// The order is the assertion. Command-to-command jumping sits with the
-    /// focus moves because both answer "go somewhere else"; after the resize
-    /// group, a geometry group would sit between the two navigation
-    /// families. The terminal-state commands are their own
-    /// group because each one discards something, and grouping them with
-    /// anything else would make that less obvious, not more.
-    @Test("Shell groups presets, create, move, directories, clear, resize, then secure entry")
+    @Test("Shell keeps frequent actions direct and all other tools in shallow submenus")
     func shellMenuGrouping() throws {
-        let groups = try Self.shellGroups()
-        #expect(
-            groups.count == 8,
-            "presets, splits, focus, navigation, directories, state, resize, secure entry")
-
-        let split = #selector(SplitViewController.splitRight(_:))
-        let focusLeft = #selector(SplitViewController.moveFocusLeft(_:))
-        let previousCommand = #selector(ViewController.jumpToPreviousCommand(_:))
-        let copyOutput = #selector(ViewController.copyLastCommandOutput(_:))
-        let revealWorkingDirectory = #selector(ViewController.revealWorkingDirectoryInFinder(_:))
-        let changeToProjectRoot = #selector(ViewController.changeDirectoryToProjectRoot(_:))
-        let clearScreen = #selector(ViewController.clearScreen(_:))
-        let reset = #selector(ViewController.resetTerminal(_:))
-        let zoom = #selector(SplitViewController.toggleZoomPane(_:))
-        let equalize = #selector(SplitViewController.equalizePanes(_:))
-
-        // The preset list heads the menu: it is how a terminal is
-        // opened, which comes before what is done with one.
-        #expect(groups[0].count == 1, "one item: the preset submenu")
-
-        #expect(groups[1].contains(split))
-        #expect(groups[2].contains(focusLeft))
-
-        // Navigation: the command jumps, then the failed-command jumps, then
-        // taking the last command's output — all of them shell-integration
-        // commands, and all about a command rather than a pane.
-        #expect(groups[3].first == previousCommand)
-        #expect(groups[3].contains(copyOutput))
-
-        // Directory navigation: reveal/copy (reads), then the two
-        // `cd` primitives, then the two new-pane variants.
-        #expect(groups[4].first == revealWorkingDirectory)
-        #expect(groups[4].contains(changeToProjectRoot))
-
-        // The three state commands, in the order of how much each
-        // discards.
-        #expect(groups[5].first == clearScreen)
-        #expect(groups[5].contains(reset))
-
-        // Geometry, zoom at its head.
-        #expect(groups[6].first == zoom)
-        #expect(groups[6].last == equalize)
-
-        // Secure Keyboard Entry alone at the end: a system-wide input
-        // mode, not a pane command, and Terminal.app's own Shell menu puts
-        // it in the same place.
-        #expect(groups[7] == [#selector(AppDelegate.toggleSecureKeyboardEntry(_:))])
+        let main = try #require(NSApp.mainMenu)
+        let shell = try #require(main.items.first { $0.title == L10n.text("menu.shell") }?.submenu)
+        let visible = shell.items.filter { !$0.isSeparatorItem && !$0.isHidden }
+        #expect(visible.count <= 12)
+        for command in [TerminalCommand.splitRight, .splitDown, .reopenClosedPane, .clearScreen, .secureKeyboardEntry] {
+            #expect(visible.contains { $0.action == command.action })
+        }
+        let groups: [(String, [TerminalCommand])] = [
+            ("menu.focus", [.focusLeft, .focusRight, .focusUp, .focusDown]),
+            ("menu.commandsAndOutput", [.previousCommand, .nextCommand, .previousFailedCommand,
+                .nextFailedCommand, .copyLastCommandOutput, .snapshotRunningCommandOutput,
+                .exportCommandOutput, .openFileReferenceInCommand, .searchCommandHistory]),
+            ("menu.workingDirectory", [.revealWorkingDirectory, .copyWorkingDirectoryPath,
+                .changeDirectoryToParent, .changeDirectoryToProjectRoot,
+                .openParentDirectoryInNewPane, .openProjectRootInNewPane, .browseRemoteFiles]),
+            ("menu.paneLayout", [.zoomPane, .growPaneHorizontally, .shrinkPaneHorizontally,
+                .growPaneVertically, .shrinkPaneVertically, .equalizePanes]),
+            ("menu.terminalState", [.clearHistory, .resetTerminal, .reconnectRemote]),
+        ]
+        for (key, commands) in groups {
+            let submenu = try #require(shell.items.first { $0.title == L10n.text(key) }?.submenu)
+            #expect(submenu.items.map(\.action) == commands.map { Optional($0.action) })
+            #expect(submenu.items.allSatisfy { $0.submenu == nil })
+        }
     }
 
     @Test("View has one Theme submenu holding appearance, then themes")
@@ -131,5 +80,12 @@ struct MenuStructureTests {
         for item in theme.items.dropFirst(appearanceCount + 1) {
             #expect(item.action == #selector(AppDelegate.selectTheme(_:)))
         }
+    }
+}
+
+@MainActor
+extension NSMenu {
+    var descendantItems: [NSMenuItem] {
+        items.flatMap { [$0] + ($0.submenu?.descendantItems ?? []) }
     }
 }

@@ -387,7 +387,7 @@ other terminal; Corta parses none of it. `directory`, if set, remains a
 *local* working directory for the launcher. The pane's title carries a `⟂`
 badge with the remote host and directory once the remote shell reports them
 (OSC 7), and says so when it cannot know them. When the connection dies,
-Shell ▸ Reconnect to Host (`reconnect-remote`) starts a new connection to
+Shell ▸ Terminal and Connection ▸ Reconnect to Host (`reconnect-remote`) starts a new connection to
 the same host — explicitly a new one, never a restore of the dead session.
 
 A preset is applied once, at spawn. A pane opened from one is an ordinary
@@ -425,7 +425,7 @@ reaching the program running in it. It also means unbinding is uniform —
 a key Corta never bound and a key you unbound behave identically — and
 that nothing can end up doing nothing, which reads as a bug rather than as
 a setting. The command itself stays reachable from its menu and from the
-command palette (⇧⌘P); Help ▸ Keyboard Shortcuts lists it with an em dash.
+command palette (⇧⌘P); Help ▸ Keyboard Shortcuts lists it as Not Set.
 
 Nothing rejects two commands sharing one keystroke. Where AppKit decides,
 the first matching menu item in menu-bar order wins; where Corta decides,

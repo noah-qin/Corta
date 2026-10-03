@@ -50,14 +50,17 @@ struct AboutView: View {
                 .help(L10n.text("about.version.tooltip"))
                 .padding(.bottom, 6)
 
-            HStack(spacing: 4) {
+            HStack(spacing: 8) {
                 Link(L10n.text("about.website"), destination: Self.url("https://github.com/noah-qin/Corta"))
+                linkSeparator
                 Link(
                     L10n.text("about.releaseNotes"),
                     destination: Self.url("https://github.com/noah-qin/Corta/releases"))
+                linkSeparator
                 Link(
                     L10n.text("about.license"),
                     destination: Self.url("https://github.com/noah-qin/Corta/blob/main/LICENSE"))
+                linkSeparator
                 Button(L10n.text("about.acknowledgements")) {
                     AcknowledgementsWindowController.shared.show()
                 }
@@ -73,6 +76,12 @@ struct AboutView: View {
         .padding(EdgeInsets(top: 28, leading: 24, bottom: 20, trailing: 24))
         .frame(width: 420)
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var linkSeparator: some View {
+        Divider()
+            .frame(height: 12)
+            .accessibilityHidden(true)
     }
 
     /// `Version 0.1.0 (1)`, plus the terminal's self-reported version when
