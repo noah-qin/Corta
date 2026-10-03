@@ -32,11 +32,26 @@
 
 import AppKit
 
-func load(_ path: String) -> NSBitmapImageRep {
+/// A capture as an image that keeps its alpha. Drawing the
+/// `NSBitmapImageRep` itself scaled filled the window's transparent rounded
+/// corners with black, which read as square corners.
+struct Capture {
+    let image: NSImage
+    let pixelsWide: Int
+    let pixelsHigh: Int
+
+    func draw(in rect: NSRect) {
+        image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
+    }
+}
+
+func load(_ path: String) -> Capture {
     guard let data = FileManager.default.contents(atPath: path),
-        let rep = NSBitmapImageRep(data: data)
+        let rep = NSBitmapImageRep(data: data), let cgImage = rep.cgImage
     else { fatalError("cannot read \(path)") }
-    return rep
+    return Capture(
+        image: NSImage(cgImage: cgImage, size: NSSize(width: rep.pixelsWide, height: rep.pixelsHigh)),
+        pixelsWide: rep.pixelsWide, pixelsHigh: rep.pixelsHigh)
 }
 
 func save(_ image: NSImage, size: NSSize, to path: String) {
@@ -53,7 +68,7 @@ func save(_ image: NSImage, size: NSSize, to path: String) {
 }
 
 /// The window, drawn at `rect` with the shadow macOS gives a key window.
-func drawWindow(_ window: NSBitmapImageRep, in rect: NSRect, scale: CGFloat) {
+func drawWindow(_ window: Capture, in rect: NSRect, scale: CGFloat) {
     NSGraphicsContext.saveGraphicsState()
     let shadow = NSShadow()
     shadow.shadowColor = NSColor.black.withAlphaComponent(0.28)
