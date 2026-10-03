@@ -278,6 +278,12 @@ so the next run is a diff rather than a re-reading.
 | 2026-09-17 | `main`, esctest2 `2798f12` | 126 | 334 | 107 | 567 | 81.1% | 14 tests moved to pass — B06's OSC 4/104 and 5/105 set/query/reset, SCORC, and the multi-column reverse-wraparound case — none regressed; the suite itself lost one test and one known bug, so the totals are not identical columns. Names in [`esctest/2026-09-17-results.txt`](esctest/2026-09-17-results.txt); XtermWinops (28) is still the largest class and still deliberate |
 | 1.1.0 (2026-10-03) | `main` at `ef11a93`, esctest2 `2798f12` | 126 | 334 | 107 | 567 | 81.1% | Identical failing list, name for name: nothing regressed through the 1.1.0 milestone and nothing moved — its terminal-side changes (Kitty `o=z`, emoji drawing, bounded glyph clusters) have no esctest case. Names in [`esctest/2026-10-03-results.txt`](esctest/2026-10-03-results.txt) |
 
+**1.1.1 (2026-10-03):** the empty-Return patch adds real-shell PTY regression
+coverage and was confirmed in the launched development app after updating
+the installed integration. Full core and Unit suites passed; esctest2 was
+not re-run because this patch changes shell hooks rather than terminal
+escape-sequence handling. Evidence: [1.1.1 release checks](test-results/2026-10-03-1.1.1-checks.md).
+
 ### 4.3 Fuzzing
 
 The parser consumes untrusted bytes and must never crash, hang, or
@@ -563,3 +569,4 @@ off in the CHANGELOG. The record stays as written.
 | [2026-10-01 — 1.1.0 audit closeout](test-results/2026-10-01-audit-closeout.md) | The 27-finding review accounted for by #189–#194, with its automated and launched-app evidence |
 | [2026-10-02 — audit follow-up](test-results/2026-10-02-follow-up.md) | Search, SFTP lifecycle, local storage and reflow follow-ups, with the A/B measurements |
 | [2026-10-03 — 1.1.0 release checks](test-results/2026-10-03-1.1.0-checks.md) | §4.4 points 1–5 and 7 on the merged tree, the esctest re-run, what was not judged |
+| [2026-10-03 — 1.1.1 release checks](test-results/2026-10-03-1.1.1-checks.md) | Real-shell empty-Return regression tests, full core/Unit suites and user-confirmed launched-app check |

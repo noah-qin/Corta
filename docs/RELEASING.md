@@ -58,8 +58,11 @@ For the maintainer, cutting any release:
    approved, the workflow signs the archive into `appcast.xml`, checks
    the item against the app, and merges the file to `main` through a
    pull request whose CI it runs and waits for — that is what makes the
-   update visible to every already-installed Corta. If the pull request
-   is left open, a check failed; the run's log says which. To rehearse or
+   update visible to every already-installed Corta. If CI passes while
+   GitHub is still refreshing merge eligibility, the workflow enables
+   squash auto-merge; the pull request stays open until the requirements
+   are satisfied. A failed check leaves it open for review; the run's log
+   reports CI failures and the PR merge state. To rehearse or
    re-run: `gh workflow run appcast.yml --ref main -f tag=vX.Y.Z
    -f dry_run=true` (a dry run stops after signing and checking), with
    `main` temporarily allowed in the environment's deployment policy.

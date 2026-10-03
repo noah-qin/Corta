@@ -254,6 +254,15 @@ check; the menu item always works.
 
 ---
 
+## Empty Return draws a green or red command marker
+
+Corta 1.1.1 fixes empty Return being reported as a completed command by the
+zsh, bash and legacy fish integration. If it still happens after updating,
+open **Settings ▸ Terminal ▸ Shell Integration**, choose **Update**, then
+open a new shell. Existing shells keep the old functions until restarted;
+old markers already drawn are not removed. Only the marked Corta block in
+the startup file is updated.
+
 ## Going back to your old terminal
 
 Quit Corta before removing its files. Review managed remote-edit copies

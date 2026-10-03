@@ -39,9 +39,9 @@ name: Update feed
 #     workflow's own token do not start workflows, and `workflow_dispatch`
 #     is the documented exception. The checks land on the commit, which is
 #     what the branch ruleset's required status checks read.
-#   - The merge is a squash from this workflow rather than auto-merge, so
-#     the run's log is the record of what was merged and why, and a
-#     failed check leaves the pull request open for a person.
+#   - The merge is a squash, with auto-merge enabled if GitHub is still
+#     refreshing required checks or merge eligibility after CI passes.
+#     A failed CI run still leaves the pull request open for a person.
 
 on:
   release:
@@ -215,10 +215,12 @@ jobs:
           echo "CI run $run_id on $branch"
           gh run watch "$run_id" --exit-status --interval 30
 
-      - name: Squash-merge
+      - name: Squash-merge or enable auto-merge
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh pr merge "${{ steps.pr.outputs.url }}" --squash --delete-branch \
+          gh pr view "${{ steps.pr.outputs.url }}" \
+            --json number,url,mergeable,mergeStateStatus
+          gh pr merge "${{ steps.pr.outputs.url }}" --squash --auto --delete-branch \
             --subject "chore: publish ${{ needs.sign.outputs.version }} to the update feed" \
             --body "Signed from the published v${{ needs.sign.outputs.version }} release by the update-feed workflow (D20)."

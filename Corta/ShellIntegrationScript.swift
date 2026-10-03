@@ -30,6 +30,11 @@ enum ShellIntegrationScript {
     /// `C`; `precmd` emits `D` with `$?` read first, then `A`; `B` is appended
     /// to `$PS1`, so it fires where the prompt ends, however many lines.
     ///
+    /// `D` only after a `C`, in every shell: `precmd` also runs for the first
+    /// prompt and after an empty line, where nothing finished, and a `D` there
+    /// marked the prompt with the last command's status — a green rule per
+    /// empty Return, or a red one after a failure.
+    ///
     /// OSC 7's path is percent-encoded byte by byte in every shell: a URL
     /// cuts a raw `C# projects` at the `#` and `what?` at the `?`, and a
     /// directory named with ESC or BEL — from an archive, say — wrote its
@@ -42,6 +47,7 @@ enum ShellIntegrationScript {
           CORTA_SHELL_INTEGRATION_ACTIVE=1
 
           __corta_preexec() {
+            __corta_ran=1
             print -n '\e]133;C\a'
           }
 
@@ -53,7 +59,10 @@ enum ShellIntegrationScript {
 
           __corta_precmd() {
             local __corta_status=$?
-            print -n "\e]133;D;${__corta_status}\a"
+            if [[ -n "$__corta_ran" ]]; then
+              print -n "\e]133;D;${__corta_status}\a"
+            fi
+            __corta_ran=
             __corta_urlencode "$PWD"
             print -rn -- $'\e]7;file://'"${HOST}${__corta_url}"$'\e\\'
             print -n '\e]133;A\a'
@@ -70,7 +79,9 @@ enum ShellIntegrationScript {
         """#
 
     /// bash: a `DEBUG` trap and `PROMPT_COMMAND`. The trap fires for
-    /// `PROMPT_COMMAND` too; the `$BASH_COMMAND` guard stops a second `C`.
+    /// `PROMPT_COMMAND` too, and after an empty line that is all it fires
+    /// for: the guard on `__corta_precmd` keeps that from reading as a
+    /// command.
     /// It also fires for every part of `PROMPT_COMMAND` and the rest of the
     /// startup files, so preexec is armed by the last part of the prompt
     /// command and disarmed by the first command after it: one `C` per
@@ -87,7 +98,9 @@ enum ShellIntegrationScript {
           __corta_preexec() {
             [[ -n "$COMP_LINE" ]] && return
             [[ -z "$__corta_armed" ]] && return
+            [[ "$BASH_COMMAND" == __corta_precmd* ]] && return
             __corta_armed=
+            __corta_ran=1
             printf '\e]133;C\a'
           }
 
@@ -116,7 +129,10 @@ enum ShellIntegrationScript {
           __corta_precmd() {
             local __corta_status=$?
             __corta_armed=
-            printf '\e]133;D;%s\a' "$__corta_status"
+            if [[ -n "$__corta_ran" ]]; then
+              printf '\e]133;D;%s\a' "$__corta_status"
+            fi
+            __corta_ran=
             __corta_urlencode "$PWD"
             printf '\e]7;file://%s%s\e\\' "$HOSTNAME" "$__corta_url"
             printf '\e]133;A\a'
@@ -149,6 +165,7 @@ enum ShellIntegrationScript {
           end
 
           function __corta_preexec --on-event fish_preexec
+            set -g __corta_ran 1
             set -q __corta_fish_marks_prompt; or printf '\e]133;C\a'
           end
 
@@ -159,7 +176,10 @@ enum ShellIntegrationScript {
           function fish_prompt
             set -l __corta_status $status
             set -l __corta_prompt (__corta_original_fish_prompt | string collect -N)
-            set -q __corta_fish_marks_prompt; or printf '\e]133;D;%s\a' $__corta_status
+            if set -q __corta_ran; and not set -q __corta_fish_marks_prompt
+              printf '\e]133;D;%s\a' $__corta_status
+            end
+            set -e __corta_ran
             printf '\e]7;file://%s%s\e\\' (hostname) (string escape --style=url -- "$PWD")
             set -q __corta_fish_marks_prompt; or printf '\e]133;A\a'
             printf '%s' $__corta_prompt

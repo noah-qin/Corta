@@ -448,9 +448,9 @@ Exit status is the number of failed checks, as `corta-release-check` reports.
 
 ```sh
 swift run --package-path CortaTerminal -c release corta-release-check \
-  package path/to/Corta.app 1.1.0 dist          # archive, sidecar, then the check
+  package path/to/Corta.app 1.1.1 dist          # archive, sidecar, then the check
 swift run --package-path CortaTerminal -c release corta-release-check \
-  check path/to/Corta.app --version 1.1.0 --archive dist/Corta-1.1.0.zip \
+  check path/to/Corta.app --version 1.1.1 --archive dist/Corta-1.1.1.zip \
   --appcast --require-notarized
 ```
 

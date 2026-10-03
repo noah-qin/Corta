@@ -72,6 +72,8 @@ Dated, and not edited except to fix a link.
 - [1.0.0 benchmark run, 2026-09-18](history/2026-09-18-V1.0.0-BENCHMARK-RUN.md) — every scenario, including energy.
 - [1.0.1 benchmark run, 2026-09-21](history/2026-09-21-V1.0.1-BENCHMARK-RUN.md) — the patch release's re-measurement.
 - [1.1.0 benchmark run, 2026-10-03](history/2026-10-03-V1.1.0-BENCHMARK-RUN.md) — the first Release-configuration frame-CPU column, and the search and reflow gains.
+- [1.1.1 benchmark run, 2026-10-03](history/2026-10-03-V1.1.1-BENCHMARK-RUN.md) — scripted core measurements for the emergency patch.
+- [1.1.1 release checks, 2026-10-03](test-results/2026-10-03-1.1.1-checks.md) — empty-Return regression coverage and launched-app confirmation.
 - [esctest results](esctest/) — result files per release.
 - [Interactive test records](test-results/) — dated passes by a person; findings are worked off in the changelog.
 
