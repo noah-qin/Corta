@@ -71,6 +71,7 @@ Dated, and not edited except to fix a link.
 - [B12 Metal 4 backend, 2026-09-15](history/2026-09-15-B12-METAL4-BACKEND.md) — measured against the MTL3 path.
 - [1.0.0 benchmark run, 2026-09-18](history/2026-09-18-V1.0.0-BENCHMARK-RUN.md) — every scenario, including energy.
 - [1.0.1 benchmark run, 2026-09-21](history/2026-09-21-V1.0.1-BENCHMARK-RUN.md) — the patch release's re-measurement.
+- [1.1.0 benchmark run, 2026-10-03](history/2026-10-03-V1.1.0-BENCHMARK-RUN.md) — the first Release-configuration frame-CPU column, and the search and reflow gains.
 - [esctest results](esctest/) — result files per release.
 - [Interactive test records](test-results/) — dated passes by a person; findings are worked off in the changelog.
 
