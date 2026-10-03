@@ -155,8 +155,11 @@ struct MenuShortcutTests {
         let rebound = Configuration.parse("bind.split-right = cmd+e\nbind.copy =").0
         #expect(rebound.keybindings[.copy] == nil)
         #expect(rebound.keybindings[.splitRight] == Shortcut.parse("cmd+e"))
+        // Hosted CI has no Metal 4 device, so the pane may show a fallback
+        // instead of installing terminalView. Menu construction needs no GPU.
+        let terminalView = TerminalView(frame: .zero)
         for config in [original, rebound] {
-            let menu = pane.contextMenu(for: pane.terminalView, bindings: config.keybindings)
+            let menu = pane.contextMenu(for: terminalView, bindings: config.keybindings)
             for command in commands {
                 let item = try #require(menu.items.first { $0.action == command.action })
                 #expect(item.keyEquivalent == (config.keybindings[command]?.menuKeyEquivalent ?? ""))
