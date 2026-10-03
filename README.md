@@ -117,17 +117,17 @@ checksum, unzip the archive and move `Corta.app` to `/Applications`.
 
 ```sh
 # Run in the directory containing both downloaded files.
-shasum -a 256 -c Corta-1.0.1.zip.sha256
-unzip Corta-1.0.1.zip
+shasum -a 256 -c Corta-1.1.0.zip.sha256
+unzip Corta-1.1.0.zip
 ```
 
 > [!NOTE]
-> **Release status:** [1.0.1](https://github.com/noah-qin/Corta/releases/tag/v1.0.1),
-> published on 2026-09-21, is the current release; 1.1.0 is in progress
-> on `main`. Every release archive is signed with a Developer ID and
-> notarised, and updates reach an installed Corta through a signed feed.
-> Changes on `main` are recorded under `[Unreleased]` in the
-> [changelog](CHANGELOG.md) until the next release.
+> **Release status:** [1.1.0](https://github.com/noah-qin/Corta/releases/tag/v1.1.0),
+> published on 2026-10-03, is the current release. Every release archive
+> is signed with a Developer ID and notarised, and updates reach an
+> installed Corta through a signed feed. Changes on `main` are recorded
+> under `[Unreleased]` in the [changelog](CHANGELOG.md) until the next
+> release.
 
 For updates, use **Corta ▸ Check for Updates…** or download a newer release.
 Installation help and uninstall instructions are in
@@ -184,17 +184,20 @@ are snapshots, not guarantees for every machine or workload.
 
 | Check | Recorded result | Evidence |
 | :--- | :--- | :--- |
-| Frame CPU, 120 × 40 full rebuild, Release | 0.58 ms, three-run mean | [Performance](docs/PERFORMANCE.md#58-the-frame-cpu-baseline-under-release-d17) |
+| Frame CPU, 120 × 40 full rebuild, Release | 0.87 ms, three-run mean | [Performance](docs/PERFORMANCE.md#58-the-frame-cpu-baseline-under-release-d17) |
 | Idle CPU, Release, 20 seconds | 0.05% | [Performance](docs/PERFORMANCE.md) |
 | Scrollback memory, 100k × 120 lines | 185.0 MB | [Performance](docs/PERFORMANCE.md) |
-| Core feed throughput | 144.2 MiB/s, five-run mean | [Performance](docs/PERFORMANCE.md) |
+| Core feed throughput | 144.1 MiB/s | [Performance](docs/PERFORMANCE.md) |
+| Search, 100k-line scrollback, one query | 25.6 ms | [Performance](docs/PERFORMANCE.md) |
 | Keypress to glass | 66.3 ms average, p95 78.7 ms; above target | [Method and limitations](docs/PERFORMANCE.md) |
-| esctest2 | 126 passed, 334 known bugs, 107 failed; 567 total | [Raw results](docs/esctest/2026-09-17-results.txt) |
+| esctest2 | 126 passed, 334 known bugs, 107 failed; 567 total | [Raw results](docs/esctest/2026-10-03-results.txt) |
 
-Performance was measured on Apple M5, macOS 27.0, on 2026-09-18; the cited
-report records power conditions by measurement. The esctest2 snapshot is
-from 2026-09-17. Its historical 81.1% figure counts passes **plus known bugs**;
-it is not a pass rate. See [conformance](docs/CONFORMANCE.md) for interpretation.
+Performance was measured on Apple M5, macOS 27.0.1, for the 1.1.0 release
+on 2026-10-03; idle CPU and keypress to glass are the 1.0.0 run's
+(2026-09-18), not re-measured since. The cited report records power
+conditions by measurement. The esctest2 run is 1.1.0's too; its 81.1%
+figure counts passes **plus known bugs** and is not a pass rate. See
+[conformance](docs/CONFORMANCE.md) for interpretation.
 
 Known limitations include above-target input latency, incomplete VT
 conformance, bundled shell integration for zsh, bash and fish only, and direct-transmission-only Kitty

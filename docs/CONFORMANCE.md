@@ -276,6 +276,7 @@ so the next run is a diff rather than a re-reading.
 | M6 (2026-09-03) | M6 closeout | 106 | 335 | 127 | 568 | 77.6% | 57 failures fixed, none introduced: programmable tabs, CNL/CPL/CHT/CBT, IND/NEL/RI, RIS and DECSTR, including the soft-reset isolation esctest itself relies on |
 | 0.1.1 (2026-09-08) | v0.1.1 | 112 | 335 | 121 | 568 | 78.7% | Six more passing, none regressed; classified by application impact in [the quality plan](history/V0.1.1-QUALITY-PLAN.md) Q01; names in [`esctest/0.1.1-results.txt`](esctest/0.1.1-results.txt). 45 of the 121 were OSC 4/5 palette set and query, then unimplemented |
 | 2026-09-17 | `main`, esctest2 `2798f12` | 126 | 334 | 107 | 567 | 81.1% | 14 tests moved to pass — B06's OSC 4/104 and 5/105 set/query/reset, SCORC, and the multi-column reverse-wraparound case — none regressed; the suite itself lost one test and one known bug, so the totals are not identical columns. Names in [`esctest/2026-09-17-results.txt`](esctest/2026-09-17-results.txt); XtermWinops (28) is still the largest class and still deliberate |
+| 1.1.0 (2026-10-03) | `main` at `ef11a93`, esctest2 `2798f12` | 126 | 334 | 107 | 567 | 81.1% | Identical failing list, name for name: nothing regressed through the 1.1.0 milestone and nothing moved — its terminal-side changes (Kitty `o=z`, emoji drawing, bounded glyph clusters) have no esctest case. Names in [`esctest/2026-10-03-results.txt`](esctest/2026-10-03-results.txt) |
 
 ### 4.3 Fuzzing
 
@@ -559,3 +560,6 @@ off in the CHANGELOG. The record stays as written.
 | [2026-09-18 — release checks](test-results/2026-09-18-release-checks.md) | What the 09-17 pass changed; the six human and hardware items for 1.0.0, including the Quick Terminal probe |
 | [2026-09-18/19 — issues #88–#90](test-results/2026-09-19-issues-88-90.md) | Mouse tracking, shared coordinates and the toolchain decision |
 | [2026-09-21 — 1.0.1 release checks](test-results/2026-09-21-1.0.1-checks.md) | §4.4 points 1–5 for the patch release, the themed cursor on screen, what was not re-run and why |
+| [2026-10-01 — 1.1.0 audit closeout](test-results/2026-10-01-audit-closeout.md) | The 27-finding review accounted for by #189–#194, with its automated and launched-app evidence |
+| [2026-10-02 — audit follow-up](test-results/2026-10-02-follow-up.md) | Search, SFTP lifecycle, local storage and reflow follow-ups, with the A/B measurements |
+| [2026-10-03 — 1.1.0 release checks](test-results/2026-10-03-1.1.0-checks.md) | §4.4 points 1–5 and 7 on the merged tree, the esctest re-run, what was not judged |

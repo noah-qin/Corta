@@ -10,36 +10,17 @@ what to edit.
 
 ## [Unreleased]
 
-### Security and reliability follow-up
+## [1.1.0] - 2026-10-03
 
-- `kitten icat` shows images it has to scale: a picture wider than the pane,
-  or one placed with `--place`. It sends those zlib-compressed (`o=z`), which
-  was ignored, so they never appeared. They are inflated now, bounded to the
-  declared size, with the zlib header and checksum checked.
-
-- The SFTP browser's free space counts in the server's fragment size: a Mac
-  with 650 GB free was shown as 168 TB, because APFS reports a 1 MiB block
-  beside the 4 KiB unit its counts are in. Folders show "--" for their size,
-  as Finder does, instead of their directory entry's bytes.
-
-- Reject stale search status and repeated/concurrent SFTP handshakes; cancel
-  pending handshakes and keep slow directory mounts off the UI thread.
-- Bind remote-edit upload approval to a private content snapshot and compare
-  remote content digests, including changes with identical size/timestamp.
-- Create private download partials, tighten managed copies and manifest modes,
-  and refuse existing directory-download destination symlinks.
-- Bound glyph clusters before shaping and reject oversized ink before eviction;
-  build Unicode row strings once and reuse reflow scratch buffers.
-- Correct restoration/export privacy documentation and add regression,
-  sanitizer and isolated SSH/SFTP validation evidence.
-- Synchronize the live color palette between settings changes and the
-  renderers that read it; the unit tests no longer read or write the
-  development build's own configuration.
-- Downloads to volumes without ACL support (exFAT, FAT, some SMB shares) and
-  into a download folder that is itself a link work again; remote-edit
-  copies from 1.0.x no longer report a conflict on every upload; a pane whose
-  directory probe waited on a slow mount gets its proxy icon once there is
-  room; approval snapshots left by a quit are removed at the next launch.
+The Apple-silicon-only release (D21): Metal 4 is the one renderer, and
+an Intel Mac stays on 1.0.1. New are SSH and SFTP in the toolbar, an
+SFTP browser that works like Finder, a sidebar Settings window, Kitty
+images `kitten icat` has to scale, a separate development build (D22)
+and an archive signed and notarised in CI (#185). Search is about fourteen
+times faster over a long scrollback, reflow twice as fast, and a
+flooding pane wakes the main thread once a frame. Two reviews' findings
+are closed under **Security** below. esctest2: 126 passed, 334 known
+bugs, 107 failed of 567 (81.1%), the same failing list as 1.0.0's.
 
 ### Added
 
@@ -165,6 +146,16 @@ what to edit.
   120×40 screen takes 0.12 ms of CPU, down from 0.17–0.34 ms.
 
 ### Fixed
+
+- `kitten icat` shows images it has to scale: a picture wider than the pane,
+  or one placed with `--place`. It sends those zlib-compressed (`o=z`), which
+  was ignored, so they never appeared. They are inflated now, bounded to the
+  declared size, with the zlib header and checksum checked.
+
+- The SFTP browser's free space counts in the server's fragment size: a Mac
+  with 650 GB free was shown as 168 TB, because APFS reports a 1 MiB block
+  beside the 4 KiB unit its counts are in. Folders show "--" for their size,
+  as Finder does, instead of their directory entry's bytes.
 
 - Remote editing requires a configured editor command. A downloaded file
   previously opened in its default application, which could execute
@@ -450,6 +441,27 @@ what to edit.
   wrong. Its deadlines now scale with `CORTA_TEST_TIMEOUT_SCALE` like
   every other test ceiling, and three transfer tests that assumed the
   window's READs arrive in offset order assert the resume offset itself.
+
+### Security
+
+- Reject stale search status and repeated/concurrent SFTP handshakes; cancel
+  pending handshakes and keep slow directory mounts off the UI thread.
+- Bind remote-edit upload approval to a private content snapshot and compare
+  remote content digests, including changes with identical size/timestamp.
+- Create private download partials, tighten managed copies and manifest modes,
+  and refuse existing directory-download destination symlinks.
+- Bound glyph clusters before shaping and reject oversized ink before eviction;
+  build Unicode row strings once and reuse reflow scratch buffers.
+- Correct restoration/export privacy documentation and add regression,
+  sanitizer and isolated SSH/SFTP validation evidence.
+- Synchronize the live color palette between settings changes and the
+  renderers that read it; the unit tests no longer read or write the
+  development build's own configuration.
+- Downloads to volumes without ACL support (exFAT, FAT, some SMB shares) and
+  into a download folder that is itself a link work again; remote-edit
+  copies from 1.0.x no longer report a conflict on every upload; a pane whose
+  directory probe waited on a slow mount gets its proxy icon once there is
+  room; approval snapshots left by a quit are removed at the next launch.
 
 ## [1.0.1] - 2026-09-21
 
@@ -1126,7 +1138,8 @@ M1–M10.
   same-conditions end-to-end re-measurement against the 45.5 ms baseline
   is still open.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.0.1...main
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.1.0...main
+[1.1.0]: https://github.com/noah-qin/Corta/releases/tag/v1.1.0
 [1.0.1]: https://github.com/noah-qin/Corta/releases/tag/v1.0.1
 [1.0.0]: https://github.com/noah-qin/Corta/releases/tag/v1.0.0
 [0.1.1]: https://github.com/noah-qin/Corta/releases/tag/v0.1.1

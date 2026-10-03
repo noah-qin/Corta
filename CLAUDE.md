@@ -3,8 +3,8 @@
 A native macOS terminal emulator in pure Swift. Metal rendering, Core
 Text shaping, AppKit shell, a hand-written VT parser.
 
-**Status (2026-10-02): 1.0.1 is the current release; 1.1.0 is in
-progress, and its GitHub milestone is the working list.** A release is a
+**Status (2026-10-03): 1.1.0 is the current release; the next
+version's GitHub milestone is the working list.** A release is a
 tag, a reviewed draft and a publish; CI then signs `appcast.xml` (D20) —
 `docs/RELEASING.md` has the steps. The tag's build and the feed each wait
 for the maintainer's approval of the `release` environment.
