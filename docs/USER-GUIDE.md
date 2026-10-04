@@ -130,7 +130,9 @@ and built-in IME modes use a soft indigo tint; unknown IME modes use gray. With 
 integration the default hides during command execution; without integration it
 shows in the focused pane. Scrollback and alternate-screen programs hide it.
 The **Position** setting chooses **Window toolbar** (default) or **Right edge
-of command line**. The toolbar badge stays fixed as commands grow or wrap.
+of command line**. The toolbar badge sits independently of the network and
+file buttons and stays fixed as commands grow or wrap. Turning it off or
+choosing command-line placement removes its toolbar slot and separating space.
 With command-line placement, long commands move the badge down to free space,
 keeping it at the right edge;
 it hides when no safe row remains and never inserts a line or scrolls the child.

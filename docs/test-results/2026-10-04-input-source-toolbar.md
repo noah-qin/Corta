@@ -12,6 +12,13 @@ third-party private-mode neutrality and configurable colors remain unchanged.
 Disabled, prompt-placement and Latin-only automatic setups remove the toolbar
 slot. Output hides the badge while preserving the slot so it does not shift.
 
+The follow-up separates the indicator from the network/files shared toolbar
+background using a native fixed spacer. The window tracks its own spacer and
+removes it together with the indicator, preserving user-added toolbar spaces.
+All four focused UI cases passed again with this presentation
+(`/tmp/corta-input-independent.xcresult`); the Chinese-source screenshot was
+visually checked and updated in `docs/brand/input-source-indicator.png`.
+
 The prompt view is reattached to TerminalView’s flipped coordinates when
 switching positions. A grid-size change resets its minimum placement row so
 transient geometry cannot pin the badge to a stale row after resize.

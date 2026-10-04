@@ -81,6 +81,12 @@ files, remote connections and child-process input.
 - Quick Terminal with an optional global hotkey, disabled by default. Enable
   it with `quick-terminal = true`, or open it from **View ▸ Quick Terminal**.
 - Secure Keyboard Entry under **Shell**, with an indicator of engaged state.
+- Persistent input-source status (`A`, `中`, `あ`, `한` and other language codes)
+  in an independent upper-right toolbar group. Automatic display follows enabled
+  non-Latin keyboard layouts and IMEs; Latin-only setups hide it. Settings also
+  offer prompt-right placement with long-command avoidance, custom colors and
+  always/off modes. Shell integration hides the default badge during execution;
+  private IME modes that macOS does not expose use neutral styling.
 - Sparkle updates through **Corta ▸ Check for Updates…**, plus an optional
   daily background check.
 

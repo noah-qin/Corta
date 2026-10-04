@@ -12,7 +12,7 @@ repository root.
 | `corta-pangolin-mascot.png` | Transparent mascot master, 1254 × 1254                           |
 | `corta-pangolin-loop.gif`   | Looping README animation, 360 × 360                              |
 | `screenshot.png`            | The README screenshot — light theme, a clean demo shell          |
-| `input-source-indicator.png` | Chinese input-source badge in the window toolbar, from an isolated demo shell |
+| `input-source-indicator.png` | Independent Chinese input-source badge, separated from toolbar action buttons, from an isolated demo shell |
 | `input-source-long-command.png` | Right-edge badge moved below a long command, without changing the grid |
 | `directory-suggestions.png` | Local zsh suggestions and command-status marks from an isolated UI-test demo shell |
 | `sftp-browser.png`          | The SFTP browser with an upload in its transfers popover         |

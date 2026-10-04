@@ -34,7 +34,7 @@ extension SplitViewController: NSToolbarDelegate {
         window.toolbar = toolbar
     }
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, .cortaConnect, .cortaFiles, .cortaInputSource]
+        [.flexibleSpace, .cortaConnect, .cortaFiles]
     }
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [.flexibleSpace, .space, .cortaConnect, .cortaFiles, .cortaInputSource]
@@ -79,9 +79,23 @@ extension SplitViewController: NSToolbarDelegate {
                 && (configuration.inputSourceIndicator == .always || pane.inputSourceIndicator.automaticallyVisible)
             let index = toolbar.items.firstIndex { $0.itemIdentifier == .cortaInputSource }
             if wanted, index == nil {
+                // A native fixed space separates the status badge from the
+                // action buttons' shared glass background. Track this exact
+                // spacer so disabling the badge preserves user-added spaces.
+                if let spacer = inputSourceToolbarSpacer,
+                   let spacerIndex = toolbar.items.firstIndex(where: { $0 === spacer }) {
+                    toolbar.removeItem(at: spacerIndex)
+                }
+                toolbar.insertItem(withItemIdentifier: .space, at: toolbar.items.count)
+                inputSourceToolbarSpacer = toolbar.items.last
                 toolbar.insertItem(withItemIdentifier: .cortaInputSource, at: toolbar.items.count)
-            } else if !wanted, let index {
-                toolbar.removeItem(at: index)
+            } else if !wanted {
+                if let index { toolbar.removeItem(at: index) }
+                if let spacer = inputSourceToolbarSpacer,
+                   let spacerIndex = toolbar.items.firstIndex(where: { $0 === spacer }) {
+                    toolbar.removeItem(at: spacerIndex)
+                }
+                inputSourceToolbarSpacer = nil
             }
         }
         if configuration.inputSourceIndicatorPosition == .prompt {
