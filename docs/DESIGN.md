@@ -528,5 +528,9 @@ styles override it until reset. Idle blinking invalidates cursor drawing and
 pauses outside visible active panes rather than polling terminal output.
 
 The input-source badge observes macOS input-source metadata, never typed text.
-Its right-edge placement avoids live command content without changing the grid
-or sending bytes to the child. Unknown private IME modes use neutral styling.
+The default fixed toolbar slot hosts the focused pane's existing accessible
+badge, separated from action buttons by a window-owned native spacer. Disabling
+it or selecting prompt placement removes both the slot and its spacer. The
+optional right-edge prompt placement avoids live command content without
+changing the grid or sending bytes to the child. Unknown private IME modes use
+neutral styling; enabled non-Latin layouts and IMEs determine automatic display.

@@ -18,7 +18,8 @@ import AppKit
 import Carbon
 import CortaTerminal
 
-/// A pane-local native overlay: no PTY writes, polling, timers or grid cells.
+/// A pane-local input state presented in the window toolbar or prompt overlay.
+/// No PTY writes, polling, timers or grid cells.
 @MainActor final class PaneInputSourceIndicator {
     let view = InputSourceIndicatorView()
     private(set) var source: InputSourceState?
@@ -86,6 +87,13 @@ import CortaTerminal
             placement.reset()
             return
         }
+        if configuration.inputSourceIndicatorPosition == .toolbar {
+            view.update(source: source, configuration: configuration)
+            view.frame = CGRect(x: 0, y: 0, width: 28, height: 18)
+            view.isHidden = false
+            placement.reset()
+            return
+        }
         let size = CGSize(width: max(24, cellSize.width * 2 + 8), height: max(12, cellSize.height - 2))
         guard let row = placement.row(grid: grid, promptRow: promptRow,
             badgeColumns: Int(ceil((size.width + 4) / cellSize.width)), compositionRect: compositionRect,
@@ -104,14 +112,21 @@ import CortaTerminal
 nonisolated struct InputSourceIndicatorPlacement {
     private var prompt: Int?
     private var minimumRow: Int?
-    mutating func reset() { prompt = nil; minimumRow = nil }
+    private var columns: Int?
+    private var rows: Int?
+    mutating func reset() { prompt = nil; minimumRow = nil; columns = nil; rows = nil }
 
     mutating func row(grid: Grid, promptRow: Int?, badgeColumns: Int,
         compositionRect: CGRect? = nil, cellSize: CGSize = .init(width: 8, height: 16),
         topInset: CGFloat = 0) -> Int? {
         let base = grid.scrollback.totalPushed
         let identity = promptRow ?? -1
-        if prompt != identity { reset(); prompt = identity }
+        if prompt != identity || columns != grid.columns || rows != grid.rows {
+            reset()
+            prompt = identity
+            columns = grid.columns
+            rows = grid.rows
+        }
         let first = promptRow.map { max(0, $0 - base) } ?? grid.cursor.row
         var row = max(first, max(grid.cursor.row, (minimumRow ?? (base + first)) - base))
         let startColumn = max(0, grid.columns - badgeColumns)

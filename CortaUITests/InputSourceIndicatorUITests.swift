@@ -19,7 +19,7 @@ import Carbon
 import XCTest
 
 final class InputSourceIndicatorUITests: XCTestCase {
-    @MainActor func testPromptLongInputExecutionAndSettings() throws {
+    @MainActor func testToolbarLongInputExecutionAndSettings() throws {
         continueAfterFailure = false
         let previous = LatinInputSource.select()
         defer { LatinInputSource.restore(previous) }
@@ -55,10 +55,10 @@ final class InputSourceIndicatorUITests: XCTestCase {
         let initial = badge.frame
         XCTAssertGreaterThan(initial.minX, window.frame.midX)
         attach(window, name: "input-source-light")
-        // Text is unexecuted, and moving the caret back must not pull the badge up.
+        // Toolbar position never changes as the command grows or the caret moves.
         app.typeText(String(repeating: "x", count: 53))
-        expectation(for: NSPredicate { _, _ in badge.exists && badge.frame.minY > initial.minY + 3 }, evaluatedWith: nil)
-        waitForExpectations(timeout: 5)
+        XCTAssertTrue(badge.exists)
+        XCTAssertEqual(badge.frame.minY, initial.minY, accuracy: 1)
         let avoided = badge.frame
         XCTAssertEqual(avoided.maxX, initial.maxX, accuracy: 1)
         app.typeKey(.leftArrow, modifierFlags: [])
@@ -87,6 +87,12 @@ final class InputSourceIndicatorUITests: XCTestCase {
         let config = try String(contentsOf: stage.appendingPathComponent("config"), encoding: .utf8)
         XCTAssertTrue(config.contains("input-source-indicator = off"))
         mode.click(); mode.menuItems["While entering commands"].click()
+        let position = settings.popUpButtons["input-source-indicator-position"]
+        XCTAssertTrue(position.exists)
+        position.click(); position.menuItems["Right edge of command line"].click()
+        XCTAssertTrue(try String(contentsOf: stage.appendingPathComponent("config"), encoding: .utf8)
+            .contains("input-source-indicator-position = prompt"))
+        position.click(); position.menuItems["Window toolbar"].click()
         let color = settings.textFields["input-source-direct-color"]
         XCTAssertTrue(color.exists)
         color.click(); color.typeText("#52b788"); color.typeKey(.return, modifierFlags: [])
@@ -148,6 +154,27 @@ final class InputSourceIndicatorUITests: XCTestCase {
         }
     }
 
+    @MainActor func testOptionalPromptPositionAvoidsLongCommands() throws {
+        let previous = LatinInputSource.select()
+        defer { LatinInputSource.restore(previous) }
+        let stage = try stage(appearance: "light")
+        defer { try? FileManager.default.removeItem(at: stage) }
+        let configURL = stage.appendingPathComponent("config")
+        let config = try String(contentsOf: configURL, encoding: .utf8)
+        try (config + "input-source-indicator-position = prompt\n").write(to: configURL, atomically: true, encoding: .utf8)
+        let app = application(stage: stage)
+        app.launch(); app.activate()
+        defer { app.terminate() }
+        let badge = app.staticTexts["input-source-indicator"]
+        XCTAssertTrue(badge.waitForExistence(timeout: 5))
+        let initial = badge.frame
+        app.typeText(String(repeating: "x", count: 53))
+        expectation(for: NSPredicate { _, _ in badge.exists && badge.frame.minY > initial.minY + 3 }, evaluatedWith: nil)
+        waitForExpectations(timeout: 5)
+        XCTAssertEqual(badge.frame.maxX, initial.maxX, accuracy: 1)
+        attach(app.windows.firstMatch, name: "input-source-prompt-avoidance")
+    }
+
     @MainActor private func waitForAbsence(_ element: XCUIElement) {
         expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: element)
         waitForExpectations(timeout: 5)
@@ -157,7 +184,7 @@ final class InputSourceIndicatorUITests: XCTestCase {
         attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
     }
     private func stage(appearance: String) throws -> URL {
-        let directory = URL(fileURLWithPath: "/private/tmp/corta-ui-stages", isDirectory: true).appendingPathComponent("corta-input-ui-\(UUID().uuidString)")
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("corta-input-ui-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try "appearance = \(appearance)\ncolumns = 60\nrows = 18\nrestore-windows = false\nfont-size = 14\n".write(to: directory.appendingPathComponent("config"), atomically: true, encoding: .utf8)
         try "PROMPT='demo ❯ '\nRPROMPT=''\n".write(to: directory.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)

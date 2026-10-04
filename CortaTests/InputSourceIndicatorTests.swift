@@ -92,9 +92,11 @@ import Testing
     }
 
     @Test func configurationRoundTripsColorsAndInvalidValuesSurvive() {
-        let parsed = Configuration.parse("input-source-indicator = always\ninput-source-direct-color = #abc\ninput-source-ime-color = #123456")
+        let parsed = Configuration.parse("input-source-indicator = always\ninput-source-indicator-position = prompt\ninput-source-direct-color = #abc\ninput-source-ime-color = #123456")
         #expect(parsed.unknown.isEmpty)
         #expect(parsed.configuration.inputSourceIndicator == .always)
+        #expect(parsed.configuration.inputSourceIndicatorPosition == .prompt)
+        #expect(Configuration().inputSourceIndicatorPosition == .toolbar)
         #expect(parsed.configuration.inputSourceDirectColor == "#aabbcc")
         #expect(Configuration.parse(parsed.configuration.serialized()).configuration == parsed.configuration)
         let invalid = Configuration.parse("input-source-indicator = sometimes\ninput-source-direct-color = yellow")
@@ -133,6 +135,16 @@ import Testing
         #expect(placement.row(grid: terminal.grid, promptRow: 0, badgeColumns: 4) == 1)
         placement.reset()
         #expect(placement.row(grid: terminal.grid, promptRow: 1, badgeColumns: 4) == 1)
+    }
+
+    @Test func resizingDiscardsPlacementFromTransientStartupGeometry() {
+        var placement = InputSourceIndicatorPlacement()
+        var narrow = Terminal(rows: 6, columns: 4)
+        narrow.feed(Array("demo ❯ ".utf8))
+        #expect(placement.row(grid: narrow.grid, promptRow: 0, badgeColumns: 4)! > 0)
+        var settled = Terminal(rows: 18, columns: 60)
+        settled.feed(Array("demo ❯ ".utf8))
+        #expect(placement.row(grid: settled.grid, promptRow: 0, badgeColumns: 4) == 0)
     }
 
     @Test func rightPromptWideTextCompositionAndBottomDoNotGetCovered() {

@@ -81,8 +81,13 @@ nonisolated struct Configuration: Equatable, Sendable {
         case auto, always, off
     }
 
+    enum InputSourceIndicatorPosition: String, CaseIterable, Sendable {
+        case toolbar, prompt
+    }
+
+    var inputSourceIndicatorPosition: InputSourceIndicatorPosition = .toolbar
     var inputSourceIndicator: InputSourceIndicatorMode = .auto
-    /// Empty uses the appearance-aware system colour.
+    /// Empty uses the subtle appearance-aware default styling.
     var inputSourceDirectColor: String = ""
     var inputSourceIMEColor: String = ""
 
@@ -284,6 +289,9 @@ nonisolated struct Configuration: Equatable, Sendable {
         case "input-source-indicator":
             guard let mode = InputSourceIndicatorMode(rawValue: value) else { return false }
             inputSourceIndicator = mode
+        case "input-source-indicator-position":
+            guard let position = InputSourceIndicatorPosition(rawValue: value) else { return false }
+            inputSourceIndicatorPosition = position
         case "input-source-direct-color", "input-source-ime-color":
             guard let color = value.isEmpty ? "" : Theme.color(value).map(Theme.hex) else { return false }
             if key == "input-source-direct-color" { inputSourceDirectColor = color }
@@ -567,6 +575,7 @@ nonisolated struct Configuration: Equatable, Sendable {
             "theme = \(theme)",
             "appearance = \(appearance.rawValue)",
             "input-source-indicator = \(inputSourceIndicator.rawValue)",
+            "input-source-indicator-position = \(inputSourceIndicatorPosition.rawValue)",
             "input-source-direct-color = \(inputSourceDirectColor)",
             "input-source-ime-color = \(inputSourceIMEColor)",
             "status-bar = \(statusBar)",

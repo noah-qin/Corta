@@ -24,6 +24,8 @@ import CortaTerminal
 final class SplitViewController: NSViewController {
     private var tree: SplitTree!
     private let systemStatusBar = SystemStatusBar(frame: .zero)
+    let inputSourceToolbarHost = NSView(frame: CGRect(x: 0, y: 0, width: 28, height: 18))
+    var inputSourceToolbarSpacer: NSToolbarItem?
     private var statusBarHeightConstraint: NSLayoutConstraint?
     var statusBarHeight: CGFloat { ConfigurationStore.shared.configuration.statusBar ? SystemStatusBar.height : 0 }
     /// The pane that receives input. Set by `noteFocus` from

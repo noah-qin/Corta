@@ -19,9 +19,10 @@ import AppKit
 extension NSToolbarItem.Identifier {
     static let cortaConnect = Self("corta.connect")
     static let cortaFiles = Self("corta.files")
+    static let cortaInputSource = Self("corta.input-source")
 }
 
-/// Only SSH and SFTP are added to the native toolbar; no extra backdrop over it.
+/// Native toolbar actions and a stable, window-local input-source status slot.
 extension SplitViewController: NSToolbarDelegate {
     func installToolbar(on window: NSWindow) {
         let toolbar = NSToolbar(identifier: "Corta.TerminalToolbar")
@@ -36,10 +37,18 @@ extension SplitViewController: NSToolbarDelegate {
         [.flexibleSpace, .cortaConnect, .cortaFiles]
     }
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, .space, .cortaConnect, .cortaFiles]
+        [.flexibleSpace, .space, .cortaConnect, .cortaFiles, .cortaInputSource]
     }
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier,
                  willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        if identifier == .cortaInputSource {
+            let item = NSToolbarItem(itemIdentifier: identifier)
+            item.label = L10n.text("inputSource.settings.title")
+            item.paletteLabel = item.label
+            item.view = inputSourceToolbarHost
+            item.visibilityPriority = .high
+            return item
+        }
         let key: String
         let symbol: String
         let action: Selector
@@ -57,6 +66,51 @@ extension SplitViewController: NSToolbarDelegate {
         item.action = action
         return item
     }
+    /// Only the focused pane can publish into this window's single status slot.
+    /// Reparent the existing accessible view instead of duplicating input state.
+    func placeInputSourceIndicator(from pane: ViewController, configuration: Configuration) {
+        let badge = pane.inputSourceIndicator.view
+        if focusedPane === pane, let toolbar = pane.view.window?.toolbar {
+            // Reserve a stable slot while a relevant source is enabled, even
+            // when command output temporarily hides the badge. Off, prompt
+            // placement and Latin-only automatic mode leave no empty slot.
+            let wanted = configuration.inputSourceIndicatorPosition == .toolbar
+                && configuration.inputSourceIndicator != .off
+                && (configuration.inputSourceIndicator == .always || pane.inputSourceIndicator.automaticallyVisible)
+            let index = toolbar.items.firstIndex { $0.itemIdentifier == .cortaInputSource }
+            if wanted, index == nil {
+                // A native fixed space separates the status badge from the
+                // action buttons' shared glass background. Track this exact
+                // spacer so disabling the badge preserves user-added spaces.
+                if let spacer = inputSourceToolbarSpacer,
+                   let spacerIndex = toolbar.items.firstIndex(where: { $0 === spacer }) {
+                    toolbar.removeItem(at: spacerIndex)
+                }
+                toolbar.insertItem(withItemIdentifier: .space, at: toolbar.items.count)
+                inputSourceToolbarSpacer = toolbar.items.last
+                toolbar.insertItem(withItemIdentifier: .cortaInputSource, at: toolbar.items.count)
+            } else if !wanted {
+                if let index { toolbar.removeItem(at: index) }
+                if let spacer = inputSourceToolbarSpacer,
+                   let spacerIndex = toolbar.items.firstIndex(where: { $0 === spacer }) {
+                    toolbar.removeItem(at: spacerIndex)
+                }
+                inputSourceToolbarSpacer = nil
+            }
+        }
+        if configuration.inputSourceIndicatorPosition == .prompt {
+            guard let terminalView = pane.terminalView else { return }
+            if badge.superview !== terminalView {
+                badge.removeFromSuperview()
+                terminalView.addSubview(badge)
+            }
+        } else if focusedPane === pane, badge.superview !== inputSourceToolbarHost {
+            inputSourceToolbarHost.subviews.forEach { $0.removeFromSuperview() }
+            badge.removeFromSuperview()
+            inputSourceToolbarHost.addSubview(badge)
+        }
+    }
+
     @objc private func connectSSH(_ sender: Any?) { RemoteConnectController.shared.show(.ssh, sender: sender) }
     /// A remote pane's own browser; from a local pane, the same connect
     /// sheet as SSH, asking which host.

@@ -697,6 +697,7 @@ class ViewController: NSViewController {
         let configuration = ConfigurationStore.shared.configuration
         let inputSnapshot = configuration.inputSourceIndicator == .off ? nil : session.inputLineSnapshot()
         let grid = inputSnapshot?.grid ?? session.snapshot()
+        splitController?.placeInputSourceIndicator(from: self, configuration: configuration)
         updateShellOverlay(grid: grid)
         if let inputSnapshot {
             let metrics = terminalRenderer.pointMetrics
