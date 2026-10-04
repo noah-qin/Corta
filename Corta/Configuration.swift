@@ -65,6 +65,32 @@ nonisolated struct Configuration: Equatable, Sendable {
         case main
     }
 
+    enum CursorShape: String, CaseIterable, Sendable {
+        case block, bar, underline
+
+        func style(blinking: Bool) -> CursorStyle {
+            switch self {
+            case .block: blinking ? .blinkingBlock : .block
+            case .bar: blinking ? .blinkingBar : .bar
+            case .underline: blinking ? .blinkingUnderline : .underline
+            }
+        }
+    }
+
+    enum InputSourceIndicatorMode: String, CaseIterable, Sendable {
+        case auto, always, off
+    }
+
+    var inputSourceIndicator: InputSourceIndicatorMode = .auto
+    /// Empty uses the appearance-aware system colour.
+    var inputSourceDirectColor: String = ""
+    var inputSourceIMEColor: String = ""
+
+    var statusBar = false
+    var statusItems: Set<SystemMetrics.Item> = Set(SystemMetrics.Item.allCases)
+    var statusNetworkInterface = "auto"
+    var cursorShape: CursorShape = .block
+    var cursorBlink: Bool = false
     var fontFamily: String = Configuration.systemFontFamily
     var fontSize: Double = 12
     var theme: String = Theme.corta.name
@@ -255,8 +281,34 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// out-of-range value is clamped and rewritten canonically.
     private mutating func apply(key: String, value: String) -> Bool {
         switch key {
+        case "input-source-indicator":
+            guard let mode = InputSourceIndicatorMode(rawValue: value) else { return false }
+            inputSourceIndicator = mode
+        case "input-source-direct-color", "input-source-ime-color":
+            guard let color = value.isEmpty ? "" : Theme.color(value).map(Theme.hex) else { return false }
+            if key == "input-source-direct-color" { inputSourceDirectColor = color }
+            else { inputSourceIMEColor = color }
+        case "status-bar":
+            guard let enabled = Self.parseBool(value) else { return false }
+            statusBar = enabled
+        case "status-items":
+            let names = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            let items = names.compactMap(SystemMetrics.Item.init(rawValue:))
+            guard items.count == names.count else { return false }
+            statusItems = Set(items)
+        case "status-network-interface":
+            guard !value.isEmpty, value.count < 32,
+                value.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_" || $0 == "-") }) else { return false }
+            statusNetworkInterface = value
+        case "cursor-shape":
+            guard let shape = CursorShape(rawValue: value) else { return false }
+            cursorShape = shape
+        case "cursor-blink":
+            guard let blink = Self.parseBool(value) else { return false }
+            cursorBlink = blink
         case "font-family":
-            fontFamily = value.isEmpty ? Self.systemFontFamily : value
+            // Legacy family names migrate to the single supported face.
+            fontFamily = Self.systemFontFamily
         case "font-size":
             // The ⌘+/⌘− clamp: below ~8pt the cell degenerates.
             guard let size = Double(value) else { return false }
@@ -514,6 +566,14 @@ nonisolated struct Configuration: Equatable, Sendable {
             "# Appearance",
             "theme = \(theme)",
             "appearance = \(appearance.rawValue)",
+            "input-source-indicator = \(inputSourceIndicator.rawValue)",
+            "input-source-direct-color = \(inputSourceDirectColor)",
+            "input-source-ime-color = \(inputSourceIMEColor)",
+            "status-bar = \(statusBar)",
+            "status-items = \(SystemMetrics.Item.allCases.filter { statusItems.contains($0) }.map(\.rawValue).joined(separator: ","))",
+            "status-network-interface = \(statusNetworkInterface)",
+            "cursor-shape = \(cursorShape.rawValue)",
+            "cursor-blink = \(cursorBlink)",
             "font-family = \(fontFamily)",
             "font-size = \(Self.number(fontSize))",
             "",

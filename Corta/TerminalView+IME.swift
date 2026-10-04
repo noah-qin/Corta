@@ -64,6 +64,8 @@ extension TerminalView: NSTextInputClient {
         // Re-read each time, so ⌘= / ⌘- mid-composition takes effect.
         if let font = preeditFontProvider?() { overlay.font = font }
         overlay.show(attributed, at: cursorRectProvider?() ?? .zero)
+        inputCompositionRect = overlay.frame
+        onInputContextChange?()
     }
 
     func unmarkText() {
@@ -74,11 +76,16 @@ extension TerminalView: NSTextInputClient {
     /// half-composed input to the PTY.
     override func resignFirstResponder() -> Bool {
         clearMarkedText()
-        return super.resignFirstResponder()
+        let accepted = super.resignFirstResponder()
+        onInputContextChange?()
+        return accepted
     }
 
     private func clearMarkedText() {
+        guard existingMarkedTextOverlay?.markedText != nil || inputCompositionRect != nil else { return }
         existingMarkedTextOverlay?.hide()
+        inputCompositionRect = nil
+        onInputContextChange?()
     }
 
     func hasMarkedText() -> Bool {

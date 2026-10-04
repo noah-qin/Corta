@@ -179,6 +179,14 @@ public struct Terminal: Sendable {
         return (row, column)
     }
 
+    /// A ready prompt, including multi-line prompts; nil while printing a
+    /// prompt or between command completion and the next prompt's B mark.
+    public var inputPromptRow: Int? {
+        guard performer.state.sawPromptEnd, !performer.state.isCommandRunning,
+            performer.state.commandExitStatus == nil else { return nil }
+        return performer.state.promptRow
+    }
+
     public var commandRecords: CommandRecordStore { performer.state.commandRecords }
 
     public mutating func takeFinishedCommand() -> Int? {

@@ -53,8 +53,13 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 | --- | --- | --- | --- |
 | `theme` | a theme name | `corta` | Built in: `corta`, plus `solarized` and `mono`, which still resolve but are not offered in the UI (§4). A theme defined in this file wins over a built-in of the same name. |
 | `appearance` | `auto`, `light`, `dark` | `auto` | Which of the theme's two variants is live. `auto` follows macOS and switches while running. |
-| `font-family` | a family name, or `system` | `system` | `system` means `NSFont.monospacedSystemFont`. A named family is verified before use: every ASCII printable must advance identically across the regular, bold, italic and bold-italic faces, and the faces must be outlines. A family that fails falls back to the system font. |
-| `font-size` | 8–64 | `12` | Points, applied to every **new** window and pane. ⌘+ / ⌘− / pinch (B09) are a *temporary*, per-window zoom that never writes here — zooming one window does not change this key, another open window, or what the next new window opens at; ⌘0 ends the zoom and returns to whatever this key currently says. A zoom does not survive quitting and relaunching Corta. |
+| `status-bar` | boolean | `false` | Show a bottom bar of local system metrics. Click it for local host details. Sampling pauses when every enabled bar is hidden. |
+| `status-items` | comma-separated `cpu`, `load`, `memory`, `network`, `disk`, `thermal` | all six | Choose metrics to collect and display. Empty shows the local-host details button without periodic sampling. |
+| `status-network-interface` | `auto` or an interface name | `auto` | Auto selects one primary interface (physical fallback); names such as `en0` or `utun2` select exactly that interface. An unavailable explicit interface shows no rate. VPN and physical traffic are never summed. |
+| `cursor-shape` | `block`, `bar`, `underline` | `block` | Default cursor shape, applied live. Terminal programs can temporarily override it with DECSCUSR; parameter 0 or a terminal reset restores this default. |
+| `cursor-blink` | boolean | `false` | Blink the default cursor every half second while its pane has keyboard focus and is visible at the live screen. Terminal programs can temporarily override blinking with DECSCUSR. |
+| `font-family` | `system` | `system` | Only the macOS system monospaced font is supported. Legacy family names are accepted and normalized to `system`; font size remains adjustable. |
+| `font-size` | 8–64 | `12` | Points, applied immediately to panes without a temporary zoom and used by new windows and panes. ⌘+ / ⌘− / pinch (B09) are a *temporary*, per-window zoom that never writes here — zooming one window does not change this key, another open window, or what the next new window opens at; ⌘0 ends the zoom and returns to whatever this key currently says. A zoom does not survive quitting and relaunching Corta. |
 
 ### Window
 
@@ -89,6 +94,9 @@ into another application hides it without moving focus again.
 | `scrollback-lines` | 0–1000000 | `10000` | Lines of history per session. **Applies to sessions opened afterwards**: a running child's history cannot be re-limited without discarding lines. |
 | `command-history-limit` | 0–10000 | `512` | How many completed/running commands a session's structured command history (jumping, copy/export by identity, Command History search) keeps at once — separate from `scrollback-lines`, which bounds visible text, not command records. **Applies to sessions opened afterwards**, same reason as `scrollback-lines`. |
 | `bell` | `visual`, `audible`, `muted` | `visual` | `visual` flashes the pane; `audible` is `NSSound.beep()`. |
+| `input-source-indicator` | `auto`, `always`, `off` | `auto` | A persistent input-source badge at the right edge of the active input line. `auto` enables it only when the user has enabled a non-Latin keyboard layout or an IME, and shows it at a ready shell prompt; without OSC 133 shell integration it falls back to the focused pane. `always` also shows it during command output. Every mode hides it in unfocused panes, scrollback and alternate-screen programs. Long input moves it downward without changing the grid; if no safe space remains it hides until the next prompt. Applies immediately. Settings ▸ Keyboard & Mouse. |
+| `input-source-direct-color` | hex color, or empty | *(empty)* | Background for confirmed direct input (`A`). Empty uses quiet gray text with a faint gray background. Accepts `#rgb` / `#rrggbb`; text automatically uses black or white for contrast. |
+| `input-source-ime-color` | hex color, or empty | *(empty)* | Background for a non-Latin keyboard layout or a reported built-in IME mode (`中`, `あ`, `한`). Empty uses a soft indigo tint. Third-party IMEs that do not expose their internal ASCII mode keep a neutral badge, independent of this color. |
 | `option-as-meta` | boolean | `false` | Whether ⌥ acts as Meta — an ESC prefix on the base character, the way a PC keyboard's Alt does — instead of composing the layout's alternate character. Off by default because on macOS ⌥ *is* text input: it types `é`, `ø`, `–`, and starts dead-key sequences, and an international layout needs that. Turn it on when a program wants `M-x` and `M-b`. Special keys are unaffected either way: ⌥ already reaches the child there as the xterm modifier parameter, and an IME still sees every event it would otherwise see. |
 | `open-file-command` | string | *(empty)* | The command run when a `path:line` reference in program output is ⌘-clicked. `{file}`, `{line}` and `{column}` are substituted, one argument at a time. The executable must be an **absolute path** and is run directly — never through a shell — so a path containing `;` or `$(…)` stays a path. For both local and remote references, a nonempty editor command is required. Empty disables opening: system default handlers can execute some file types. The hover tooltip names the required setting. The same template is used for the managed local copy the remote-editing flow downloads — `{file}` is the copy, the line and column are the reference's own. |
 | `search-regex` | boolean | `false` | Whether the search field is read as a regular expression (ICU syntax, as `NSRegularExpression` accepts it). The **`*`** button in the search bar writes this key. Three things are reported rather than shown as "no results": a pattern that does not compile, a pattern whose shape makes a backtracking engine take exponential time (`(a+)+`, `(a*)*`, `(a\|a)+` — every one has a linear equivalent, and it is refused *before* it runs because ICU's time limit is not reachable from Swift), and a sweep that stopped on its 500 ms budget or on a line longer than 64,000 units, which the match count marks with a `+`. |
@@ -342,6 +350,18 @@ already resolved and confirmed. The program chooses the path, never the
 scheme, and never whether the thing is a file at all.
 
 ---
+
+### Graphical theme editing
+
+View → Theme editor opens the editor directly. Settings → Appearance → Create theme copies the selected theme into an
+unsaved draft. Edit dark and light variants using color pickers or HEX input;
+the preview is local to the editor. Save theme writes a new custom theme and
+selects it. Edit theme is offered for custom themes; built-ins are copied rather
+than modified. Cancel discards the draft. Restore source colors restores the
+current variant to the colors it had when the editor opened. Invalid colors
+disable saving. An external edit to the same custom theme requires reopening
+the editor before saving.
+
 
 ## 4a. Presets
 
@@ -631,8 +651,9 @@ search away.
 
 | Change | Takes effect |
 | --- | --- |
-| `theme`, `appearance`, `font-family`, `font-size` | Immediately, in every open pane. |
+| `theme`, `appearance`, `font-family`, `font-size`, `cursor-shape`, `cursor-blink` | Immediately, in every open pane. |
 | `bell`, `option-as-meta`, `search-case-sensitive`, `search-regex`, `open-file-command`, `copy-on-select`, `mouse-override-modifier`, `link-activation`, `allow-clipboard-write`, `confirm-close`, `directory-history`, notification keys | Immediately — they are read when the behaviour happens. |
+| `status-bar`, `status-items`, `status-network-interface`, input-source indicator keys | Immediately; polling follows visible enabled bars. |
 | `bind.*` | Immediately: the menu key equivalents are re-applied on every file change. |
 | `theme.*` | Immediately, if the live theme is the one you edited. |
 | `columns`, `rows` | The next window opened. |
@@ -686,3 +707,29 @@ an upload remain pending edits. Managed copies remain on disk with private
 file modes. Restored sessions retain arrangement and directory metadata,
 with `restore-windows = true` by default, and start fresh processes without
 restoring terminal text. See [data-at-rest policy](SECURITY.md#5-data-at-rest).
+
+With Corta zsh integration installed or updated, Tab on a whitespace-only
+command line inserts four spaces; normal command completion bindings remain
+intact. Output tab stops remain eight columns. The shell keeps its original
+input behavior without integration.
+
+Host details are also available from View → Local host details or Settings →
+Terminal → Local host details, even with the status bar disabled.
+
+## 9. Local system status and input indentation
+
+CPU is the busy fraction of Mach CPU tick deltas between samples. Load shows
+1-, 5-, and 15-minute averages. Memory is wired + non-purgeable anonymous +
+physical compressed pages, excluding file cache; it is not total minus free.
+Network rates use byte-counter deltas for exactly one interface, resetting the
+baseline on interface changes or pauses. Disk free is the available capacity of
+the volume containing the user's home directory, refreshed every 30 seconds.
+Thermal state is macOS's normal / elevated / high / critical classification,
+not a temperature in degrees. Metrics sample every two seconds off the UI
+thread, and all windows share one sampler. These are local-machine metrics,
+including while the selected pane is connected over SSH.
+
+The bottom bar is 24 points high. It uses abbreviated labels and byte quantities
+with up to one decimal digit to fit more selected metrics. Hover or open details
+for full labels and precision; accessibility also receives the full text.
+Numbers follow the current locale, and labels follow the app's selected language.

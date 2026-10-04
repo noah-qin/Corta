@@ -61,7 +61,15 @@ final class SettingsModel {
     var keybindings = Keybindings()
     var availableFonts: [String] = []
 
+    var statusBar = false
+    var statusItems = Set(SystemMetrics.Item.allCases)
+    var statusNetworkInterface = "auto"
     var theme: String = Theme.corta.name
+    var inputSourceIndicator: Configuration.InputSourceIndicatorMode = .auto
+    var inputSourceDirectColor = ""
+    var inputSourceIMEColor = ""
+    var cursorShape: Configuration.CursorShape = .block
+    var cursorBlink: Bool = false
     var appearance: Configuration.Appearance = .auto
     var fontFamily: String = Configuration.systemFontFamily
     var fontSize: Double = 12
@@ -127,7 +135,13 @@ final class SettingsModel {
 
     init() {
         refresh()
+        followsSystemDark = AppearanceController.shared.isDark
         refreshExternalState()
+        notificationObservers.append(NotificationCenter.default.addObserver(
+            forName: AppearanceController.didChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.followsSystemDark = AppearanceController.shared.isDark }
+        })
         notificationObservers.append(NotificationCenter.default.addObserver(
             forName: ConfigurationStore.didChange, object: nil, queue: .main
         ) { [weak self] _ in
@@ -186,9 +200,17 @@ final class SettingsModel {
         suggestApplicationsFolder = configuration.suggestApplicationsFolder
         presets = configuration.presets
         keybindings = configuration.keybindings
+        statusBar = configuration.statusBar
+        statusItems = configuration.statusItems
+        statusNetworkInterface = configuration.statusNetworkInterface
         theme = configuration.theme
+        inputSourceIndicator = configuration.inputSourceIndicator
+        inputSourceDirectColor = configuration.inputSourceDirectColor
+        inputSourceIMEColor = configuration.inputSourceIMEColor
+        cursorShape = configuration.cursorShape
+        cursorBlink = configuration.cursorBlink
         appearance = configuration.appearance
-        fontFamily = configuration.fontFamily
+        fontFamily = Configuration.systemFontFamily
         fontSize = configuration.fontSize
         scrollbackLines = configuration.scrollbackLines
         columns = configuration.columns
@@ -237,6 +259,17 @@ final class SettingsModel {
 
     // MARK: - Derived display
 
+    /// Explicit selection drives the preview immediately; AppKit appearance
+    /// propagation and configuration notifications may arrive later.
+    var previewIsDark: Bool {
+        switch appearance {
+        case .light: false
+        case .dark: true
+        case .auto: followsSystemDark
+        }
+    }
+    private(set) var followsSystemDark = false
+
     var fontFamilyDisplay: String {
         fontFamily == Configuration.systemFontFamily
             ? L10n.text("settings.font.systemMonospaced") : fontFamily
@@ -253,9 +286,57 @@ final class SettingsModel {
 
     // MARK: - Setters
 
+    func setStatusBar(_ enabled: Bool) {
+        commit { $0.statusBar = enabled; return nil }
+    }
+    func setStatusItem(_ item: SystemMetrics.Item, enabled: Bool) {
+        commit { config in
+            if enabled { config.statusItems.insert(item) } else { config.statusItems.remove(item) }
+            return nil
+        }
+    }
+    func setStatusNetworkInterface(_ value: String) {
+        let name = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let (parsed, unknown) = Configuration.parse("status-network-interface = \(name)")
+        guard unknown.isEmpty else { return }
+        commit { $0.statusNetworkInterface = parsed.statusNetworkInterface; return nil }
+    }
+
     func setTheme(_ name: String) {
         commit { configuration in
             configuration.theme = name
+            return nil
+        }
+    }
+
+    func setInputSourceIndicator(_ value: Configuration.InputSourceIndicatorMode) {
+        commit { configuration in
+            configuration.inputSourceIndicator = value
+            return nil
+        }
+    }
+
+    func setInputSourceColor(_ value: String, direct: Bool) {
+        commit { configuration in
+            guard let normalized = value.isEmpty ? "" : Theme.color(value).map(Theme.hex) else {
+                return L10n.text("inputSource.color.invalid")
+            }
+            if direct { configuration.inputSourceDirectColor = normalized }
+            else { configuration.inputSourceIMEColor = normalized }
+            return nil
+        }
+    }
+
+    func setCursorShape(_ value: Configuration.CursorShape) {
+        commit { configuration in
+            configuration.cursorShape = value
+            return nil
+        }
+    }
+
+    func setCursorBlink(_ value: Bool) {
+        commit { configuration in
+            configuration.cursorBlink = value
             return nil
         }
     }
@@ -710,16 +791,12 @@ extension SettingsModel {
     }
 
     func loadFonts() async {
-        let families = await Task.detached { MonospacedFontCatalog.families() }.value
-        availableFonts = families
+        availableFonts = []
     }
 
     func setFontFamily(_ value: String) {
         commit { configuration in
-            guard value == Configuration.systemFontFamily || MonospacedFontCatalog.isUsable(family: value) else {
-                return L10n.text("ui.font.invalid")
-            }
-            configuration.fontFamily = value
+            configuration.fontFamily = Configuration.systemFontFamily
             return nil
         }
     }

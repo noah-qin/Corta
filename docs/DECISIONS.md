@@ -151,21 +151,20 @@ file could carry. A key added to `Configuration` without a row in
 arrangement, directory history) lives in its own files and is not a
 setting — `CONFIGURATION.md` §8 draws the line.
 
-## D11 — Curated themes and verified font families
+## D11 — Curated themes and one primary font
 
-**Decision.** The Settings page and View menu offer `Theme.builtIn`
-(just `corta`) and user-defined themes. `Theme.known` also resolves
-`solarized` and `mono` from the config file. Settings offers installed font
-families only after `MonospacedFontCatalog` verifies all four faces and
-ASCII advances; the system monospaced family remains the default.
+**Decision.** Settings and View offer built-in and user-defined themes, with a
+color editor. The only supported primary font is macOS System Monospaced;
+font size remains adjustable. Legacy `font-family` names migrate to `system`.
+PingFang and Apple Color Emoji remain glyph fallbacks for CJK and emoji.
 
-**Why.** A font picker makes an existing config capability discoverable.
-Mechanical verification protects terminal cell geometry; it does not
-imply editorial endorsement of every installed face.
+**Why.** User feedback showed inconsistent appearance across installed faces.
+A single primary family gives one font stack to validate and keeps the grid
+predictable. Settings no longer scans installed fonts.
 
-**Consequence.** Keep the validation of D12 and show a preview of the
-selected family and appearance. New bundled themes still need a working-day
-readability review before joining the offered list.
+**Consequence.** Show the resolved font and preview the selected appearance
+and cursor immediately. The catalog validation utilities remain available for
+font/rendering diagnostics, without exposing additional families in the app.
 
 ## D12 — A font family is verified, never trusted
 

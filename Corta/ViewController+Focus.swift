@@ -42,7 +42,7 @@ extension ViewController {
 
     /// Filtered to this pane's window, or every pane reports every window.
     func observeWindowFocus() {
-        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification, NSWindow.didChangeOcclusionStateNotification] {
             NotificationCenter.default.addObserver(
                 self, selector: #selector(windowFocusChanged(_:)), name: name, object: nil)
         }

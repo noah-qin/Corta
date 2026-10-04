@@ -148,7 +148,7 @@ original report's environment cannot be recovered (CHANGELOG 1.0.0). The
 | Foreground / background, bold, italic, underline | P0   | Real faces where the family has them; synthetic oblique and stroked weight where it does not |
 | Missing glyph is visible, not blank              | P0   | Hollow box for a scalar no font in the cascade covers |
 | Every glyph clipped to its cell box              | P0   | Overwide ink is scaled to fit rather than painted into the next column |
-| Cursor: block / bar / underline, blink           | P0   | DECSCUSR shapes; blinking variants render steadily (see below) |
+| Cursor: block / bar / underline, blink           | P0   | Configurable shapes and blinking; DECSCUSR overrides (see below) |
 | Selection highlight                              | P0   | Document-anchored quads; follows its text as output scrolls |
 | Retina / HiDPI scaling                           | P0   | Grid laid out in pixels, not points — one of §4.4's shipped bugs |
 | **Font fallback** for CJK and emoji              | P0   | Core Text cascade list; the shaped run's font rasterises the glyph (M3.5) |
@@ -169,9 +169,11 @@ traits) was removed at the same time: its Font ▸ Smaller item claimed
 ⌘- first in menu order and routed it to `modifyFont:`, which a terminal
 never implements — the shortcut arrived dead. `MenuShortcutTests` pins
 the invariant: no keystroke is claimed by two menu items. The
-cursor renders the core's DECSCUSR state — block, bar and underline;
-blinking variants render steadily, because a blink timer would force
-frames on an idle screen (`PERFORMANCE.md` §1, idle CPU ~0%).
+cursor uses the configured block, bar or underline shape, with optional
+blinking (off by default). DECSCUSR can temporarily override shape and blink;
+parameter 0 and terminal resets return to the configured defaults. A half-second
+timer wakes only the visible, focused live pane when blinking is enabled;
+inactive, occluded and scrolled-back panes stop that timer.
 
 ### 2.3 Windows and sessions
 

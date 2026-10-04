@@ -25,6 +25,18 @@ import Testing
 /// they change.
 @MainActor
 struct SettingsModelTests {
+    @Test func explicitAppearanceImmediatelyUpdatesPreviewAndFontIsFixed() {
+        let model = SettingsModel()
+        let original = model.appearance
+        defer { model.setAppearance(original) }
+        model.setAppearance(.dark)
+        #expect(model.previewIsDark)
+        model.setAppearance(.light)
+        #expect(!model.previewIsDark)
+        model.setFontFamily("PT Mono")
+        #expect(model.fontFamily == Configuration.systemFontFamily)
+    }
+
     @Test("a scrollback value outside 0...1,000,000 is clamped and reported")
     func scrollbackIsClamped() {
         let model = SettingsModel()

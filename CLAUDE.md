@@ -61,7 +61,7 @@ line each:
   features, no automation that runs commands. **D10** The config file is
   the only settings store and `docs/CONFIGURATION.md` is its reference —
   a key without a row is a key nobody can find; no `UserDefaults` for
-  anything the file could carry. **D11** Curated themes and verified installed font families;
+  anything the file could carry. **D11** Curated themes and one system monospaced primary font;
   additional themes resolved from config. **D12** A font family is verified, never trusted.
 - **D13** Never change the machine to test. **D14** App-layer changes
   are verified by launching the app. **D15** Never size the session from

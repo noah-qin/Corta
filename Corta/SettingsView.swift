@@ -43,6 +43,8 @@ import SwiftUI
 @MainActor @Observable
 final class SettingsNavigation {
     var selection: SettingsView.Category = .general
+    var showHostDetails = false
+    var themeEditorRequest = 0
 }
 
 /// The category list. AppKit hosts it as the split view's sidebar item, which
@@ -85,6 +87,7 @@ private struct SettingsSidebarRow: View {
 }
 
 struct SettingsView: View {
+    @State private var themeEditor: ThemeEditorModel?
     @Bindable var model: SettingsModel
     let navigation: SettingsNavigation
 
@@ -144,7 +147,16 @@ struct SettingsView: View {
             .id(category)
             .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
             .frame(minWidth: 460, minHeight: 400)
-            .task { await model.loadFonts() }
+            .onChange(of: navigation.themeEditorRequest) { _, _ in
+                themeEditor = ThemeEditorModel(source: model.previewTheme, editing: false)
+            }
+            .sheet(isPresented: Binding(get: { navigation.showHostDetails }, set: { navigation.showHostDetails = $0 })) {
+                VStack {
+                    SystemStatusDetails(metrics: SystemMetricsStore.shared.snapshot, showMetrics: false)
+                    Button(L10n.text("common.close")) { navigation.showHostDetails = false }
+                        .keyboardShortcut(.cancelAction)
+                }.padding(.bottom, 16)
+            }
     }
 
     @ViewBuilder
@@ -190,7 +202,17 @@ struct SettingsView: View {
                 }
                 .onChange(of: model.theme) { _, value in model.setTheme(value) }
             }
-            Picker(L10n.text("settings.label.lightOrDark"), selection: $model.appearance) {
+            HStack {
+                Button(L10n.text("theme.create")) {
+                    themeEditor = ThemeEditorModel(source: model.previewTheme, editing: false)
+                }.accessibilityIdentifier("theme-create")
+                if ConfigurationStore.shared.configuration.customThemes.contains(where: { $0.name == model.theme }) {
+                    Button(L10n.text("theme.edit")) {
+                        themeEditor = ThemeEditorModel(source: model.previewTheme, editing: true)
+                    }.accessibilityIdentifier("theme-edit")
+                }
+            }
+            Picker(L10n.text("settings.label.lightOrDark"), selection: bind(model.appearance, model.setAppearance)) {
                 ForEach(Configuration.Appearance.allCases, id: \.self) { appearance in
                     Text(
                         appearance == .auto
@@ -199,35 +221,37 @@ struct SettingsView: View {
                     ).tag(appearance)
                 }
             }
-            .onChange(of: model.appearance) { _, value in model.setAppearance(value) }
+            .accessibilityIdentifier("appearance-mode")
 
-            Picker(L10n.text("settings.label.font"), selection: bind(model.fontFamily, model.setFontFamily)) {
-                Text(L10n.text("settings.font.systemMonospaced")).tag(Configuration.systemFontFamily)
-                if model.fontFamily != Configuration.systemFontFamily && !model.availableFonts.contains(model.fontFamily) {
-                    Text(model.fontFamily).tag(model.fontFamily)
-                }
-                ForEach(model.availableFonts, id: \.self) { Text($0).tag($0) }
-            }
-            .help(L10n.text("settings.help.font"))
-            // Only when there is something to say: a resolved font used to
-            // leave an empty row here.
-            if model.fontStatus.kind != .none {
-                LabeledContent(L10n.text("settings.label.fontStatus")) {
-                    StatusRowView(
-                        status: model.fontStatus,
-                        action: Self.action(if: model.fontStatus.kind == .failed) {
-                            model.retryFontResolution()
-                        })
-                }
+            LabeledContent(L10n.text("settings.label.font")) {
+                Text(L10n.text("settings.font.systemMonospaced"))
+                    .accessibilityIdentifier("supported-font")
             }
             LabeledContent(L10n.text("settings.label.size")) {
                 Stepper(value: bind(model.fontSize, model.setFontSize), in: 8...64) {
                     Text(model.fontSize, format: .number)
                 }
             }
-            LabeledContent(L10n.text("settings.label.preview")) {
-                FontPreviewSwiftUIView(theme: model.previewTheme, font: model.previewFont, isDark: AppearanceController.shared.isDark)
+            Section(L10n.text("settings.section.cursor")) {
+                Picker(L10n.text("settings.label.cursorShape"), selection: bind(model.cursorShape, model.setCursorShape)) {
+                    ForEach(Configuration.CursorShape.allCases, id: \.self) { shape in
+                        Text(L10n.text("settings.cursor.\(shape.rawValue)")).tag(shape)
+                    }
+                }
+                .accessibilityIdentifier("cursor-shape")
+                Toggle(L10n.text("settings.label.cursorBlink"), isOn: bind(model.cursorBlink, model.setCursorBlink))
+                    .accessibilityIdentifier("cursor-blink")
+                    .help(L10n.text("settings.help.cursor"))
+                LabeledContent(L10n.text("settings.label.preview")) {
+                    FontPreviewSwiftUIView(theme: model.previewTheme, font: model.previewFont, isDark: model.previewIsDark,
+                        cursorStyle: model.cursorShape.style(blinking: model.cursorBlink))
+                        .accessibilityIdentifier("appearance-preview")
+                        .accessibilityValue(model.previewIsDark ? "dark" : "light")
+                }
             }
+        }
+        .sheet(item: $themeEditor) { editor in
+            ThemeEditorView(editor: editor, previewFont: model.previewFont)
         }
     }
 
@@ -235,6 +259,21 @@ struct SettingsView: View {
 
     private var terminalPage: some View {
         Form {
+            Section(L10n.text("status.settings")) {
+                Button(L10n.text("status.details")) { navigation.showHostDetails = true }
+                    .accessibilityIdentifier("host-details")
+                Toggle(L10n.text("status.enable"), isOn: bind(model.statusBar, model.setStatusBar))
+                    .accessibilityIdentifier("status-bar-enable")
+                ForEach(SystemMetrics.Item.allCases, id: \.self) { item in
+                    Toggle(L10n.text("status.item.\(item.rawValue)"), isOn: Binding(
+                        get: { model.statusItems.contains(item) },
+                        set: { model.setStatusItem(item, enabled: $0) }))
+                        .disabled(!model.statusBar)
+                        .accessibilityIdentifier("status-item-\(item.rawValue)")
+                }
+                StatusNetworkInterfaceField(model: model).disabled(!model.statusBar)
+                Text(L10n.text("status.settings.help")).font(.caption).foregroundStyle(.secondary)
+            }
             Section(L10n.text("settings.section.output")) {
                 LabeledContent(L10n.text("settings.label.scrollback")) {
                     numberField(bind(model.scrollbackLines, model.setScrollbackLines), width: 92)
@@ -277,6 +316,17 @@ struct SettingsView: View {
 
     private var keyboardMousePage: some View {
         Form {
+            Section(L10n.text("inputSource.settings.title")) {
+                Picker(L10n.text("inputSource.settings.display"), selection: bind(model.inputSourceIndicator, model.setInputSourceIndicator)) {
+                    ForEach(Configuration.InputSourceIndicatorMode.allCases, id: \.self) { mode in
+                        Text(L10n.text("inputSource.mode.\(mode.rawValue)")).tag(mode)
+                    }
+                }
+                .accessibilityIdentifier("input-source-indicator-mode")
+                .help(L10n.text("inputSource.settings.help"))
+                InputSourceColorField(value: model.inputSourceDirectColor, direct: true, model: model)
+                InputSourceColorField(value: model.inputSourceIMEColor, direct: false, model: model)
+            }
             Section(L10n.text("settings.section.keyboard")) {
                 Toggle(
                     L10n.text("settings.label.optionAsMeta"),
@@ -603,5 +653,47 @@ private struct OpenFileCommandField: View {
         // A refused or trimmed value reads back as what the file holds.
         synced = model.openFileCommand
         draft = synced
+    }
+}
+
+/// A draft commits only on Return or blur, so partial hex values never reach the file.
+private struct InputSourceColorField: View {
+    let value: String
+    let direct: Bool
+    let model: SettingsModel
+    @State private var draft = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        LabeledContent(L10n.text(direct ? "inputSource.color.direct" : "inputSource.color.ime")) {
+            TextField("", text: $draft, prompt: Text(L10n.text("inputSource.color.system")))
+                .labelsHidden()
+                .frame(width: 110)
+                .focused($focused)
+                .accessibilityIdentifier(direct ? "input-source-direct-color" : "input-source-ime-color")
+                .onSubmit { commit() }
+                .onChange(of: focused) { _, active in if !active { commit() } }
+                .onAppear { draft = value }
+                .onChange(of: value) { _, newValue in if !focused { draft = newValue } }
+                .help(L10n.text("inputSource.color.help"))
+        }
+    }
+
+    private func commit() {
+        model.setInputSourceColor(draft.trimmingCharacters(in: .whitespaces), direct: direct)
+        draft = direct ? model.inputSourceDirectColor : model.inputSourceIMEColor
+    }
+}
+
+private struct StatusNetworkInterfaceField: View {
+    @Bindable var model: SettingsModel
+    @State private var value = "auto"
+    var body: some View {
+        TextField(L10n.text("status.interface"), text: $value)
+            .accessibilityIdentifier("status-network-interface")
+            .onSubmit { model.setStatusNetworkInterface(value); value = model.statusNetworkInterface }
+            .onAppear { value = model.statusNetworkInterface }
+            .onChange(of: model.statusNetworkInterface) { _, name in value = name }
+            .help(L10n.text("status.network.help"))
     }
 }

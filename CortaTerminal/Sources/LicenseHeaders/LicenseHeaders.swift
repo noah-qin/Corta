@@ -78,6 +78,7 @@ public enum LicenseHeaders {
         ("Corta/Localizable.xcstrings", .reuse),
         ("TestPlans/*.xctestplan", .reuse),
         ("Sparkle-Info.plist", .reuse),
+        ("Corta/PrivacyInfo.xcprivacy", .reuse),
         ("appcast.xml", .reuse),
         ("**/*.md", .reuse),
         ("NOTICE", .reuse),

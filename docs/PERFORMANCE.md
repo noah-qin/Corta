@@ -915,3 +915,37 @@ follow-up record):
 The render figures are inside each other's spread: no change to the frame
 path is measurable. Apple silicon MacBook Air, macOS 27.0.1, Xcode 27.0
 (27A266a), on the same machine and toolchain for both sides.
+
+### Cursor settings verification (2026-10-04)
+
+On the Apple M5 MacBook Air with Xcode 27.0 and macOS 27.0.1, the Release
+frame-CPU baseline after adding optional cursor blinking measured **0.562 ms
+average / 0.821 ms p95** (120×40, Menlo 14 at 1×, 60 iterations). This is a
+post-change measurement, without a paired pre-change comparison. See the
+[verification record](test-results/2026-10-04-cursor-window.md) for scope and
+limits; blink-enabled idle CPU was not separately measured.
+
+### Input-source indicator follow-up, 2026-10-04
+
+On the same Apple M5 host, macOS 27.0.1 and Xcode 27.0 (27A266a), the
+Release plan's three renderer tests passed. One 60-iteration 120×40
+full-screen run measured **0.858 ms average, 3.017 ms p95**. Instance-upload
+p50 / p95: typing **0.026 / 0.061 ms**, scroll **0.028 / 0.056 ms**, full
+rebuild **0.153 / 0.174 ms**. This working tree also includes the cursor
+and window-settings changes above; this is not an isolated A/B result.
+
+The offscreen renderer baseline excludes native AppKit overlays. The badge
+uses input-source notifications and the existing output/focus redraws; it
+adds no polling timer. Native-overlay idle CPU and keypress latency were not
+separately measured. Live UI checks cover input-source switching, long input,
+scrollback, command execution and alternate-screen hiding.
+
+### System-status and theme-editor completion, 2026-10-04
+
+The final Release renderer check on the same Apple M5 host passed all three
+performance tests: **0.656 ms average / 2.310 ms p95**, 60 frames, 120×40,
+Menlo 14 at 1×. Instance upload p50/p95: typing **0.020 / 0.047 ms**, scroll
+**0.023 / 0.041 ms**, full rebuild **0.157 / 0.175 ms**. This is an offscreen
+post-change measurement including the earlier working-tree changes; native
+status-bar UI and idle CPU were not separately measured. See the
+[completion record](test-results/2026-10-04-system-status-theme-editor.md).

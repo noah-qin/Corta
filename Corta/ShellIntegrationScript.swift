@@ -21,7 +21,7 @@ enum ShellIntegrationScript {
     /// Each emits FinalTerm A/B/C/D plus OSC 7 through the shell's own hooks.
     static func script(for shell: ShellKind) -> String {
         switch shell {
-        case .zsh: return zsh + "\n" + zshDirectoryCompletion
+        case .zsh: return zsh + "\n" + zshCompactIndent + "\n" + zshDirectoryCompletion
         case .bash: return bash
         case .fish: return fish
         }
@@ -75,6 +75,39 @@ enum ShellIntegrationScript {
           if [[ "$PS1" != *'\e]133;B\a'* ]]; then
             PS1="${PS1}%{"$'\e]133;B\a'"%}"
           fi
+        fi
+        """#
+
+    /// ZLE expands literal tabs to eight columns itself. Only whitespace-only
+    /// input uses four spaces; each keymap retains its existing completion
+    /// widget for nonblank commands. Full-screen programs keep the Tab byte.
+    static let zshCompactIndent = #"""
+        if [[ -o interactive && $TERM_PROGRAM == Corta && -z $__corta_indent_installed ]]; then
+          __corta_indent_installed=1
+          __corta_indent_emacs() {
+            if [[ -z ${BUFFER//[[:space:]]/} ]]; then
+              LBUFFER+='    '
+            else
+              zle __corta_indent_original_emacs
+            fi
+          }
+          __corta_indent_viins() {
+            if [[ -z ${BUFFER//[[:space:]]/} ]]; then
+              LBUFFER+='    '
+            else
+              zle __corta_indent_original_viins
+            fi
+          }
+          for __corta_indent_map in emacs viins; do
+            __corta_indent_binding=$(bindkey -M $__corta_indent_map '^I' 2>/dev/null)
+            __corta_indent_original=${__corta_indent_binding##* }
+            if [[ -n $__corta_indent_original && $__corta_indent_original != undefined-key ]]; then
+              zle -A $__corta_indent_original __corta_indent_original_$__corta_indent_map
+              zle -N __corta_indent_$__corta_indent_map
+              bindkey -M $__corta_indent_map '^I' __corta_indent_$__corta_indent_map
+            fi
+          done
+          unset __corta_indent_map __corta_indent_binding __corta_indent_original
         fi
         """#
 

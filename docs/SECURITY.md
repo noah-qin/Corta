@@ -515,3 +515,17 @@ the shell retrieves and quotes its own candidate and edits BUFFER, without
 eval or accept-line. Reports are ignored during commands and alternate-screen
 applications. Startup wrappers are private temporary files, restore ZDOTDIR,
 and source the user's existing startup files without modifying them.
+
+## Local system status and graphical themes
+
+The optional status bar reads local public OS counters and metadata. It neither
+runs shell commands for polling nor connects to remote hosts, and sends no
+metrics or host details over the network. All windows share one sampler, which
+stops when no enabled bar is visible. The privacy manifest declares required
+API reasons; it does not grant additional permissions or claim telemetry.
+
+Custom themes are settings stored through the existing configuration store.
+The graphical editor validates draft names/colors and checks for concurrent
+edits before saving. Input-source badges use OS metadata, not keystroke contents;
+private IME modes are deliberately left unknown. Neither feature changes the
+execution or clipboard trust boundaries described above.

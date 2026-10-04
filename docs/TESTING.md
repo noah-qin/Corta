@@ -522,3 +522,33 @@ and run the entire `CortaTests/ImageMemoryAndTextureTests` suite. Verify the
 printed cycle count; a method-only filter can select zero Swift Testing cases.
 For stable mixed-history/reflow comparisons, use `corta-bench --history`
 without simultaneous builds or sanitizer workloads.
+
+## System status, cursor and theme follow-up
+
+The feature suites are CursorAndWindowSettingsTests, SystemStatusAndThemeEditorTests,
+InputSourceIndicatorTests, SettingsModelTests, ConfigurationTests and
+ShellIntegrationSessionTests. Their UI counterparts use disposable CORTA_STAGE_DIR
+and ZDOTDIR directories and process-only AppleLanguages overrides. They must not
+edit production preferences, global language settings or user startup files.
+
+SystemStatusAndThemeEditorUITests exercises status selection, independent menu
+entrances, theme save/cancel and immediate appearance preview. Its localization
+case launches all nine shipped languages and opens the translated theme and
+host-detail interfaces. CursorAndWindowUITests checks actual idle blinking and
+window constraints. The catalog tests check coverage and format arguments;
+coverage alone does not establish native-speaker quality or VoiceOver usability.
+
+See the [dated feature record](test-results/2026-10-04-system-status-theme-editor.md)
+for focused suites, screenshots, benchmark scope and unverified environments.
+macOS 26+ Apple silicon is the target; a newer local test host does not by itself
+prove runtime behavior on every supported macOS release or physical display setup.
+
+On Xcode 27, the generated UI runner is sandboxed. The new feature UI fixtures
+use `/private/tmp/corta-ui-stages/` so the app and runner can share disposable
+configuration files without accessing each other’s protected containers. Create
+that directory before the run. For local ad-hoc `build-for-testing`, preserve
+the generated runner entitlements and add only a temporary absolute-path
+read/write exception for this directory when signing the runner; then run
+`test-without-building`. This changes the local runner artifact only, not Corta’s
+shipping entitlements. An inaccessible fixture is a setup failure, not evidence
+that settings or translations work.

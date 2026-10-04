@@ -203,8 +203,10 @@ public nonisolated final class TerminalRenderer {
         grid: Grid, scrollOffset: Int, cursorVisible: Bool, selection: TerminalSelection?,
         searchMatches: [TerminalSelection] = [], currentSearchMatchIndex: Int? = nil,
         hoveredLink: TerminalSelection? = nil,
-        indexedOverrides: IndexedColorOverrides = [:], indexedOverridesGeneration: UInt64 = 0
+        indexedOverrides: IndexedColorOverrides = [:], indexedOverridesGeneration: UInt64 = 0,
+        cursorStyle: CursorStyle? = nil
     ) -> Bool {
+        let effectiveCursorStyle = cursorStyle ?? grid.cursorStyle
         self.indexedOverrides = indexedOverrides
         framePalette = themeVariant ?? TerminalColorPalette.activeVariant
         let offset = min(max(0, scrollOffset), grid.scrollback.count)
@@ -233,7 +235,7 @@ public nonisolated final class TerminalRenderer {
         }
 
         if fullRebuild || !Self.selectionsEqual(cachedSelection, selection)
-            || grid.cursor != cachedCursor || grid.cursorStyle != cachedCursorStyle
+            || grid.cursor != cachedCursor || effectiveCursorStyle != cachedCursorStyle
             || cursorVisible != cachedCursorVisible
             || (selection != nil && cachedScrollbackTotalPushed != grid.scrollback.totalPushed)
             || cachedSearchMatches != searchMatches
@@ -241,7 +243,7 @@ public nonisolated final class TerminalRenderer {
             || !Self.selectionsEqual(cachedHoveredLink, hoveredLink)
         {
             rebuildOverlay(
-                grid: grid, cursorVisible: cursorVisible, selection: selection, offset: offset,
+                grid: grid, cursorStyle: effectiveCursorStyle, cursorVisible: cursorVisible, selection: selection, offset: offset,
                 searchMatches: searchMatches, currentSearchMatchIndex: currentSearchMatchIndex,
                 hoveredLink: hoveredLink)
             changed = true
@@ -266,7 +268,7 @@ public nonisolated final class TerminalRenderer {
             cellWidth: Float(metrics.cellWidth), cellHeight: Float(metrics.cellHeight))
         cachedImagePlacements = grid.imagePlacements
         cachedCursor = grid.cursor
-        cachedCursorStyle = grid.cursorStyle
+        cachedCursorStyle = effectiveCursorStyle
         cachedCursorVisible = cursorVisible
         cachedSelection = selection
         cachedSearchMatches = searchMatches
@@ -543,7 +545,7 @@ public nonisolated final class TerminalRenderer {
     }
 
     private func rebuildOverlay(
-        grid: Grid, cursorVisible: Bool, selection: TerminalSelection?, offset: Int,
+        grid: Grid, cursorStyle: CursorStyle, cursorVisible: Bool, selection: TerminalSelection?, offset: Int,
         searchMatches: [TerminalSelection] = [], currentSearchMatchIndex: Int? = nil,
         hoveredLink: TerminalSelection? = nil
     ) {
@@ -580,11 +582,10 @@ public nonisolated final class TerminalRenderer {
         if cursorVisible {
             let cellOrigin = SIMD2<Float>(
                 Float(grid.cursor.column) * cellWidth, Float(grid.cursor.row) * cellHeight)
-            // Blinking styles draw steady: a blink timer would force frames on an
-            // idle screen. An eighth of a cell, at least 2 device pixels.
+            // An eighth of a cell, at least 2 device pixels.
             let stroke = max(2, (cellHeight / 8).rounded(.down))
             let cursorColor = framePalette.cursor
-            switch grid.cursorStyle {
+            switch cursorStyle {
             case .block, .blinkingBlock:
                 overlayScratch.append(
                     QuadInstance(

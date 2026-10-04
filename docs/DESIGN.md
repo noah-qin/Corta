@@ -508,3 +508,25 @@ stale results. Search outcomes likewise check generation before updating any
 UI status. Remote editing persists a SHA-256 remote baseline, validates
 content before upload, and sends the approved private snapshot rather than
 a live editor file. See [Security](SECURITY.md) for race and ACL boundaries.
+
+## Local status and appearance editing
+
+SystemMetrics uses public Mach, getloadavg, getifaddrs, Foundation volume and
+ProcessInfo thermal APIs. A shared main-actor SystemMetricsStore owns visible
+bar clients and one two-second timer. Its actor sampler performs reads off the
+main thread; cancellation and generation checks discard obsolete results.
+Window bars are siblings of the terminal split tree, so toggling the optional
+24-point bar does not reconstruct sessions. No metric is collected for SSH
+hosts. Host details are also reachable independently of the bar.
+
+ThemeEditorModel holds a draft copied from the active theme, validates names
+and HEX colors and detects concurrent changes. ThemeEditorView previews that
+draft; Save persists through ConfigurationStore and Cancel discards it. The
+primary font is System Monospaced; fallback shaping remains Core Text’s job.
+Cursor preference supplies block/bar/underline and blinking; explicit DECSCUSR
+styles override it until reset. Idle blinking invalidates cursor drawing and
+pauses outside visible active panes rather than polling terminal output.
+
+The input-source badge observes macOS input-source metadata, never typed text.
+Its right-edge placement avoids live command content without changing the grid
+or sending bytes to the child. Unknown private IME modes use neutral styling.

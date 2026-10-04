@@ -19,25 +19,33 @@ import CoreText
 import CortaTerminal
 import SwiftUI
 
-/// A read-only preview of the *currently resolved* theme and font in
-/// the Appearance tab's own colours and glyphs, not the swatch of a picker.
-/// Nothing here can be clicked or chosen; `docs/DECISIONS.md` D11's "Corta offers
-/// one theme and one font; it resolves several" is untouched — this shows
-/// what that one theme and font actually look like instead of asking the
-/// reader to imagine it from two names.
+/// Preview the selected appearance, fixed primary font and configured cursor.
+/// Theme-editor previews use the draft colors without changing live settings.
 struct FontPreviewSwiftUIView: View {
     let theme: Theme
     let font: CTFont
     var isDark: Bool = NSApp.effectiveAppearance.name == .darkAqua
+
+    var cursorStyle: CursorStyle?
 
     private var variant: Theme.Variant { theme.variant(dark: isDark) }
     private var nsFont: NSFont { font as NSFont }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(verbatim: "~/corta $ echo hello")
-                .font(Font(nsFont))
-                .foregroundStyle(Self.color(variant.foreground))
+            HStack(spacing: 4) {
+                Text(verbatim: "~/corta $ echo hello")
+                    .font(Font(nsFont))
+                    .foregroundStyle(Self.color(variant.foreground))
+                if let cursorStyle {
+                    if cursorStyle == .blinkingBlock || cursorStyle == .blinkingBar || cursorStyle == .blinkingUnderline {
+                        TimelineView(.periodic(from: .now, by: 0.5)) { context in
+                            previewCursor(cursorStyle)
+                                .opacity(Int(context.date.timeIntervalSinceReferenceDate * 2) % 2 == 0 ? 1 : 0)
+                        }
+                    } else { previewCursor(cursorStyle) }
+                }
+            }
             // Two colours in one line, as two runs side by side: `Text + Text`
             // is deprecated on macOS 26, and interpolating styled `Text`s
             // makes a `"%@%@"` localizable key Xcode extracts into the
@@ -60,6 +68,16 @@ struct FontPreviewSwiftUIView: View {
         .background(Self.color(variant.background), in: RoundedRectangle(cornerRadius: 4))
         .accessibilityElement(children: .ignore)
         .accessibilityAddTraits(.isImage)
+    }
+
+    private func previewCursor(_ style: CursorStyle) -> some View {
+        let bar = style == .bar || style == .blinkingBar
+        let underline = style == .underline || style == .blinkingUnderline
+        let width = CGFloat(CTFontGetSize(font)) * 0.6
+        let height = CGFloat(CTFontGetSize(font)) * 1.25
+        return Rectangle().fill(Self.color(variant.cursor))
+            .frame(width: bar ? 1 : width, height: underline ? 1 : height)
+            .frame(width: width, height: height, alignment: underline ? .bottomLeading : .leading)
     }
 
     private static func color(_ value: SIMD4<Float>) -> SwiftUI.Color {
