@@ -157,6 +157,7 @@ public struct Terminal: Sendable {
     }
 
     public var windowTitle: String? { performer.state.windowTitle }
+    public var directoryCompletion: DirectoryCompletion? { performer.state.directoryCompletion }
 
     /// Local-or-nil by construction, so always safe for a local spawn.
     public var workingDirectory: String? { performer.state.workingDirectory }

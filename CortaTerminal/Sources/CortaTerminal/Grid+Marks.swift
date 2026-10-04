@@ -45,7 +45,7 @@ extension Grid {
     }
 
     public var failedPromptRows: [Int] {
-        promptRows(matching: { $0 == .promptFailed })
+        promptRows(matching: { $0 == .promptFailed || $0 == .promptInterrupted })
     }
 
     /// Walked, not indexed: an index would need fixing up by eviction, reflow,

@@ -64,6 +64,7 @@ extension Performer {
                 state.commandRecords.markPromptEnd(column: grid.cursor.column)
             }
         case 0x43:  // 'C' — the command is running, and its output starts here
+            state.directoryCompletion = nil
             state.isCommandRunning = true
             state.shellMarksOutputStart = true
             state.promptAwaitsRepaint = false
@@ -112,7 +113,7 @@ extension Performer {
             // Only a row still holding its prompt: `clear` erased the one it
             // was typed on, and colouring that drew a rule down an empty row.
             if let row = state.promptRow, grid.line(atAbsoluteRow: row)?.mark.isPrompt == true {
-                grid.setMark(status == 0 ? .promptSucceeded : .promptFailed, atAbsoluteRow: row)
+                grid.setMark(status == 0 ? .promptSucceeded : status == 130 ? .promptInterrupted : .promptFailed, atAbsoluteRow: row)
             }
             let endRow = grid.absoluteRow(ofScreenRow: grid.cursor.row)
             state.commandRecords.finish(exitStatus: status, endRow: endRow, at: Date())

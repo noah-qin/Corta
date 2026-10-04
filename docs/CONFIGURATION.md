@@ -169,6 +169,8 @@ status, never the command text (`SECURITY.md` §5).
 
 | Key | Values | Default | Notes |
 | --- | --- | --- | --- |
+| `directory-completion` | boolean | `true` | Faint folder alternatives below `cd`, with an inline suffix as you narrow the matches in a standard local zsh session. Tab fills the selected path; Left/Right select the previous/next candidate; Esc dismisses. Up/Down retain shell history navigation and Shift+Tab goes to the shell. Set to `false` to disable suggestions and restore native key handling. New sessions load the bundled hooks without editing the user's startup files. Restart the shell after enabling. Bash and fish retain native completion. See [Directory suggestions](USER-GUIDE.md#directory-suggestions-zsh). |
+| `command-status-marks` | boolean | `true` | Show command outcomes in the left margin: green for exit 0, red for other errors, and a split gray line for interruption (exit 130). Hover for the textual outcome. |
 | `directory-history` | boolean | `true` | Whether Corta remembers directories a completed command actually ran in (`OSC 7`), to rank for the directory switcher. |
 
 Not the config file's own state: `directory-history` only gates whether

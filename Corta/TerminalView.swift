@@ -81,6 +81,8 @@ final class TerminalView: NSView, CALayerDelegate {
     /// must dismiss it rather than reach the child. Returns whether the event
     /// was handled. ⌘G / ⇧⌘G are storyboard items with no `bind.` key.
     var onSearchKey: ((NSEvent) -> Bool)?
+    var onCompletionKey: ((NSEvent) -> Bool)?
+    let shellOverlay = ShellOverlayView()
 
     /// A live resize ended; deliver the final size without the debounce.
     var onLiveResizeEnded: (() -> Void)?

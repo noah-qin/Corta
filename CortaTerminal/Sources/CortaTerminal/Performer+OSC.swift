@@ -46,6 +46,9 @@ extension Performer {
             setClipboard(payload)
         case 133:
             shellIntegration(payload)
+        case 134:
+            guard !grid.isAlternateScreenActive, !state.isCommandRunning else { return }
+            state.directoryCompletion = DirectoryCompletion(payload: String(decoding: payload, as: UTF8.self))
         case 8:
             setHyperlink(payload)
         case 4:

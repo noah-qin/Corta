@@ -414,6 +414,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         isTerminating = true
         flushLayoutSave()
         DirectoryHistoryStore.shared.flush()
+        ZshBootstrap.removeGeneratedFiles()
         // The secure-input count must reach zero before exit.
         SecureInput.shared.disengage()
         QuickTerminalController.shared.teardown()

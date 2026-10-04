@@ -28,7 +28,7 @@ nonisolated enum TerminalLayout {
     /// Padding only, or the left column clips. Chrome (titlebar, tab bar) is
     /// measured at runtime from `contentLayoutRect` and added; a fixed value
     /// hid the first row under a tab bar.
-    static let insets = NSEdgeInsets(top: 8, left: 10, bottom: 8, right: 10)
+    static let insets = NSEdgeInsets(top: 8, left: 14, bottom: 8, right: 10)
     static var insetWidth: CGFloat { insets.left + insets.right }
     static var insetHeight: CGFloat { insets.top + insets.bottom }
 

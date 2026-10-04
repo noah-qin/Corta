@@ -504,3 +504,14 @@ proxy icon can remain absent; cancellation cannot interrupt a kernel stat.
 The dated [follow-up verification record](test-results/2026-10-02-follow-up.md)
 separates repairs from available runtime evidence and environment limits.
 It is not a claim that every supported machine or dependency path was tested.
+
+### Directory completion reports (OSC 134)
+
+The bundled zsh line editor reports a revision, selection index, typed basename prefix, and up to
+20 percent-encoded folder labels, bounded by the parser's 4096-byte OSC limit.
+Labels reject control characters and are display-only. Corta never echoes
+a label into stdin. A user selection sends only fixed widget key sequences;
+the shell retrieves and quotes its own candidate and edits BUFFER, without
+eval or accept-line. Reports are ignored during commands and alternate-screen
+applications. Startup wrappers are private temporary files, restore ZDOTDIR,
+and source the user's existing startup files without modifying them.

@@ -28,6 +28,7 @@ extension TerminalView {
         // From the bindings, never a literal: a literal fired exactly when the
         // menu stopped claiming the key, i.e. after a rebind or unbind.
         let bindings = keybindings?() ?? Keybindings()
+        if onCompletionKey?(event) == true { return }
         if onSearchKey?(event) == true {
             return
         }

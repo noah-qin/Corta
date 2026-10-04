@@ -205,6 +205,9 @@ final class CommandHistoryModel {
         if record.isRunning {
             symbolName = "ellipsis.circle"
             statusDescription = L10n.text("commandHistory.statusRunning")
+        } else if record.exitStatus == 130 {
+            symbolName = "minus.circle"
+            statusDescription = L10n.text("commandHistory.statusInterrupted")
         } else if record.didFail {
             symbolName = "xmark.circle.fill"
             statusDescription = L10n.format("commandHistory.statusFailed", record.exitStatus ?? 1)

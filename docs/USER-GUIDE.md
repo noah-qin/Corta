@@ -14,6 +14,7 @@ and Find Previous can be changed ([Keyboard shortcuts](#keyboard-shortcuts)).
 - [Links and file references](#links-and-file-references)
 - [Shell integration](#shell-integration)
 - [The working directory](#the-working-directory)
+- [Directory suggestions (zsh)](#directory-suggestions-zsh)
 - [Remote work: SSH and SFTP](#remote-work-ssh-and-sftp)
 - [Images in the terminal](#images-in-the-terminal)
 - [The command palette](#the-command-palette)
@@ -158,7 +159,9 @@ it from **Settings ▸ Terminal ▸ Shell Integration**: it adds one marked bloc
 to your shell's startup file — `~/.zshrc`; for bash both `~/.bashrc` and
 `~/.bash_profile` (or whichever login file bash reads); or
 `~/.config/fish/config.fish` — and **Remove** takes out exactly that block.
-Nothing is installed without you pressing the button.
+The startup-file block is only installed when you press the button. Standard
+local zsh sessions also load Corta's bundled hooks automatically, without
+editing your startup files, including the directory suggestions described below.
 
 When Settings reports an outdated integration, choose **Update** and open a
 new shell. Updating the app alone does not replace a previously installed
@@ -203,6 +206,46 @@ The folder icon in the title bar is the directory too: drag it, or ⌘-click
 it to see the path. With `directory-history` on, Corta remembers the
 directories your commands ran in; **Settings ▸ Privacy & Security ▸ History** shows
 how many and clears them.
+
+## Directory suggestions (zsh)
+
+Corta includes directory suggestions, enabled by default in standard local
+zsh sessions. Type `cd ` to see folders in the current directory as faint
+text below your input. Keep typing to filter the folders; a faint suffix
+appears beside the cursor. For example, `cd De` can suggest `Developer/`.
+Suggestions are previews: they are not part of your command until accepted.
+
+![Directory suggestions below cd, with success, failure and interrupted command marks](brand/directory-suggestions.png)
+
+While a suggestion is visible:
+
+| Key | Action |
+| --- | --- |
+| Left / Right | Select the previous / next folder instead of moving the input cursor. |
+| Tab | Fill the selected directory into the input; do not execute it. This replaces native Tab completion while suggestions are visible. |
+| Esc | Dismiss suggestions for the current input. Press Esc before using Left / Right to edit the command, or again for the shell's own Esc action. |
+| Up / Down | Keep the shell's normal command-history navigation. |
+| Shift+Tab | Pass through to the shell's configured binding. |
+| Return | Execute only the actual input; never automatically accept a faint suggestion. |
+
+You can filter relative paths, subdirectories and `~/` paths. Hidden folders
+appear when you type a dot prefix. Complex shell expressions keep native
+completion. Bash and fish retain their own completion; this feature does not
+automatically install hooks on remote machines or in custom shell commands.
+
+**Optional: turn it off.** In **Settings ▸ Terminal ▸ Shell**, turn off
+**Directory suggestions (zsh)**, or set this in your config file:
+
+```ini
+directory-completion = false
+```
+
+This immediately disables Corta's suggestions and key interception, leaving
+the shell's native editing and completion available. Reopen the shell after
+enabling it again. There is no startup-file block to delete for the automatic
+local hooks. If you also installed shell integration manually, its **Remove**
+button removes that separate startup-file block; removal is not needed to
+turn off directory suggestions.
 
 ## Remote work: SSH and SFTP
 
