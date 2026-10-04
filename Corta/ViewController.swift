@@ -148,6 +148,7 @@ class ViewController: NSViewController {
     var lastRequestedSize: TerminalSize?
 
     let search = PaneSearchState()
+    let inputSourceIndicator = PaneInputSourceIndicator()
 
     /// An O(scrollback) copy/export build, off the interaction path. Cancelling
     /// only stops its result being applied — the build runs to completion — and
@@ -458,6 +459,14 @@ class ViewController: NSViewController {
         // `view` weakly too: the closure is stored on it, and a strong capture
         // kept every closed pane's view — and its drawables — alive.
         view.addSubview(view.shellOverlay)
+        view.addSubview(inputSourceIndicator.view)
+        inputSourceIndicator.onChange = { [weak self] in self?.invalidateDisplay() }
+        view.onInputContextChange = { [weak self, weak view] in
+            guard let self, let view else { return }
+            if view.window?.firstResponder !== view { inputSourceIndicator.view.isHidden = true }
+            invalidateDisplay()
+        }
+        inputSourceIndicator.start()
         view.onCompletionKey = { [weak self] event in self?.handleDirectoryCompletionKey(event) ?? false }
         view.onKeyBytes = { [weak self, weak view] bytes in
             guard let self else { return }
@@ -528,6 +537,7 @@ class ViewController: NSViewController {
         }
         view.onFocus = { [weak self] in
             guard let self else { return }
+            self.inputSourceIndicator.refreshSource()
             self.splitController?.noteFocus(self)
         }
         view.cursorRectProvider = { [weak self] in
@@ -569,6 +579,11 @@ class ViewController: NSViewController {
 
     // MARK: - Teardown
 
+    var cursorBlinkTimer: Timer?
+    var cursorBlinkVisible = true
+    var lastBlinkCursor: Cursor?
+    var lastBlinkStyle: CursorStyle?
+
     /// Two close paths can reach one pane. Also checked by copy/export
     /// completions — the generation guard catches a newer build, not a
     /// teardown.
@@ -580,6 +595,8 @@ class ViewController: NSViewController {
     func teardown() {
         guard !didTeardown else { return }
         didTeardown = true
+        stopCursorBlink()
+        inputSourceIndicator.stop()
         directoryProbeGeneration += 1
         trailingTitleRefresh?.cancel()
         trailingTitleRefresh = nil
@@ -677,7 +694,20 @@ class ViewController: NSViewController {
         let forced = needsRedraw || wasSynchronizedOutputActive
         needsRedraw = false
         wasSynchronizedOutputActive = false
-        let grid = session.snapshot()
+        let configuration = ConfigurationStore.shared.configuration
+        let inputSnapshot = configuration.inputSourceIndicator == .off ? nil : session.inputLineSnapshot()
+        let grid = inputSnapshot?.grid ?? session.snapshot()
+        updateShellOverlay(grid: grid)
+        if let inputSnapshot {
+            let metrics = terminalRenderer.pointMetrics
+            inputSourceIndicator.update(grid: grid, hasIntegration: inputSnapshot.hasIntegration,
+                promptRow: inputSnapshot.promptRow,
+                focused: hasUserFocus && view.window?.firstResponder === terminalView,
+                scrollOffset: scrollOffset, configuration: configuration,
+                cellSize: CGSize(width: metrics.cellWidth, height: metrics.cellHeight),
+                topInset: topInset, compositionRect: terminalView.inputCompositionRect,
+                blockedRects: terminalView.shellOverlay.occupiedRects + (search.bar.map { [$0.frame] } ?? []))
+        } else { inputSourceIndicator.view.isHidden = true }
         if hasOutput, scrollOffset > 0, let anchor = scrollAnchorTotalPushed {
             // Keep the viewport on the same document row while scrolled away.
             // From this frame's own snapshot — a separate read could see more rows
@@ -689,16 +719,17 @@ class ViewController: NSViewController {
                 scrollAnchorTotalPushed = grid.scrollback.totalPushed
             }
         }
-        updateShellOverlay(grid: grid)
         let mappedSearchMatches = search.matches.map { TerminalSelection($0, grid: grid) }
+        let cursorStyle = effectiveCursorStyle(grid: grid)
+        updateCursorBlink(grid: grid, style: cursorStyle, reset: hasOutput)
         let indexedPalette = session.indexedPalette
         let damaged = terminalRenderer.updateInstances(
             grid: grid, scrollOffset: scrollOffset,
-            cursorVisible: scrollOffset == 0 && isFocusedPane, selection: selection,
+            cursorVisible: scrollOffset == 0 && isFocusedPane && cursorBlinkVisible, selection: selection,
             searchMatches: mappedSearchMatches,
             currentSearchMatchIndex: search.currentMatchIndex, hoveredLink: hoveredLink,
             indexedOverrides: indexedPalette.overrides,
-            indexedOverridesGeneration: indexedPalette.overridesGeneration)
+            indexedOverridesGeneration: indexedPalette.overridesGeneration, cursorStyle: cursorStyle)
         return forced || damaged
     }
 
@@ -1274,6 +1305,9 @@ class ViewController: NSViewController {
         focusRingView?.layer?.borderWidth =
             SystemAccessibility.increaseContrast ? Self.focusRingWidth + 1 : Self.focusRingWidth
         reportFocusIfNeeded()
+        if !hasUserFocus { stopCursorBlink(); inputSourceIndicator.view.isHidden = true }
+        else { inputSourceIndicator.refreshSource() }
+        invalidateDisplay()
     }
 
     /// Enough to tell panes apart, little enough to read through.

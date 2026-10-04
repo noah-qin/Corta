@@ -172,7 +172,7 @@ extension ViewController {
         }
         window.contentMinSize = NSSize(
             width: CGFloat(minimumColumns) * metrics.cellWidth + TerminalLayout.insetWidth,
-            height: CGFloat(minimumRows) * metrics.cellHeight + verticalInsets)
+            height: CGFloat(minimumRows) * metrics.cellHeight + verticalInsets + (splitController?.statusBarHeight ?? 0))
         // Keep the child's rows × columns and resize the window around it.
         guard let gridSize = lastRequestedSize else { return }
         // Grow from the top-left as Terminal.app does, keeping the text still,
@@ -180,7 +180,7 @@ extension ViewController {
         let topLeft = NSPoint(x: window.frame.minX, y: window.frame.maxY)
         window.setContentSize(NSSize(
             width: CGFloat(gridSize.columns) * metrics.cellWidth + TerminalLayout.insetWidth,
-            height: CGFloat(gridSize.rows) * metrics.cellHeight + verticalInsets))
+            height: CGFloat(gridSize.rows) * metrics.cellHeight + verticalInsets + (splitController?.statusBarHeight ?? 0)))
         var frame = window.frame
         frame.origin.y = topLeft.y - frame.height
         frame.origin.x = topLeft.x

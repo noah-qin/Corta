@@ -33,7 +33,7 @@ struct ConfigurationTests {
     @Test("a written configuration parses back to itself")
     func roundTrip() {
         var configuration = Configuration()
-        configuration.fontFamily = "Menlo"
+        configuration.fontFamily = Configuration.systemFontFamily
         configuration.fontSize = 15
         configuration.theme = "solarized"
         configuration.appearance = .dark

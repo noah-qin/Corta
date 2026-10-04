@@ -80,19 +80,23 @@ nonisolated struct WindowState: Equatable, Sendable {
         /// `visibleFrame` (clear of menu bar and Dock), and checks for
         /// zero, negative or NaN sizes first, since `min`/`max` propagate
         /// NaN.
-        func onScreen(_ screens: [NSScreen] = NSScreen.screens) -> NSRect {
-            let saved =
-                isUsable
-                ? rect
-                : NSRect(
-                    origin: x.isFinite && y.isFinite ? rect.origin : .zero,
-                    size: Self.defaultSize)
-            let target =
-                screens.max(by: {
-                    $0.visibleFrame.intersection(saved).area
-                        < $1.visibleFrame.intersection(saved).area
-                }) ?? NSScreen.main
-            guard let visible = target?.visibleFrame, !visible.isEmpty else { return saved }
+        func onScreen(_ screens: [NSScreen] = NSScreen.screens, preferredScreen: NSScreen? = nil, minimumSize: CGSize = WindowState.Frame.minimumSize) -> NSRect {
+            fitting(visibleFrames: screens.map(\.visibleFrame),
+                    preferredFrame: preferredScreen?.visibleFrame ?? (screens.isEmpty ? NSScreen.main?.visibleFrame : nil),
+                    minimumSize: minimumSize)
+        }
+
+        /// Geometry-only path for Dock and multi-display regression fixtures.
+        func fitting(visibleFrames: [NSRect], preferredFrame: NSRect? = nil, minimumSize: CGSize = WindowState.Frame.minimumSize) -> NSRect {
+            let valid = x.isFinite && y.isFinite && width.isFinite && height.isFinite
+                && width > 0 && height > 0 && width >= minimumSize.width && height >= minimumSize.height
+            let saved = valid ? rect : NSRect(
+                origin: x.isFinite && y.isFinite ? rect.origin : .zero,
+                size: Self.defaultSize)
+            let target = preferredFrame ?? visibleFrames.max(by: {
+                $0.intersection(saved).area < $1.intersection(saved).area
+            })
+            guard let visible = target, !visible.isEmpty else { return saved }
             var result = saved
             result.size.width = min(result.width, visible.width)
             result.size.height = min(result.height, visible.height)

@@ -73,6 +73,9 @@ public struct Grid: Sendable {
     /// DECSCUSR state (xterm ctlseqs). Global to the terminal rather than
     /// per screen: it survives an alternate-screen round trip.
     public var cursorStyle: CursorStyle = .blinkingBlock
+    /// A program's DECSCUSR override; parameter 0 and resets return to the
+    /// application's configured default without changing that configuration.
+    public var cursorStyleIsExplicit: Bool = false
 
     /// Grapheme clusters too large for a cell's single scalar
     /// (`DECISIONS.md` D05): combining-mark clusters and emoji ZWJ sequences.
@@ -570,6 +573,7 @@ public struct Grid: Sendable {
         savedPen = Pen()
         savedPendingWrap = false
         cursorStyle = .blinkingBlock
+        cursorStyleIsExplicit = false
     }
 
     /// DECALN: `E` everywhere, margins reset, cursor home, in the default pen.
@@ -1010,6 +1014,7 @@ public struct Grid: Sendable {
         suspendedMain = nil
         var main = suspended.grid
         main.cursorStyle = cursorStyle  // the style is global, not per screen
+        main.cursorStyleIsExplicit = cursorStyleIsExplicit
         main.cellPixelHeight = cellPixelHeight  // a property of the window
         main.cellPixelWidth = cellPixelWidth
         // Terminal-wide, not per screen: `self = main` would restore the old

@@ -12,6 +12,23 @@ what to edit.
 
 ### Added
 
+- Optional local system status bar with CPU, load, memory, one-interface network
+  rates, home-volume free space and four thermal levels; click for host details.
+  Metrics are selectable, sampling is shared across windows and pauses when hidden.
+- Graphical theme creation and editing with light/dark previews, color pickers,
+  HEX input, cancel and source-color reset, saved to the existing config file.
+
+- Persistent input-source badge for Chinese, Japanese, Korean and other input
+  sources, pinned to the focused pane's right edge with long-command avoidance,
+  prompt-only/always/off modes and configurable direct-input/IME colors. Private
+  IME modes use a neutral badge; scrollback and alternate-screen programs hide it.
+  Automatic display follows enabled non-Latin layouts and IMEs. Default styling
+  uses faint gray direct-input badges and a subtle indigo tint for non-Latin
+  layouts and confirmed IME modes.
+
+- Live cursor shape and blinking settings, with temporary DECSCUSR overrides
+  from terminal programs; blinking pauses in inactive or hidden panes.
+
 - Optional built-in directory suggestions for local zsh sessions: faint
   folder alternatives below `cd`, inline suffix previews, Left/Right selection
   and Tab acceptance without executing the command. Up/Down keep shell history
@@ -21,6 +38,12 @@ what to edit.
   with usage and opt-out instructions in the user guide.
 
 ### Changed
+
+- Primary font is System Monospaced; legacy configured families migrate to it.
+- Corta zsh integration inserts four spaces for Tab on a blank command line
+  while preserving command completion and terminal output tab stops.
+- The optional status bar uses a compact 24-point layout with localized short
+  labels and full metric values in details, tooltips and accessibility.
 
 - Command-status rules sit in a narrow margin beside the prompt with text
   tooltips. Exit status 130 uses a gray interrupted mark and a textual history
@@ -32,6 +55,13 @@ what to edit.
 
 ### Fixed
 
+- Appearance previews follow light/dark changes immediately and show cursor
+  shape and blinking. The default remains a nonblinking block cursor.
+- View menu and Terminal settings expose local host details even with the
+  status bar off; View also opens the theme editor directly.
+
+- New terminal windows and cascaded windows fit the screen’s usable area,
+  avoiding a side Dock and oversized configured grids.
 - The terminal context menu displays configured shortcuts for editing,
   splitting and closing, including custom bindings and unbound commands.
 

@@ -377,6 +377,16 @@ public final class TerminalSession: @unchecked Sendable {
         registerStateWaiter { state.withLock { $0.terminal.grid } }
     }
 
+    /// One coherent read for the native input-source overlay, with the grid
+    /// and shell phase from the same parse batch. No command-history copy.
+    public func inputLineSnapshot() -> (grid: Grid, hasIntegration: Bool, promptRow: Int?) {
+        registerStateWaiter {
+            state.withLock {
+                ($0.terminal.grid, $0.terminal.hasShellIntegration, $0.terminal.inputPromptRow)
+            }
+        }
+    }
+
     /// Applied to the grid, never written to the child's input, which is for
     /// keystrokes only (`SECURITY.md` §6).
     public enum TerminalStateCommand: Sendable {

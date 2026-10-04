@@ -149,6 +149,15 @@ bind.equalize-panes = ctrl+cmd+e
 bind.command-palette = cmd+shift+p
 ```
 
+On the development tree (not yet in 1.1.1), **View ▸ Theme editor…** opens
+color pickers and separate light/dark previews. **Settings ▸ Appearance ▸
+Cursor** selects block, bar or underline and an independent blink switch; the
+default is a nonblinking block. The primary font is System Monospaced.
+**Settings ▸ Terminal ▸ Bottom status bar** enables selectable local metrics
+(default off); click it for host details, or use **View ▸ Local host details…**.
+See the [personalization tutorial](docs/USER-GUIDE.md#personalizing-the-terminal)
+for the steps, network-interface selection and thermal-state limitations.
+
 The [configuration reference](docs/CONFIGURATION.md) lists every key, default
 and when changes take effect. Shell integration for zsh, bash and fish can be
 installed from **Settings ▸ Terminal**. The [user guide](docs/USER-GUIDE.md)

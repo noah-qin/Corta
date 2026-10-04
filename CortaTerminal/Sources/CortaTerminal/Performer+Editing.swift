@@ -128,7 +128,11 @@ extension Performer {
         // DECSCUSR — xterm ctlseqs: `CSI Ps SP q` sets the cursor style.
         // The grid stores it; drawing it is the renderer's concern.
         guard intermediates.count == 1, intermediates[0] == 0x20, final == 0x71 else { return false }
-        switch parameters[0] {
+        let styleParameter = parameters[0]
+        if (0...6).contains(styleParameter) {
+            grid.cursorStyleIsExplicit = styleParameter != 0
+        }
+        switch styleParameter {
         case 0, 1: grid.cursorStyle = .blinkingBlock
         case 2: grid.cursorStyle = .block
         case 3: grid.cursorStyle = .blinkingUnderline

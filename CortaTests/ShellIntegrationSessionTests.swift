@@ -38,6 +38,37 @@ struct ShellIntegrationSessionTests {
         }
     }
 
+    @Test func blankZshTabInsertsFourSpacesAndCommandTabStillCompletes() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("corta-tab-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let rc = "PROMPT='demo> '\n" + ShellIntegrationScript.script(for: .zsh)
+        try rc.write(to: directory.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
+        try "".write(to: directory.appendingPathComponent("unique-completion-target"), atomically: true, encoding: .utf8)
+        let session = try TerminalSession(executable: "/bin/zsh", arguments: ["-d", "-i"],
+            environment: ["HOME": directory.path, "ZDOTDIR": directory.path, "TERM": "xterm-256color", "TERM_PROGRAM": "Corta", "LC_ALL": "C", "PATH": "/usr/bin:/bin"],
+            size: TerminalSize(rows: 20, columns: 100), workingDirectory: directory.path)
+        defer { session.stop() }
+        session.start()
+        func waitFor(_ condition: (Grid) -> Bool) throws {
+            let deadline = ContinuousClock.now + .seconds(5) * testTimeoutScale
+            while ContinuousClock.now < deadline {
+                if condition(session.snapshot()) { return }
+                Thread.sleep(forTimeInterval: 0.01)
+            }
+            try #require(Bool(false), "\(session.snapshot().dump())")
+        }
+        try waitFor { $0.cursor.column == 6 && $0.dump().contains("demo>") }
+        session.write([0x09])
+        try waitFor { $0.cursor.column == 10 }
+        session.write([0x09])
+        try waitFor { $0.cursor.column == 14 }
+        session.write([0x15]) // Ctrl-U clears the indentation.
+        session.write(Array("cat unique-".utf8))
+        session.write([0x09])
+        try waitFor { $0.dump().contains("cat unique-completion-target") }
+    }
+
     private func exercise(shell: String, fishFallback: Bool) throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("corta-shell-session-\(UUID().uuidString)")

@@ -57,6 +57,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             window.setFrameTopLeftPoint(
                 NSPoint(x: previous.frame.minX + 24, y: previous.frame.maxY - 24))
         }
+        if let window = controller.window, window.tabbedWindows == nil {
+            window.setFrame(WindowState.Frame(window.frame).onScreen(preferredScreen: window.screen, minimumSize: .zero), display: false)
+        }
         controller.showWindow(nil)
         controller.window?.makeKeyAndOrderFront(nil)
         return controller
@@ -172,6 +175,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func showSettings(_ sender: Any?) {
         SettingsWindowController.shared.show(sender)
     }
+
+    @objc func showThemeEditor(_ sender: Any?) { SettingsWindowController.shared.showThemeEditor(sender) }
+    @objc func showHostDetails(_ sender: Any?) { SettingsWindowController.shared.showHostDetails(sender) }
 
     @objc func showCommandPalette(_ sender: Any?) {
         CommandPaletteController.shared.show(sender)

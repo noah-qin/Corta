@@ -10,6 +10,7 @@ and Find Previous can be changed ([Keyboard shortcuts](#keyboard-shortcuts)).
 - [Install and update](#install-and-update)
 - [Windows, tabs and panes](#windows-tabs-and-panes)
 - [Text, fonts and themes](#text-fonts-and-themes)
+- [Personalizing the terminal](#personalizing-the-terminal)
 - [Scrollback, search and selection](#scrollback-search-and-selection)
 - [Links and file references](#links-and-file-references)
 - [Shell integration](#shell-integration)
@@ -73,15 +74,16 @@ installed when you say so.
 
 ## Text, fonts and themes
 
-- **Font.** `font-family` (the system monospaced font by default) and
-  `font-size` (12 pt). Settings ▸ Appearance previews the choice. A family
-  is only accepted if every character really has the same width.
+- **Font.** `font-family = system` (the only supported primary font) and
+  `font-size` (12 pt). Settings ▸ Appearance previews the font, colors and cursor. Legacy font
+  family names migrate to the system face.
 - **Zoom.** ⌘= / ⌘− / ⌘0 or a pinch make the text bigger, smaller or
   the configured size again, in the current window only. Zoom never
   changes the config file.
 - **Theme.** One theme, `corta`, with a light and a dark variant;
   `appearance = auto` follows macOS as it switches. You can define your
-  own theme in the config file, or inherit from one and change a few
+  own theme through **View ▸ Theme editor…** or in the config file, or inherit
+  from one and change a few
   colours ([Themes](CONFIGURATION.md#4-themes)).
 - **Unicode.** Chinese, Japanese and Korean text takes two columns and
   lines up with everything else; emoji, combining marks, flags and emoji
@@ -97,6 +99,98 @@ installed when you say so.
   `option-as-meta = true` for Emacs-style Meta keys.
 - **Bell.** A flash of the pane (`bell = visual`), or a sound
   (`bell = audible`).
+
+## Personalizing the terminal
+
+### Cursor appearance
+
+Open Settings (⌘,) → Appearance → Cursor. Choose Block, Bar or Underline,
+then enable Blink cursor if desired. The default is **Block, blinking off**.
+The three shapes and independent switch provide six combinations. These are also `cursor-shape` and
+`cursor-blink` in the configuration file. Changes apply to open panes.
+Terminal programs can temporarily choose their own shape and blinking through
+DECSCUSR; parameter 0 or a terminal reset returns to your configured defaults.
+Blinking pauses when a pane is inactive, hidden or showing scrollback.
+
+### Input-source indicator
+
+The focused terminal shows a small badge at the right edge of the input line:
+`A` for confirmed direct input, `中` for Chinese, `あ` for Japanese and `한`
+for Korean. Other sources use their language code. Hover for the full source
+name. A neutral badge identifies sources whose internal input mode is not
+reported by macOS, including third-party IMEs with private English toggles.
+Corta never guesses that mode from typed text and never changes the input source.
+
+Settings ▸ Keyboard & Mouse ▸ Input Source Indicator chooses **While entering
+commands** (default), **Always in focused pane**, or **Off**. The default only
+enables the indicator for users with an enabled non-Latin keyboard layout or
+an IME; Latin-only keyboard setups remain uncluttered. Switching back to a Latin
+layout keeps a quiet gray `A` on a faint gray background. Non-Latin layouts
+and built-in IME modes use a soft indigo tint; unknown IME modes use gray. With shell
+integration the default hides during command execution; without integration it
+shows in the focused pane. Scrollback and alternate-screen programs hide it.
+Long commands move the badge down to free space, keeping it at the right edge;
+it hides when no safe row remains and never inserts a line or scrolls the child.
+Direct-input and IME colors accept hex values; clear a field for the subtle default styling.
+
+[Chinese input-source badge](brand/input-source-indicator.png) ·
+[Long-command avoidance](brand/input-source-long-command.png)
+
+### Optional local system status
+
+Open Settings (⌘,) → Terminal, enable Bottom status bar, then select the
+metrics you want to see: CPU usage, system load,
+memory usage, network rates, disk free space and thermal state. It is off
+by default; each metric has its own toggle. Click the bar to see the local
+host's name, macOS version, chip, core count and total memory. The bar says
+Local even in an SSH pane; it does not monitor a remote server. In narrow
+windows, click for the full selected metrics.
+
+The network interface defaults to auto. It measures one primary interface,
+so VPN traffic is not added to physical traffic. Enter a specific interface
+name in Settings to measure it instead. Sampling stops while every enabled
+bar is hidden. Thermal state is a four-level macOS report, not degrees.
+
+### Creating and editing themes
+
+Settings → Appearance → Create theme opens a graphical editor. Name your
+copy, switch between dark and light variants, and change colors using color
+pickers or HEX values. The preview updates without changing terminal windows.
+Save theme activates and persists it; Cancel keeps your previous theme.
+Custom themes offer Edit theme. Restore source colors resets the current
+variant. You can still edit the same config file by hand. If that custom theme
+changes outside the editor, reopen the editor before saving.
+
+View → Theme editor opens graphical color editing directly. View → Local host details
+shows host configuration without requiring the optional status bar. The same
+host-details button is available in Settings → Terminal. Appearance previews
+follow explicit mode changes immediately and show the selected cursor shape
+and blink state. Terminal programs can still temporarily override cursor style.
+
+### Compact Tab indentation (zsh)
+
+In Settings → Terminal, install or update Shell Integration, then open a new
+shell. With Corta's zsh shell integration installed or updated, Tab on a whitespace-only
+command line inserts four spaces. Tab after command text retains the existing
+completion binding. This is a ZLE widget; terminal output tab stops remain eight
+columns, and full-screen programs continue receiving the Tab key. Without the
+integration, the shell retains its own input-tab behavior.
+
+The bottom status bar uses compact labels, a single-space separator, and short
+byte units. Full names and precision remain in its tooltip, accessibility
+value and host-details popover. Status, host and theme-editor text is translated
+in all nine shipped languages and follows macOS's language choice for the app.
+
+### Language and defaults
+
+The app follows macOS’s preferred language for Corta: English, Simplified and
+Traditional Chinese, Japanese, Korean, German, French, Spanish and Brazilian
+Portuguese. Restart Corta after changing its app-language preference in macOS.
+Numeric formatting follows the current locale. Existing explicit cursor and
+status settings are preserved; defaults apply when those keys are absent.
+
+These features are in the development tree and remain **Unreleased** until
+they appear in a published release. macOS 26+ and Apple silicon are required.
 
 ## Scrollback, search and selection
 
@@ -345,12 +439,14 @@ Settings is a sidebar of categories, the way System Settings is laid out:
 
 - **General** — the new-window size, restoring windows, confirming close,
   long-task notifications and updates.
-- **Appearance** — light or dark, verified installed fonts, size, and a
-  preview.
+- **Appearance** — light or dark, the system monospaced font, size, and a
+  live preview, cursor shape/blinking and graphical theme editing.
 - **Terminal** — scrollback, the command-history limit, the bell, search
-  defaults, the open-file command and shell integration.
+  defaults, the open-file command, shell integration, optional system status
+  and local host details.
 - **Keyboard & Mouse** — Option as Meta, how links open, the modifier that
-  selects text while a program owns the mouse, and copy on select.
+  selects text while a program owns the mouse, copy on select and input-source
+  indicator modes/colors.
 - **Shortcuts** — every command's key; a reset arrow appears beside one you
   have changed.
 - **Quick Terminal** — the system-wide hotkey, position and screen.
@@ -358,8 +454,8 @@ Settings is a sidebar of categories, the way System Settings is laid out:
 - **Privacy & Security** — clipboard writes from programs (OSC 52), Secure
   Keyboard Entry, and the directory history.
 
-These controls edit the same config file. Custom theme colors remain
-configurable through the file.
+These controls edit the same config file. Custom theme colors can be edited
+graphically or through the file.
 
 The window toolbar adds SSH and SFTP. Both open a sheet on the window that
 accepts `user@host` or a config alias and suggests recent and configured

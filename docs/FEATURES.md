@@ -84,6 +84,24 @@ files, remote connections and child-process input.
 - Sparkle updates through **Corta ▸ Check for Updates…**, plus an optional
   daily background check.
 
+## Optional system status and graphical themes
+
+- A bottom status bar, off by default, with individually selectable local CPU,
+  load, memory, network rates, home-volume free space and four thermal levels.
+  Click for host, macOS version, chip, core count and total memory. Windows
+  share one sampler; hidden bars stop polling. SSH panes still show local data.
+- A graphical theme editor in Appearance settings, with separate light/dark
+  previews, color pickers and HEX fields, save/cancel and source-color reset.
+  It saves through the existing configuration file; manual editing remains
+  supported. Built-ins are copied, while custom themes can be edited.
+
+- View → Local host details and Terminal settings expose host configuration
+  even with the bar disabled. View → Theme editor opens color editing directly.
+- System Monospaced is the primary font, with configurable size and system
+  fallback for missing characters. Legacy font-family names migrate to system.
+- Cursor shapes are block, bar and underline, with independent blinking; the
+  default is a nonblinking block. Programs retain temporary DECSCUSR control.
+
 ## Known limits
 
 - **VT conformance is incomplete.** The 2026-09-17 esctest2 run recorded

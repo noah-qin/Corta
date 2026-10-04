@@ -83,6 +83,8 @@ final class TerminalView: NSView, CALayerDelegate {
     var onSearchKey: ((NSEvent) -> Bool)?
     var onCompletionKey: ((NSEvent) -> Bool)?
     let shellOverlay = ShellOverlayView()
+    var onInputContextChange: (() -> Void)?
+    var inputCompositionRect: CGRect?
 
     /// A live resize ended; deliver the final size without the debounce.
     var onLiveResizeEnded: (() -> Void)?
@@ -143,7 +145,7 @@ final class TerminalView: NSView, CALayerDelegate {
 
     override func becomeFirstResponder() -> Bool {
         let accepted = super.becomeFirstResponder()
-        if accepted { onFocus?() }
+        if accepted { onFocus?(); onInputContextChange?() }
         return accepted
     }
 

@@ -76,6 +76,18 @@ final class SettingsWindowController: NSWindowController {
         }
     }
 
+    func showThemeEditor(_ sender: Any?) {
+        navigation.selection = .appearance
+        show(sender)
+        navigation.themeEditorRequest += 1
+    }
+
+    func showHostDetails(_ sender: Any?) {
+        navigation.selection = .terminal
+        show(sender)
+        navigation.showHostDetails = true
+    }
+
     @objc func show(_ sender: Any?) {
         model.windowWillShow()
         showWindow(sender)

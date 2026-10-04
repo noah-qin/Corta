@@ -23,6 +23,9 @@ import CortaTerminal
 /// N panes still share one window.
 final class SplitViewController: NSViewController {
     private var tree: SplitTree!
+    private let systemStatusBar = SystemStatusBar(frame: .zero)
+    private var statusBarHeightConstraint: NSLayoutConstraint?
+    var statusBarHeight: CGFloat { ConfigurationStore.shared.configuration.statusBar ? SystemStatusBar.height : 0 }
     /// The pane that receives input. Set by `noteFocus` from
     /// `TerminalView.becomeFirstResponder`, so every route to focus funnels
     /// through one place; `SplitViewController+Restore` sets it to rebuild a
@@ -93,6 +96,7 @@ final class SplitViewController: NSViewController {
             initialGridSize: nil, preset: pendingPreset ?? restoredPreset)
         focusedPane = pane
         tree = SplitTree(root: pane.view)
+        systemStatusBar.onVisibilityChange = { [weak self] in self?.updateStatusBarLayout() }
         installRoot()
     }
 
@@ -237,18 +241,15 @@ final class SplitViewController: NSViewController {
             didCorrectWindowSize = true
             return
         }
-        let target = pane.initialWindowContentSize
-        guard abs(window.frame.height - target.height) > 1
-            || abs(window.frame.width - target.width) > 1
-        else {
-            didCorrectWindowSize = true
-            return
-        }
+        var target = pane.initialWindowContentSize
+        target.height += statusBarHeight
         didCorrectWindowSize = true
         var frame = window.frame
         frame.origin.y += frame.height - target.height
         frame.size = target
-        window.setFrame(frame, display: true)
+        // Initial sizing and restoration share the same Dock/menu-bar bounds.
+        // Clamp after AppKit's final chrome correction and before PTY sizing.
+        window.setFrame(WindowState.Frame(frame).onScreen(preferredScreen: window.screen, minimumSize: .zero), display: true)
     }
 
     // MARK: - Panes
@@ -275,21 +276,39 @@ final class SplitViewController: NSViewController {
         panes.first { $0.view === leaf }
     }
 
-    /// The content view has one subview: the tree's root, which changes
-    /// identity on the first split and the last collapse.
+    /// The terminal root changes identity on the first split and last collapse;
+    /// the optional status bar remains anchored beneath it.
     private func installRoot() {
         // A zoomed pane fills the view; the tree stays intact, just detached.
         let root = zoomedPane?.view ?? tree.root
         guard root.superview !== view else { return }
-        view.subviews.forEach { $0.removeFromSuperview() }
+        view.subviews.filter { $0 !== systemStatusBar }.forEach { $0.removeFromSuperview() }
+        if systemStatusBar.superview == nil {
+            systemStatusBar.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(systemStatusBar)
+            let height = systemStatusBar.heightAnchor.constraint(equalToConstant: statusBarHeight)
+            statusBarHeightConstraint = height
+            NSLayoutConstraint.activate([
+                systemStatusBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+                systemStatusBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+                systemStatusBar.bottomAnchor.constraint(equalTo: view.bottomAnchor), height,
+            ])
+        }
         root.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(root)
+        view.addSubview(root, positioned: .below, relativeTo: systemStatusBar)
         NSLayoutConstraint.activate([
             root.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             root.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             root.topAnchor.constraint(equalTo: view.topAnchor),
-            root.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            root.bottomAnchor.constraint(equalTo: systemStatusBar.topAnchor),
         ])
+    }
+
+    private func updateStatusBarLayout() {
+        statusBarHeightConstraint?.constant = statusBarHeight
+        updateWindowMinSize()
+        view.layoutSubtreeIfNeeded()
+        for pane in panes { pane.resizeSessionToFitView(); pane.invalidateDisplay() }
     }
 
     /// Marks the saved arrangement stale; `AppDelegate` debounces the write.
@@ -491,6 +510,7 @@ final class SplitViewController: NSViewController {
     /// Whole-window teardown for closes that bypass `closePane` (red button,
     /// tab close, ⌘Q). Idempotent per pane.
     func teardown() {
+        systemStatusBar.stop()
         for pane in panes { pane.teardown() }
     }
 
@@ -592,7 +612,7 @@ final class SplitViewController: NSViewController {
             of: tree.root, leafSize: leafMinimumSize, dividerThickness: 1)
         window.contentMinSize = NSSize(
             width: treeMinimum.width,
-            height: treeMinimum.height + pane.windowChrome)
+            height: treeMinimum.height + pane.windowChrome + statusBarHeight)
     }
 
     private func leafMinimumSize(_ leaf: NSView) -> CGSize {

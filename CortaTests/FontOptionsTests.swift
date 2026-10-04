@@ -169,33 +169,16 @@ import Testing
         #expect(equals.uvRect != greater.uvRect, "\(family) ligated across two cells")
     }
 
-    // MARK: - A third-party family, config file to font
+    // MARK: - Single supported family
 
-    /// `font-family` naming an installed, verified family has to survive
-    /// parsing *and* resolve to a face of that family — not quietly fall back
-    /// to System Monospaced, which is what an unusable family does.
-    @Test func aThirdPartyFamilyResolvesFromTheConfigFile() throws {
-        let family = try #require(
-            Self.installedCandidate(), "no candidate monospaced family installed")
-        guard Self.fontSubsystemResolves(family) else {
-            print("note: the font subsystem is not resolving \(family) right now; see fontSubsystemResolves")
-            return
+    @Test func legacyConfiguredFamiliesUseTheSystemMonospacedFace() {
+        for family in ["PT Mono", "Menlo", "Missing-Font"] {
+            let parsed = Configuration.parse("font-family = \(family)\nfont-size = 13\n")
+            #expect(parsed.configuration.fontFamily == Configuration.systemFontFamily)
+            #expect(parsed.unknown.isEmpty)
+            let font = TerminalFont.primary(ofSize: parsed.configuration.fontSize, family: parsed.configuration.fontFamily)
+            let system = TerminalFont.primary(ofSize: 13)
+            #expect(CTFontCopyPostScriptName(font) == CTFontCopyPostScriptName(system))
         }
-        #expect(MonospacedFontCatalog.isUsable(family: family), "\(family) was not offered")
-
-        let parsed = Configuration.parse("font-family = \(family)\nfont-size = 13\n")
-        #expect(parsed.configuration.fontFamily == family)
-        #expect(parsed.unknown.isEmpty)
-
-        let font = TerminalFont.primary(
-            ofSize: parsed.configuration.fontSize, family: parsed.configuration.fontFamily)
-        #expect(CTFontCopyFamilyName(font) as String == family)
-        let system = TerminalFont.primary(ofSize: parsed.configuration.fontSize, family: nil)
-        #expect(
-            CTFontCopyPostScriptName(font) as String != CTFontCopyPostScriptName(system) as String,
-            "\(family) resolved to the system face instead of itself")
-        // The catalog is the gate the settings page lists from, so a family
-        // the config can name has to appear there too.
-        #expect(MonospacedFontCatalog.families().contains(family))
     }
 }

@@ -19,6 +19,10 @@ document is right and the record is a record.
 | [Troubleshooting](TROUBLESHOOTING.md) | Corta will not install, will not start, or does something your last terminal did not. Ends with how to uninstall cleanly. |
 | [Changelog](../CHANGELOG.md) | You want to know what changed in a release, or what has landed on `main` since the last one. |
 
+Start with the [personalization tutorial](USER-GUIDE.md#personalizing-the-terminal)
+for cursor defaults, the optional system bar, host details and graphical themes.
+These development-tree features are listed under Unreleased in the changelog.
+
 ## For contributors
 
 | Document | Covers |

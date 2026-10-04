@@ -38,6 +38,7 @@ path = [
   "Corta/Localizable.xcstrings",
   "TestPlans/*.xctestplan",
   "Sparkle-Info.plist",
+  "Corta/PrivacyInfo.xcprivacy",
   "appcast.xml",
 ]
 SPDX-FileCopyrightText = "2026 Noah Qin"

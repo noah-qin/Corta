@@ -348,6 +348,12 @@ extension AppDelegate {
         let themeItem = NSMenuItem(title: L10n.text("settings.label.theme"), action: nil, keyEquivalent: "")
         themeItem.submenu = themeMenu
         view.addItem(themeItem)
+        let editor = NSMenuItem(title: L10n.text("theme.editor") + "…", action: #selector(showThemeEditor(_:)), keyEquivalent: "")
+        editor.target = self
+        view.addItem(editor)
+        let details = NSMenuItem(title: L10n.text("status.details") + "…", action: #selector(showHostDetails(_:)), keyEquivalent: "")
+        details.target = self
+        view.addItem(details)
     }
 
     /// Rebuilt from the configuration as the menu opens, so a theme defined

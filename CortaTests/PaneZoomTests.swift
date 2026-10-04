@@ -54,16 +54,17 @@ struct PaneZoomTests {
         defer { split.teardown() }
         let pane = try #require(split.focusedPane)
         let treeRoot = try #require(split.view.subviews.first)
+        let statusBar = try #require(split.view.subviews.first { $0 is SystemStatusBar })
 
         split.toggleZoomPane(nil)
         #expect(split.isPaneZoomed)
         // The pane itself is what the controller's view holds now.
-        #expect(split.view.subviews == [pane.view])
+        #expect(split.view.subviews == [pane.view, statusBar])
         #expect(treeRoot.superview == nil)
 
         split.toggleZoomPane(nil)
         #expect(!split.isPaneZoomed)
-        #expect(split.view.subviews == [treeRoot])
+        #expect(split.view.subviews == [treeRoot, statusBar])
         // And the pane is back inside the tree, not orphaned or left on the
         // controller's view — the failure a screenshot cannot show.
         #expect(pane.view.isDescendant(of: treeRoot))

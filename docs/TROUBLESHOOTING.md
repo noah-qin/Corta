@@ -304,3 +304,29 @@ The local file changed after the version shown by the original prompt.
 Approve the new edit explicitly. An older managed entry without a remote
 content digest also needs a conflict decision once. A content comparison
 can identify remote changes even when file size and timestamp are unchanged.
+
+## Cursor, system status and theme editor
+
+These features are in the development tree until the next release. In Settings
+(⌘,) → Appearance → Cursor, select a shape and enable Blink cursor separately.
+The default is a nonblinking block. Blinking pauses while the pane is inactive,
+hidden or scrolled back; a terminal program can temporarily override the setting
+with DECSCUSR. Reset Terminal restores the configured style.
+
+The bottom status bar is disabled by default. Enable it and choose metrics in
+Settings → Terminal. View → Local host details… works even when the bar is off.
+Rates need two samples, so allow a few seconds. Network auto measures one
+primary interface: choose an explicit interface when a VPN or multiple adapters
+makes that choice unsuitable. SSH panes still report the local Mac. Thermal
+levels are macOS classifications, not Celsius readings. Narrow windows may
+truncate the bar; click it for the complete selected values.
+
+View → Theme editor… opens color editing directly; Appearance settings also
+has Create theme and, for custom themes, Edit theme. Invalid HEX colors disable
+Save. If the config was edited elsewhere, reopen the editor to avoid overwriting
+that edit. System Monospaced is the only primary font; old family names migrate
+to it, and font size remains configurable.
+
+The interface follows macOS’s language choice for Corta. Restart after changing
+that app-language preference. Nine translations ship; language and numeric
+region formatting can differ. See the [tutorial](USER-GUIDE.md#personalizing-the-terminal).

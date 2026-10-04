@@ -29,6 +29,8 @@ final class ShellOverlayView: NSView {
     var completion: DirectoryCompletion?
     private var preview: DirectoryGhostView?
     private var candidateRow: DirectoryCandidateRowView?
+    /// Native completion previews occupy space outside the terminal grid.
+    var occupiedRects: [CGRect] { subviews.filter { !$0.isHidden }.map(\.frame) }
     override var isFlipped: Bool { true }
 
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
