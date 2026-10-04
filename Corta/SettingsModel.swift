@@ -65,6 +65,7 @@ final class SettingsModel {
     var statusItems = Set(SystemMetrics.Item.allCases)
     var statusNetworkInterface = "auto"
     var theme: String = Theme.corta.name
+    var inputSourceIndicatorPosition: Configuration.InputSourceIndicatorPosition = .toolbar
     var inputSourceIndicator: Configuration.InputSourceIndicatorMode = .auto
     var inputSourceDirectColor = ""
     var inputSourceIMEColor = ""
@@ -204,6 +205,7 @@ final class SettingsModel {
         statusItems = configuration.statusItems
         statusNetworkInterface = configuration.statusNetworkInterface
         theme = configuration.theme
+        inputSourceIndicatorPosition = configuration.inputSourceIndicatorPosition
         inputSourceIndicator = configuration.inputSourceIndicator
         inputSourceDirectColor = configuration.inputSourceDirectColor
         inputSourceIMEColor = configuration.inputSourceIMEColor
@@ -312,6 +314,13 @@ final class SettingsModel {
     func setInputSourceIndicator(_ value: Configuration.InputSourceIndicatorMode) {
         commit { configuration in
             configuration.inputSourceIndicator = value
+            return nil
+        }
+    }
+
+    func setInputSourceIndicatorPosition(_ value: Configuration.InputSourceIndicatorPosition) {
+        commit { configuration in
+            configuration.inputSourceIndicatorPosition = value
             return nil
         }
     }

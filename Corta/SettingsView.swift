@@ -324,6 +324,12 @@ struct SettingsView: View {
                 }
                 .accessibilityIdentifier("input-source-indicator-mode")
                 .help(L10n.text("inputSource.settings.help"))
+                Picker(L10n.text("inputSource.settings.position"), selection: bind(model.inputSourceIndicatorPosition, model.setInputSourceIndicatorPosition)) {
+                    ForEach(Configuration.InputSourceIndicatorPosition.allCases, id: \.self) { position in
+                        Text(L10n.text("inputSource.position.\(position.rawValue)")).tag(position)
+                    }
+                }
+                .accessibilityIdentifier("input-source-indicator-position")
                 InputSourceColorField(value: model.inputSourceDirectColor, direct: true, model: model)
                 InputSourceColorField(value: model.inputSourceIMEColor, direct: false, model: model)
             }

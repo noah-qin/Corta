@@ -552,3 +552,9 @@ read/write exception for this directory when signing the runner; then run
 `test-without-building`. This changes the local runner artifact only, not Corta’s
 shipping entitlements. An inaccessible fixture is a setup failure, not evidence
 that settings or translations work.
+
+The input-source indicator UI fixtures use the runner’s
+`FileManager.default.temporaryDirectory` and pass that isolated stage to the
+app. They do not require the temporary `/private/tmp/corta-ui-stages/` signing
+exception described above. Toolbar and optional prompt placement are covered
+in [the input-source placement record](test-results/2026-10-04-input-source-toolbar.md).

@@ -19,7 +19,8 @@ what to edit.
   HEX input, cancel and source-color reset, saved to the existing config file.
 
 - Persistent input-source badge for Chinese, Japanese, Korean and other input
-  sources, pinned to the focused pane's right edge with long-command avoidance,
+  sources, fixed in the window toolbar by default, with optional prompt-right
+  placement and long-command avoidance,
   prompt-only/always/off modes and configurable direct-input/IME colors. Private
   IME modes use a neutral badge; scrollback and alternate-screen programs hide it.
   Automatic display follows enabled non-Latin layouts and IMEs. Default styling

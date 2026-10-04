@@ -114,7 +114,7 @@ Blinking pauses when a pane is inactive, hidden or showing scrollback.
 
 ### Input-source indicator
 
-The focused terminal shows a small badge at the right edge of the input line:
+The focused terminal shows a small badge in the window’s upper-right toolbar:
 `A` for confirmed direct input, `中` for Chinese, `あ` for Japanese and `한`
 for Korean. Other sources use their language code. Hover for the full source
 name. A neutral badge identifies sources whose internal input mode is not
@@ -129,7 +129,10 @@ layout keeps a quiet gray `A` on a faint gray background. Non-Latin layouts
 and built-in IME modes use a soft indigo tint; unknown IME modes use gray. With shell
 integration the default hides during command execution; without integration it
 shows in the focused pane. Scrollback and alternate-screen programs hide it.
-Long commands move the badge down to free space, keeping it at the right edge;
+The **Position** setting chooses **Window toolbar** (default) or **Right edge
+of command line**. The toolbar badge stays fixed as commands grow or wrap.
+With command-line placement, long commands move the badge down to free space,
+keeping it at the right edge;
 it hides when no safe row remains and never inserts a line or scrolls the child.
 Direct-input and IME colors accept hex values; clear a field for the subtle default styling.
 

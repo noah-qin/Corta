@@ -31516,55 +31516,232 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Automatic display requires an enabled non-Latin layout or IME. Pinned to the right edge. Without shell integration, shown in the focused pane. Hidden in full-screen terminal programs."
+            "value": "Automatic display requires an enabled non-Latin layout or IME. Fixed in the toolbar by default; command-line placement is optional. Without shell integration, shown in the focused pane. Hidden in full-screen terminal programs."
           }
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "translated",
-            "value": "自动模式仅对启用了非拉丁字母键盘或输入法的用户显示。固定在右侧。没有 shell 集成时，在聚焦窗格显示。全屏终端程序中隐藏。"
+            "state": "needs_review",
+            "value": "自动模式仅对启用了非拉丁字母键盘或输入法的用户显示。默认固定在工具栏，也可选命令行右侧。没有 shell 集成时，在聚焦窗格显示。全屏终端程序中隐藏。"
           }
         },
         "ja": {
           "stringUnit": {
-            "state": "translated",
-            "value": "自動表示は非ラテン文字のキーボードまたは入力メソッドが有効な場合のみ。右端に固定。シェル統合がない場合はフォーカス中に表示。全画面の端末プログラムでは非表示。"
+            "state": "needs_review",
+            "value": "自動表示は非ラテン文字のキーボードまたは入力メソッドが有効な場合のみ。標準ではツールバーに固定。コマンド行の右端も選択できます。シェル統合がない場合はフォーカス中に表示。全画面の端末プログラムでは非表示。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
-            "state": "translated",
-            "value": "自動模式僅對啟用了非拉丁字母鍵盤或輸入法的使用者顯示。固定在右側。沒有 shell 整合時，在聚焦窗格顯示。全螢幕終端程式中隱藏。"
+            "state": "needs_review",
+            "value": "自動模式僅對啟用了非拉丁字母鍵盤或輸入法的使用者顯示。預設固定在工具列，也可選命令列右側。沒有 shell 整合時，在聚焦窗格顯示。全螢幕終端程式中隱藏。"
           }
         },
         "ko": {
           "stringUnit": {
-            "state": "translated",
-            "value": "자동 표시는 비라틴 문자 키보드 또는 입력기가 활성화된 경우에만 적용됩니다. 오른쪽 가장자리에 고정됩니다. 셸 통합이 없으면 활성 패널에 표시됩니다. 전체 화면 터미널 프로그램에서는 숨겨집니다."
+            "state": "needs_review",
+            "value": "자동 표시는 비라틴 문자 키보드 또는 입력기가 활성화된 경우에만 적용됩니다. 기본적으로 도구 막대에 고정됩니다. 명령줄 오른쪽도 선택할 수 있습니다. 셸 통합이 없으면 활성 패널에 표시됩니다. 전체 화면 터미널 프로그램에서는 숨겨집니다."
           }
         },
         "de": {
           "stringUnit": {
-            "state": "translated",
-            "value": "Automatisch nur mit aktiviertem nichtlateinischem Layout oder einer Eingabemethode. Am rechten Rand fixiert. Ohne Shell-Integration im aktiven Bereich sichtbar. In Vollbild-Terminalprogrammen ausgeblendet."
+            "state": "needs_review",
+            "value": "Automatisch nur mit aktiviertem nichtlateinischem Layout oder einer Eingabemethode. Standardmäßig in der Symbolleiste; optional am rechten Rand der Befehlszeile. Ohne Shell-Integration im aktiven Bereich sichtbar. In Vollbild-Terminalprogrammen ausgeblendet."
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "translated",
-            "value": "Affichage automatique avec une disposition non latine ou une méthode de saisie activée. Fixé au bord droit. Sans intégration du shell, visible dans le volet actif. Masqué dans les programmes de terminal en plein écran."
+            "state": "needs_review",
+            "value": "Affichage automatique avec une disposition non latine ou une méthode de saisie activée. Fixé dans la barre d’outils par défaut ; placement sur la ligne de commande en option. Sans intégration du shell, visible dans le volet actif. Masqué dans les programmes de terminal en plein écran."
           }
         },
         "es": {
           "stringUnit": {
-            "state": "translated",
-            "value": "Se muestra automáticamente con una distribución no latina o un método de entrada habilitado. Fijado al borde derecho. Sin integración del shell, se muestra en el panel activo. Se oculta en programas de terminal a pantalla completa."
+            "state": "needs_review",
+            "value": "Se muestra automáticamente con una distribución no latina o un método de entrada habilitado. Fijo en la barra de herramientas de forma predeterminada; ubicación en la línea de comandos opcional. Sin integración del shell, se muestra en el panel activo. Se oculta en programas de terminal a pantalla completa."
           }
         },
         "pt-BR": {
           "stringUnit": {
+            "state": "needs_review",
+            "value": "Exibição automática com um layout não latino ou método de entrada ativado. Fixo na barra de ferramentas por padrão; posição na linha de comando opcional. Sem integração do shell, aparece no painel ativo. Oculto em programas de terminal em tela cheia."
+          }
+        }
+      }
+    },
+    "inputSource.settings.position": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
             "state": "translated",
-            "value": "Exibição automática com um layout não latino ou método de entrada ativado. Fixo na borda direita. Sem integração do shell, aparece no painel ativo. Oculto em programas de terminal em tela cheia."
+            "value": "Position"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "位置"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "位置"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "位置"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "위치"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Position"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Position"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Posición"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Posição"
+          }
+        }
+      }
+    },
+    "inputSource.position.toolbar": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Window toolbar"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "窗口工具栏"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "視窗工具列"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ウインドウのツールバー"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "창 도구 막대"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Fenster-Symbolleiste"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Barre d’outils de la fenêtre"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Barra de herramientas de la ventana"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Barra de ferramentas da janela"
+          }
+        }
+      }
+    },
+    "inputSource.position.prompt": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Right edge of command line"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "命令行右侧"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "命令列右側"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "コマンド行の右端"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "명령줄 오른쪽"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Rechter Rand der Befehlszeile"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Bord droit de la ligne de commande"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Borde derecho de la línea de comandos"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Borda direita da linha de comando"
           }
         }
       }
