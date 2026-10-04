@@ -153,6 +153,8 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// switcher. On by default: nothing leaves the app. The history lives in
     /// `DirectoryHistory`'s own file; clearing it is a Settings action.
     var directoryHistory: Bool = true
+    var directoryCompletion: Bool = true
+    var commandStatusMarks: Bool = true
     /// Reopen last run's windows, splits and directories.
     var restoreWindows: Bool = true
     /// Ask before closing a pane with a running child process.
@@ -314,6 +316,12 @@ nonisolated struct Configuration: Equatable, Sendable {
         case "allow-clipboard-write":
             guard let parsed = Self.parseBool(value) else { return false }
             allowClipboardWrite = parsed
+        case "directory-completion":
+            guard let parsed = Self.parseBool(value) else { return false }
+            directoryCompletion = parsed
+        case "command-status-marks":
+            guard let parsed = Self.parseBool(value) else { return false }
+            commandStatusMarks = parsed
         case "directory-history":
             guard let parsed = Self.parseBool(value) else { return false }
             directoryHistory = parsed
@@ -524,6 +532,8 @@ nonisolated struct Configuration: Equatable, Sendable {
             "open-file-command = \(openFileCommand)",
             "allow-clipboard-write = \(allowClipboardWrite)",
             "directory-history = \(directoryHistory)",
+            "directory-completion = \(directoryCompletion)",
+            "command-status-marks = \(commandStatusMarks)",
             "restore-windows = \(restoreWindows)",
             "confirm-close = \(confirmClose)",
             "update-auto-check = \(updateAutoCheck)",

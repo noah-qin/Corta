@@ -321,7 +321,8 @@ class ViewController: NSViewController {
                 started = try Self.startSession(
                     size: initialSize, directory: inheritedWorkingDirectory,
                     scrollbackLimit: configuration.scrollbackLines,
-                    commandHistoryLimit: configuration.commandHistoryLimit, preset: preset)
+                    commandHistoryLimit: configuration.commandHistoryLimit, preset: preset,
+                    directoryCompletion: configuration.directoryCompletion)
             }
         } catch {
             presentFailure(
@@ -456,6 +457,8 @@ class ViewController: NSViewController {
         }
         // `view` weakly too: the closure is stored on it, and a strong capture
         // kept every closed pane's view — and its drawables — alive.
+        view.addSubview(view.shellOverlay)
+        view.onCompletionKey = { [weak self] event in self?.handleDirectoryCompletionKey(event) ?? false }
         view.onKeyBytes = { [weak self, weak view] bytes in
             guard let self else { return }
             if bytes.contains(0x0D) { taskNotifier.noteCommandSubmitted(in: view?.window) }
@@ -686,6 +689,7 @@ class ViewController: NSViewController {
                 scrollAnchorTotalPushed = grid.scrollback.totalPushed
             }
         }
+        updateShellOverlay(grid: grid)
         let mappedSearchMatches = search.matches.map { TerminalSelection($0, grid: grid) }
         let indexedPalette = session.indexedPalette
         let damaged = terminalRenderer.updateInstances(
@@ -1090,6 +1094,7 @@ class ViewController: NSViewController {
                 device: device,
                 font: TerminalFont.primary(ofSize: fontSize, family: fontFamily), scale: scale)
         }
+        renderer.drawsCommandMarks = false
         // A finished decode schedules a frame; otherwise it waits for unrelated
         // output.
         renderer.kittyImageRenderer.onImagesReady = { [weak self] in
@@ -1115,7 +1120,7 @@ class ViewController: NSViewController {
     static func startSession(
         size: TerminalSize, directory: String?, scrollbackLimit: Int,
         commandHistoryLimit: Int = CommandRecordStore.defaultCapacity, preset: Preset? = nil,
-        configuredShell: String? = nil
+        configuredShell: String? = nil, directoryCompletion: Bool = true
     ) throws(PTYError) -> StartedSession {
         // An uninstalled preset shell degrades to a working terminal.
         let configured =
@@ -1146,7 +1151,10 @@ class ViewController: NSViewController {
                     executable: attempt.shell,
                     // Only for the preset's own shell; a fallback may not understand them.
                     arguments: attempt.shell == configured ? arguments : ["-l"],
-                    environment: environment, size: size,
+                    environment: directoryCompletion
+                        ? ZshBootstrap.environment(environment, executable: attempt.shell,
+                            arguments: attempt.shell == configured ? arguments : ["-l"])
+                        : environment, size: size,
                     workingDirectory: attempt.directory,
                     // Applies to new sessions: shrinking a live one would drop lines.
                     scrollbackLimit: scrollbackLimit, commandHistoryLimit: commandHistoryLimit)
@@ -1172,7 +1180,9 @@ class ViewController: NSViewController {
         // A local cwd for the launcher; the remote side lands where it lands.
         return try TerminalSession(
             executable: command.executable, arguments: command.arguments,
-            environment: environment, size: size,
+            environment: configuration.directoryCompletion
+                ? ZshBootstrap.environment(environment, executable: command.executable, arguments: command.arguments)
+                : environment, size: size,
             workingDirectory: preset?.directory ?? inheritedWorkingDirectory ?? NSHomeDirectory(),
             scrollbackLimit: configuration.scrollbackLines,
             commandHistoryLimit: configuration.commandHistoryLimit)

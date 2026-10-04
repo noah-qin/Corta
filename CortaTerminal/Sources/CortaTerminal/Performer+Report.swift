@@ -39,6 +39,7 @@ public struct PerformerState: Sendable {
     public internal(set) var bellRequested = false
     /// Never reported back: the title query is a command-injection vector.
     public internal(set) var windowTitle: String?
+    public internal(set) var directoryCompletion: DirectoryCompletion?
     /// Local only; a report naming another host goes to `remoteContext`.
     public internal(set) var workingDirectory: String?
     /// This machine's names when the session started (`Performer.localHostnames`).

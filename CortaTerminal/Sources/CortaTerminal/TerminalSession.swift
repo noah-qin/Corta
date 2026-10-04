@@ -598,6 +598,10 @@ public final class TerminalSession: @unchecked Sendable {
         registerStateWaiter { state.withLock { $0.terminal.promptEndPosition } }
     }
 
+    public var directoryCompletion: DirectoryCompletion? {
+        registerStateWaiter { state.withLock { $0.terminal.directoryCompletion } }
+    }
+
     public var commandRecords: CommandRecordStore {
         registerStateWaiter { state.withLock { $0.terminal.commandRecords } }
     }

@@ -21,7 +21,7 @@ enum ShellIntegrationScript {
     /// Each emits FinalTerm A/B/C/D plus OSC 7 through the shell's own hooks.
     static func script(for shell: ShellKind) -> String {
         switch shell {
-        case .zsh: return zsh
+        case .zsh: return zsh + "\n" + zshDirectoryCompletion
         case .bash: return bash
         case .fish: return fish
         }
@@ -186,5 +186,110 @@ enum ShellIntegrationScript {
             printf '\e]133;B\a'
           end
         end
+        """#
+
+    static let zshDirectoryCompletion = #"""
+        if [[ -o interactive && $TERM_PROGRAM == Corta && -z $__corta_cd_installed ]]; then
+          typeset -g __corta_cd_installed=1 __corta_cd_revision=0 __corta_cd_index=1
+          typeset -g __corta_cd_buffer='' __corta_cd_dismissed=''
+          typeset -ga __corta_cd_paths
+
+          __corta_cd_encode() {
+            emulate -L zsh
+            setopt extendedglob no_multibyte
+            REPLY=${1//(#m)[^A-Za-z0-9\/._~-]/%${(l:2::0:)$(( [##16] #MATCH ))}}
+          }
+
+          __corta_cd_refresh() {
+            emulate -L zsh
+            setopt extendedglob
+            local prefix raw directory leaf candidatePath name packet='' encodedPrefix='' REPLY
+            local -a words paths
+            (( ++__corta_cd_revision ))
+            [[ $BUFFER != $__corta_cd_dismissed ]] && __corta_cd_dismissed=''
+            # Only a single cd argument, with the insertion point at the end.
+            # Quotes are lexed by zsh; expansions other than ~/ stay with native Tab.
+            if [[ $BUFFER == 'cd '* && $CURSOR == ${#BUFFER} && $BUFFER != $__corta_cd_dismissed ]]; then
+              raw=${BUFFER#'cd '}
+              words=( ${(z)raw} )
+              if (( ${#words} <= 1 )) && [[ $raw != *[\;\|\&\<\>\`\$\(\)\{\}]* && $raw != *[[:cntrl:]]* ]]; then
+                prefix=${(Q)raw}
+                if [[ $prefix == */* ]]; then
+                  directory=${prefix%/*}/
+                  leaf=${prefix##*/}
+                else
+                  directory=./
+                  leaf=$prefix
+                fi
+                [[ $directory == '~/'* ]] && directory=$HOME/${directory#'~/'}
+                # Follow directory symlinks; hidden names appear only for a dot prefix.
+                if [[ $leaf == .* ]]; then
+                  paths=( "$directory"*(N-/D) )
+                else
+                  paths=( "$directory"*(N-/) )
+                fi
+                __corta_cd_encode "$leaf"
+                encodedPrefix=$REPLY
+                for candidatePath in $paths; do
+                  name=${candidatePath:t}
+                  [[ $name == "$leaf"* && $name != *[[:cntrl:]]* ]] || continue
+                  (( ${#name} <= 128 )) || continue
+                  __corta_cd_paths+=( "$candidatePath" )
+                  __corta_cd_encode "$name/"
+                  (( ${#packet} + ${#REPLY} + ${#encodedPrefix} < 3400 )) || { __corta_cd_paths[-1]=(); break; }
+                  packet+=";$REPLY"
+                  (( ${#__corta_cd_paths} >= 20 )) && break
+                done
+              fi
+            fi
+            if [[ $BUFFER != $__corta_cd_buffer ]]; then
+              __corta_cd_index=1
+              __corta_cd_buffer=$BUFFER
+            fi
+            (( __corta_cd_index > ${#__corta_cd_paths} )) && __corta_cd_index=1
+            if (( ${#__corta_cd_paths} )); then
+              print -rn -- $'\e]134;'"$__corta_cd_revision;$((__corta_cd_index-1));p=$encodedPrefix$packet"$'\a'
+            else
+              print -rn -- $'\e]134;'"$__corta_cd_revision;0"$'\a'
+            fi
+          }
+
+          __corta_cd_redraw() {
+            __corta_cd_paths=()
+            __corta_cd_refresh
+          }
+          __corta_cd_next() {
+            (( ${#__corta_cd_paths} )) && (( __corta_cd_index = __corta_cd_index % ${#__corta_cd_paths} + 1 ))
+          }
+          __corta_cd_previous() {
+            (( ${#__corta_cd_paths} )) && (( __corta_cd_index = (__corta_cd_index + ${#__corta_cd_paths} - 2) % ${#__corta_cd_paths} + 1 ))
+          }
+          __corta_cd_accept() {
+            emulate -L zsh
+            local candidatePath
+            if [[ $BUFFER == $__corta_cd_buffer && $CURSOR == ${#BUFFER} ]] && (( ${#__corta_cd_paths} )); then
+              candidatePath=$__corta_cd_paths[$__corta_cd_index]
+              [[ $candidatePath == ./* && ${candidatePath#./} != -* ]] && candidatePath=${candidatePath#./}
+              BUFFER="cd ${(q)candidatePath}/"
+              CURSOR=${#BUFFER}
+              __corta_cd_dismissed=''
+            fi
+          }
+          __corta_cd_dismiss() { __corta_cd_dismissed=$BUFFER; }
+          autoload -Uz add-zle-hook-widget
+          add-zle-hook-widget line-pre-redraw __corta_cd_redraw
+          zle -N __corta_cd_next
+          zle -N __corta_cd_previous
+          zle -N __corta_cd_accept
+          zle -N __corta_cd_dismiss
+          # Bind both emacs and vi insertion maps, without replacing native Tab.
+          for __corta_cd_map in emacs viins; do
+            bindkey -M $__corta_cd_map $'\e[97~' __corta_cd_previous
+            bindkey -M $__corta_cd_map $'\e[98~' __corta_cd_next
+            bindkey -M $__corta_cd_map $'\e[99~' __corta_cd_accept
+            bindkey -M $__corta_cd_map $'\e[96~' __corta_cd_dismiss
+          done
+          unset __corta_cd_map
+        fi
         """#
 }

@@ -26,11 +26,13 @@ public enum LineMark: UInt8, Sendable {
     /// Where output begins (`C`): otherwise "the last command's output" must be
     /// guessed as one row past the prompt, wrong for a two-line prompt.
     case outputStart = 4
+    /// SIGINT-style exit status, retained even when command history is disabled.
+    case promptInterrupted = 5
 
     /// Not `!= .none`: jumping to an output-start mark lands a line low.
     public var isPrompt: Bool {
         switch self {
-        case .prompt, .promptSucceeded, .promptFailed: return true
+        case .prompt, .promptSucceeded, .promptFailed, .promptInterrupted: return true
         case .none, .outputStart: return false
         }
     }

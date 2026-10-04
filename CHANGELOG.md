@@ -10,8 +10,21 @@ what to edit.
 
 ## [Unreleased]
 
+### Added
+
+- Optional built-in directory suggestions for local zsh sessions: faint
+  folder alternatives below `cd`, inline suffix previews, Left/Right selection
+  and Tab acceptance without executing the command. Up/Down keep shell history
+  navigation and Shift+Tab passes through. Settings can disable suggestions;
+  bundled startup hooks do not edit the user's shell files.
+- Localized settings for directory suggestions and command-status marks,
+  with usage and opt-out instructions in the user guide.
+
 ### Changed
 
+- Command-status rules sit in a narrow margin beside the prompt with text
+  tooltips. Exit status 130 uses a gray interrupted mark and a textual history
+  status instead of the red failure indicator.
 - Shell groups focus, command output, working-directory, pane-layout and
   connection tools into submenus while keeping splitting and clearing direct.
 - Keyboard Shortcuts uses aligned columns, clearer section boundaries and

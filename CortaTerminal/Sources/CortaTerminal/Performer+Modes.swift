@@ -87,6 +87,7 @@ extension Performer {
                         state.parkedMainKeyboardProtocol = state.keyboardProtocol
                         state.keyboardProtocol = KeyboardProtocolStack()
                     }
+                    state.directoryCompletion = nil
                     grid.enterAlternateScreen()
                 } else {
                     if let main = state.parkedMainKeyboardProtocol {

@@ -48,6 +48,14 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
   copy/export, navigation between commands and long-task notifications.
   Install or remove the bundled zsh, bash or fish hooks in **Settings ▸
   Terminal**; they go into the login shell's startup file.
+- Built-in directory suggestions for standard local zsh sessions, with
+  faint alternatives and inline previews, Left/Right selection and Tab
+  acceptance. Up/Down keep command history navigation; Shift+Tab passes
+  through. Disable the optional feature in Settings or with
+  `directory-completion = false` ([usage](USER-GUIDE.md#directory-suggestions-zsh)).
+  Local hooks load without changing the user's startup files.
+- Optional command-status rules in the prompt margin, with textual tooltips
+  and gray interrupted marks for exit status 130.
 - Remote context reported by shell integration, a host indicator and reconnect
   action. SSH connections use system OpenSSH, including its configuration,
   agent and `ProxyJump`; Corta does not provide its own SSH implementation.

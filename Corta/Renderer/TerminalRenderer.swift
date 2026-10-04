@@ -142,6 +142,7 @@ public nonisolated final class TerminalRenderer {
     /// `updateInstances` — one lock on the shared palette per frame rather
     /// than per row, and no frame half in one theme and half in the next.
     private var framePalette: Theme.Variant = Theme.corta.dark
+    var drawsCommandMarks = true
 
     /// Rows in the cached frame: the grid height `draw` lays out.
     var cachedRowCount: Int { cachedLines.count }
@@ -621,7 +622,7 @@ public nonisolated final class TerminalRenderer {
         // The mark: a rule down a prompt row's left edge, coloured by outcome —
         // which of the last twenty failed, at a glance. Inside the first cell:
         // the inset is outside this renderer's rect.
-        if line.mark == .promptSucceeded || line.mark == .promptFailed {
+        if drawsCommandMarks && (line.mark == .promptSucceeded || line.mark == .promptFailed || line.mark == .promptInterrupted) {
             let width = max(2, Float(scale) * 2)
             background.append(
                 QuadInstance(
@@ -828,7 +829,8 @@ public nonisolated final class TerminalRenderer {
     /// carry nothing a reader can use, and after `clear` a grey rule on the
     /// lone prompt read as a rendering artefact (#165).
     private static func markColor(_ mark: LineMark) -> SIMD4<Float> {
-        mark == .promptFailed
+        if mark == .promptInterrupted { return SIMD4<Float>(0.5, 0.5, 0.5, 0.9) }
+        return mark == .promptFailed
             ? SIMD4<Float>(0.9, 0.3, 0.25, 0.9)
             : SIMD4<Float>(0.25, 0.75, 0.35, 0.85)
     }

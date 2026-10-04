@@ -75,6 +75,8 @@ final class SettingsModel {
     var linkActivation: Configuration.LinkActivation = .command
     var allowClipboardWrite: Bool = false
     var directoryHistory: Bool = true
+    var directoryCompletion: Bool = true
+    var commandStatusMarks: Bool = true
     var restoreWindows: Bool = true
     var confirmClose: Bool = true
     var notifyOnLongTask: Bool = false
@@ -198,6 +200,8 @@ final class SettingsModel {
         linkActivation = configuration.linkActivation
         allowClipboardWrite = configuration.allowClipboardWrite
         directoryHistory = configuration.directoryHistory
+        directoryCompletion = configuration.directoryCompletion
+        commandStatusMarks = configuration.commandStatusMarks
         restoreWindows = configuration.restoreWindows
         confirmClose = configuration.confirmClose
         notifyOnLongTask = configuration.notifyOnLongTask
@@ -346,6 +350,14 @@ final class SettingsModel {
             configuration.allowClipboardWrite = value
             return nil
         }
+    }
+
+    func setDirectoryCompletion(_ value: Bool) {
+        commit { $0.directoryCompletion = value; return nil }
+    }
+
+    func setCommandStatusMarks(_ value: Bool) {
+        commit { $0.commandStatusMarks = value; return nil }
     }
 
     func setDirectoryHistory(_ value: Bool) {

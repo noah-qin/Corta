@@ -256,6 +256,9 @@ struct SettingsView: View {
                 Toggle(L10n.text("ui.search.regex"), isOn: bind(model.searchRegex, model.setSearchRegex))
             }
             Section(L10n.text("settings.section.shell")) {
+                Toggle(L10n.text("settings.label.directoryCompletion"), isOn: bind(model.directoryCompletion, model.setDirectoryCompletion))
+                    .help(L10n.text("settings.help.directoryCompletion"))
+                Toggle(L10n.text("settings.label.commandStatusMarks"), isOn: bind(model.commandStatusMarks, model.setCommandStatusMarks))
                 LabeledContent(L10n.text("settings.label.openFileCommand")) {
                     OpenFileCommandField(model: model)
                 }
