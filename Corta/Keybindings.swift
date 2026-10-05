@@ -315,7 +315,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .increaseFontSize: return #selector(ViewController.increaseFontSize(_:))
         case .decreaseFontSize: return #selector(ViewController.decreaseFontSize(_:))
         case .resetFontSize: return #selector(ViewController.resetFontSize(_:))
-        case .find: return #selector(ViewController.performFindPanelAction(_:))
+        case .find: return #selector(PaneSearch.performFindPanelAction(_:))
         case .copy: return #selector(ViewController.copy(_:))
         case .paste: return #selector(ViewController.paste(_:))
         case .selectAll: return #selector(NSResponder.selectAll(_:))

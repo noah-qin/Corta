@@ -24,7 +24,7 @@ import CortaTerminal
 /// Copy and export build their (potentially whole-scrollback) text off
 /// the interaction path, sharing one cancellable `largeTextTask` handle.
 ///
-/// `.serialized` and a real pane, like `SearchDebounceTests` — the text
+/// `.serialized` and a real pane, like `PaneTeardownTests` — the text
 /// under copy comes from a genuine shell.
 @MainActor
 @Suite(.serialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
