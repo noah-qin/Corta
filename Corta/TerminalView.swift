@@ -209,9 +209,7 @@ final class TerminalView: NSView, CALayerDelegate {
         // §5.7). This lets the A/B be two launches of one binary, traced with
         // `InputLatencySignposts`. An environment variable, not a config key:
         // nobody should tune it (D10).
-        if let raw = ProcessInfo.processInfo.environment["CORTA_MAX_DRAWABLES"],
-            let count = Int(raw), (2...3).contains(count)
-        {
+        if let count = DiagnosticsEnvironment.maxDrawables() {
             metalLayer.maximumDrawableCount = count
         }
         metalLayer.colorspace = CGColorSpace(name: CGColorSpace.sRGB)

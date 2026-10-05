@@ -284,9 +284,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// The setting, plus an escape hatch the UI tests set so each launch
     /// doesn't reopen the previous test's windows. A real launch never has it.
     static var isRestoreEnabled: Bool {
-        guard ProcessInfo.processInfo.environment["CORTA_RESTORE_WINDOWS"] != "0" else {
-            return false
-        }
+        guard !DiagnosticsEnvironment.isWindowRestoreSuppressed() else { return false }
         return ConfigurationStore.shared.configuration.restoreWindows
     }
 

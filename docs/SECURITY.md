@@ -214,6 +214,16 @@ alongside it:
   / `TIOCSCTTY`) so job control and signals are correctly scoped.
 - Sanitise the environment; do not leak internal variables to the child.
 
+The SFTP browser spawns `/usr/bin/ssh`, and that process holds the
+user's SSH session. `CORTA_SFTP_SSH` substitutes another program for it,
+so `RemoteWorkflowUITests` can drive the real flow against a local
+`sftp-server`; anything able to set Corta's launch environment could use
+it the same way. Only a Debug build (the separate `CortaDev` application,
+D22) reads it, only an absolute path to an existing executable is
+accepted, and each use is logged under the `diagnostics` category. The
+other launch switches (`TESTING.md`, "Environment switches") measure or
+relocate state and substitute nothing.
+
 ### 4.4 Child lifecycle
 
 On window or tab close, send `SIGHUP` to the child's **process group**,
@@ -353,6 +363,12 @@ which records S01–S04 and S07 in full); the entries below are the ones
 whose write-up belongs with the design rather than with the release that
 made them.
 
+- **S15 — 2026-10-05: the SFTP `ssh` override is Debug-only.** Eight
+  `CORTA_*` switches were read in seven files; they are now one type,
+  `DiagnosticsEnvironment`. `CORTA_SFTP_SSH`, which picks the program
+  that holds the SSH session, was honoured by a Release build for any
+  absolute path; it is now read only by a Debug build, must name an
+  existing executable, and is logged (§4.3).
 - **S14 — 2026-10-03: compressed Kitty images inflate under a ceiling.**
   `kitten icat` sends an image it scaled to fit as zlib-compressed pixels
   (`o=z`); the key was ignored, the compressed bytes failed the size check,
