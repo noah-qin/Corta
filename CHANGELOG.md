@@ -69,6 +69,12 @@ what to edit.
   swaps the SFTP browser's `ssh` for another program; the development
   build accepts only an absolute path to an executable and logs its use.
   Every `CORTA_*` launch switch is listed in `docs/TESTING.md`.
+- A block cursor is opaque in the theme's cursor colour, with the character
+  under it drawn in the background colour, as Terminal.app draws it.
+- Selection, search-match, hovered-link and command-mark colours come from
+  the active theme instead of fixed values chosen for a dark background, so
+  they stay visible in light themes; `docs/CONFIGURATION.md` §4 gives the
+  formulas.
 - Primary font is System Monospaced; legacy configured families migrate to it.
 - Corta zsh integration inserts four spaces for Tab on a blank command line
   while preserving command completion and terminal output tab stops.

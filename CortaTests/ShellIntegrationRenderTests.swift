@@ -151,7 +151,7 @@ import Testing
         fixture.renderer.invalidate()
         let hovered = Self.draw(fixture, grid: grid, hoveredLink: link)
         let underline = bluest(hovered, x: x)
-        // The rule is blue: (0.45, 0.7, 1.0).
+        // The rule is the theme's cyan, bluer than red in every built-in.
         #expect(underline.b > underline.r)
         #expect(underline.b > 100)
         // And only under the link, not across the whole row.

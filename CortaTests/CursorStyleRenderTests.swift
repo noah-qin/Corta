@@ -153,6 +153,7 @@ import Testing
 
     /// A style change alone — no line touched, cursor unmoved — must still
     /// produce a frame, or the new style never appears on an idle screen.
+    /// Leaving the default block rebuilds the one row it was drawn into.
     @Test func cursorStyleChangeAloneReportsDamage() throws {
         guard let device = MTLCreateSystemDefaultDevice() else {
             Issue.record("No Metal device available in this environment")
@@ -169,6 +170,12 @@ import Testing
                 grid: terminal.grid, scrollOffset: 0, cursorVisible: true, selection: nil))
 
         terminal.feed(Array("\u{1B}[4 q".utf8))  // DECSCUSR: steady underline
+        #expect(
+            renderer.updateInstances(
+                grid: terminal.grid, scrollOffset: 0, cursorVisible: true, selection: nil))
+        #expect(renderer.lastRebuiltRowCount == 1)
+
+        terminal.feed(Array("\u{1B}[6 q".utf8))  // underline to bar: overlay only
         #expect(
             renderer.updateInstances(
                 grid: terminal.grid, scrollOffset: 0, cursorVisible: true, selection: nil))

@@ -99,7 +99,7 @@ import Testing
         let row2 = Self.cellCenter(fixture, column: 6, row: 2)
         let outside = Self.cellCenter(fixture, column: 2, row: 1)
         // The pass clears to opaque black, so tint shows in the colour
-        // channels: the match colour (0.85, 0.75, 0.2) is dominantly red.
+        // channels: the match colour, the theme's yellow, carries red.
         #expect(Self.pixel(of: plain, x: row1.x, y: row1.y).r > 0, "a match paints its cells")
         #expect(
             Self.pixel(of: plain, x: outside.x, y: outside.y).r == 0,
@@ -108,8 +108,7 @@ import Testing
         let withCurrent = Self.draw(
             fixture, grid: grid, scrollOffset: 0, searchMatches: matches,
             currentSearchMatchIndex: 1)
-        // (0.95, 0.55, 0.15) at 0.6 alpha premultiplies to more red than
-        // (0.85, 0.75, 0.2) at 0.35.
+        // The same yellow at 0.7 alpha paints more red than at 0.35.
         #expect(
             Self.pixel(of: withCurrent, x: row2.x, y: row2.y).r
                 > Self.pixel(of: withCurrent, x: row1.x, y: row1.y).r,

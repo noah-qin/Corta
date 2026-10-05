@@ -68,6 +68,57 @@ nonisolated extension Theme.Variant {
     }
 }
 
+/// The colours a variant does not name but the renderer paints: highlights
+/// and rules over the text. Derived, so a light theme gets a selection
+/// chosen for a light background and a custom theme needs no extra keys
+/// (`docs/CONFIGURATION.md` §4, "Derived colours").
+nonisolated struct OverlayColors: Equatable, Sendable {
+    var selection: SIMD4<Float>
+    var searchMatch: SIMD4<Float>
+    var currentSearchMatch: SIMD4<Float>
+    var linkUnderline: SIMD4<Float>
+    var markSucceeded: SIMD4<Float>
+    var markFailed: SIMD4<Float>
+    var markInterrupted: SIMD4<Float>
+}
+
+nonisolated extension Theme.Variant {
+    /// Translucent fills sit under the glyph, so the text keeps its own
+    /// colour; the alphas are what keeps it readable over them.
+    ///
+    /// - selection: blue (`ansi4`) moved 40% of the way to the foreground,
+    ///   at 40% — pure blue at Corta's dark background barely showed (a
+    ///   1.2:1 contrast), and a step towards the text colour lifts it on a
+    ///   dark theme and keeps it light on a light one
+    /// - search match: yellow (`ansi3`) at 35%; the current match at 55%
+    /// - hovered-link underline: cyan (`ansi6`), opaque
+    /// - prompt marks: green (`ansi2`) at 85% for success, red (`ansi1`) at
+    ///   90% for failure, and the midpoint of foreground and background at
+    ///   90% for an interrupted command (exit 130) — neither outcome.
+    ///
+    /// Only the normal eight: Solarized's bright slots are its grey base
+    /// tones, not brighter hues.
+    var overlayColors: OverlayColors {
+        func slot(_ index: Int, alpha: Float) -> SIMD4<Float> {
+            var color = index < ansi.count ? ansi[index] : foreground
+            color.w = alpha
+            return color
+        }
+        var selection = slot(4, alpha: 1) * 0.6 + foreground * 0.4
+        selection.w = 0.4
+        var neutral = (foreground + background) / 2
+        neutral.w = 0.9
+        return OverlayColors(
+            selection: selection,
+            searchMatch: slot(3, alpha: 0.35),
+            currentSearchMatch: slot(3, alpha: 0.55),
+            linkUnderline: slot(6, alpha: 1),
+            markSucceeded: slot(2, alpha: 0.85),
+            markFailed: slot(1, alpha: 0.9),
+            markInterrupted: neutral)
+    }
+}
+
 /// 8-bit sRGB, opaque.
 private nonisolated func rgb(_ r: UInt8, _ g: UInt8, _ b: UInt8) -> SIMD4<Float> {
     SIMD4<Float>(Float(r) / 255, Float(g) / 255, Float(b) / 255, 1)

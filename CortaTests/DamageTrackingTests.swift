@@ -69,10 +69,15 @@ import Testing
                 }
             }
         }
-        renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: true, selection: nil)
+        var cursorVisible = true
+        renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: cursorVisible, selection: nil)
         for step in 0..<300 {
             var text = ""
-            switch generator.next() % 4 {
+            switch generator.next() % 5 {
+            case 4:  // A cursor that blinks, changes shape, or jumps (#125).
+                text = ["\u{1B}[2 q", "\u{1B}[6 q", "\u{1B}[1 q", ""][Int(generator.next() % 4)]
+                    + "\u{1B}[\(generator.next() % 12 + 1);\(generator.next() % 40 + 1)H"
+                cursorVisible = generator.next() % 3 != 0
             case 0:  // An edit on one row.
                 text = "\u{1B}[\(generator.next() % 12 + 1);\(generator.next() % 30 + 1)H"
                 for _ in 0..<(generator.next() % 8) { text += pieces[Int(generator.next() % 8)] }
@@ -87,10 +92,10 @@ import Testing
                 }
             }
             terminal.feed(Array(text.utf8))
-            renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: true, selection: nil)
+            renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: cursorVisible, selection: nil)
             let incremental = flatten(renderer.cachedInstancesForTesting)
             renderer.invalidate()
-            renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: true, selection: nil)
+            renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: cursorVisible, selection: nil)
             let full = flatten(renderer.cachedInstancesForTesting)
             #expect(incremental == full, "step \(step)")
             if incremental != full { return }
@@ -127,17 +132,41 @@ import Testing
         #expect(renderer.lastRebuiltRowCount == 0)
     }
 
+    /// A bar or underline cursor is an overlay quad: CUP moves it without
+    /// touching any line, so no rows rebuild, but the frame must still be
+    /// drawn.
     @Test func cursorMotionAloneRebuildsNoRowsButStillReportsDamage() throws {
+        let renderer = try #require(Self.makeRenderer())
+        var terminal = Terminal(rows: 4, columns: 10)
+        terminal.feed(Array("abc\u{1B}[6 q".utf8))
+        renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: true, selection: nil)
+
+        terminal.feed(Array("\u{1B}[3;5H".utf8))
+        #expect(renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: true, selection: nil))
+        #expect(renderer.lastRebuiltRowCount == 0)
+    }
+
+    /// A block cursor is part of its row (#125): a move rebuilds the row it
+    /// left and the row it entered, one each, and a move within a row that
+    /// row alone.
+    @Test func blockCursorMotionRebuildsTheRowItLeftAndTheRowItEntered() throws {
         let renderer = try #require(Self.makeRenderer())
         var terminal = Terminal(rows: 4, columns: 10)
         terminal.feed(Array("abc".utf8))
         renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: true, selection: nil)
 
-        // CUP moves the cursor without touching any line: no rows rebuild,
-        // but the frame must still be drawn (the cursor quad moved).
         terminal.feed(Array("\u{1B}[3;5H".utf8))
         #expect(renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: true, selection: nil))
-        #expect(renderer.lastRebuiltRowCount == 0)
+        #expect(renderer.lastRebuiltRowCount == 2)
+
+        terminal.feed(Array("\u{1B}[3;1H".utf8))
+        #expect(renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: true, selection: nil))
+        #expect(renderer.lastRebuiltRowCount == 1)
+
+        // A blink phase is the same: the cursor's row, and nothing else.
+        #expect(renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil))
+        #expect(renderer.lastRebuiltRowCount == 1)
+        #expect(!renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil))
     }
 
     @Test func hiddenCursorChangesNothing() throws {
