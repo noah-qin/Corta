@@ -204,7 +204,7 @@ extension ViewController: NSMenuItemValidation {
     }
 
     private func writeHistory(_ text: String, run: Bool) -> Bool {
-        guard canChangeDirectorySafely,
+        guard commands.canChangeDirectorySafely,
             var bytes = Paste.historyBytes(for: text, bracketedPasteEnabled: bracketedPasteEnabled())
         else { return false }
         if run { bytes.append(0x0D) }
@@ -325,7 +325,7 @@ extension ViewController: NSMenuItemValidation {
         case #selector(jumpToPreviousFailedCommand(_:)),
             #selector(jumpToNextFailedCommand(_:)):
             return hasShellIntegration && hasFailedCommands
-        case #selector(copyLastCommandOutput(_:)), #selector(exportCommandOutput(_:)):
+        case #selector(copyLastCommandOutput(_:)):
             return commandOutputText(for: effectiveCommand) != nil
         case #selector(snapshotRunningCommandOutput(_:)):
             guard isOperable else { return false }
@@ -339,26 +339,9 @@ extension ViewController: NSMenuItemValidation {
         case #selector(clearScreen(_:)), #selector(clearHistory(_:)),
             #selector(resetTerminal(_:)):
             return validateTerminalStateItem(menuItem)
-        case #selector(exportText(_:)):
-            return isOperable
-        case #selector(revealWorkingDirectoryInFinder(_:)), #selector(copyWorkingDirectoryPath(_:)),
-            #selector(openParentDirectoryInNewPane(_:)):
-            return hasKnownWorkingDirectory
-        case #selector(changeDirectoryToParent(_:)):
-            // `shellDirectory` is nil exactly when there is no honest answer.
-            return shellDirectory != nil && canChangeDirectorySafely
-        // Not whether a root exists: finding one walks the path with a `stat`
-        // per level, and the path is the child's — `/net/<host>/…` mounts on
-        // first touch, and validation runs on the main thread each time a
-        // menu opens. The action looks, off the main thread, and says so
-        // when there is none.
-        case #selector(changeDirectoryToProjectRoot(_:)):
-            return hasKnownWorkingDirectory && canChangeDirectorySafely
-        case #selector(openProjectRootInNewPane(_:)):
-            return hasKnownWorkingDirectory
         default:
             // The actions the pane forwards are validated by their owner.
-            return remote.validateMenuItem(menuItem)
+            return remote.validateMenuItem(menuItem) && commands.validateMenuItem(menuItem)
         }
     }
 

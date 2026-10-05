@@ -23,10 +23,10 @@ import QuartzCore
 /// One pane: a `TerminalSession` and the renderer and view that draw it.
 /// Knows no sibling panes beyond `splitController` (D07). This file owns
 /// lifecycle and the session; the render loop is `PaneFrameLoop`'s, the
-/// window title `PaneWindowTitle`'s, search `PaneSearch`'s and the remote
-/// side `PaneRemote`'s, and the remaining behaviour lives in the
-/// `ViewController+<concern>.swift` extensions.
-class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost {
+/// window title `PaneWindowTitle`'s, search `PaneSearch`'s, the remote side
+/// `PaneRemote`'s and the menu commands `PaneCommands`', and the remaining
+/// behaviour lives in the `ViewController+<concern>.swift` extensions.
+class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneCommandsHost {
     // Not `private`: extensions reach these and cannot add storage.
     var terminalView: TerminalView!
     var terminalRenderer: TerminalRenderer!
@@ -46,7 +46,6 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost {
     /// `Configuration.systemFontFamily` means System Monospaced. Kept to tell a
     /// family swap from a size change.
     var fontFamily: String = Configuration.systemFontFamily
-    var pinchAccumulator: CGFloat = 0
     let taskNotifier = TaskNotifier()
     /// Terminal.app's stock profile, so TUIs keep the same proportions in both.
     static let defaultFontSize: CGFloat = 12
@@ -127,18 +126,11 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost {
     /// Whether this pane talks to another machine, Reconnect, remote
     /// references and the SFTP browser's entry.
     private(set) lazy var remote = PaneRemote(host: self)
+    /// Font size, copy and export, drops and Services, Finder actions and
+    /// app-initiated `cd`.
+    private(set) lazy var commands = PaneCommands(host: self)
     let inputSourceIndicator = PaneInputSourceIndicator()
 
-    /// An O(scrollback) copy/export build, off the interaction path. Cancelling
-    /// only stops its result being applied — the build runs to completion — and
-    /// `largeTextTaskGeneration` keeps a late one from clearing its successor.
-    var largeTextTask: Task<Void, Never>?
-    var largeTextTaskGeneration = 0
-    /// Test hook: a private pasteboard, so tests never touch the real one.
-    var pasteboardForTesting: NSPasteboard?
-    /// Test hook: holds the detached build, which has no scheduling barrier —
-    /// otherwise "not landed yet" depends on the scheduler.
-    var largeTextBuildGateForTesting: (@Sendable () -> Void)?
     /// The child sees the final size now, not after the debounce.
     func endLiveResize() {
         resizeDebouncer?.flush()
@@ -472,12 +464,12 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost {
         view.keybindings = {
             ConfigurationStore.shared.configuration.keybindings
         }
-        installNativeIntegrations(on: view)
+        commands.installNativeIntegrations(on: view)
         view.onMagnify = { [weak self] magnification in
-            self?.magnify(by: magnification)
+            self?.commands.magnify(by: magnification)
         }
         view.onMagnifyEnded = { [weak self] in
-            self?.endMagnification()
+            self?.commands.endMagnification()
         }
         view.onBackingScaleChange = { [weak self] scale in
             self?.rebuildAtlas(forBackingScale: scale)
@@ -573,8 +565,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost {
         inputSourceIndicator.stop()
         windowTitle.stop()
         search.close()
-        largeTextTask?.cancel()
-        largeTextTask = nil
+        commands.stop()
         taskNotifier.cancel()
         NotificationCenter.default.removeObserver(self)
         terminalView?.stopRendering()
@@ -754,6 +745,10 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost {
         session?.snapshot()
     }
 
+    func selectedText() -> String? {
+        commands.selectedText()
+    }
+
     // MARK: - Forwarding
 
     // Menu items, the palette and key bindings send their actions to the
@@ -763,6 +758,24 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost {
     @objc func performFindPanelAction(_ sender: Any?) { search.performFindPanelAction(sender) }
     @objc func reconnectRemote(_ sender: Any?) { remote.reconnectRemote(sender) }
     @objc func browseRemoteFiles(_ sender: Any?) { remote.browseRemoteFiles(sender) }
+    @objc func copy(_ sender: Any?) { commands.copy(sender) }
+    @objc func increaseFontSize(_ sender: Any?) { commands.increaseFontSize(sender) }
+    @objc func decreaseFontSize(_ sender: Any?) { commands.decreaseFontSize(sender) }
+    @objc func resetFontSize(_ sender: Any?) { commands.resetFontSize(sender) }
+    @objc func exportText(_ sender: Any?) { commands.exportText(sender) }
+    @objc func exportCommandOutput(_ sender: Any?) { commands.exportCommandOutput(sender) }
+    @objc func revealWorkingDirectoryInFinder(_ sender: Any?) {
+        commands.revealWorkingDirectoryInFinder(sender)
+    }
+    @objc func copyWorkingDirectoryPath(_ sender: Any?) { commands.copyWorkingDirectoryPath(sender) }
+    @objc func changeDirectoryToParent(_ sender: Any?) { commands.changeDirectoryToParent(sender) }
+    @objc func changeDirectoryToProjectRoot(_ sender: Any?) {
+        commands.changeDirectoryToProjectRoot(sender)
+    }
+    @objc func openParentDirectoryInNewPane(_ sender: Any?) {
+        commands.openParentDirectoryInNewPane(sender)
+    }
+    @objc func openProjectRootInNewPane(_ sender: Any?) { commands.openProjectRootInNewPane(sender) }
 
     func resizeSessionToFitView() {
         // Nothing reaches the child before `sizeSettled`: earlier layouts run at

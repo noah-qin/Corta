@@ -24,10 +24,10 @@ struct NativeIntegrationTests {
     @Test("pinch accumulation uses keyboard-sized steps and preserves remainder")
     func pinchSteps() {
         var accumulator: CGFloat = 0
-        #expect(ViewController.fontSizes(
+        #expect(PaneCommands.fontSizes(
             forMagnification: 0.14, accumulator: &accumulator, startingAt: 12).isEmpty)
         #expect(accumulator == 0.14)
-        #expect(ViewController.fontSizes(
+        #expect(PaneCommands.fontSizes(
             forMagnification: 0.31, accumulator: &accumulator, startingAt: 12) == [13, 14, 15])
         #expect(abs(accumulator) < 0.000_001)
     }
@@ -35,7 +35,7 @@ struct NativeIntegrationTests {
     @Test("pinch accumulation clamps and drops blocked remainder")
     func pinchClamp() {
         var accumulator: CGFloat = 0
-        #expect(ViewController.fontSizes(
+        #expect(PaneCommands.fontSizes(
             forMagnification: 0.45, accumulator: &accumulator, startingAt: 63) == [64])
         #expect(accumulator == 0)
     }
@@ -71,11 +71,11 @@ struct NativeIntegrationTests {
 
     @Test("dropped shell paths quote metacharacters, apostrophes and backslashes")
     func shellQuoting() {
-        #expect(ViewController.shellQuoted("/tmp/plain-file") == "/tmp/plain-file")
-        #expect(ViewController.shellQuoted("/tmp/a b") == "'/tmp/a b'")
-        #expect(ViewController.shellQuoted("/tmp/a'b") == #"'/tmp/a'"'"'b'"#)
-        #expect(ViewController.shellQuoted(#"/tmp/a\b"#) == #"'/tmp/a'"\\"'b'"#)
-        #expect(ViewController.shellQuoted("/tmp/$(touch hacked)") == "'/tmp/$(touch hacked)'")
+        #expect(PaneCommands.shellQuoted("/tmp/plain-file") == "/tmp/plain-file")
+        #expect(PaneCommands.shellQuoted("/tmp/a b") == "'/tmp/a b'")
+        #expect(PaneCommands.shellQuoted("/tmp/a'b") == #"'/tmp/a'"'"'b'"#)
+        #expect(PaneCommands.shellQuoted(#"/tmp/a\b"#) == #"'/tmp/a'"\\"'b'"#)
+        #expect(PaneCommands.shellQuoted("/tmp/$(touch hacked)") == "'/tmp/$(touch hacked)'")
     }
 
     /// The quoting is read by whatever shell the pane runs. fish's single
@@ -97,7 +97,7 @@ struct NativeIntegrationTests {
         for name in names {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: shell)
-            let script = "printf '%s\\n' " + ViewController.shellQuoted(name)
+            let script = "printf '%s\\n' " + PaneCommands.shellQuoted(name)
             process.arguments = (shell.hasSuffix("fish") ? ["--no-config"] : []) + ["-c", script]
             let output = Pipe()
             process.standardOutput = output
@@ -113,14 +113,14 @@ struct NativeIntegrationTests {
     func dropTextSanitisesControls() {
         // ESC and the other C0 controls are stripped before quoting, and a
         // path reduced to nothing is left out of the run entirely.
-        #expect(ViewController.quotedDropText(["/tmp/a\u{1B}[2Jb"]) == "'/tmp/a[2Jb'")
-        #expect(ViewController.quotedDropText(["\u{7}", "/tmp/ok"]) == "/tmp/ok")
+        #expect(PaneCommands.quotedDropText(["/tmp/a\u{1B}[2Jb"]) == "'/tmp/a[2Jb'")
+        #expect(PaneCommands.quotedDropText(["\u{7}", "/tmp/ok"]) == "/tmp/ok")
     }
 
     @Test("a newline in a dropped filename stays inside the quotes")
     func dropTextQuotesNewline() {
         // Inside single quotes a newline is a literal character, not an
         // executed line; the paste-path newline warning covers the rest.
-        #expect(ViewController.quotedDropText(["/tmp/a\nb"]) == "'/tmp/a\nb'")
+        #expect(PaneCommands.quotedDropText(["/tmp/a\nb"]) == "'/tmp/a\nb'")
     }
 }

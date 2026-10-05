@@ -159,7 +159,7 @@ struct MenuShortcutTests {
         // instead of installing terminalView. Menu construction needs no GPU.
         let terminalView = TerminalView(frame: .zero)
         for config in [original, rebound] {
-            let menu = pane.contextMenu(for: terminalView, bindings: config.keybindings)
+            let menu = pane.commands.contextMenu(bindings: config.keybindings)
             for command in commands {
                 let item = try #require(menu.items.first { $0.action == command.action })
                 #expect(item.keyEquivalent == (config.keybindings[command]?.menuKeyEquivalent ?? ""))
@@ -175,6 +175,6 @@ struct MenuShortcutTests {
         }
         #expect(claims.count == 1)
         #expect(claims.first?.path == "View > Smaller")
-        #expect(claims.first?.item.action == #selector(ViewController.decreaseFontSize(_:)))
+        #expect(claims.first?.item.action == #selector(PaneCommands.decreaseFontSize(_:)))
     }
 }

@@ -284,7 +284,7 @@ struct RemotePaneIsolationTests {
         // directory navigation offers nothing rather than a `cd` into a
         // path on another machine.
         #expect(pane.remote.state == .local)
-        #expect(pane.shellDirectory == nil)
+        #expect(pane.commands.shellDirectory == nil)
         #expect(!pane.windowTitle.composed.contains("⟂"))
     }
 

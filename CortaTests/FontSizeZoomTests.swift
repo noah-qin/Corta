@@ -52,17 +52,17 @@ struct FontSizeZoomTests {
         split.viewDidAppear()
         let frame = window.frame
         let oldColumns = pane.gridSize(fitting: pane.view.bounds.size).columns
-        pane.increaseFontSize(nil)
+        pane.commands.increaseFontSize(nil)
         #expect(window.frame == frame)
         #expect(!pane.windowTitle.composed.contains("×"))
         #expect(pane.gridSize(fitting: pane.view.bounds.size).columns < oldColumns)
-        pane.resetFontSize(nil)
+        pane.commands.resetFontSize(nil)
         #expect(window.frame == frame)
-        pane.increaseFontSize(nil)
+        pane.commands.increaseFontSize(nil)
         split.splitRight(nil)
         #expect(split.panes.allSatisfy { $0.fontSize == pane.fontSize && $0.isFontSizeZoomed })
         let splitFrame = window.frame
-        pane.increaseFontSize(nil)
+        pane.commands.increaseFontSize(nil)
         #expect(window.frame == splitFrame)
         #expect(split.panes.allSatisfy { $0.fontSize == pane.fontSize })
     }
@@ -72,8 +72,8 @@ struct FontSizeZoomTests {
         defer { split.teardown() }
         let pane = try #require(split.focusedPane)
         let before = ConfigurationStore.shared.configuration
-        pane.increaseFontSize(nil)
-        pane.increaseFontSize(nil)
+        pane.commands.increaseFontSize(nil)
+        pane.commands.increaseFontSize(nil)
         #expect(pane.isFontSizeZoomed)
         #expect(ConfigurationStore.shared.configuration == before)
     }
@@ -89,7 +89,7 @@ struct FontSizeZoomTests {
         let paneB = try #require(splitB.focusedPane)
         let originalA = paneA.fontSize
         let originalB = paneB.fontSize
-        paneA.increaseFontSize(nil)
+        paneA.commands.increaseFontSize(nil)
         #expect(paneA.fontSize == originalA + 1)
         #expect(paneB.fontSize == originalB)
         #expect(!paneB.isFontSizeZoomed)
@@ -99,10 +99,10 @@ struct FontSizeZoomTests {
         let (split, _) = makeSplit()
         defer { split.teardown() }
         let pane = try #require(split.focusedPane)
-        pane.increaseFontSize(nil)
-        pane.increaseFontSize(nil)
+        pane.commands.increaseFontSize(nil)
+        pane.commands.increaseFontSize(nil)
         #expect(pane.isFontSizeZoomed)
-        pane.resetFontSize(nil)
+        pane.commands.resetFontSize(nil)
         #expect(!pane.isFontSizeZoomed)
         #expect(pane.fontSize == CGFloat(ConfigurationStore.shared.configuration.fontSize))
     }

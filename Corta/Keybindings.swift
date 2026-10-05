@@ -312,11 +312,11 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .equalizePanes: return #selector(SplitViewController.equalizePanes(_:))
         case .zoomPane: return #selector(SplitViewController.toggleZoomPane(_:))
         case .reopenClosedPane: return #selector(SplitViewController.reopenClosedPane(_:))
-        case .increaseFontSize: return #selector(ViewController.increaseFontSize(_:))
-        case .decreaseFontSize: return #selector(ViewController.decreaseFontSize(_:))
-        case .resetFontSize: return #selector(ViewController.resetFontSize(_:))
+        case .increaseFontSize: return #selector(PaneCommands.increaseFontSize(_:))
+        case .decreaseFontSize: return #selector(PaneCommands.decreaseFontSize(_:))
+        case .resetFontSize: return #selector(PaneCommands.resetFontSize(_:))
         case .find: return #selector(PaneSearch.performFindPanelAction(_:))
-        case .copy: return #selector(ViewController.copy(_:))
+        case .copy: return #selector(PaneCommands.copy(_:))
         case .paste: return #selector(ViewController.paste(_:))
         case .selectAll: return #selector(NSResponder.selectAll(_:))
         case .scrollPageUp: return #selector(ViewController.scrollHistoryPageUp(_:))
@@ -332,23 +332,23 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
             return #selector(ViewController.copyLastCommandOutput(_:))
         case .snapshotRunningCommandOutput:
             return #selector(ViewController.snapshotRunningCommandOutput(_:))
-        case .exportCommandOutput: return #selector(ViewController.exportCommandOutput(_:))
+        case .exportCommandOutput: return #selector(PaneCommands.exportCommandOutput(_:))
         case .openFileReferenceInCommand:
             return #selector(ViewController.openFileReferenceInCommand(_:))
         case .revealWorkingDirectory:
-            return #selector(ViewController.revealWorkingDirectoryInFinder(_:))
+            return #selector(PaneCommands.revealWorkingDirectoryInFinder(_:))
         case .copyWorkingDirectoryPath:
-            return #selector(ViewController.copyWorkingDirectoryPath(_:))
+            return #selector(PaneCommands.copyWorkingDirectoryPath(_:))
         case .changeDirectoryToParent:
-            return #selector(ViewController.changeDirectoryToParent(_:))
+            return #selector(PaneCommands.changeDirectoryToParent(_:))
         case .changeDirectoryToProjectRoot:
-            return #selector(ViewController.changeDirectoryToProjectRoot(_:))
+            return #selector(PaneCommands.changeDirectoryToProjectRoot(_:))
         case .openParentDirectoryInNewPane:
-            return #selector(ViewController.openParentDirectoryInNewPane(_:))
+            return #selector(PaneCommands.openParentDirectoryInNewPane(_:))
         case .openProjectRootInNewPane:
-            return #selector(ViewController.openProjectRootInNewPane(_:))
+            return #selector(PaneCommands.openProjectRootInNewPane(_:))
         case .searchCommandHistory: return #selector(ViewController.searchCommandHistory(_:))
-        case .exportText: return #selector(ViewController.exportText(_:))
+        case .exportText: return #selector(PaneCommands.exportText(_:))
         case .clearScreen: return #selector(ViewController.clearScreen(_:))
         case .clearHistory: return #selector(ViewController.clearHistory(_:))
         case .resetTerminal: return #selector(ViewController.resetTerminal(_:))

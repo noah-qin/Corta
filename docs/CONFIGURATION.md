@@ -197,7 +197,7 @@ this history already local — `OSC 7`'s own host check
 .currentDirectory` ever reports it, so nothing here can rank a path that
 belongs to a different machine.
 
-An app-initiated directory change (`ViewController.changeDirectory(to:)`)
+An app-initiated directory change (`PaneCommands.changeDirectory(to:)`)
 writes `cd '<path>'` to the child only when
 `ViewController.canChangeDirectorySafely` holds: shell integration is
 active, no command is currently running, and the cursor is still exactly

@@ -78,7 +78,7 @@ struct SFTPBrowserWiringTests {
         let browse = try #require(
             actions.firstIndex(of: #selector(PaneRemote.browseRemoteFiles(_:))))
         let directories = try #require(
-            actions.firstIndex(of: #selector(ViewController.revealWorkingDirectoryInFinder(_:))))
+            actions.firstIndex(of: #selector(PaneCommands.revealWorkingDirectoryInFinder(_:))))
         let state = try #require(
             actions.firstIndex(of: #selector(ViewController.clearScreen(_:))))
         // In the directory-navigation group: after those, before the state
