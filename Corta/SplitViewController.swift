@@ -598,17 +598,21 @@ final class SplitViewController: NSViewController {
 
     /// ⌘= / ⌘- / ⌘0 apply to every pane: they share the window's resize
     /// increments and minimum size, derived from one cell geometry.
-    func setFontSizeForAllPanes(_ size: CGFloat, isZoomed: Bool) {
+    /// Each pane refits its own grid (`ViewController.setFontSize`); with
+    /// one pane the window is also fitted to whole cells, with several the
+    /// frames stay. `settle: false` is a pinch still in progress.
+    func setFontSizeForAllPanes(_ size: CGFloat, isZoomed: Bool, settle: Bool = true) {
         for pane in panes {
-            pane.setFontSize(size)
+            pane.setFontSize(size, settle: settle)
             // On every pane, so each pane's `configurationChanged` agrees.
             pane.isFontSizeZoomed = isZoomed
         }
-        if hasMultiplePanes {
-            // No window size keeps every grid intact; keep the frames and refit each
-            // grid instead of the single-pane window re-fit.
-            for pane in panes { pane.resizeSessionToFitView(coalesce: false) }
-        }
+        updateWindowMinSize()
+    }
+
+    /// The end of a pinch: every pane's grid and the window settle at once.
+    func settleFontChangeForAllPanes() {
+        for pane in panes { pane.settleFontChange() }
         updateWindowMinSize()
     }
 

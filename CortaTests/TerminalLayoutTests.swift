@@ -104,6 +104,12 @@ struct GridCellCountTests {
         #expect(ViewController.cellCount(1) == 1)
     }
 
+    /// A pane fitted to whole cells can measure a rounding error short.
+    @Test func aHairShortOfACellCountsIt() {
+        #expect(ViewController.cellCount(79.9995) == 80)
+        #expect(ViewController.cellCount(79.99) == 79)
+    }
+
     @Test func belowOneCellReadsAsOne() {
         #expect(ViewController.cellCount(0.2) == 1)
         #expect(ViewController.cellCount(-40) == 1)

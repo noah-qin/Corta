@@ -37,7 +37,9 @@ protocol PaneCommandsHost: AnyObject {
     var remote: PaneRemote { get }
     var fontSize: CGFloat { get }
     var isFontSizeZoomed: Bool { get set }
-    func setFontSize(_ newSize: CGFloat)
+    func setFontSize(_ newSize: CGFloat, settle: Bool)
+    /// Ends a gesture's run of unsettled font sizes.
+    func settleFontChange()
     func selectionRange(for selection: TerminalSelection, in grid: Grid) -> SelectionRange
     /// Input addressed to the live screen brings the viewport back to it.
     func returnToBottomOnInput()
@@ -49,8 +51,9 @@ protocol PaneCommandsHost: AnyObject {
 /// context menu: font size and pinch, copy and export, drops, Services and
 /// Look Up, the Finder actions and app-initiated `cd`.
 ///
-/// Its actions reach it through the pane's
-/// `supplementalTarget(forAction:sender:)`, and it validates its own items.
+/// The pane forwards each action from an `@objc` method of the same name,
+/// and its `validateMenuItem` asks this one for the items it owns; a new
+/// action here needs its forwarder there.
 final class PaneCommands: NSObject, NSMenuItemValidation {
     weak var host: PaneCommandsHost?
 
@@ -66,6 +69,8 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     var largeTextBuildGateForTesting: (@Sendable () -> Void)?
     /// Pinch magnification not yet spent on a whole point.
     private var pinchAccumulator: CGFloat = 0
+    /// The current pinch changed the size, so its end settles the window.
+    private var pinchChangedSize = false
 
     init(host: PaneCommandsHost? = nil) {
         self.host = host
@@ -115,30 +120,34 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     /// (`SplitViewController.setFontSizeForAllPanes`).
     @objc func increaseFontSize(_ sender: Any?) {
         guard let host else { return }
-        applyFontSizeForAllPanes(host.fontSize + 1, isZoomed: true)
+        applyFontSizeForAllPanes(host.fontSize + 1, isZoomed: true, settle: true)
     }
 
     @objc func decreaseFontSize(_ sender: Any?) {
         guard let host else { return }
-        applyFontSizeForAllPanes(host.fontSize - 1, isZoomed: true)
+        applyFontSizeForAllPanes(host.fontSize - 1, isZoomed: true, settle: true)
     }
 
     /// Ends the zoom at the config file's current size, as a new window would
     /// open.
     @objc func resetFontSize(_ sender: Any?) {
         let configured = CGFloat(ConfigurationStore.shared.configuration.fontSize)
-        applyFontSizeForAllPanes(configured, isZoomed: false)
+        applyFontSizeForAllPanes(configured, isZoomed: false, settle: true)
     }
 
     /// Pinch zoom, spent one whole point at a time so it lands on ⌘+/⌘−'s
-    /// steps: each size is an atlas rebuild.
+    /// steps: each size is an atlas rebuild. The grid follows through the
+    /// drag debounce and the window is fitted once, when the pinch ends.
     func magnify(by magnification: CGFloat) {
         guard let host else { return }
         let sizes = Self.fontSizes(
             forMagnification: magnification,
             accumulator: &pinchAccumulator,
             startingAt: host.fontSize)
-        for size in sizes { applyFontSizeForAllPanes(size, isZoomed: true) }
+        for size in sizes {
+            applyFontSizeForAllPanes(size, isZoomed: true, settle: false)
+            pinchChangedSize = true
+        }
     }
 
     /// The pure step accumulator, for tests.
@@ -167,9 +176,16 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         return sizes
     }
 
-    /// The next pinch starts from zero.
+    /// The next pinch starts from zero; this one's size settles.
     func endMagnification() {
         pinchAccumulator = 0
+        guard pinchChangedSize, let host else { return }
+        pinchChangedSize = false
+        if let splitController = host.splitController {
+            splitController.settleFontChangeForAllPanes()
+        } else {
+            host.settleFontChange()
+        }
     }
 
     /// A zoom is a per-window size that never touches the config file:
@@ -177,12 +193,12 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     /// config change. `configurationChanged` skips the size while
     /// `isFontSizeZoomed`, and `resetFontSize` ends it. New panes inherit the
     /// window's temporary zoom.
-    private func applyFontSizeForAllPanes(_ newSize: CGFloat, isZoomed: Bool) {
+    private func applyFontSizeForAllPanes(_ newSize: CGFloat, isZoomed: Bool, settle: Bool) {
         guard let host else { return }
         if let splitController = host.splitController {
-            splitController.setFontSizeForAllPanes(newSize, isZoomed: isZoomed)
+            splitController.setFontSizeForAllPanes(newSize, isZoomed: isZoomed, settle: settle)
         } else {
-            host.setFontSize(newSize)
+            host.setFontSize(newSize, settle: settle)
             host.isFontSizeZoomed = isZoomed
         }
     }

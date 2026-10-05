@@ -431,7 +431,7 @@ event monitor makes that easy to get wrong:
   dropped; the tail of a burst is searched once the sweep lands.
 - **The bar keeps off what it searches.** It sits top-right and moves to
   the bottom-right while the cursor or the current match would be under it
-  (`placeSearchBarClearOfContent`, on output, scroll, layout and match
+  (`PaneSearch.placeClearOfContent`, on output, scroll, layout and match
   changes — a few rect tests, only while a bar is open); its field narrows
   with a split pane instead of the bar covering the pane.
 - **Closing restores the text, not the row count.**

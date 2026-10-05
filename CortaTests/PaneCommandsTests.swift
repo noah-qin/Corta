@@ -42,7 +42,12 @@ private final class CommandsTestHost: PaneCommandsHost {
     private(set) var pastes: [String] = []
     private(set) lazy var commands = PaneCommands(host: self)
 
-    func setFontSize(_ newSize: CGFloat) { fontSize = min(64, max(8, newSize)) }
+    private(set) var settles = 0
+    func setFontSize(_ newSize: CGFloat, settle: Bool) {
+        fontSize = min(64, max(8, newSize))
+        if settle { settles += 1 }
+    }
+    func settleFontChange() { settles += 1 }
     func selectionRange(for selection: TerminalSelection, in grid: Grid) -> SelectionRange {
         SelectionRange(
             start: SelectionPoint(row: selection.start.row, column: selection.start.column),
@@ -71,16 +76,23 @@ struct PaneCommandsTests {
         #expect(!host.isFontSizeZoomed)
     }
 
-    @Test("a pinch is spent a whole point at a time, and a new one starts from zero")
+    @Test("a pinch is spent a whole point at a time, settles once at its end, and a new one starts from zero")
     func pinchSteps() {
         let host = CommandsTestHost()
         host.commands.magnify(by: 0.1)
         #expect(host.fontSize == 12)
         host.commands.magnify(by: 0.1)
-        #expect(host.fontSize == 13)
+        host.commands.magnify(by: 0.3)
+        #expect(host.fontSize == 15)
+        // The steps refit without settling; the window waits for the end.
+        #expect(host.settles == 0)
         host.commands.endMagnification()
+        #expect(host.settles == 1)
         host.commands.magnify(by: 0.1)
-        #expect(host.fontSize == 13)
+        #expect(host.fontSize == 15)
+        // A pinch that changed nothing settles nothing.
+        host.commands.endMagnification()
+        #expect(host.settles == 1)
     }
 
     @Test("the context menu sends copy here and paste and select-all to the pane")
