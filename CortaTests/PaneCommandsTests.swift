@@ -39,7 +39,6 @@ private final class CommandsTestHost: PaneCommandsHost {
     let remote = PaneRemote()
     var fontSize: CGFloat = 12
     var isFontSizeZoomed = false
-    private(set) var pastes: [String] = []
     private(set) lazy var commands = PaneCommands(host: self)
 
     private(set) var settles = 0
@@ -49,7 +48,8 @@ private final class CommandsTestHost: PaneCommandsHost {
     }
     func settleFontChange() { settles += 1 }
     let pointer = PanePointer()
-    func sendPaste(_ sanitized: String) { pastes.append(sanitized) }
+    private(set) var redraws = 0
+    func invalidateDisplay() { redraws += 1 }
 }
 
 /// Font size, the context menu, the `cd` gate and the menu items, against
@@ -118,12 +118,19 @@ struct PaneCommandsTests {
         }
     }
 
-    @Test("Services text goes down the paste path, sanitised")
-    func servicesInsertIsAPaste() {
+    @Test("a failed pane greys Clear and Reset, and they leave it alone")
+    func failedPaneHasNothingToClear() {
         let host = CommandsTestHost()
-        // No session: nothing to paste into.
-        host.commands.insertAsPaste("ls")
-        #expect(host.pastes.isEmpty)
+        host.scrollOffset = 3
+        for action in [
+            #selector(PaneCommands.clearScreen(_:)), #selector(PaneCommands.clearHistory(_:)),
+            #selector(PaneCommands.resetTerminal(_:)),
+        ] {
+            let item = NSMenuItem(title: "", action: action, keyEquivalent: "")
+            #expect(!host.commands.validateMenuItem(item), "\(action)")
+        }
+        host.commands.clearScreen(nil)
+        #expect(host.scrollOffset == 3)
     }
 
     @Test("the pane answers the menu commands and validates them as its commands do")

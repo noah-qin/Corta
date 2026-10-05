@@ -80,7 +80,7 @@ struct SFTPBrowserWiringTests {
         let directories = try #require(
             actions.firstIndex(of: #selector(PaneCommands.revealWorkingDirectoryInFinder(_:))))
         let state = try #require(
-            actions.firstIndex(of: #selector(ViewController.clearScreen(_:))))
+            actions.firstIndex(of: #selector(PaneCommands.clearScreen(_:))))
         // In the directory-navigation group: after those, before the state
         // commands, within the same separator-delimited run.
         #expect(browse > directories && browse < state)

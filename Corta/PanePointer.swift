@@ -634,7 +634,7 @@ final class PanePointer: NSObject {
     /// The return-to-bottom affordance, reachable three ways: the pill, the
     /// Scroll to Bottom command, and — because a person who has scrolled up
     /// and starts typing means to be at the prompt — the next keystroke
-    /// (`ViewController+Input`'s existing behaviour, unchanged).
+    /// (`returnToBottomOnInput`).
     func returnToBottom() {
         scroll(.toBottom)
     }

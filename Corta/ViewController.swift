@@ -21,13 +21,13 @@ import Metal
 import QuartzCore
 
 /// One pane: a `TerminalSession` and the renderer and view that draw it.
-/// Knows no sibling panes beyond `splitController` (D07). This file owns
-/// lifecycle and the session; the render loop is `PaneFrameLoop`'s, the
-/// window title `PaneWindowTitle`'s, search `PaneSearch`'s, the remote side
-/// `PaneRemote`'s and the menu commands `PaneCommands`', and the remaining
-/// behaviour lives in the `ViewController+<concern>.swift` extensions.
+/// Knows no sibling panes beyond `splitController` (D07). The pane keeps
+/// the session, the view, the renderer, sizing, teardown and the wiring
+/// between them; each other concern is a collaborator it composes
+/// (`docs/DESIGN.md` §4.1), and new behaviour is added as one.
 class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneCommandsHost,
-    PaneFocusHost, PanePointerHost, PaneShellIntegrationHost, NSMenuItemValidation
+    PaneFocusHost, PanePointerHost, PaneShellIntegrationHost, PaneAppearanceHost,
+    NSMenuItemValidation
 {
     // Not `private`: extensions reach these and cannot add storage.
     var terminalView: TerminalView!
@@ -114,6 +114,9 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// OSC 133's jumps, command output, history fill, the status marks and
     /// directory completion, and the OSC 52 drain.
     private(set) lazy var shell = PaneShellIntegration(host: self)
+    /// The configuration file and the live appearance followed, and the
+    /// font's size, family and backing scale applied.
+    private(set) lazy var appearance = PaneAppearance(host: self)
     let inputSourceIndicator = PaneInputSourceIndicator()
 
     /// The child sees the final size now, not after the debounce.
@@ -349,7 +352,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         if !didInstallObservers {
             didInstallObservers = true
             focus.observeWindows()
-            observeConfiguration()
+            appearance.observe()
         }
         let generation = frameLoop.attach(session: session, renderer: terminalRenderer)
         let wake = frameLoop.outputWake
@@ -422,13 +425,13 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             self?.commands.endMagnification()
         }
         view.onBackingScaleChange = { [weak self] scale in
-            self?.rebuildAtlas(forBackingScale: scale)
+            self?.appearance.rebuildAtlas(forBackingScale: scale)
         }
         view.onDrawableSizeChange = { [weak self] in
             self?.invalidateDisplay()
         }
         view.onPaste = { [weak self] in
-            self?.pasteFromClipboard()
+            self?.commands.pasteFromClipboard()
         }
         view.onSearchKey = { [weak self] (event: NSEvent) -> Bool in
             self?.search.handleKey(event) ?? false
@@ -513,7 +516,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         search.close()
         commands.stop()
         taskNotifier.cancel()
-        NotificationCenter.default.removeObserver(self)
+        appearance.stop()
         terminalView?.stopRendering()
         session?.stop()
     }
@@ -676,6 +679,12 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         commands.selectedText()
     }
 
+    func setFontSize(_ newSize: CGFloat, settle: Bool = true) {
+        appearance.setFontSize(newSize, settle: settle)
+    }
+
+    func settleFontChange() { appearance.settleFontChange() }
+
     /// What copy, export and open-reference act on (`PaneShellIntegration`).
     var effectiveCommand: CommandRecord? { shell.effectiveCommand }
 
@@ -707,13 +716,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// Every owner of an item's action gets its say; one that does not own
     /// it answers yes.
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        if let action = menuItem.action,
-            [#selector(clearScreen(_:)), #selector(clearHistory(_:)), #selector(resetTerminal(_:))]
-                .contains(action)
-        {
-            return validateTerminalStateItem(menuItem)
-        }
-        return actionOwners.allSatisfy {
+        actionOwners.allSatisfy {
             ($0 as? NSMenuItemValidation)?.validateMenuItem(menuItem) ?? true
         }
     }
