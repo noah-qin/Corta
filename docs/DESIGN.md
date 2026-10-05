@@ -233,13 +233,15 @@ the forwarding between them.
 | `PaneRemote`      | Whether the pane talks to another machine (`PaneRemoteState`, with the report tracker both the title and one-off questions read through), Reconnect and its wording, `path:line` references resolved on the remote host and opened as managed copies, and the SFTP browser's entry and its menu gate. Reaches the pane through `PaneRemoteHost` |
 | `PaneCommands`    | The menu and context-menu commands: font size and pinch zoom, copy and export (one cancellable large-text task between them), drops, Services and Look Up, the Finder actions, and app-initiated `cd` with its safety gate. Reaches the pane through `PaneCommandsHost` |
 
-A collaborator that owns menu actions implements them, and the pane
-forwards each from an `@objc` method of the same name: menu items, the
-palette and key bindings send to the first responder, and the pane is the
-object in that chain. Its `validateMenuItem` asks the owner the same way.
-Not `supplementalTarget(forAction:sender:)`: an item whose target is the
-pane by name never consults it, and AppKit sends the action to the pane
-anyway.
+A collaborator that owns menu actions implements them as `@objc`
+methods, and the pane answers for them through the Objective-C runtime:
+`responds(to:)` says yes for a selector a collaborator's class implements,
+and `forwardingTarget(for:)` hands the message on, so menu items, the
+palette, key bindings and the storyboard reach the owner whether they
+target the first responder or the pane by name. The pane's
+`validateMenuItem` asks the owners the same way. Not
+`supplementalTarget(forAction:sender:)`: an item whose target is the pane
+by name never consults it.
 
 ---
 

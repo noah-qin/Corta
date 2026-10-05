@@ -154,5 +154,10 @@ struct PaneCommandsTests {
         ] {
             #expect(pane.responds(to: action), "\(action)")
         }
+        // Sent to the pane by name, as a menu item with a target or the
+        // palette does, the action runs on its owner.
+        let size = pane.fontSize
+        #expect(NSApp.sendAction(#selector(PaneCommands.increaseFontSize(_:)), to: pane, from: nil))
+        #expect(pane.fontSize == size + 1)
     }
 }

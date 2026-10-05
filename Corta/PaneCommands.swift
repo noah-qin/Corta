@@ -51,9 +51,8 @@ protocol PaneCommandsHost: AnyObject {
 /// context menu: font size and pinch, copy and export, drops, Services and
 /// Look Up, the Finder actions and app-initiated `cd`.
 ///
-/// The pane forwards each action from an `@objc` method of the same name,
-/// and its `validateMenuItem` asks this one for the items it owns; a new
-/// action here needs its forwarder there.
+/// The pane forwards its actions here (`ViewController.forwardingTarget`),
+/// and its `validateMenuItem` asks this one for the items it owns.
 final class PaneCommands: NSObject, NSMenuItemValidation {
     weak var host: PaneCommandsHost?
 

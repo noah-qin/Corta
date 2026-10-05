@@ -685,31 +685,38 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
 
     // MARK: - Forwarding
 
-    // Menu items, the palette and key bindings send their actions to the
-    // first responder, and the pane is in its chain; the pane answers for
-    // the collaborator that owns each one, and `validateMenuItem` asks it.
+    /// Menu items, the palette, key bindings and the storyboard send their
+    /// actions to the first responder or to the pane by name; the pane
+    /// answers for the collaborator that implements each, through the
+    /// Objective-C runtime's forwarding, and `validateMenuItem` asks it too.
+    /// A collaborator's new `@objc` action needs nothing here.
+    private var actionOwners: [NSObject] { [search, remote, commands] }
+    /// The same owners as classes, for a question that may come from any
+    /// thread and so must not touch the instances.
+    nonisolated private static let actionOwnerClasses: [NSObject.Type] = [
+        PaneSearch.self, PaneRemote.self, PaneCommands.self,
+    ]
 
-    @objc func performFindPanelAction(_ sender: Any?) { search.performFindPanelAction(sender) }
-    @objc func reconnectRemote(_ sender: Any?) { remote.reconnectRemote(sender) }
-    @objc func browseRemoteFiles(_ sender: Any?) { remote.browseRemoteFiles(sender) }
-    @objc func copy(_ sender: Any?) { commands.copy(sender) }
-    @objc func increaseFontSize(_ sender: Any?) { commands.increaseFontSize(sender) }
-    @objc func decreaseFontSize(_ sender: Any?) { commands.decreaseFontSize(sender) }
-    @objc func resetFontSize(_ sender: Any?) { commands.resetFontSize(sender) }
-    @objc func exportText(_ sender: Any?) { commands.exportText(sender) }
-    @objc func exportCommandOutput(_ sender: Any?) { commands.exportCommandOutput(sender) }
-    @objc func revealWorkingDirectoryInFinder(_ sender: Any?) {
-        commands.revealWorkingDirectoryInFinder(sender)
+    nonisolated override func responds(to aSelector: Selector!) -> Bool {
+        if super.responds(to: aSelector) { return true }
+        guard let aSelector else { return false }
+        return Self.actionOwnerClasses.contains { $0.instancesRespond(to: aSelector) }
     }
-    @objc func copyWorkingDirectoryPath(_ sender: Any?) { commands.copyWorkingDirectoryPath(sender) }
-    @objc func changeDirectoryToParent(_ sender: Any?) { commands.changeDirectoryToParent(sender) }
-    @objc func changeDirectoryToProjectRoot(_ sender: Any?) {
-        commands.changeDirectoryToProjectRoot(sender)
+
+    /// Only what the pane itself does not answer: `NSObject`'s and
+    /// `NSResponder`'s own selectors stay the pane's. Actions are sent on the
+    /// main thread.
+    nonisolated override func forwardingTarget(for aSelector: Selector!) -> Any? {
+        guard let aSelector, Thread.isMainThread else {
+            return super.forwardingTarget(for: aSelector)
+        }
+        // Handed straight back to the runtime on this thread.
+        nonisolated(unsafe) var owner: NSObject?
+        MainActor.assumeIsolated {
+            owner = actionOwners.first { $0.responds(to: aSelector) }
+        }
+        return owner ?? super.forwardingTarget(for: aSelector)
     }
-    @objc func openParentDirectoryInNewPane(_ sender: Any?) {
-        commands.openParentDirectoryInNewPane(sender)
-    }
-    @objc func openProjectRootInNewPane(_ sender: Any?) { commands.openProjectRootInNewPane(sender) }
 
     /// `coalesce: false` delivers the size now: a font change is one step,
     /// and waiting out the drag debounce drew a frame of the new font over
