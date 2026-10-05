@@ -822,7 +822,14 @@ class ViewController: NSViewController {
         // The title shows the live size, as Terminal.app does.
         if isFocusedPane {
             invalidateProcessFacts()
-            noteTransientSizeChange()
+            // Zoom changes the grid, but only a physical window drag needs
+            // a temporary size label in the title and native tab.
+            if view.inLiveResize { noteTransientSizeChange() }
+            else {
+                transientSizeReset?.cancel()
+                transientSizeReset = nil
+                isShowingTransientSize = false
+            }
             applyWindowTitle()
         }
     }
@@ -884,8 +891,9 @@ class ViewController: NSViewController {
     /// path here to offer a drag of.
     func applyWindowTitle() {
         guard let window = view.window else { return }
-        let title = composedWindowTitle
+        let title = (window.windowController as? TerminalWindowController)?.customTabTitle ?? composedWindowTitle
         if window.title != title { window.title = title }
+        (window.windowController as? TerminalWindowController)?.refreshTabTitle()
 
         if window.representedURL != representedDirectory {
             window.representedURL = representedDirectory

@@ -19,6 +19,9 @@ repository root.
 | `theme-editor.png`        | Theme draft with dark/light variants, color wells, HEX fields and a local preview |
 | `system-status-bar-zh-Hans.png` | Compact status bar with Simplified Chinese UI from a disposable shell |
 | `system-status-bar.png`   | Optional local metrics from a disposable UI-test shell |
+| `inline-tab-rename.png` | Borderless rename selection centered over a native tab title |
+| `input-source-capsule.png` | Full-height input-source capsule without nested toolbar chrome |
+| `table-borders.png` | Connected borders around Latin/CJK text and VS16 emoji, with native tabs, from the isolated #213 UI fixture |
 | `settings.png`              | The Settings window, Appearance page                             |
 | `shortcuts.png`             | Keyboard Shortcuts with aligned bindings and grouped sections    |
 | `about.png`                 | About with separated links (development build)                   |

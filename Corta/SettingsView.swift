@@ -201,6 +201,7 @@ struct SettingsView: View {
                     }
                 }
                 .onChange(of: model.theme) { _, value in model.setTheme(value) }
+                .accessibilityIdentifier("appearance-theme")
             }
             HStack {
                 Button(L10n.text("theme.create")) {

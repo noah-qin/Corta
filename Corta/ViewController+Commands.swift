@@ -40,10 +40,12 @@ extension ViewController {
         item(.copy, self, enabled: selection != nil)
         item(.paste, self)
         item(.selectAll, self)
+        item(.newTab, NSApp.delegate)
         if let splitController {
             menu.addItem(.separator())
             item(.splitRight, splitController)
             item(.splitDown, splitController)
+            item(.renameTab, splitController)
             let closeTitle = L10n.text(splitController.hasMultiplePanes ? "menu.closePane" : "menu.closeWindow")
             item(.close, splitController, title: closeTitle)
         }
@@ -110,8 +112,7 @@ extension ViewController {
     /// A per-window size that never touches the config file: writing the
     /// global default would resize every window on the next config change.
     /// `configurationChanged` skips the size while `isFontSizeZoomed`, and
-    /// `resetFontSize` ends it. A pane split off a zoomed window opens at the
-    /// configured size.
+    /// `resetFontSize` ends it. New panes inherit the window's temporary zoom.
     private func zoomFontSizeForAllPanes(to newSize: CGFloat) {
         applyFontSizeForAllPanes(newSize, isZoomed: true)
     }
@@ -142,8 +143,8 @@ extension ViewController {
         invalidateDisplay()
     }
 
-    /// Re-points the renderer at a new size. One pane keeps its grid and
-    /// resizes the window; with splits the grids refit instead.
+    /// Re-points the renderer while retaining the window frame. All font
+    /// changes refit the grid, including settings and temporary zoom.
     func setFontSize(_ newSize: CGFloat) {
         // A failed pane has no renderer; its retry builds one at the
         // configured size.
@@ -167,24 +168,14 @@ extension ViewController {
         window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
         // With splits no window size keeps every grid; the caller refits.
         guard splitController?.hasMultiplePanes != true else {
+            resizeSessionToFitView()
             invalidateDisplay()
             return
         }
         window.contentMinSize = NSSize(
             width: CGFloat(minimumColumns) * metrics.cellWidth + TerminalLayout.insetWidth,
             height: CGFloat(minimumRows) * metrics.cellHeight + verticalInsets + (splitController?.statusBarHeight ?? 0))
-        // Keep the child's rows × columns and resize the window around it.
-        guard let gridSize = lastRequestedSize else { return }
-        // Grow from the top-left as Terminal.app does, keeping the text still,
-        // clamped to the screen.
-        let topLeft = NSPoint(x: window.frame.minX, y: window.frame.maxY)
-        window.setContentSize(NSSize(
-            width: CGFloat(gridSize.columns) * metrics.cellWidth + TerminalLayout.insetWidth,
-            height: CGFloat(gridSize.rows) * metrics.cellHeight + verticalInsets + (splitController?.statusBarHeight ?? 0)))
-        var frame = window.frame
-        frame.origin.y = topLeft.y - frame.height
-        frame.origin.x = topLeft.x
-        window.setFrame(window.constrainFrameRect(frame, to: window.screen), display: true)
+        resizeSessionToFitView()
         invalidateDisplay()
     }
 }

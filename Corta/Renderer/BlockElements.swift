@@ -89,3 +89,72 @@ nonisolated enum BlockElements {
         }
     }
 }
+
+
+/// Common light/heavy table borders are pixel-aligned strokes that reach
+/// their cell edges. Font bearings and fallback advances cannot open gaps.
+nonisolated enum BoxDrawing {
+    struct Pieces: RandomAccessCollection {
+        private var storage = InlineArray<4, SIMD4<Float>>(repeating: .zero)
+        private(set) var endIndex = 0
+        var startIndex: Int { 0 }
+        subscript(position: Int) -> SIMD4<Float> { storage[position] }
+        mutating func append(_ rect: SIMD4<Float>) {
+            storage[endIndex] = rect
+            endIndex += 1
+        }
+    }
+
+    static func pieces(for scalar: UInt32, width: Float, height: Float, scale: Float) -> Pieces? {
+        // left, right, up, down. The common solid U+2500–U+254B
+        // characters encode each arm as absent/light/heavy.
+        let arms: UInt8
+        switch scalar {
+        case 0x2500: arms = 0x05
+        case 0x2501: arms = 0x0A
+        case 0x2502: arms = 0x50
+        case 0x2503: arms = 0xA0
+        case 0x250C...0x254B:
+            // Four two-bit arm weights, from Unicode's character names.
+            let values: InlineArray<64, UInt8> = [
+                0x44,0x48,0x84,0x88, 0x41,0x42,0x81,0x82,
+                0x14,0x18,0x24,0x28, 0x11,0x12,0x21,0x22,
+                0x54,0x58,0x64,0x94,0xA4,0x68,0x98,0xA8,
+                0x51,0x52,0x61,0x91,0xA1,0x62,0x92,0xA2,
+                0x45,0x46,0x49,0x4A,0x85,0x86,0x89,0x8A,
+                0x15,0x16,0x19,0x1A,0x25,0x26,0x29,0x2A,
+                0x55,0x56,0x59,0x5A,0x65,0x95,0xA5,0x66,
+                0x69,0x96,0x99,0x6A,0x9A,0xA6,0xA9,0xAA
+            ]
+            arms = values[Int(scalar - 0x250C)]
+        case 0x2574...0x2577: arms = UInt8(1 << ((scalar - 0x2574) * 2))
+        case 0x2578...0x257B: arms = UInt8(2 << ((scalar - 0x2578) * 2))
+        case 0x257C: arms = 0x09
+        case 0x257D: arms = 0x90
+        case 0x257E: arms = 0x06
+        case 0x257F: arms = 0x60
+        default: return nil
+        }
+        var pieces = Pieces()
+        let light = max(1, scale.rounded(.down))
+        // Every arm extends into the centre by half the heavier stroke,
+        // so mixed-weight junctions join without a hole.
+        let overlap = light
+        for direction in 0..<4 {
+            let weight = (arms >> (direction * 2)) & 3
+            guard weight != 0 else { continue }
+            let thickness = min(min(width, height), light * Float(weight))
+            let x = ((width - thickness) / 2).rounded(.down)
+            let y = ((height - thickness) / 2).rounded(.down)
+            switch direction {
+            case 0: pieces.append(.init(0, y, min(width, width / 2 + overlap), thickness))
+            case 1: pieces.append(.init(max(0, width / 2 - overlap), y,
+                                       width - max(0, width / 2 - overlap), thickness))
+            case 2: pieces.append(.init(x, 0, thickness, min(height, height / 2 + overlap)))
+            default: pieces.append(.init(x, max(0, height / 2 - overlap), thickness,
+                                         height - max(0, height / 2 - overlap)))
+            }
+        }
+        return pieces
+    }
+}

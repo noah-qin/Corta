@@ -134,6 +134,25 @@ tests is caught on every run — without anything being driven. Neither CI
 nor an offscreen rendering test replaces launching the app.
 `CortaPerformanceTests` is listed the same way, for the same reason.
 
+### Terminal feedback regression (#213)
+
+The UI runner is sandboxed; Corta and its spawn helper cannot reliably use
+fixtures inside that runner's container. Prepare a disposable shared stage
+before running the tab, font and appearance regression:
+
+```sh
+TASK_STAGE=$(CortaUITests/stage-feedback-ui.sh)
+TEST_RUNNER_CORTA_FEEDBACK_STAGE="$TASK_STAGE" xcodebuild test \
+  -project Corta.xcodeproj -scheme Corta -testPlan UI \
+  -only-testing:CortaUITests/SearchAndTabUITests/testFeedbackAppearanceTabsAndFontSize
+```
+
+The test checks the actual configuration write and dark/light pixels, not
+only whether clicking a menu succeeded. It also verifies in-place tab
+rename, Escape cancellation, tab shortcuts, right-click New Tab and theme
+preview. Without the shared stage it reports a skip with the setup reason.
+Remove the printed stage after the development app has exited.
+
 ### Measuring the render loop
 
 A render-loop change records a new frame-CPU baseline (`DECISIONS.md`

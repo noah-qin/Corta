@@ -80,13 +80,18 @@ extension ViewController {
     func handleLinkHover(_ event: NSEvent, in terminalView: TerminalView) {
         // The underline must mean "this will open".
         let armed = opensLinksOnPlainClick || event.modifierFlags.contains(.command)
-        if armed, session != nil, let link = linkUnder(event, in: terminalView) {
-            if !hoveringLink {
+        if session != nil, let link = linkUnder(event, in: terminalView) {
+            if armed, !hoveringLink {
                 NSCursor.pointingHand.set()
                 hoveringLink = true
+            } else if !armed, hoveringLink {
+                NSCursor.arrow.set()
+                hoveringLink = false
             }
-            if terminalView.toolTip != link.url { terminalView.toolTip = link.url }
-            setHoveredLink(link.range)
+            let tip = opensLinksOnPlainClick
+                ? link.url : L10n.format("link.commandClick", link.url)
+            if terminalView.toolTip != tip { terminalView.toolTip = tip }
+            setHoveredLink(armed ? link.range : nil)
         } else if armed, session != nil,
             let reference = fileReferenceUnder(event, in: terminalView)
         {
@@ -131,9 +136,9 @@ extension ViewController {
         }
     }
 
-    private func setHoveredLink(_ range: SelectionRange) {
+    private func setHoveredLink(_ range: SelectionRange?) {
         guard session != nil else { return }
-        let highlight = TerminalSelection(range, grid: session.snapshot())
+        let highlight = range.map { TerminalSelection($0, grid: session.snapshot()) }
         guard !Self.sameRange(hoveredLink, highlight) else { return }
         hoveredLink = highlight
         invalidateDisplay()

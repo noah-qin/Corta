@@ -144,3 +144,51 @@ struct WideWriteTests {
         #expect(grid[0, 1].scalar == 0x61)
     }
 }
+
+
+struct EmojiPresentationWidthTests {
+    @Test func claudeTableEmojiBordersStayInTheSameColumn() {
+        for emoji in ["✅", "❌", "⚠️", "👨‍👩‍👧", "🇨🇳"] {
+            var terminal = Terminal(rows: 2, columns: 20)
+            terminal.feed(Array("│  \(emoji)  │".utf8))
+            #expect(terminal.grid[0, 7].scalar == 0x2502, "border shifted after \(emoji)")
+        }
+    }
+
+    @Test func aSelectorArrivingInAnotherReadStillWidensTheCluster() {
+        var terminal = Terminal(rows: 2, columns: 10)
+        terminal.feed(Array("⚠".utf8))
+        #expect(terminal.grid.cursor.column == 1)
+        terminal.feed(Array("️X".utf8))
+        #expect(terminal.grid[0, 0].attributes.contains(.wide))
+        #expect(terminal.grid[0, 1].attributes.contains(.wideSpacer))
+        #expect(terminal.grid[0, 2].scalar == 0x58)
+    }
+
+    @Test func wideningAtTheRightMarginMovesTheWholeCluster() {
+        var terminal = Terminal(rows: 3, columns: 4)
+        terminal.feed(Array("abc⚠️X".utf8))
+        #expect(terminal.grid[0, 3].scalar == 0x20)
+        #expect(terminal.grid[1, 0].scalar == 0x26A0)
+        #expect(terminal.grid[1, 0].attributes.contains(.wide))
+        #expect(terminal.grid[1, 1].attributes.contains(.wideSpacer))
+        #expect(terminal.grid[1, 2].scalar == 0x58)
+        #expect(terminal.grid.documentLine(0).wrapped)
+    }
+
+    @Test func unrelatedLettersAndTextPresentationStayNarrow() {
+        for text in ["A️X", "⚠︎X", "⚠X"] {
+            var terminal = Terminal(rows: 1, columns: 6)
+            terminal.feed(Array(text.utf8))
+            #expect(!terminal.grid[0, 0].attributes.contains(.wide))
+            #expect(terminal.grid[0, 1].scalar == 0x58)
+        }
+    }
+
+    @Test func aOneColumnGridNeverCreatesAnOrphanSpacer() {
+        var terminal = Terminal(rows: 2, columns: 1)
+        terminal.feed(Array("⚠️".utf8))
+        #expect(!terminal.grid[0, 0].attributes.contains(.wide))
+        #expect(!terminal.grid[0, 0].attributes.contains(.wideSpacer))
+    }
+}

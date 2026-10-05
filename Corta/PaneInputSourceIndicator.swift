@@ -89,7 +89,7 @@ import CortaTerminal
         }
         if configuration.inputSourceIndicatorPosition == .toolbar {
             view.update(source: source, configuration: configuration)
-            view.frame = CGRect(x: 0, y: 0, width: 28, height: 18)
+            view.frame = CGRect(x: 0, y: 0, width: 28, height: 24)
             view.isHidden = false
             placement.reset()
             return
@@ -176,6 +176,7 @@ nonisolated struct InputSourceIndicatorPlacement {
 
     override func layout() {
         super.layout()
+        layer?.cornerRadius = configuration.inputSourceIndicatorPosition == .toolbar ? bounds.height / 2 : 4
         let height = min(bounds.height, label.intrinsicContentSize.height)
         label.frame = CGRect(x: 0, y: (bounds.height - height) / 2, width: bounds.width, height: height)
     }

@@ -73,6 +73,56 @@ struct BlockElementRenderTests {
         #expect(left + right == total)
     }
 
+    /// These are the exact kinds of borders in the Claude Code reproducer.
+    /// A font glyph can have the right advance yet leave a gap at every cell.
+    @Test func tableBordersMeetAtEveryCellBoundary() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        for size: CGFloat in [12, 17] {
+            for scale: CGFloat in [1, 2] {
+                let renderer = try TerminalRenderer(device: device,
+                    font: TerminalFont.primary(ofSize: size), scale: scale)
+                var terminal = Terminal(rows: 3, columns: 5)
+                terminal.feed(Array("\u{1B}[37m┌───┐\r\n│   │\r\n└───┘".utf8))
+                let w = Int(renderer.metrics.cellWidth), h = Int(renderer.metrics.cellHeight)
+                let texture = MetalRenderTarget.make(device: device, width: 5 * w, height: 3 * h)
+                renderer.renderAndWait(grid: terminal.grid,
+                    rect: CGRect(x: 0, y: 0, width: 5*w, height: 3*h),
+                    drawableSize: CGSize(width: 5*w, height: 3*h), cursorVisible: false,
+                    selection: nil, target: texture)
+                var bytes = [UInt8](repeating: 0, count: 5*w*3*h*4)
+                texture.getBytes(&bytes, bytesPerRow: 5*w*4,
+                    from: MTLRegionMake2D(0, 0, 5*w, 3*h), mipmapLevel: 0)
+                let stroke = max(1, Int(scale))
+                let midX = (w-stroke)/2, midY = (h-stroke)/2
+                func ink(_ x: Int, _ y: Int) -> Bool {
+                    let i = (y*5*w+x)*4
+                    return Int(bytes[i])+Int(bytes[i+1])+Int(bytes[i+2]) > 100
+                }
+                for x in midX..<(4*w+midX) {
+                    #expect(ink(x, midY), "top border gap at \(x), size \(size), scale \(scale)")
+                    #expect(ink(x, 2*h+midY), "bottom border gap at \(x)")
+                }
+                for y in midY..<(2*h+midY) {
+                    #expect(ink(midX, y), "left border gap at \(y)")
+                    #expect(ink(4*w+midX, y), "right border gap at \(y)")
+                }
+            }
+        }
+    }
+
+    @Test func faintTableStrokeHasUniformColorAcrossItsJunction() throws {
+        let (_, _, _, optionalTexture) = try Self.render("\u{1B}[2m─")
+        let texture = try #require(optionalTexture)
+        let width = texture.width, height = texture.height
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        texture.getBytes(&pixels, bytesPerRow: width * 4,
+            from: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)
+        let y = (height - 1) / 2
+        for channel in 0..<3 {
+            #expect(pixels[(y * width) * 4 + channel] == pixels[(y * width + width / 2) * 4 + channel])
+        }
+    }
+
     /// Renders one cell holding `character` in (255,140,0) and reports how
     /// many pixels have ink, the cell's pixel count, its average colour, and
     /// the texture itself, so a failing test can attach it.

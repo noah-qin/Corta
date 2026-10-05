@@ -50,6 +50,8 @@ installed when you say so.
 | To… | Use |
 | --- | --- |
 | Open a window / a tab | ⌘N / ⌘T |
+| Previous / next tab | ⇧⌘[ / ⇧⌘] |
+| Rename the current tab | Double-click the tab title, or right-click ▸ Rename Tab… |
 | Split the pane to the right / downwards | ⌘D / ⇧⌘D |
 | Move focus between panes | ⌥⌘ + arrow key |
 | Resize the focused pane | ⌃⌘ + arrow key |
@@ -58,6 +60,10 @@ installed when you say so.
 | Close the pane, tab or window | ⌘W |
 | Put back the pane you just closed | ⇧⌘T |
 
+- Rename a tab directly in its title: double-click, or choose Rename Tab…
+  from its right-click menu. Return saves, Esc cancels, and an empty name
+  restores the automatic title. Custom names survive shell output and session
+  restoration. The tab and terminal right-click menus also offer New Tab.
 - **Zoom Pane** is temporary: nothing closes and no process is disturbed.
 - **Reopen Closed Pane** restores the pane's place, size and working
   directory — not the program that was running in it.
@@ -79,8 +85,8 @@ installed when you say so.
   family names migrate to the system face.
 - **Zoom.** ⌘= / ⌘− / ⌘0 or a pinch make the text bigger, smaller or
   the configured size again, in the current window only. Zoom never
-  changes the config file.
-- **Theme.** One theme, `corta`, with a light and a dark variant;
+  changes the config file. Font changes keep the window size and refit the visible rows and columns.
+- **Theme.** Three built-in themes, `corta`, `solarized` and `mono`, each with light and dark variants;
   `appearance = auto` follows macOS as it switches. You can define your
   own theme through **View ▸ Theme editor…** or in the config file, or inherit
   from one and change a few
@@ -88,9 +94,8 @@ installed when you say so.
 - **Unicode.** Chinese, Japanese and Korean text takes two columns and
   lines up with everything else; emoji, combining marks, flags and emoji
   sequences are one cluster each. Characters the font lacks come from the
-  system's fallback fonts. An emoji that `wcwidth` counts as one column
-  (a text character followed by the emoji selector, like ✍️) draws at full
-  size into a blank cell after it.
+  system's fallback fonts. Standardized emoji presentation sequences (a text character followed
+  by VS16, like ⚠️ or ✍️) take two columns; text presentation stays narrow.
 - **Input methods.** Pinyin, Kana, Hangul and every other macOS input
   method compose in place, with the candidate window beside the cursor.
 - **True colour.** 24-bit colour, the 256-colour palette, bold, italic,
@@ -234,7 +239,7 @@ they appear in a published release. macOS 26+ and Apple silicon are required.
 
 ## Links and file references
 
-- **URLs** open with ⌘-click; set `link-activation = click` to open them
+- **URLs** show their target and the ⌘-click instruction on hover, and open with ⌘-click; set `link-activation = click` to open them
   with a plain click instead. Hold ⌘ over a link — including one a program
   marks explicitly (OSC 8, as `ls --hyperlink` prints) — to underline it
   and see its real target as a tooltip before you click; the click itself
