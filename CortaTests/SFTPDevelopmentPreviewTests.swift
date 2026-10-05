@@ -16,7 +16,7 @@
 
 #if DEBUG
 import Testing
-import CortaTerminal
+import CortaSFTP
 @testable import Corta
 
 @MainActor

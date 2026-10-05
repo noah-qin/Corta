@@ -27,6 +27,7 @@ let package = Package(
     platforms: [.macOS("26.0")],
     products: [
         .library(name: "CortaTerminal", targets: ["CortaTerminal"]),
+        .library(name: "CortaSFTP", targets: ["CortaSFTP"]),
         .executable(name: "corta-dump", targets: ["corta-dump"]),
         .executable(name: "corta-bench", targets: ["corta-bench"]),
         .executable(name: "corta-exec", targets: ["corta-exec"]),
@@ -37,6 +38,15 @@ let package = Package(
     targets: [
         .target(
             name: "CortaTerminal",
+            swiftSettings: [.defaultIsolation(nil)]
+        ),
+        // The SFTP client, spoken to `ssh -s … sftp` over pipes. A sibling of
+        // the core, not part of it: the terminal never needs it, the app
+        // imports the two separately, and neither depends on the other — a
+        // dependency would make Xcode link the core twice and turn it into
+        // an embedded dynamic framework. `ModuleBoundaryTests` keep it so.
+        .target(
+            name: "CortaSFTP",
             swiftSettings: [.defaultIsolation(nil)]
         ),
         // The spawn helper `Spawn.swift` posix_spawns and then execve's over
@@ -113,6 +123,11 @@ let package = Package(
             // directory through `#filePath`, so they are neither compiled
             // nor copied into a bundle.
             exclude: ["Golden"],
+            swiftSettings: [.defaultIsolation(nil)]
+        ),
+        .testTarget(
+            name: "CortaSFTPTests",
+            dependencies: ["CortaSFTP"],
             swiftSettings: [.defaultIsolation(nil)]
         ),
     ]

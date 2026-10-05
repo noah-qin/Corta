@@ -13,6 +13,10 @@ local SwiftPM dependency of the app with default actor isolation
 disabled, because the reader thread, the parser and the grid run off the
 main thread (`docs/DECISIONS.md` D04).
 
+File transfer is not here. The SFTP client is `CortaSFTP`, a sibling
+library in the same package that the app imports on its own; the core
+does not import it, and it does not import the core.
+
 Every byte from the child is hostile (`docs/SECURITY.md` §1). The parser
 caps every input it accumulates, drops unknown sequences cleanly, and
 never writes stream-supplied text back to the child. The fuzz harness

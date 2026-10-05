@@ -13,6 +13,7 @@
 		A1C0A003030465E2000E8DD20 /* AppIconDev.icon in Resources */ = {isa = PBXBuildFile; fileRef = A1C0A002030465E2000E8DD20 /* AppIconDev.icon */; };
 		C07A000130465E2000E8DD20 /* CortaTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000530465E2000E8DD20 /* CortaTerminal */; };
 		C07A000230465E2000E8DD20 /* CortaTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000630465E2000E8DD20 /* CortaTerminal */; };
+		C07A001030465E2000E8DD20 /* CortaSFTP in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000A30465E2000E8DD20 /* CortaSFTP */; };
 		C07A000830465E2000E8DD20 /* corta-exec in Embed corta-exec */ = {isa = PBXBuildFile; productRef = C07A000730465E2000E8DD20 /* corta-exec */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		5B0E0C1D30465E2000E8DD20 /* CortaTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = 5B0E0C1C30465E2000E8DD20 /* CortaTerminal */; };
 /* End PBXBuildFile section */
@@ -96,6 +97,7 @@
 				4F9658043049C77E005C56CD /* Sparkle in Frameworks */,
 				4F2E2B293047183A0037705B /* corta-exec in Frameworks */,
 				C07A000130465E2000E8DD20 /* CortaTerminal in Frameworks */,
+				C07A001030465E2000E8DD20 /* CortaSFTP in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -172,6 +174,7 @@
 			name = Corta;
 			packageProductDependencies = (
 				C07A000530465E2000E8DD20 /* CortaTerminal */,
+				C07A000A30465E2000E8DD20 /* CortaSFTP */,
 				C07A000730465E2000E8DD20 /* corta-exec */,
 				4F9658033049C77E005C56CD /* Sparkle */,
 			);
@@ -992,6 +995,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C07A000430465E2000E8DD20 /* XCLocalSwiftPackageReference "CortaTerminal" */;
 			productName = CortaTerminal;
+		};
+		C07A000A30465E2000E8DD20 /* CortaSFTP */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C07A000430465E2000E8DD20 /* XCLocalSwiftPackageReference "CortaTerminal" */;
+			productName = CortaSFTP;
 		};
 		C07A000730465E2000E8DD20 /* corta-exec */ = {
 			isa = XCSwiftPackageProductDependency;

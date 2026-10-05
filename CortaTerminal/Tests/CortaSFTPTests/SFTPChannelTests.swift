@@ -17,7 +17,7 @@
 import Foundation
 import Testing
 
-@testable import CortaTerminal
+@testable import CortaSFTP
 
 /// The subprocess channel's pure policy: argv shape and exit
 /// classification. Nothing here spawns a process; the channel's real

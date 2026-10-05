@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Cocoa
+import CortaSFTP
 import CortaTerminal
 import UserNotifications
 

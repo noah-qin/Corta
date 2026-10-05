@@ -16,7 +16,7 @@
 
 #if DEBUG
 import Foundation
-import CortaTerminal
+import CortaSFTP
 
 /// Read-only fixtures for the real browser. Never opens a channel or local file.
 nonisolated final class SFTPPreviewClient: SFTPClient {

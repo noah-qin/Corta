@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import CortaSFTP
 import CortaTerminal
 import Foundation
 
@@ -22,14 +23,17 @@ import Foundation
 /// argv — a verification hook (like `CORTA_MAX_DRAWABLES`) for driving the real
 /// flow against a local `sftp-server` without a network or sshd. Read once
 /// from the environment; relative values are ignored (no `PATH` search,
-/// `SFTPChannel.swift`).
+/// `SFTPChannel.swift`). Either way the child gets the same sanitised
+/// environment as a shell (`ChildEnvironment`).
 extension SFTPConnection {
     static func forApp(host: String) -> SFTPConnection {
+        let environment = ChildEnvironment.default()
         if let override = ProcessInfo.processInfo.environment["CORTA_SFTP_SSH"],
             override.hasPrefix("/")
         {
-            return SFTPConnection(host: host, sshExecutable: override)
+            return SFTPConnection(
+                host: host, sshExecutable: override, environment: environment)
         }
-        return SFTPConnection(host: host)
+        return SFTPConnection(host: host, environment: environment)
     }
 }

@@ -33,7 +33,10 @@ swift test --package-path CortaTerminal --filter GoldenTests
 ```
 
 Tests use Swift Testing in
-[`CortaTerminal/Tests/CortaTerminalTests`](../CortaTerminal/Tests/CortaTerminalTests/).
+[`CortaTerminal/Tests/CortaTerminalTests`](../CortaTerminal/Tests/CortaTerminalTests/);
+the SFTP client's, with their in-memory server (`SFTPTestSupport`), are in
+[`CortaTerminal/Tests/CortaSFTPTests`](../CortaTerminal/Tests/CortaSFTPTests/).
+`swift test` runs both.
 Keep regressions beside the subsystem they exercise. Name a test after the
 observable behaviour, derive expected results from the specification or a
 reproducer, and keep inputs as small as possible. Preserve the original

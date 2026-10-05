@@ -201,13 +201,21 @@ four reasons and what it would have bought.
 | `Scrollback`        | `CortaTerminal`                      | nonisolated | Ring buffer of variable-length lines                 |
 | `TerminalSession`   | `CortaTerminal`                      | nonisolated | Owns PTY + Parser + Grid; the unit a split renders   |
 | `PTY`, `corta-exec` | `CortaTerminal`                      | nonisolated | Spawn, read/write, winsize, child lifecycle          |
-| `SFTP`              | `CortaTerminal/…/SFTP/`              | nonisolated | The SFTP protocol over the system `ssh`, no SSH library (§7.9) |
+| `CortaSFTP`         | `CortaTerminal/Sources/CortaSFTP/`   | nonisolated | The SFTP protocol over the system `ssh`, no SSH library (§7.9); a sibling library, not part of the core |
 | Renderer            | `Corta/Renderer/`                    | nonisolated | `TerminalRenderer`, `Metal4Backend` (the only GPU backend: one render pass per frame, D21), `QuadPipelineCache`, `GlyphAtlas`, `KittyImageRenderer`; draws a session into a rect, driven from the display link |
 | Font stack          | `Corta/Renderer/`                    | nonisolated | `TerminalFont`, `MonospacedFontCatalog`, `CellMetrics`: Core Text shaping, fallback, verification, the ASCII fast path |
 | Shell               | `Corta/`                             | MainActor   | Windows, tabs, the split tree, key bindings, IME, settings, shell integration, remote context |
 
-`CortaTerminal` must not import AppKit or Metal (`PackageIsolationTests`
-and `ModuleBoundaryTests` hold that line).
+`CortaTerminal` is the terminal core — PTY, parser, grid, selection,
+search, shell integration — and nothing else. `CortaSFTP` sits beside it
+in the same package: the app imports the two separately, and neither
+imports the other. A dependency either way would put the core into the app
+through two products, which Xcode resolves by linking it twice over; the
+one piece of descriptor machinery both need (`GuardedDescriptor`) is a
+byte-for-byte copy instead, held equal by `SharedSourceTests`, and the ssh
+child's environment is passed in by the app (the core's
+`ChildEnvironment`). Neither library may import AppKit or Metal
+(`PackageIsolationTests` and `ModuleBoundaryTests` hold those lines).
 
 ---
 
@@ -447,7 +455,7 @@ The record: [history/2026-09-11-B06-CONFORMANCE-GAPS.md](history/2026-09-11-B06-
 A file-transfer feature wants
 libssh2 or a Swift SSH stack; Corta has neither and adds no dependency.
 The engine speaks the SFTPv3 wire protocol itself
-(`CortaTerminal/Sources/CortaTerminal/SFTP/`) over a channel that is
+(`CortaTerminal/Sources/CortaSFTP/`) over a channel that is
 simply the system's `ssh -s -- <host> sftp` subprocess with **plain
 pipes** — a PTY would corrupt binary frames — so authentication, host
 keys, `ProxyJump` and every `~/.ssh/config` behavior stay with OpenSSH,
