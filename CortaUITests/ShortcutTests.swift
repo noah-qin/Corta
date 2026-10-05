@@ -107,20 +107,6 @@ final class ShortcutTests: XCTestCase {
         }
     }
 
-    /// Polls the window's width: `NSPredicate` expectations evaluate against
-    /// a cached snapshot and never see the resize.
-    @MainActor
-    private func waitForWidth(
-        _ app: XCUIApplication, _ predicate: (CGFloat) -> Bool, _ what: String
-    ) {
-        let deadline = Date().addingTimeInterval(5)
-        while Date() < deadline {
-            if predicate(app.windows.firstMatch.frame.width) { return }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        }
-        XCTFail("window width did not change: \(what) (now \(app.windows.firstMatch.frame.width))")
-    }
-
     @MainActor
     private func clickViewMenuItem(_ app: XCUIApplication, _ title: String) {
         let viewMenu = app.menuBars.firstMatch.menuBarItems["View"]
@@ -132,8 +118,13 @@ final class ShortcutTests: XCTestCase {
         item.click()
     }
 
+    /// A font change keeps the window where it is: the top edge stays and
+    /// the size moves by less than a cell, so the new grid fills it
+    /// (`SplitViewController.fitWindowToWholeCells`). Smaller and Actual
+    /// Size land on the frame the window opened at, whole cells of the
+    /// configured font.
     @MainActor
-    func testFontSizeShortcutsResizeTheWindowAroundTheGrid() throws {
+    func testFontSizeShortcutsFitTheWindowInPlace() throws {
         let app = XCUIApplication()
         // Session restore would otherwise carry the previous
         // test's windows into this one; the suite asserts window counts.
@@ -141,18 +132,45 @@ final class ShortcutTests: XCTestCase {
         app.launch()
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 5))
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        let original = window.frame
 
-        let original = window.frame.width
-        // Same column count at a bigger cell: the window gets wider.
         app.typeKey("=", modifierFlags: .command)
-        waitForWidth(app, { $0 > original }, "⌘= should widen the window")
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        let zoomed = window.frame
+        assertFittedInPlace(zoomed, from: original, "⌘=")
 
         clickViewMenuItem(app, "Smaller")
-        waitForWidth(app, { $0 == original }, "Smaller should restore the width")
+        waitForFrame(app, original, "Smaller should land on the frame the window opened at")
 
         clickViewMenuItem(app, "Bigger")
-        waitForWidth(app, { $0 > original }, "Bigger should widen the window again")
+        waitForFrame(app, zoomed, "Bigger should land on the same frame as ⌘= did")
         clickViewMenuItem(app, "Actual Size")
-        waitForWidth(app, { $0 == original }, "Actual Size should restore the default size")
+        waitForFrame(app, original, "Actual Size should land on the frame the window opened at")
+    }
+
+    /// Less than a cell either way, top edge fixed. A cell at the sizes
+    /// these tests use is under 20pt in both directions.
+    @MainActor
+    private func assertFittedInPlace(
+        _ frame: CGRect, from original: CGRect, _ what: String,
+        file: StaticString = #filePath, line: UInt = #line
+    ) {
+        XCTAssertEqual(frame.minY, original.minY, accuracy: 0.5, "\(what) moved the top edge", file: file, line: line)
+        XCTAssertEqual(frame.minX, original.minX, accuracy: 0.5, "\(what) moved the left edge", file: file, line: line)
+        XCTAssertLessThan(abs(frame.width - original.width), 20, "\(what): \(frame) vs \(original)", file: file, line: line)
+        XCTAssertLessThan(abs(frame.height - original.height), 20, "\(what): \(frame) vs \(original)", file: file, line: line)
+    }
+
+    /// Polls: `NSPredicate` expectations evaluate against a cached snapshot
+    /// and never see the resize.
+    @MainActor
+    private func waitForFrame(_ app: XCUIApplication, _ expected: CGRect, _ what: String) {
+        let deadline = Date().addingTimeInterval(5)
+        while Date() < deadline {
+            if app.windows.firstMatch.frame == expected { return }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        XCTFail("\(what): now \(app.windows.firstMatch.frame), expected \(expected)")
     }
 }

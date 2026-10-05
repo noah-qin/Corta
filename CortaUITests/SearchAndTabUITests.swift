@@ -139,7 +139,13 @@ final class SearchAndTabUITests: XCTestCase {
         let original = app.windows.firstMatch.frame
         app.typeKey("=", modifierFlags: .command)
         RunLoop.current.run(until: Date().addingTimeInterval(0.5))
-        XCTAssertEqual(app.windows.firstMatch.frame, original)
+        // In place: the top edge stays and the size moves by less than a
+        // cell (`SplitViewController.fitWindowToWholeCells`).
+        let zoomed = app.windows.firstMatch.frame
+        XCTAssertEqual(zoomed.minY, original.minY, accuracy: 0.5)
+        XCTAssertEqual(zoomed.minX, original.minX, accuracy: 0.5)
+        XCTAssertLessThan(abs(zoomed.width - original.width), 20)
+        XCTAssertLessThan(abs(zoomed.height - original.height), 20)
         XCTAssertFalse(app.windows.firstMatch.label.contains("×"))
         app.typeKey("0", modifierFlags: .command)
         app.typeKey("t", modifierFlags: .command)

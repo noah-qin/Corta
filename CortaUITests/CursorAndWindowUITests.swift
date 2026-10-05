@@ -20,8 +20,7 @@ import XCTest
 final class CursorAndWindowUITests: XCTestCase {
     @MainActor func testOversizedWindowsAndRestorationFitVisibleScreen() throws {
         continueAfterFailure = false
-        let stage = try makeStage(config: "columns = 500\nrows = 300\nrestore-windows = true\ncursor-shape = bar\ncursor-blink = true\n")
-        defer { try? FileManager.default.removeItem(at: stage) }
+        let stage = try preparedStage("cursor-oversized")
         let app = makeApp(stage: stage)
         app.launch()
         defer { app.terminate() }
@@ -39,8 +38,7 @@ final class CursorAndWindowUITests: XCTestCase {
 
     @MainActor func testCursorSettingsPersistAndBlinkInLiveWindow() throws {
         continueAfterFailure = false
-        let stage = try makeStage(config: "appearance = light\ncolumns = 90\nrows = 24\nrestore-windows = false\ncursor-shape = bar\ncursor-blink = true\n")
-        defer { try? FileManager.default.removeItem(at: stage) }
+        let stage = try preparedStage("cursor-blink")
         let app = makeApp(stage: stage)
         app.launch()
         defer { app.terminate() }
@@ -85,11 +83,16 @@ final class CursorAndWindowUITests: XCTestCase {
         XCTAssertGreaterThan(Set(captures).count, 1, "the enabled cursor must blink on an idle terminal")
     }
 
-    private func makeStage(config: String) throws -> URL {
-        let stage = URL(fileURLWithPath: "/private/tmp/corta-ui-stages", isDirectory: true).appendingPathComponent("corta-cursor-ui-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: stage, withIntermediateDirectories: true)
-        try config.write(to: stage.appendingPathComponent("config"), atomically: true, encoding: .utf8)
-        try "PROMPT='demo ❯ '\n".write(to: stage.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
+    /// The stage `stage-ui-fixtures.sh` prepared for `name`: the sandboxed
+    /// runner cannot write one the app could read.
+    private func preparedStage(_ name: String) throws -> URL {
+        guard let root = ProcessInfo.processInfo.environment["CORTA_UI_FIXTURES"] else {
+            throw XCTSkip(
+                "Set TEST_RUNNER_CORTA_UI_FIXTURES using CortaUITests/stage-ui-fixtures.sh; the runner's sandbox cannot write a stage the app can read.")
+        }
+        let stage = URL(fileURLWithPath: root, isDirectory: true).appendingPathComponent(name)
+        guard FileManager.default.fileExists(atPath: stage.appendingPathComponent("config").path)
+        else { throw XCTSkip("stage-ui-fixtures.sh made no stage named \(name)") }
         return stage
     }
 
