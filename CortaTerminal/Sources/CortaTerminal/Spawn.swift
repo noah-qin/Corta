@@ -68,8 +68,8 @@ enum Spawn {
         defer { posix_spawnattr_destroy(&attributes) }
         // `CLOEXEC_DEFAULT`: only the file actions' descriptors reach the
         // child — 0–2 and the inherited `writeEnd`. Without it every
-        // descriptor this process opened without `FD_CLOEXEC` (an SFTP pipe,
-        // a file mid-transfer) would be the shell's too.
+        // descriptor this process opened without `FD_CLOEXEC` (a file-transfer
+        // pipe, a file mid-transfer) would be the shell's too.
         posix_spawnattr_setflags(
             &attributes,
             Int16(

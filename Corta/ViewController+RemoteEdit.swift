@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Cocoa
+import CortaSFTP
 import CortaTerminal
 
 /// `path:line[:column]` references in a remote pane: resolved against the

@@ -17,7 +17,7 @@
 import Foundation
 import Testing
 
-@testable import CortaTerminal
+@testable import CortaSFTP
 
 /// Opt-in encrypted TCP fixture. The runner creates private keys/configuration
 /// and an unprivileged localhost sshd; no personal SSH policy is consulted.
@@ -30,7 +30,7 @@ struct SFTPSSHIntegrationTests {
     }
     private func client(config: String = "ssh.conf") -> SFTPConnection {
         SFTPConnection(host: "fixture", arguments: ["-F", root.appendingPathComponent(config).path,
-            "-s", "--", "fixture", "sftp"])
+            "-s", "--", "fixture", "sftp"], environment: ProcessInfo.processInfo.environment)
     }
 
     @Test("real SSH authentication, host verification and SFTP round-trip")

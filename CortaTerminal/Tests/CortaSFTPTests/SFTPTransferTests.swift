@@ -18,7 +18,7 @@ import Foundation
 import Synchronization
 import Testing
 
-@testable import CortaTerminal
+@testable import CortaSFTP
 
 /// The transfer engine against the scripted fake server: atomic
 /// destinations, resume with endpoint validation, conflict policies,

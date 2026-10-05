@@ -17,7 +17,7 @@
 import Foundation
 import Testing
 
-@testable import CortaTerminal
+@testable import CortaSFTP
 
 /// The session against the scripted fake server over the in-memory
 /// loopback: handshake and capabilities, request/response plumbing, the

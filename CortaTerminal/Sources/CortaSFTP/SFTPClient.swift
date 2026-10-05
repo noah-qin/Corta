@@ -142,14 +142,17 @@ public final class SFTPConnection: SFTPClient, @unchecked Sendable {
     /// stand in for ssh in `SFTPRealServerTests`. Production passes
     /// neither.
     private let arguments: [String]?
+    /// The ssh child's environment — see `SFTPSubprocessChannel.spawn`.
+    private let environment: [String: String]
 
     public init(
         host: String, sshExecutable: String = SFTPSubprocessChannel.defaultSSHPath,
-        arguments: [String]? = nil
+        arguments: [String]? = nil, environment: [String: String]
     ) {
         self.host = host
         self.sshExecutable = sshExecutable
         self.arguments = arguments
+        self.environment = environment
     }
 
     public var capabilities: SFTPServerCapabilities? {
@@ -207,7 +210,8 @@ public final class SFTPConnection: SFTPClient, @unchecked Sendable {
         let channel: SFTPSubprocessChannel
         do {
             channel = try SFTPSubprocessChannel.spawn(
-                host: host, executable: sshExecutable, arguments: arguments)
+                host: host, executable: sshExecutable, arguments: arguments,
+                environment: environment)
         } catch {
             throw .transport(error)
         }

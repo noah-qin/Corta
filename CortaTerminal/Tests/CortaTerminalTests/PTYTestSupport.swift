@@ -109,8 +109,7 @@ func testTimeout(_ seconds: Int) -> Duration {
 }
 
 /// The same ceiling as a `TimeInterval`, for the waits that are expressed
-/// in `Date` arithmetic (the SFTP test rig's idle-read deadline and its
-/// log polling).
+/// in `Date` arithmetic.
 func testTimeoutInterval(_ seconds: TimeInterval) -> TimeInterval {
     seconds * TimeInterval(testTimeoutScale)
 }

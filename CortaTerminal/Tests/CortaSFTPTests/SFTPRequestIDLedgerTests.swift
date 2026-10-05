@@ -16,7 +16,7 @@
 
 import Testing
 
-@testable import CortaTerminal
+@testable import CortaSFTP
 
 /// The cancellation orderings the session cannot be driven through from
 /// outside — each turns on a window between a continuation resuming and a

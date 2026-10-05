@@ -50,7 +50,7 @@ public enum SFTPTransportError: Error, Equatable {
 
     /// Pure, so the policy is testable. Only 255 is ssh's own error (`ssh(1)`);
     /// any other exit or signal is a broken channel.
-    public static func classify(exit: ChildExit, diagnostics: String) -> SFTPTransportError {
+    public static func classify(exit: SFTPProcessExit, diagnostics: String) -> SFTPTransportError {
         guard case .exited(let code) = exit else {
             return .connectionLost
         }
@@ -109,7 +109,7 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
     private let stdoutRead: GuardedDescriptor
 
     private struct State {
-        var exit: ChildExit?
+        var exit: SFTPProcessExit?
         var isReaping = false
         var isClosed = false
     }
@@ -131,13 +131,13 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
         return String(decoding: data, as: UTF8.self)
     }
 
-    public var exitStatus: ChildExit? { state.withLock { $0.exit } }
+    public var exitStatus: SFTPProcessExit? { state.withLock { $0.exit } }
 
     /// Bounded, and for diagnostics only: turns a bare `.connectionLost` into
     /// the classification `classify(exit:)` gives. Never disturbs a live child.
-    public func awaitExit(timeout: Duration = .seconds(2)) -> ChildExit? {
+    public func awaitExit(timeout: Duration = .seconds(2)) -> SFTPProcessExit? {
         let deadline = ContinuousClock.now + timeout
-        var exit: ChildExit?
+        var exit: SFTPProcessExit?
         while true {
             if exit == nil { exit = reap(blocking: false) }
             // Both the exit and stderr's EOF.
@@ -148,12 +148,14 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
     }
 
     /// Throws only for local failures; remote ones surface as EOF plus
-    /// `exitStatus`.
+    /// `exitStatus`. `environment` is the child's whole environment, and has
+    /// no default: the app passes the core's sanitised one
+    /// (`ChildEnvironment.default()`), which this module cannot see.
     public static func spawn(
         host: String,
         executable: String = SFTPSubprocessChannel.defaultSSHPath,
         arguments: [String]? = nil,
-        environment: [String: String] = ChildEnvironment.default()
+        environment: [String: String]
     ) throws(SFTPTransportError) -> SFTPSubprocessChannel {
         guard executable.hasPrefix("/") else { throw .executablePathNotAbsolute }
 
@@ -354,7 +356,7 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
 
     /// Only one `waitpid` ever runs for this child, as in `PTY.reap`.
     @discardableResult
-    private func reap(blocking: Bool) -> ChildExit? {
+    private func reap(blocking: Bool) -> SFTPProcessExit? {
         let shouldReap = state.withLock { state -> Bool in
             if state.exit != nil || state.isReaping { return false }
             state.isReaping = true
@@ -379,7 +381,7 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
             state.withLock { $0.isReaping = false }
             return state.withLock { $0.exit }
         }
-        let exit = ChildExit(waitpidStatus: status)
+        let exit = SFTPProcessExit(waitpidStatus: status)
         state.withLock {
             $0.exit = exit
             $0.isReaping = false

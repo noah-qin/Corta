@@ -18,7 +18,7 @@ import Darwin
 import Foundation
 import Synchronization
 
-@testable import CortaTerminal
+@testable import CortaSFTP
 
 /// SFTP test support — an in-memory transport pair and a scripted SFTP
 /// server, so the session and transfer engine can be driven end to end
@@ -35,6 +35,16 @@ import Synchronization
 /// the client's in-flight window can be observed, refusing paths, and
 /// recording the exact request sequence (which is what makes the
 /// atomic-rename and CLOSE-on-cancel assertions possible).
+
+/// A `Date`-arithmetic ceiling (the rig's idle-read deadline and its log
+/// polling), scaled by `CORTA_TEST_TIMEOUT_SCALE` for the sanitizer lane —
+/// the same rule as `CortaTerminalTests`' `testTimeout`, repeated because
+/// test targets cannot share a file.
+func testTimeoutInterval(_ seconds: TimeInterval) -> TimeInterval {
+    let scale = ProcessInfo.processInfo.environment["CORTA_TEST_TIMEOUT_SCALE"]
+        .flatMap(Int.init) ?? 1
+    return seconds * TimeInterval(max(1, scale))
+}
 
 /// One bidirectional in-memory channel.
 final class SFTPLoopbackConnection: @unchecked Sendable {

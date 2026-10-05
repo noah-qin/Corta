@@ -17,7 +17,7 @@
 import Foundation
 import Testing
 
-@testable import CortaTerminal
+@testable import CortaSFTP
 
 /// The SFTPv3 codec against hand-computed wire bytes. Every message
 /// type round-trips through exact bytes, and truncated, lying or oversize

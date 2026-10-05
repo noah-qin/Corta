@@ -18,7 +18,7 @@ import Foundation
 import Synchronization
 import Testing
 
-@testable import CortaTerminal
+@testable import CortaSFTP
 
 /// SFTP against the real thing: `/usr/libexec/sftp-server` is on every Mac,
 /// and `SFTPSubprocessChannel.spawn` takes an executable and argv, so the
@@ -44,7 +44,8 @@ struct SFTPRealServerTests {
     /// A connection whose "ssh" is the server itself.
     private static func connect(root: URL) async throws -> SFTPConnection {
         let client = SFTPConnection(
-            host: "local", sshExecutable: server, arguments: ["-d", root.path])
+            host: "local", sshExecutable: server, arguments: ["-d", root.path],
+            environment: ProcessInfo.processInfo.environment)
         _ = try await client.connect()
         return client
     }
@@ -256,7 +257,9 @@ struct SFTPRealServerTests {
 
     @Test("a missing executable fails the spawn, not the connection")
     func missingExecutableFails() async {
-        let client = SFTPConnection(host: "x", sshExecutable: "/nonexistent/ssh")
+        let client = SFTPConnection(
+            host: "x", sshExecutable: "/nonexistent/ssh",
+            environment: ProcessInfo.processInfo.environment)
         await #expect(throws: SFTPError.self) { try await client.connect() }
     }
 
@@ -279,7 +282,9 @@ struct SFTPRealServerTests {
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
         defer { try? FileManager.default.removeItem(at: script) }
 
-        let client = SFTPConnection(host: "example.com", sshExecutable: script.path)
+        let client = SFTPConnection(
+            host: "example.com", sshExecutable: script.path,
+            environment: ProcessInfo.processInfo.environment)
         // Bound outside the catch: binding the typed error with `catch let
         // error as SFTPError` and switching on it in the same clause crashed
         // the CI toolchain's SILGen (Swift 6.3.3, Xcode 26.6).
