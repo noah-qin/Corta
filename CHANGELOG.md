@@ -106,6 +106,8 @@ what to edit.
   splitting and closing, including custom bindings and unbound commands.
 - Try Again on a pane whose shell failed to start no longer stacks another
   focus ring and highlight over the pane each time.
+- Opening the Shell menu, or the shortcut for Copy Last Command Output, on a
+  pane whose setup failed no longer crashes Corta.
 
 ## [1.1.1] - 2026-10-03
 
