@@ -248,7 +248,7 @@ nonisolated struct Configuration: Equatable, Sendable {
             let key = line[..<separator].trimmingCharacters(in: .whitespaces)
             var value = line[line.index(after: separator)...]
                 .trimmingCharacters(in: .whitespaces)
-            if let comment = value.dropFirst().firstIndex(of: "#") {
+            if let comment = commentStart(in: value) {
                 value = String(value[..<comment]).trimmingCharacters(in: .whitespaces)
             }
             guard !key.isEmpty else { continue }
@@ -525,6 +525,20 @@ nonisolated struct Configuration: Equatable, Sendable {
             : applyVariantField(parts[3], value: value, into: &draft.light)
         drafts[name] = draft
         return applied
+    }
+
+    /// Where a trailing comment starts. A `#` that opens the value or
+    /// follows a comma is a colour: `ansi = #000, #f00` is a list, and
+    /// cutting it at the second `#` kept only its first slot — which a theme
+    /// the editor wrote and read back then lost.
+    static func commentStart(in value: String) -> String.Index? {
+        var previous: Character?
+        for index in value.indices {
+            let character = value[index]
+            if character == "#", index != value.startIndex, previous != "," { return index }
+            if !character.isWhitespace { previous = character }
+        }
+        return nil
     }
 
     private static func variantIsDark(_ text: String) -> Bool? {

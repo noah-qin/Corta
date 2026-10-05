@@ -28,9 +28,10 @@ key = value        # comment to end of line
 - One setting per line. Whitespace around the key, the `=` and the value
   is ignored.
 - A line whose first non-blank character is `#` is a comment.
-- A `#` that **opens a value** is a colour, not a comment
-  (`background = #101018`). The key is split off before comments are
-  stripped, which is what makes both readings possible.
+- A `#` that **opens a value**, or follows a comma in a list, is a colour,
+  not a comment (`background = #101018`, `ansi = #000, #c23621`). The key
+  is split off before comments are stripped, which is what makes both
+  readings possible.
 - Booleans accept `true`/`false`, `yes`/`no`, `on`/`off`, `1`/`0`.
 - An **unknown key is preserved**, not dropped: a file written by a newer
   Corta survives a round trip through an older one.
@@ -303,7 +304,7 @@ Existing custom selections and inheritance continue to work.
 | `theme.<name>.inherit` | A built-in to start from: `corta`, `solarized`, `mono`. Defaults to `corta`. |
 | `theme.<name>.<variant>.foreground` | Default text colour. `<variant>` is `dark` or `light`. |
 | `theme.<name>.<variant>.background` | Default background. |
-| `theme.<name>.<variant>.cursor` | Cursor colour, for every cursor style. A block cursor is drawn translucent over the character under it, so that character stays readable. |
+| `theme.<name>.<variant>.cursor` | Cursor colour, for every cursor style. A block cursor is opaque, and the character under it is drawn in the background colour, as Terminal.app draws it. |
 | `theme.<name>.<variant>.ansi` | The whole table on one line, comma-separated. A shorter list overrides a prefix of it. |
 | `theme.<name>.<variant>.ansi<N>` | One slot, `N` from 0 to 15: black, red, green, yellow, blue, magenta, cyan, white, then the eight bright ones. |
 
@@ -313,6 +314,25 @@ component — the terminal surface is opaque content, not a glass layer.
 Anything left unset is inherited, so a two-line theme is a legal theme —
 and a half-written one still renders, which matters because this file is
 hand-edited.
+
+### Derived colours
+
+The highlights drawn over the text have no keys: they are worked out from
+the variant's own colours, so a light theme gets a selection that shows on
+a light background and a custom theme needs nothing extra. Fills sit under
+the characters, which keep their own colour.
+
+- **Selection:** blue (`ansi4`) moved 40% of the way towards the
+  foreground, at 40% opacity.
+- **Search matches:** yellow (`ansi3`) at 35% opacity; the current match
+  at 55%.
+- **Hovered link:** an underline in cyan (`ansi6`).
+- **Command marks:** green (`ansi2`) at 85% opacity for a command that
+  succeeded, red (`ansi1`) at 90% for one that failed, and the midpoint of
+  the foreground and background at 90% for one that was interrupted.
+
+Only the first eight slots are used: in some themes, Solarized among
+them, the bright slots are grey tones rather than brighter hues.
 
 ```ini
 theme = midnight

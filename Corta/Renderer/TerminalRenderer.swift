@@ -44,7 +44,10 @@ public nonisolated struct TerminalSelection: Equatable, Sendable {
 /// damage, so the shell skips it entirely (idle ~0% CPU).
 ///
 /// Cursor and selection are background-pass quads — colour under the glyph —
-/// not another pipeline.
+/// not another pipeline. A block cursor is part of its row, not the overlay:
+/// an opaque cell in the cursor colour whose character is drawn in the
+/// theme background, so moving it rebuilds the row it left and the row it
+/// entered, one each.
 ///
 /// `public`, with the few members `CortaPerformanceTests` drives: that bundle
 /// imports the app without `@testable`, because `-enable-testing` inhibits
@@ -57,13 +60,6 @@ public nonisolated final class TerminalRenderer {
     let kittyImageRenderer: KittyImageRenderer
     /// Cached because `draw` takes no `Grid`.
     private var cachedImagePlacements = ImagePlacementTable()
-
-    /// A block cursor sits under the glyph, so the character stays readable.
-    private static let blockCursorAlpha: Float = 0.6
-    private static let selectionColor = SIMD4<Float>(0.25, 0.45, 0.85, 0.4)
-    private static let searchMatchColor = SIMD4<Float>(0.85, 0.75, 0.2, 0.35)
-    private static let currentSearchMatchColor = SIMD4<Float>(0.95, 0.55, 0.15, 0.6)
-    private static let linkUnderlineColor = SIMD4<Float>(0.45, 0.7, 1.0, 0.95)
 
     // MARK: - Damage-tracked instance cache
 
@@ -99,6 +95,21 @@ public nonisolated final class TerminalRenderer {
     private var cachedCurrentSearchMatchIndex: Int?
     private var cachedHoveredLink: TerminalSelection?
     private var needsFullRebuild = true
+
+    /// Where the rows draw a block cursor: a screen row and column, live
+    /// screen only. It lives in the row instances, so a row is stale when
+    /// the cursor enters or leaves it, or when a scroll shift carries a
+    /// baked cursor to another row.
+    private struct BlockCursor: Equatable {
+        var row: Int
+        var column: Int
+    }
+    private var blockCursor: BlockCursor?
+    /// Rows the damage pass rebuilds whatever their revision says: the
+    /// block cursor's old and new rows. -1 is none; two `Int`s, not a set,
+    /// so the per-row test allocates nothing.
+    private var forcedRowA = -1
+    private var forcedRowB = -1
 
     /// Reused, so a damaged row allocates nothing: every damaged row's new
     /// instances, back to back, with where each row's are.
@@ -139,6 +150,8 @@ public nonisolated final class TerminalRenderer {
     /// `updateInstances` — one lock on the shared palette per frame rather
     /// than per row, and no frame half in one theme and half in the next.
     private var framePalette: Theme.Variant = Theme.corta.dark
+    /// `framePalette`'s derived colours, worked out once per frame.
+    private var frameOverlay = Theme.corta.dark.overlayColors
     var drawsCommandMarks = true
 
     /// Rows in the cached frame: the grid height `draw` lays out.
@@ -206,6 +219,7 @@ public nonisolated final class TerminalRenderer {
         let effectiveCursorStyle = cursorStyle ?? grid.cursorStyle
         self.indexedOverrides = indexedOverrides
         framePalette = themeVariant ?? TerminalColorPalette.activeVariant
+        frameOverlay = framePalette.overlayColors
         let offset = min(max(0, scrollOffset), grid.scrollback.count)
         let fullRebuild =
             needsFullRebuild
@@ -217,13 +231,19 @@ public nonisolated final class TerminalRenderer {
             || cachedIndexedOverridesGeneration != indexedOverridesGeneration
 
         var changed = fullRebuild
+        let previousBlockCursor = blockCursor
+        let isBlock = effectiveCursorStyle == .block || effectiveCursorStyle == .blinkingBlock
+        blockCursor =
+            isBlock && cursorVisible && offset == 0
+            ? BlockCursor(row: grid.cursor.row, column: grid.cursor.column) : nil
         // An eviction mid-build stales every UV: rebuild once. Content that alone
         // overflows the atlas draws blank.
         let atlasGeneration = glyphAtlas.generation
         if fullRebuild {
             rebuildAllRows(grid: grid, offset: offset)
         } else {
-            changed = rebuildDamagedRows(grid: grid, offset: offset)
+            changed = rebuildDamagedRows(
+                grid: grid, offset: offset, previousBlockCursor: previousBlockCursor)
         }
         if glyphAtlas.generation != atlasGeneration {
             rebuildAllRows(grid: grid, offset: offset)
@@ -381,11 +401,14 @@ public nonisolated final class TerminalRenderer {
     /// scrollback storage with no revision to compare, so that path is
     /// unchanged: `visibleLine` is fetched and compared by value every row,
     /// every call, same as the whole cache always did.
-    private func rebuildDamagedRows(grid: Grid, offset: Int) -> Bool {
+    private func rebuildDamagedRows(
+        grid: Grid, offset: Int, previousBlockCursor: BlockCursor?
+    ) -> Bool {
         var backgroundStart = 0
         var glyphStart = 0
         var colorGlyphStart = 0
         let liveScreen = offset == 0
+        var shifted = 0
         if liveScreen {
             let rotated = grid.linesRotated - cachedLinesRotated
             // `< grid.rows`: at or past a full screen's worth, nothing
@@ -393,8 +416,18 @@ public nonisolated final class TerminalRenderer {
             // per-row loop below rebuilds them all just as a full rebuild
             // would, only row by row instead of in one pass.
             if rotated > 0, rotated < UInt64(grid.rows) {
-                applyScrollShift(Int(rotated), cellHeight: Float(metrics.cellHeight))
+                shifted = Int(rotated)
+                applyScrollShift(shifted, cellHeight: Float(metrics.cellHeight))
             }
+        }
+        // The block cursor is baked into its row: rebuild the row it left —
+        // where a shift carried it — and the row it is on, which may hold
+        // content shifted in from below without it.
+        forcedRowA = -1
+        forcedRowB = -1
+        if previousBlockCursor != blockCursor || shifted > 0 {
+            if let previousBlockCursor { forcedRowA = previousBlockCursor.row - shifted }
+            if let blockCursor { forcedRowB = blockCursor.row }
         }
         rowBackground.removeAll(keepingCapacity: true)
         rowGlyphs.removeAll(keepingCapacity: true)
@@ -402,12 +435,13 @@ public nonisolated final class TerminalRenderer {
         rebuiltRows.removeAll(keepingCapacity: true)
         for row in 0..<grid.rows {
             let revision = liveScreen ? grid.lineRevision(row) : 0
+            let forced = row == forcedRowA || row == forcedRowB
             // `!liveScreen` always re-checks by value below: history rows
             // carry no revision to compare.
-            let possiblyChanged = !liveScreen || revision != cachedRevisions[row]
+            let possiblyChanged = forced || !liveScreen || revision != cachedRevisions[row]
             if possiblyChanged {
                 let line = Self.visibleLine(grid: grid, row: row, offset: offset)
-                if liveScreen || line != cachedLines[row] {
+                if liveScreen || forced || line != cachedLines[row] {
                     let rebuilt = RebuiltRow(
                         row: row, background: rowBackground.count..<rowBackground.count,
                         glyphs: rowGlyphs.count..<rowGlyphs.count,
@@ -552,21 +586,22 @@ public nonisolated final class TerminalRenderer {
             overlayScratch.append(
                 contentsOf: selectionQuads(
                     selection, grid: grid, offset: offset, cellWidth: cellWidth, cellHeight: cellHeight,
-                    color: Self.selectionColor))
+                    color: frameOverlay.selection))
         }
         // After the selection, before the cursor, which stays on top.
         for (index, match) in searchMatches.enumerated() {
             overlayScratch.append(
                 contentsOf: selectionQuads(
                     match, grid: grid, offset: offset, cellWidth: cellWidth, cellHeight: cellHeight,
-                    color: index == currentSearchMatchIndex ? Self.currentSearchMatchColor : Self.searchMatchColor))
+                    color: index == currentSearchMatchIndex
+                        ? frameOverlay.currentSearchMatch : frameOverlay.searchMatch))
         }
         // A rule, not a fill: it must read as a link and not fight the
         // selection.
         if let hoveredLink {
             for quad in selectionQuads(
                 hoveredLink, grid: grid, offset: offset, cellWidth: cellWidth,
-                cellHeight: cellHeight, color: Self.linkUnderlineColor)
+                cellHeight: cellHeight, color: frameOverlay.linkUnderline)
             {
                 let thickness = max(1, Float(scale).rounded(.down))
                 overlayScratch.append(
@@ -575,7 +610,8 @@ public nonisolated final class TerminalRenderer {
                         size: .init(quad.size.x, thickness), color: quad.color))
             }
         }
-        if cursorVisible {
+        // A block cursor is drawn by its row (`appendRowInstances`).
+        if cursorVisible, blockCursor == nil {
             let cellOrigin = SIMD2<Float>(
                 Float(grid.cursor.column) * cellWidth, Float(grid.cursor.row) * cellHeight)
             // An eighth of a cell, at least 2 device pixels.
@@ -583,10 +619,7 @@ public nonisolated final class TerminalRenderer {
             let cursorColor = framePalette.cursor
             switch cursorStyle {
             case .block, .blinkingBlock:
-                overlayScratch.append(
-                    QuadInstance(
-                        origin: cellOrigin, size: .init(cellWidth, cellHeight),
-                        color: .init(cursorColor.x, cursorColor.y, cursorColor.z, Self.blockCursorAlpha)))
+                break  // Only off the live screen, where no cursor is drawn.
             case .underline, .blinkingUnderline:
                 overlayScratch.append(
                     QuadInstance(
@@ -616,6 +649,30 @@ public nonisolated final class TerminalRenderer {
         let baseline = Float(metrics.baselineOffset)
         // Once per row: the property retains the ANSI array on every touch.
         let palette = framePalette
+        // The block cursor's columns in this row — two under a wide
+        // character, so the whole glyph inverts — or an empty range. Past
+        // the line's stored cells there is no character to invert: one
+        // cursor-coloured cell.
+        var cursorStart = 0
+        var cursorEnd = 0
+        if let blockCursor, blockCursor.row == row {
+            if blockCursor.column < line.count {
+                cursorStart = blockCursor.column
+                cursorEnd = cursorStart + 1
+                let attributes = line[cursorStart].attributes
+                if attributes.contains(.wide) {
+                    cursorEnd += 1
+                } else if attributes.contains(.wideSpacer), cursorStart > 0 {
+                    // On the right half (a CUP or one BS can land there).
+                    cursorStart -= 1
+                }
+            } else {
+                background.append(
+                    QuadInstance(
+                        origin: .init(Float(blockCursor.column) * cellWidth, Float(row) * cellHeight),
+                        size: .init(cellWidth, cellHeight), color: palette.cursor))
+            }
+        }
         // The mark: a rule down a prompt row's left edge, coloured by outcome —
         // which of the last twenty failed, at a glance. Inside the first cell:
         // the inset is outside this renderer's rect.
@@ -625,7 +682,7 @@ public nonisolated final class TerminalRenderer {
                 QuadInstance(
                     origin: .init(0, Float(row) * cellHeight),
                     size: .init(width, cellHeight),
-                    color: Self.markColor(line.mark)))
+                    color: Self.markColor(line.mark, frameOverlay)))
         }
         for column in 0..<line.count {
             let cell = line[column]
@@ -637,13 +694,22 @@ public nonisolated final class TerminalRenderer {
             let resolvedFg = palette.resolveForeground(cell.foreground, indexedOverrides: indexedOverrides)
             let resolvedBg = palette.resolveBackground(cell.background, indexedOverrides: indexedOverrides)
             var fg = reversed ? resolvedBg : resolvedFg
-            let bg = reversed ? resolvedFg : resolvedBg
+            var bg = reversed ? resolvedFg : resolvedBg
             // SGR 2: alpha on the foreground — one multiply, and correct over a
             // coloured background, where blending to the default would tint it.
             if attributes.contains(.dim) { fg.w *= Self.dimAlpha }
+            // The block cursor, as Terminal.app draws it: an opaque cell in the
+            // cursor colour, its character — and rules, box and block pieces —
+            // in the theme background. Not the cell's own background: under
+            // reverse video that is the foreground, often the cursor colour.
+            let underCursor = column >= cursorStart && column < cursorEnd
+            if underCursor {
+                fg = palette.background
+                bg = palette.cursor
+            }
 
             let origin = SIMD2<Float>(Float(column) * cellWidth, Float(row) * cellHeight)
-            if !(reversed ? cell.foreground : cell.background).isDefault || reversed {
+            if underCursor || !(reversed ? cell.foreground : cell.background).isDefault || reversed {
                 background.append(
                     QuadInstance(origin: origin, size: .init(cellWidth, cellHeight), color: bg))
             }
@@ -821,11 +887,9 @@ public nonisolated final class TerminalRenderer {
     /// has not reported — always the current one — and an output-start row
     /// carry nothing a reader can use, and after `clear` a grey rule on the
     /// lone prompt read as a rendering artefact (#165).
-    private static func markColor(_ mark: LineMark) -> SIMD4<Float> {
-        if mark == .promptInterrupted { return SIMD4<Float>(0.5, 0.5, 0.5, 0.9) }
-        return mark == .promptFailed
-            ? SIMD4<Float>(0.9, 0.3, 0.25, 0.9)
-            : SIMD4<Float>(0.25, 0.75, 0.35, 0.85)
+    private static func markColor(_ mark: LineMark, _ overlay: OverlayColors) -> SIMD4<Float> {
+        if mark == .promptInterrupted { return overlay.markInterrupted }
+        return mark == .promptFailed ? overlay.markFailed : overlay.markSucceeded
     }
 
     private static func selectionsEqual(_ a: TerminalSelection?, _ b: TerminalSelection?) -> Bool {

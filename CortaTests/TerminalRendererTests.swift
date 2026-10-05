@@ -65,9 +65,8 @@ import Testing
         let atCursor = Self.pixel(of: texture, x: cursorX, y: cursorY)
         let elsewhere = Self.pixel(of: texture, x: width - 4, y: height - 4)
 
-        // The cursor block is the theme's light cursor, translucent over
-        // black — brighter than the untouched background, which stays pure
-        // black.
+        // The cursor block is the theme's light cursor, opaque over black —
+        // brighter than the untouched background, which stays pure black.
         if atCursor.r <= elsewhere.r {
             MetalRenderTarget.attachPNG(texture, named: "cursor-block-render.png")
         }
