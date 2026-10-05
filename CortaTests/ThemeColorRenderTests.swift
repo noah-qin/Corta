@@ -281,13 +281,17 @@ import Testing
         var variant = Theme.corta.dark
         variant.cursor = SIMD4<Float>(0, 0.8, 0, 1)
         var terminal = Terminal(rows: 2, columns: 10)
-        terminal.feed(Array("中\u{1B}[1;1H".utf8))
-        let frame = try Self.render(terminal.grid, variant: variant, cursorVisible: true)
         let opaque = SIMD4<Float>(0, 0, 0, 1)
-        // Corners: outside the ideograph's ink in both cells.
-        for x in [1, 2 * frame.cellWidth - 2] {
-            let corner = Self.pixel(of: frame.texture, x: x, y: frame.cellHeight - 1)
-            #expect(Self.matches(corner, variant.cursor, over: opaque), "x \(x): \(corner)")
+        // On the left cell, then on the right half (the spacer).
+        for column in [1, 2] {
+            terminal.feed(Array("中\u{1B}[1;\(column)H".utf8))
+            let frame = try Self.render(terminal.grid, variant: variant, cursorVisible: true)
+            // Corners: outside the ideograph's ink in both cells.
+            for x in [1, 2 * frame.cellWidth - 2] {
+                let corner = Self.pixel(of: frame.texture, x: x, y: frame.cellHeight - 1)
+                #expect(Self.matches(corner, variant.cursor, over: opaque), "column \(column), x \(x): \(corner)")
+            }
+            terminal.feed(Array("\u{1B}[1;1H".utf8))
         }
     }
 

@@ -658,7 +658,14 @@ public nonisolated final class TerminalRenderer {
         if let blockCursor, blockCursor.row == row {
             if blockCursor.column < line.count {
                 cursorStart = blockCursor.column
-                cursorEnd = cursorStart + (line[cursorStart].attributes.contains(.wide) ? 2 : 1)
+                cursorEnd = cursorStart + 1
+                let attributes = line[cursorStart].attributes
+                if attributes.contains(.wide) {
+                    cursorEnd += 1
+                } else if attributes.contains(.wideSpacer), cursorStart > 0 {
+                    // On the right half (a CUP or one BS can land there).
+                    cursorStart -= 1
+                }
             } else {
                 background.append(
                     QuadInstance(
