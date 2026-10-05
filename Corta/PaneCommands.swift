@@ -201,9 +201,18 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         }
     }
 
-    // MARK: - Drops, Services and Look Up
+    // MARK: - Pinch, paste, drops, Services and Look Up
 
     func installNativeIntegrations(on view: TerminalView) {
+        view.onMagnify = { [weak self] magnification in
+            self?.magnify(by: magnification)
+        }
+        view.onMagnifyEnded = { [weak self] in
+            self?.endMagnification()
+        }
+        view.onPaste = { [weak self] in
+            self?.pasteFromClipboard()
+        }
         view.onDropPaths = { [weak self] paths in
             self?.insertDroppedPaths(paths)
         }

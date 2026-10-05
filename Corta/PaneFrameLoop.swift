@@ -95,6 +95,21 @@ final class PaneFrameLoop {
         return generation
     }
 
+    /// Makes `view`'s display link drive this loop.
+    func install(on view: TerminalView) {
+        view.onRenderFrame = { [weak self] drawableSize, drawable in
+            guard let self else {
+                // Never hold a drawable: an unpresented one is never recycled.
+                drawable.present()
+                return true
+            }
+            return render(drawableSize: drawableSize, drawable: drawable)
+        }
+        view.shouldRenderFrame = { [weak self] in
+            self?.prepareFrame() ?? false
+        }
+    }
+
     /// Whether `generation` is the attached session's.
     func isCurrent(_ generation: Int) -> Bool {
         generation == self.generation

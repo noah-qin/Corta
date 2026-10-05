@@ -365,16 +365,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     }
 
     private func installTerminalCallbacks(on view: TerminalView) {
-        view.onRenderFrame = { [weak self] drawableSize, drawable in
-            guard let self else {
-                drawable.present()
-                return true
-            }
-            return frameLoop.render(drawableSize: drawableSize, drawable: drawable)
-        }
-        view.shouldRenderFrame = { [weak self] in
-            self?.frameLoop.prepareFrame() ?? false
-        }
+        frameLoop.install(on: view)
+        pointer.install(on: view)
         // `view` weakly too: the closure is stored on it, and a strong capture
         // kept every closed pane's view — and its drawables — alive.
         view.addSubview(view.shellOverlay)
@@ -392,9 +384,6 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             if bytes.contains(0x0D) { taskNotifier.noteCommandSubmitted(in: view?.window) }
             pointer.returnToBottomOnInput()
             session.write(bytes)
-        }
-        view.onScroll = { [weak self] gesture in
-            self?.pointer.scroll(gesture)
         }
         view.onLiveResizeEnded = { [weak self] in
             self?.endLiveResize()
@@ -418,20 +407,11 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             ConfigurationStore.shared.configuration.keybindings
         }
         commands.installNativeIntegrations(on: view)
-        view.onMagnify = { [weak self] magnification in
-            self?.commands.magnify(by: magnification)
-        }
-        view.onMagnifyEnded = { [weak self] in
-            self?.commands.endMagnification()
-        }
         view.onBackingScaleChange = { [weak self] scale in
             self?.appearance.rebuildAtlas(forBackingScale: scale)
         }
         view.onDrawableSizeChange = { [weak self] in
             self?.invalidateDisplay()
-        }
-        view.onPaste = { [weak self] in
-            self?.commands.pasteFromClipboard()
         }
         view.onSearchKey = { [weak self] (event: NSEvent) -> Bool in
             self?.search.handleKey(event) ?? false
@@ -444,60 +424,14 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             }
             return TerminalFont.primary(ofSize: fontSize, family: fontFamily) as NSFont
         }
-        view.isMouseReportingEnabled = { [weak self] in
-            self?.pointer.mouseReportingEnabled() ?? false
-        }
-        view.mouseTrackingMode = { [weak self] in
-            self?.session?.sgrMouseTrackingMode ?? .off
-        }
-        view.mouseOverrideModifier = ConfigurationStore.shared.configuration.mouseOverrideModifier
-        view.onMouseBytes = { [weak self] bytes in
-            self?.session.write(bytes)
-        }
         view.onFocus = { [weak self] in
             guard let self else { return }
             self.inputSourceIndicator.refreshSource()
             self.splitController?.noteFocus(self)
         }
-        view.cursorRectProvider = { [weak self] in
-            guard let self, let terminalRenderer, session != nil else { return nil }
-            let metrics = terminalRenderer.pointMetrics
-            let cursor = session.snapshot().cursor
-            return CGRect(
-                x: TerminalLayout.insets.left + CGFloat(cursor.column) * metrics.cellWidth,
-                y: topInset + CGFloat(cursor.row) * metrics.cellHeight,
-                width: metrics.cellWidth, height: metrics.cellHeight)
-        }
-        view.accessibilitySnapshotProvider = { [weak self] in
-            guard let self, let session else { return nil }
-            let grid = session.snapshot()
-            return TerminalAccessibilitySnapshot(
-                grid: grid,
-                selection: selection.map { pointer.selectionRange(for: $0, in: grid) },
-                scrollOffset: scrollOffset)
-        }
-        view.accessibilityCellFrameProvider = { [weak self] row, column in
-            guard let self, let terminalRenderer else { return .zero }
-            let metrics = terminalRenderer.pointMetrics
-            return CGRect(
-                x: TerminalLayout.insets.left + CGFloat(column) * metrics.cellWidth,
-                y: topInset + CGFloat(row) * metrics.cellHeight,
-                width: metrics.cellWidth, height: metrics.cellHeight)
-        }
-        view.cellAtPoint = { [weak self] point in
-            guard let self, let terminalRenderer, session != nil, let terminalView
-            else { return (column: 0, row: 0) }
-            let grid = session.snapshot()
-            let position = PanePointer.documentPosition(
-                for: point, viewHeight: terminalView.bounds.height,
-                metrics: terminalRenderer.pointMetrics, grid: grid, scrollOffset: 0,
-                topInset: self.topInset)
-            return (position.column, position.row)
-        }
     }
 
     // MARK: - Teardown
-
 
     /// Two close paths can reach one pane. Also checked by copy/export
     /// completions — the generation guard catches a newer build, not a
@@ -815,34 +749,13 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         failureView?.removeFromSuperview()
         let failure = PaneFailureView(
             title: title, detail: detail, canRetry: canRetry, canReconnect: canReconnect)
-        failure.onRetry = { [weak self] in self?.retryAfterFailure() }
+        failure.onRetry = { [weak self] in self?.rebuildPane(strictRespawn: false) }
         failure.onReconnect = { [weak self] in self?.remote.reconnectRemote(nil) }
         failure.onOpenSettings = { SettingsWindowController.shared.show(nil) }
-        failure.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(failure)
-        NSLayoutConstraint.activate([
-            failure.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            failure.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            failure.topAnchor.constraint(equalTo: view.topAnchor),
-            failure.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-        ])
+        failure.present(in: view)
         failureView = failure
-        // Or nothing is focused and assistive technology hears nothing.
-        view.window?.makeFirstResponder(failure.primaryAction)
-        NSAccessibility.post(element: failure, notification: .layoutChanged)
-        if NSWorkspace.shared.isVoiceOverEnabled {
-            NSAccessibility.post(
-                element: NSApp as Any, notification: .announcementRequested,
-                userInfo: [
-                    .announcement: failure.announcement,
-                    .priority: NSAccessibilityPriorityLevel.high.rawValue,
-                ])
-        }
     }
 
-    private func retryAfterFailure() {
-        rebuildPane(strictRespawn: false)
-    }
 
     /// Behind Try Again (the ladder) and Reconnect (the exact command).
     func rebuildPane(strictRespawn: Bool) {

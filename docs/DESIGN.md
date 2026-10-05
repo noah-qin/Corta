@@ -221,9 +221,12 @@ child's environment is passed in by the app (the core's
 
 A pane is a `ViewController` that composes collaborators, each owning one
 concern with its own state and tests; new behaviour is added as a
-collaborator, never as another `ViewController+X.swift`. The controller
-keeps the session, the view, the renderer, focus, sizing, teardown, and
-the forwarding between them.
+collaborator, never as another `ViewController+X.swift` — there are
+none. The controller (one file, under 800 lines) keeps the session, the
+view, the renderer, sizing, teardown, the viewport's offset and the
+selection, and the wiring between its collaborators. Each reaches the pane
+through its own `Pane…Host` protocol, so its tests drive it with a stand-in
+host rather than a `ViewController`.
 
 | Collaborator      | Owns                                                                 |
 | ----------------- | -------------------------------------------------------------------- |
@@ -231,7 +234,12 @@ the forwarding between them.
 | `PaneWindowTitle` | The window title and proxy icon: their composition and sanitising, the interval-cached process facts behind them, the off-main directory probe |
 | `PaneSearch`      | Scrollback search: the bar and its placement, key routing (Esc, ⌘G), the debounced off-main sweeps and their generations, the matches the renderer highlights, the pre-search viewport it restores. Reaches the pane only through `PaneSearchHost` |
 | `PaneRemote`      | Whether the pane talks to another machine (`PaneRemoteState`, with the report tracker both the title and one-off questions read through), Reconnect and its wording, `path:line` references resolved on the remote host and opened as managed copies, and the SFTP browser's entry and its menu gate. Reaches the pane through `PaneRemoteHost` |
-| `PaneCommands`    | The menu and context-menu commands: font size and pinch zoom, copy and export (one cancellable large-text task between them), drops, Services and Look Up, the Finder actions, and app-initiated `cd` with its safety gate. Reaches the pane through `PaneCommandsHost` |
+| `PaneCommands`    | The menu and context-menu commands: font size and pinch zoom, copy, paste and export (one cancellable large-text task between copy and export), drops, Services and Look Up, the Finder actions, app-initiated `cd` with its safety gate, and Clear Screen, Clear History and Reset Terminal |
+| `PanePointer`     | Scrolling — wheel, keys and the scroll-position pill — mouse selection and its auto-scroll, link hover and opening, local `path:line` references, and the cell geometry the cursor rect, accessibility and the IME ask for |
+| `PaneShellIntegration` | What OSC 133 marks make possible: command jumps, the effective command and its output, history fill and run, the running command's snapshot, the status marks and directory completion; and the OSC 52 drain |
+| `PaneFocus`       | The dim, ring and highlight that show which pane has the keyboard, focus reporting (`?1004`) and the window observers behind it, and the cursor's blink |
+| `PaneAppearance`  | Following the configuration file and the live appearance, and applying a font size, family or backing scale: the cell metrics, the window minimum and fit, and the grid |
+| `PaneSpawn`       | Not an instance: the fallback ladder that starts a pane's child, and the exact respawn behind Reconnect |
 
 A collaborator that owns menu actions implements them as `@objc`
 methods, and the pane answers for them through the Objective-C runtime:

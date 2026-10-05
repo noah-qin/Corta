@@ -72,6 +72,60 @@ final class PanePointer: NSObject {
     private var terminalView: TerminalView? { host?.terminalView ?? nil }
     private func invalidateDisplay() { host?.invalidateDisplay() }
 
+    /// The view's pointer hooks: the wheel, mouse reporting's questions,
+    /// and the cell geometry the cursor rect, accessibility and the IME ask
+    /// for.
+    func install(on view: TerminalView) {
+        view.onScroll = { [weak self] gesture in
+            self?.scroll(gesture)
+        }
+        view.isMouseReportingEnabled = { [weak self] in
+            self?.mouseReportingEnabled() ?? false
+        }
+        view.mouseTrackingMode = { [weak self] in
+            self?.session?.sgrMouseTrackingMode ?? .off
+        }
+        view.mouseOverrideModifier = ConfigurationStore.shared.configuration.mouseOverrideModifier
+        view.onMouseBytes = { [weak self] bytes in
+            self?.session?.write(bytes)
+        }
+        view.cursorRectProvider = { [weak self] in
+            guard let self, session != nil else { return nil }
+            let cursor = session.snapshot().cursor
+            return cellRect(row: cursor.row, column: cursor.column)
+        }
+        view.accessibilitySnapshotProvider = { [weak self] in
+            guard let self, let session else { return nil }
+            let grid = session.snapshot()
+            return TerminalAccessibilitySnapshot(
+                grid: grid,
+                selection: selection.map { selectionRange(for: $0, in: grid) },
+                scrollOffset: scrollOffset)
+        }
+        view.accessibilityCellFrameProvider = { [weak self] row, column in
+            self?.cellRect(row: row, column: column) ?? .zero
+        }
+        view.cellAtPoint = { [weak self] point in
+            guard let self, let terminalRenderer, session != nil, let terminalView
+            else { return (column: 0, row: 0) }
+            let position = Self.documentPosition(
+                for: point, viewHeight: terminalView.bounds.height,
+                metrics: terminalRenderer.pointMetrics, grid: session.snapshot(), scrollOffset: 0,
+                topInset: topInset)
+            return (position.column, position.row)
+        }
+    }
+
+    /// A screen cell's rect in the terminal view's coordinates.
+    private func cellRect(row: Int, column: Int) -> CGRect? {
+        guard let terminalRenderer else { return nil }
+        let metrics = terminalRenderer.pointMetrics
+        return CGRect(
+            x: TerminalLayout.insets.left + CGFloat(column) * metrics.cellWidth,
+            y: topInset + CGFloat(row) * metrics.cellHeight,
+            width: metrics.cellWidth, height: metrics.cellHeight)
+    }
+
     // MARK: - Scrolling from the keyboard
 
     @objc func scrollHistoryPageUp(_ sender: Any?) { scroll(.page(up: true)) }
