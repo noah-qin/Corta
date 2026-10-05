@@ -137,6 +137,24 @@ tests is caught on every run — without anything being driven. Neither CI
 nor an offscreen rendering test replaces launching the app.
 `CortaPerformanceTests` is listed the same way, for the same reason.
 
+### Stages for the UI plan
+
+The UI runner is sandboxed: it reads anywhere but writes only its own
+container, which the app cannot read, so a UI test cannot write the
+config it launches the app with. `CursorAndWindowUITests` and
+`SystemStatusAndThemeEditorUITests` read theirs from a root prepared
+outside the sandbox, and skip with this instruction without it:
+
+```sh
+UI_FIXTURES=$(CortaUITests/stage-ui-fixtures.sh)
+FEEDBACK_STAGE=$(CortaUITests/stage-feedback-ui.sh)
+TEST_RUNNER_CORTA_UI_FIXTURES="$UI_FIXTURES" \
+TEST_RUNNER_CORTA_FEEDBACK_STAGE="$FEEDBACK_STAGE" xcodebuild test \
+  -project Corta.xcodeproj -scheme Corta -testPlan UI
+```
+
+Remove both printed directories once the development app has exited.
+
 ### Terminal feedback regression (#213)
 
 The UI runner is sandboxed; Corta and its spawn helper cannot reliably use

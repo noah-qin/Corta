@@ -19,8 +19,7 @@ import XCTest
 final class SystemStatusAndThemeEditorUITests: XCTestCase {
     @MainActor func testStatusBarIsOptionalSelectableAndHasLocalHostDetails() throws {
         continueAfterFailure = false
-        let stage = try makeStage()
-        defer { try? FileManager.default.removeItem(at: stage) }
+        let stage = try preparedStage("system-status-bar")
         let app = makeApp(stage)
         app.launch()
         defer { app.terminate() }
@@ -69,8 +68,7 @@ final class SystemStatusAndThemeEditorUITests: XCTestCase {
         continueAfterFailure = false
         let previous = LatinInputSource.select()
         defer { LatinInputSource.restore(previous) }
-        let stage = try makeStage()
-        defer { try? FileManager.default.removeItem(at: stage) }
+        let stage = try preparedStage("system-theme-editor")
         let app = makeApp(stage)
         app.launch()
         defer { app.terminate() }
@@ -107,8 +105,7 @@ final class SystemStatusAndThemeEditorUITests: XCTestCase {
 
     @MainActor func testMenuEntrypointsAndImmediateAppearancePreview() throws {
         continueAfterFailure = false
-        let stage = try makeStage()
-        defer { try? FileManager.default.removeItem(at: stage) }
+        let stage = try preparedStage("system-menu-preview")
         let app = makeApp(stage)
         app.launch()
         defer { app.terminate() }
@@ -156,10 +153,7 @@ final class SystemStatusAndThemeEditorUITests: XCTestCase {
             ("pt-BR", ["Visualização", "Editor de temas", "Detalhes do host local", "Cancelar", "Local", "Carga", "Memória", "Rede", "Disco livre", "Estado térmico"]),
         ]
         for (language, labels) in translations {
-            let stage = try makeStage()
-            defer { try? FileManager.default.removeItem(at: stage) }
-            try "appearance = light\nstatus-bar = true\nrestore-windows = false\ninput-source-indicator = off\n".write(
-                to: stage.appendingPathComponent("config"), atomically: true, encoding: .utf8)
+            let stage = try preparedStage("system-language-\(language)")
             let app = makeApp(stage)
             app.launchArguments = ["-AppleLanguages", "(\(language))"]
             app.launch()
@@ -199,12 +193,16 @@ final class SystemStatusAndThemeEditorUITests: XCTestCase {
         menu.menuItems["Settings…"].click()
         XCTAssertTrue(app.windows["Corta.Settings"].waitForExistence(timeout: 5))
     }
-    private func makeStage() throws -> URL {
-        let stage = URL(fileURLWithPath: "/private/tmp/corta-ui-stages", isDirectory: true).appendingPathComponent("corta-system-ui-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: stage, withIntermediateDirectories: true)
-        try "appearance = light\nrestore-windows = false\ninput-source-indicator = off\n".write(
-            to: stage.appendingPathComponent("config"), atomically: true, encoding: .utf8)
-        try "PROMPT='demo ❯ '\n".write(to: stage.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
+    /// The stage `stage-ui-fixtures.sh` prepared for `name`: the sandboxed
+    /// runner cannot write one the app could read.
+    private func preparedStage(_ name: String) throws -> URL {
+        guard let root = ProcessInfo.processInfo.environment["CORTA_UI_FIXTURES"] else {
+            throw XCTSkip(
+                "Set TEST_RUNNER_CORTA_UI_FIXTURES using CortaUITests/stage-ui-fixtures.sh; the runner's sandbox cannot write a stage the app can read.")
+        }
+        let stage = URL(fileURLWithPath: root, isDirectory: true).appendingPathComponent(name)
+        guard FileManager.default.fileExists(atPath: stage.appendingPathComponent("config").path)
+        else { throw XCTSkip("stage-ui-fixtures.sh made no stage named \(name)") }
         return stage
     }
     @MainActor private func makeApp(_ stage: URL) -> XCUIApplication {
