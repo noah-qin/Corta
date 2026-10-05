@@ -18,19 +18,16 @@ import CortaSFTP
 import CortaTerminal
 import Foundation
 
-/// Which `ssh` an SFTP connection spawns: the system client, unless
-/// `CORTA_SFTP_SSH` names an absolute path to run instead with the same
-/// argv — a verification hook (like `CORTA_MAX_DRAWABLES`) for driving the real
-/// flow against a local `sftp-server` without a network or sshd. Read once
-/// from the environment; relative values are ignored (no `PATH` search,
-/// `SFTPChannel.swift`). Either way the child gets the same sanitised
-/// environment as a shell (`ChildEnvironment`).
+/// Which `ssh` an SFTP connection spawns: the system client, unless a
+/// Debug build's `CORTA_SFTP_SSH` names an executable to run instead with
+/// the same argv — a verification hook for driving the real flow against a
+/// local `sftp-server` without a network or sshd
+/// (`DiagnosticsEnvironment.sftpSSHExecutable`). Either way the child gets
+/// the same sanitised environment as a shell (`ChildEnvironment`).
 extension SFTPConnection {
     static func forApp(host: String) -> SFTPConnection {
         let environment = ChildEnvironment.default()
-        if let override = ProcessInfo.processInfo.environment["CORTA_SFTP_SSH"],
-            override.hasPrefix("/")
-        {
+        if let override = DiagnosticsEnvironment.sftpSSHExecutable() {
             return SFTPConnection(
                 host: host, sshExecutable: override, environment: environment)
         }

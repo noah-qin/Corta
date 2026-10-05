@@ -54,8 +54,8 @@ nonisolated enum AppPaths {
         temporaryDirectory: String = NSTemporaryDirectory(),
         processID: Int32 = ProcessInfo.processInfo.processIdentifier
     ) -> URL? {
-        if let raw = environment["CORTA_STAGE_DIR"], raw.hasPrefix("/") {
-            return URL(fileURLWithPath: raw, isDirectory: true)
+        if let explicit = DiagnosticsEnvironment.stageDirectory(in: environment) {
+            return explicit
         }
         if environment["XCTestConfigurationFilePath"] != nil {
             return URL(fileURLWithPath: temporaryDirectory, isDirectory: true)
@@ -73,7 +73,7 @@ nonisolated enum AppPaths {
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) {
         guard environment["XCTestConfigurationFilePath"] != nil,
-            environment["CORTA_STAGE_DIR"] == nil
+            DiagnosticsEnvironment.stageDirectory(in: environment) == nil
         else { return }
         let temporary = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         let own = ProcessInfo.processInfo.processIdentifier

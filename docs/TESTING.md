@@ -422,6 +422,33 @@ Never change global hotkeys, secure-input state, shell startup files or
 dependencies and per-process environments. Use temporary directories for
 fixtures and clean up the resources you create.
 
+### Environment switches
+
+The app reads these from its own launch environment, and only through
+`DiagnosticsEnvironment` (`Corta/DiagnosticsEnvironment.swift`). They are
+measurement and staging seams, deliberately not config keys (D10): a
+launch that sets none behaves as shipped. Set one on the launch you
+control — or as `TEST_RUNNER_<name>` in front of `xcodebuild test`, which
+hands it to the test host — never through `launchctl setenv` (D13). None
+reaches a shell: `ChildEnvironment` strips every `CORTA_` name, and
+`DiagnosticsEnvironmentTests` holds this table, that stripping and the
+single reader to the code.
+
+| Variable | Values | Builds | Effect |
+| --- | --- | --- | --- |
+| `CORTA_FRAME_LATENCY` | number ≥ 1 | all | The display link's `preferredFrameLatency` (default 2; `PERFORMANCE.md` §5.7) |
+| `CORTA_MAX_DRAWABLES` | `2` or `3` | all | The Metal layer's drawable count (default 3), for a double-buffering A/B |
+| `CORTA_RENDER_METRICS` | any; an absolute path also writes there | all | Frame-timing percentiles to the `render-metrics` log category, and to the file |
+| `CORTA_RENDER_METRICS_KEYSTROKES` | integer > 0 | all | Keystrokes per keypress-to-present summary (default 200) |
+| `CORTA_RESTORE_WINDOWS` | `0` | all | Skips reopening last run's windows |
+| `CORTA_STAGE_DIR` | absolute path | all | Config, Application Support and rc files move into it (`AppPaths`) |
+| `CORTA_SFTP_SSH` | absolute path to an executable | Debug only | Runs in place of `ssh` for the SFTP browser, with the same argv; logged (`SECURITY.md` §4.3) |
+
+The test suites read their own `CORTA_*` knobs — `CORTA_TEST_TIMEOUT_SCALE`,
+`CORTA_RECORD_RENDER_REFERENCES`, `CORTA_STRESS_SECONDS`,
+`CORTA_UPDATE_GOLDEN` and the benchmark output paths — described where
+each is used above; the app never reads them.
+
 ## The update feed
 
 `appcast.xml` on `main` *is* the live feed — `Sparkle-Info.plist`'s `SUFeedURL`

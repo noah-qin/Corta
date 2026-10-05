@@ -69,9 +69,7 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         // `RenderPolicy` manages only the rate range, so nothing overrides it.
         // Unset, the link keeps its default of 2 frames: setting 1 measured no
         // shorter (`PERFORMANCE.md` §5.7).
-        if let raw = ProcessInfo.processInfo.environment["CORTA_FRAME_LATENCY"],
-            let latency = Float(raw), latency >= 1
-        {
+        if let latency = DiagnosticsEnvironment.frameLatency() {
             newLink.preferredFrameLatency = latency
         }
         link = newLink

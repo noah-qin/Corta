@@ -65,6 +65,10 @@ what to edit.
 
 ### Changed
 
+- A Release build no longer honours `CORTA_SFTP_SSH`, the test hook that
+  swaps the SFTP browser's `ssh` for another program; the development
+  build accepts only an absolute path to an executable and logs its use.
+  Every `CORTA_*` launch switch is listed in `docs/TESTING.md`.
 - Primary font is System Monospaced; legacy configured families migrate to it.
 - Corta zsh integration inserts four spaces for Tab on a blank command line
   while preserving command completion and terminal output tab stops.

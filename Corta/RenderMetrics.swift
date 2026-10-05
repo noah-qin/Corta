@@ -38,13 +38,9 @@ nonisolated enum RenderMetrics {
         case keypressToPresent
     }
 
-    static let isEnabled = ProcessInfo.processInfo.environment["CORTA_RENDER_METRICS"] != nil
+    static let isEnabled = DiagnosticsEnvironment.isRenderMetricsEnabled()
 
-    private static let outputFile: URL? = {
-        guard let raw = ProcessInfo.processInfo.environment["CORTA_RENDER_METRICS"], raw.hasPrefix("/")
-        else { return nil }
-        return URL(fileURLWithPath: raw)
-    }()
+    private static let outputFile = DiagnosticsEnvironment.renderMetricsFile()
 
     private static let log = OSLog(subsystem: "dev.noahqin.Corta", category: "render-metrics")
 
@@ -52,11 +48,7 @@ nonisolated enum RenderMetrics {
     private static let capacity = 600
     /// 200 keystrokes, as earlier runs used; override with
     /// `CORTA_RENDER_METRICS_KEYSTROKES=<n>`.
-    private static let keystrokeCapacity: Int = {
-        let raw = ProcessInfo.processInfo.environment["CORTA_RENDER_METRICS_KEYSTROKES"] ?? ""
-        if let n = Int(raw), n > 0 { return n }
-        return 200
-    }()
+    private static let keystrokeCapacity = DiagnosticsEnvironment.renderMetricsKeystrokes() ?? 200
 
     private static let lock = NSLock()
     // Mutated only under `lock`; an actor would make render-path calls
