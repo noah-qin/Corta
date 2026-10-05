@@ -363,8 +363,8 @@ which records S01–S04 and S07 in full); the entries below are the ones
 whose write-up belongs with the design rather than with the release that
 made them.
 
-- **S15 — 2026-10-05: the SFTP `ssh` override is Debug-only.** Eight
-  `CORTA_*` switches were read in seven files; they are now one type,
+- **S15 — 2026-10-05: the SFTP `ssh` override is Debug-only.** Seven
+  `CORTA_*` switches were read in six files; they are now one type,
   `DiagnosticsEnvironment`. `CORTA_SFTP_SSH`, which picks the program
   that holds the SSH session, was honoured by a Release build for any
   absolute path; it is now read only by a Debug build, must name an
