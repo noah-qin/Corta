@@ -21,9 +21,10 @@ what to edit.
   including newly created and inactive tabs.
 - Font settings, keyboard zoom and pinch refit rows and columns while keeping
   the window in place, subject to minimum-size constraints. A single-pane
-  window adjusts by less than a cell so the grid fills it, keeping the same
-  gap under the last row at every size, and the new rows and columns reach
-  the shell in one step instead of after the resize debounce.
+  window moves its bottom and right edges to whole cells so the grid fills
+  it, keeping the same gap under the last row at every size; a pinch settles
+  once when it ends, and the new rows and columns reach the shell in one step
+  instead of after the resize debounce.
 - Previous/next tab commands (⇧⌘[ / ⇧⌘]) are configurable. Tabs can be renamed
   in place by double-clicking their title or using the tab context menu; Return
   saves, Esc cancels, and names survive shell output and restore. Tab and

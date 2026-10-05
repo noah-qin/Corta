@@ -120,10 +120,6 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
 
     /// ⌘+/⌘− re-fit the window to keep this grid size.
     var lastRequestedSize: TerminalSize?
-    /// The usable area a run of font changes started from, and the frame and
-    /// usable area the last one left; either changed since starts a new run
-    /// (`fitWindowToWholeCells`).
-    var fontChangeAnchor: (usable: CGSize, frameSize: CGSize, fittedUsable: CGSize)?
 
     /// Scrollback search: the bar, its sweeps and the highlighted matches.
     private(set) lazy var search = PaneSearch(host: self)
@@ -215,19 +211,31 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     }
 
     /// How a split predicts the new pane's winsize before layout settles it.
+    /// Also the grid `resizeSessionToFitView` sends, so a prediction and the
+    /// session never disagree. Half a point of slack: a window fitted to
+    /// whole cells can land a rounding step short of the last one, and the
+    /// right and bottom insets absorb the overhang.
     func gridSize(fitting size: CGSize) -> TerminalSize {
         let metrics = cellMetrics
+        let usable = usableSize(fitting: size)
         return TerminalSize(
-            rows: Self.cellCount((size.height - verticalInsets) / metrics.cellHeight),
-            columns: Self.cellCount((size.width - TerminalLayout.insetWidth) / metrics.cellWidth))
+            rows: Self.cellCount((usable.height + Self.fitSlack) / metrics.cellHeight),
+            columns: Self.cellCount((usable.width + Self.fitSlack) / metrics.cellWidth))
     }
 
+    /// The area of a pane `size` large that the grid may use: the size less
+    /// the insets.
+    func usableSize(fitting size: CGSize) -> CGSize {
+        CGSize(width: size.width - TerminalLayout.insetWidth, height: size.height - verticalInsets)
+    }
+
+    nonisolated static let fitSlack: CGFloat = 0.5
+
     /// Clamped before converting: a zero metric makes the quotient infinite,
-    /// and `UInt16(.infinity)` traps. A hair of slack, so a pane fitted to
-    /// whole cells is not a cell short through rounding.
+    /// and `UInt16(.infinity)` traps.
     nonisolated static func cellCount(_ quotient: CGFloat) -> UInt16 {
         guard quotient.isFinite else { return 1 }
-        return UInt16(min(max(1, quotient + 0.001), CGFloat(UInt16.max)))
+        return UInt16(min(max(1, quotient), CGFloat(UInt16.max)))
     }
 
     /// The *frame* size (`setContentSize` sizes the frame here) for the initial
@@ -794,14 +802,11 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         guard didSizeWindow, session != nil, let terminalRenderer, view.window != nil,
             let splitController, splitController.sizeSettled
         else { return }
-        let usable = CGSize(
-            width: view.bounds.width - TerminalLayout.insetWidth,
-            height: view.bounds.height - verticalInsets)
-        let columns = Self.cellCount(usable.width / terminalRenderer.pointMetrics.cellWidth)
-        let rows = Self.cellCount(usable.height / terminalRenderer.pointMetrics.cellHeight)
-        let pixels = pixelSize(columns: Int(columns), rows: Int(rows), metrics: terminalRenderer.metrics)
+        let grid = gridSize(fitting: view.bounds.size)
+        let pixels = pixelSize(
+            columns: Int(grid.columns), rows: Int(grid.rows), metrics: terminalRenderer.metrics)
         let size = TerminalSize(
-            rows: rows, columns: columns, pixelWidth: pixels.width, pixelHeight: pixels.height)
+            rows: grid.rows, columns: grid.columns, pixelWidth: pixels.width, pixelHeight: pixels.height)
         guard size != lastRequestedSize else {
             // A layout pass may have queued this size behind the debounce.
             if !coalesce { resizeDebouncer.flush() }

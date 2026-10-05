@@ -86,8 +86,9 @@ installed when you say so.
 - **Zoom.** ⌘= / ⌘− / ⌘0 or a pinch make the text bigger, smaller or
   the configured size again, in the current window only. Zoom never
   changes the config file. Font changes keep the window where it is and refit the visible rows and
-  columns; a window with one pane and no tabs moves its bottom and right edges by less than a cell
-  so the text fills it exactly, and ⌘0 brings it back to the size it started at.
+  columns; a window with one pane and no tabs moves its bottom and right edges to whole cells so
+  the text fills it exactly, and ⌘0 brings it back to the size it started at. Full-screen, maximised
+  and tiled windows keep their size.
 - **Theme.** Three built-in themes, `corta`, `solarized` and `mono`, each with light and dark variants;
   `appearance = auto` follows macOS as it switches. You can define your
   own theme through **View ▸ Theme editor…** or in the config file, or inherit
