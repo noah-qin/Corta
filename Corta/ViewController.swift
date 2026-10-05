@@ -21,12 +21,14 @@ import Metal
 import QuartzCore
 
 /// One pane: a `TerminalSession` and the renderer and view that draw it.
-/// Knows no sibling panes beyond `splitController` (D07). This file owns
-/// lifecycle and the session; the render loop is `PaneFrameLoop`'s, the
-/// window title `PaneWindowTitle`'s, search `PaneSearch`'s, the remote side
-/// `PaneRemote`'s and the menu commands `PaneCommands`', and the remaining
-/// behaviour lives in the `ViewController+<concern>.swift` extensions.
-class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneCommandsHost {
+/// Knows no sibling panes beyond `splitController` (D07). The pane keeps
+/// the session, the view, the renderer, sizing, teardown and the wiring
+/// between them; each other concern is a collaborator it composes
+/// (`docs/DESIGN.md` §4.1), and new behaviour is added as one.
+class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneCommandsHost,
+    PaneFocusHost, PanePointerHost, PaneShellIntegrationHost, PaneAppearanceHost,
+    NSMenuItemValidation
+{
     // Not `private`: extensions reach these and cannot add storage.
     var terminalView: TerminalView!
     var terminalRenderer: TerminalRenderer!
@@ -59,15 +61,10 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// What actually spawned — after a fallback, not what was asked for. The
     /// remote-state composition and Reconnect read it.
     private(set) var launchedCommand: (executable: String, arguments: [String])?
-    /// Cleared when the viewport moves (`scrollOffset`'s `didSet`), so
-    /// `effectiveCommand` never targets a command scrolled out of view.
-    /// `jumpToCommand` sets it after its own scroll.
-    var selectedCommandID: Int?
-
     var scrollOffset = 0 {
         didSet {
             guard scrollOffset != oldValue else { return }
-            selectedCommandID = nil
+            shell.selectedCommandID = nil
             if scrollOffset == 0 {
                 sawOutputWhileScrolled = false
                 scrollAnchorTotalPushed = nil
@@ -76,7 +73,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
                 // measured from there.
                 scrollAnchorTotalPushed = session?.scrollbackTotalPushed
             }
-            updateScrollPositionIndicator()
+            pointer.updateScrollPositionIndicator()
             search.placeClearOfContent()
         }
     }
@@ -85,34 +82,13 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// `prepareFrame` keeps the viewport on the same document row with it.
     var scrollAnchorTotalPushed: Int?
 
-    var scrollPositionIndicator: ScrollPositionIndicator?
-
     /// The fact a person scrolled up to wait for.
     var sawOutputWhileScrolled = false
-    /// Cursor changes on transitions only: resetting the arrow every move
-    /// fights the divider's resize cursor.
-    var hoveringLink = false
-    /// Underlined, so the target shows before a click opens it.
-    var hoveredLink: TerminalSelection?
     var selection: TerminalSelection?
-    /// Dims unfocused panes; never intercepts input (`PassthroughView`).
-    var focusDimView: NSView?
-    /// On `hasUserFocus`, not `isFocusedPane`: hidden when the window resigns
-    /// key, like the ring — neither claims where the keyboard *would* go.
-    var focusHighlightView: NSView?
-    /// The positive focus signal, so unfocused panes need not look disabled.
-    var focusRingView: NSView?
-    /// Re-tensioned every layout, so a top pane's ring clears a tab bar that
-    /// appears, hides or is dragged out.
-    private var focusRingTopConstraint: NSLayoutConstraint?
     /// Non-nil exactly when `isOperable` is false.
     var failureView: PaneFailureView?
     /// A fallback shell or directory, reported once the toast can be seen.
     private var pendingSessionNotice: String?
-    /// `setUpPane` can run twice (a retry); observers must not.
-    private var didInstallObservers = false
-    /// `nil` until the first `?1004` report, so it always goes out.
-    var lastReportedFocus: Bool?
     /// Keeps transient startup layouts from reaching the child
     /// (`resizeSessionToFitView`).
     var didSizeWindow = false
@@ -129,6 +105,16 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// Font size, copy and export, drops and Services, Finder actions and
     /// app-initiated `cd`.
     private(set) lazy var commands = PaneCommands(host: self)
+    /// The dim, ring and highlight, the cursor's blink, and `?1004`.
+    private(set) lazy var focus = PaneFocus(host: self)
+    /// Scrolling, mouse selection, links and local file references.
+    private(set) lazy var pointer = PanePointer(host: self)
+    /// OSC 133's jumps, command output, history fill, the status marks and
+    /// directory completion, and the OSC 52 drain.
+    private(set) lazy var shell = PaneShellIntegration(host: self)
+    /// The configuration file and the live appearance followed, and the
+    /// font's size, family and backing scale applied.
+    private(set) lazy var appearance = PaneAppearance(host: self)
     let inputSourceIndicator = PaneInputSourceIndicator()
 
     /// The child sees the final size now, not after the debounce.
@@ -157,7 +143,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         return TerminalLayout.insets.top + chromeOverlap
     }
     /// The chrome share alone — what the focus ring, drawn flush, needs.
-    private var chromeOverlap: CGFloat {
+    var chromeOverlap: CGFloat {
         guard let window = view.window else { return 0 }
         let distanceFromTop = window.frame.height - view.convert(view.bounds, to: nil).maxY
         return TerminalLayout.chromeOverlap(
@@ -283,7 +269,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         } catch {
             presentFailure(
                 title: L10n.text("failure.title.renderer"),
-                detail: Self.describe(error), canRetry: true)
+                detail: PaneSpawn.describe(error), canRetry: true)
             return
         }
 
@@ -296,14 +282,16 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
                 rows: initialSize.rows, columns: initialSize.columns,
                 pixelWidth: pixels.width, pixelHeight: pixels.height)
         }
-        let started: StartedSession
+        let started: PaneSpawn.Started
         do {
             if strictRespawn, let command = remote.reconnectCommand {
-                started = StartedSession(
-                    session: try respawn(command, size: initialSize, configuration: configuration),
+                started = PaneSpawn.Started(
+                    session: try PaneSpawn.respawn(
+                        command, size: initialSize, configuration: configuration, preset: preset,
+                        workingDirectory: inheritedWorkingDirectory),
                     notice: nil, executable: command.executable, arguments: command.arguments)
             } else {
-                started = try Self.startSession(
+                started = try PaneSpawn.start(
                     size: initialSize, directory: inheritedWorkingDirectory,
                     scrollbackLimit: configuration.scrollbackLines,
                     commandHistoryLimit: configuration.commandHistoryLimit, preset: preset,
@@ -312,7 +300,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         } catch {
             presentFailure(
                 title: L10n.text("failure.title.session"),
-                detail: Self.describe(error), canRetry: true,
+                detail: PaneSpawn.describe(error), canRetry: true,
                 canReconnect: remote.reconnectCommand.map {
                     PaneRemoteState.isRemoteLauncher(executable: $0.executable)
                 } ?? false)
@@ -352,68 +340,16 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             view.bottomAnchor.constraint(equalTo: self.view.bottomAnchor),
         ])
         terminalView = view
-
-        let dim = PassthroughView()
-        dim.wantsLayer = true
-        dim.layer?.backgroundColor = NSColor.black.withAlphaComponent(Self.unfocusedDim).cgColor
-        dim.isHidden = true
-        dim.translatesAutoresizingMaskIntoConstraints = false
-        self.view.addSubview(dim)
-        NSLayoutConstraint.activate([
-            dim.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
-            dim.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
-            dim.topAnchor.constraint(equalTo: self.view.topAnchor),
-            dim.bottomAnchor.constraint(equalTo: self.view.bottomAnchor),
-        ])
-        focusDimView = dim
-
-        let highlight = PassthroughView()
-        highlight.wantsLayer = true
-        highlight.layer?.backgroundColor =
-            NSColor.controlAccentColor.withAlphaComponent(Self.focusHighlightAlpha).cgColor
-        highlight.isHidden = true
-        highlight.translatesAutoresizingMaskIntoConstraints = false
-        self.view.addSubview(highlight)
-        NSLayoutConstraint.activate([
-            highlight.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
-            highlight.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
-            highlight.topAnchor.constraint(equalTo: self.view.topAnchor),
-            highlight.bottomAnchor.constraint(equalTo: self.view.bottomAnchor),
-        ])
-        focusHighlightView = highlight
-
-        let ring = PassthroughView()
-        ring.wantsLayer = true
-        ring.layer?.borderWidth = Self.focusRingWidth
-        ring.layer?.cornerRadius = TerminalLayout.windowCornerRadius
-        ring.layer?.borderColor = Self.focusRingColor.cgColor
-        ring.isHidden = true
-        ring.translatesAutoresizingMaskIntoConstraints = false
-        self.view.addSubview(ring)
-        let ringTop = ring.topAnchor.constraint(
-            equalTo: self.view.topAnchor, constant: Self.focusRingWidth / 2)
-        NSLayoutConstraint.activate([
-            ring.leadingAnchor.constraint(
-                equalTo: self.view.leadingAnchor, constant: Self.focusRingWidth / 2),
-            ring.trailingAnchor.constraint(
-                equalTo: self.view.trailingAnchor, constant: -Self.focusRingWidth / 2),
-            ringTop,
-            ring.bottomAnchor.constraint(
-                equalTo: self.view.bottomAnchor, constant: -Self.focusRingWidth / 2),
-        ])
-        focusRingTopConstraint = ringTop
-        focusRingView = ring
+        focus.installViews(in: self.view)
     }
 
     private func installSessionCallbacks() {
         resizeDebouncer = ResizeDebouncer { [weak self] size in
             self?.session?.resize(to: size)
         }
-        if !didInstallObservers {
-            didInstallObservers = true
-            observeWindowFocus()
-            observeConfiguration()
-        }
+        // Each is idempotent: a retry's second setup observes nothing twice.
+        focus.observeWindows()
+        appearance.observe()
         let generation = frameLoop.attach(session: session, renderer: terminalRenderer)
         let wake = frameLoop.outputWake
         taskNotifier.lastOutputUptimeNanoseconds = { wake.lastOutputUptimeNanoseconds }
@@ -425,16 +361,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     }
 
     private func installTerminalCallbacks(on view: TerminalView) {
-        view.onRenderFrame = { [weak self] drawableSize, drawable in
-            guard let self else {
-                drawable.present()
-                return true
-            }
-            return frameLoop.render(drawableSize: drawableSize, drawable: drawable)
-        }
-        view.shouldRenderFrame = { [weak self] in
-            self?.frameLoop.prepareFrame() ?? false
-        }
+        frameLoop.install(on: view)
+        pointer.install(on: view)
         // `view` weakly too: the closure is stored on it, and a strong capture
         // kept every closed pane's view — and its drawables — alive.
         view.addSubview(view.shellOverlay)
@@ -446,15 +374,12 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             invalidateDisplay()
         }
         inputSourceIndicator.start()
-        view.onCompletionKey = { [weak self] event in self?.handleDirectoryCompletionKey(event) ?? false }
+        view.onCompletionKey = { [weak self] event in self?.shell.handleDirectoryCompletionKey(event) ?? false }
         view.onKeyBytes = { [weak self, weak view] bytes in
             guard let self else { return }
             if bytes.contains(0x0D) { taskNotifier.noteCommandSubmitted(in: view?.window) }
-            returnToBottomOnInput()
+            pointer.returnToBottomOnInput()
             session.write(bytes)
-        }
-        view.onScroll = { [weak self] gesture in
-            self?.scroll(gesture)
         }
         view.onLiveResizeEnded = { [weak self] in
             self?.endLiveResize()
@@ -478,20 +403,11 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             ConfigurationStore.shared.configuration.keybindings
         }
         commands.installNativeIntegrations(on: view)
-        view.onMagnify = { [weak self] magnification in
-            self?.commands.magnify(by: magnification)
-        }
-        view.onMagnifyEnded = { [weak self] in
-            self?.commands.endMagnification()
-        }
         view.onBackingScaleChange = { [weak self] scale in
-            self?.rebuildAtlas(forBackingScale: scale)
+            self?.appearance.rebuildAtlas(forBackingScale: scale)
         }
         view.onDrawableSizeChange = { [weak self] in
             self?.invalidateDisplay()
-        }
-        view.onPaste = { [weak self] in
-            self?.pasteFromClipboard()
         }
         view.onSearchKey = { [weak self] (event: NSEvent) -> Bool in
             self?.search.handleKey(event) ?? false
@@ -504,64 +420,14 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             }
             return TerminalFont.primary(ofSize: fontSize, family: fontFamily) as NSFont
         }
-        view.isMouseReportingEnabled = { [weak self] in
-            self?.mouseReportingEnabled() ?? false
-        }
-        view.mouseTrackingMode = { [weak self] in
-            self?.session?.sgrMouseTrackingMode ?? .off
-        }
-        view.mouseOverrideModifier = ConfigurationStore.shared.configuration.mouseOverrideModifier
-        view.onMouseBytes = { [weak self] bytes in
-            self?.session.write(bytes)
-        }
         view.onFocus = { [weak self] in
             guard let self else { return }
             self.inputSourceIndicator.refreshSource()
             self.splitController?.noteFocus(self)
         }
-        view.cursorRectProvider = { [weak self] in
-            guard let self, let terminalRenderer, session != nil else { return nil }
-            let metrics = terminalRenderer.pointMetrics
-            let cursor = session.snapshot().cursor
-            return CGRect(
-                x: TerminalLayout.insets.left + CGFloat(cursor.column) * metrics.cellWidth,
-                y: topInset + CGFloat(cursor.row) * metrics.cellHeight,
-                width: metrics.cellWidth, height: metrics.cellHeight)
-        }
-        view.accessibilitySnapshotProvider = { [weak self] in
-            guard let self, let session else { return nil }
-            let grid = session.snapshot()
-            return TerminalAccessibilitySnapshot(
-                grid: grid,
-                selection: selection.map { selectionRange(for: $0, in: grid) },
-                scrollOffset: scrollOffset)
-        }
-        view.accessibilityCellFrameProvider = { [weak self] row, column in
-            guard let self, let terminalRenderer else { return .zero }
-            let metrics = terminalRenderer.pointMetrics
-            return CGRect(
-                x: TerminalLayout.insets.left + CGFloat(column) * metrics.cellWidth,
-                y: topInset + CGFloat(row) * metrics.cellHeight,
-                width: metrics.cellWidth, height: metrics.cellHeight)
-        }
-        view.cellAtPoint = { [weak self] point in
-            guard let self, let terminalRenderer, session != nil, let terminalView
-            else { return (column: 0, row: 0) }
-            let grid = session.snapshot()
-            let position = Self.documentPosition(
-                for: point, viewHeight: terminalView.bounds.height,
-                metrics: terminalRenderer.pointMetrics, grid: grid, scrollOffset: 0,
-                topInset: self.topInset)
-            return (position.column, position.row)
-        }
     }
 
     // MARK: - Teardown
-
-    var cursorBlinkTimer: Timer?
-    var cursorBlinkVisible = true
-    var lastBlinkCursor: Cursor?
-    var lastBlinkStyle: CursorStyle?
 
     /// Two close paths can reach one pane. Also checked by copy/export
     /// completions — the generation guard catches a newer build, not a
@@ -574,13 +440,13 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     func teardown() {
         guard !didTeardown else { return }
         didTeardown = true
-        stopCursorBlink()
+        focus.stop()
         inputSourceIndicator.stop()
         windowTitle.stop()
         search.close()
         commands.stop()
         taskNotifier.cancel()
-        NotificationCenter.default.removeObserver(self)
+        appearance.stop()
         terminalView?.stopRendering()
         session?.stop()
     }
@@ -590,27 +456,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         // Size or scale can change with no grid change the diff would see.
         invalidateDisplay()
         resizeSessionToFitView()
-        updateFocusRingLayout()
+        focus.updateLayout()
         search.placeClearOfContent()
-    }
-
-    /// Tab bar changes are all layout passes, so `viewDidLayout` suffices.
-    private func updateFocusRingLayout() {
-        guard focusRingView != nil else { return }
-        focusRingTopConstraint?.constant = chromeOverlap + Self.focusRingWidth / 2
-        updateFocusRingCornerMask()
-    }
-
-    /// Only corners that are the window's, as `TerminalView` does for the
-    /// drawable; this view is not flipped, so `MaxY` is the top.
-    private func updateFocusRingCornerMask() {
-        guard let window = view.window, let ring = focusRingView else { return }
-        let edges = TerminalLayout.exteriorEdges(
-            paneFrameInWindow: view.convert(view.bounds, to: nil), windowSize: window.frame.size)
-        var mask: CACornerMask = []
-        if edges.top && edges.left { mask.insert(.layerMinXMaxYCorner) }
-        if edges.top && edges.right { mask.insert(.layerMaxXMaxYCorner) }
-        ring.layer?.maskedCorners = mask
     }
 
     private func makeFrameLoop() -> PaneFrameLoop {
@@ -647,7 +494,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         if scrollOffset > 0, !sawOutputWhileScrolled {
             // Nothing else says so: no scroll bar, and the live screen is off view.
             sawOutputWhileScrolled = true
-            updateScrollPositionIndicator()
+            pointer.updateScrollPositionIndicator()
         }
         // Search refresh is a full-scrollback sweep; off the render path.
         if search.bar != nil {
@@ -657,7 +504,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         }
         // Rate-limited and gated on VoiceOver inside the call.
         terminalView?.noteAccessibilityValueChanged()
-        drainClipboardRequests()
+        shell.drainClipboardRequests()
         let finished = session.takeFinishedCommand()
         // The prompt's return is the moment the program left: the title
         // names the shell again now, not an interval later.
@@ -684,12 +531,12 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         let inputSnapshot = configuration.inputSourceIndicator == .off ? nil : session.inputLineSnapshot()
         let grid = inputSnapshot?.grid ?? session.snapshot()
         splitController?.placeInputSourceIndicator(from: self, configuration: configuration)
-        updateShellOverlay(grid: grid)
+        shell.updateShellOverlay(grid: grid)
         if let inputSnapshot {
             let metrics = terminalRenderer.pointMetrics
             inputSourceIndicator.update(grid: grid, hasIntegration: inputSnapshot.hasIntegration,
                 promptRow: inputSnapshot.promptRow,
-                focused: hasUserFocus && view.window?.firstResponder === terminalView,
+                focused: focus.hasUserFocus && view.window?.firstResponder === terminalView,
                 scrollOffset: scrollOffset, configuration: configuration,
                 cellSize: CGSize(width: metrics.cellWidth, height: metrics.cellHeight),
                 topInset: topInset, compositionRect: terminalView.inputCompositionRect,
@@ -706,14 +553,14 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
                 scrollAnchorTotalPushed = grid.scrollback.totalPushed
             }
         }
-        let cursorStyle = effectiveCursorStyle(grid: grid)
-        updateCursorBlink(grid: grid, style: cursorStyle, reset: hasOutput)
+        let cursorStyle = focus.effectiveCursorStyle(grid: grid)
+        focus.updateCursorBlink(grid: grid, style: cursorStyle, reset: hasOutput)
         return PaneFrameLoop.Content(
             grid: grid, scrollOffset: scrollOffset,
-            cursorVisible: scrollOffset == 0 && isFocusedPane && cursorBlinkVisible,
+            cursorVisible: scrollOffset == 0 && isFocusedPane && focus.cursorBlinkVisible,
             selection: selection,
             searchMatches: search.matches.map { TerminalSelection($0, grid: grid) },
-            currentSearchMatchIndex: search.currentMatchIndex, hoveredLink: hoveredLink,
+            currentSearchMatchIndex: search.currentMatchIndex, hoveredLink: pointer.hoveredLink,
             cursorStyle: cursorStyle)
     }
 
@@ -762,33 +609,66 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         commands.selectedText()
     }
 
+    func setFontSize(_ newSize: CGFloat, settle: Bool = true) {
+        appearance.setFontSize(newSize, settle: settle)
+    }
+
+    func settleFontChange() { appearance.settleFontChange() }
+
+    /// What copy, export and open-reference act on (`PaneShellIntegration`).
+    var effectiveCommand: CommandRecord? { shell.effectiveCommand }
+
+    /// ⌘A: `NSResponder` declares it, so the pane overrides rather than
+    /// forwards.
+    override func selectAll(_ sender: Any?) { pointer.selectAll(sender) }
+
     // MARK: - Forwarding
 
-    // Menu items, the palette and key bindings send their actions to the
-    // first responder, and the pane is in its chain; the pane answers for
-    // the collaborator that owns each one, and `validateMenuItem` asks it.
+    /// Menu items, the palette, key bindings and the storyboard send their
+    /// actions to the first responder or to the pane by name; the pane
+    /// answers for the collaborator that implements each, through the
+    /// Objective-C runtime's forwarding, and `validateMenuItem` asks it too.
+    /// A collaborator's new `@objc` action needs nothing here; a new
+    /// collaborator that owns actions joins both lists, in the same order
+    /// (`PaneCommandsTests` holds them equal). `focus` and `appearance` have
+    /// only notification selectors and stay out.
+    var actionOwners: [NSObject] { [search, remote, commands, pointer, shell] }
+    /// The same owners as classes, for a question that may come from any
+    /// thread and so must not touch the instances.
+    nonisolated static let actionOwnerClasses: [NSObject.Type] = [
+        PaneSearch.self, PaneRemote.self, PaneCommands.self, PanePointer.self,
+        PaneShellIntegration.self,
+    ]
 
-    @objc func performFindPanelAction(_ sender: Any?) { search.performFindPanelAction(sender) }
-    @objc func reconnectRemote(_ sender: Any?) { remote.reconnectRemote(sender) }
-    @objc func browseRemoteFiles(_ sender: Any?) { remote.browseRemoteFiles(sender) }
-    @objc func copy(_ sender: Any?) { commands.copy(sender) }
-    @objc func increaseFontSize(_ sender: Any?) { commands.increaseFontSize(sender) }
-    @objc func decreaseFontSize(_ sender: Any?) { commands.decreaseFontSize(sender) }
-    @objc func resetFontSize(_ sender: Any?) { commands.resetFontSize(sender) }
-    @objc func exportText(_ sender: Any?) { commands.exportText(sender) }
-    @objc func exportCommandOutput(_ sender: Any?) { commands.exportCommandOutput(sender) }
-    @objc func revealWorkingDirectoryInFinder(_ sender: Any?) {
-        commands.revealWorkingDirectoryInFinder(sender)
+    nonisolated override func responds(to aSelector: Selector!) -> Bool {
+        if super.responds(to: aSelector) { return true }
+        guard let aSelector else { return false }
+        return Self.actionOwnerClasses.contains { $0.instancesRespond(to: aSelector) }
     }
-    @objc func copyWorkingDirectoryPath(_ sender: Any?) { commands.copyWorkingDirectoryPath(sender) }
-    @objc func changeDirectoryToParent(_ sender: Any?) { commands.changeDirectoryToParent(sender) }
-    @objc func changeDirectoryToProjectRoot(_ sender: Any?) {
-        commands.changeDirectoryToProjectRoot(sender)
+
+    /// Every owner of an item's action gets its say; one that does not own
+    /// it answers yes.
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        actionOwners.allSatisfy {
+            ($0 as? NSMenuItemValidation)?.validateMenuItem(menuItem) ?? true
+        }
     }
-    @objc func openParentDirectoryInNewPane(_ sender: Any?) {
-        commands.openParentDirectoryInNewPane(sender)
+
+    /// Only what the pane itself does not answer: `NSObject`'s and
+    /// `NSResponder`'s own selectors stay the pane's. Actions are sent on the
+    /// main thread; one sent from another would not be forwarded, and the
+    /// runtime would report the selector unrecognised.
+    nonisolated override func forwardingTarget(for aSelector: Selector!) -> Any? {
+        guard let aSelector, Thread.isMainThread else {
+            return super.forwardingTarget(for: aSelector)
+        }
+        // Handed straight back to the runtime on this thread.
+        nonisolated(unsafe) var owner: NSObject?
+        MainActor.assumeIsolated {
+            owner = actionOwners.first { $0.responds(to: aSelector) }
+        }
+        return owner ?? super.forwardingTarget(for: aSelector)
     }
-    @objc func openProjectRootInNewPane(_ sender: Any?) { commands.openProjectRootInNewPane(sender) }
 
     /// `coalesce: false` delivers the size now: a font change is one step,
     /// and waiting out the drag debounce drew a frame of the new font over
@@ -861,97 +741,6 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         return renderer
     }
 
-    struct StartedSession {
-        let session: TerminalSession
-        /// A fallback was used, and the pane says so.
-        let notice: String?
-        /// The rung that succeeded, for `PaneRemoteState` and Reconnect.
-        let executable: String
-        let arguments: [String]
-    }
-
-    /// Degrades rather than fails: `$SHELL` and the directory can each be stale
-    /// (uninstalled shell, unmounted volume), and neither alone may abort the
-    /// pane. Each is dropped in turn; `/bin/sh` in `/` is guaranteed by POSIX.
-    /// - Parameter configuredShell: a parameter so tests can stage a missing
-    ///   shell without setting `$SHELL` for anything else.
-    static func startSession(
-        size: TerminalSize, directory: String?, scrollbackLimit: Int,
-        commandHistoryLimit: Int = CommandRecordStore.defaultCapacity, preset: Preset? = nil,
-        configuredShell: String? = nil, directoryCompletion: Bool = true
-    ) throws(PTYError) -> StartedSession {
-        // An uninstalled preset shell degrades to a working terminal.
-        let configured =
-            preset?.shell ?? configuredShell
-            ?? ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        let arguments = preset.map { $0.arguments.isEmpty ? ["-l"] : $0.arguments } ?? ["-l"]
-        // A preset adds and overrides, never removes (`SECURITY.md` §4.3).
-        var environment = ChildEnvironment.default()
-        for (key, value) in preset?.environment ?? [:] { environment[key] = value }
-        let home = NSHomeDirectory()
-        // From Finder the app's cwd is "/"; start where a login shell would.
-        let preferred = preset?.directory ?? directory ?? home
-        let attempts: [(shell: String, directory: String, notice: String?)] = [
-            (configured, preferred, nil),
-            (configured, home, L10n.text("failure.notice.fallbackDirectory")),
-            ("/bin/zsh", preferred, L10n.format("failure.notice.fallbackShell", "/bin/zsh")),
-            ("/bin/zsh", home, L10n.format("failure.notice.fallbackShell", "/bin/zsh")),
-            ("/bin/sh", "/", L10n.format("failure.notice.fallbackShell", "/bin/sh")),
-        ]
-        var attempted = Set<String>()
-        var lastError = PTYError.spawnFailed(code: ENOENT)
-        for attempt in attempts {
-            // Identical rungs only delay the failure view.
-            guard attempted.insert("\(attempt.shell)\u{0}\(attempt.directory)").inserted
-            else { continue }
-            do {
-                let session = try TerminalSession(
-                    executable: attempt.shell,
-                    // Only for the preset's own shell; a fallback may not understand them.
-                    arguments: attempt.shell == configured ? arguments : ["-l"],
-                    environment: directoryCompletion
-                        ? ZshBootstrap.environment(environment, executable: attempt.shell,
-                            arguments: attempt.shell == configured ? arguments : ["-l"])
-                        : environment, size: size,
-                    workingDirectory: attempt.directory,
-                    // Applies to new sessions: shrinking a live one would drop lines.
-                    scrollbackLimit: scrollbackLimit, commandHistoryLimit: commandHistoryLimit)
-                return StartedSession(
-                    session: session, notice: attempt.notice,
-                    executable: attempt.shell,
-                    arguments: attempt.shell == configured ? arguments : ["-l"])
-            } catch {
-                lastError = error
-            }
-        }
-        throw lastError
-    }
-
-    /// The recorded command, exactly — a fallback would silently turn a remote
-    /// pane into a local shell.
-    private func respawn(
-        _ command: (executable: String, arguments: [String]),
-        size: TerminalSize, configuration: Configuration
-    ) throws(PTYError) -> TerminalSession {
-        var environment = ChildEnvironment.default()
-        for (key, value) in preset?.environment ?? [:] { environment[key] = value }
-        // A local cwd for the launcher; the remote side lands where it lands.
-        return try TerminalSession(
-            executable: command.executable, arguments: command.arguments,
-            environment: configuration.directoryCompletion
-                ? ZshBootstrap.environment(environment, executable: command.executable, arguments: command.arguments)
-                : environment, size: size,
-            workingDirectory: preset?.directory ?? inheritedWorkingDirectory ?? NSHomeDirectory(),
-            scrollbackLimit: configuration.scrollbackLines,
-            commandHistoryLimit: configuration.commandHistoryLimit)
-    }
-
-    /// Casts to `PTYError`, not `CustomStringConvertible`: every `Error` now
-    /// conforms to that, so the `localizedDescription` fallback would never run.
-    private static func describe(_ error: Error) -> String {
-        (error as? PTYError)?.description ?? error.localizedDescription
-    }
-
     /// With `isOperable` false every geometry and render entry short-circuits.
     /// `canReconnect` adds Reconnect, described as a new connection.
     private func presentFailure(
@@ -960,34 +749,13 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         failureView?.removeFromSuperview()
         let failure = PaneFailureView(
             title: title, detail: detail, canRetry: canRetry, canReconnect: canReconnect)
-        failure.onRetry = { [weak self] in self?.retryAfterFailure() }
+        failure.onRetry = { [weak self] in self?.rebuildPane(strictRespawn: false) }
         failure.onReconnect = { [weak self] in self?.remote.reconnectRemote(nil) }
         failure.onOpenSettings = { SettingsWindowController.shared.show(nil) }
-        failure.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(failure)
-        NSLayoutConstraint.activate([
-            failure.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            failure.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            failure.topAnchor.constraint(equalTo: view.topAnchor),
-            failure.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-        ])
+        failure.present(in: view)
         failureView = failure
-        // Or nothing is focused and assistive technology hears nothing.
-        view.window?.makeFirstResponder(failure.primaryAction)
-        NSAccessibility.post(element: failure, notification: .layoutChanged)
-        if NSWorkspace.shared.isVoiceOverEnabled {
-            NSAccessibility.post(
-                element: NSApp as Any, notification: .announcementRequested,
-                userInfo: [
-                    .announcement: failure.announcement,
-                    .priority: NSAccessibilityPriorityLevel.high.rawValue,
-                ])
-        }
     }
 
-    private func retryAfterFailure() {
-        rebuildPane(strictRespawn: false)
-    }
 
     /// Behind Try Again (the ladder) and Reconnect (the exact command).
     func rebuildPane(strictRespawn: Bool) {
@@ -995,8 +763,12 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         failureView = nil
         terminalView?.removeFromSuperview()
         terminalView = nil
-        focusDimView?.removeFromSuperview()
-        focusDimView = nil
+        // A new session: nothing of the old one's viewport, selection or
+        // overlays may point into it.
+        focus.removeViews()
+        pointer.reset()
+        selection = nil
+        scrollOffset = 0
         setUpPane(strictRespawn: strictRespawn)
         guard isOperable, let terminalView else { return }
         // The window settled long ago; this pane needs a real winsize now.
@@ -1017,44 +789,4 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             terminalView?.showToast(notice, kind: .warning)
         }
     }
-
-    func applyFocusAppearance() {
-        // One pane needs neither.
-        let inSplit = splitController?.hasMultiplePanes == true
-        // The dim is structural and stays while the app is inactive; ring and
-        // highlight follow `hasUserFocus`, so cmd-tab leaves no false ring.
-        focusDimView?.isHidden = isFocusedPane || !inSplit
-        let highlighted = hasUserFocus && inSplit
-        focusRingView?.isHidden = !highlighted
-        focusHighlightView?.isHidden = !highlighted
-        // The accent can change at runtime; Increase Contrast wants more.
-        focusRingView?.layer?.borderColor = Self.focusRingColor.cgColor
-        focusRingView?.layer?.borderWidth =
-            SystemAccessibility.increaseContrast ? Self.focusRingWidth + 1 : Self.focusRingWidth
-        reportFocusIfNeeded()
-        if !hasUserFocus { stopCursorBlink(); inputSourceIndicator.view.isHidden = true }
-        else { inputSourceIndicator.refreshSource() }
-        invalidateDisplay()
-    }
-
-    /// Enough to tell panes apart, little enough to read through.
-    static let unfocusedDim: CGFloat = 0.08
-    /// A hairline; 2pt dominated small windows.
-    static let focusRingWidth: CGFloat = 1
-    /// Half-strength accent — full alpha was louder than the text it framed;
-    /// full again under Increase Contrast.
-    static var focusRingColor: NSColor {
-        let accent = NSColor.controlAccentColor
-        return SystemAccessibility.increaseContrast
-            ? accent : accent.withAlphaComponent(focusRingAlpha)
-    }
-
-    static let focusRingAlpha: CGFloat = 0.5
-    /// Stronger recoloured the text underneath.
-    static let focusHighlightAlpha: CGFloat = 0.05
-}
-
-/// Input falls through to the terminal view.
-private final class PassthroughView: NSView {
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }

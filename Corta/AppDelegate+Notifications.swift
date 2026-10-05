@@ -51,6 +51,6 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
             pane.session?.commandRecords.records.contains { $0.id == commandID } == true
         }) else { return }
         window.makeFirstResponder(pane.terminalView)
-        pane.focusCommand(id: commandID)
+        pane.shell.focusCommand(id: commandID)
     }
 }

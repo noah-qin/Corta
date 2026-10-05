@@ -35,6 +35,29 @@ final class PaneFailureView: NSView {
 
     var announcement: String { accessibilityLabel() ?? "" }
 
+    /// Covers `view`, takes the keyboard — or nothing is focused and
+    /// assistive technology hears nothing — and is announced.
+    func present(in view: NSView) {
+        translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(self)
+        NSLayoutConstraint.activate([
+            leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            topAnchor.constraint(equalTo: view.topAnchor),
+            bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
+        view.window?.makeFirstResponder(primaryAction)
+        NSAccessibility.post(element: self, notification: .layoutChanged)
+        if NSWorkspace.shared.isVoiceOverEnabled {
+            NSAccessibility.post(
+                element: NSApp as Any, notification: .announcementRequested,
+                userInfo: [
+                    .announcement: announcement,
+                    .priority: NSAccessibilityPriorityLevel.high.rawValue,
+                ])
+        }
+    }
+
     init(title: String, detail: String, canRetry: Bool, canReconnect: Bool = false) {
         super.init(frame: .zero)
         wantsLayer = true

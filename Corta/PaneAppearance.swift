@@ -14,23 +14,72 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import Cocoa
+import AppKit
 import CortaTerminal
 
+/// What following the configuration and appearance needs from the pane.
+protocol PaneAppearanceHost: AnyObject {
+    var view: NSView { get }
+    var session: TerminalSession! { get }
+    var terminalView: TerminalView! { get }
+    var terminalRenderer: TerminalRenderer! { get }
+    var splitController: SplitViewController? { get }
+    var didSizeWindow: Bool { get }
+    /// A change rebuilds the atlas, rasterised for one size.
+    var fontSize: CGFloat { get set }
+    /// `Configuration.systemFontFamily` means System Monospaced.
+    var fontFamily: String { get set }
+    /// A temporary zoom, which a configuration change leaves alone.
+    var isFontSizeZoomed: Bool { get }
+    func resizeSessionToFitView(coalesce: Bool)
+    func invalidateDisplay()
+}
+
 /// Following the config file while running, and re-pointing the renderer
-/// when the font size or backing scale changes. Panes pull, reading the store
+/// when the font size or backing scale changes. Each pane pulls, reading the store
 /// at load and on change, so no registry is needed. Two notifications:
 /// `ConfigurationStore.didChange` (the file changed) and
 /// `AppearanceController.didChange` (the live variant changed, e.g. Dark
 /// Mode, with no file change).
-extension ViewController {
-    func observeConfiguration() {
+final class PaneAppearance: NSObject {
+    weak var host: PaneAppearanceHost?
+    private var isObserving = false
+
+    init(host: PaneAppearanceHost? = nil) {
+        self.host = host
+    }
+
+    // The pane's state, read and written where the code that uses it reads
+    // it best.
+    private var session: TerminalSession? { host?.session ?? nil }
+    private var terminalView: TerminalView? { host?.terminalView ?? nil }
+    private var terminalRenderer: TerminalRenderer? { host?.terminalRenderer ?? nil }
+    private var fontSize: CGFloat {
+        get { host?.fontSize ?? ViewController.defaultFontSize }
+        set { host?.fontSize = newValue }
+    }
+    private var fontFamily: String {
+        get { host?.fontFamily ?? Configuration.systemFontFamily }
+        set { host?.fontFamily = newValue }
+    }
+    private var isFontSizeZoomed: Bool { host?.isFontSizeZoomed ?? false }
+    private func invalidateDisplay() { host?.invalidateDisplay() }
+
+    func observe() {
+        guard !isObserving else { return }
+        isObserving = true
         NotificationCenter.default.addObserver(
             self, selector: #selector(configurationChanged),
             name: ConfigurationStore.didChange, object: nil)
         NotificationCenter.default.addObserver(
             self, selector: #selector(appearanceChanged),
             name: AppearanceController.didChange, object: nil)
+    }
+
+    /// The pane closed.
+    func stop() {
+        NotificationCenter.default.removeObserver(self)
+        isObserving = false
     }
 
     @objc func configurationChanged() {
@@ -48,7 +97,8 @@ extension ViewController {
     }
 
     @objc func appearanceChanged() {
-        (view.window?.windowController as? TerminalWindowController)?.applyCanvasAppearance()
+        guard let host else { return }
+        (host.view.window?.windowController as? TerminalWindowController)?.applyCanvasAppearance()
         // OSC 10/11/12 answers follow the live variant.
         session?.dynamicColors =
             AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)
@@ -60,10 +110,10 @@ extension ViewController {
                 .indexedPaletteDefaults.defaults)
         // Colours are baked into the instance buffer, so rebuild it all; a
         // forced frame alone kept the old glyph colours (dark on dark).
-        terminalRenderer.invalidate()
-        terminalView.layer?.backgroundColor = nil
+        terminalRenderer?.invalidate()
+        terminalView?.layer?.backgroundColor = nil
         invalidateDisplay()
-        terminalView.drawNow()
+        terminalView?.drawNow()
     }
 
     // MARK: - Font size
@@ -73,7 +123,7 @@ extension ViewController {
     /// The window is not fitted: moving between displays is not a font
     /// change, and a frame that changed under a drag would fight it.
     func rebuildAtlas(forBackingScale scale: CGFloat) {
-        guard scale > 0, scale != terminalRenderer.scale else { return }
+        guard let terminalRenderer, scale > 0, scale != terminalRenderer.scale else { return }
         terminalRenderer.setFont(
             TerminalFont.primary(
                 ofSize: fontSize,
@@ -111,7 +161,7 @@ extension ViewController {
         // A failed pane has no renderer; its retry builds one at the
         // configured size.
         guard let terminalRenderer else { return }
-        let scale = view.window?.backingScaleFactor ?? terminalRenderer.scale
+        let scale = host?.view.window?.backingScaleFactor ?? terminalRenderer.scale
         terminalRenderer.setFont(TerminalFont.primary(ofSize: fontSize, family: fontFamily), scale: scale)
         applyCellMetrics(settle: settle, fitsWindow: true)
     }
@@ -122,17 +172,18 @@ extension ViewController {
     /// cells (`fitsWindow`, and only once a change settles), then the grid.
     /// One path, so no source of a metrics change skips a step.
     private func applyCellMetrics(settle: Bool, fitsWindow: Bool) {
+        guard let host, let terminalRenderer else { return }
         let metrics = terminalRenderer.pointMetrics
-        terminalView.cellSize = CGSize(width: metrics.cellWidth, height: metrics.cellHeight)
+        terminalView?.cellSize = CGSize(width: metrics.cellWidth, height: metrics.cellHeight)
         // Before the window exists, initial sizing reads the new metrics.
-        guard didSizeWindow, let window = view.window else {
+        guard host.didSizeWindow, let window = host.view.window else {
             invalidateDisplay()
             return
         }
         window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
-        splitController?.updateWindowMinSize()
-        if settle, fitsWindow { splitController?.fitWindowToWholeCells(metrics: metrics) }
-        resizeSessionToFitView(coalesce: !settle)
+        host.splitController?.updateWindowMinSize()
+        if settle, fitsWindow { host.splitController?.fitWindowToWholeCells(metrics: metrics) }
+        host.resizeSessionToFitView(coalesce: !settle)
         invalidateDisplay()
     }
 }

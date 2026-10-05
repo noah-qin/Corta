@@ -409,7 +409,7 @@ final class SplitViewController: NSViewController {
 
     private func applyFocusAppearance(to pane: ViewController) {
         focusedPane = pane
-        for other in panes { other.applyFocusAppearance() }
+        for other in panes { other.focus.applyAppearance() }
     }
 
     // MARK: - Splitting and closing
@@ -542,8 +542,8 @@ final class SplitViewController: NSViewController {
         // The cursor draws only in the focused pane: both panes need a redraw.
         previous?.invalidateDisplay()
         pane.invalidateDisplay()
-        previous?.applyFocusAppearance()
-        pane.applyFocusAppearance()
+        previous?.focus.applyAppearance()
+        pane.focus.applyAppearance()
         applyWindowTitle()
     }
 

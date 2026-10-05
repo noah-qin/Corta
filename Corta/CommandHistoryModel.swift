@@ -232,7 +232,7 @@ final class CommandHistoryModel {
             directoryTooltip = record.workingDirectory
         }
         let timestamp = timestampFormatter.string(from: record.startedAt)
-        let commandText = ViewController.commandLineText(grid: grid, record: record)
+        let commandText = PaneShellIntegration.commandLineText(grid: grid, record: record)
         return Row(
             id: record.id, statusSymbolName: symbolName, statusDescription: statusDescription,
             timestamp: timestamp, directoryText: directoryText,
@@ -249,16 +249,16 @@ final class CommandHistoryModel {
     }
 
     func find(id: Int) {
-        guard let pane, pane.focusCommand(id: id) else { return }
+        guard let pane, pane.shell.focusCommand(id: id) else { return }
         onDismiss?()
         pane.view.window?.makeKeyAndOrderFront(nil)
         pane.view.window?.makeFirstResponder(pane.terminalView)
     }
 
     func fill(id: Int) {
-        guard let pane, let record = record(id: id), let text = pane.commandLineText(for: record)
+        guard let pane, let record = record(id: id), let text = pane.shell.commandLineText(for: record)
         else { return }
-        guard pane.fillPrompt(with: text) else {
+        guard pane.shell.fillPrompt(with: text) else {
             pane.terminalView?.showToast(L10n.text("toast.cannotFillPrompt"), kind: .warning)
             return
         }
@@ -266,9 +266,9 @@ final class CommandHistoryModel {
     }
 
     func run(id: Int) {
-        guard let pane, let record = record(id: id), let text = pane.commandLineText(for: record)
+        guard let pane, let record = record(id: id), let text = pane.shell.commandLineText(for: record)
         else { return }
-        guard pane.fillAndRunPrompt(with: text) else {
+        guard pane.shell.fillAndRunPrompt(with: text) else {
             pane.terminalView?.showToast(L10n.text("toast.cannotFillPrompt"), kind: .warning)
             return
         }

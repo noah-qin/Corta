@@ -152,7 +152,7 @@ struct RemoteReferenceResolutionTests {
         // The composition `open` performs: the local copy path is `{file}`,
         // the reference's line and column are substituted as themselves.
         let copyPath = "/tmp/store/build-box/0123abcd/main.rs"
-        let arguments = ViewController.openFileArguments(
+        let arguments = PanePointer.openFileArguments(
             template: "/usr/bin/open -a editor --args {file} +{line}:{column}",
             path: copyPath, line: 42, column: 7)
         #expect(
@@ -229,7 +229,7 @@ struct RemoteEditCoordinatorTests {
             store: store, makeClient: { _ in fake },
             opener: { url, line, column in
                 opened += 1
-                return ViewController.openFileAt(
+                return PanePointer.openFileAt(
                     url: url, line: line, column: column,
                     allowsDefaultApplication: false, command: "")
             },
@@ -251,7 +251,7 @@ struct RemoteEditCoordinatorTests {
     @Test("an explicitly configured remote editor receives the file as data")
     func configuredRemoteEditorAllowed() {
         for name in ["file.swift", "evil.command", "semi;$(echo evil).terminal"] {
-            #expect(ViewController.openFileAt(
+            #expect(PanePointer.openFileAt(
                 url: URL(fileURLWithPath: "/tmp/" + name), line: 42, column: 7,
                 allowsDefaultApplication: false, command: "/usr/bin/true {file} {line} {column}"))
         }

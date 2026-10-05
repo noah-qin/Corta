@@ -31,9 +31,9 @@ struct FileReferenceResolutionTests {
     @Test("local output references require an editor, including executable handler files")
     func localReferenceNeverFallsBackToDefaultHandler() {
         for path in ["/tmp/attack.command", "/tmp/attack.terminal", "/tmp/ordinary.txt"] {
-            #expect(!ViewController.openFileAt(url: URL(fileURLWithPath: path), line: 1, column: nil, command: ""))
+            #expect(!PanePointer.openFileAt(url: URL(fileURLWithPath: path), line: 1, column: nil, command: ""))
         }
-        #expect(ViewController.openFileAt(
+        #expect(PanePointer.openFileAt(
             url: URL(fileURLWithPath: "/tmp/space ;$(echo).swift"), line: 3, column: 4,
             allowsDefaultApplication: false, command: "/usr/bin/true {file} {line} {column}"))
     }
@@ -48,7 +48,7 @@ struct FileReferenceResolutionTests {
     @Test("a relative path resolves against the pane's directory")
     func relativeResolution() throws {
         let resolved = try #require(
-            ViewController.resolve(
+            PanePointer.resolve(
                 Self.reference("b.txt"), directory: "/tmp/a",
                 isRegularFile: { $0 == "/tmp/a/b.txt" }))
         #expect(resolved.url.path == "/tmp/a/b.txt")
@@ -58,7 +58,7 @@ struct FileReferenceResolutionTests {
     @Test("an absolute path is taken as it is")
     func absoluteResolution() throws {
         let resolved = try #require(
-            ViewController.resolve(
+            PanePointer.resolve(
                 Self.reference("/etc/hosts"), directory: "/tmp",
                 isRegularFile: { $0 == "/etc/hosts" }))
         #expect(resolved.url.path == "/etc/hosts")
@@ -71,11 +71,11 @@ struct FileReferenceResolutionTests {
     @Test("a pane with no local directory resolves nothing")
     func remotePanesRefuse() {
         #expect(
-            ViewController.resolve(
+            PanePointer.resolve(
                 Self.reference("src/main.rs"), directory: nil, isRegularFile: { _ in true })
                 == nil)
         #expect(
-            ViewController.resolve(
+            PanePointer.resolve(
                 Self.reference("/etc/hosts"), directory: nil, isRegularFile: { _ in true })
                 == nil)
     }
@@ -86,7 +86,7 @@ struct FileReferenceResolutionTests {
     @Test("a path that is not a file here is refused")
     func missingFilesRefuse() {
         #expect(
-            ViewController.resolve(
+            PanePointer.resolve(
                 Self.reference("nope.txt"), directory: "/tmp", isRegularFile: { _ in false })
                 == nil)
     }
@@ -98,7 +98,7 @@ struct FileReferenceResolutionTests {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         #expect(
-            ViewController.resolve(
+            PanePointer.resolve(
                 Self.reference(directory.lastPathComponent),
                 directory: directory.deletingLastPathComponent().path) == nil)
     }
@@ -110,7 +110,7 @@ struct FileReferenceResolutionTests {
     func pathsAreStandardized() throws {
         var checked: [String] = []
         let resolved = try #require(
-            ViewController.resolve(
+            PanePointer.resolve(
                 Self.reference("../sibling/x.txt"), directory: "/tmp/a",
                 isRegularFile: { path in
                     checked.append(path)
@@ -130,7 +130,7 @@ struct FileReferenceResolutionTests {
         try "let x = 1\n".write(to: file, atomically: true, encoding: .utf8)
 
         let resolved = try #require(
-            ViewController.resolve(Self.reference("main.swift", line: 3), directory: directory.path))
+            PanePointer.resolve(Self.reference("main.swift", line: 3), directory: directory.path))
         #expect(resolved.url.lastPathComponent == "main.swift")
         #expect(resolved.line == 3)
     }
@@ -142,7 +142,7 @@ struct FileReferenceResolutionTests {
 struct OpenFileCommandTests {
     @Test("placeholders are substituted per argument")
     func substitution() {
-        let arguments = ViewController.openFileArguments(
+        let arguments = PanePointer.openFileArguments(
             template: "/usr/bin/xed --line {line} {file}", path: "/tmp/a b.swift", line: 42,
             column: nil)
         #expect(arguments == ["/usr/bin/xed", "--line", "42", "/tmp/a b.swift"])
@@ -153,7 +153,7 @@ struct OpenFileCommandTests {
     /// metacharacters never mean anything again.
     @Test("a path with spaces and metacharacters stays one argument")
     func hostilePaths() {
-        let arguments = ViewController.openFileArguments(
+        let arguments = PanePointer.openFileArguments(
             template: "/bin/editor {file}", path: "/tmp/a; rm -rf ~/b.swift", line: 1,
             column: nil)
         #expect(arguments == ["/bin/editor", "/tmp/a; rm -rf ~/b.swift"])
@@ -161,10 +161,10 @@ struct OpenFileCommandTests {
 
     @Test("the column defaults to 1 when the output named none")
     func columnDefault() {
-        let arguments = ViewController.openFileArguments(
+        let arguments = PanePointer.openFileArguments(
             template: "/bin/e -l {line} -c {column} {file}", path: "/tmp/x", line: 9, column: nil)
         #expect(arguments == ["/bin/e", "-l", "9", "-c", "1", "/tmp/x"])
-        let withColumn = ViewController.openFileArguments(
+        let withColumn = PanePointer.openFileArguments(
             template: "/bin/e -c {column} {file}", path: "/tmp/x", line: 9, column: 4)
         #expect(withColumn == ["/bin/e", "-c", "4", "/tmp/x"])
     }
@@ -193,7 +193,7 @@ struct OpenFileCommandTests {
         ]
         for template in templates {
             let judged = Configuration.isUsableOpenFileCommand(template)
-            let arguments = ViewController.openFileArguments(
+            let arguments = PanePointer.openFileArguments(
                 template: template, path: "/tmp/x", line: 3, column: nil)
             // Accepted means the first word the launcher will exec is the
             // absolute path the validator approved.

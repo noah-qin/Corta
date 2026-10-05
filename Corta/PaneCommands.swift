@@ -27,8 +27,8 @@ protocol PaneCommandsHost: AnyObject {
     var terminalView: TerminalView! { get }
     var terminalRenderer: TerminalRenderer! { get }
     var splitController: SplitViewController? { get }
-    var selection: TerminalSelection? { get }
-    var scrollOffset: Int { get }
+    var selection: TerminalSelection? { get set }
+    var scrollOffset: Int { get set }
     var topInset: CGFloat { get }
     var didTeardown: Bool { get }
     var isFocusedPane: Bool { get }
@@ -37,23 +37,21 @@ protocol PaneCommandsHost: AnyObject {
     var remote: PaneRemote { get }
     var fontSize: CGFloat { get }
     var isFontSizeZoomed: Bool { get set }
+    func invalidateDisplay()
     func setFontSize(_ newSize: CGFloat, settle: Bool)
     /// Ends a gesture's run of unsettled font sizes.
     func settleFontChange()
-    func selectionRange(for selection: TerminalSelection, in grid: Grid) -> SelectionRange
-    /// Input addressed to the live screen brings the viewport back to it.
-    func returnToBottomOnInput()
-    /// Queues an already-sanitised paste, whole or not at all.
-    func sendPaste(_ sanitized: String)
+    /// Selection geometry and the viewport's return to the live screen.
+    var pointer: PanePointer { get }
 }
 
 /// The commands a pane answers from the menu, the palette and its own
-/// context menu: font size and pinch, copy and export, drops, Services and
-/// Look Up, the Finder actions and app-initiated `cd`.
+/// context menu: font size and pinch, copy, paste and export, drops,
+/// Services and Look Up, the Finder actions, app-initiated `cd`, and
+/// Clear Screen, Clear History and Reset Terminal.
 ///
-/// The pane forwards each action from an `@objc` method of the same name,
-/// and its `validateMenuItem` asks this one for the items it owns; a new
-/// action here needs its forwarder there.
+/// The pane forwards its actions here (`ViewController.forwardingTarget`),
+/// and its `validateMenuItem` asks this one for the items it owns.
 final class PaneCommands: NSObject, NSMenuItemValidation {
     weak var host: PaneCommandsHost?
 
@@ -203,9 +201,18 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         }
     }
 
-    // MARK: - Drops, Services and Look Up
+    // MARK: - Pinch, paste, drops, Services and Look Up
 
     func installNativeIntegrations(on view: TerminalView) {
+        view.onMagnify = { [weak self] magnification in
+            self?.magnify(by: magnification)
+        }
+        view.onMagnifyEnded = { [weak self] in
+            self?.endMagnification()
+        }
+        view.onPaste = { [weak self] in
+            self?.pasteFromClipboard()
+        }
         view.onDropPaths = { [weak self] paths in
             self?.insertDroppedPaths(paths)
         }
@@ -267,9 +274,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         guard let host, let session = host.session else { return }
         let sanitized = Paste.sanitized(text)
         guard !sanitized.isEmpty else { return }
-        if Paste.needsWarning(
-            text: sanitized, bracketedPasteEnabled: session.isBracketedPasteEnabled)
-        {
+        if Paste.needsWarning(text: sanitized, bracketedPasteEnabled: bracketedPasteEnabled()) {
             let alert = NSAlert()
             alert.messageText = L10n.text("paste.newlines.title")
             alert.informativeText = L10n.text("paste.newlines.message")
@@ -280,8 +285,8 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         // A paste in every way that matters, as in `pasteFromClipboard` —
         // including saying so when the child is not reading, rather than
         // dropping the drop without a word.
-        host.returnToBottomOnInput()
-        host.sendPaste(sanitized)
+        host.pointer.returnToBottomOnInput()
+        sendPaste(sanitized)
     }
 
     /// The selection's text, or nil when there is none or it is empty.
@@ -290,7 +295,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
             return nil
         }
         let grid = session.snapshot()
-        let text = Selection.text(of: host.selectionRange(for: selection, in: grid), in: grid)
+        let text = Selection.text(of: host.pointer.selectionRange(for: selection, in: grid), in: grid)
         return text.isEmpty ? nil : text
     }
 
@@ -302,7 +307,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         else { return nil }
         let grid = session.snapshot()
         let metrics = terminalRenderer.pointMetrics
-        let position = ViewController.documentPosition(
+        let position = PanePointer.documentPosition(
             for: point, viewHeight: terminalView.bounds.height,
             metrics: metrics, grid: grid,
             scrollOffset: host.scrollOffset, topInset: host.topInset)
@@ -324,7 +329,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     @objc func copy(_ sender: Any?) {
         guard let host, let selection = host.selection, let session = host.session else { return }
         let grid = session.snapshot()
-        let range = host.selectionRange(for: selection, in: grid)
+        let range = host.pointer.selectionRange(for: selection, in: grid)
         let pasteboard = pasteboardForTesting ?? .general
         // The pasteboard is shared by every pane and app: recheck `changeCount`
         // before writing so a slow copy never clobbers a newer write.
@@ -373,7 +378,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         guard let host, host.isOperable, let window = host.view.window else { return }
         let grid = host.session.snapshot()
         let selection = host.selection
-        let range = selection.map { host.selectionRange(for: $0, in: grid) }
+        let range = selection.map { host.pointer.selectionRange(for: $0, in: grid) }
         performExport(
             window: window, grid: grid, range: range,
             messageKey: selection != nil ? "export.message.selection" : "export.message.history",
@@ -384,7 +389,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     @objc func exportCommandOutput(_ sender: Any?) {
         guard let host, host.isOperable, let window = host.view.window else { return }
         let grid = host.session.snapshot()
-        guard let range = ViewController.commandOutputRange(grid: grid, record: host.effectiveCommand)
+        guard let range = PaneShellIntegration.commandOutputRange(grid: grid, record: host.effectiveCommand)
         else {
             host.terminalView?.showToast(L10n.text("toast.noCommandOutput"), kind: .warning)
             return
@@ -672,6 +677,109 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
             }
     }
 
+    // MARK: - Paste
+
+    /// ⌘V: the one paste path drops and Services also take
+    /// (`insertAsPaste`).
+    func pasteFromClipboard() {
+        guard let text = NSPasteboard.general.string(forType: .string) else { return }
+        insertAsPaste(text)
+    }
+
+    /// Queues a sanitised paste whole, or not at all. In pieces, a backlog
+    /// that filled part-way stopped it after `ESC[200~` and before
+    /// `ESC[201~`, and the shell — Claude Code, zsh — stayed in paste mode,
+    /// taking every later Return as pasted text: the pane looked frozen.
+    func sendPaste(_ sanitized: String) {
+        let payload = Paste.bytes(for: sanitized, bracketedPasteEnabled: bracketedPasteEnabled())
+        // Chunks, so the writer hands the child one at a time.
+        guard let session = host?.session else { return }
+        switch session.write(chunks: Paste.chunked(payload)) {
+        case .accepted:
+            break
+        case .backpressured:
+            // The child stopped reading; nothing was sent. Say why.
+            host?.terminalView?.showToast(L10n.text("toast.pasteStopped"), kind: .warning)
+        case .stopped:
+            // The session is gone; nobody would read the toast.
+            break
+        }
+    }
+
+    /// ⌘V, and the context menu.
+    @objc func paste(_ sender: Any?) {
+        pasteFromClipboard()
+    }
+
+    /// ?2004: wrap pastes in `ESC[200~`…`ESC[201~`, skip the newline warning.
+    func bracketedPasteEnabled() -> Bool {
+        host?.session?.isBracketedPasteEnabled ?? false
+    }
+
+    // MARK: - Clear and reset
+
+    /// Clear Screen, Clear History and Reset Terminal — three names because
+    /// "clear" means something different everywhere, and the menu says what
+    /// each discards:
+    ///
+    /// | Command | Screen | Scrollback | Modes, colours, cursor |
+    /// | --- | --- | --- | --- |
+    /// | Clear Screen | erased | kept | kept |
+    /// | Clear History | kept | discarded | kept |
+    /// | Reset Terminal | erased | discarded | reset |
+    ///
+    /// They act on the grid, never the child: `\u{1B}c` written to the
+    /// child's input would be typed characters (`SECURITY.md` §6). The child is
+    /// never told, so running jobs are undisturbed; `vim` redraws on its next
+    /// frame, a shell on ⌃L or Return.
+    @objc func clearScreen(_ sender: Any?) {
+        applyTerminalState(.clearScreen, notice: "toast.clearedScreen")
+    }
+
+    @objc func clearHistory(_ sender: Any?) {
+        guard confirmDiscardingHistory(titleKey: "clear.history.title") else { return }
+        applyTerminalState(.clearHistory, notice: "toast.clearedHistory")
+    }
+
+    @objc func resetTerminal(_ sender: Any?) {
+        guard confirmDiscardingHistory(titleKey: "clear.reset.title") else { return }
+        applyTerminalState(.reset, notice: "toast.resetTerminal")
+    }
+
+    /// Asks before discarding history, which can't be undone — never for Clear
+    /// Screen or an empty scrollback, so the dialog keeps its meaning. States
+    /// the line count. Honours `confirm-close` rather than a second key.
+    private func confirmDiscardingHistory(titleKey: String) -> Bool {
+        guard let host, host.isOperable, ConfigurationStore.shared.configuration.confirmClose
+        else { return true }
+        let lines = host.session.snapshot().scrollback.count
+        guard lines > 0 else { return true }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = L10n.text(titleKey)
+        alert.informativeText = L10n.format("clear.history.detail", lines)
+        alert.addButton(withTitle: L10n.text("clear.history.discard"))
+        alert.addButton(withTitle: L10n.text("common.cancel"))
+        alert.buttons.first?.hasDestructiveAction = true
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    /// Applies the command, then drops a selection or viewport pointing into
+    /// discarded history (which would highlight the wrong text or show
+    /// nothing), and confirms with a toast.
+    private func applyTerminalState(
+        _ command: TerminalSession.TerminalStateCommand, notice: String
+    ) {
+        guard let host, host.isOperable else { return }
+        host.session.apply(command)
+        host.selection = nil
+        host.scrollOffset = 0
+        host.invalidateDisplay()
+        host.terminalView?.noteAccessibilityValueChanged()
+        host.terminalView?.noteAccessibilitySelectionChanged()
+        host.terminalView?.showToast(L10n.text(notice))
+    }
+
     // MARK: - Menu validation
 
     /// Greys out what this pane cannot do now: a disabled item says "not
@@ -680,7 +788,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         switch menuItem.action {
         case #selector(exportCommandOutput(_:)):
             guard let host, host.isOperable else { return false }
-            return ViewController.commandOutputText(
+            return PaneShellIntegration.commandOutputText(
                 grid: host.session.snapshot(), record: host.effectiveCommand) != nil
         case #selector(exportText(_:)):
             return host?.isOperable == true
@@ -699,6 +807,9 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
             return hasKnownWorkingDirectory && canChangeDirectorySafely
         case #selector(openProjectRootInNewPane(_:)):
             return hasKnownWorkingDirectory
+        // A failed pane (`PaneFailureView`) has nothing to clear.
+        case #selector(clearScreen(_:)), #selector(clearHistory(_:)), #selector(resetTerminal(_:)):
+            return host?.isOperable == true
         default:
             return true
         }

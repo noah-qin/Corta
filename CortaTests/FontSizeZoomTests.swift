@@ -164,7 +164,7 @@ struct FontSizeZoomTests {
         let pane = try #require(split.focusedPane)
         pane.isFontSizeZoomed = true
         pane.fontSize = 999
-        pane.configurationChanged()
+        pane.appearance.configurationChanged()
         #expect(pane.fontSize == 999)
     }
 
@@ -176,7 +176,7 @@ struct FontSizeZoomTests {
         let pane = try #require(split.focusedPane)
         pane.isFontSizeZoomed = false
         pane.fontSize = 999
-        pane.configurationChanged()
+        pane.appearance.configurationChanged()
         #expect(pane.fontSize == CGFloat(ConfigurationStore.shared.configuration.fontSize))
     }
 }

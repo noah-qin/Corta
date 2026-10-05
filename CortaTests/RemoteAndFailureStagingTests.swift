@@ -106,7 +106,7 @@ struct RemoteWorkingDirectoryTests {
         // and resolves to nothing here, even though `/tmp` exists locally and
         // a same-named file might too.
         #expect(
-            ViewController.resolve(
+            PanePointer.resolve(
                 reference, directory: terminal.workingDirectory,
                 isRegularFile: { _ in true }) == nil)
     }
@@ -131,7 +131,7 @@ struct RemoteWorkingDirectoryTests {
 
         let line = terminal.grid.logicalLine(containing: 0)
         let reference = try #require(FileReferenceDetection.references(in: line).first)
-        let resolved = try #require(ViewController.resolve(reference, directory: reported))
+        let resolved = try #require(PanePointer.resolve(reference, directory: reported))
         #expect(resolved.url.lastPathComponent == "main.rs")
         #expect(resolved.line == 42)
         #expect(resolved.column == 17)
@@ -151,7 +151,7 @@ struct RemoteWorkingDirectoryTests {
 struct SpawnFallbackLadderTests {
     @Test("a shell that does not exist falls back, and says so")
     func missingShellFallsBack() throws {
-        let started = try ViewController.startSession(
+        let started = try PaneSpawn.start(
             size: TerminalSize(rows: 24, columns: 80),
             directory: NSHomeDirectory(), scrollbackLimit: 100,
             configuredShell: "/nonexistent/shell")
@@ -162,7 +162,7 @@ struct SpawnFallbackLadderTests {
 
     @Test("a directory that does not exist falls back to home")
     func missingDirectoryFallsBack() throws {
-        let started = try ViewController.startSession(
+        let started = try PaneSpawn.start(
             size: TerminalSize(rows: 24, columns: 80),
             directory: "/no/such/directory/here", scrollbackLimit: 100)
         defer { started.session.stop() }
@@ -174,7 +174,7 @@ struct SpawnFallbackLadderTests {
     /// ladder drops one, then the other.
     @Test("a bad shell and a bad directory still produce a terminal")
     func bothBadStillStarts() throws {
-        let started = try ViewController.startSession(
+        let started = try PaneSpawn.start(
             size: TerminalSize(rows: 24, columns: 80),
             directory: "/no/such/directory/here", scrollbackLimit: 100,
             configuredShell: "/nonexistent/shell")
@@ -187,7 +187,7 @@ struct SpawnFallbackLadderTests {
     /// a notice on an ordinary launch would be noise.
     @Test("the ordinary case reports no fallback")
     func ordinaryCaseIsSilent() throws {
-        let started = try ViewController.startSession(
+        let started = try PaneSpawn.start(
             size: TerminalSize(rows: 24, columns: 80),
             directory: NSHomeDirectory(), scrollbackLimit: 100,
             configuredShell: "/bin/zsh")
