@@ -607,7 +607,7 @@ final class SplitViewController: NSViewController {
         if hasMultiplePanes {
             // No window size keeps every grid intact; keep the frames and refit each
             // grid instead of the single-pane window re-fit.
-            for pane in panes { pane.resizeSessionToFitView() }
+            for pane in panes { pane.resizeSessionToFitView(coalesce: false) }
         }
         updateWindowMinSize()
     }

@@ -120,6 +120,10 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
 
     /// ⌘+/⌘− re-fit the window to keep this grid size.
     var lastRequestedSize: TerminalSize?
+    /// The usable area a run of font changes started from, and the frame
+    /// size the last one left; a frame that has since changed starts a new
+    /// run (`fitWindowToWholeCells`).
+    var fontChangeAnchor: (usable: CGSize, frameSize: CGSize)?
 
     /// Scrollback search: the bar, its sweeps and the highlighted matches.
     private(set) lazy var search = PaneSearch(host: self)
@@ -777,7 +781,10 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     }
     @objc func openProjectRootInNewPane(_ sender: Any?) { commands.openProjectRootInNewPane(sender) }
 
-    func resizeSessionToFitView() {
+    /// `coalesce: false` delivers the size now: a font change is one step,
+    /// and waiting out the drag debounce drew a frame of the new font over
+    /// the old grid first.
+    func resizeSessionToFitView(coalesce: Bool = true) {
         // Nothing reaches the child before `sizeSettled`: earlier layouts run at
         // transient sizes (the first after `setContentSize` is one titlebar short)
         // and would strand blank rows under the prompt. The session is born at the
@@ -789,12 +796,18 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         let usable = CGSize(
             width: view.bounds.width - TerminalLayout.insetWidth,
             height: view.bounds.height - verticalInsets)
-        let columns = UInt16(max(1, usable.width / terminalRenderer.pointMetrics.cellWidth))
-        let rows = UInt16(max(1, usable.height / terminalRenderer.pointMetrics.cellHeight))
+        // A hair of slack: a window fitted to whole cells can land a rounding
+        // error short of the last one.
+        let columns = UInt16(max(1, usable.width / terminalRenderer.pointMetrics.cellWidth + 0.001))
+        let rows = UInt16(max(1, usable.height / terminalRenderer.pointMetrics.cellHeight + 0.001))
         let pixels = pixelSize(columns: Int(columns), rows: Int(rows), metrics: terminalRenderer.metrics)
         let size = TerminalSize(
             rows: rows, columns: columns, pixelWidth: pixels.width, pixelHeight: pixels.height)
-        guard size != lastRequestedSize else { return }
+        guard size != lastRequestedSize else {
+            // A layout pass may have queued this size behind the debounce.
+            if !coalesce { resizeDebouncer.flush() }
+            return
+        }
         // A column change reflows every row (DESIGN.md §3.1), so a stored
         // selection or offset would name the wrong text. A row-only change is
         // ordinary growth, already handled.
@@ -805,7 +818,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         lastRequestedSize = size
         // Trailing edge only: drags and the zoom animation lay out per frame,
         // and rewrapping mid-gesture is the visible "text jumps".
-        resizeDebouncer.resize(to: size, coalesce: true)
+        resizeDebouncer.resize(to: size, coalesce: coalesce)
         // The title shows the live size, as Terminal.app does.
         if isFocusedPane {
             windowTitle.invalidateProcessFacts()

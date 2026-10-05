@@ -48,7 +48,10 @@ extension ViewController {
                 width: metrics.cellWidth, height: metrics.cellHeight)
             view.window?.contentResizeIncrements = NSSize(
                 width: metrics.cellWidth, height: metrics.cellHeight)
-            resizeSessionToFitView()
+            if didSizeWindow, let window = view.window, splitController?.hasMultiplePanes != true {
+                fitWindowToWholeCells(window, metrics: metrics)
+            }
+            resizeSessionToFitView(coalesce: false)
         }
         // A zoom survives config changes; `resetFontSize` ends it.
         if !isFontSizeZoomed {
@@ -91,11 +94,12 @@ extension ViewController {
         terminalView.cellSize = CGSize(width: metrics.cellWidth, height: metrics.cellHeight)
         view.window?.contentResizeIncrements = NSSize(
             width: metrics.cellWidth, height: metrics.cellHeight)
-        resizeSessionToFitView()
+        resizeSessionToFitView(coalesce: false)
         invalidateDisplay()
     }
 
-    /// Re-points the renderer while retaining the window frame. All font
+    /// Re-points the renderer while keeping the window where it is: a lone
+    /// pane's window moves by less than a cell (`fitWindowToWholeCells`). All font
     /// changes refit the grid, including settings and temporary zoom.
     func setFontSize(_ newSize: CGFloat) {
         // A failed pane has no renderer; its retry builds one at the
@@ -120,14 +124,68 @@ extension ViewController {
         window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
         // With splits no window size keeps every grid; the caller refits.
         guard splitController?.hasMultiplePanes != true else {
-            resizeSessionToFitView()
+            resizeSessionToFitView(coalesce: false)
             invalidateDisplay()
             return
         }
         window.contentMinSize = NSSize(
             width: CGFloat(minimumColumns) * metrics.cellWidth + TerminalLayout.insetWidth,
             height: CGFloat(minimumRows) * metrics.cellHeight + verticalInsets + (splitController?.statusBarHeight ?? 0))
-        resizeSessionToFitView()
+        fitWindowToWholeCells(window, metrics: metrics)
+        resizeSessionToFitView(coalesce: false)
         invalidateDisplay()
+    }
+
+    /// Trims or grows a lone pane's window by less than a cell, top edge
+    /// fixed, so the new font's grid fills it exactly. Without it the window
+    /// kept its frame and the remainder — anywhere from nothing to almost a
+    /// row — sat under the last line, different after every step.
+    ///
+    /// Rounded from the size the run of font changes started at, not from
+    /// the last step's: rounding each step from the one before walks the
+    /// window a little every time, while from the anchor ⌘+ then ⌘0 lands on
+    /// the frame it began with. Full screen and a maximised window keep
+    /// their frame; there the remainder stays.
+    func fitWindowToWholeCells(_ window: NSWindow, metrics: CellMetrics) {
+        guard !window.styleMask.contains(.fullScreen), !window.isZoomed,
+            metrics.cellWidth > 0, metrics.cellHeight > 0
+        else {
+            fontChangeAnchor = nil
+            return
+        }
+        view.layoutSubtreeIfNeeded()
+        let usable = CGSize(
+            width: view.bounds.width - TerminalLayout.insetWidth,
+            height: view.bounds.height - verticalInsets)
+        let anchor =
+            fontChangeAnchor.flatMap { $0.frameSize == window.frame.size ? $0.usable : nil }
+            ?? usable
+        var columns = max(CGFloat(minimumColumns), (anchor.width / metrics.cellWidth).rounded())
+        var rows = max(CGFloat(minimumRows), (anchor.height / metrics.cellHeight).rounded())
+        var frame = window.frame
+        func resized() -> NSRect {
+            var resized = frame
+            resized.size.width += columns * metrics.cellWidth - usable.width
+            resized.size.height += rows * metrics.cellHeight - usable.height
+            // The top edge stays put; AppKit's origin is the bottom left.
+            resized.origin.y = frame.maxY - resized.height
+            return resized
+        }
+        // Rounding up may not fit on the screen; give back a cell instead.
+        if let visible = window.screen?.visibleFrame {
+            while resized().width > visible.width, columns > CGFloat(minimumColumns) { columns -= 1 }
+            while resized().height > visible.height, rows > CGFloat(minimumRows) { rows -= 1 }
+            frame = resized()
+            if frame.minY < visible.minY { frame.origin.y = visible.minY }
+        } else {
+            frame = resized()
+        }
+        if frame != window.frame {
+            window.setFrame(frame, display: false)
+            // The pane's bounds follow on the next layout pass; take it now,
+            // so the size sent to the child is the fitted one.
+            window.contentView?.layoutSubtreeIfNeeded()
+        }
+        fontChangeAnchor = (anchor, window.frame.size)
     }
 }
