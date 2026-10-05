@@ -107,10 +107,10 @@ struct RemoteReferenceResolutionTests {
 
     @Test("a relative reference joins the pane's remote directory")
     func relative() {
-        let resolved = ViewController.resolveRemote(Self.reference("src/main.rs"), state: Self.state)
+        let resolved = PaneRemote.resolve(Self.reference("src/main.rs"), state: Self.state)
         #expect(
             resolved
-                == ViewController.ResolvedRemoteReference(
+                == PaneRemote.ResolvedReference(
                     host: "build-box", remotePath: "/srv/app/src/main.rs",
                     line: 42, column: nil,
                     range: Self.reference("src/main.rs").range))
@@ -119,17 +119,17 @@ struct RemoteReferenceResolutionTests {
     @Test("absolute paths pass through; dot segments are resolved")
     func absoluteAndDotSegments() {
         #expect(
-            ViewController.resolveRemote(Self.reference("/var/log/x.log"), state: Self.state)?
+            PaneRemote.resolve(Self.reference("/var/log/x.log"), state: Self.state)?
                 .remotePath == "/var/log/x.log")
         #expect(
-            ViewController.resolveRemote(Self.reference("src/../Makefile"), state: Self.state)?
+            PaneRemote.resolve(Self.reference("src/../Makefile"), state: Self.state)?
                 .remotePath == "/srv/app/Makefile",
             "one remote file is one managed copy, however spelled")
     }
 
     @Test("line and column ride along")
     func lineAndColumn() {
-        let resolved = ViewController.resolveRemote(
+        let resolved = PaneRemote.resolve(
             Self.reference("a.rs", line: 7, column: 3), state: Self.state)
         #expect(resolved?.line == 7 && resolved?.column == 3)
     }
@@ -137,14 +137,14 @@ struct RemoteReferenceResolutionTests {
     @Test("what cannot be known honestly is refused")
     func refusals() {
         // "~" is the remote account's home — not knowable from here.
-        #expect(ViewController.resolveRemote(Self.reference("~/.bashrc"), state: Self.state) == nil)
+        #expect(PaneRemote.resolve(Self.reference("~/.bashrc"), state: Self.state) == nil)
         // No host, an uncertain pane, a local pane: nothing to resolve against.
         #expect(
-            ViewController.resolveRemote(
+            PaneRemote.resolve(
                 Self.reference("a.rs"), state: .remoteUnknown(provenance: .foregroundProcess))
                 == nil)
-        #expect(ViewController.resolveRemote(Self.reference("a.rs"), state: .unknown) == nil)
-        #expect(ViewController.resolveRemote(Self.reference("a.rs"), state: .local) == nil)
+        #expect(PaneRemote.resolve(Self.reference("a.rs"), state: .unknown) == nil)
+        #expect(PaneRemote.resolve(Self.reference("a.rs"), state: .local) == nil)
     }
 
     @Test("the managed copy's path and the reference's line reach the editor command")

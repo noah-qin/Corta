@@ -125,8 +125,8 @@ extension ViewController: NSMenuItemValidation {
             return
         }
         // Remote: open the managed local copy at the same line.
-        if let remote = remoteFileReferenceInCommand(effectiveCommand) {
-            openRemote(remote)
+        if let remoteReference = remote.resolve(detectedReferenceInCommand(effectiveCommand)) {
+            remote.open(remoteReference)
             return
         }
         terminalView?.showToast(L10n.text("toast.noFileReferenceInCommand"), kind: .warning)
@@ -333,18 +333,12 @@ extension ViewController: NSMenuItemValidation {
         case #selector(openFileReferenceInCommand(_:)):
             guard isOperable else { return false }
             return fileReferenceInCommand(effectiveCommand) != nil
-                || remoteFileReferenceInCommand(effectiveCommand) != nil
+                || remote.resolve(detectedReferenceInCommand(effectiveCommand)) != nil
         case #selector(searchCommandHistory(_:)):
             return isOperable
         case #selector(clearScreen(_:)), #selector(clearHistory(_:)),
             #selector(resetTerminal(_:)):
             return validateTerminalStateItem(menuItem)
-        case #selector(reconnectRemote(_:)):
-            // Only a dead remote launcher can reconnect.
-            return canReconnectRemote
-        case #selector(browseRemoteFiles(_:)):
-            // Remote panes only (an unknown host asks for one).
-            return canBrowseRemoteFiles
         case #selector(exportText(_:)):
             return isOperable
         case #selector(revealWorkingDirectoryInFinder(_:)), #selector(copyWorkingDirectoryPath(_:)),
@@ -363,7 +357,8 @@ extension ViewController: NSMenuItemValidation {
         case #selector(openProjectRootInNewPane(_:)):
             return hasKnownWorkingDirectory
         default:
-            return true
+            // The actions the pane forwards are validated by their owner.
+            return remote.validateMenuItem(menuItem)
         }
     }
 

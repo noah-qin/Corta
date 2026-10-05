@@ -51,11 +51,11 @@ struct SFTPBrowserWiringTests {
     @Test("the menu item is offered exactly for remote panes")
     func gating() {
         #expect(
-            ViewController.canBrowseRemoteFiles(
+            PaneRemote.canBrowseFiles(
                 state: .remote(host: "h", directory: "/d", provenance: .osc7)))
-        #expect(ViewController.canBrowseRemoteFiles(state: .remoteUnknown(provenance: .foregroundProcess)))
-        #expect(!ViewController.canBrowseRemoteFiles(state: .local))
-        #expect(!ViewController.canBrowseRemoteFiles(state: .unknown))
+        #expect(PaneRemote.canBrowseFiles(state: .remoteUnknown(provenance: .foregroundProcess)))
+        #expect(!PaneRemote.canBrowseFiles(state: .local))
+        #expect(!PaneRemote.canBrowseFiles(state: .unknown))
     }
 
     @Test("the command table entry is complete and unbound by default")
@@ -66,7 +66,7 @@ struct SFTPBrowserWiringTests {
         #expect(command.title == L10n.text("command.browseRemoteFiles"))
         #expect(command.category == .terminal)
         #expect(command.defaultShortcut == nil)
-        #expect(command.action == #selector(ViewController.browseRemoteFiles(_:)))
+        #expect(command.action == #selector(PaneRemote.browseRemoteFiles(_:)))
     }
 
     @Test("the Shell menu carries the item, after the directory commands")
@@ -76,7 +76,7 @@ struct SFTPBrowserWiringTests {
             menu.items.first { $0.title == L10n.text("menu.shell") || $0.title == "Shell" }?.submenu)
         let actions = shell.descendantItems.compactMap(\.action)
         let browse = try #require(
-            actions.firstIndex(of: #selector(ViewController.browseRemoteFiles(_:))))
+            actions.firstIndex(of: #selector(PaneRemote.browseRemoteFiles(_:))))
         let directories = try #require(
             actions.firstIndex(of: #selector(ViewController.revealWorkingDirectoryInFinder(_:))))
         let state = try #require(

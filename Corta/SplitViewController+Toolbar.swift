@@ -120,7 +120,7 @@ extension SplitViewController: NSToolbarDelegate {
     /// sheet as SSH, asking which host.
     @objc private func openRemoteFiles(_ sender: Any?) {
         guard let pane = focusedPane else { return }
-        if pane.canBrowseRemoteFiles { pane.browseRemoteFiles(sender); return }
+        if pane.remote.canBrowseFiles { pane.remote.browseRemoteFiles(sender); return }
         RemoteConnectController.shared.show(.sftp, sender: sender)
     }
 }

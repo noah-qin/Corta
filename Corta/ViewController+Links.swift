@@ -42,8 +42,8 @@ extension ViewController {
             return open(reference)
         }
         // Remote: open the host file's managed local copy.
-        if let remote = remoteFileReferenceUnder(event, in: terminalView) {
-            return openRemote(remote)
+        if let remoteReference = remote.resolve(detectedReferenceUnder(event, in: terminalView)) {
+            return remote.open(remoteReference)
         }
         return false
     }
@@ -57,8 +57,8 @@ extension ViewController {
         if let reference = fileReferenceUnder(event, in: terminalView) {
             return open(reference)
         }
-        if let remote = remoteFileReferenceUnder(event, in: terminalView) {
-            return openRemote(remote)
+        if let remoteReference = remote.resolve(detectedReferenceUnder(event, in: terminalView)) {
+            return remote.open(remoteReference)
         }
         return false
     }
@@ -107,7 +107,7 @@ extension ViewController {
             if terminalView.toolTip != tip { terminalView.toolTip = tip }
             setHoveredLink(reference.range)
         } else if armed, session != nil,
-            let remote = remoteFileReferenceUnder(event, in: terminalView)
+            let remoteReference = remote.resolve(detectedReferenceUnder(event, in: terminalView))
         {
             // Remote: host and path, and that a managed copy opens.
             if !hoveringLink {
@@ -115,9 +115,10 @@ extension ViewController {
                 hoveringLink = true
             }
             let tip = L10n.format(
-                "link.remoteFile", "\(remote.host):\(remote.remotePath):\(remote.line)")
+                "link.remoteFile",
+                "\(remoteReference.host):\(remoteReference.remotePath):\(remoteReference.line)")
             if terminalView.toolTip != tip { terminalView.toolTip = tip }
-            setHoveredLink(remote.range)
+            setHoveredLink(remoteReference.range)
         } else {
             resetLinkHover(terminalView)
         }

@@ -74,7 +74,7 @@ extension ViewController {
     }
 
     /// Detection before resolution, shared with the remote path
-    /// (`ViewController+RemoteEdit.swift`).
+    /// (`PaneRemote.resolve`).
     func detectedReferenceUnder(_ event: NSEvent, in terminalView: TerminalView)
         -> FileReferenceDetection.Reference?
     {
