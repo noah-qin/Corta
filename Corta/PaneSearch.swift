@@ -42,8 +42,7 @@ protocol PaneSearchHost: AnyObject {
 /// over logical lines, so wrapped matches are whole).
 ///
 /// Keys arrive two ways: the Find menu (⌘F, ⌘G, ⇧⌘G) through the responder
-/// chain — the pane hands `performFindPanelAction(_:)` here
-/// (`ViewController.supplementalTarget(forAction:sender:)`) — and
+/// chain, which the pane forwards here (`performFindPanelAction(_:)`) — and
 /// `TerminalView.onSearchKey` for Esc, which has no menu item and must never
 /// reach the child while the bar is open.
 final class PaneSearch: NSObject, NSSearchFieldDelegate {

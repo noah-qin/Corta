@@ -753,13 +753,13 @@ class ViewController: NSViewController, PaneSearchHost {
         session?.snapshot()
     }
 
-    /// Menu and palette actions a collaborator owns reach it through the
-    /// responder chain here: AppKit asks for a supplemental target when the
-    /// pane itself does not respond, and validates the item against it.
-    override func supplementalTarget(forAction action: Selector, sender: Any?) -> Any? {
-        if search.responds(to: action) { return search }
-        return super.supplementalTarget(forAction: action, sender: sender)
-    }
+    // MARK: - Forwarding
+
+    // Menu items, the palette and key bindings send their actions to the
+    // first responder, and the pane is in its chain; the pane answers for
+    // the collaborator that owns each one.
+
+    @objc func performFindPanelAction(_ sender: Any?) { search.performFindPanelAction(sender) }
 
     func resizeSessionToFitView() {
         // Nothing reaches the child before `sizeSettled`: earlier layouts run at

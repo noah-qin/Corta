@@ -231,9 +231,13 @@ the forwarding between them.
 | `PaneWindowTitle` | The window title and proxy icon: their composition and sanitising, the interval-cached process facts behind them, the off-main directory probe |
 | `PaneSearch`      | Scrollback search: the bar and its placement, key routing (Esc, ⌘G), the debounced off-main sweeps and their generations, the matches the renderer highlights, the pre-search viewport it restores. Reaches the pane only through `PaneSearchHost` |
 
-A collaborator that owns menu actions receives them through the pane's
-`supplementalTarget(forAction:sender:)`: AppKit asks the pane for one when
-the pane itself does not respond, and validates the item against it.
+A collaborator that owns menu actions implements them, and the pane
+forwards each from an `@objc` method of the same name: menu items, the
+palette and key bindings send to the first responder, and the pane is the
+object in that chain. Its `validateMenuItem` asks the owner the same way.
+Not `supplementalTarget(forAction:sender:)`: an item whose target is the
+pane by name never consults it, and AppKit sends the action to the pane
+anyway.
 
 ---
 

@@ -368,14 +368,20 @@ struct PaneSearchTests {
     }
 }
 
-/// The pane hands the Find menu to its search: the menu items name
-/// `performFindPanelAction:`, which only `PaneSearch` implements.
+/// The Find menu reaches the pane through the responder chain, and the
+/// pane hands it to its search.
 @MainActor
 struct PaneSearchRoutingTests {
-    @Test func theFindActionReachesThePanesSearch() {
+    @Test func theFindActionReachesThePanesSearch() throws {
+        let host = SearchTestHost()
+        host.print("P04MARKER\n")
         let pane = ViewController()
-        let action = #selector(PaneSearch.performFindPanelAction(_:))
-        #expect(!pane.responds(to: action))
-        #expect(pane.supplementalTarget(forAction: action, sender: nil) as AnyObject === pane.search)
+        #expect(pane.responds(to: #selector(PaneSearch.performFindPanelAction(_:))))
+        // Tag 1 is Find…; the pane's own search is what opens.
+        let find = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        find.tag = 1
+        host.search.performFindPanelAction(find)
+        #expect(host.search.bar != nil)
+        host.search.close()
     }
 }
