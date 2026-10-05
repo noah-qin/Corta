@@ -23,7 +23,7 @@ extension ViewController {
         let overlay = terminalView.shellOverlay
         overlay.frame = terminalView.bounds
         let metrics = terminalRenderer.pointMetrics
-        let content = Self.contentRect(in: terminalView.bounds.size, scale: 1,
+        let content = PaneFrameLoop.contentRect(in: terminalView.bounds.size, scale: 1,
             gridHeight: CGFloat(grid.rows) * metrics.cellHeight, topInset: topInset)
         let config = ConfigurationStore.shared.configuration
         let records = session.commandRecords.records

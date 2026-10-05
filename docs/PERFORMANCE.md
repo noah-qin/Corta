@@ -136,7 +136,7 @@ to one integer compare. Scrolled into history the rows come from
 immutable scrollback storage with no such stamp, so that path still
 compares `Line` values directly (`TerminalRenderer.rebuildDamagedRows`).
 The shell takes one `session.snapshot()` + diff per frame, in
-`ViewController.prepareFrame`, and releases it there: `render` draws the
+`PaneFrameLoop.prepareFrame`, and releases it there: `render` draws the
 renderer's cached instances and reads no grid. A second snapshot would
 diff a grid the first had just diffed in the same vsync callback, and one
 held until the next frame would cost the reader a scrollback copy (§5.9).

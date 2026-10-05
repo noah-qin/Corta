@@ -285,7 +285,7 @@ struct RemotePaneIsolationTests {
         // path on another machine.
         #expect(pane.paneRemoteState == .local)
         #expect(pane.shellDirectory == nil)
-        #expect(!pane.composedWindowTitle.contains("⟂"))
+        #expect(!pane.windowTitle.composed.contains("⟂"))
     }
 
     /// End to end through the split the user's ⌘D takes: a pane referring
@@ -468,8 +468,8 @@ struct SSHPresetPaneTests {
                 == .remote(host: "build-box", directory: "/srv/app", provenance: .osc7))
         // The title's copy of the state is cached on an interval; force the
         // re-read rather than racing it.
-        pane.invalidateProcessFacts()
-        #expect(pane.composedWindowTitle.contains("⟂ build-box"))
+        pane.windowTitle.invalidateProcessFacts()
+        #expect(pane.windowTitle.composed.contains("⟂ build-box"))
         // Nothing local changed its mind: the remote report never reaches
         // the local-spawn value.
         #expect(session.workingDirectory == nil)
@@ -488,8 +488,8 @@ struct SSHPresetPaneTests {
         let session = try #require(pane.session)
         #expect(await waitUntilTrue { session.remoteContext != nil })
         #expect(session.remoteContext?.directory == "/srv/app\ninjected")
-        pane.invalidateProcessFacts()
-        let title = pane.composedWindowTitle
+        pane.windowTitle.invalidateProcessFacts()
+        let title = pane.windowTitle.composed
         #expect(title.contains("⟂ build-box"))
         #expect(!title.contains("\n"))
     }

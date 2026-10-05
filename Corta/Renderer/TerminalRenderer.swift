@@ -275,7 +275,7 @@ public nonisolated final class TerminalRenderer {
     }
 
     /// Diff and draw in one call, for tests and benchmarks; the app's loop
-    /// diffs in `prepareFrame` and calls `draw` directly. `onCompleted`
+    /// diffs in `PaneFrameLoop.prepareFrame` and calls `draw` directly. `onCompleted`
     /// runs when the GPU has finished the frame.
     public func render(
         grid: Grid,

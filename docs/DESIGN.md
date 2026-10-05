@@ -217,6 +217,19 @@ child's environment is passed in by the app (the core's
 `ChildEnvironment`). Neither library may import AppKit or Metal
 (`PackageIsolationTests` and `ModuleBoundaryTests` hold those lines).
 
+### 4.1 A pane and its collaborators
+
+A pane is a `ViewController` that composes collaborators, each owning one
+concern with its own state and tests; new behaviour is added as a
+collaborator, never as another `ViewController+X.swift`. The controller
+keeps the session, the view, the renderer, focus, sizing, teardown, and
+the forwarding between them.
+
+| Collaborator      | Owns                                                                 |
+| ----------------- | -------------------------------------------------------------------- |
+| `PaneFrameLoop`   | When a frame is owed (the output wake, forced redraws, `?2026`), the diff into the renderer and the draw. The pane supplies the frame's content and an `onOutputBatch` stage — title, notifications, accessibility, history — run once per frame that saw output |
+| `PaneWindowTitle` | The window title and proxy icon: their composition and sanitising, the interval-cached process facts behind them, the off-main directory probe |
+
 ---
 
 ## 5. Milestones

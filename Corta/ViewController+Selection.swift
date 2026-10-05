@@ -240,7 +240,7 @@ extension ViewController {
             topInset: topInset)
     }
 
-    /// Pure, for tests. Mirrors `contentRect(in:scale:gridHeight:)`:
+    /// Pure, for tests. Mirrors `PaneFrameLoop.contentRect(in:scale:gridHeight:topInset:)`:
     /// top-anchored when the grid fits, bottom-anchored while it overflows.
     nonisolated static func documentPosition(
         for point: CGPoint, viewHeight: CGFloat, metrics: CellMetrics, grid: Grid,

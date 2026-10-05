@@ -54,7 +54,7 @@ struct FontSizeZoomTests {
         let oldColumns = pane.gridSize(fitting: pane.view.bounds.size).columns
         pane.increaseFontSize(nil)
         #expect(window.frame == frame)
-        #expect(!pane.composedWindowTitle.contains("×"))
+        #expect(!pane.windowTitle.composed.contains("×"))
         #expect(pane.gridSize(fitting: pane.view.bounds.size).columns < oldColumns)
         pane.resetFontSize(nil)
         #expect(window.frame == frame)
