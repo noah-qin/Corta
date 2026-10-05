@@ -62,7 +62,7 @@ final class ShortcutTests: XCTestCase {
     /// reason specific to this test machine rather than to Corta:
     /// 1. The window title carries the grid size only for the ~1.5s after
     ///    `resizeSessionToFitView` actually *changes* `lastRequestedSize`
-    ///    (`ViewController.noteTransientSizeChange`). On a normal launch,
+    ///    (`PaneWindowTitle.noteTransientSizeChange`). On a normal launch,
     ///    where the pre-display frame already lands at the configured grid
     ///    (the case this test exercises when nothing is broken), that
     ///    never fires — `lastRequestedSize` is seeded to the session's own

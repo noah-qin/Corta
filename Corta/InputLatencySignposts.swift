@@ -25,11 +25,11 @@ import OSLog
 /// | Stage | Interval | Where |
 /// | --- | --- | --- |
 /// | key event → bytes on the PTY | `keyDown` | `TerminalView.deliverBytes` (⌘/⌃ bypass, or declined by the IME), `.insertText` (most typing), `.doCommand(by:)` (Return, Delete, Escape, arrows) |
-/// | reader wakes, parses, writes the grid | `output` | `ViewController.noteOutput` |
-/// | MainActor hop that wakes the display link | `wake` | `ViewController.noteOutput` |
+/// | reader wakes, parses, writes the grid | `output` | `PaneFrameLoop.noteOutput` |
+/// | MainActor hop that wakes the display link | `wake` | `PaneFrameLoop.noteOutput` |
 /// | vsync callback, damage diff, instance build | `frame` | `FrameScheduler.metalDisplayLink(_:needsUpdate:)` |
-/// | encode + commit | `commit` | `ViewController.render` |
-/// | GPU work through to completion | `gpu` | `ViewController.render` |
+/// | encode + commit | `commit` | `PaneFrameLoop.render` |
+/// | GPU work through to completion | `gpu` | `PaneFrameLoop.render` |
 ///
 /// Every call sits behind `OSSignposter.isEnabled`, one atomic load when
 /// no trace is recording, so it is safe in release builds.

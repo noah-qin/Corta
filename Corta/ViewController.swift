@@ -19,21 +19,22 @@ import CoreText
 import CortaTerminal
 import Metal
 import QuartzCore
-import Synchronization
 
 /// One pane: a `TerminalSession` and the renderer and view that draw it.
 /// Knows no sibling panes beyond `splitController` (D07). This file owns
-/// lifecycle, the session and the render loop; behaviour lives in the
-/// `ViewController+<concern>.swift` extensions.
+/// lifecycle and the session; the render loop is `PaneFrameLoop`'s and the
+/// window title `PaneWindowTitle`'s, and the remaining behaviour lives in
+/// the `ViewController+<concern>.swift` extensions.
 class ViewController: NSViewController {
     // Not `private`: extensions reach these and cannot add storage.
     var terminalView: TerminalView!
     var terminalRenderer: TerminalRenderer!
     var session: TerminalSession!
-    /// Captured by each session's callbacks, so one from a session a retry has
-    /// since replaced is a no-op — `[weak self]` only says the controller is
-    /// alive, not that it is still this session's.
-    private var sessionGeneration = 0
+    /// Decides when a frame is owed and draws it; the pane supplies the
+    /// content and the output-batch stage.
+    private(set) lazy var frameLoop = makeFrameLoop()
+    /// The window title and proxy icon this pane shows while focused.
+    private(set) lazy var windowTitle = makeWindowTitle()
     /// Kept so a font change can rebuild the renderer.
     var device: MTLDevice!
     /// A change rebuilds the renderer: the atlas is rasterised for one size.
@@ -115,34 +116,9 @@ class ViewController: NSViewController {
     /// Keeps transient startup layouts from reaching the child
     /// (`resizeSessionToFitView`).
     var didSizeWindow = false
-    /// For changes the damage diff cannot see: drawable size, scale, scrolling.
-    private var needsRedraw = true
-    /// `?2026` withheld a frame, so the next one presents even if the diff
-    /// finds nothing.
-    private var wasSynchronizedOutputActive = false
-    /// An idle frame costs this one check, not a diff. One per session,
-    /// replaced with it (`OutputWakeGate`).
-    private var outputWake = OutputWakeGate()
     private var resizeDebouncer: ResizeDebouncer!
-    private var cachedProcessName: String?
-    private var cachedDirectory: String?
-    /// `cachedDirectory` if it was a directory when it last changed: the
-    /// title bar's proxy icon.
-    private var representedDirectory: URL?
-    private var directoryProbeGeneration = 0
-    // At most two blocked filesystem probes process-wide. Admission does not
-    // queue work: a hung mount must not grow a backlog of threads or closures.
-    nonisolated private static let directoryProbes = Mutex(0)
-    var directoryCheckerForTesting: (@Sendable (String) -> Bool)?
-    private var cachedRemoteState: PaneRemoteState = .local
     /// Shared by both readers so they supersede the same report.
     private var remoteReportTracker = PaneRemoteState.ReportTracker()
-    private var lastProcessFactsRefresh: CFTimeInterval = 0
-    /// A title rebuild waiting out `processFactsInterval`; at most one, and
-    /// cancelled by `teardown`.
-    private var trailingTitleRefresh: DispatchWorkItem?
-    private var isShowingTransientSize = false
-    private var transientSizeReset: DispatchWorkItem?
 
     /// ⌘+/⌘− re-fit the window to keep this grid size.
     var lastRequestedSize: TerminalSize?
@@ -336,9 +312,7 @@ class ViewController: NSViewController {
         }
         session = started.session
         launchedCommand = (started.executable, started.arguments)
-        sessionGeneration += 1
-        invalidateProcessFacts()
-        cachedRemoteState = .local
+        windowTitle.reset(session: started.session)
         remoteReportTracker = PaneRemoteState.ReportTracker()
         session.dynamicColors =
             AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)
@@ -350,7 +324,7 @@ class ViewController: NSViewController {
         lastRequestedSize = initialSize
 
         installPaneViews()
-        installSessionCallbacks(generation: sessionGeneration)
+        installSessionCallbacks()
         installTerminalCallbacks(on: terminalView)
         // The PTY reader must not run until all callbacks and views are ready.
         session.start()
@@ -423,7 +397,7 @@ class ViewController: NSViewController {
         focusRingView = ring
     }
 
-    private func installSessionCallbacks(generation: Int) {
+    private func installSessionCallbacks() {
         resizeDebouncer = ResizeDebouncer { [weak self] size in
             self?.session?.resize(to: size)
         }
@@ -432,12 +406,9 @@ class ViewController: NSViewController {
             observeWindowFocus()
             observeConfiguration()
         }
-        let wake = OutputWakeGate()
-        outputWake = wake
+        let generation = frameLoop.attach(session: session, renderer: terminalRenderer)
+        let wake = frameLoop.outputWake
         taskNotifier.lastOutputUptimeNanoseconds = { wake.lastOutputUptimeNanoseconds }
-        session.onOutput = { [weak self] in
-            self?.noteOutput(generation: generation, wake: wake)
-        }
         session.onChildExit = { [weak self] childExit in
             Task(priority: .userInitiated) { @MainActor in
                 self?.noteChildExit(childExit, generation: generation)
@@ -451,10 +422,10 @@ class ViewController: NSViewController {
                 drawable.present()
                 return true
             }
-            return render(drawableSize: drawableSize, drawable: drawable)
+            return frameLoop.render(drawableSize: drawableSize, drawable: drawable)
         }
         view.shouldRenderFrame = { [weak self] in
-            self?.prepareFrame() ?? false
+            self?.frameLoop.prepareFrame() ?? false
         }
         // `view` weakly too: the closure is stored on it, and a strong capture
         // kept every closed pane's view — and its drawables — alive.
@@ -597,9 +568,7 @@ class ViewController: NSViewController {
         didTeardown = true
         stopCursorBlink()
         inputSourceIndicator.stop()
-        directoryProbeGeneration += 1
-        trailingTitleRefresh?.cancel()
-        trailingTitleRefresh = nil
+        windowTitle.stop()
         closeSearchBar()
         largeTextTask?.cancel()
         largeTextTask = nil
@@ -637,63 +606,73 @@ class ViewController: NSViewController {
         ring.layer?.maskedCorners = mask
     }
 
-    /// Per vsync. With nothing new it reports nothing pending, which lets the
-    /// scheduler pause (idle ~0% CPU, `PERFORMANCE.md` §3); otherwise the diff is
-    /// cached for `render` and a frame happens only on damage.
-    private func prepareFrame() -> Bool {
-        guard let session, terminalRenderer != nil else { return false }
-        if session.takeBell() {
-            handleBell()
+    private func makeFrameLoop() -> PaneFrameLoop {
+        let loop = PaneFrameLoop()
+        loop.onBell = { [weak self] in self?.handleBell() }
+        loop.onOutputBatch = { [weak self] in self?.noteOutputBatch() }
+        loop.content = { [weak self] hasOutput in self?.frameContent(hasOutput: hasOutput) }
+        loop.onNeedsDisplay = { [weak self] in self?.terminalView?.setNeedsRedraw() }
+        loop.topInset = { [weak self] in self?.topInset ?? 0 }
+        return loop
+    }
+
+    private func makeWindowTitle() -> PaneWindowTitle {
+        let title = PaneWindowTitle()
+        title.resolveRemoteState = { [weak self] in self?.resolveRemoteState() ?? .local }
+        title.window = { [weak self] in self?.viewIfLoaded?.window }
+        title.gridSize = { [weak self] in self?.lastRequestedSize }
+        title.canApplyDeferred = { [weak self] in
+            guard let self else { return false }
+            return !didTeardown && isFocusedPane
         }
-        let hasOutput = outputWake.takePending()
-        guard needsRedraw || hasOutput else { return false }
-        // Title, directory and process all arrive as output, so this keeps the
-        // window and tab title current without a timer. An unfocused pane's
-        // applies on focus.
-        if hasOutput, isFocusedPane {
-            applyWindowTitle()
+        return title
+    }
+
+    /// The output-batch stage: what a batch changes beyond the grid. Title,
+    /// directory and process all arrive as output, so this keeps the window
+    /// and tab title current without a timer; an unfocused pane's applies on
+    /// focus.
+    private func noteOutputBatch() {
+        guard let session else { return }
+        if isFocusedPane {
+            windowTitle.apply()
         }
-        // Search refresh is a full-scrollback sweep; off the render path.
-        if hasOutput, scrollOffset > 0, !sawOutputWhileScrolled {
+        if scrollOffset > 0, !sawOutputWhileScrolled {
             // Nothing else says so: no scroll bar, and the live screen is off view.
             sawOutputWhileScrolled = true
             updateScrollPositionIndicator()
         }
-        if hasOutput, search.bar != nil {
+        // Search refresh is a full-scrollback sweep; off the render path.
+        if search.bar != nil {
             scheduleBackgroundSearchRefresh()
             // The cursor may have moved under the bar.
             placeSearchBarClearOfContent()
         }
-        if hasOutput {
-            // Rate-limited and gated on VoiceOver inside the call.
-            terminalView?.noteAccessibilityValueChanged()
-            drainClipboardRequests()
-            let finished = session.takeFinishedCommand()
-            // The prompt's return is the moment the program left: the title
-            // names the shell again now, not an interval later.
-            if finished != nil, isFocusedPane {
-                invalidateProcessFacts()
-                applyWindowTitle()
-            }
-            if session.hasShellIntegration {
-                taskNotifier.noteCommandRunning(
-                    session.isCommandRunning, exitStatus: finished,
-                    commandID: finished != nil ? session.commandRecords.lastCompleted?.id : nil,
-                    in: view.window)
-                // Ranked once a command ran there, not on every `cd`.
-                if finished != nil, let directory = session.currentDirectory {
-                    DirectoryHistoryStore.shared.record(directory)
-                }
+        // Rate-limited and gated on VoiceOver inside the call.
+        terminalView?.noteAccessibilityValueChanged()
+        drainClipboardRequests()
+        let finished = session.takeFinishedCommand()
+        // The prompt's return is the moment the program left: the title
+        // names the shell again now, not an interval later.
+        if finished != nil, isFocusedPane {
+            windowTitle.invalidateProcessFacts()
+            windowTitle.apply()
+        }
+        if session.hasShellIntegration {
+            taskNotifier.noteCommandRunning(
+                session.isCommandRunning, exitStatus: finished,
+                commandID: finished != nil ? session.commandRecords.lastCompleted?.id : nil,
+                in: view.window)
+            // Ranked once a command ran there, not on every `cd`.
+            if finished != nil, let directory = session.currentDirectory {
+                DirectoryHistoryStore.shared.record(directory)
             }
         }
-        if session.isSynchronizedOutputEnabled {
-            // Owe a present until the DECRST, or a torn state shows.
-            wasSynchronizedOutputActive = true
-            return false
-        }
-        let forced = needsRedraw || wasSynchronizedOutputActive
-        needsRedraw = false
-        wasSynchronizedOutputActive = false
+    }
+
+    /// What this frame draws, and the overlays placed against it.
+    private func frameContent(hasOutput: Bool) -> PaneFrameLoop.Content? {
+        guard let session, let terminalRenderer else { return nil }
         let configuration = ConfigurationStore.shared.configuration
         let inputSnapshot = configuration.inputSourceIndicator == .off ? nil : session.inputLineSnapshot()
         let grid = inputSnapshot?.grid ?? session.snapshot()
@@ -720,18 +699,15 @@ class ViewController: NSViewController {
                 scrollAnchorTotalPushed = grid.scrollback.totalPushed
             }
         }
-        let mappedSearchMatches = search.matches.map { TerminalSelection($0, grid: grid) }
         let cursorStyle = effectiveCursorStyle(grid: grid)
         updateCursorBlink(grid: grid, style: cursorStyle, reset: hasOutput)
-        let indexedPalette = session.indexedPalette
-        let damaged = terminalRenderer.updateInstances(
+        return PaneFrameLoop.Content(
             grid: grid, scrollOffset: scrollOffset,
-            cursorVisible: scrollOffset == 0 && isFocusedPane && cursorBlinkVisible, selection: selection,
-            searchMatches: mappedSearchMatches,
+            cursorVisible: scrollOffset == 0 && isFocusedPane && cursorBlinkVisible,
+            selection: selection,
+            searchMatches: search.matches.map { TerminalSelection($0, grid: grid) },
             currentSearchMatchIndex: search.currentMatchIndex, hoveredLink: hoveredLink,
-            indexedOverrides: indexedPalette.overrides,
-            indexedOverridesGeneration: indexedPalette.overridesGeneration, cursorStyle: cursorStyle)
-        return forced || damaged
+            cursorStyle: cursorStyle)
     }
 
     private func handleBell() {
@@ -745,35 +721,16 @@ class ViewController: NSViewController {
         }
     }
 
-    /// On the reader thread, per parse batch; `generation` guards against a
-    /// replaced session. Hops to the main actor only when `wake` was idle:
-    /// the frame that takes the flag re-arms it, so a flood costs one hop a
-    /// frame, not one a batch.
-    nonisolated private func noteOutput(generation: Int, wake: OutputWakeGate) {
-        // A point, not an interval: the interval began on another thread.
-        InputLatencySignposts.emit(.output)
-        RenderMetrics.noteOutputForKeystroke()
-        guard wake.noteOutput() else { return }
-        // Measured apart: a busy main thread lengthens this stage.
-        let interval = InputLatencySignposts.begin(.wake)
-        // On the keypress-to-pixel chain; the default priority has no claim.
-        Task(priority: .userInitiated) { @MainActor [weak self] in
-            InputLatencySignposts.end(.wake, interval)
-            guard let self, self.sessionGeneration == generation else { return }
-            self.terminalView?.setNeedsRedraw()
-        }
-    }
-
     /// A child that exited on its own. A user's close set `didTeardown` before
     /// stopping the session, and must not toast; a generation check alone
     /// would miss it.
     @MainActor
     private func noteChildExit(_: ChildExit, generation: Int) {
-        guard !didTeardown, sessionGeneration == generation else { return }
+        guard !didTeardown, frameLoop.isCurrent(generation) else { return }
         // A dead child produces no output to rebuild the title; the `⟂ host`
         // badge would outlive its connection.
-        invalidateProcessFacts()
-        applyWindowTitle()
+        windowTitle.invalidateProcessFacts()
+        windowTitle.apply()
         // A remote launcher: the connection ended, and the way back is a new one.
         if let launchedCommand,
             PaneRemoteState.isRemoteLauncher(executable: launchedCommand.executable)
@@ -786,8 +743,7 @@ class ViewController: NSViewController {
 
     /// For local changes that produce no output.
     func invalidateDisplay() {
-        needsRedraw = true
-        terminalView?.setNeedsRedraw()
+        frameLoop.invalidate()
     }
 
     func resizeSessionToFitView() {
@@ -821,177 +777,13 @@ class ViewController: NSViewController {
         resizeDebouncer.resize(to: size, coalesce: true)
         // The title shows the live size, as Terminal.app does.
         if isFocusedPane {
-            invalidateProcessFacts()
+            windowTitle.invalidateProcessFacts()
             // Zoom changes the grid, but only a physical window drag needs
             // a temporary size label in the title and native tab.
-            if view.inLiveResize { noteTransientSizeChange() }
-            else {
-                transientSizeReset?.cancel()
-                transientSizeReset = nil
-                isShowingTransientSize = false
-            }
-            applyWindowTitle()
+            if view.inLiveResize { windowTitle.noteTransientSizeChange() }
+            else { windowTitle.endTransientSize() }
+            windowTitle.apply()
         }
-    }
-
-    // MARK: - Window title
-
-    /// `⟂ host — <title or directory> — <process> — <columns>×<rows>`, as
-    /// Terminal.app shows; unknown parts are left out. The host badge leads — it
-    /// answers which computer the rest is on. An OSC 0/2 title beats the
-    /// directory. Every part but the size is child input: capped and stripped of
-    /// controls (`SECURITY.md` §2).
-    var composedWindowTitle: String {
-        guard session != nil else { return "Corta" }
-        refreshProcessFactsIfStale()
-        var parts: [String] = []
-        // The badge's host and directory are the remote shell's own OSC 7
-        // text, percent-decoded — as hostile as any other child-supplied
-        // component, and sanitised the same way.
-        if let badge = Self.sanitizedTitleComponent(cachedRemoteState.titleComponent) {
-            parts.append(badge)
-        }
-        if let title = Self.sanitizedTitleComponent(session.windowTitle) {
-            parts.append(title)
-        } else if let directory = Self.sanitizedTitleComponent(cachedDirectory.map(Self.abbreviated)) {
-            // OSC 7 text too: a directory named with a newline or a bidi
-            // override would otherwise reach the title as it is.
-            parts.append(directory)
-        }
-        if let process = Self.sanitizedTitleComponent(cachedProcessName) {
-            parts.append(process)
-        }
-        // The grid size, only while it is changing.
-        //
-        // Appended permanently, the title would read "~/Corta — zsh —
-        // 120×27" for the whole life of the window: a third of the space,
-        // and with tabs a third of every tab label, spent on a number that
-        // is interesting for the two seconds of a drag and never again.
-        // Terminal.app shows it during a resize for exactly that reason.
-        // With tabs the cost is worse than cosmetic — the tab label
-        // truncates from the right, so the directory or task name the user
-        // is actually distinguishing tabs by would be the first thing to
-        // disappear.
-        if let size = lastRequestedSize, isShowingTransientSize {
-            parts.append("\(size.columns)×\(size.rows)")
-        }
-        return parts.isEmpty ? "Corta" : parts.joined(separator: " — ")
-    }
-
-    /// Applies this pane's title to the window, plus the proxy icon for its
-    /// working directory — the folder in the title bar, which makes the path
-    /// draggable and ⌘-clickable the way every document window's is.
-    ///
-    /// The represented URL is only set for a directory that exists: the path
-    /// arrives over OSC 7 from the child, and a proxy icon is something the
-    /// user can drag into another application. A remote pane gets no icon at
-    /// all, by construction rather than by check: `cachedDirectory` reads
-    /// `session.currentDirectory`, which a remote `OSC 7` report never
-    /// reaches (it lands in `remoteContext`), so there is no remote
-    /// path here to offer a drag of.
-    func applyWindowTitle() {
-        guard let window = view.window else { return }
-        let title = (window.windowController as? TerminalWindowController)?.customTabTitle ?? composedWindowTitle
-        if window.title != title { window.title = title }
-        (window.windowController as? TerminalWindowController)?.refreshTabTitle()
-
-        if window.representedURL != representedDirectory {
-            window.representedURL = representedDirectory
-        }
-    }
-
-    static let directoryProbeRetryDelay: TimeInterval = 2
-
-    /// OSC 7 paths can point at an unresponsive network mount. Never stat on
-    /// the main actor, and never publish a result for a superseded path.
-    func probeRepresentedDirectory(_ path: String?) {
-        directoryProbeGeneration += 1
-        let generation = directoryProbeGeneration
-        representedDirectory = nil
-        guard let path else { return }
-        let admitted = Self.directoryProbes.withLock { active in
-            guard active < 2 else { return false }
-            active += 1
-            return true
-        }
-        // Two probes are already stuck on a slow mount. Try again shortly,
-        // rather than leave this pane without its proxy icon until the next
-        // `cd`; a newer path in the meantime supersedes the retry.
-        guard admitted else {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Self.directoryProbeRetryDelay) {
-                [weak self] in
-                guard let self, !self.didTeardown, generation == self.directoryProbeGeneration
-                else { return }
-                self.probeRepresentedDirectory(path)
-            }
-            return
-        }
-        let checker = directoryCheckerForTesting
-        Task.detached(priority: .utility) { [weak self] in
-            let exists: Bool
-            if let checker {
-                exists = checker(path)
-            } else {
-                var isDirectory: ObjCBool = false
-                exists = FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
-                    && isDirectory.boolValue
-            }
-            Self.directoryProbes.withLock { $0 -= 1 }
-            await MainActor.run { [weak self] in
-                guard let self, !self.didTeardown,
-                    generation == self.directoryProbeGeneration else { return }
-                self.representedDirectory = exists ? URL(fileURLWithPath: path) : nil
-                self.applyWindowTitle()
-            }
-        }
-    }
-
-    /// Shows the grid size in the title for a moment after a resize, then
-    /// takes it away again. Called from `resizeSessionToFitView`, which is
-    /// the only place the size changes.
-    func noteTransientSizeChange() {
-        isShowingTransientSize = true
-        transientSizeReset?.cancel()
-        let work = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            isShowingTransientSize = false
-            transientSizeReset = nil
-            applyWindowTitle()
-        }
-        transientSizeReset = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.transientSizeDuration, execute: work)
-    }
-
-    private static let transientSizeDuration: TimeInterval = 1.5
-
-    /// The process name, directory and remote state behind the title, and
-    /// when they were last read.
-    ///
-    /// All three are syscalls — `tcgetpgrp`, `proc_name`, `proc_pidinfo` —
-    /// and the title is rebuilt on every output batch, which during a `yes`
-    /// or a build is thousands of batches a second. Refreshed on an interval
-    /// instead: a directory that changed a quarter of a second ago is not
-    /// worth three syscalls per frame, and the OSC 0/2 title (the part a
-    /// program updates deliberately) is read fresh every time regardless.
-    /// The remote state rides the same cadence: `ssh` starting or
-    /// exiting announces itself with output — the far end's banner, the
-    /// local shell's returning prompt — so the badge follows within one
-    /// interval, with no timer of its own.
-    private func refreshProcessFactsIfStale() {
-        let now = CACurrentMediaTime()
-        let elapsed = now - lastProcessFactsRefresh
-        guard elapsed >= Self.processFactsInterval else {
-            scheduleTrailingTitleRefresh(after: Self.processFactsInterval - elapsed)
-            return
-        }
-        lastProcessFactsRefresh = now
-        cachedProcessName = session.activeProcessName
-        let directory = session.currentDirectory
-        if directory != cachedDirectory {
-            cachedDirectory = directory
-            probeRepresentedDirectory(directory)
-        }
-        cachedRemoteState = resolveRemoteState()
     }
 
     /// One fresh read of the pane's remote state — the syscalls, the
@@ -1005,115 +797,6 @@ class ViewController: NSViewController {
             hasForegroundJob: session.hasForegroundJob,
             foregroundProcessName: session.foregroundProcessName,
             childIsRemoteLauncher: childIsLiveRemoteLauncher)
-    }
-
-    /// One more title rebuild once the interval has passed. A skipped refresh
-    /// is only stale if nothing follows it, and a program that exits and hands
-    /// back the prompt within the interval is followed by nothing: without
-    /// this, `kitten icat` left "— kitten" in the title until the next output.
-    private func scheduleTrailingTitleRefresh(after delay: CFTimeInterval) {
-        guard trailingTitleRefresh == nil else { return }
-        let work = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            trailingTitleRefresh = nil
-            // An unfocused pane's title applies on focus.
-            guard !didTeardown, isFocusedPane else { return }
-            applyWindowTitle()
-        }
-        trailingTitleRefresh = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
-    }
-
-    /// On focus and command boundaries, where waiting out the interval would
-    /// show something stale.
-    func invalidateProcessFacts() {
-        lastProcessFactsRefresh = 0
-    }
-
-    private static let processFactsInterval: CFTimeInterval = 0.4
-
-    /// No controls (a newline truncates a title) and a hard length cap.
-    private static func sanitizedTitleComponent(_ text: String?) -> String? {
-        guard let text else { return nil }
-        let cleaned =
-            text
-            .components(separatedBy: .controlCharacters).joined(separator: " ")
-            .trimmingCharacters(in: .whitespaces)
-        guard !cleaned.isEmpty else { return nil }
-        guard cleaned.count > titleComponentLimit else { return cleaned }
-        return cleaned.prefix(titleComponentLimit) + "…"
-    }
-
-    private static let titleComponentLimit = 80
-
-    /// `~/Developer`, or just the last name deeper down; the proxy icon has the
-    /// full path.
-    private static func abbreviated(_ path: String) -> String {
-        let home = NSHomeDirectory()
-        if path == home { return "~" }
-        let name = (path as NSString).lastPathComponent
-        return name.isEmpty ? path : name
-    }
-
-    /// Right after `prepareFrame()` in the same callback, drawing its cached
-    /// context; never blocks the reader (`PERFORMANCE.md` §2.1). Draws the
-    /// renderer's cached instances, which `prepareFrame` last diffed, as one
-    /// Metal 4 render pass; the backend commits and presents the drawable.
-    /// Returns false for a frame the backend dropped, which the scheduler
-    /// owes another tick.
-    private func render(drawableSize: CGSize, drawable: CAMetalDrawable) -> Bool {
-        guard let terminalRenderer else {
-            // Never hold a drawable: an unpresented one is never recycled.
-            drawable.present()
-            return true
-        }
-        let rect = Self.contentRect(
-            in: drawableSize, scale: terminalRenderer.scale,
-            gridHeight: CGFloat(terminalRenderer.cachedRowCount) * terminalRenderer.metrics.cellHeight,
-            topInset: topInset)
-        let gpu = InputLatencySignposts.begin(.gpu)
-        let gpuStart = RenderMetrics.isEnabled ? DispatchTime.now() : nil
-        // `gpu` spans submission to completion — the only place GPU time and a
-        // drawable wait become visible.
-        let onCompleted: (@Sendable ((any Error)?) -> Void)? =
-            (gpu != nil || gpuStart != nil)
-            ? { @Sendable _ in
-                InputLatencySignposts.end(.gpu, gpu)
-                if let gpuStart {
-                    let ms =
-                        Double(DispatchTime.now().uptimeNanoseconds - gpuStart.uptimeNanoseconds)
-                        / 1_000_000
-                    RenderMetrics.record(.gpu, milliseconds: ms)
-                }
-            }
-            : nil
-        let background = TerminalColorPalette.clearColor
-        let commit = InputLatencySignposts.begin(.commit)
-        let drawn = terminalRenderer.draw(
-            rect: rect, drawableSize: drawableSize, target: drawable.texture,
-            clearColor: MTLClearColorMake(
-                Double(background.x), Double(background.y), Double(background.z),
-                Double(background.w)),
-            // For Metal System Trace: ties a command buffer to its pane.
-            drawable: drawable, label: "Corta.frame.\(ObjectIdentifier(self).hashValue)",
-            onCompleted: onCompleted)
-        InputLatencySignposts.end(.commit, commit)
-        return drawn
-    }
-
-    /// Top-anchored when the grid fits, so the rounding remainder sits at the
-    /// bottom, not under the titlebar; bottom-anchored when mid-drag the grid is
-    /// taller, so the prompt stays put (top-pinning was the "text jumps").
-    static func contentRect(
-        in drawableSize: CGSize, scale: CGFloat, gridHeight: CGFloat, topInset: CGFloat
-    ) -> CGRect {
-        let bottom = drawableSize.height - TerminalLayout.insets.bottom * scale
-        let fits = topInset * scale + gridHeight <= bottom
-        return CGRect(
-            x: TerminalLayout.insets.left * scale,
-            y: fits ? topInset * scale : bottom - gridHeight,
-            width: max(0, drawableSize.width - TerminalLayout.insetWidth * scale),
-            height: gridHeight)
     }
 
     // MARK: - Failure paths

@@ -555,7 +555,7 @@ final class SplitViewController: NSViewController {
             window.representedURL = nil
             return
         }
-        focusedPane.applyWindowTitle()
+        focusedPane.windowTitle.apply()
     }
 
     @objc func moveFocusLeft(_ sender: Any?) { moveFocus(.left) }

@@ -468,7 +468,7 @@ extension ViewController {
         }
     }
 
-    /// Output-triggered refresh from `prepareFrame`. Never scrolls, so the
+    /// Output-triggered refresh from the output-batch stage. Never scrolls, so the
     /// viewport stays on the match the user is reading.
     ///
     /// One sweep at most in flight. Output arriving meanwhile sets
