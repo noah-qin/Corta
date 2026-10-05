@@ -36,23 +36,13 @@ extension ViewController {
     @objc func configurationChanged() {
         let configuration = ConfigurationStore.shared.configuration
         terminalView?.mouseOverrideModifier = configuration.mouseOverrideModifier
-        // A family change forces `setFontSize` (the ⌘+/⌘− path) even at the
-        // same size.
-        if configuration.fontFamily != fontFamily {
+        // A zoom survives config changes; `resetFontSize` ends it. Family
+        // and size apply together, so a reload that changes both re-points
+        // the renderer, fits the window and resizes the child once.
+        let size = isFontSizeZoomed ? fontSize : min(64, max(8, configuration.fontSize))
+        if configuration.fontFamily != fontFamily || size != fontSize {
             fontFamily = configuration.fontFamily
-            let scale = view.window?.backingScaleFactor ?? terminalRenderer.scale
-            terminalRenderer.setFont(
-                TerminalFont.primary(ofSize: fontSize, family: fontFamily), scale: scale)
-            let metrics = terminalRenderer.pointMetrics
-            terminalView.cellSize = CGSize(
-                width: metrics.cellWidth, height: metrics.cellHeight)
-            view.window?.contentResizeIncrements = NSSize(
-                width: metrics.cellWidth, height: metrics.cellHeight)
-            resizeSessionToFitView()
-        }
-        // A zoom survives config changes; `resetFontSize` ends it.
-        if !isFontSizeZoomed {
-            setFontSize(min(64, max(8, configuration.fontSize)))
+            applyFont(size: size, settle: true)
         }
         invalidateDisplay()
     }
@@ -80,6 +70,8 @@ extension ViewController {
 
     /// A new backing scale needs a new atlas, or text goes soft; the cell box
     /// snaps to device pixels, so this uses the `setFont` path and refits.
+    /// The window is not fitted: moving between displays is not a font
+    /// change, and a frame that changed under a drag would fight it.
     func rebuildAtlas(forBackingScale scale: CGFloat) {
         guard scale > 0, scale != terminalRenderer.scale else { return }
         terminalRenderer.setFont(
@@ -87,47 +79,60 @@ extension ViewController {
                 ofSize: fontSize,
                 family: fontFamily),
             scale: scale)
-        let metrics = terminalRenderer.pointMetrics
-        terminalView.cellSize = CGSize(width: metrics.cellWidth, height: metrics.cellHeight)
-        view.window?.contentResizeIncrements = NSSize(
-            width: metrics.cellWidth, height: metrics.cellHeight)
-        resizeSessionToFitView()
-        invalidateDisplay()
+        applyCellMetrics(settle: true, fitsWindow: false)
     }
 
-    /// Re-points the renderer while retaining the window frame. All font
-    /// changes refit the grid, including settings and temporary zoom.
-    func setFontSize(_ newSize: CGFloat) {
+    /// Re-points the renderer while keeping the window where it is: a lone
+    /// pane's window moves its bottom and right edges to whole cells
+    /// (`SplitViewController.fitWindowToWholeCells`). All font changes refit
+    /// the grid, including settings and temporary zoom.
+    ///
+    /// `settle: false` is a step of a gesture still in progress — a pinch
+    /// steps a point at a time, several a second — so the grid refits through
+    /// the drag debounce and the window waits for `settleFontChange()`.
+    func setFontSize(_ newSize: CGFloat, settle: Bool = true) {
+        let clamped = min(64, max(8, newSize))
+        guard clamped != fontSize else { return }
+        applyFont(size: clamped, settle: settle)
+    }
+
+    /// The end of a gesture's run of `setFontSize(_:settle: false)`.
+    func settleFontChange() {
+        guard terminalRenderer != nil else { return }
+        applyCellMetrics(settle: true, fitsWindow: true)
+    }
+
+    /// Re-points the renderer at `size` in the current family — rather than
+    /// rebuilding it, which made key repeat stutter — and follows with the
+    /// cell metrics. Below ~8pt the cell degenerates; above 64pt it outgrows
+    /// the minimum window.
+    private func applyFont(size: CGFloat, settle: Bool) {
+        fontSize = min(64, max(8, size))
         // A failed pane has no renderer; its retry builds one at the
         // configured size.
         guard let terminalRenderer else { return }
-        // Below ~8pt the cell degenerates; above 64pt it outgrows the minimum
-        // window.
-        let clamped = min(64, max(8, newSize))
-        guard clamped != fontSize else { return }
-        fontSize = clamped
-
-        let font = TerminalFont.primary(
-            ofSize: fontSize, family: fontFamily)
         let scale = view.window?.backingScaleFactor ?? terminalRenderer.scale
-        // Re-point rather than rebuild; rebuilding made key repeat stutter.
-        terminalRenderer.setFont(font, scale: scale)
+        terminalRenderer.setFont(TerminalFont.primary(ofSize: fontSize, family: fontFamily), scale: scale)
+        applyCellMetrics(settle: settle, fitsWindow: true)
+    }
+
+    /// After the renderer's metrics changed — size, family or backing scale —
+    /// everything measured in cells follows: the view's cell box, the
+    /// window's resize increments and minimum, the window fitted to whole
+    /// cells (`fitsWindow`, and only once a change settles), then the grid.
+    /// One path, so no source of a metrics change skips a step.
+    private func applyCellMetrics(settle: Bool, fitsWindow: Bool) {
         let metrics = terminalRenderer.pointMetrics
         terminalView.cellSize = CGSize(width: metrics.cellWidth, height: metrics.cellHeight)
-
         // Before the window exists, initial sizing reads the new metrics.
-        guard didSizeWindow, let window = view.window else { return }
-        window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
-        // With splits no window size keeps every grid; the caller refits.
-        guard splitController?.hasMultiplePanes != true else {
-            resizeSessionToFitView()
+        guard didSizeWindow, let window = view.window else {
             invalidateDisplay()
             return
         }
-        window.contentMinSize = NSSize(
-            width: CGFloat(minimumColumns) * metrics.cellWidth + TerminalLayout.insetWidth,
-            height: CGFloat(minimumRows) * metrics.cellHeight + verticalInsets + (splitController?.statusBarHeight ?? 0))
-        resizeSessionToFitView()
+        window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
+        splitController?.updateWindowMinSize()
+        if settle, fitsWindow { splitController?.fitWindowToWholeCells(metrics: metrics) }
+        resizeSessionToFitView(coalesce: !settle)
         invalidateDisplay()
     }
 }

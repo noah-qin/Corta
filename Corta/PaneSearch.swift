@@ -333,7 +333,7 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
         wrapper.layer?.borderColor = border.color.cgColor
         wrapper.layer?.borderWidth = border.width
         if let layer = wrapper.layer {
-            // An explicit path (kept in step by `placeSearchBarClearOfContent`):
+            // An explicit path (kept in step by `placeClearOfContent`):
             // the wrapper draws nothing, so a derived shadow traced only the hairline.
             layer.shadowColor = NSColor.black.cgColor
             layer.shadowOpacity = 0.16

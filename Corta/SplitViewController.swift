@@ -598,18 +598,95 @@ final class SplitViewController: NSViewController {
 
     /// ⌘= / ⌘- / ⌘0 apply to every pane: they share the window's resize
     /// increments and minimum size, derived from one cell geometry.
-    func setFontSizeForAllPanes(_ size: CGFloat, isZoomed: Bool) {
+    /// Each pane refits its own grid (`ViewController.setFontSize`); with
+    /// one pane the window is also fitted to whole cells, with several the
+    /// frames stay. `settle: false` is a pinch still in progress.
+    func setFontSizeForAllPanes(_ size: CGFloat, isZoomed: Bool, settle: Bool = true) {
         for pane in panes {
-            pane.setFontSize(size)
+            pane.setFontSize(size, settle: settle)
             // On every pane, so each pane's `configurationChanged` agrees.
             pane.isFontSizeZoomed = isZoomed
         }
-        if hasMultiplePanes {
-            // No window size keeps every grid intact; keep the frames and refit each
-            // grid instead of the single-pane window re-fit.
-            for pane in panes { pane.resizeSessionToFitView() }
+    }
+
+    /// The end of a pinch: every pane's grid and the window settle at once.
+    func settleFontChangeForAllPanes() {
+        for pane in panes { pane.settleFontChange() }
+    }
+
+    /// The usable area a run of font changes started from, and the frame and
+    /// usable area the last fit left; either changed since by anything else
+    /// — a drag, the status bar — starts a new run.
+    private var fontChangeAnchor: (usable: CGSize, frameSize: CGSize, fittedUsable: CGSize)?
+
+    /// Moves a lone pane's bottom and right edges, top edge fixed, so the
+    /// grid at `metrics` fills the pane exactly: without it the remainder of
+    /// the usable size over the cell size — anywhere from nothing to almost a
+    /// row — sat under the last line, different after every font change.
+    ///
+    /// Whole cells of the size the run of changes started at, rounded to the
+    /// nearest, rather than of the last step's: rounding each step from the
+    /// one before walks the window, while from the anchor ⌘+ then ⌘0 lands on
+    /// the frame it began with.
+    ///
+    /// The frame stays, with its remainder, where it is not the pane's alone
+    /// to change or a move would undo an arrangement: splits, full screen, a
+    /// maximised window, the Quick Terminal's docked panel, native tabs (one
+    /// frame for every tab), a window overhanging its screen, one whose
+    /// bottom or right edge is flush with the screen's edge or middle (tiled
+    /// or docked), and a window not yet past its startup layout (D15).
+    func fitWindowToWholeCells(metrics: CellMetrics) {
+        guard let window = view.window, panes.count == 1, let pane = panes.first,
+            sizeSettled, !window.styleMask.contains(.fullScreen), !window.isZoomed,
+            !(window is NSPanel), (window.tabbedWindows?.count ?? 1) <= 1,
+            metrics.cellWidth > 0, metrics.cellHeight > 0
+        else {
+            fontChangeAnchor = nil
+            return
         }
-        updateWindowMinSize()
+        let current = window.frame
+        if let visible = window.screen?.visibleFrame {
+            func flush(_ edge: CGFloat, _ lines: [CGFloat]) -> Bool {
+                lines.contains { abs(edge - $0) <= 1 }
+            }
+            guard visible.contains(current),
+                !flush(current.minY, [visible.minY, visible.midY]),
+                !flush(current.maxX, [visible.maxX, visible.midX])
+            else {
+                fontChangeAnchor = nil
+                return
+            }
+        }
+        view.layoutSubtreeIfNeeded()
+        let usable = pane.usableSize(fitting: pane.view.bounds.size)
+        if let previous = fontChangeAnchor,
+            previous.frameSize != current.size
+                || abs(previous.fittedUsable.width - usable.width) > ViewController.fitSlack
+                || abs(previous.fittedUsable.height - usable.height) > ViewController.fitSlack
+        {
+            fontChangeAnchor = nil
+        }
+        let anchor = fontChangeAnchor?.usable ?? usable
+        let columns = max(CGFloat(pane.minimumColumns), (anchor.width / metrics.cellWidth).rounded())
+        let rows = max(CGFloat(pane.minimumRows), (anchor.height / metrics.cellHeight).rounded())
+        var frame = current
+        frame.size.width += columns * metrics.cellWidth - usable.width
+        frame.size.height += rows * metrics.cellHeight - usable.height
+        // The top edge stays put; AppKit's origin is the bottom left.
+        frame.origin.y = current.maxY - frame.height
+        if let visible = window.screen?.visibleFrame, !visible.contains(frame) {
+            fontChangeAnchor = nil
+            return
+        }
+        if frame != current {
+            window.setFrame(frame, display: false)
+            // The pane's bounds follow on the next layout pass; take it now,
+            // so the size the pane then sends its child is the fitted one.
+            view.layoutSubtreeIfNeeded()
+        }
+        fontChangeAnchor = (
+            usable: anchor, frameSize: window.frame.size,
+            fittedUsable: pane.usableSize(fitting: pane.view.bounds.size))
     }
 
     // MARK: - Minimum sizes
