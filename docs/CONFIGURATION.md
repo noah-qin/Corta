@@ -28,9 +28,10 @@ key = value        # comment to end of line
 - One setting per line. Whitespace around the key, the `=` and the value
   is ignored.
 - A line whose first non-blank character is `#` is a comment.
-- A `#` that **opens a value** is a colour, not a comment
-  (`background = #101018`). The key is split off before comments are
-  stripped, which is what makes both readings possible.
+- A `#` that **opens a value**, or follows a comma in a list, is a colour,
+  not a comment (`background = #101018`, `ansi = #000, #c23621`). The key
+  is split off before comments are stripped, which is what makes both
+  readings possible.
 - Booleans accept `true`/`false`, `yes`/`no`, `on`/`off`, `1`/`0`.
 - An **unknown key is preserved**, not dropped: a file written by a newer
   Corta survives a round trip through an older one.

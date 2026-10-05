@@ -91,6 +91,10 @@ what to edit.
 
 ### Fixed
 
+- A theme's `ansi = #…, #…` list kept only its first colour: the second `#`
+  was read as the start of a comment. Settings and the theme editor write
+  every theme this way, so a custom theme's other fifteen ANSI colours
+  reverted to its base theme's the next time the file was read.
 - Appearance previews follow light/dark changes immediately and show cursor
   shape and blinking. The default remains a nonblinking block cursor.
 - View menu and Terminal settings expose local host details even with the

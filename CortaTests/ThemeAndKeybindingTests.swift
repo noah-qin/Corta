@@ -81,6 +81,32 @@ import Testing
         #expect(theme.dark.ansi == Theme.corta.dark.ansi)
     }
 
+    /// The file writes a theme's table as one `ansi = #…, #…` line. The
+    /// comment stripper once cut it at the second `#`, so every slot past
+    /// the first fell back to the base theme — invisible above, where the
+    /// table *is* the base's.
+    @Test("a whole ANSI table survives a write and re-read")
+    func ansiTableRoundTrips() {
+        var lines = ["theme = probe"]
+        for index in 0..<16 {
+            lines.append("theme.probe.dark.ansi\(index) = #\(String(format: "%02x", 16 + index))3040")
+        }
+        let (parsed, _) = Configuration.parse(lines.joined(separator: "\n"))
+        let written = parsed.serialized()
+        #expect(written.contains("theme.probe.dark.ansi = #103040, #113040"))
+        let (reparsed, _) = Configuration.parse(written)
+        let theme = try! #require(Theme.named("probe", in: reparsed))
+        #expect(theme.dark.ansi == (0..<16).map { Theme.color("#\(String(format: "%02x", 16 + $0))3040")! })
+
+        // A trailing comment after a list is still a comment.
+        let (commented, unknown) = Configuration.parse(
+            "theme.c.dark.ansi = #000, #f00 # red\ntheme.c.dark.background = #101018 # deep")
+        let c = try! #require(Theme.named("c", in: commented))
+        #expect(unknown.isEmpty)
+        #expect(c.dark.ansi[1] == Theme.color("#f00"))
+        #expect(c.dark.background == Theme.color("#101018"))
+    }
+
     /// A half-typed theme must still render — a config file is hand-edited,
     /// and a bad colour must not black out the terminal.
     @Test("a malformed colour is preserved, not applied")
