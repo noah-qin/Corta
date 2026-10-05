@@ -108,7 +108,7 @@ final class RemoteEditCoordinator {
     private let makeClient: (String) -> any SFTPClient
     /// Opens the editor on a local path at a line/column — the same
     /// `open-file-command` machinery local file references use
-    /// (`ViewController.openFileAt`), injected so tests see the arguments
+    /// (`PanePointer.openFileAt`), injected so tests see the arguments
     /// rather than launching an editor.
     private let opener: @MainActor (URL, Int, Int?) -> Bool
     private var presenter: RemoteEditPresenter
@@ -145,7 +145,7 @@ final class RemoteEditCoordinator {
     ) {
         self.store = store
         self.makeClient = makeClient ?? { SFTPConnection.forApp(host: $0) }
-        self.opener = opener ?? ViewController.openRemoteFileAt(url:line:column:)
+        self.opener = opener ?? PanePointer.openRemoteFileAt(url:line:column:)
         self.presenter = presenter ?? RemoteEditPresenter(
             promptUpload: { _ in }, promptConflict: { _ in }, showError: { _ in })
         // The default presenter needs to call back into the coordinator,

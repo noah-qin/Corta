@@ -196,18 +196,18 @@ struct ScrollIndicatorIntegrationTests {
         try #require(pane.isOperable)
         try #require(fill(pane, atLeast: 60), "the child produced no scrollback")
 
-        #expect(pane.scrollPositionIndicator == nil, "nothing to say at the bottom")
+        #expect(pane.pointer.scrollPositionIndicator == nil, "nothing to say at the bottom")
 
         pane.terminalView?.scrollWheel(with: Self.wheel(lines: 12))
         #expect(pane.scrollOffset > 0)
-        let pill = try #require(pane.scrollPositionIndicator)
+        let pill = try #require(pane.pointer.scrollPositionIndicator)
         #expect(pill.superview === pane.terminalView)
         #expect(pill.accessibilityLabel()?.isEmpty == false)
 
         // The affordance itself: pressing it goes back, and the pill goes.
         #expect(pill.accessibilityPerformPress())
         #expect(pane.scrollOffset == 0)
-        #expect(pane.scrollPositionIndicator == nil)
+        #expect(pane.pointer.scrollPositionIndicator == nil)
     }
 
     /// Output arriving while scrolled changes the pill's words — the fact a
@@ -219,19 +219,19 @@ struct ScrollIndicatorIntegrationTests {
         try #require(fill(pane, atLeast: 60), "the child produced no scrollback")
 
         pane.terminalView?.scrollWheel(with: Self.wheel(lines: 12))
-        let pill = try #require(pane.scrollPositionIndicator)
+        let pill = try #require(pane.pointer.scrollPositionIndicator)
         let resting = try #require(pill.accessibilityLabel())
         #expect(!pill.hasNewOutput)
 
         pane.sawOutputWhileScrolled = true
-        pane.updateScrollPositionIndicator()
+        pane.pointer.updateScrollPositionIndicator()
         let alerted = try #require(pill.accessibilityLabel())
         #expect(pill.hasNewOutput)
         #expect(alerted != resting)
 
         // Returning to the bottom clears the state, so the next scroll does
         // not still claim there is new output below.
-        pane.scroll(.toBottom)
+        pane.pointer.scroll(.toBottom)
         #expect(!pane.sawOutputWhileScrolled)
     }
 
@@ -334,12 +334,12 @@ struct ScrollIndicatorIntegrationTests {
 
         // Already at the bottom: a no-op, not an assertion failure waiting
         // to happen if this ever grew a side effect beyond `scrollOffset`.
-        pane.returnToBottomOnInput()
+        pane.pointer.returnToBottomOnInput()
         #expect(pane.scrollOffset == 0)
 
         pane.terminalView?.scrollWheel(with: Self.wheel(lines: 12))
         try #require(pane.scrollOffset > 0)
-        pane.returnToBottomOnInput()
+        pane.pointer.returnToBottomOnInput()
         #expect(pane.scrollOffset == 0)
     }
 }

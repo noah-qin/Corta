@@ -48,12 +48,7 @@ private final class CommandsTestHost: PaneCommandsHost {
         if settle { settles += 1 }
     }
     func settleFontChange() { settles += 1 }
-    func selectionRange(for selection: TerminalSelection, in grid: Grid) -> SelectionRange {
-        SelectionRange(
-            start: SelectionPoint(row: selection.start.row, column: selection.start.column),
-            end: SelectionPoint(row: selection.end.row, column: selection.end.column))
-    }
-    func returnToBottomOnInput() {}
+    let pointer = PanePointer()
     func sendPaste(_ sanitized: String) { pastes.append(sanitized) }
 }
 

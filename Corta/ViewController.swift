@@ -27,7 +27,7 @@ import QuartzCore
 /// `PaneRemote`'s and the menu commands `PaneCommands`', and the remaining
 /// behaviour lives in the `ViewController+<concern>.swift` extensions.
 class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneCommandsHost,
-    PaneFocusHost
+    PaneFocusHost, PanePointerHost
 {
     // Not `private`: extensions reach these and cannot add storage.
     var terminalView: TerminalView!
@@ -78,7 +78,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
                 // measured from there.
                 scrollAnchorTotalPushed = session?.scrollbackTotalPushed
             }
-            updateScrollPositionIndicator()
+            pointer.updateScrollPositionIndicator()
             search.placeClearOfContent()
         }
     }
@@ -87,15 +87,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// `prepareFrame` keeps the viewport on the same document row with it.
     var scrollAnchorTotalPushed: Int?
 
-    var scrollPositionIndicator: ScrollPositionIndicator?
-
     /// The fact a person scrolled up to wait for.
     var sawOutputWhileScrolled = false
-    /// Cursor changes on transitions only: resetting the arrow every move
-    /// fights the divider's resize cursor.
-    var hoveringLink = false
-    /// Underlined, so the target shows before a click opens it.
-    var hoveredLink: TerminalSelection?
     var selection: TerminalSelection?
     /// Non-nil exactly when `isOperable` is false.
     var failureView: PaneFailureView?
@@ -121,6 +114,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     private(set) lazy var commands = PaneCommands(host: self)
     /// The dim, ring and highlight, the cursor's blink, and `?1004`.
     private(set) lazy var focus = PaneFocus(host: self)
+    /// Scrolling, mouse selection, links and local file references.
+    private(set) lazy var pointer = PanePointer(host: self)
     let inputSourceIndicator = PaneInputSourceIndicator()
 
     /// The child sees the final size now, not after the debounce.
@@ -394,11 +389,11 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         view.onKeyBytes = { [weak self, weak view] bytes in
             guard let self else { return }
             if bytes.contains(0x0D) { taskNotifier.noteCommandSubmitted(in: view?.window) }
-            returnToBottomOnInput()
+            pointer.returnToBottomOnInput()
             session.write(bytes)
         }
         view.onScroll = { [weak self] gesture in
-            self?.scroll(gesture)
+            self?.pointer.scroll(gesture)
         }
         view.onLiveResizeEnded = { [weak self] in
             self?.endLiveResize()
@@ -449,7 +444,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             return TerminalFont.primary(ofSize: fontSize, family: fontFamily) as NSFont
         }
         view.isMouseReportingEnabled = { [weak self] in
-            self?.mouseReportingEnabled() ?? false
+            self?.pointer.mouseReportingEnabled() ?? false
         }
         view.mouseTrackingMode = { [weak self] in
             self?.session?.sgrMouseTrackingMode ?? .off
@@ -477,7 +472,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             let grid = session.snapshot()
             return TerminalAccessibilitySnapshot(
                 grid: grid,
-                selection: selection.map { selectionRange(for: $0, in: grid) },
+                selection: selection.map { pointer.selectionRange(for: $0, in: grid) },
                 scrollOffset: scrollOffset)
         }
         view.accessibilityCellFrameProvider = { [weak self] row, column in
@@ -492,7 +487,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             guard let self, let terminalRenderer, session != nil, let terminalView
             else { return (column: 0, row: 0) }
             let grid = session.snapshot()
-            let position = Self.documentPosition(
+            let position = PanePointer.documentPosition(
                 for: point, viewHeight: terminalView.bounds.height,
                 metrics: terminalRenderer.pointMetrics, grid: grid, scrollOffset: 0,
                 topInset: self.topInset)
@@ -568,7 +563,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         if scrollOffset > 0, !sawOutputWhileScrolled {
             // Nothing else says so: no scroll bar, and the live screen is off view.
             sawOutputWhileScrolled = true
-            updateScrollPositionIndicator()
+            pointer.updateScrollPositionIndicator()
         }
         // Search refresh is a full-scrollback sweep; off the render path.
         if search.bar != nil {
@@ -634,7 +629,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             cursorVisible: scrollOffset == 0 && isFocusedPane && focus.cursorBlinkVisible,
             selection: selection,
             searchMatches: search.matches.map { TerminalSelection($0, grid: grid) },
-            currentSearchMatchIndex: search.currentMatchIndex, hoveredLink: hoveredLink,
+            currentSearchMatchIndex: search.currentMatchIndex, hoveredLink: pointer.hoveredLink,
             cursorStyle: cursorStyle)
     }
 
@@ -683,6 +678,10 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         commands.selectedText()
     }
 
+    /// ⌘A: `NSResponder` declares it, so the pane overrides rather than
+    /// forwards.
+    override func selectAll(_ sender: Any?) { pointer.selectAll(sender) }
+
     // MARK: - Forwarding
 
     /// Menu items, the palette, key bindings and the storyboard send their
@@ -690,11 +689,11 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// answers for the collaborator that implements each, through the
     /// Objective-C runtime's forwarding, and `validateMenuItem` asks it too.
     /// A collaborator's new `@objc` action needs nothing here.
-    private var actionOwners: [NSObject] { [search, remote, commands] }
+    private var actionOwners: [NSObject] { [search, remote, commands, pointer] }
     /// The same owners as classes, for a question that may come from any
     /// thread and so must not touch the instances.
     nonisolated private static let actionOwnerClasses: [NSObject.Type] = [
-        PaneSearch.self, PaneRemote.self, PaneCommands.self,
+        PaneSearch.self, PaneRemote.self, PaneCommands.self, PanePointer.self,
     ]
 
     nonisolated override func responds(to aSelector: Selector!) -> Bool {

@@ -34,7 +34,7 @@ extension ViewController {
             alert.addButton(withTitle: L10n.text("common.cancel"))
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
-        returnToBottomOnInput()
+        pointer.returnToBottomOnInput()
         sendPaste(sanitized)
     }
 

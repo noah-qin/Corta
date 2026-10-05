@@ -106,7 +106,7 @@ struct RemoteWorkingDirectoryTests {
         // and resolves to nothing here, even though `/tmp` exists locally and
         // a same-named file might too.
         #expect(
-            ViewController.resolve(
+            PanePointer.resolve(
                 reference, directory: terminal.workingDirectory,
                 isRegularFile: { _ in true }) == nil)
     }
@@ -131,7 +131,7 @@ struct RemoteWorkingDirectoryTests {
 
         let line = terminal.grid.logicalLine(containing: 0)
         let reference = try #require(FileReferenceDetection.references(in: line).first)
-        let resolved = try #require(ViewController.resolve(reference, directory: reported))
+        let resolved = try #require(PanePointer.resolve(reference, directory: reported))
         #expect(resolved.url.lastPathComponent == "main.rs")
         #expect(resolved.line == 42)
         #expect(resolved.column == 17)

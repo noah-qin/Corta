@@ -40,9 +40,8 @@ protocol PaneCommandsHost: AnyObject {
     func setFontSize(_ newSize: CGFloat, settle: Bool)
     /// Ends a gesture's run of unsettled font sizes.
     func settleFontChange()
-    func selectionRange(for selection: TerminalSelection, in grid: Grid) -> SelectionRange
-    /// Input addressed to the live screen brings the viewport back to it.
-    func returnToBottomOnInput()
+    /// Selection geometry and the viewport's return to the live screen.
+    var pointer: PanePointer { get }
     /// Queues an already-sanitised paste, whole or not at all.
     func sendPaste(_ sanitized: String)
 }
@@ -279,7 +278,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         // A paste in every way that matters, as in `pasteFromClipboard` —
         // including saying so when the child is not reading, rather than
         // dropping the drop without a word.
-        host.returnToBottomOnInput()
+        host.pointer.returnToBottomOnInput()
         host.sendPaste(sanitized)
     }
 
@@ -289,7 +288,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
             return nil
         }
         let grid = session.snapshot()
-        let text = Selection.text(of: host.selectionRange(for: selection, in: grid), in: grid)
+        let text = Selection.text(of: host.pointer.selectionRange(for: selection, in: grid), in: grid)
         return text.isEmpty ? nil : text
     }
 
@@ -301,7 +300,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         else { return nil }
         let grid = session.snapshot()
         let metrics = terminalRenderer.pointMetrics
-        let position = ViewController.documentPosition(
+        let position = PanePointer.documentPosition(
             for: point, viewHeight: terminalView.bounds.height,
             metrics: metrics, grid: grid,
             scrollOffset: host.scrollOffset, topInset: host.topInset)
@@ -323,7 +322,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     @objc func copy(_ sender: Any?) {
         guard let host, let selection = host.selection, let session = host.session else { return }
         let grid = session.snapshot()
-        let range = host.selectionRange(for: selection, in: grid)
+        let range = host.pointer.selectionRange(for: selection, in: grid)
         let pasteboard = pasteboardForTesting ?? .general
         // The pasteboard is shared by every pane and app: recheck `changeCount`
         // before writing so a slow copy never clobbers a newer write.
@@ -372,7 +371,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         guard let host, host.isOperable, let window = host.view.window else { return }
         let grid = host.session.snapshot()
         let selection = host.selection
-        let range = selection.map { host.selectionRange(for: $0, in: grid) }
+        let range = selection.map { host.pointer.selectionRange(for: $0, in: grid) }
         performExport(
             window: window, grid: grid, range: range,
             messageKey: selection != nil ? "export.message.selection" : "export.message.history",

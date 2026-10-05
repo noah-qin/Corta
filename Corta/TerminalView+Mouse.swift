@@ -31,7 +31,7 @@ extension TerminalView {
         // it is neither an SGR report nor the start of a selection.
         if event.modifierFlags.contains(.command),
             let controller = paneController,
-            controller.handleLinkClick(event, in: self)
+            controller.pointer.handleLinkClick(event, in: self)
         { return }
         showMouseOverrideHintIfNeeded()
         if report(event, phase: .press(.left)) { return }
@@ -39,7 +39,7 @@ extension TerminalView {
             super.mouseDown(with: event)
             return
         }
-        controller.handleSelectionMouseDown(event, in: self)
+        controller.pointer.handleSelectionMouseDown(event, in: self)
     }
 
     override func mouseUp(with event: NSEvent) {
@@ -164,11 +164,11 @@ extension TerminalView {
             super.mouseMoved(with: event)
             return
         }
-        controller.handleLinkHover(event, in: self)
+        controller.pointer.handleLinkHover(event, in: self)
     }
 
     override func mouseExited(with event: NSEvent) {
-        paneController?.resetLinkHover(self)
+        paneController?.pointer.resetLinkHover(self)
     }
 
     /// ⌘ pressed or released while the pointer rests still: `locationInWindow`
@@ -178,6 +178,6 @@ extension TerminalView {
             super.flagsChanged(with: event)
             return
         }
-        controller.handleLinkHover(event, in: self)
+        controller.pointer.handleLinkHover(event, in: self)
     }
 }

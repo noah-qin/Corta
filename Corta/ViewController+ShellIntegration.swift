@@ -21,13 +21,6 @@ import CortaTerminal
 /// (viewport moves in document rows), plus the OSC 52 clipboard drain,
 /// which arrives through the same output path.
 extension ViewController: NSMenuItemValidation {
-    // MARK: - Scrolling from the keyboard
-
-    @objc func scrollHistoryPageUp(_ sender: Any?) { scroll(.page(up: true)) }
-    @objc func scrollHistoryPageDown(_ sender: Any?) { scroll(.page(up: false)) }
-    @objc func scrollHistoryToTop(_ sender: Any?) { scroll(.toTop) }
-    @objc func scrollHistoryToBottom(_ sender: Any?) { scroll(.toBottom) }
-
     // MARK: - Command to command
 
     @objc func jumpToPreviousCommand(_ sender: Any?) { jumpToCommand(backwards: true) }
@@ -117,15 +110,15 @@ extension ViewController: NSMenuItemValidation {
     }
 
     /// Opens the first `path:line[:column]` in `effectiveCommand`'s output
-    /// with the same logic as ⌘-click (`ViewController+FileReferences.swift`).
+    /// with the same logic as ⌘-click (`PanePointer`).
     @objc func openFileReferenceInCommand(_ sender: Any?) {
         guard isOperable else { return }
-        if let reference = fileReferenceInCommand(effectiveCommand) {
-            open(reference)
+        if let reference = pointer.fileReferenceInCommand(effectiveCommand) {
+            pointer.open(reference)
             return
         }
         // Remote: open the managed local copy at the same line.
-        if let remoteReference = remote.resolve(detectedReferenceInCommand(effectiveCommand)) {
+        if let remoteReference = remote.resolve(pointer.detectedReferenceInCommand(effectiveCommand)) {
             remote.open(remoteReference)
             return
         }
@@ -332,8 +325,8 @@ extension ViewController: NSMenuItemValidation {
             return session.commandRecords.last?.isRunning == true
         case #selector(openFileReferenceInCommand(_:)):
             guard isOperable else { return false }
-            return fileReferenceInCommand(effectiveCommand) != nil
-                || remote.resolve(detectedReferenceInCommand(effectiveCommand)) != nil
+            return pointer.fileReferenceInCommand(effectiveCommand) != nil
+                || remote.resolve(pointer.detectedReferenceInCommand(effectiveCommand)) != nil
         case #selector(searchCommandHistory(_:)):
             return isOperable
         case #selector(clearScreen(_:)), #selector(clearHistory(_:)),
