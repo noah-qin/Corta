@@ -100,7 +100,7 @@ import Testing
     /// A colour no built-in has, distinct per slot: `#rrggbb` and its value.
     private static func probeColor(_ seed: Int) -> (hex: String, value: SIMD4<Float>) {
         let r = (20 + seed * 13) % 256
-        let g = (230 - seed * 11) % 256
+        let g = (230 + seed * 245) % 256  // down by 11 a step, wrapping
         let b = (60 + seed * 29) % 256
         let hex = String(format: "#%02x%02x%02x", r, g, b)
         return (hex, SIMD4<Float>(Float(r) / 255, Float(g) / 255, Float(b) / 255, 1))

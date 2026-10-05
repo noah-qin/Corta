@@ -120,15 +120,17 @@ import Testing
         let renderer = try #require(Self.makeRenderer())
         var terminal = Terminal(rows: 4, columns: 10)
         terminal.feed(Array("aaaa\r\nbbbb\r\ncccc".utf8))
-        renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: true, selection: nil)
+        // Hidden: a block cursor moving off row 2 would rebuild that row too
+        // (`blockCursorMotionRebuildsTheRowItLeftAndTheRowItEntered`).
+        renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
 
         // Overwrite row 1 only (CUP to row 2, column 1, then write).
         terminal.feed(Array("\u{1B}[2;1HXX".utf8))
-        #expect(renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: true, selection: nil))
+        #expect(renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil))
         #expect(renderer.lastRebuiltRowCount == 1)
 
         // And it settles again.
-        #expect(!renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: true, selection: nil))
+        #expect(!renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil))
         #expect(renderer.lastRebuiltRowCount == 0)
     }
 

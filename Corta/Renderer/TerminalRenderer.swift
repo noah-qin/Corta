@@ -650,12 +650,21 @@ public nonisolated final class TerminalRenderer {
         // Once per row: the property retains the ANSI array on every touch.
         let palette = framePalette
         // The block cursor's columns in this row — two under a wide
-        // character, so the whole glyph inverts — or an empty range.
+        // character, so the whole glyph inverts — or an empty range. Past
+        // the line's stored cells there is no character to invert: one
+        // cursor-coloured cell.
         var cursorStart = 0
         var cursorEnd = 0
-        if let blockCursor, blockCursor.row == row, blockCursor.column < line.count {
-            cursorStart = blockCursor.column
-            cursorEnd = cursorStart + (line[cursorStart].attributes.contains(.wide) ? 2 : 1)
+        if let blockCursor, blockCursor.row == row {
+            if blockCursor.column < line.count {
+                cursorStart = blockCursor.column
+                cursorEnd = cursorStart + (line[cursorStart].attributes.contains(.wide) ? 2 : 1)
+            } else {
+                background.append(
+                    QuadInstance(
+                        origin: .init(Float(blockCursor.column) * cellWidth, Float(row) * cellHeight),
+                        size: .init(cellWidth, cellHeight), color: palette.cursor))
+            }
         }
         // The mark: a rule down a prompt row's left edge, coloured by outcome —
         // which of the last twenty failed, at a glance. Inside the first cell:
