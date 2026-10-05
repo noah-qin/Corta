@@ -382,7 +382,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     @objc func exportCommandOutput(_ sender: Any?) {
         guard let host, host.isOperable, let window = host.view.window else { return }
         let grid = host.session.snapshot()
-        guard let range = ViewController.commandOutputRange(grid: grid, record: host.effectiveCommand)
+        guard let range = PaneShellIntegration.commandOutputRange(grid: grid, record: host.effectiveCommand)
         else {
             host.terminalView?.showToast(L10n.text("toast.noCommandOutput"), kind: .warning)
             return
@@ -678,7 +678,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         switch menuItem.action {
         case #selector(exportCommandOutput(_:)):
             guard let host, host.isOperable else { return false }
-            return ViewController.commandOutputText(
+            return PaneShellIntegration.commandOutputText(
                 grid: host.session.snapshot(), record: host.effectiveCommand) != nil
         case #selector(exportText(_:)):
             return host?.isOperable == true

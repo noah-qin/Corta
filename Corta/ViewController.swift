@@ -27,7 +27,7 @@ import QuartzCore
 /// `PaneRemote`'s and the menu commands `PaneCommands`', and the remaining
 /// behaviour lives in the `ViewController+<concern>.swift` extensions.
 class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneCommandsHost,
-    PaneFocusHost, PanePointerHost
+    PaneFocusHost, PanePointerHost, PaneShellIntegrationHost, NSMenuItemValidation
 {
     // Not `private`: extensions reach these and cannot add storage.
     var terminalView: TerminalView!
@@ -61,15 +61,10 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// What actually spawned — after a fallback, not what was asked for. The
     /// remote-state composition and Reconnect read it.
     private(set) var launchedCommand: (executable: String, arguments: [String])?
-    /// Cleared when the viewport moves (`scrollOffset`'s `didSet`), so
-    /// `effectiveCommand` never targets a command scrolled out of view.
-    /// `jumpToCommand` sets it after its own scroll.
-    var selectedCommandID: Int?
-
     var scrollOffset = 0 {
         didSet {
             guard scrollOffset != oldValue else { return }
-            selectedCommandID = nil
+            shell.selectedCommandID = nil
             if scrollOffset == 0 {
                 sawOutputWhileScrolled = false
                 scrollAnchorTotalPushed = nil
@@ -116,6 +111,9 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     private(set) lazy var focus = PaneFocus(host: self)
     /// Scrolling, mouse selection, links and local file references.
     private(set) lazy var pointer = PanePointer(host: self)
+    /// OSC 133's jumps, command output, history fill, the status marks and
+    /// directory completion, and the OSC 52 drain.
+    private(set) lazy var shell = PaneShellIntegration(host: self)
     let inputSourceIndicator = PaneInputSourceIndicator()
 
     /// The child sees the final size now, not after the debounce.
@@ -385,7 +383,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             invalidateDisplay()
         }
         inputSourceIndicator.start()
-        view.onCompletionKey = { [weak self] event in self?.handleDirectoryCompletionKey(event) ?? false }
+        view.onCompletionKey = { [weak self] event in self?.shell.handleDirectoryCompletionKey(event) ?? false }
         view.onKeyBytes = { [weak self, weak view] bytes in
             guard let self else { return }
             if bytes.contains(0x0D) { taskNotifier.noteCommandSubmitted(in: view?.window) }
@@ -573,7 +571,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         }
         // Rate-limited and gated on VoiceOver inside the call.
         terminalView?.noteAccessibilityValueChanged()
-        drainClipboardRequests()
+        shell.drainClipboardRequests()
         let finished = session.takeFinishedCommand()
         // The prompt's return is the moment the program left: the title
         // names the shell again now, not an interval later.
@@ -600,7 +598,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         let inputSnapshot = configuration.inputSourceIndicator == .off ? nil : session.inputLineSnapshot()
         let grid = inputSnapshot?.grid ?? session.snapshot()
         splitController?.placeInputSourceIndicator(from: self, configuration: configuration)
-        updateShellOverlay(grid: grid)
+        shell.updateShellOverlay(grid: grid)
         if let inputSnapshot {
             let metrics = terminalRenderer.pointMetrics
             inputSourceIndicator.update(grid: grid, hasIntegration: inputSnapshot.hasIntegration,
@@ -678,6 +676,9 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         commands.selectedText()
     }
 
+    /// What copy, export and open-reference act on (`PaneShellIntegration`).
+    var effectiveCommand: CommandRecord? { shell.effectiveCommand }
+
     /// ⌘A: `NSResponder` declares it, so the pane overrides rather than
     /// forwards.
     override func selectAll(_ sender: Any?) { pointer.selectAll(sender) }
@@ -689,17 +690,32 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// answers for the collaborator that implements each, through the
     /// Objective-C runtime's forwarding, and `validateMenuItem` asks it too.
     /// A collaborator's new `@objc` action needs nothing here.
-    private var actionOwners: [NSObject] { [search, remote, commands, pointer] }
+    private var actionOwners: [NSObject] { [search, remote, commands, pointer, shell] }
     /// The same owners as classes, for a question that may come from any
     /// thread and so must not touch the instances.
     nonisolated private static let actionOwnerClasses: [NSObject.Type] = [
         PaneSearch.self, PaneRemote.self, PaneCommands.self, PanePointer.self,
+        PaneShellIntegration.self,
     ]
 
     nonisolated override func responds(to aSelector: Selector!) -> Bool {
         if super.responds(to: aSelector) { return true }
         guard let aSelector else { return false }
         return Self.actionOwnerClasses.contains { $0.instancesRespond(to: aSelector) }
+    }
+
+    /// Every owner of an item's action gets its say; one that does not own
+    /// it answers yes.
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if let action = menuItem.action,
+            [#selector(clearScreen(_:)), #selector(clearHistory(_:)), #selector(resetTerminal(_:))]
+                .contains(action)
+        {
+            return validateTerminalStateItem(menuItem)
+        }
+        return actionOwners.allSatisfy {
+            ($0 as? NSMenuItemValidation)?.validateMenuItem(menuItem) ?? true
+        }
     }
 
     /// Only what the pane itself does not answer: `NSObject`'s and

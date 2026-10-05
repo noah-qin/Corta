@@ -323,18 +323,18 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .scrollPageDown: return #selector(PanePointer.scrollHistoryPageDown(_:))
         case .scrollToTop: return #selector(PanePointer.scrollHistoryToTop(_:))
         case .scrollToBottom: return #selector(PanePointer.scrollHistoryToBottom(_:))
-        case .previousCommand: return #selector(ViewController.jumpToPreviousCommand(_:))
-        case .nextCommand: return #selector(ViewController.jumpToNextCommand(_:))
+        case .previousCommand: return #selector(PaneShellIntegration.jumpToPreviousCommand(_:))
+        case .nextCommand: return #selector(PaneShellIntegration.jumpToNextCommand(_:))
         case .previousFailedCommand:
-            return #selector(ViewController.jumpToPreviousFailedCommand(_:))
-        case .nextFailedCommand: return #selector(ViewController.jumpToNextFailedCommand(_:))
+            return #selector(PaneShellIntegration.jumpToPreviousFailedCommand(_:))
+        case .nextFailedCommand: return #selector(PaneShellIntegration.jumpToNextFailedCommand(_:))
         case .copyLastCommandOutput:
-            return #selector(ViewController.copyLastCommandOutput(_:))
+            return #selector(PaneShellIntegration.copyLastCommandOutput(_:))
         case .snapshotRunningCommandOutput:
-            return #selector(ViewController.snapshotRunningCommandOutput(_:))
+            return #selector(PaneShellIntegration.snapshotRunningCommandOutput(_:))
         case .exportCommandOutput: return #selector(PaneCommands.exportCommandOutput(_:))
         case .openFileReferenceInCommand:
-            return #selector(ViewController.openFileReferenceInCommand(_:))
+            return #selector(PaneShellIntegration.openFileReferenceInCommand(_:))
         case .revealWorkingDirectory:
             return #selector(PaneCommands.revealWorkingDirectoryInFinder(_:))
         case .copyWorkingDirectoryPath:
@@ -347,7 +347,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
             return #selector(PaneCommands.openParentDirectoryInNewPane(_:))
         case .openProjectRootInNewPane:
             return #selector(PaneCommands.openProjectRootInNewPane(_:))
-        case .searchCommandHistory: return #selector(ViewController.searchCommandHistory(_:))
+        case .searchCommandHistory: return #selector(PaneShellIntegration.searchCommandHistory(_:))
         case .exportText: return #selector(PaneCommands.exportText(_:))
         case .clearScreen: return #selector(ViewController.clearScreen(_:))
         case .clearHistory: return #selector(ViewController.clearHistory(_:))
