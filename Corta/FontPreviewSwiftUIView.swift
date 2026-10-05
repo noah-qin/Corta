@@ -65,7 +65,7 @@ struct FontPreviewSwiftUIView: View {
         }
         .padding(EdgeInsets(top: 6, leading: 8, bottom: 6, trailing: 8))
         .frame(maxWidth: .infinity, minHeight: 66, alignment: .leading)
-        .background(Self.color(variant.background), in: RoundedRectangle(cornerRadius: 4))
+        .background(Self.color(variant.background), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .accessibilityElement(children: .ignore)
         .accessibilityAddTraits(.isImage)
     }

@@ -164,6 +164,9 @@ nonisolated struct Shortcut: Equatable, Sendable {
 nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     case newWindow = "new-window"
     case newTab = "new-tab"
+    case previousTab = "previous-tab"
+    case nextTab = "next-tab"
+    case renameTab = "rename-tab"
     case close
     case splitRight = "split-right"
     case splitDown = "split-down"
@@ -220,6 +223,9 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         switch self {
         case .newWindow: return L10n.text("command.newWindow")
         case .newTab: return L10n.text("command.newTab")
+        case .previousTab: return L10n.text("command.previousTab")
+        case .nextTab: return L10n.text("command.nextTab")
+        case .renameTab: return L10n.text("command.renameTab")
         case .close: return L10n.text("command.close")
         case .splitRight: return L10n.text("command.splitRight")
         case .splitDown: return L10n.text("command.splitDown")
@@ -286,6 +292,9 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         switch self {
         case .newWindow: return #selector(AppDelegate.newDocument(_:))
         case .newTab: return #selector(AppDelegate.newTab(_:))
+        case .previousTab: return #selector(SplitViewController.selectPreviousCortaTab(_:))
+        case .nextTab: return #selector(SplitViewController.selectNextCortaTab(_:))
+        case .renameTab: return #selector(SplitViewController.renameCurrentTab(_:))
         case .close: return #selector(SplitViewController.performClose(_:))
         case .splitRight: return #selector(SplitViewController.splitRight(_:))
         case .splitDown: return #selector(SplitViewController.splitDown(_:))
@@ -360,6 +369,9 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         switch self {
         case .newWindow: return Shortcut("n", .command)
         case .newTab: return Shortcut("t", .command)
+        case .previousTab: return Shortcut("[", [.command, .shift])
+        case .nextTab: return Shortcut("]", [.command, .shift])
+        case .renameTab: return nil
         case .close: return Shortcut("w", .command)
         case .splitRight: return Shortcut("d", .command)
         case .splitDown: return Shortcut("d", [.command, .shift])
@@ -452,7 +464,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     /// replacing that knowledge.
     var category: CommandCategory {
         switch self {
-        case .newWindow, .newTab, .close, .quickTerminal: return .window
+        case .newWindow, .newTab, .previousTab, .nextTab, .renameTab, .close, .quickTerminal: return .window
         case .splitRight, .splitDown, .focusLeft, .focusRight, .focusUp, .focusDown,
             .growPaneHorizontally, .shrinkPaneHorizontally, .growPaneVertically,
             .shrinkPaneVertically, .equalizePanes, .zoomPane, .reopenClosedPane:
@@ -483,6 +495,9 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .newWindow: return 1
         case .close: return 2
         case .quickTerminal: return 3
+        case .previousTab: return 4
+        case .nextTab: return 5
+        case .renameTab: return 6
         case .splitRight: return 0
         case .splitDown: return 1
         case .focusLeft: return 2

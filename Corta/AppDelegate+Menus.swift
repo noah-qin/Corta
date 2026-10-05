@@ -324,6 +324,10 @@ extension AppDelegate {
         else { return }
         file.addItem(.separator())
         file.addItem(item(for: .exportText))
+        file.addItem(.separator())
+        for command in [TerminalCommand.previousTab, .nextTab, .renameTab] {
+            file.addItem(item(for: command))
+        }
     }
 
     /// Theme, appearance, scrolling and the palette, under View. Theme and

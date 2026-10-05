@@ -24,7 +24,7 @@ import CortaTerminal
 final class SplitViewController: NSViewController {
     private var tree: SplitTree!
     private let systemStatusBar = SystemStatusBar(frame: .zero)
-    let inputSourceToolbarHost = NSView(frame: CGRect(x: 0, y: 0, width: 28, height: 18))
+    let inputSourceToolbarHost = NSView(frame: CGRect(x: 0, y: 0, width: 28, height: 24))
     var inputSourceToolbarSpacer: NSToolbarItem?
     private var statusBarHeightConstraint: NSLayoutConstraint?
     var statusBarHeight: CGFloat { ConfigurationStore.shared.configuration.statusBar ? SystemStatusBar.height : 0 }
@@ -128,9 +128,9 @@ final class SplitViewController: NSViewController {
         // Its content is a live process, not a document. Left restorable, AppKit
         // re-applied a stale saved frame after the sizing below.
         window.isRestorable = false
-        // Let the Metal layer's translucent clear show through.
-        window.isOpaque = false
-        window.backgroundColor = .clear
+        // AppKit may expose areas outside the drawable after appearance/tab
+        // transitions. Back them with the same opaque canvas as the terminal.
+        (window.windowController as? TerminalWindowController)?.applyCanvasAppearance()
         window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
         updateWindowMinSize()
         // With `.fullSizeContentView`, `setContentSize` sizes the frame and
@@ -155,6 +155,7 @@ final class SplitViewController: NSViewController {
 
         // The splits go last: they halve the window's final frame.
         if let restore = pendingRestore {
+            (window.windowController as? TerminalWindowController)?.customTabTitle = restore.customTabTitle
             pendingRestore = nil
             // The saved frame is authoritative; skip the default-grid correction.
             didCorrectWindowSize = true
@@ -429,6 +430,9 @@ final class SplitViewController: NSViewController {
             workingDirectory: workingDirectory ?? focusedPane.session?.workingDirectory,
             initialGridSize: halvedGridSize(of: focusedPane, orientation: orientation),
             preset: preset)
+        // A window's temporary zoom also applies to newly created panes.
+        pane.setFontSize(focusedPane.fontSize)
+        pane.isFontSizeZoomed = focusedPane.isFontSizeZoomed
         let node = tree.split(
             leaf: focusedPane.view, orientation: orientation, newLeaf: pane.view)
         node.delegate = self
@@ -570,6 +574,10 @@ final class SplitViewController: NSViewController {
     /// Focus moves need more than one pane.
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
+        case #selector(selectPreviousCortaTab(_:)), #selector(selectNextCortaTab(_:)):
+            return (view.window?.tabbedWindows?.count ?? 0) > 1
+        case #selector(renameCurrentTab(_:)):
+            return view.window != nil
         case #selector(moveFocusLeft(_:)), #selector(moveFocusRight(_:)),
             #selector(moveFocusUp(_:)), #selector(moveFocusDown(_:)):
             return tree != nil && tree.leafCount > 1

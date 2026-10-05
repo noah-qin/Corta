@@ -37,6 +37,7 @@ nonisolated struct WindowState: Equatable, Sendable {
     var tabIndex: Int?
     /// Frontmost in its group; decodes `true` for untabbed or older data.
     var isSelectedTab: Bool
+    var customTabTitle: String?
 
     init(
         frame: Frame, layout: PaneLayout, tabGroupID: String? = nil, tabIndex: Int? = nil,
@@ -109,13 +110,14 @@ nonisolated struct WindowState: Equatable, Sendable {
 
 nonisolated extension WindowState: Codable {
     private enum CodingKeys: String, CodingKey {
-        case version, id, frame, layout, tabGroupID, tabIndex, isSelectedTab
+        case version, id, frame, layout, tabGroupID, tabIndex, isSelectedTab, customTabTitle
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 0
         id = try container.decodeIfPresent(String.self, forKey: .id)
+        customTabTitle = try container.decodeIfPresent(String.self, forKey: .customTabTitle)
         frame = try container.decode(Frame.self, forKey: .frame)
         layout = try container.decode(PaneLayout.self, forKey: .layout)
         tabGroupID = try container.decodeIfPresent(String.self, forKey: .tabGroupID)
@@ -127,6 +129,7 @@ nonisolated extension WindowState: Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(Self.currentVersion, forKey: .version)
         try container.encodeIfPresent(id, forKey: .id)
+        try container.encodeIfPresent(customTabTitle, forKey: .customTabTitle)
         try container.encode(frame, forKey: .frame)
         try container.encode(layout, forKey: .layout)
         try container.encodeIfPresent(tabGroupID, forKey: .tabGroupID)
@@ -283,11 +286,10 @@ enum SessionRestore {
             let states = try? JSONDecoder().decode([WindowState].self, from: data)
         else { return [] }
         // Skip windows from a newer format rather than guess.
-        return states.filter { $0.version <= WindowState.currentVersion }.map {
-            WindowState(
-                frame: $0.frame,
-                layout: $0.layout.validated().droppingMissingDirectories(),
-                tabGroupID: $0.tabGroupID, tabIndex: $0.tabIndex, isSelectedTab: $0.isSelectedTab)
+        return states.filter { $0.version <= WindowState.currentVersion }.map { saved in
+            var state = saved
+            state.layout = saved.layout.validated().droppingMissingDirectories()
+            return state
         }
     }
 

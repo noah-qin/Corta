@@ -120,9 +120,9 @@ files, remote connections and child-process input.
 - **Bundled shell integration covers zsh, bash and fish.** Other shells need
   their own OSC 133 hooks for command boundaries; without them notifications
   use a heuristic.
-- **An emoji keeps the width `wcwidth` gives it.** A text-default character
-  with the emoji selector (✍️, 🖼️) is one column, as the shell counts it; it
-  draws at full size only when a blank cell follows it.
+- **Emoji presentation sequences take two columns.** Standardized text-default
+  characters with VS16 (⚠️, ✍️, 🖼️) occupy a wide pair, including at a
+  line boundary. Programs must count the full sequence, not each scalar.
 - **Kitty graphics support direct transmission only.** File-based transmission
   is rejected by design. Animation and Unicode-placeholder placement are absent.
 - **Quick Terminal hotkeys use physical key positions**, not characters emitted

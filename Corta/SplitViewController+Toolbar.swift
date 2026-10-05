@@ -46,6 +46,7 @@ extension SplitViewController: NSToolbarDelegate {
             item.label = L10n.text("inputSource.settings.title")
             item.paletteLabel = item.label
             item.view = inputSourceToolbarHost
+            item.isBordered = false
             item.visibilityPriority = .high
             return item
         }
@@ -101,12 +102,15 @@ extension SplitViewController: NSToolbarDelegate {
         if configuration.inputSourceIndicatorPosition == .prompt {
             guard let terminalView = pane.terminalView else { return }
             if badge.superview !== terminalView {
+                badge.autoresizingMask = []
                 badge.removeFromSuperview()
                 terminalView.addSubview(badge)
             }
         } else if focusedPane === pane, badge.superview !== inputSourceToolbarHost {
             inputSourceToolbarHost.subviews.forEach { $0.removeFromSuperview() }
             badge.removeFromSuperview()
+            badge.frame = inputSourceToolbarHost.bounds
+            badge.autoresizingMask = [.width, .height]
             inputSourceToolbarHost.addSubview(badge)
         }
     }

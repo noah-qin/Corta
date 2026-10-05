@@ -57,6 +57,7 @@ extension ViewController {
     }
 
     @objc func appearanceChanged() {
+        (view.window?.windowController as? TerminalWindowController)?.applyCanvasAppearance()
         // OSC 10/11/12 answers follow the live variant.
         session?.dynamicColors =
             AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)

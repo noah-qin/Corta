@@ -22281,55 +22281,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Secure Keyboard Entry is on: other apps cannot observe what you type here."
+            "value": "Secure Keyboard Entry is enabled. Click to open Privacy & Security settings."
           }
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "translated",
-            "value": "安全键盘输入已开启：其他应用无法看到你在此输入的内容。"
+            "state": "needs_review",
+            "value": "安全键盘输入已启用。点击打开隐私与安全设置。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "安全鍵盤輸入已開啟：其他應用程式無法看到你在此輸入的內容。"
+            "value": "安全鍵盤輸入已啟用。點擊開啟隱私權與安全性設定。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "セキュリティキーボード入力がオンです。他のアプリはここでの入力を監視できません。"
+            "value": "セキュアキーボード入力が有効です。クリックしてプライバシーとセキュリティの設定を開きます。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "보안 키보드 입력이 켜져 있습니다. 다른 앱은 여기서 입력하는 내용을 볼 수 없습니다."
+            "value": "보안 키보드 입력이 활성화되었습니다. 클릭하여 개인정보 보호 및 보안 설정을 여세요."
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Sichere Tastatureingabe ist aktiv: Andere Apps können Ihre Eingaben hier nicht mitlesen."
+            "value": "Sichere Tastatureingabe ist aktiviert. Klicken, um Datenschutz und Sicherheit zu öffnen."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "La saisie clavier sécurisée est activée : les autres apps ne peuvent pas observer ce que vous tapez ici."
+            "value": "La saisie sécurisée au clavier est activée. Cliquez pour ouvrir Confidentialité et sécurité."
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "La entrada de teclado segura está activada: otras apps no pueden observar lo que escribes aquí."
+            "value": "La entrada segura de teclado está activada. Haz clic para abrir Privacidad y seguridad."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "A entrada de teclado segura está ativada: outros apps não podem observar o que você digita aqui."
+            "value": "A entrada segura do teclado está ativada. Clique para abrir Privacidade e Segurança."
           }
         }
       }
@@ -34928,6 +34928,301 @@
           "stringUnit": {
             "state": "translated",
             "value": "Variante"
+          }
+        }
+      }
+    },
+    "command.previousTab": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previous Tab"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "上一个标签页"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "上一個標籤頁"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "前のタブ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "이전 탭"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Vorheriger Tab"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Onglet précédent"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Pestaña anterior"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Aba anterior"
+          }
+        }
+      }
+    },
+    "command.nextTab": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next Tab"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "下一个标签页"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "下一個標籤頁"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "次のタブ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "다음 탭"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Nächster Tab"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Onglet suivant"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Pestaña siguiente"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Próxima aba"
+          }
+        }
+      }
+    },
+    "command.renameTab": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename Tab…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "重命名标签页…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "重新命名標籤頁…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "タブの名前を変更…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "탭 이름 변경…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Tab umbenennen…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Renommer l’onglet…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Renombrar pestaña…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Renomear aba…"
+          }
+        }
+      }
+    },
+    "link.commandClick": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌘-click to open: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "⌘点击打开：%@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "⌘點擊開啟：%@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "⌘クリックで開く：%@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "⌘클릭하여 열기: %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Mit ⌘-Klick öffnen: %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "⌘-clic pour ouvrir : %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "⌘-clic para abrir: %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "⌘-clique para abrir: %@"
+          }
+        }
+      }
+    },
+    "tab.rename.gesture": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Double-click to rename; right-click for tab actions."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "双击重命名；右键查看标签页操作。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "按兩下重新命名；右鍵查看標籤頁操作。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ダブルクリックで名前を変更。右クリックでタブ操作。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "두 번 클릭하여 이름 변경, 오른쪽 클릭하여 탭 작업."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Zum Umbenennen doppelklicken; Rechtsklick für Tab-Aktionen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Double-cliquez pour renommer ; clic droit pour les actions de l’onglet."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Doble clic para renombrar; clic derecho para acciones de pestaña."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Clique duas vezes para renomear; clique com o botão direito para ações da aba."
           }
         }
       }

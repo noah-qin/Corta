@@ -153,10 +153,14 @@ setting — `CONFIGURATION.md` §8 draws the line.
 
 ## D11 — Curated themes and one primary font
 
-**Decision.** Settings and View offer built-in and user-defined themes, with a
-color editor. The only supported primary font is macOS System Monospaced;
+**Decision.** Settings and View offer Corta, Solarized and Mono alongside
+user-defined themes, with a color editor. Issue #213 exposed that existing
+presets were undiscoverable; all three are now offered with the existing preview. The only supported primary font is macOS System Monospaced;
 font size remains adjustable. Legacy `font-family` names migrate to `system`.
 PingFang and Apple Color Emoji remain glyph fallbacks for CJK and emoji.
+Standardized VS16 emoji sequences occupy two cells: #213 showed that keeping
+their scalar width shifted Claude Code table borders. Scalar width rules
+remain unchanged; clients must count the complete emoji sequence.
 
 **Why.** User feedback showed inconsistent appearance across installed faces.
 A single primary family gives one font stack to validate and keeps the grid

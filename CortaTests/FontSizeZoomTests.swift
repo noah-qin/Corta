@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
+import CortaTerminal
 import Testing
 
 @testable import Corta
@@ -41,6 +42,29 @@ struct FontSizeZoomTests {
         _ = split.view
         split.view.layoutSubtreeIfNeeded()
         return (split, window)
+    }
+
+    @Test func changingFontSizeKeepsTheWindowFrame() throws {
+        let (split, window) = makeSplit()
+        defer { split.teardown() }
+        let pane = try #require(split.focusedPane)
+        split.viewWillAppear()
+        split.viewDidAppear()
+        let frame = window.frame
+        let oldColumns = pane.gridSize(fitting: pane.view.bounds.size).columns
+        pane.increaseFontSize(nil)
+        #expect(window.frame == frame)
+        #expect(!pane.composedWindowTitle.contains("×"))
+        #expect(pane.gridSize(fitting: pane.view.bounds.size).columns < oldColumns)
+        pane.resetFontSize(nil)
+        #expect(window.frame == frame)
+        pane.increaseFontSize(nil)
+        split.splitRight(nil)
+        #expect(split.panes.allSatisfy { $0.fontSize == pane.fontSize && $0.isFontSizeZoomed })
+        let splitFrame = window.frame
+        pane.increaseFontSize(nil)
+        #expect(window.frame == splitFrame)
+        #expect(split.panes.allSatisfy { $0.fontSize == pane.fontSize })
     }
 
     @Test func zoomingOneWindowNeverTouchesTheConfigFile() throws {

@@ -151,10 +151,8 @@ extension Theme {
                 rgb(60, 95, 175), rgb(150, 75, 160), rgb(50, 140, 150), rgb(10, 10, 10),
             ]))
 
-    /// The one theme Corta offers (D11): one theme that is right beats two
-    /// that were never lived with. `solarized` and `mono` stay resolvable, so
-    /// existing configs and `inherit` keep working.
-    nonisolated static let builtIn: [Theme] = [.corta]
+    /// A small curated choice; custom themes continue to take precedence.
+    nonisolated static let builtIn: [Theme] = [.corta, .solarized, .mono]
 
     /// Every theme resolvable by name, offered or not.
     nonisolated static let known: [Theme] = [.corta, .solarized, .mono]

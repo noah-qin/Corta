@@ -10,6 +10,26 @@ what to edit.
 
 ## [Unreleased]
 
+### Terminal feedback (#213)
+
+- Standardized VS16 emoji sequences (such as ⚠️) occupy two columns so
+  subsequent text and table borders stay aligned, including across PTY reads
+  and at the right margin.
+- Solid light/heavy table borders draw on the cell grid instead of using font
+  glyph bearings, keeping Claude Code table corners and junctions connected.
+- Terminal windows retain an opaque theme background across appearance changes,
+  including newly created and inactive tabs.
+- Font settings, keyboard zoom and pinch refit rows and columns while keeping
+  the window frame, subject to minimum-size constraints.
+- Previous/next tab commands (⇧⌘[ / ⇧⌘]) are configurable. Tabs can be renamed
+  in place by double-clicking their title or using the tab context menu; Return
+  saves, Esc cancels, and names survive shell output and restore. Tab and
+  terminal context menus include New Tab.
+- Solarized and Mono join Corta in the theme picker; custom themes are preserved.
+- URL hover explains ⌘-click and shows the target. Secure Keyboard Entry’s lock
+  opens Privacy & Security settings. Close confirmation keeps its running-job
+  default and makes Cancel the default keyboard action.
+
 ### Added
 
 - Optional local system status bar with CPU, load, memory, one-interface network

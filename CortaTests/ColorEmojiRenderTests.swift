@@ -216,10 +216,9 @@ import Testing
         #expect(Double(small) < Double(large) * 0.8, "🔸 drew as large as 🔶: \(small) vs \(large)")
     }
 
-    /// A text-default base with VS16 (✍️) is one column in the grid, as
-    /// wcwidth counts it, but draws into a blank cell after it. Without VS16,
-    /// or with text after it, it keeps to its own cell.
-    @Test func emojiSelectorOverflowsOnlyIntoABlankCell() throws {
+    /// Valid VS16 emoji have a two-cell box, even when immediately followed
+    /// by text. The text stays in its own next cell.
+    @Test func emojiSelectorUsesTwoCellsWithoutOverlappingText() throws {
         guard let device = Self.makeDevice() else {
             Issue.record("No Metal device available in this environment")
             return
@@ -238,13 +237,13 @@ import Testing
         }
         var terminal = Terminal(rows: 1, columns: 6)
         terminal.feed(Array("\u{270D}\u{FE0F} x".utf8))
-        #expect(!terminal.grid[0, 0].attributes.contains(.wide), "VS16 widened the cell")
+        #expect(terminal.grid[0, 0].attributes.contains(.wide))
 
         #expect(coloredInSecondCell("\u{270D}\u{FE0F} x") > 0, "✍️ did not draw into the blank cell")
-        // The foreground is not a pure grey, so text counts as colored too:
-        // the same x after a plain letter is the baseline.
-        let squeezed = coloredInSecondCell("\u{270D}\u{FE0F}x"), plain = coloredInSecondCell("ax")
-        #expect(squeezed == plain, "✍️ drew over the text after it: \(squeezed) vs \(plain)")
+        #expect(coloredInSecondCell("\u{270D}\u{FE0F}x") > 0)
+        var adjacent = Terminal(rows: 1, columns: 6)
+        adjacent.feed(Array("\u{270D}\u{FE0F}x".utf8))
+        #expect(adjacent.grid[0, 2].scalar == 0x78)
         // 🖼 without VS16: one column, drawn from the color font all the same.
         #expect(renderer.glyphAtlas.glyph(shaping: 0x1F5BC, style: .regular)?.isColor == true)
         #expect(coloredInSecondCell("\u{1F5BC} x") == 0, "an emoji without VS16 overflowed")

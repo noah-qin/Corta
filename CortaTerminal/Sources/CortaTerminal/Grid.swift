@@ -326,6 +326,47 @@ public struct Grid: Sendable {
             return
         }
         combine(scalar, row: target.row, column: target.column)
+        if scalar == 0xFE0F { widenEmojiPresentation(at: target) }
+    }
+
+    /// VS16 changes a standardized text-default emoji from one to two cells.
+    /// The selector itself remains zero-width; all later output sees the new
+    /// cursor position, including when the cluster moves across the margin.
+    private mutating func widenEmojiPresentation(at target: (row: Int, column: Int)) {
+        var lead = lines[target.row][target.column]
+        guard columns >= 2, !lead.attributes.contains(.wide),
+              supportsEmojiPresentation(lead.scalar),
+              let cluster = graphemes.scalars(for: lead.grapheme), cluster.count == 2, cluster.last == 0xFE0F
+        else { return }
+        lead.attributes.insert(.wide)
+        if target.column == columns - 1 {
+            lines[target.row][target.column] = pen.eraseCell
+            cursor.row = target.row
+            cursor.column = target.column
+            pendingWrap = true
+            writeWide(lead.scalar)
+            if let moved = clusterJoinTarget() { lines[moved.row][moved.column] = lead }
+            return
+        }
+        if insertMode {
+            lines[target.row].insertCells(1, at: target.column + 1, template: pen.eraseCell, width: columns)
+        }
+        blankWidePairHalves(row: target.row, column: target.column + 1)
+        var spacer = lead
+        spacer.scalar = 0x20
+        spacer.grapheme = .none
+        spacer.attributes.remove(.wide)
+        spacer.attributes.insert(.wideSpacer)
+        lines[target.row][target.column] = lead
+        lines[target.row][target.column + 1] = spacer
+        if cursor.row == target.row {
+            if target.column + 2 >= columns {
+                cursor.column = columns - 1
+                pendingWrap = true
+            } else {
+                cursor.column = target.column + 2
+            }
+        }
     }
 
     /// The previously written cell, following wraps and wide pairs; `nil`

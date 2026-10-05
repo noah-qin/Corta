@@ -51,7 +51,7 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 
 | Key | Values | Default | Notes |
 | --- | --- | --- | --- |
-| `theme` | a theme name | `corta` | Built in: `corta`, plus `solarized` and `mono`, which still resolve but are not offered in the UI (§4). A theme defined in this file wins over a built-in of the same name. |
+| `theme` | a theme name | `corta` | Built in: `corta`, `solarized` and `mono`, all offered in the UI (§4). A theme defined in this file wins over a built-in of the same name. |
 | `appearance` | `auto`, `light`, `dark` | `auto` | Which of the theme's two variants is live. `auto` follows macOS and switches while running. |
 | `status-bar` | boolean | `false` | Show a bottom bar of local system metrics. Click it for local host details. Sampling pauses when every enabled bar is hidden. |
 | `status-items` | comma-separated `cpu`, `load`, `memory`, `network`, `disk`, `thermal` | all six | Choose metrics to collect and display. Empty shows the local-host details button without periodic sampling. |
@@ -59,7 +59,7 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 | `cursor-shape` | `block`, `bar`, `underline` | `block` | Default cursor shape, applied live. Terminal programs can temporarily override it with DECSCUSR; parameter 0 or a terminal reset restores this default. |
 | `cursor-blink` | boolean | `false` | Blink the default cursor every half second while its pane has keyboard focus and is visible at the live screen. Terminal programs can temporarily override blinking with DECSCUSR. |
 | `font-family` | `system` | `system` | Only the macOS system monospaced font is supported. Legacy family names are accepted and normalized to `system`; font size remains adjustable. |
-| `font-size` | 8–64 | `12` | Points, applied immediately to panes without a temporary zoom and used by new windows and panes. ⌘+ / ⌘− / pinch (B09) are a *temporary*, per-window zoom that never writes here — zooming one window does not change this key, another open window, or what the next new window opens at; ⌘0 ends the zoom and returns to whatever this key currently says. A zoom does not survive quitting and relaunching Corta. |
+| `font-size` | 8–64 | `12` | Points, applied immediately to panes without a temporary zoom and used by new windows and panes. Font changes keep the window frame and refit the terminal rows and columns; very small windows remain subject to minimum-size constraints. ⌘+ / ⌘− / pinch (B09) are a *temporary*, per-window zoom that never writes here — zooming one window does not change this key, another open window, or what the next new window opens at; ⌘0 ends the zoom and returns to whatever this key currently says. New panes in the same window inherit its temporary zoom. A zoom does not survive quitting and relaunching Corta. |
 
 ### Window
 
@@ -291,9 +291,9 @@ A theme is the sixteen ANSI colours plus the three the terminal owns
 are *not* part of a theme: xterm defines them numerically, so a program
 asking for colour 137 means one specific colour.
 
-Corta offers one theme, `corta`. Two more — `solarized` and `mono` — stay
-defined and resolvable, so `theme = solarized` and inheriting from them
-both work; they are simply not recommended from the UI.
+Corta offers three previewable themes: `corta`, `solarized` and `mono`.
+Select a preset in Settings → Appearance to preview it immediately.
+Existing custom selections and inheritance continue to work.
 
 ### Keys
 
@@ -461,6 +461,9 @@ the key against both rows, which is how you spot it.
 | --- | --- | --- |
 | `new-window` | New Window | `cmd+n` |
 | `new-tab` | New Tab | `cmd+t` |
+| `previous-tab` | Previous Tab | `shift+cmd+[` |
+| `next-tab` | Next Tab | `shift+cmd+]` |
+| `rename-tab` | Rename Tab… | *(none)* |
 | `close` | Close | `cmd+w` |
 | `split-right` | Split Pane Right | `cmd+d` |
 | `split-down` | Split Pane Down | `shift+cmd+d` |

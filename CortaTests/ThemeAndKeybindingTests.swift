@@ -276,3 +276,37 @@ import Testing
         #expect(parsed.serialized().contains("bell = audible"))
     }
 }
+
+
+@MainActor struct TerminalFeedbackTests {
+    @Test func canvasStaysOpaqueAcrossAppearanceChanges() {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 500),
+            styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        let controller = TerminalWindowController(window: window)
+        let before = TerminalColorPalette.activeVariant
+        defer { TerminalColorPalette.apply(before) }
+        for variant in [Theme.corta.light, Theme.corta.dark, Theme.solarized.light] {
+            TerminalColorPalette.apply(variant)
+            controller.applyCanvasAppearance()
+            #expect(window.isOpaque)
+            #expect(window.backgroundColor.alphaComponent == 1)
+            #expect(!window.titlebarAppearsTransparent)
+        }
+    }
+
+    @Test func customTabTitleSurvivesStateEncoding() throws {
+        var state = WindowState(frame: WindowState.Frame(NSRect(x: 0, y: 0, width: 900, height: 600)),
+                                layout: .pane(directory: nil))
+        state.customTabTitle = "Production"
+        let restored = try JSONDecoder().decode(WindowState.self, from: JSONEncoder().encode(state))
+        #expect(restored.customTabTitle == "Production")
+        #expect(restored == state)
+    }
+
+    @Test func existingThemesAndCustomOverridesRemainAvailable() {
+        let config = Configuration.parse("theme.solarized.dark.background = #123456").configuration
+        let themes = Theme.all(in: config)
+        #expect(Set(themes.map(\.name)) == ["corta", "solarized", "mono"])
+        #expect(themes.first(where: { $0.name == "solarized" })?.dark.background == Theme.color("#123456"))
+    }
+}

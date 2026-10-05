@@ -88,9 +88,6 @@ public nonisolated final class TerminalRenderer {
     /// other check.
     private var cachedIndexedOverridesGeneration: UInt64 = 0
     private var indexedOverrides: IndexedColorOverrides = [:]
-    /// The cursor's viewport cell while it is drawn, set per frame: a
-    /// one-column emoji does not overflow into it.
-    private var cursorCell: (row: Int, column: Int)?
     /// The delta is how far a whole-screen scroll shifted: shift the cache
     /// instead of rebuilding (`applyScrollShift`).
     private var cachedLinesRotated: UInt64 = 0
@@ -210,7 +207,6 @@ public nonisolated final class TerminalRenderer {
         self.indexedOverrides = indexedOverrides
         framePalette = themeVariant ?? TerminalColorPalette.activeVariant
         let offset = min(max(0, scrollOffset), grid.scrollback.count)
-        cursorCell = cursorVisible && offset == 0 ? (grid.cursor.row, grid.cursor.column) : nil
         let fullRebuild =
             needsFullRebuild
             || cachedLines.count != grid.rows
@@ -679,6 +675,22 @@ public nonisolated final class TerminalRenderer {
             guard !isInvisible, !attributes.contains(.wideSpacer) else { continue }
             // Geometry, not glyphs: glyphs fall short of rounded-up cells and leave
             // a grid of gaps between block characters (`BlockElements`).
+            if cell.scalar >= 0x2500, cell.scalar <= 0x257F,
+                let pieces = BoxDrawing.pieces(for: cell.scalar, width: cellWidth,
+                                               height: cellHeight, scale: Float(scale)) {
+                // Stroke arms overlap at junctions. Resolve faint text over
+                // its cell background once, so overlap cannot brighten it.
+                let stroke = SIMD4<Float>(
+                    fg.x * fg.w + bg.x * (1 - fg.w),
+                    fg.y * fg.w + bg.y * (1 - fg.w),
+                    fg.z * fg.w + bg.z * (1 - fg.w), 1)
+                for piece in pieces {
+                    background.append(QuadInstance(
+                        origin: .init(origin.x + piece.x, origin.y + piece.y),
+                        size: .init(piece.z, piece.w), color: stroke))
+                }
+                continue
+            }
             if let pieces = BlockElements.pieces(for: cell.scalar) {
                 for piece in pieces {
                     background.append(
@@ -696,11 +708,9 @@ public nonisolated final class TerminalRenderer {
                 bold: attributes.contains(.bold), italic: attributes.contains(.italic))
             let isWide = attributes.contains(.wide)
             let info: GlyphAtlas.GlyphInfo
-            var hasEmojiSelector = false
             if !cell.grapheme.isNone,
                 let scalars = graphemes.scalars(for: cell.grapheme)
             {
-                hasEmojiSelector = scalars.contains(0xFE0F)
                 // Even on a space base: a combining mark can attach to one.
                 guard let shaped = glyphAtlas.glyph(forCluster: scalars, style: style)
                 else { continue }
@@ -730,19 +740,7 @@ public nonisolated final class TerminalRenderer {
                 origin.y + baseline - info.bearing.y - info.size.y
             )
             var glyphSize = info.size
-            var boxWidth = isWide ? cellWidth * 2 : cellWidth
-            // An emoji the grid holds in one column — a text-default base with
-            // VS16, which wcwidth still counts as one — draws at full size into
-            // a following blank cell instead of shrinking into its own. Only the
-            // drawing grows; the width applications count on is unchanged. Never
-            // into the cursor's cell: at a prompt it would cover the cursor and
-            // shrink back with the next keystroke.
-            if info.isColor, !isWide, hasEmojiSelector, column + 1 < line.count,
-                Self.isBlankForOverflow(line[column + 1]),
-                cursorCell.map({ $0.row != row || $0.column != column + 1 }) ?? true
-            {
-                boxWidth = cellWidth * 2
-            }
+            let boxWidth = isWide ? cellWidth * 2 : cellWidth
             // Fit every glyph's ink to its box, not just wide ones: a bold face a
             // shade wider, or a font monospaced for letters only, spills into the
             // next column and nothing clips it. One device pixel of tolerance keeps
@@ -792,12 +790,6 @@ public nonisolated final class TerminalRenderer {
                 (cellOrigin.y + (cellHeight - size.y) / 2).rounded(.down)),
             size
         )
-    }
-
-    /// A cell a one-column emoji may draw into: a space or an empty cell,
-    /// with no cluster of its own.
-    private static func isBlankForOverflow(_ cell: Cell) -> Bool {
-        cell.grapheme.isNone && (cell.scalar == 0x20 || cell.scalar == 0)
     }
 
     /// Inset so a run of them reads as boxes, not a grid.

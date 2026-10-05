@@ -101,8 +101,35 @@ extension SplitViewController {
             : L10n.format("close.running.multiple", ListFormatter.localizedString(byJoining: Array(Set(names)).sorted()))
         alert.addButton(withTitle: L10n.text("close.running.closeAnyway"))
         alert.addButton(withTitle: L10n.text("common.cancel"))
-        // Destructive-first buttons: make Cancel the escape key explicitly.
+        // Keep the destructive action explicit; Return defaults to Cancel.
         alert.buttons.first?.hasDestructiveAction = true
+        alert.buttons.first?.keyEquivalent = ""
+        alert.buttons.last?.keyEquivalent = "\r"
         return alert.runModal() == .alertFirstButtonReturn
+    }
+}
+
+
+extension SplitViewController {
+    @objc func selectPreviousCortaTab(_ sender: Any?) { selectAdjacentTab(offset: -1) }
+    @objc func selectNextCortaTab(_ sender: Any?) { selectAdjacentTab(offset: 1) }
+
+    func selectAdjacentTab(offset: Int) {
+        guard let window = view.window, let tabs = window.tabbedWindows,
+              let index = tabs.firstIndex(of: window), tabs.count > 1 else { return }
+        let target = tabs[(index + offset + tabs.count) % tabs.count]
+        window.tabGroup?.selectedWindow = target
+        target.makeKeyAndOrderFront(nil)
+    }
+
+    @objc func renameCurrentTab(_ sender: Any?) {
+        (view.window?.windowController as? TerminalWindowController)?.beginTabRename()
+    }
+
+    func setCustomTabTitle(_ value: String) {
+        guard let controller = view.window?.windowController as? TerminalWindowController else { return }
+        let title = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        controller.customTabTitle = title.isEmpty ? nil : String(title.prefix(200))
+        applyWindowTitle()
     }
 }

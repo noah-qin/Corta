@@ -76,6 +76,11 @@ final class SettingsWindowController: NSWindowController {
         }
     }
 
+    func showPrivacySettings(_ sender: Any?) {
+        navigation.selection = .privacy
+        show(sender)
+    }
+
     func showThemeEditor(_ sender: Any?) {
         navigation.selection = .appearance
         show(sender)
