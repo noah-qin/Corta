@@ -231,6 +231,7 @@ the forwarding between them.
 | `PaneWindowTitle` | The window title and proxy icon: their composition and sanitising, the interval-cached process facts behind them, the off-main directory probe |
 | `PaneSearch`      | Scrollback search: the bar and its placement, key routing (Esc, ⌘G), the debounced off-main sweeps and their generations, the matches the renderer highlights, the pre-search viewport it restores. Reaches the pane only through `PaneSearchHost` |
 | `PaneRemote`      | Whether the pane talks to another machine (`PaneRemoteState`, with the report tracker both the title and one-off questions read through), Reconnect and its wording, `path:line` references resolved on the remote host and opened as managed copies, and the SFTP browser's entry and its menu gate. Reaches the pane through `PaneRemoteHost` |
+| `PaneCommands`    | The menu and context-menu commands: font size and pinch zoom, copy and export (one cancellable large-text task between them), drops, Services and Look Up, the Finder actions, and app-initiated `cd` with its safety gate. Reaches the pane through `PaneCommandsHost` |
 
 A collaborator that owns menu actions implements them, and the pane
 forwards each from an `@objc` method of the same name: menu items, the

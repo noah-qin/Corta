@@ -107,7 +107,7 @@ struct ExportTextTests {
     @Test("with no selection the whole document is exported")
     func wholeDocument() {
         let grid = Self.terminal().grid
-        let text = ViewController.exportableText(grid: grid, selection: nil)
+        let text = PaneCommands.exportableText(grid: grid, selection: nil)
         // Both ends: the scrollback's oldest line and the live screen's.
         #expect(text.contains("line0"))
         #expect(text.contains("line7"))
@@ -119,7 +119,7 @@ struct ExportTextTests {
         let selection = SelectionRange(
             anchor: SelectionPoint(row: -2, column: 0),
             head: SelectionPoint(row: -2, column: grid.columns - 1))
-        let text = ViewController.exportableText(grid: grid, selection: selection)
+        let text = PaneCommands.exportableText(grid: grid, selection: selection)
         #expect(text.contains("line"))
         #expect(!text.contains("line0"))
         #expect(text.split(separator: "\n").count == 1)
@@ -131,7 +131,7 @@ struct ExportTextTests {
     func wrappedLinesJoin() {
         var terminal = Terminal(rows: 4, columns: 10, scrollbackLimit: 100)
         terminal.feed(Array("abcdefghijklmno".utf8))  // wraps at 10 columns
-        let text = ViewController.exportableText(grid: terminal.grid, selection: nil)
+        let text = PaneCommands.exportableText(grid: terminal.grid, selection: nil)
         #expect(text.contains("abcdefghijklmno"))
     }
 
@@ -140,8 +140,8 @@ struct ExportTextTests {
     @Test("the suggested filename says what and when")
     func filename() {
         let date = Date(timeIntervalSince1970: 1_757_000_000)
-        let history = ViewController.exportFilename(hasSelection: false, date: date)
-        let selection = ViewController.exportFilename(hasSelection: true, date: date)
+        let history = PaneCommands.exportFilename(hasSelection: false, date: date)
+        let selection = PaneCommands.exportFilename(hasSelection: true, date: date)
         #expect(history.hasPrefix("Corta History "))
         #expect(selection.hasPrefix("Corta Selection "))
         #expect(history.hasSuffix(".txt"))
@@ -162,7 +162,7 @@ struct ExportWriteTests {
     func writesUTF8() throws {
         let url = temporaryURL()
         defer { try? FileManager.default.removeItem(at: url) }
-        try ViewController.write("héllo 中文 🙂\nsecond line\n", to: url)
+        try PaneCommands.write("héllo 中文 🙂\nsecond line\n", to: url)
         let read = try String(contentsOf: url, encoding: .utf8)
         #expect(read == "héllo 中文 🙂\nsecond line\n")
     }
@@ -173,9 +173,9 @@ struct ExportWriteTests {
     func trailingNewline() throws {
         let url = temporaryURL()
         defer { try? FileManager.default.removeItem(at: url) }
-        try ViewController.write("no newline", to: url)
+        try PaneCommands.write("no newline", to: url)
         #expect(try String(contentsOf: url, encoding: .utf8) == "no newline\n")
-        try ViewController.write("has newline\n", to: url)
+        try PaneCommands.write("has newline\n", to: url)
         #expect(try String(contentsOf: url, encoding: .utf8) == "has newline\n")
     }
 
@@ -186,15 +186,15 @@ struct ExportWriteTests {
     func atomicReplacement() throws {
         let url = temporaryURL()
         defer { try? FileManager.default.removeItem(at: url) }
-        try ViewController.write("first\n", to: url)
-        try ViewController.write("second\n", to: url)
+        try PaneCommands.write("first\n", to: url)
+        try PaneCommands.write("second\n", to: url)
         #expect(try String(contentsOf: url, encoding: .utf8) == "second\n")
     }
 
     @Test("a write to an unwritable location throws rather than failing silently")
     func unwritableLocationThrows() {
         #expect(throws: (any Error).self) {
-            try ViewController.write("x\n", to: URL(fileURLWithPath: "/no/such/dir/x.txt"))
+            try PaneCommands.write("x\n", to: URL(fileURLWithPath: "/no/such/dir/x.txt"))
         }
     }
 }

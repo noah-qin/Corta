@@ -54,7 +54,7 @@ extension TerminalView {
         if paneController?.search.bar == nil {
             window?.makeFirstResponder(self)
         }
-        if let menu = paneController?.contextMenu(for: self) {
+        if let menu = paneController?.commands.contextMenu() {
             NSMenu.popUpContextMenu(menu, with: event, for: self)
             return
         }

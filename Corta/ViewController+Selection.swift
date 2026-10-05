@@ -63,49 +63,9 @@ extension ViewController {
     }
 }
 
-/// Mouse selection and copy: the AppKit side of the core's
-/// `Selection.swift`.
+/// Mouse selection: the AppKit side of the core's `Selection.swift`. Copy
+/// is `PaneCommands.copy(_:)`.
 extension ViewController {
-    // MARK: - Copy
-
-    /// ⌘C through the responder chain; never reaches the PTY. The text build
-    /// is O(selection) — the whole document for ⌘A — so it runs off the main
-    /// actor on `largeTextTask`, like `exportText(_:)`.
-    @objc func copy(_ sender: Any?) {
-        guard let selection, session != nil else { return }
-        let grid = session.snapshot()
-        let range = selectionRange(for: selection, in: grid)
-        let pasteboard = pasteboardForTesting ?? .general
-        // The pasteboard is shared by every pane and app: recheck `changeCount`
-        // before writing so a slow copy never clobbers a newer write.
-        let changeCountAtStart = pasteboard.changeCount
-        largeTextTask?.cancel()
-        largeTextTaskGeneration &+= 1
-        let generation = largeTextTaskGeneration
-        // `.detached`, so the build is off the main actor by construction
-        // rather than by inference; the pasteboard write hops back.
-        let gate = largeTextBuildGateForTesting
-        largeTextTask = Task.detached(priority: .userInitiated) { [weak self] in
-            gate?()
-            let text = Selection.text(of: range, in: grid)
-            await MainActor.run {
-                // Only this generation may clear the handle a newer copy installed.
-                guard let self, !self.didTeardown, self.largeTextTaskGeneration == generation else { return }
-                self.largeTextTask = nil
-                guard !Task.isCancelled, !text.isEmpty else { return }
-                let pasteboard = self.pasteboardForTesting ?? .general
-                guard pasteboard.changeCount == changeCountAtStart else {
-                    // Someone wrote since; their write is newer than this selection.
-                    return
-                }
-                pasteboard.clearContents()
-                pasteboard.setString(text, forType: .string)
-                // Confirm only a write that happened: copy-on-select is never silent.
-                self.terminalView?.showToast(L10n.text("toast.copied"))
-            }
-        }
-    }
-
     /// ⌘A: scrollback plus screen.
     override func selectAll(_ sender: Any?) {
         guard session != nil else { return }
@@ -176,7 +136,7 @@ extension ViewController {
                 if head != anchor || unit != .character || extending {
                     applySelection(anchor: anchor, head: head, unit: unit, grid: grid)
                     // On mouse-up only, not per drag position.
-                    if ConfigurationStore.shared.configuration.copyOnSelect { copy(nil) }
+                    if ConfigurationStore.shared.configuration.copyOnSelect { commands.copy(nil) }
                 } else {
                     // `link-activation = click`: on mouse-up, so a drag still selects.
                     openLinkOnPlainClick(next, in: terminalView)

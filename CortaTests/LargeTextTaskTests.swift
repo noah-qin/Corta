@@ -72,7 +72,7 @@ struct LargeTextTaskTests {
         // developer's own clipboard contents.
         let pasteboard = NSPasteboard.withUniqueName()
         defer { pasteboard.releaseGlobally() }
-        pane.pasteboardForTesting = pasteboard
+        pane.commands.pasteboardForTesting = pasteboard
 
         let markerBefore = "sentinel-\(UUID().uuidString)"
         pasteboard.clearContents()
@@ -85,15 +85,15 @@ struct LargeTextTaskTests {
         // asynchronous. The gate makes that deterministic.
         let buildEntered = Mutex(false)
         let releaseBuild = Mutex(false)
-        pane.largeTextBuildGateForTesting = {
+        pane.commands.largeTextBuildGateForTesting = {
             buildEntered.withLock { $0 = true }
             while !releaseBuild.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.002) }
         }
 
-        pane.copy(nil)
+        pane.commands.copy(nil)
         #expect(await waitUpTo(5) { buildEntered.withLock { $0 } })
         #expect(pasteboard.string(forType: .string) == markerBefore, "the build is parked before touching the pasteboard")
-        #expect(pane.largeTextTask != nil)
+        #expect(pane.commands.largeTextTask != nil)
 
         releaseBuild.withLock { $0 = true }
 
@@ -105,7 +105,7 @@ struct LargeTextTaskTests {
         // names, or `largeTextTask != nil` stops meaning "a build is
         // running."
         #expect(
-            await waitUpTo(5) { pane.largeTextTask == nil },
+            await waitUpTo(5) { pane.commands.largeTextTask == nil },
             "expected the handle to clear once the copy completed")
     }
 
@@ -128,16 +128,16 @@ struct LargeTextTaskTests {
 
         let pasteboard = NSPasteboard.withUniqueName()
         defer { pasteboard.releaseGlobally() }
-        pane.pasteboardForTesting = pasteboard
+        pane.commands.pasteboardForTesting = pasteboard
 
         let buildEntered = Mutex(false)
         let releaseBuild = Mutex(false)
-        pane.largeTextBuildGateForTesting = {
+        pane.commands.largeTextBuildGateForTesting = {
             buildEntered.withLock { $0 = true }
             while !releaseBuild.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.002) }
         }
 
-        pane.copy(nil)
+        pane.commands.copy(nil)
         #expect(await waitUpTo(5) { buildEntered.withLock { $0 } })
 
         // Someone else writes to the same pasteboard while the build is
@@ -148,7 +148,7 @@ struct LargeTextTaskTests {
         pasteboard.setString(newerContent, forType: .string)
 
         releaseBuild.withLock { $0 = true }
-        #expect(await waitUpTo(5) { pane.largeTextTask == nil })
+        #expect(await waitUpTo(5) { pane.commands.largeTextTask == nil })
 
         // The stale build must not have overwritten the newer write.
         #expect(pasteboard.string(forType: .string) == newerContent)
@@ -158,7 +158,7 @@ struct LargeTextTaskTests {
         let pane = makePane()
         let started = Mutex(false)
         let cancelled = Mutex(false)
-        pane.largeTextTask = Task {
+        pane.commands.largeTextTask = Task {
             started.withLock { $0 = true }
             do {
                 try await Task.sleep(for: .seconds(30))
@@ -170,7 +170,7 @@ struct LargeTextTaskTests {
 
         pane.teardown()
 
-        #expect(pane.largeTextTask == nil)
+        #expect(pane.commands.largeTextTask == nil)
         // `await Task.sleep`, not `Thread.sleep`: this test and the
         // in-flight task both run on the main actor, so blocking the
         // thread here would starve the task's own cancellation catch block
