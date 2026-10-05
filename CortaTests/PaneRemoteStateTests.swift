@@ -152,17 +152,17 @@ struct PaneRemoteStateTests {
     /// own command doing it, not Corta restoring anything.
     @Test("a reattaching command line is recognised for what it is")
     func reattachDetection() {
-        #expect(ViewController.reattachesRemoteSession(["user@build-box", "tmux", "attach"]))
-        #expect(ViewController.reattachesRemoteSession(["user@build-box", "tmux", "a"]))
-        #expect(ViewController.reattachesRemoteSession(["user@build-box", "tmux", "attach-session", "-t", "main"]))
-        #expect(ViewController.reattachesRemoteSession(["user@build-box", "screen", "-x"]))
-        #expect(ViewController.reattachesRemoteSession(["user@build-box", "screen", "-rr"]))
+        #expect(PaneRemote.reattachesSession(["user@build-box", "tmux", "attach"]))
+        #expect(PaneRemote.reattachesSession(["user@build-box", "tmux", "a"]))
+        #expect(PaneRemote.reattachesSession(["user@build-box", "tmux", "attach-session", "-t", "main"]))
+        #expect(PaneRemote.reattachesSession(["user@build-box", "screen", "-x"]))
+        #expect(PaneRemote.reattachesSession(["user@build-box", "screen", "-rr"]))
         // Quoted into one argument, as presets often spell it: same line.
-        #expect(ViewController.reattachesRemoteSession(["user@build-box", "tmux attach"]))
+        #expect(PaneRemote.reattachesSession(["user@build-box", "tmux attach"]))
         // A fresh session is not a reattach.
-        #expect(!ViewController.reattachesRemoteSession(["user@build-box"]))
-        #expect(!ViewController.reattachesRemoteSession(["user@build-box", "tmux", "new-session"]))
-        #expect(!ViewController.reattachesRemoteSession(["user@build-box", "screen"]))
+        #expect(!PaneRemote.reattachesSession(["user@build-box"]))
+        #expect(!PaneRemote.reattachesSession(["user@build-box", "tmux", "new-session"]))
+        #expect(!PaneRemote.reattachesSession(["user@build-box", "screen"]))
     }
 
     /// The stale-report seam: `ssh A` reported and exited, the pane sat at
@@ -283,7 +283,7 @@ struct RemotePaneIsolationTests {
         // local rather than dressing a stale report up as a live one, and
         // directory navigation offers nothing rather than a `cd` into a
         // path on another machine.
-        #expect(pane.paneRemoteState == .local)
+        #expect(pane.remote.state == .local)
         #expect(pane.shellDirectory == nil)
         #expect(!pane.windowTitle.composed.contains("⟂"))
     }
@@ -458,13 +458,13 @@ struct SSHPresetPaneTests {
         // is what says the pane is remote.
         #expect(!session.hasForegroundJob)
         #expect(session.remoteContext == nil)
-        #expect(pane.paneRemoteState == .remoteUnknown(provenance: .spawnedLauncher))
+        #expect(pane.remote.state == .remoteUnknown(provenance: .spawnedLauncher))
 
         // The far end answers.
         session.write(Array("\n".utf8))
         #expect(await waitUntilTrue { session.remoteContext != nil })
         #expect(
-            pane.paneRemoteState
+            pane.remote.state
                 == .remote(host: "build-box", directory: "/srv/app", provenance: .osc7))
         // The title's copy of the state is cached on an interval; force the
         // re-read rather than racing it.
@@ -505,15 +505,15 @@ struct SSHPresetPaneTests {
         let pane = Self.makePane(launcher: launcher, script: "read _")
         defer { pane.teardown() }
         let dead = try #require(pane.session)
-        #expect(await waitUntilTrue { pane.paneRemoteState == .remoteUnknown(provenance: .spawnedLauncher) })
-        #expect(!pane.canReconnectRemote, "a live connection has nothing to reconnect")
+        #expect(await waitUntilTrue { pane.remote.state == .remoteUnknown(provenance: .spawnedLauncher) })
+        #expect(!pane.remote.canReconnect, "a live connection has nothing to reconnect")
 
         dead.write(Array("\n".utf8))
         #expect(await waitUntilTrue { dead.pty.exitStatus != nil })
-        #expect(pane.paneRemoteState == .local, "the exited launcher owns nothing any more")
-        #expect(pane.canReconnectRemote)
+        #expect(pane.remote.state == .local, "the exited launcher owns nothing any more")
+        #expect(pane.remote.canReconnect)
 
-        pane.reconnectRemote(nil)
+        pane.remote.reconnectRemote(nil)
         let respawned = try #require(pane.session)
         #expect(respawned !== dead)
         // The same command, byte for byte — not a paraphrase of it.
@@ -524,7 +524,7 @@ struct SSHPresetPaneTests {
         #expect(respawned.remoteContext == nil)
         #expect(
             await waitUntilTrue {
-                pane.paneRemoteState == .remoteUnknown(provenance: .spawnedLauncher)
+                pane.remote.state == .remoteUnknown(provenance: .spawnedLauncher)
             })
     }
 
@@ -540,15 +540,15 @@ struct SSHPresetPaneTests {
             try? FileManager.default.removeItem(at: launcher.deletingLastPathComponent())
         }
         #expect(await waitUntilTrue { pane.session?.pty.exitStatus != nil })
-        #expect(pane.canReconnectRemote)
+        #expect(pane.remote.canReconnect)
 
         // The binary is gone now: the exact command cannot be re-run.
         try FileManager.default.removeItem(at: launcher)
-        pane.reconnectRemote(nil)
+        pane.remote.reconnectRemote(nil)
         #expect(
             await waitUntilTrue { pane.failureView != nil },
             "a failed reconnect shows the failure view instead of a silent local shell")
-        #expect(pane.canReconnectRemote, "the button stays on offer — the command is still remote")
+        #expect(pane.remote.canReconnect, "the button stays on offer — the command is still remote")
     }
 
     /// The negative: a local shell never sees Reconnect, dead or alive —
@@ -563,6 +563,6 @@ struct SSHPresetPaneTests {
         _ = pane.view
         defer { pane.teardown() }
         #expect(await waitUntilTrue { pane.session?.pty.exitStatus != nil })
-        #expect(!pane.canReconnectRemote)
+        #expect(!pane.remote.canReconnect)
     }
 }

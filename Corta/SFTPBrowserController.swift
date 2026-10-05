@@ -40,13 +40,13 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
 
     let model: SFTPBrowserModel
 
-    /// Opens the browser for a pane. Only called for `.remote` and
-    /// `.remoteUnknown` states — `ViewController.canBrowseRemoteFiles`
-    /// gates the menu item — and anything else is refused here as well,
-    /// because a window over a local pane would be a silent local file
-    /// manager wearing a remote UI.
-    static func show(for pane: ViewController) {
-        switch pane.paneRemoteState {
+    /// Opens the browser for a pane in `state`. Only called for `.remote`
+    /// and `.remoteUnknown` — `PaneRemote.canBrowseFiles` gates the menu
+    /// item — and anything else is refused here as well, because a window
+    /// over a local pane would be a silent local file manager wearing a
+    /// remote UI.
+    static func show(for state: PaneRemoteState) {
+        switch state {
         case .remote(let host, let directory, _):
             if let open = byHost[host] {
                 open.present()

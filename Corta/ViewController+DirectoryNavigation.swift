@@ -45,7 +45,7 @@ extension ViewController {
     /// Only for `changeDirectory(to:)`; local spawns and Finder read
     /// `session.workingDirectory`.
     var shellDirectory: (path: String, host: String?)? {
-        switch paneRemoteState {
+        switch remote.state {
         case .remote(let host, let directory, _):
             return (directory, host)
         case .local:

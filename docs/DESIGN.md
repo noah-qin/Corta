@@ -230,6 +230,7 @@ the forwarding between them.
 | `PaneFrameLoop`   | When a frame is owed (the output wake, forced redraws, `?2026`), the diff into the renderer and the draw. The pane supplies the frame's content and an `onOutputBatch` stage — title, notifications, accessibility, history — run once per frame that saw output |
 | `PaneWindowTitle` | The window title and proxy icon: their composition and sanitising, the interval-cached process facts behind them, the off-main directory probe |
 | `PaneSearch`      | Scrollback search: the bar and its placement, key routing (Esc, ⌘G), the debounced off-main sweeps and their generations, the matches the renderer highlights, the pre-search viewport it restores. Reaches the pane only through `PaneSearchHost` |
+| `PaneRemote`      | Whether the pane talks to another machine (`PaneRemoteState`, with the report tracker both the title and one-off questions read through), Reconnect and its wording, `path:line` references resolved on the remote host and opened as managed copies, and the SFTP browser's entry and its menu gate. Reaches the pane through `PaneRemoteHost` |
 
 A collaborator that owns menu actions implements them, and the pane
 forwards each from an `@objc` method of the same name: menu items, the

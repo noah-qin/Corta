@@ -23,10 +23,10 @@ import QuartzCore
 /// One pane: a `TerminalSession` and the renderer and view that draw it.
 /// Knows no sibling panes beyond `splitController` (D07). This file owns
 /// lifecycle and the session; the render loop is `PaneFrameLoop`'s, the
-/// window title `PaneWindowTitle`'s and search `PaneSearch`'s, and the
-/// remaining behaviour lives in the `ViewController+<concern>.swift`
-/// extensions.
-class ViewController: NSViewController, PaneSearchHost {
+/// window title `PaneWindowTitle`'s, search `PaneSearch`'s and the remote
+/// side `PaneRemote`'s, and the remaining behaviour lives in the
+/// `ViewController+<concern>.swift` extensions.
+class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost {
     // Not `private`: extensions reach these and cannot add storage.
     var terminalView: TerminalView!
     var terminalRenderer: TerminalRenderer!
@@ -118,14 +118,15 @@ class ViewController: NSViewController, PaneSearchHost {
     /// (`resizeSessionToFitView`).
     var didSizeWindow = false
     private var resizeDebouncer: ResizeDebouncer!
-    /// Shared by both readers so they supersede the same report.
-    private var remoteReportTracker = PaneRemoteState.ReportTracker()
 
     /// ⌘+/⌘− re-fit the window to keep this grid size.
     var lastRequestedSize: TerminalSize?
 
     /// Scrollback search: the bar, its sweeps and the highlighted matches.
     private(set) lazy var search = PaneSearch(host: self)
+    /// Whether this pane talks to another machine, Reconnect, remote
+    /// references and the SFTP browser's entry.
+    private(set) lazy var remote = PaneRemote(host: self)
     let inputSourceIndicator = PaneInputSourceIndicator()
 
     /// An O(scrollback) copy/export build, off the interaction path. Cancelling
@@ -292,7 +293,7 @@ class ViewController: NSViewController, PaneSearchHost {
         }
         let started: StartedSession
         do {
-            if strictRespawn, let command = reconnectCommand {
+            if strictRespawn, let command = remote.reconnectCommand {
                 started = StartedSession(
                     session: try respawn(command, size: initialSize, configuration: configuration),
                     notice: nil, executable: command.executable, arguments: command.arguments)
@@ -307,7 +308,7 @@ class ViewController: NSViewController, PaneSearchHost {
             presentFailure(
                 title: L10n.text("failure.title.session"),
                 detail: Self.describe(error), canRetry: true,
-                canReconnect: reconnectCommand.map {
+                canReconnect: remote.reconnectCommand.map {
                     PaneRemoteState.isRemoteLauncher(executable: $0.executable)
                 } ?? false)
             return
@@ -315,7 +316,7 @@ class ViewController: NSViewController, PaneSearchHost {
         session = started.session
         launchedCommand = (started.executable, started.arguments)
         windowTitle.reset(session: started.session)
-        remoteReportTracker = PaneRemoteState.ReportTracker()
+        remote.reset()
         session.dynamicColors =
             AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)
             .dynamicColors
@@ -620,7 +621,7 @@ class ViewController: NSViewController, PaneSearchHost {
 
     private func makeWindowTitle() -> PaneWindowTitle {
         let title = PaneWindowTitle()
-        title.resolveRemoteState = { [weak self] in self?.resolveRemoteState() ?? .local }
+        title.resolveRemoteState = { [weak self] in self?.remote.resolveState() ?? .local }
         title.window = { [weak self] in self?.viewIfLoaded?.window }
         title.gridSize = { [weak self] in self?.lastRequestedSize }
         title.canApplyDeferred = { [weak self] in
@@ -757,9 +758,11 @@ class ViewController: NSViewController, PaneSearchHost {
 
     // Menu items, the palette and key bindings send their actions to the
     // first responder, and the pane is in its chain; the pane answers for
-    // the collaborator that owns each one.
+    // the collaborator that owns each one, and `validateMenuItem` asks it.
 
     @objc func performFindPanelAction(_ sender: Any?) { search.performFindPanelAction(sender) }
+    @objc func reconnectRemote(_ sender: Any?) { remote.reconnectRemote(sender) }
+    @objc func browseRemoteFiles(_ sender: Any?) { remote.browseRemoteFiles(sender) }
 
     func resizeSessionToFitView() {
         // Nothing reaches the child before `sizeSettled`: earlier layouts run at
@@ -799,19 +802,6 @@ class ViewController: NSViewController, PaneSearchHost {
             else { windowTitle.endTransientSize() }
             windowTitle.apply()
         }
-    }
-
-    /// One fresh read of the pane's remote state — the syscalls, the
-    /// spawn record and the stale-report mask together. Both readers
-    /// (`refreshProcessFactsIfStale`, `paneRemoteState`) come through here
-    /// so a report one of them saw the pane local behind is superseded for
-    /// the other too.
-    func resolveRemoteState() -> PaneRemoteState {
-        remoteReportTracker.resolve(
-            remoteContext: session.remoteContext,
-            hasForegroundJob: session.hasForegroundJob,
-            foregroundProcessName: session.foregroundProcessName,
-            childIsRemoteLauncher: childIsLiveRemoteLauncher)
     }
 
     // MARK: - Failure paths
@@ -941,7 +931,7 @@ class ViewController: NSViewController, PaneSearchHost {
         let failure = PaneFailureView(
             title: title, detail: detail, canRetry: canRetry, canReconnect: canReconnect)
         failure.onRetry = { [weak self] in self?.retryAfterFailure() }
-        failure.onReconnect = { [weak self] in self?.reconnectRemote(nil) }
+        failure.onReconnect = { [weak self] in self?.remote.reconnectRemote(nil) }
         failure.onOpenSettings = { SettingsWindowController.shared.show(nil) }
         failure.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(failure)
@@ -986,7 +976,7 @@ class ViewController: NSViewController, PaneSearchHost {
         invalidateDisplay()
         if strictRespawn {
             // Every time: a new connection; the old scrollback is gone.
-            terminalView.showToast(reconnectNotice)
+            terminalView.showToast(remote.reconnectNotice)
         }
     }
 
