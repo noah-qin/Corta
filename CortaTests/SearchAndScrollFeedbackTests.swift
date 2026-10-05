@@ -43,14 +43,14 @@ struct SearchStabilityTests {
         let before = Self.ranges(atRows: [-100, -60, -20])
         let anchor = 200 + (-60)  // the middle one
         #expect(
-            ViewController.index(closestTo: anchor, in: before, totalPushed: 200) == 1)
+            PaneSearch.index(closestTo: anchor, in: before, totalPushed: 200) == 1)
 
         // Ten lines of output later every document row has shifted by ten and
         // a new match has appeared *above* the others, so the index would now
         // name the wrong one.
         let after = Self.ranges(atRows: [-110, -70, -30, -5])
         #expect(
-            ViewController.index(closestTo: anchor, in: after, totalPushed: 210) == 1)
+            PaneSearch.index(closestTo: anchor, in: after, totalPushed: 210) == 1)
         // The naive answer — keep the number — would have been match 1 in a
         // list where the text at index 1 is a different line.
         #expect(after[1].start.row == -70)
@@ -63,8 +63,8 @@ struct SearchStabilityTests {
     @Test("a vanished anchor lands on the nearest match")
     func nearestWhenTheAnchorIsGone() {
         let matches = Self.ranges(atRows: [-100, -50, -10])
-        #expect(ViewController.index(closestTo: 1000 - 52, in: matches, totalPushed: 1000) == 1)
-        #expect(ViewController.index(closestTo: 1000 - 9, in: matches, totalPushed: 1000) == 2)
+        #expect(PaneSearch.index(closestTo: 1000 - 52, in: matches, totalPushed: 1000) == 1)
+        #expect(PaneSearch.index(closestTo: 1000 - 9, in: matches, totalPushed: 1000) == 2)
     }
 
     /// With no anchor the newest match wins, which is where a fresh search
@@ -72,8 +72,8 @@ struct SearchStabilityTests {
     @Test("no anchor starts at the newest match")
     func noAnchorStartsAtTheEnd() {
         let matches = Self.ranges(atRows: [-100, -50, -10])
-        #expect(ViewController.index(closestTo: nil, in: matches, totalPushed: 0) == 2)
-        #expect(ViewController.index(closestTo: 5, in: [], totalPushed: 0) == nil)
+        #expect(PaneSearch.index(closestTo: nil, in: matches, totalPushed: 0) == 2)
+        #expect(PaneSearch.index(closestTo: 5, in: [], totalPushed: 0) == nil)
     }
 
     // MARK: - Case sensitivity

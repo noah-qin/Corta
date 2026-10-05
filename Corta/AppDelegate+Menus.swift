@@ -130,7 +130,7 @@ extension AppDelegate {
     /// and Grammar, Substitutions, Transformations, Speech, Paste and Match
     /// Style, and Find and Replace. The child owns every byte on screen, so
     /// these were greyed out or silently did nothing
-    /// (`ViewController.performFindPanelAction` handles only tags 1, 2, 3, 7).
+    /// (`PaneSearch.performFindPanelAction` handles only tags 1, 2, 3, 7).
     ///
     /// Removed by action (or, for the three template submenus, by their
     /// children's actions), so localized menus prune the same items.
@@ -177,7 +177,7 @@ extension AppDelegate {
                 find.items.contains(where: {
                     $0.action == #selector(NSResponder.performTextFinderAction(_:))
                         || $0.action
-                            == #selector(ViewController.performFindPanelAction(_:))
+                            == #selector(PaneSearch.performFindPanelAction(_:))
                 })
             else { continue }
             for candidate in find.items.reversed()

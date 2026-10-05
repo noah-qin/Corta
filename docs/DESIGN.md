@@ -229,6 +229,15 @@ the forwarding between them.
 | ----------------- | -------------------------------------------------------------------- |
 | `PaneFrameLoop`   | When a frame is owed (the output wake, forced redraws, `?2026`), the diff into the renderer and the draw. The pane supplies the frame's content and an `onOutputBatch` stage — title, notifications, accessibility, history — run once per frame that saw output |
 | `PaneWindowTitle` | The window title and proxy icon: their composition and sanitising, the interval-cached process facts behind them, the off-main directory probe |
+| `PaneSearch`      | Scrollback search: the bar and its placement, key routing (Esc, ⌘G), the debounced off-main sweeps and their generations, the matches the renderer highlights, the pre-search viewport it restores. Reaches the pane only through `PaneSearchHost` |
+
+A collaborator that owns menu actions implements them, and the pane
+forwards each from an `@objc` method of the same name: menu items, the
+palette and key bindings send to the first responder, and the pane is the
+object in that chain. Its `validateMenuItem` asks the owner the same way.
+Not `supplementalTarget(forAction:sender:)`: an item whose target is the
+pane by name never consults it, and AppKit sends the action to the pane
+anyway.
 
 ---
 
@@ -413,7 +422,7 @@ event monitor makes that easy to get wrong:
   copy, and the config file only supplies the default for the next bar.
 - **Esc belongs to one bar.** `NSEvent.addLocalMonitorForEvents` fires
   app-wide, so the handler checks the event's window *and* that the
-  window's field-editor delegate is this pane's own `searchField` — a
+  window's field-editor delegate is this pane's own search field — a
   split puts two bars in one window.
 - **No refresh is lost.** An output-triggered refresh that arrives while
   a sweep is in flight sets `search.needsRefresh` instead of being

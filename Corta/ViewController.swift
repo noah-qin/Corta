@@ -22,10 +22,11 @@ import QuartzCore
 
 /// One pane: a `TerminalSession` and the renderer and view that draw it.
 /// Knows no sibling panes beyond `splitController` (D07). This file owns
-/// lifecycle and the session; the render loop is `PaneFrameLoop`'s and the
-/// window title `PaneWindowTitle`'s, and the remaining behaviour lives in
-/// the `ViewController+<concern>.swift` extensions.
-class ViewController: NSViewController {
+/// lifecycle and the session; the render loop is `PaneFrameLoop`'s, the
+/// window title `PaneWindowTitle`'s and search `PaneSearch`'s, and the
+/// remaining behaviour lives in the `ViewController+<concern>.swift`
+/// extensions.
+class ViewController: NSViewController, PaneSearchHost {
     // Not `private`: extensions reach these and cannot add storage.
     var terminalView: TerminalView!
     var terminalRenderer: TerminalRenderer!
@@ -77,7 +78,7 @@ class ViewController: NSViewController {
                 scrollAnchorTotalPushed = session?.scrollbackTotalPushed
             }
             updateScrollPositionIndicator()
-            if search.bar != nil { placeSearchBarClearOfContent() }
+            search.placeClearOfContent()
         }
     }
 
@@ -123,7 +124,8 @@ class ViewController: NSViewController {
     /// ⌘+/⌘− re-fit the window to keep this grid size.
     var lastRequestedSize: TerminalSize?
 
-    let search = PaneSearchState()
+    /// Scrollback search: the bar, its sweeps and the highlighted matches.
+    private(set) lazy var search = PaneSearch(host: self)
     let inputSourceIndicator = PaneInputSourceIndicator()
 
     /// An O(scrollback) copy/export build, off the interaction path. Cancelling
@@ -486,7 +488,7 @@ class ViewController: NSViewController {
             self?.pasteFromClipboard()
         }
         view.onSearchKey = { [weak self] (event: NSEvent) -> Bool in
-            self?.handleSearchKey(event) ?? false
+            self?.search.handleKey(event) ?? false
         }
         view.cellSize = CGSize(width: terminalRenderer.pointMetrics.cellWidth, height: terminalRenderer.pointMetrics.cellHeight)
         view.preeditFontProvider = { [weak self] in
@@ -569,7 +571,7 @@ class ViewController: NSViewController {
         stopCursorBlink()
         inputSourceIndicator.stop()
         windowTitle.stop()
-        closeSearchBar()
+        search.close()
         largeTextTask?.cancel()
         largeTextTask = nil
         taskNotifier.cancel()
@@ -584,7 +586,7 @@ class ViewController: NSViewController {
         invalidateDisplay()
         resizeSessionToFitView()
         updateFocusRingLayout()
-        if search.bar != nil { placeSearchBarClearOfContent() }
+        search.placeClearOfContent()
     }
 
     /// Tab bar changes are all layout passes, so `viewDidLayout` suffices.
@@ -644,9 +646,9 @@ class ViewController: NSViewController {
         }
         // Search refresh is a full-scrollback sweep; off the render path.
         if search.bar != nil {
-            scheduleBackgroundSearchRefresh()
+            search.scheduleBackgroundRefresh()
             // The cursor may have moved under the bar.
-            placeSearchBarClearOfContent()
+            search.placeClearOfContent()
         }
         // Rate-limited and gated on VoiceOver inside the call.
         terminalView?.noteAccessibilityValueChanged()
@@ -745,6 +747,19 @@ class ViewController: NSViewController {
     func invalidateDisplay() {
         frameLoop.invalidate()
     }
+
+    /// The grid now, or nil for a failed pane.
+    func snapshot() -> Grid? {
+        session?.snapshot()
+    }
+
+    // MARK: - Forwarding
+
+    // Menu items, the palette and key bindings send their actions to the
+    // first responder, and the pane is in its chain; the pane answers for
+    // the collaborator that owns each one.
+
+    @objc func performFindPanelAction(_ sender: Any?) { search.performFindPanelAction(sender) }
 
     func resizeSessionToFitView() {
         // Nothing reaches the child before `sizeSettled`: earlier layouts run at
