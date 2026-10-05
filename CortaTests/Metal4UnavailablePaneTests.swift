@@ -49,8 +49,8 @@ struct Metal4UnavailablePaneTests {
         _ = pane.view
         #expect(pane.failureView != nil)
         pane.setFontSize(pane.fontSize + 2)
-        pane.reportFocusIfNeeded()
-        pane.applyFocusAppearance()
+        pane.focus.reportIfNeeded()
+        pane.focus.applyAppearance()
         #expect(pane.failureView != nil)
     }
 
