@@ -274,9 +274,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         guard let host, let session = host.session else { return }
         let sanitized = Paste.sanitized(text)
         guard !sanitized.isEmpty else { return }
-        if Paste.needsWarning(
-            text: sanitized, bracketedPasteEnabled: session.isBracketedPasteEnabled)
-        {
+        if Paste.needsWarning(text: sanitized, bracketedPasteEnabled: bracketedPasteEnabled()) {
             let alert = NSAlert()
             alert.messageText = L10n.text("paste.newlines.title")
             alert.informativeText = L10n.text("paste.newlines.message")
@@ -681,21 +679,11 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
 
     // MARK: - Paste
 
+    /// ⌘V: the one paste path drops and Services also take
+    /// (`insertAsPaste`).
     func pasteFromClipboard() {
         guard let text = NSPasteboard.general.string(forType: .string) else { return }
-        let sanitized = Paste.sanitized(text)
-        guard !sanitized.isEmpty else { return }
-        if Paste.needsWarning(text: sanitized, bracketedPasteEnabled: bracketedPasteEnabled()) {
-            let alert = NSAlert()
-            alert.messageText = L10n.text("paste.newlines.title")
-            alert.informativeText =
-                L10n.text("paste.newlines.message")
-            alert.addButton(withTitle: L10n.text("common.paste"))
-            alert.addButton(withTitle: L10n.text("common.cancel"))
-            guard alert.runModal() == .alertFirstButtonReturn else { return }
-        }
-        host?.pointer.returnToBottomOnInput()
-        sendPaste(sanitized)
+        insertAsPaste(text)
     }
 
     /// Queues a sanitised paste whole, or not at all. In pieces, a backlog

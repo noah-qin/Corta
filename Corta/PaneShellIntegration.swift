@@ -180,8 +180,10 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
     }
 
     /// A completed command's output as text.
+    /// Nil for a failed pane, whose menu still validates this.
     func commandOutputText(for record: CommandRecord?) -> String? {
-        Self.commandOutputText(grid: session.snapshot(), record: record)
+        guard isOperable else { return nil }
+        return Self.commandOutputText(grid: session.snapshot(), record: record)
     }
 
     /// Pure, for `CommandOutputTests`. Without a `C` mark it starts one row
@@ -247,7 +249,8 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
 
     private func writeHistory(_ text: String, run: Bool) -> Bool {
         guard host?.commands.canChangeDirectorySafely == true,
-            var bytes = Paste.historyBytes(for: text, bracketedPasteEnabled: session?.isBracketedPasteEnabled ?? false)
+            var bytes = Paste.historyBytes(
+                for: text, bracketedPasteEnabled: host?.commands.bracketedPasteEnabled() ?? false)
         else { return false }
         if run { bytes.append(0x0D) }
         // Admit the closing paste marker and optional Return together, so

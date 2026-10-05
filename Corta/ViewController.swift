@@ -89,8 +89,6 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     var failureView: PaneFailureView?
     /// A fallback shell or directory, reported once the toast can be seen.
     private var pendingSessionNotice: String?
-    /// `setUpPane` can run twice (a retry); observers must not.
-    private var didInstallObservers = false
     /// Keeps transient startup layouts from reaching the child
     /// (`resizeSessionToFitView`).
     var didSizeWindow = false
@@ -349,11 +347,9 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         resizeDebouncer = ResizeDebouncer { [weak self] size in
             self?.session?.resize(to: size)
         }
-        if !didInstallObservers {
-            didInstallObservers = true
-            focus.observeWindows()
-            appearance.observe()
-        }
+        // Each is idempotent: a retry's second setup observes nothing twice.
+        focus.observeWindows()
+        appearance.observe()
         let generation = frameLoop.attach(session: session, renderer: terminalRenderer)
         let wake = frameLoop.outputWake
         taskNotifier.lastOutputUptimeNanoseconds = { wake.lastOutputUptimeNanoseconds }
@@ -632,11 +628,14 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// actions to the first responder or to the pane by name; the pane
     /// answers for the collaborator that implements each, through the
     /// Objective-C runtime's forwarding, and `validateMenuItem` asks it too.
-    /// A collaborator's new `@objc` action needs nothing here.
-    private var actionOwners: [NSObject] { [search, remote, commands, pointer, shell] }
+    /// A collaborator's new `@objc` action needs nothing here; a new
+    /// collaborator that owns actions joins both lists, in the same order
+    /// (`PaneCommandsTests` holds them equal). `focus` and `appearance` have
+    /// only notification selectors and stay out.
+    var actionOwners: [NSObject] { [search, remote, commands, pointer, shell] }
     /// The same owners as classes, for a question that may come from any
     /// thread and so must not touch the instances.
-    nonisolated private static let actionOwnerClasses: [NSObject.Type] = [
+    nonisolated static let actionOwnerClasses: [NSObject.Type] = [
         PaneSearch.self, PaneRemote.self, PaneCommands.self, PanePointer.self,
         PaneShellIntegration.self,
     ]
@@ -657,7 +656,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
 
     /// Only what the pane itself does not answer: `NSObject`'s and
     /// `NSResponder`'s own selectors stay the pane's. Actions are sent on the
-    /// main thread.
+    /// main thread; one sent from another would not be forwarded, and the
+    /// runtime would report the selector unrecognised.
     nonisolated override func forwardingTarget(for aSelector: Selector!) -> Any? {
         guard let aSelector, Thread.isMainThread else {
             return super.forwardingTarget(for: aSelector)
@@ -763,7 +763,12 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         failureView = nil
         terminalView?.removeFromSuperview()
         terminalView = nil
+        // A new session: nothing of the old one's viewport, selection or
+        // overlays may point into it.
         focus.removeViews()
+        pointer.reset()
+        selection = nil
+        scrollOffset = 0
         setUpPane(strictRespawn: strictRespawn)
         guard isOperable, let terminalView else { return }
         // The window settled long ago; this pane needs a real winsize now.

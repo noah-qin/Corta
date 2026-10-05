@@ -51,6 +51,15 @@ final class PanePointer: NSObject {
     private(set) var hoveredLink: TerminalSelection?
     private(set) var scrollPositionIndicator: ScrollPositionIndicator?
 
+    /// The pane's view and session are being replaced: the pill and the
+    /// hover belonged to the old ones.
+    func reset() {
+        scrollPositionIndicator?.removeFromSuperview()
+        scrollPositionIndicator = nil
+        hoveredLink = nil
+        hoveringLink = false
+    }
+
     init(host: PanePointerHost? = nil) {
         self.host = host
     }

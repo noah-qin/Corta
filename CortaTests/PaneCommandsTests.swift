@@ -118,6 +118,47 @@ struct PaneCommandsTests {
         }
     }
 
+    @Test("the pane's two lists of action owners name the same collaborators")
+    func actionOwnerListsAgree() {
+        let pane = ViewController()
+        #expect(
+            pane.actionOwners.map { ObjectIdentifier(type(of: $0)) }
+                == ViewController.actionOwnerClasses.map { ObjectIdentifier($0) })
+    }
+
+    @Test("a failed pane validates Copy Last Command Output without a session")
+    func failedPaneValidatesCommandOutput() {
+        let pane = ViewController()
+        let item = NSMenuItem(
+            title: "", action: #selector(PaneShellIntegration.copyLastCommandOutput(_:)),
+            keyEquivalent: "")
+        #expect(!pane.validateMenuItem(item))
+    }
+
+    /// Drops and Services take the ⌘V path (`SECURITY.md` §2.3): sanitised,
+    /// then written to the child. `cat` echoes what arrives.
+    @Test("text inserted as a paste reaches the child sanitised")
+    func insertAsPasteSanitises() throws {
+        let host = CommandsTestHost()
+        let session = try TerminalSession(
+            executable: "/bin/cat", arguments: [], environment: ChildEnvironment.default(),
+            size: TerminalSize(rows: 10, columns: 60), workingDirectory: "/")
+        defer { session.stop() }
+        session.start()
+        host.session = session
+        host.commands.insertAsPaste("safe\u{1B}[31mtext")
+        session.write(Array("\n".utf8))
+        let deadline = Date().addingTimeInterval(5 * Double(testTimeoutScale))
+        func lines() -> [String] { session.snapshot().logicalLines().map(\.text) }
+        while Date() < deadline, !lines().contains(where: { $0.contains("safe") }) {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
+        }
+        let echoed = try #require(lines().first { $0.contains("safe") })
+        // Unsanitised, the echo would read `safe^[[31mtext` and `cat`'s
+        // copy would turn red and read `safetext`.
+        #expect(echoed.contains("safe[31mtext"))
+    }
+
     @Test("a failed pane greys Clear and Reset, and they leave it alone")
     func failedPaneHasNothingToClear() {
         let host = CommandsTestHost()
