@@ -358,6 +358,15 @@ import Testing
         #expect(terminal.takeClipboardCopy() == "a[201~bcd\te\nf\rg")
     }
 
+    @Test("tag characters survive only as part of a subdivision flag")
+    func tagCharactersAreStrippedOutsideFlags() {
+        var terminal = self.terminal()
+        let scotland = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}"
+        let payload = Data("a\u{E0068}\u{E0069}b\(scotland)\u{E0068}c\u{206A}d".utf8).base64EncodedString()
+        terminal.feed(Array("\u{1B}]52;c;\(payload)\u{1B}\\".utf8))
+        #expect(terminal.takeClipboardCopy() == "ab\(scotland)cd")
+    }
+
     /// A payload of nothing but spoofing characters sanitises to empty,
     /// and empty copies nothing.
     @Test("a payload of only spoofing characters copies nothing")

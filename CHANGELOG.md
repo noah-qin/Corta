@@ -189,13 +189,15 @@ what to edit.
   output, from any program — no longer freezes every Corta window for up to
   a minute and a half, and opening Shell ▸ Commands and Output after such a
   command no longer freezes it for hours: the `path:line` detector
-  backtracked quadratically. It now scans in linear time.
+  backtracked quadratically, and located each of a line's matches by
+  counting from its start. Both are linear now.
 - Kitty images on the alternate screen share the pane's 320 MB budget with
   the main screen's, an unfinished transmission counts against it, and all
   panes together keep at most 1 GB. Under a megabyte of compressed output
   could make one pane hold about 0.9 GB.
-- Bidi overrides, isolates and the hidden zero-width characters (ZWSP, word
-  joiner, BOM and the invisible operators) are drawn as U+FFFD instead of
+- Bidi overrides, isolates, the hidden zero-width characters (ZWSP, word
+  joiner, BOM, the invisible operators) and Unicode tag characters outside a
+  subdivision flag are drawn as U+FFFD instead of
   nothing, as `SECURITY.md` §2.5 requires: invisible, they let a command look
   like something other than what a copy of it contains.
 - Text a program places on the clipboard with OSC 52 also loses its control

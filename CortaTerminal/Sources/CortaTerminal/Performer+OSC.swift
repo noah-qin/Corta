@@ -126,13 +126,27 @@ extension Performer {
     /// and an ESC there can end another terminal's bracketed paste.
     static func sanitiseClipboardText(_ text: String) -> String {
         var scalars = String.UnicodeScalarView()
-        scalars.append(contentsOf: text.unicodeScalars.filter { scalar in
-            switch scalar.value {
-            case 0x09, 0x0A, 0x0D: return true
-            case 0x00..<0x20, 0x7F...0x9F: return false
-            default: return !ConcealingScalars.contains(scalar.value)
+        // The flag and tags kept so far, as the grid judges a cluster.
+        var flag: [UInt32] = []
+        for scalar in text.unicodeScalars {
+            let value = scalar.value
+            switch value {
+            case 0x09, 0x0A, 0x0D: break
+            case 0x00..<0x20, 0x7F...0x9F: continue
+            default:
+                if ConcealingScalars.isTag(value) {
+                    guard ConcealingScalars.continuesFlag(flag, with: value) else { continue }
+                } else if ConcealingScalars.contains(value) {
+                    continue
+                }
             }
-        })
+            if ConcealingScalars.isTag(value) {
+                flag.append(value)
+            } else {
+                flag = value == ConcealingScalars.flagBase ? [value] : []
+            }
+            scalars.append(scalar)
+        }
         return String(scalars)
     }
 

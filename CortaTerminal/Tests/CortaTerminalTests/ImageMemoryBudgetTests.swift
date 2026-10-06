@@ -169,6 +169,24 @@ struct ImageMemoryBudgetTests {
         #expect(terminal.retainedImageBytes == 400)
     }
 
+    @Test("a terminal reset keeps the session's share of the shared budget")
+    func resetKeepsTheAllowance() {
+        var terminal = Terminal(rows: 4, columns: 10)
+        terminal.imageByteAllowance = 500
+        terminal.feed(Array("\u{1B}c".utf8) + Self.pngTransmission(id: 1, bytes: 600))
+        #expect(terminal.imageByteAllowance == 500)
+        #expect(terminal.grid.imagePlacements.imageCount == 0)
+    }
+
+    @Test("a full quota answers ENOSPC; only an image too large for any quota is EINVAL")
+    func fullQuotaIsNoSpace() {
+        var terminal = Terminal(rows: 4, columns: 10)
+        terminal.imageByteAllowance = 500
+        let payload = Data(repeating: 0xAA, count: 600).base64EncodedString()
+        terminal.feed(Array("\u{1B}_Ga=t,f=100,i=1,m=1;\(payload)\u{1B}\\".utf8))
+        #expect(String(decoding: terminal.takeOutput(), as: UTF8.self).contains("ENOSPC"))
+    }
+
     @Test("a shared budget gives each owner what the others leave, and forgets a released one")
     func sharedBudgetAllowances() {
         let budget = ImageMemoryBudget(limit: 1000)

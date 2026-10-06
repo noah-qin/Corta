@@ -88,14 +88,18 @@ extension Performer {
             KittyGraphics.maximumImageBytes,
             grid.imagePlacements.availableBytes(for: state.pendingImageTransmission!.header.imageID))
         let budget = room / 3 * 4 + 4
-        guard state.pendingImageTransmission!.base64.count + payloadBase64.count <= budget else {
+        let held = state.pendingImageTransmission!.base64.count + payloadBase64.count
+        guard held <= budget else {
             // Still acknowledged, with the pending header's `quiet` — a continuation
             // carries no `q=`, and re-parsing it would un-quiet the transmission.
+            // Too large for any image is the client's error; too large for the
+            // room left is a full quota, which a client may free and retry.
             let pending = state.pendingImageTransmission!
             state.pendingImageTransmission = nil
+            let anyImage = KittyGraphics.maximumImageBytes / 3 * 4 + 4
             respond(
                 imageID: pending.header.imageID, placementID: nil, quiet: pending.header.quiet,
-                error: "EINVAL:too large")
+                error: held > anyImage ? "EINVAL:too large" : "ENOSPC:image data too large")
             return
         }
         state.pendingImageTransmission!.base64.append(contentsOf: payloadBase64)

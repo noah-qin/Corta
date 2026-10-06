@@ -222,7 +222,7 @@ public struct Grid: Sendable {
         guard let value = Unicode.Scalar(scalar), !Self.isControl(value) else { return }
         // Drawn, not folded invisibly into the previous cell: invisible is
         // what makes a bidi override or a hidden ZWSP work (`SECURITY.md` §2.5).
-        if ConcealingScalars.contains(scalar) {
+        if ConcealingScalars.contains(scalar), !continuesFlagTagSequence(scalar) {
             writeNarrow(UTF8Decoder.replacement)
             return
         }
@@ -289,6 +289,14 @@ public struct Grid: Sendable {
             }
             index = end
         }
+    }
+
+    /// A tag continuing a cluster that starts with U+1F3F4: a subdivision flag.
+    private func continuesFlagTagSequence(_ scalar: UInt32) -> Bool {
+        guard ConcealingScalars.isTag(scalar), let target = clusterJoinTarget() else { return false }
+        let cell = lines[target.row][target.column]
+        let cluster = graphemes.scalars(for: cell.grapheme) ?? [cell.scalar]
+        return ConcealingScalars.continuesFlag(cluster, with: scalar)
     }
 
     private static func isControl(_ scalar: Unicode.Scalar) -> Bool {

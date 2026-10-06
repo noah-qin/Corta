@@ -238,6 +238,18 @@ struct LinkDetectionTests {
         #expect(elapsed < .seconds(1), "took \(elapsed)")
     }
 
+    @Test("a line of 25,000 references converts their offsets in linear time")
+    func manyMatchesAreLinear() {
+        var terminal = Terminal(rows: 50, columns: 200, scrollbackLimit: 1_000)
+        terminal.feed(Array(String(repeating: "a:1 ", count: 24_950).utf8))
+        let grid = terminal.grid
+        let start = ContinuousClock.now
+        _ = FileReferenceDetection.reference(at: SelectionPoint(row: grid.cursor.row, column: 5), in: grid)
+        let elapsed = ContinuousClock.now - start
+        // Counted from the line's start per match, this took 7 s.
+        #expect(elapsed < .seconds(1), "took \(elapsed)")
+    }
+
     @Test("the linear pattern finds exactly what the quadratic one did")
     func linearPatternMatchesTheOldOne() {
         var generator = SystemRandomNumberGenerator()

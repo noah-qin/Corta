@@ -127,8 +127,12 @@ control characters as nothing.** Draw them as a visible replacement
 glyph. Invisible-by-default is what makes the attack work.
 
 **As implemented (S16, 2026-10-07).** `ConcealingScalars` is the one list:
-U+202A–202E and U+2066–2069 (embeddings, overrides, isolates), U+200B,
-U+2060–2064 and U+FEFF (the zero-width characters that hide content). The
+U+202A–202E and U+2066–2069 (embeddings, overrides, isolates), U+180E,
+U+200B, U+2060–2064, U+206A–206F and U+FEFF (zero-width and deprecated
+format characters), and the tag characters U+E0001 and U+E0020–E007F, which
+encode ASCII invisibly. Tags pass only as a subdivision flag — U+1F3F4, at
+most seven tags, nothing after the cancel tag — so a flag cannot carry a
+hidden message. The
 grid draws each as U+FFFD in a cell of its own, so a copy of what was shown
 holds what was shown; OSC 52 strips them. ZWJ, ZWNJ and LRM/RLM stay
 zero-width — emoji sequences and real bidi text need them. Before S16 they

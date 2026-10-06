@@ -72,6 +72,7 @@ public enum FileReferenceDetection {
         let text = line.text
         let ns = text as NSString
         var found: [Reference] = []
+        var cursor = CharacterOffsetCursor(text)
         pattern.enumerateMatches(
             in: text, options: [], range: NSRange(location: 0, length: ns.length)
         ) { match, _, _ in
@@ -87,7 +88,8 @@ public enum FileReferenceDetection {
             if match.numberOfRanges >= 4, match.range(at: 3).location != NSNotFound {
                 column = Int(ns.substring(with: match.range(at: 3)))
             }
-            let startOffset = ns.substring(to: match.range.location).count
+            guard let startOffset = cursor.characterOffset(atUTF16Offset: match.range.location)
+            else { return }
             let endOffset = startOffset + ns.substring(with: match.range).count - 1
             guard let start = line.position(at: startOffset),
                 let end = line.position(at: endOffset)
