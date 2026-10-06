@@ -48,6 +48,16 @@ struct PasteTests {
         }
     }
 
+    @Test func deleteAndC1ControlsAreStripped() {
+        // DEL would backspace over "echo safe" once it reached the line editor.
+        #expect(Paste.sanitized("echo safe\u{7F}\u{7F}\u{7F}\u{7F}\u{7F}\u{7F}\u{7F}\u{7F}\u{7F}rm") == "echo saferm")
+        for value: UInt32 in 0x80...0x9F {
+            let text = "a\(Unicode.Scalar(value)!)b"
+            #expect(Paste.sanitized(text) == "ab", "C1 control U+\(String(value, radix: 16)) must be stripped")
+        }
+        #expect(Paste.sanitized("café\u{A0}x") == "café\u{A0}x")
+    }
+
     @Test func tabNewlineAndReturnSurvive() {
         #expect(Paste.sanitized("\ta\nb\rc") == "\ta\nb\rc")
     }

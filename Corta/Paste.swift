@@ -25,10 +25,18 @@ nonisolated enum Paste {
     private static let bracketStart: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x30, 0x7E]
     private static let bracketEnd: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x31, 0x7E]
 
-    /// Strips C0 except tab, LF and CR; newlines are guarded by the warning.
+    /// Strips C0 except tab, LF and CR (newlines are guarded by the warning),
+    /// DEL and C1. DEL is a line editor's backspace, so a pasted one erased
+    /// text the user had seen and left a different command than the one on
+    /// the clipboard; C1 includes CSI and ST, which a program reading 8-bit
+    /// controls takes for the end of a bracketed paste.
     static func sanitized(_ text: String) -> String {
         String(String.UnicodeScalarView(text.unicodeScalars.filter { scalar in
-            scalar.value >= 0x20 || scalar == "\t" || scalar == "\n" || scalar == "\r"
+            switch scalar.value {
+            case 0x09, 0x0A, 0x0D: return true
+            case 0x00..<0x20, 0x7F...0x9F: return false
+            default: return true
+            }
         }))
     }
 

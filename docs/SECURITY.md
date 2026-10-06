@@ -70,7 +70,8 @@ Copying a command from a web page where a hidden element appended
 - When a paste contains a newline **and** the application has not enabled
   bracketed paste mode, warn before sending.
 - Strip `ESC` and other C0 control characters from pasted text — a paste
-  is data, never a command stream.
+  is data, never a command stream — and DEL and the C1 range with them:
+  DEL is a line editor's backspace, and C1 holds CSI and ST.
 
 ### 2.4 URLs and hyperlinks
 
