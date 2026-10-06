@@ -340,6 +340,8 @@ struct SessionRestore {
                 at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             let data = try JSONEncoder().encode(states)
             try data.write(to: url, options: .atomic)
+            // Owner-only, as `recent-hosts.json`: directories say where you work.
+            chmod(url.path, 0o600)
         } catch {
             // Losing the arrangement is not worth interrupting a quit for.
         }

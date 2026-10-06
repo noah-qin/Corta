@@ -490,9 +490,18 @@ final class RemoteEditCoordinator {
             removeSnapshot(copy.id)
             Task { [weak self] in await self?.redownload(copy) }
         case .saveCopyElsewhere(let destination):
+            do {
+                try FileManager.default.copyItem(at: store.localURL(for: copy), to: destination)
+            } catch {
+                // Said, and the decision stays owed: dropping it here told
+                // the user nothing while no copy existed where they chose.
+                let code = ((error as NSError).userInfo[NSUnderlyingErrorKey] as? NSError)?.code
+                presenter.showError(SFTPBrowserModel.errorMessage(
+                    .localIOFailed(operation: "save copy", code: Int32(code ?? Int(EIO))),
+                    host: copy.host))
+                return
+            }
             removeSnapshot(copy.id)
-            try? FileManager.default.copyItem(
-                at: store.localURL(for: copy), to: destination)
             pendingConflicts.removeAll { $0.id == conflictID }
             pendingUploads.removeAll { $0.id == conflictID }
         case .dismiss:

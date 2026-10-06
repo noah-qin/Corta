@@ -60,6 +60,40 @@ struct ImageDecodePipelineTests {
         #expect(count.value == 1, "deleted queued image must not decode")
     }
 
+    @Test("visible images over the pane budget wait instead of evicting each other every frame")
+    func visibleOverflowDoesNotThrash() throws {
+        let device = try #require(Self.makeDevice())
+        let decodes = Counter()
+        // 2×2 bgra = 16 bytes: the budget holds one of the two visible images.
+        let renderer = KittyImageRenderer(
+            device: device, textureByteBudget: 16,
+            decodeImage: { data in
+                decodes.value += 1
+                return KittyImageRenderer.decode(data)
+            },
+            decodeScheduler: { $0() })
+        var terminal = Terminal(rows: 10, columns: 40)
+        Self.placeRGBA(&terminal, id: 1, byte: 1)
+        Self.placeRGBA(&terminal, id: 2, byte: 2)
+        func update() {
+            renderer.update(table: Self.table(of: terminal), rows: 10, offset: 0,
+                scrollbackTotalPushed: 0, cellWidth: 10, cellHeight: 20)
+        }
+        for _ in 0..<10 { update() }
+        // Evicting a visible image to install the other re-decoded it on the
+        // next frame, without end.
+        #expect(decodes.value == 2, "each image decodes once; the overflow waits")
+        #expect(renderer.textureCount == 1)
+
+        // Room appears when the shown image goes: the waiting one installs.
+        let shown: UInt32 = renderer.texture(for: KittyGraphics.ImageID(rawValue: 1)) != nil ? 1 : 2
+        terminal.feed(Array("\u{1B}_Ga=d,d=i,i=\(shown)\u{1B}\\".utf8))
+        update()
+        update()
+        #expect(renderer.texture(for: KittyGraphics.ImageID(rawValue: 3 - shown)) != nil)
+        #expect(decodes.value == 3)
+    }
+
     @Test("actual scheduled jobs are bounded across panes")
     func globalDecodeAdmissionIsBounded() throws {
         let device = try #require(Self.makeDevice())

@@ -265,6 +265,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+        // Off the main thread: a listing of the temporary directory.
+        DispatchQueue.global(qos: .utility).async { ZshBootstrap.removeStaleFolders() }
         // The saved arrangement, or one window; restored windows are born in
         // their saved directories, so no first window is opened to replace.
         if !restoreWindowsIfConfigured() { openWindow(workingDirectory: nil) }

@@ -127,6 +127,14 @@ struct RemoteReferenceResolutionTests {
             "one remote file is one managed copy, however spelled")
     }
 
+    @Test("a reported host that could not have been typed resolves nothing")
+    func unacceptableHostIsRefused() {
+        for host in ["evil`touch x`", "-oProxyCommand=x", "a b", "h\u{202E}x"] {
+            let state = PaneRemoteState.remote(host: host, directory: "/srv", provenance: .osc7)
+            #expect(PaneRemote.resolve(Self.reference("src/main.rs"), state: state) == nil, "\(host)")
+        }
+    }
+
     @Test("line and column ride along")
     func lineAndColumn() {
         let resolved = PaneRemote.resolve(

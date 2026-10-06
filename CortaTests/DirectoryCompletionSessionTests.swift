@@ -21,6 +21,25 @@ import CortaTerminal
 
 @MainActor
 struct DirectoryCompletionSessionTests {
+    @Test("startup folders a crashed run left are removed once a day old, and nothing else")
+    func staleStartupFoldersAreRemoved() throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("corta-stale-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: root) }
+        let old = root.appendingPathComponent(ZshBootstrap.folderPrefix + "old")
+        let fresh = root.appendingPathComponent(ZshBootstrap.folderPrefix + "fresh")
+        let other = root.appendingPathComponent("someone-else")
+        for url in [old, fresh, other] { try fm.createDirectory(at: url, withIntermediateDirectories: true) }
+        let now = Date()
+        let dayAgo = now.addingTimeInterval(-ZshBootstrap.staleAge - 60)
+        try fm.setAttributes([.modificationDate: dayAgo], ofItemAtPath: old.path)
+        try fm.setAttributes([.modificationDate: dayAgo], ofItemAtPath: other.path)
+        ZshBootstrap.removeStaleFolders(in: root, now: now)
+        #expect(!fm.fileExists(atPath: old.path))
+        #expect(fm.fileExists(atPath: fresh.path), "the other build may be starting a shell from it")
+        #expect(fm.fileExists(atPath: other.path))
+    }
+
     @Test func shellOwnsFilteringAndAcceptance() throws {
         let fm = FileManager.default
         let home = fm.temporaryDirectory.appendingPathComponent("corta-cd-session-\(UUID().uuidString)")

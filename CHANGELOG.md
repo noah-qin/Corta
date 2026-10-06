@@ -116,6 +116,16 @@ what to edit.
 
 ### Fixed
 
+- Visible Kitty images that together exceed a pane's texture budget no longer
+  evict and re-decode each other on every frame; the ones that do not fit wait
+  until others leave the screen or are deleted.
+- Holding ⌘ over output, or opening Shell ▸ Commands and Output, scans for a
+  `path:line` once rather than twice, and skips lines too long to hold one.
+- Startup folders for zsh integration left in the temporary directory by a
+  crash or force quit are removed at the next launch, once a day old.
+- Save Local Copy Elsewhere in a remote-edit conflict says when the copy
+  could not be written, and keeps the conflict, instead of dismissing it as
+  if the copy had been made.
 - A theme's `ansi = #…, #…` list kept only its first colour: the second `#`
   was read as the start of a comment. Settings and the theme editor write
   every theme this way, so a custom theme's other fifteen ANSI colours
@@ -203,6 +213,21 @@ what to edit.
 - Text a program places on the clipboard with OSC 52 also loses its control
   characters other than tab and newlines. Corta's paste stripped them, but
   another application's might not, and an ESC there can end a bracketed paste.
+- A link's tooltip names the URL that opens — host in its IDNA form,
+  invisible characters percent-encoded, user and password removed — and that
+  URL is the one opened. `https://аpple.com` (a Cyrillic `а`) had shown as
+  Apple's address, and `https://github.com@evil.example` named GitHub first.
+- Files downloaded from the SFTP browser, including ones dragged to Finder,
+  carry macOS's quarantine mark, so an app, script or installer among them
+  gets Gatekeeper's first-open check like any other download.
+- A file whose name contains `{line}`, `{column}` or `{file}` opens under its
+  own name with `open-file-command`; the placeholder in the name was
+  substituted too, opening a different file from the one shown.
+- A host name reaches `ssh` only if it passes the check the connect sheet
+  applies, whichever way it was named: the SFTP browser's own field and a
+  remote pane's reported host (`⌘`-click on a remote `path:line`) skipped it.
+- `directory-history.json` and `state.json` are owner-only (`0600`), as
+  `recent-hosts.json` already was.
 
 ## [1.1.1] - 2026-10-03
 

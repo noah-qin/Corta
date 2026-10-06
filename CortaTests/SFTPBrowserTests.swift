@@ -204,6 +204,21 @@ struct SFTPBrowserModelTests {
         #expect(model.connectionState == .needsHost)
     }
 
+    @Test("a host that could not be typed in the connect sheet is refused before ssh")
+    func invalidHostIsRefused() async {
+        let fake = FakeSFTPClient()
+        let model = SFTPBrowserModel(host: nil, startDirectory: nil) { host in
+            fake.connectedHosts.append(host)
+            return fake
+        }
+        model.hostField = "evil;touch x"
+        model.connect()
+        await Task.yield()
+        #expect(fake.connectedHosts.isEmpty)
+        #expect(model.connectionState == .failed(message: L10n.text("ui.connect.invalidHost")))
+        #expect(model.hostField == "evil;touch x", "left in the field to correct")
+    }
+
     /// A host the pane *reported* is a suggestion: the window opens on the
     /// host-entry step with the name prefilled, connects to nothing until
     /// Connect is pressed, and then connects to whatever the field holds

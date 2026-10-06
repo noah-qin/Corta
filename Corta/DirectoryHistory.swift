@@ -272,6 +272,8 @@ final class DirectoryHistoryStore {
             try? FileManager.default.createDirectory(
                 at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             try? data.write(to: fileURL, options: .atomic)
+            // Owner-only, as `recent-hosts.json`: directories say where you work.
+            chmod(fileURL.path, 0o600)
         }
     }
 }
