@@ -76,6 +76,33 @@ struct KittyGraphicsTests {
         #expect(terminal.grid.imagePlacements.orderedPlacements().count == 1)
     }
 
+    /// The protocol's own form: "subsequent chunks must have only the m and
+    /// optionally q keys". Read as image 0, the first chunk was discarded and
+    /// the client was told `EINVAL:bad size` — every chunked image from a
+    /// client that numbers its images.
+    @Test("a continuation chunk with only m= continues the open transmission")
+    func continuationWithoutImageID() {
+        var terminal = Terminal(rows: 10, columns: 40)
+        let whole = Self.rgba(4).base64EncodedString()
+        let midpoint = whole.index(whole.startIndex, offsetBy: whole.count / 2)
+        terminal.feed(Self.apc("a=T,i=7,f=32,s=2,v=2,m=1", payload: String(whole[..<midpoint])))
+        terminal.feed(Self.apc("q=0,m=1", payload: ""))
+        terminal.feed(Self.apc("m=0", payload: String(whole[midpoint...])))
+        #expect(terminal.grid.imagePlacements.image(KittyGraphics.ImageID(rawValue: 7)) != nil)
+        #expect(terminal.grid.imagePlacements.orderedPlacements().count == 1)
+        #expect(String(decoding: terminal.takeOutput(), as: UTF8.self) == "\u{1B}_Gi=7;OK\u{1B}\\")
+    }
+
+    @Test("a chunk naming another image still abandons the open transmission")
+    func newImageIDAbandonsTransmission() {
+        var terminal = Terminal(rows: 10, columns: 40)
+        let whole = Self.rgba(1).base64EncodedString()
+        terminal.feed(Self.apc("a=T,i=7,f=32,s=2,v=2,m=1", payload: "AAAA"))
+        terminal.feed(Self.apc("a=T,i=8,f=32,s=1,v=1", payload: whole))
+        #expect(terminal.grid.imagePlacements.image(KittyGraphics.ImageID(rawValue: 8)) != nil)
+        #expect(terminal.grid.imagePlacements.image(KittyGraphics.ImageID(rawValue: 7)) == nil)
+    }
+
     @Test("transmit without display (a=t) stores the image but places nothing")
     func transmitOnlyStoresWithoutPlacing() {
         var terminal = Terminal(rows: 10, columns: 40)
