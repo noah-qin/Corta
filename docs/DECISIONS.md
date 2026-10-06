@@ -330,8 +330,9 @@ four points with something other than a shadow data structure.
 takes. `.github/workflows/appcast.yml` then signs the published archive
 into `appcast.xml` with the Sparkle EdDSA key and merges the result
 through a pull request. The private key is a secret of the `release`
-GitHub environment, which only `v*` tags may use and which requires the
-maintainer's approval on every run; the key is piped to
+GitHub environment — until the 2026-10-06 amendment below, one only `v*`
+tags could use and that required the maintainer's approval on every run;
+the key is piped to
 `generate_appcast --ed-key-file -` and never written to disk. The
 workflow is the only route: the manual `scripts/release.sh` was removed
 in 1.1.0 (#133), because a second path that signs the feed is a second
@@ -384,6 +385,16 @@ to protected main and the manual workflow request, rather than approval of
 each job. Missing signing configuration fails; published archive bytes
 are never replaced. A serialized pipeline prevents releases overtaking
 each other, and neither merges nor feed updates trigger another release.
+
+*What the boundary is, measured 2026-10-07.* The `release` environment has
+a branch policy (`main`) and no required reviewer, and the `main` ruleset
+requires status checks but no review, with the admin role allowed to
+bypass it. So one maintainer credential able to push to `main` and request
+a workflow run reaches the Developer ID certificate, the notary key and the
+unrevocable Sparkle key with no second step. That is the accepted cost of
+one-click releases; restoring a required reviewer (or removing the
+ruleset bypass) is how to buy the second step back, and either reopens
+this amendment.
 
 ## D21 — Corta builds for Apple silicon only
 

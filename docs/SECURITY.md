@@ -291,26 +291,30 @@ needs no Accessibility permission (rule 7) and, unlike an `NSEvent`
 global monitor, keeps working under Secure Keyboard Entry. Terminal
 transcripts are never indexed for Spotlight.
 
-### 4.7 The update feed is signed, and its key sits behind an approval
+### 4.7 The update feed is signed, and its key sits in the release environment
 
 An installed Corta accepts an update only when `appcast.xml` on `main`
 carries an EdDSA signature that the public key baked into the app
 verifies — Developer ID and notarisation satisfy Gatekeeper, not Sparkle.
-Since 1.0.0 that signature is produced by `.github/workflows/appcast.yml`
-after a person publishes the GitHub release (D20). The private key is a
-secret of the `release` GitHub environment: only a `v*` tag may use it,
-every run waits for the maintainer's approval, and the key reaches
+The signature is produced by `.github/workflows/appcast.yml`, called by
+`release.yml` in the run a person requests on `main` (D20, amended
+2026-10-06). The private key is a secret of the `release` GitHub
+environment, which admits only `main` and — since that amendment — no
+longer waits for a reviewer: the boundary is the code admitted to `main`
+and the person who requests the run, which for this repository is one
+maintainer credential (D20 says what that costs). The key reaches
 `generate_appcast` on stdin rather than as a file or an argument. The
 feed item is then held to `corta-release-check --appcast
 --require-notarized` — build number, enclosure URL, exact length,
 signature, Developer ID, staple, Gatekeeper — before a pull request
 carries it to `main` through the ordinary checks. The key has no
 revocation path (a new public key is unknown to every copy that has not
-updated), which is why it lives behind an approval rather than as a plain
-repository secret, and why every third-party action and Sparkle's own
-tools in that workflow are pinned by hash. The Developer ID certificate
+updated), which is why it lives in an environment no pull request or
+other branch can reach rather than as a plain repository secret, and why
+every third-party action and Sparkle's own tools in that workflow are
+pinned by hash. The Developer ID certificate
 `release.yml` signs with and the App Store Connect API key it notarises
-with sit in the same environment behind the same approval; the
+with sit in the same environment; the
 certificate reaches the runner only inside a keychain the job creates
 and deletes.
 
