@@ -46,8 +46,28 @@ public struct ImagePlacementTable: Sendable {
     private var placementOrder: [PlacementKey] = []
     /// Per instance: the table is copied into the renderer's frame cache.
     private var storedImageBytes = 0
-    /// A `var` so tests need not send hundreds of megabytes.
+    /// A `var` so tests need not send hundreds of megabytes, and so the
+    /// alternate screen's table gets what the parked main screen left.
     var maximumStoredBytes = KittyGraphics.maximumPaneImageBytes
+    /// What the process-wide budget leaves this table (`ImageMemoryBudget`),
+    /// set by the performer before each store; unlimited without one.
+    var externalLimit = Int.max
+    private var byteLimit: Int { min(maximumStoredBytes, externalLimit) }
+
+    /// Bytes this table holds — the figure its budgets are charged.
+    public var storedBytes: Int { storedImageBytes }
+
+    /// Bytes a store under `id` could reclaim first: the image it replaces,
+    /// or for an anonymous image every older anonymous one, which give way.
+    func reclaimableBytes(for id: KittyGraphics.ImageID) -> Int {
+        guard id.rawValue == 0 else { return images[id]?.bytes.count ?? 0 }
+        return anonymousOrder.reduce(0) { $0 + (images[$1]?.bytes.count ?? 0) }
+    }
+
+    /// Room for one more image under `id`, net of what it would replace.
+    func availableBytes(for id: KittyGraphics.ImageID) -> Int {
+        max(0, byteLimit - storedImageBytes + reclaimableBytes(for: id))
+    }
 
     /// Bumped per `store`, so the texture cache tells "reused id, new bytes"
     /// from "same image" without hashing.
@@ -90,7 +110,7 @@ public struct ImagePlacementTable: Sendable {
         else { return .tooManyImages }
         let replacedBytes = images[id]?.bytes.count ?? 0
         let newTotal = storedImageBytes - replacedBytes + data.bytes.count
-        guard newTotal <= maximumStoredBytes else { return .byteBudgetExceeded }
+        guard newTotal <= byteLimit else { return .byteBudgetExceeded }
         storedImageBytes = newTotal
         images[id] = data
         storeGenerationCounter &+= 1
@@ -116,12 +136,12 @@ public struct ImagePlacementTable: Sendable {
         guard images.count - anonymousOrder.count < KittyGraphics.maximumTrackedImages else {
             return (KittyGraphics.ImageID(rawValue: 0), .tooManyImages)
         }
-        guard storedImageBytes - anonymousBytes + data.bytes.count <= maximumStoredBytes else {
+        guard storedImageBytes - anonymousBytes + data.bytes.count <= byteLimit else {
             return (KittyGraphics.ImageID(rawValue: 0), .byteBudgetExceeded)
         }
         while !anonymousOrder.isEmpty,
             images.count >= KittyGraphics.maximumTrackedImages
-                || storedImageBytes + data.bytes.count > maximumStoredBytes
+                || storedImageBytes + data.bytes.count > byteLimit
         {
             delete(.image(anonymousOrder.removeFirst()))
         }

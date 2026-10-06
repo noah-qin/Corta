@@ -21,6 +21,20 @@ import Testing
 /// The grid API, driven directly. No parser, no escape sequences.
 @Suite("Grid")
 struct GridTests {
+    @Test("bidi overrides and hidden zero-width characters draw as U+FFFD, joiners stay invisible")
+    func concealingScalarsAreVisible() {
+        var grid = Grid(rows: 2, columns: 20)
+        for scalar in "l\u{202E}s\u{200B}x\u{2066}y\u{FEFF}z".unicodeScalars { grid.write(scalar.value) }
+        // Each concealing scalar takes a cell of its own, so the eye sees it.
+        #expect(grid.cursor.column == 9)
+        #expect(grid.lines[0][1].scalar == 0xFFFD)
+        #expect(grid.lines[0][3].scalar == 0xFFFD)
+
+        var joined = Grid(rows: 2, columns: 20)
+        for scalar in "a\u{200D}b\u{200C}c\u{200E}d".unicodeScalars { joined.write(scalar.value) }
+        #expect(joined.cursor.column == 4, "ZWJ, ZWNJ and LRM are real text and stay zero-width")
+    }
+
     @Test("an ASCII run matches scalar writes across wraps")
     func asciiRunMatchesScalarWrites() {
         let bytes = Array("abcdefghij".utf8)

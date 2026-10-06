@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import Foundation
 import Testing
 
 @testable import CortaTerminal
@@ -215,5 +216,52 @@ struct LinkDetectionTests {
         #expect(FileReferenceDetection.references(in: Self.line("a.rs:0")).isEmpty)
         #expect(
             FileReferenceDetection.references(in: Self.line("a.rs:12345678901234567890")).isEmpty)
+    }
+
+    // MARK: - File references
+
+    /// The pattern the possessive one replaced, kept to prove the two agree.
+    private static let quadraticPattern = try! NSRegularExpression(
+        pattern: #"(?<![^\s(\[<'"])([~./]?[\w.+\-/]*[\w.+\-]+):(\d{1,9})(?!\d)(?::(\d{1,9})(?!\d))?"#)
+
+    @Test("a 100,000-cell token with no colon is scanned in linear time")
+    func longTokenWithoutColonIsLinear() {
+        var terminal = Terminal(rows: 50, columns: 200, scrollbackLimit: 1_000)
+        terminal.feed(Array(String(repeating: "a", count: 99_800).utf8))
+        let grid = terminal.grid
+        let start = ContinuousClock.now
+        let found = FileReferenceDetection.reference(
+            at: SelectionPoint(row: grid.cursor.row, column: 5), in: grid)
+        let elapsed = ContinuousClock.now - start
+        #expect(found == nil)
+        // Quadratic, this took 54 s; linear, a few milliseconds.
+        #expect(elapsed < .seconds(1), "took \(elapsed)")
+    }
+
+    @Test("the linear pattern finds exactly what the quadratic one did")
+    func linearPatternMatchesTheOldOne() {
+        var generator = SystemRandomNumberGenerator()
+        let alphabet = Array("ab./~-+_:19 (\"'<[x")
+        var samples = ["src/main.swift:12", "./a/b.rs:3:4", "/:1", "~:2", "a/:3", ".:4", "~/x:5", "(f.c:6)", "u+v-w:7:8", "x//y:9"]
+        for _ in 0..<2_000 {
+            samples.append(String((0..<Int.random(in: 1...24, using: &generator)).map { _ in
+                alphabet.randomElement(using: &generator)!
+            }))
+        }
+        for text in samples {
+            let ns = text as NSString
+            // Group 1, through the same filters `references(in:)` applies.
+            let expected = Self.quadraticPattern.matches(
+                in: text, range: NSRange(location: 0, length: ns.length)
+            ).compactMap { match -> String? in
+                let path = ns.substring(with: match.range(at: 1))
+                guard let line = Int(ns.substring(with: match.range(at: 2))), line > 0,
+                    path.contains(where: { $0.isLetter || $0 == "/" || $0 == "~" || $0 == "_" })
+                else { return nil }
+                return path
+            }
+            let found = FileReferenceDetection.references(in: Self.line(text)).map(\.path)
+            #expect(found == expected, "\(text)")
+        }
     }
 }

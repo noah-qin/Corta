@@ -74,7 +74,8 @@ enum PaneSpawn {
                         : environment, size: size,
                     workingDirectory: attempt.directory,
                     // Applies to new sessions: shrinking a live one would drop lines.
-                    scrollbackLimit: scrollbackLimit, commandHistoryLimit: commandHistoryLimit)
+                    scrollbackLimit: scrollbackLimit, commandHistoryLimit: commandHistoryLimit,
+                    imageBudget: .app)
                 return Started(
                     session: session, notice: attempt.notice,
                     executable: attempt.shell,
@@ -103,7 +104,8 @@ enum PaneSpawn {
                 : environment, size: size,
             workingDirectory: preset?.directory ?? workingDirectory ?? NSHomeDirectory(),
             scrollbackLimit: configuration.scrollbackLines,
-            commandHistoryLimit: configuration.commandHistoryLimit)
+            commandHistoryLimit: configuration.commandHistoryLimit,
+            imageBudget: .app)
     }
 
     /// Casts to `PTYError`, not `CustomStringConvertible`: every `Error` now
@@ -111,4 +113,10 @@ enum PaneSpawn {
     static func describe(_ error: Error) -> String {
         (error as? PTYError)?.description ?? error.localizedDescription
     }
+}
+
+extension ImageMemoryBudget {
+    /// Every pane's Kitty images together (`SECURITY.md` §3): one hostile
+    /// stream per pane could otherwise retain a pane budget in each.
+    static let app = ImageMemoryBudget()
 }

@@ -202,6 +202,20 @@ public struct Terminal: Sendable {
         return text
     }
 
+    /// Image bytes this terminal may hold in all, set from an
+    /// `ImageMemoryBudget` before each feed; `Int.max` leaves only the pane cap.
+    public var imageByteAllowance: Int {
+        get { performer.state.imageByteAllowance }
+        set { performer.state.imageByteAllowance = newValue }
+    }
+
+    /// Image bytes held on both screens, plus an unfinished transmission at
+    /// its decoded size — what this terminal charges an `ImageMemoryBudget`.
+    public var retainedImageBytes: Int {
+        performer.grid.retainedImageBytes
+            + (performer.state.pendingImageTransmission?.base64.count ?? 0) / 4 * 3
+    }
+
     /// Query responses; `TerminalSession` writes them to the PTY after every
     /// `feed`.
     public mutating func takeOutput() -> [UInt8] {

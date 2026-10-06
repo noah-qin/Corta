@@ -68,6 +68,8 @@ fuzzing and app-level verification.
 - ``GraphemeTable``
 - ``HyperlinkTable``
 - ``ImagePlacementTable``
+- ``ImageMemoryBudget``
+- ``ConcealingScalars``
 
 ### Reading the grid
 

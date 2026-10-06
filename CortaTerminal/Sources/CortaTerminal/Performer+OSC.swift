@@ -120,23 +120,20 @@ extension Performer {
         state.pendingClipboardCopy = text
     }
 
-    /// Strips bidi embeddings, overrides and isolates and the zero-width
-    /// characters that hide content (ZWSP, word joiner, BOM) — what lets pasted
-    /// text differ from how it displayed. Keeps ZWJ/ZWNJ and LRM/RLM, which real
-    /// text needs.
+    /// Strips `ConcealingScalars` — what lets pasted text differ from how it
+    /// displayed — and every control but tab, LF and CR. Corta's own paste
+    /// strips controls again, but the pasteboard reaches other applications,
+    /// and an ESC there can end another terminal's bracketed paste.
     static func sanitiseClipboardText(_ text: String) -> String {
         var scalars = String.UnicodeScalarView()
-        scalars.append(contentsOf: text.unicodeScalars.filter { !isSpoofingScalar($0) })
+        scalars.append(contentsOf: text.unicodeScalars.filter { scalar in
+            switch scalar.value {
+            case 0x09, 0x0A, 0x0D: return true
+            case 0x00..<0x20, 0x7F...0x9F: return false
+            default: return !ConcealingScalars.contains(scalar.value)
+            }
+        })
         return String(scalars)
-    }
-
-    private static func isSpoofingScalar(_ scalar: Unicode.Scalar) -> Bool {
-        switch scalar.value {
-        case 0x202A...0x202E, 0x2066...0x2069, 0x200B, 0x2060, 0xFEFF:
-            return true
-        default:
-            return false
-        }
     }
 
     /// Strict base64 without a detour through `String`; data after padding is

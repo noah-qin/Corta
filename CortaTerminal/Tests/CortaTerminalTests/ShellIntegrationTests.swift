@@ -348,6 +348,16 @@ import Testing
         #expect(terminal.takeClipboardCopy() == "abc\u{200D}d\u{200C}e")
     }
 
+    /// The pasteboard reaches other applications, whose paste may not strip
+    /// controls: an ESC there can close another terminal's bracketed paste.
+    @Test("controls other than tab and newlines are stripped from the copy")
+    func controlsAreStrippedFromTheCopy() {
+        var terminal = self.terminal()
+        let payload = Data("a\u{1B}[201~b\u{7F}c\u{9B}d\te\nf\rg".utf8).base64EncodedString()
+        terminal.feed(Array("\u{1B}]52;c;\(payload)\u{1B}\\".utf8))
+        #expect(terminal.takeClipboardCopy() == "a[201~bcd\te\nf\rg")
+    }
+
     /// A payload of nothing but spoofing characters sanitises to empty,
     /// and empty copies nothing.
     @Test("a payload of only spoofing characters copies nothing")

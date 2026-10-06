@@ -46,8 +46,14 @@ public enum FileReferenceDetection {
     /// Digit runs capped at nine and not followed by a tenth, or a long run
     /// reports a number the output never named. Anchored so `foo.rs:12` inside a
     /// URL is left to the URL detector.
+    ///
+    /// The path run is possessive, its last character checked by lookbehind:
+    /// written as `[\w.+\-/]*[\w.+\-]+`, two overlapping quantifiers, a
+    /// 100,000-character token with no colon backtracked quadratically — 54 s on
+    /// the main thread per ⌘ press. `:` is in neither class, so the run can only
+    /// end at the colon either way and the matches are the same.
     private static let pattern = try! NSRegularExpression(
-        pattern: #"(?<![^\s(\[<'"])([~./]?[\w.+\-/]*[\w.+\-]+):(\d{1,9})(?!\d)(?::(\d{1,9})(?!\d))?"#,
+        pattern: #"(?<![^\s(\[<'"])([~./]?[\w.+\-/]*+(?<=[\w.+\-])):(\d{1,9})(?!\d)(?::(\d{1,9})(?!\d))?"#,
         options: [])
 
     /// As in `LinkDetection`: this runs on every ⌘-hover.
