@@ -211,8 +211,8 @@ public nonisolated enum QuadPipelineCache {
     /// Whether a cold creation compiles through the previous launch's archive.
     /// On unless a caller turns it off, as the archive tests and the
     /// construction benchmark do before `discardPipelines()`: the benchmark's
-    /// cold figure must be a compile, not an archive hit (~37 ms against
-    /// ~9 ms), and a hosted test bundle once segfaulted reading an archive
+    /// cold figure must be a compile, not an archive hit (~38 ms against
+    /// 6–9 ms), and a hosted test bundle once segfaulted reading an archive
     /// back (`-[_MTLDevice recordBinaryArchiveUsage:]`, a null C string
     /// reaching `strlen`; an upstream report ties it to
     /// `MTLGetShaderCachePath()` returning nil) — not reproduced on macOS
