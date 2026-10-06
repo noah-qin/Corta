@@ -5,9 +5,10 @@ Text shaping, AppKit shell, a hand-written VT parser.
 
 **Status (2026-10-03): 1.1.1 is the current release; the next
 version's GitHub milestone is the working list.** A release is a
-tag, a reviewed draft and a publish; CI then signs `appcast.xml` (D20) —
-`docs/RELEASING.md` has the steps. The tag's build and the feed each wait
-for the maintainer's approval of the `release` environment.
+single manual `Release` run on `main` that versions, signs, notarises,
+publishes and signs `appcast.xml` (D20, amended) — `docs/RELEASING.md` has
+the steps. The `release` environment admits only `main` and has no
+required reviewer: requesting the run is the approval.
 `CHANGELOG.md`'s `[Unreleased]` section is the record of what lands
 after it. Compatibility with AI command-line tools
 is terminal correctness; built-in AI is a non-goal. A roadmap issue is
@@ -174,10 +175,10 @@ the app's `SUPublicEDKey` — is `scripts/verify-appcast.swift`, which that
 check calls at release time, `ci.yml` runs offline on every run and
 `nightly.yml` runs against the published archives.
 
-**Release secrets live behind the approval, and signing needs the
+**Release secrets live in the release environment, and signing needs the
 certificate.** The Developer ID `.p12` and its password, the App Store
 Connect key that notarises, and the Sparkle key are secrets of the
-`release` environment (`v*` tags only, approval on every run), never
+`release` environment (`main` only, no required reviewer — D20 amended), never
 repository secrets. An API key cannot sign with a cloud-managed Developer
 ID certificate — the export fails with *Cloud signing permission error*
 whatever the key's role — so do not propose key-only signing. A signing
