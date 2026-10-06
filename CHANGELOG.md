@@ -92,6 +92,9 @@ what to edit.
   something running, quitting, clearing history or resetting, and pasting
   text with newlines — appear as a sheet on that window instead of a dialog
   that blocks the whole app.
+- The find bar and the command palette draw SwiftUI's Liquid Glass
+  (`glassEffect`) instead of AppKit glass views, with the same opaque fill
+  under Reduce Transparency and drawn border under Increase Contrast.
 - The first terminal window opens centred on the screen. Restoring the
   previous arrangement opens only the saved windows, instead of first
   starting a shell in a home-directory window and closing it.

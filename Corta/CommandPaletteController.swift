@@ -20,8 +20,8 @@ import SwiftUI
 /// The command palette: type part of a name, press Return.
 ///
 /// `CommandPaletteModel` filters and selects; `CommandPaletteView` lays
-/// out. This builds the AppKit panel and its `NSGlassEffectView`, keeping
-/// Reduce Transparency handling identical to the search bar's.
+/// out and draws its own glass. This builds the transparent AppKit panel it
+/// floats in.
 ///
 /// Commands go through `NSApp.sendAction(_:to:from:)` with a nil target —
 /// the responder chain, as a menu item does. The panel closes first, since
@@ -45,6 +45,9 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
         panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = true
         panel.level = .floating
+        // Clear, so only the view's glass shows; its shape casts the shadow.
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
         super.init(window: panel)
         panel.delegate = self
         panel.contentView = Self.buildContentView(model: model)
@@ -91,40 +94,12 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
 
     // MARK: - Layout
 
-    /// Glass for floating chrome, like the search bar; one surface, so no
-    /// container.
     private static func buildContentView(model: CommandPaletteModel) -> NSView {
         let hosting = NSHostingView(rootView: CommandPaletteView(model: model))
-        hosting.translatesAutoresizingMaskIntoConstraints = false
         // The panel is titled, for key status, with its titlebar hidden under
         // the content; left in, the titlebar's safe area pushed the search
         // field a whole titlebar height down from the top edge.
         hosting.safeAreaRegions = []
-
-        let content = NSGlassEffectView()
-        content.style = .regular
-        // Reduce Transparency: opaque tint and a drawn border, as the search bar.
-        if SystemAccessibility.reduceTransparency {
-            content.tintColor = .windowBackgroundColor
-        }
-        if SystemAccessibility.increaseContrast || SystemAccessibility.reduceTransparency {
-            content.wantsLayer = true
-            let border = SystemAccessibility.panelBorder
-            content.layer?.borderColor = border.color.cgColor
-            content.layer?.borderWidth = border.width
-        }
-        let wrapper = NSView()
-        wrapper.addSubview(hosting)
-        NSLayoutConstraint.activate([
-            hosting.leadingAnchor.constraint(equalTo: wrapper.leadingAnchor),
-            hosting.trailingAnchor.constraint(equalTo: wrapper.trailingAnchor),
-            hosting.topAnchor.constraint(equalTo: wrapper.topAnchor),
-            hosting.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor),
-        ])
-        content.contentView = wrapper
-        // The window-corner radius (as `TerminalView`), not a pill: a panel
-        // reads as a window.
-        content.cornerRadius = 10
-        return content
+        return hosting
     }
 }

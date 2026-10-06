@@ -16,10 +16,14 @@
 
 import SwiftUI
 
-/// The command palette's content, in SwiftUI.
+/// The command palette, in SwiftUI, glass included.
 /// `CommandPaletteModel` owns the state; `CommandPaletteController` only
-/// hosts this view in an `NSHostingView` inside its `NSGlassEffectView`
-/// panel and forwards `show(_:)`.
+/// hosts this view as its transparent panel's content and forwards
+/// `show(_:)`.
+///
+/// Glass for floating chrome, like the search bar; one surface, so one
+/// `GlassEffectContainer`. Reduce Transparency and Increase Contrast are
+/// environment values: an opaque tint and a drawn border.
 ///
 /// The search field keeps focus the whole time the palette is open — arrow
 /// keys, Return and Escape are all read off it directly (`.onKeyPress`/
@@ -32,8 +36,30 @@ struct CommandPaletteView: View {
 
     @Bindable var model: CommandPaletteModel
     @FocusState private var searchFocused: Bool
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    /// The window-corner radius (as `TerminalView`), not a pill: a panel
+    /// reads as a window.
+    private static let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
 
     var body: some View {
+        GlassEffectContainer {
+            content
+                .glassEffect(
+                    reduceTransparency
+                        ? .regular.tint(Color(nsColor: .windowBackgroundColor)) : .regular,
+                    in: Self.shape)
+                .overlay {
+                    if contrast == .increased || reduceTransparency {
+                        let border = SystemAccessibility.panelBorder
+                        Self.shape.strokeBorder(Color(nsColor: border.color), lineWidth: border.width)
+                    }
+                }
+        }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 8) {
             TextField(L10n.text("commandPalette.placeholder"), text: $model.query)
                 .textFieldStyle(.plain)

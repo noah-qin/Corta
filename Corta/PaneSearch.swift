@@ -48,8 +48,9 @@ protocol PaneSearchHost: AnyObject {
 final class PaneSearch: NSObject, NSSearchFieldDelegate {
     weak var host: PaneSearchHost?
 
-    var bar: NSGlassEffectView?
-    var container: NSGlassEffectContainerView?
+    /// The hosted `SearchBarView`, while the bar is open.
+    var bar: NSView?
+    let barModel = SearchBarModel()
     /// The bar sits top-right; it moves to the bottom-right while the cursor
     /// or the current match would sit under it. One of the pair is active.
     var topConstraint: NSLayoutConstraint?
@@ -185,15 +186,6 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
         caseSensitive = ConfigurationStore.shared.configuration.searchCaseSensitive
         regex = ConfigurationStore.shared.configuration.searchRegex
 
-        // One weight and size so the symbols read as a set.
-        let symbols = NSImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
-            .applying(.init(scale: .small))
-
-        let glass = NSImageView(
-            image: NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: nil)!)
-        glass.symbolConfiguration = symbols
-        glass.contentTintColor = .labelColor
-
         let field = NSSearchField()
         field.placeholderString = L10n.text("search.placeholder")
         field.sendsWholeSearchString = false
@@ -207,100 +199,16 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
         field.font = .systemFont(ofSize: 13)
         (field.cell as? NSSearchFieldCell)?.searchButtonCell = nil
         (field.cell as? NSSearchFieldCell)?.cancelButtonCell = nil
-        field.translatesAutoresizingMaskIntoConstraints = false
-        // 200pt when the pane has room; a narrow split pane squeezes the field
-        // first, so the bar never runs past the pane's leading edge.
-        let preferredWidth = field.widthAnchor.constraint(equalToConstant: 200)
-        preferredWidth.priority = .defaultHigh
-        preferredWidth.isActive = true
-        field.widthAnchor.constraint(greaterThanOrEqualToConstant: 64).isActive = true
-        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        barModel.caseSensitive = caseSensitive
+        barModel.regex = regex
+        barModel.countText = ""
+        barModel.onToggleCase = { [weak self] in self?.toggleSearchCase() }
+        barModel.onToggleRegex = { [weak self] in self?.toggleSearchRegex() }
+        barModel.onPrevious = { [weak self] in self?.showPreviousMatch() }
+        barModel.onNext = { [weak self] in self?.showNextMatch() }
+        barModel.onClose = { [weak self] in self?.close() }
 
-        // Monospaced digits, so the buttons don't twitch as the count changes.
-        let countLabel = NSTextField(labelWithString: "")
-        countLabel.font = .monospacedDigitSystemFont(
-            ofSize: NSFont.smallSystemFontSize, weight: .regular)
-        countLabel.textColor = SystemAccessibility.secondaryLabelColor
-        countLabel.alignment = .right
-        countLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        countLabel.translatesAutoresizingMaskIntoConstraints = false
-        countLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
-
-        let separator = NSBox()
-        separator.boxType = .separator
-        separator.translatesAutoresizingMaskIntoConstraints = false
-        separator.heightAnchor.constraint(equalToConstant: 16).isActive = true
-
-        func button(_ symbolName: String, _ description: String, _ action: Selector) -> NSButton {
-            let button = NSButton(
-                image: NSImage(systemSymbolName: symbolName, accessibilityDescription: description)!,
-                target: self, action: action)
-            button.isBordered = false
-            button.symbolConfiguration = symbols
-            button.contentTintColor = SystemAccessibility.secondaryLabelColor
-            button.translatesAutoresizingMaskIntoConstraints = false
-            button.widthAnchor.constraint(equalToConstant: 22).isActive = true
-            button.heightAnchor.constraint(equalToConstant: 22).isActive = true
-            return button
-        }
-
-        // On/off shows in the tint and the accessibility value, never tint alone.
-        let caseButton = button(
-            "textformat", L10n.text("search.caseSensitive"), #selector(toggleSearchCase(_:)))
-        updateCaseButton(caseButton)
-        let regexButton = button(
-            "asterisk", L10n.text("search.regex"), #selector(toggleSearchRegex(_:)))
-        updateRegexButton(regexButton)
-
-        let stack = NSStackView(views: [
-            glass, field, countLabel, separator, caseButton, regexButton,
-            button("chevron.up", "Previous Match", #selector(searchBarPrevious(_:))),
-            button("chevron.down", "Next Match", #selector(searchBarNext(_:))),
-            button("xmark", "Close Find", #selector(searchBarClose(_:))),
-        ])
-        stack.orientation = .horizontal
-        stack.alignment = .centerY
-        stack.spacing = 6
-        stack.setCustomSpacing(8, after: glass)
-        stack.setCustomSpacing(10, after: countLabel)
-        stack.setCustomSpacing(10, after: separator)
-        stack.setCustomSpacing(2, after: stack.views[4])
-        stack.setCustomSpacing(8, after: stack.views[5])
-        stack.setCustomSpacing(2, after: stack.views[6])
-        stack.setCustomSpacing(6, after: stack.views[7])
-        stack.edgeInsets = NSEdgeInsets(top: 7, left: 12, bottom: 7, right: 8)
-        stack.translatesAutoresizingMaskIntoConstraints = false
-
-        // The container merges neighbouring glass into one render batch.
-        let container = NSGlassEffectContainerView()
-        let bar = NSGlassEffectView()
-        bar.style = .regular
-        // Untinted: a window-background tint matched the terminal's own
-        // background and the pill vanished into it. Reduce Transparency means
-        // nothing shows through, so the fill goes opaque there.
-        bar.tintColor = SystemAccessibility.reduceTransparency ? .windowBackgroundColor : nil
-        let content = NSView()
-        content.addSubview(stack)
-        NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            stack.topAnchor.constraint(equalTo: content.topAnchor),
-            stack.bottomAnchor.constraint(equalTo: content.bottomAnchor),
-        ])
-        bar.contentView = content
-        bar.translatesAutoresizingMaskIntoConstraints = false
-        // The container merges descendants of `contentView`, so the glass goes in
-        // a wrapper; placed in `contentView` directly it merged nothing.
-        let wrapper = NSView()
-        wrapper.addSubview(bar)
-        NSLayoutConstraint.activate([
-            bar.leadingAnchor.constraint(equalTo: wrapper.leadingAnchor),
-            bar.trailingAnchor.constraint(equalTo: wrapper.trailingAnchor),
-            bar.topAnchor.constraint(equalTo: wrapper.topAnchor),
-            bar.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor),
-        ])
-        container.contentView = wrapper
-        container.translatesAutoresizingMaskIntoConstraints = false
+        let container = SearchBarView.hostingView(model: barModel, field: field)
         view.addSubview(container)
         // `topInset`, not `windowChrome`: only a top pane sits under the chrome.
         let top = container.topAnchor.constraint(
@@ -318,31 +226,7 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
         ])
         topConstraint = top
         bottomConstraint = bottom
-        // A pill: half the laid-out height.
         view.layoutSubtreeIfNeeded()
-        bar.cornerRadius = bar.bounds.height / 2
-
-        // Glass over a flat terminal background has nothing to refract, so on
-        // its own it read as no bar at all: a hairline and a soft shadow lift
-        // it off the output. Increase Contrast gets the stronger edge.
-        let border =
-            SystemAccessibility.increaseContrast || SystemAccessibility.reduceTransparency
-            ? SystemAccessibility.panelBorder : (color: NSColor.separatorColor, width: 1)
-        wrapper.wantsLayer = true
-        wrapper.layer?.cornerRadius = bar.cornerRadius
-        wrapper.layer?.borderColor = border.color.cgColor
-        wrapper.layer?.borderWidth = border.width
-        if let layer = wrapper.layer {
-            // An explicit path (kept in step by `placeClearOfContent`):
-            // the wrapper draws nothing, so a derived shadow traced only the hairline.
-            layer.shadowColor = NSColor.black.cgColor
-            layer.shadowOpacity = 0.16
-            layer.shadowRadius = 10
-            layer.shadowOffset = CGSize(width: 0, height: -3)
-            layer.masksToBounds = false
-        }
-        container.wantsLayer = true
-        container.layer?.masksToBounds = false
 
         // Ease in, or appear at once under Reduce Motion.
         container.alphaValue = 0
@@ -352,8 +236,7 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
             container.animator().alphaValue = 1
         }
 
-        self.bar = bar
-        self.container = container
+        self.bar = container
         self.field = field
         placeClearOfContent()
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
@@ -364,8 +247,7 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
 
     /// Dismisses the bar and restores the viewport.
     func close() {
-        container?.removeFromSuperview()
-        container = nil
+        bar?.removeFromSuperview()
         topConstraint = nil
         bottomConstraint = nil
         bar = nil
@@ -416,7 +298,7 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
     /// scrolls and when the current match changes — a few rect comparisons,
     /// on the main thread, only while a bar is open.
     func placeClearOfContent() {
-        guard let container, let top = topConstraint, let bottom = bottomConstraint,
+        guard let container = bar, let top = topConstraint, let bottom = bottomConstraint,
             let host, let terminalView = host.terminalView
         else { return }
         let view = host.view
@@ -425,14 +307,6 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
         if top.constant != topInset + 2 { top.constant = topInset + 2 }
         let size = container.frame.size
         guard size.width > 0, size.height > 0 else { return }
-        if let wrapper = bar?.superview, let layer = wrapper.layer,
-            layer.shadowPath?.boundingBox.size != wrapper.bounds.size
-        {
-            let radius = size.height / 2
-            layer.shadowPath = CGPath(
-                roundedRect: wrapper.bounds, cornerWidth: radius, cornerHeight: radius,
-                transform: nil)
-        }
         let bounds = view.bounds
         let x = bounds.maxX - 14 - size.width
         // In `view`'s own coordinates, whichever way up it is.
@@ -714,22 +588,17 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
     }
 
     private func updateCountLabel() {
-        // Found by type so the bar's construction stays in one place.
-        let label = bar?.contentView?.subviews
-            .compactMap { $0 as? NSStackView }.first?
-            .arrangedSubviews.compactMap { $0 as? NSTextField }
-            .first { !($0 is NSSearchField) }
-        guard let label else { return }
+        guard bar != nil else { return }
         if status == .invalidPattern {
-            label.stringValue = L10n.text("search.invalidPattern")
+            barModel.countText = L10n.text("search.invalidPattern")
         } else if status == .patternTooSlow {
-            label.stringValue = L10n.text("search.patternTooSlow")
+            barModel.countText = L10n.text("search.patternTooSlow")
         } else if matches.isEmpty {
-            label.stringValue = field?.stringValue.isEmpty == false ? "No Results" : ""
+            barModel.countText = field?.stringValue.isEmpty == false ? "No Results" : ""
         } else if let current = currentMatchIndex {
             // "+" when the sweep stopped early (the match cap, an over-long line, or
             // the time budget): there may be uncounted matches.
-            label.stringValue =
+            barModel.countText =
                 "\(current + 1)/\(matches.count)"
                 + (status == .incomplete ? "+" : "")
         }
@@ -737,55 +606,28 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
 
     /// Flips this pane's case sensitivity and saves it as the default for
     /// bars opened later; other open bars keep theirs.
-    @objc private func toggleSearchCase(_ sender: Any?) {
+    func toggleSearchCase() {
         caseSensitive.toggle()
         if !ConfigurationStore.shared.update({ $0.searchCaseSensitive = self.caseSensitive }) {
             // A failed write rolls the config back; match it.
             caseSensitive = ConfigurationStore.shared.configuration.searchCaseSensitive
         }
-        if let button = sender as? NSButton { updateCaseButton(button) }
+        barModel.caseSensitive = caseSensitive
         // The list changes; re-find the place rather than keep it.
         currentMatchAnchor = nil
         updateResults(scrollsToMatch: true)
     }
 
     /// As `toggleSearchCase`, for regex mode.
-    @objc private func toggleSearchRegex(_ sender: Any?) {
+    func toggleSearchRegex() {
         regex.toggle()
         if !ConfigurationStore.shared.update({ $0.searchRegex = self.regex }) {
             // See `toggleSearchCase`.
             regex = ConfigurationStore.shared.configuration.searchRegex
         }
-        if let button = sender as? NSButton { updateRegexButton(button) }
+        barModel.regex = regex
         currentMatchAnchor = nil
         updateResults(scrollsToMatch: true)
-    }
-
-    private func updateRegexButton(_ button: NSButton) {
-        let on = regex
-        button.contentTintColor = on ? .controlAccentColor : SystemAccessibility.secondaryLabelColor
-        button.setAccessibilityValue(on ? 1 : 0)
-        button.toolTip = L10n.text("search.regex")
-    }
-
-    /// Tint for a glance; the accessibility value states it outright.
-    private func updateCaseButton(_ button: NSButton) {
-        let on = caseSensitive
-        button.contentTintColor = on ? .controlAccentColor : SystemAccessibility.secondaryLabelColor
-        button.setAccessibilityValue(on ? 1 : 0)
-        button.toolTip = L10n.text("search.caseSensitive")
-    }
-
-    @objc private func searchBarNext(_ sender: Any?) {
-        showNextMatch()
-    }
-
-    @objc private func searchBarPrevious(_ sender: Any?) {
-        showPreviousMatch()
-    }
-
-    @objc private func searchBarClose(_ sender: Any?) {
-        close()
     }
 
     // MARK: - NSSearchFieldDelegate
