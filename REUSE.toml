@@ -33,7 +33,6 @@ path = [
   "CortaTests/RenderReferences/**",
   "docs/esctest/**",
   "Corta.xcodeproj/**",
-  "Corta/Base.lproj/**",
   "Corta/Assets.xcassets/**",
   "Corta/Localizable.xcstrings",
   "TestPlans/*.xctestplan",
