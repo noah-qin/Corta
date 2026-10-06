@@ -103,9 +103,16 @@ jobs:
       # be reproduced exactly.
       - name: Fuzz
         id: fuzz
+        # Through the environment, never spliced into the script: an input
+        # interpolated by the expression engine is shell source.
+        env:
+          SEED_INPUT: ${{ github.event.inputs.seed }}
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
-          seed="${{ github.event.inputs.seed }}"
-          if [ -z "$seed" ]; then seed=$(( ${{ github.run_number }} * 7919 % 100000 )); fi
+          seed="$SEED_INPUT"
+          case "$seed" in
+            ''|*[!0-9]*) seed=$(( RUN_NUMBER * 7919 % 100000 )) ;;
+          esac
           echo "seed=$seed" >> "$GITHUB_OUTPUT"
           echo "Fuzzing with seed $seed"
           CortaTerminal/.build/release/corta-fuzz --fuzz 20000000 --seed "$seed" \
