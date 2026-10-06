@@ -44,9 +44,6 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
     /// Survives `attach(to:)` recreating the link, or a tab moving windows
     /// would lose `RenderPolicy`'s rate.
     private var desiredFrameRateRange = CAFrameRateRange.default
-    /// The flash guard's state; stored, since the stand-in must stay until a
-    /// frame is actually presented.
-    private(set) var firstPresentState: FirstPresentState = .idle
 
     init(metalLayer: CAMetalLayer) {
         self.metalLayer = metalLayer
@@ -99,36 +96,6 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         }
     }
 
-    /// Arms the flash guard and returns; used before a window is shown and
-    /// after a theme change. Never pumps the run loop, which would nest
-    /// timers and delegates inside what looks like a leaf call. The layer's
-    /// `backgroundColor` stands in as the theme's clear colour until the real
-    /// frame lands; with no link yet, the next `attach(to:)` completes it.
-    func requestFirstPresent() {
-        let bg = TerminalColorPalette.clearColor
-        metalLayer.backgroundColor = CGColor(
-            red: CGFloat(bg.x), green: CGFloat(bg.y), blue: CGFloat(bg.z),
-            alpha: CGFloat(bg.w))
-        firstPresentState = .awaitingFrame
-        link?.isPaused = false
-    }
-
-    /// The first frame is committed but not yet on the glass; stripping the
-    /// stand-in now showed the desktop for one compositor frame on reopen. It
-    /// is retired on the next tick instead.
-    func noteFrameSubmitted() {
-        guard firstPresentState == .awaitingFrame else { return }
-        firstPresentState = .submitted
-    }
-
-    /// Back to `.idle`, on the tick after submission (tests call it directly).
-    /// A no-op when idle, so a stray call never strips a newer stand-in.
-    func notePresentedFrame() {
-        guard firstPresentState != .idle else { return }
-        firstPresentState = .idle
-        metalLayer.backgroundColor = nil
-    }
-
     func metalDisplayLink(
         _ link: CAMetalDisplayLink, needsUpdate update: CAMetalDisplayLink.Update
     ) {
@@ -150,36 +117,17 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
             RenderMetrics.record(.drawableWait, milliseconds: max(0, latenessMS))
         }
         let stillPending = shouldRenderFrame?() ?? true
-        // Last tick's frame is on the glass; retire the stand-in.
-        let retiringStandIn = firstPresentState == .submitted
-        if retiringStandIn { notePresentedFrame() }
-        var drawn = true
-        if let onRenderFrame {
-            drawn = onRenderFrame(metalLayer.drawableSize, update.drawable)
-            // Only a drawn frame may retire the stand-in; a dropped one would
-            // strip it over a drawable that was never drawn into.
-            if drawn { noteFrameSubmitted() }
-        }
-        if Self.mayPause(stillPending: stillPending, drawn: drawn, firstPresentState: firstPresentState) {
+        let drawn = onRenderFrame?(metalLayer.drawableSize, update.drawable) ?? true
+        if Self.mayPause(stillPending: stillPending, drawn: drawn) {
             link.isPaused = true
         }
     }
 
     /// Whether the link may pause after a tick. Not while anything is
-    /// pending; not after a dropped frame, whose drawable shows stale
+    /// pending, and not after a dropped frame, whose drawable shows stale
     /// contents until one draws — the damage it carried was already taken,
-    /// so nothing else would ask again; and not while a stand-in is up, so it
-    /// retires on time.
-    static func mayPause(stillPending: Bool, drawn: Bool, firstPresentState: FirstPresentState) -> Bool {
-        !stillPending && drawn && firstPresentState != .submitted
+    /// so nothing else would ask again.
+    static func mayPause(stillPending: Bool, drawn: Bool) -> Bool {
+        !stillPending && drawn
     }
-}
-
-/// The flash guard (`FrameScheduler.requestFirstPresent`).
-enum FirstPresentState: Equatable {
-    case idle
-    /// Requested; the layer's `backgroundColor` stands in.
-    case awaitingFrame
-    /// Scheduled; the stand-in stays until the next tick.
-    case submitted
 }

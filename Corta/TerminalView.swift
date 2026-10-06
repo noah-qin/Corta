@@ -213,7 +213,12 @@ final class TerminalView: NSView, CALayerDelegate {
             metalLayer.maximumDrawableCount = count
         }
         metalLayer.colorspace = CGColorSpace(name: CGColorSpace.sRGB)
-        metalLayer.isOpaque = false
+        // Opaque, like the window: the canvas is content, not glass, and the
+        // compositor need not blend it. Until a frame lands, and around a
+        // resize, the layer's own colour shows — the theme's, never what is
+        // behind the window.
+        metalLayer.isOpaque = true
+        applyCanvasBackground()
         // A hosted layer isn't clipped by the window's rounded corners. The view
         // is flipped, so MinY corners are the top ones; `layout()` rounds only the
         // corners this pane touches, or an interior pane notches the divider.
@@ -358,13 +363,20 @@ final class TerminalView: NSView, CALayerDelegate {
         }
     }
 
-    /// Arms the first-present guard: the layer shows the theme background
-    /// until the first real frame, so a new window, tab or theme change never
-    /// flashes what is behind it. Returns immediately
-    /// (`FrameScheduler.requestFirstPresent`).
+    /// Sizes the drawable for the current bounds and asks for a frame.
+    /// Returns immediately; the frame lands on the next vsync.
     func drawNow() {
         updateDrawableSize()
-        frameScheduler.requestFirstPresent()
+        frameScheduler.resume()
+    }
+
+    /// The theme's background on the layer itself, shown before the first
+    /// frame and wherever the drawable has not caught up. On setup and on
+    /// every theme or appearance change.
+    func applyCanvasBackground() {
+        let bg = TerminalColorPalette.defaultBackground
+        metalLayer.backgroundColor = CGColor(
+            srgbRed: CGFloat(bg.x), green: CGFloat(bg.y), blue: CGFloat(bg.z), alpha: 1)
     }
 
     /// The visual bell, drawn on the layer.

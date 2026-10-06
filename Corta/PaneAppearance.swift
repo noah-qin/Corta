@@ -111,7 +111,7 @@ final class PaneAppearance: NSObject {
         // Colours are baked into the instance buffer, so rebuild it all; a
         // forced frame alone kept the old glyph colours (dark on dark).
         terminalRenderer?.invalidate()
-        terminalView?.layer?.backgroundColor = nil
+        terminalView?.applyCanvasBackground()
         invalidateDisplay()
         terminalView?.drawNow()
     }
