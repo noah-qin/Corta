@@ -484,3 +484,40 @@ code on users' machines.
 the Mac App Store reopens this entry and §4.1 together. The development
 build carries no updater (D22), so Sparkle only ever runs in the signed
 Release application.
+
+## D24 — The canvas stays below the titlebar; no background extension
+
+**Decision.** The terminal is not wrapped in an `NSBackgroundExtensionView`.
+The titlebar stays opaque chrome, and the grid's top inset keeps following
+the measured chrome (`ViewController.windowChrome`).
+
+**Why.** Tried in a spike for #124 and captured through XCUITest, on a
+dark theme with coloured output in the first row (2026-10-06). Under the
+opaque titlebar the extension view changes nothing visible, since the
+titlebar covers what it extends. With `titlebarAppearsTransparent`, it
+mirrors and blurs the content's top edge into the titlebar — and for a
+terminal that edge is the first row of output, so the window title sat
+over a smear of the previous command's text. An image extends into
+chrome well; a line of text does not.
+
+**Consequence.** Reopen with a design for what the titlebar band should
+show (a solid theme colour, say) rather than with the API alone.
+
+## D25 — Metal frames present on their own, not with the transaction
+
+**Decision.** The terminal's `CAMetalLayer` keeps `presentsWithTransaction`
+off.
+
+**Why.** Measured for #124 (2026-10-06, `PERFORMANCE.md` §5.12). The
+AppKit overlays that track rows — the command-status rules — do run one
+to two frames ahead of the Metal text during continuous output, in every
+captured frame. But `presentsWithTransaction` left that gap exactly as it
+was (also with `preferredFrameLatency` 1), and cost about 1.5 ms of median
+keypress-to-glass. The gap comes from the overlay committing with this
+run-loop pass while the display link's drawable lands one to two frames
+later, which presenting inside the transaction does not change for a
+`CAMetalDisplayLink`-driven pipeline.
+
+**Consequence.** An overlay that must stay locked to the text is drawn in
+the Metal pass (#238), not synchronised by presentation. Reopen this only
+with a measurement in which the property closes the gap.
