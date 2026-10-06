@@ -21,6 +21,17 @@ import UserNotifications
 
 @main
 class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
+    /// The entry point. No nib: the delegate is created here, and builds the
+    /// menu bar (`installMenus`) and the first window
+    /// (`applicationDidFinishLaunching`) itself. `NSApplicationMain` never
+    /// returns, so the local keeps the delegate alive — `NSApplication`'s
+    /// reference to it is weak.
+    static func main() {
+        let delegate = AppDelegate()
+        NSApplication.shared.delegate = delegate
+        _ = NSApplicationMain(CommandLine.argc, CommandLine.unsafeArgv)
+    }
+
 
     /// Nothing else retains a window controller, and dropping one takes its
     /// window and session down.
