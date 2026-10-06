@@ -907,7 +907,7 @@ a grid snapshot older than the records. The rules lead because
 `ShellOverlayView` commits with this run-loop pass while the drawable for
 the same snapshot lands one to two frames later; neither property changes
 that. The fix is to draw what must stay locked to the text in the Metal
-pass (#238).
+pass (#238, §5.13).
 
 **Cost.** `MeasurementUITests/testKeypressToGlass`, Benchmark
 configuration, 200 samples, two rounds alternating:
@@ -926,6 +926,42 @@ millisecond and a half at the median and buys nothing, so it stays off
 under the titlebar; that is a visual result, recorded in D24.
 
 Apple M5, macOS 27.0.1 (26A434), Xcode 27.0 (27A266a), on battery.
+
+### 5.13 The command-status rules in the Metal pass (#238)
+
+§5.12 found the rules one to two frames ahead of the text. They are now
+instances of their own, rebuilt from the frame's rows whenever the frame
+changes and drawn in the same render pass, scissored to the 2-point column
+6 points left of the grid; `ShellOverlayView` keeps only their tooltips.
+
+**Acceptance.** §5.12's method unchanged — a prompt-and-output pair every
+16 ms, every third failing, `window.screenshot()` while it scrolls, Vision
+reading each prompt's number and the rule's colour beside it — on the same
+machine, the development build, before and after:
+
+| Build | Frames | Shift 0 | Shift 1 | Shift 2 |
+| --- | --- | --- | --- | --- |
+| Before (`main`, AppKit rules) | 16 | 1 | 9 | 6 |
+| After (rules in the Metal pass) | 16 | 16 | 0 | 0 |
+
+Each frame showed 8 to 14 prompts, every one with a rule. A hover over a
+rule still shows its tooltip.
+
+**D17.** Five runs each of `-testPlan Release -configuration Benchmark`,
+alternating, the first three before-first and the last two after-first;
+medians, with the range:
+
+| Build | Frame CPU avg | Full rebuild p50, CPU only | Every row redrawn p50 |
+| --- | --- | --- | --- |
+| Before | 0.825 ms (0.794–0.857) | 0.149 ms (0.141–0.167) | 0.126 ms (0.125–0.131) |
+| After | 0.769 ms (0.684–0.874) | 0.154 ms (0.149–0.161) | 0.134 ms (0.125–0.138) |
+
+The averaged figure is inside its own spread (§5.8). The CPU-only rows
+moved by 5 and 8 µs, within the before build's own range for the full
+rebuild; the rule pass is one walk of the frame's rows on a changed frame,
+and the benchmark's screen carries no marks.
+
+Apple M5, macOS 27.0.1 (26A434), Xcode 27.0 (27A266a), on mains power.
 
 ## Follow-up performance checks
 

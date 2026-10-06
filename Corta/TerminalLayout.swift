@@ -31,6 +31,11 @@ nonisolated enum TerminalLayout {
     static let insets = NSEdgeInsets(top: 8, left: 14, bottom: 8, right: 10)
     static var insetWidth: CGFloat { insets.left + insets.right }
     static var insetHeight: CGFloat { insets.top + insets.bottom }
+    /// A command-status rule: this far left of the grid, and this wide, in
+    /// points — in the left inset, never over a cell. Drawn by the renderer;
+    /// its tooltip area is the same rect.
+    static let statusRuleOffset: CGFloat = 6
+    static let statusRuleWidth: CGFloat = 2
 
     /// How much chrome overlaps a pane this far below the window top; zero
     /// for lower and interior panes. Shared by `ViewController.topInset` and

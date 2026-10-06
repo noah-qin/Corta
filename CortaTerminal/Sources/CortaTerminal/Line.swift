@@ -36,6 +36,15 @@ public enum LineMark: UInt8, Sendable {
         case .none, .outputStart: return false
         }
     }
+
+    /// A prompt whose command reported how it ended: the rows that carry a
+    /// status rule.
+    public var hasOutcome: Bool {
+        switch self {
+        case .promptSucceeded, .promptFailed, .promptInterrupted: return true
+        case .none, .prompt, .outputStart: return false
+        }
+    }
 }
 
 /// One row of the grid. Variable length — cells only up to the last written

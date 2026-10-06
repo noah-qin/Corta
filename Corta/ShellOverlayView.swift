@@ -19,10 +19,11 @@ import CoreText
 import CortaTerminal
 
 /// Native overlays live in the margin and beside the caret, never in terminal cells.
+/// The command-status rules themselves are drawn by `TerminalRenderer`, with
+/// the text they belong to (#238); this view keeps only their tooltips.
 final class ShellOverlayView: NSView {
     struct Status: Equatable {
         var rect: CGRect
-        var code: Int
         var description: String
     }
     var statuses: [Status] = []
@@ -40,22 +41,6 @@ final class ShellOverlayView: NSView {
         statuses = rows
         removeAllToolTips()
         for row in rows { addToolTip(row.rect.insetBy(dx: -3, dy: 0), owner: self, userData: nil) }
-        needsDisplay = true
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        for status in statuses where status.rect.intersects(dirtyRect) {
-            let color: NSColor = status.code == 0 ? .systemGreen : status.code == 130 ? .secondaryLabelColor : .systemRed
-            color.setFill()
-            var rect = status.rect
-            rect.origin.y += 2
-            rect.size.height -= 4
-            if status.code == 130 {
-                let middle = rect.midY
-                NSRect(x: rect.minX, y: rect.minY, width: rect.width, height: max(1, middle - rect.minY - 2)).fill()
-                NSRect(x: rect.minX, y: middle + 2, width: rect.width, height: max(1, rect.maxY - middle - 2)).fill()
-            } else { rect.fill() }
-        }
     }
 
     @objc func view(_ view: NSView, stringForToolTip tag: NSView.ToolTipTag, point: NSPoint, userData data: UnsafeMutableRawPointer?) -> String {

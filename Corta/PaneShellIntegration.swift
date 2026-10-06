@@ -412,6 +412,7 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
         let config = ConfigurationStore.shared.configuration
         let records = session.commandRecords.records
         var rows: [ShellOverlayView.Status] = []
+        // The tooltips for the rules the renderer draws (`TerminalRenderer.rebuildMarks`).
         if config.commandStatusMarks && !grid.isAlternateScreenActive {
             let byRow = Dictionary(records.compactMap { record -> (Int, Int)? in
                 guard let code = record.exitStatus else { return nil }
@@ -420,11 +421,15 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
             let firstAbsolute = grid.scrollback.totalPushed - scrollOffset
             for row in 0..<grid.rows {
                 let absolute = firstAbsolute + row
-                guard let line = grid.line(atAbsoluteRow: absolute),
-                    line.mark == .promptSucceeded || line.mark == .promptFailed || line.mark == .promptInterrupted else { continue }
+                guard let line = grid.line(atAbsoluteRow: absolute), line.mark.hasOutcome else { continue }
                 let code = byRow[absolute] ?? (line.mark == .promptSucceeded ? 0 : line.mark == .promptInterrupted ? 130 : 1)
                 let text = code == 0 ? L10n.text("commandStatus.succeeded") : code == 130 ? L10n.text("commandHistory.statusInterrupted") : L10n.format("commandHistory.statusFailed", code)
-                rows.append(.init(rect: CGRect(x: content.minX - 6, y: content.minY + CGFloat(row) * metrics.cellHeight, width: 2, height: metrics.cellHeight), code: code, description: text))
+                rows.append(.init(
+                    rect: CGRect(
+                        x: content.minX - TerminalLayout.statusRuleOffset,
+                        y: content.minY + CGFloat(row) * metrics.cellHeight,
+                        width: TerminalLayout.statusRuleWidth, height: metrics.cellHeight),
+                    description: text))
             }
         }
         overlay.updateStatuses(rows)

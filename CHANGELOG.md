@@ -118,6 +118,10 @@ what to edit.
   focus ring and highlight over the pane each time.
 - Opening the Shell menu, or the shortcut for Copy Last Command Output, on a
   pane whose setup failed no longer crashes Corta.
+- Command-status rules stay beside their own prompt while output scrolls.
+  They were drawn a frame or two ahead of the text, so during continuous
+  output a prompt briefly showed the green or red of a command below it.
+  They are now drawn with the text, in the theme's green and red (#238).
 
 ## [1.1.1] - 2026-10-03
 
