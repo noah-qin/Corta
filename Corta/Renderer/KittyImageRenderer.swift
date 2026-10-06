@@ -486,8 +486,19 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         return DecodedImage(width: width, height: height, bgra: bgra)
     }
 
-    private static func decodePNG(_ bytes: [UInt8]) -> DecodedImage? {
-        guard let source = CGImageSourceCreateWithData(Data(bytes) as CFData, nil) else { return nil }
+    /// The eight bytes every PNG starts with (RFC 2083 §3.1).
+    private static let pngSignature: [UInt8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
+
+    /// `f=100` is PNG and nothing else. `CGImageSource` sniffs content, so
+    /// unchecked any output could reach every ImageIO parser — TIFF, PSD,
+    /// HEIC and the rest — under the name of a PNG: the signature is checked
+    /// before ImageIO sees a byte, and the type ImageIO settles on after.
+    static func decodePNG(_ bytes: [UInt8]) -> DecodedImage? {
+        guard bytes.starts(with: pngSignature) else { return nil }
+        let options = [kCGImageSourceTypeIdentifierHint: "public.png"] as CFDictionary
+        guard let source = CGImageSourceCreateWithData(Data(bytes) as CFData, options),
+            CGImageSourceGetType(source) as String? == "public.png"
+        else { return nil }
         // Dimensions come off the header before anything decodes, so the caps
         // stop a hostile declaration before the work starts.
         guard let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
@@ -500,15 +511,22 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
             image.width == width, image.height == height
         else { return nil }
         var bgra = [UInt8](repeating: 0, count: width * height * 4)
-        guard
-            let context = CGContext(
-                data: &bgra, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
-                space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
-                    | CGBitmapInfo.byteOrder32Little.rawValue)
-        else { return nil }
-        // No CTM flip, as in `GlyphAtlas.rasterizeColor`.
-        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        // The context draws into the buffer after its initializer returns, so
+        // the pointer must outlive both calls: `&bgra` is valid for the
+        // initializer alone.
+        let drawn = bgra.withUnsafeMutableBytes { buffer -> Bool in
+            guard
+                let context = CGContext(
+                    data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                    bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                    bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
+                        | CGBitmapInfo.byteOrder32Little.rawValue)
+            else { return false }
+            // No CTM flip, as in `GlyphAtlas.rasterizeColor`.
+            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+            return true
+        }
+        guard drawn else { return nil }
         return DecodedImage(width: width, height: height, bgra: bgra)
     }
 
