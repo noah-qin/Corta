@@ -19,7 +19,7 @@ import SwiftUI
 
 /// The About window.
 ///
-/// It replaces `orderFrontStandardAboutPanel:`, which the storyboard wired up
+/// It replaces `orderFrontStandardAboutPanel:`, which the old storyboard wired up
 /// and which showed the icon, the name, a version and then nothing: the panel
 /// fills itself from `Info.plist`, `NSHumanReadableCopyright` was an empty
 /// string, and there was no `Credits.rtf` to give it a body. The result was a

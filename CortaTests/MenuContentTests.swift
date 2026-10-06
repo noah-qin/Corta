@@ -25,7 +25,7 @@ import Testing
 /// `MenuShortcutTests` pins *which keys* the menu bar claims; this pins the
 /// words: File's New is a new window under the same name the palette and the
 /// shortcuts sheet use, and Corta Help leads somewhere real instead of the
-/// storyboard template's `showHelp:` against a help book Corta never shipped.
+/// old storyboard template's `showHelp:` against a help book Corta never shipped.
 @MainActor
 struct MenuContentTests {
     /// Every item in the menu bar, depth-first.

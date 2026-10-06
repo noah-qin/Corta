@@ -24,9 +24,10 @@ import Cocoa
 /// here. Items dispatch through the responder chain unless they name a
 /// target.
 extension AppDelegate {
-    /// Lets `menuNeedsUpdate` tell Edit from the theme menu without a
-    /// localized title.
+    /// The submenus `menuNeedsUpdate` acts on, told apart by identity rather
+    /// than by a localized title. Weak: the menu bar owns them.
     fileprivate static weak var editMenu: NSMenu?
+    fileprivate static weak var themeMenu: NSMenu?
 
     func installMenus() {
         let mainMenu = NSMenu(title: "Main Menu")
@@ -37,9 +38,7 @@ extension AppDelegate {
             makeAppMenu(services: services), makeFileMenu(), makeShellMenu(), makeEditMenu(),
             makeViewMenu(), window, help,
         ] {
-            let item = NSMenuItem(title: menu.title, action: nil, keyEquivalent: "")
-            item.submenu = menu
-            mainMenu.addItem(item)
+            mainMenu.addSubmenu(menu)
         }
         NSApp.mainMenu = mainMenu
         // AppKit fills these: the Services list, the window list and tab
@@ -70,9 +69,7 @@ extension AppDelegate {
         menu.addItem(.separator())
         menu.addItem(item(for: .settings))
         menu.addItem(.separator())
-        let servicesItem = NSMenuItem(title: services.title, action: nil, keyEquivalent: "")
-        servicesItem.submenu = services
-        menu.addItem(servicesItem)
+        menu.addSubmenu(services)
         menu.addItem(.separator())
         menu.addItem(withTitle: L10n.text("menu.hideCorta"), action: #selector(NSApplication.hide(_:)), key: "h")
         menu.addItem(
@@ -110,12 +107,9 @@ extension AppDelegate {
         }
         shell.addItem(.separator())
         func group(_ key: String, _ commands: [TerminalCommand]) {
-            let title = L10n.text(key)
-            let parent = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-            let submenu = NSMenu(title: title)
+            let submenu = NSMenu(title: L10n.text(key))
             for command in commands { submenu.addItem(item(for: command)) }
-            parent.submenu = submenu
-            shell.addItem(parent)
+            shell.addSubmenu(submenu)
         }
         group("menu.focus", [.focusLeft, .focusRight, .focusUp, .focusDown])
         group("menu.commandsAndOutput", [
@@ -166,9 +160,7 @@ extension AppDelegate {
                 key: keyEquivalent)
             item.tag = tag
         }
-        let findItem = NSMenuItem(title: find.title, action: nil, keyEquivalent: "")
-        findItem.submenu = find
-        menu.addItem(findItem)
+        menu.addSubmenu(find)
         // AppKit injects AutoFill, Dictation and Emoji & Symbols later, and
         // again; see `menuNeedsUpdate`.
         menu.delegate = self
@@ -200,9 +192,7 @@ extension AppDelegate {
         view.addItem(item(for: .quickTerminal))
         view.addItem(.separator())
 
-        let themeItem = NSMenuItem(title: L10n.text("settings.label.theme"), action: nil, keyEquivalent: "")
-        themeItem.submenu = themeMenu
-        view.addItem(themeItem)
+        view.addSubmenu(makeThemeMenu())
         view.addItem(withTitle: L10n.text("theme.editor") + "…", action: #selector(showThemeEditor(_:)), target: self)
         view.addItem(withTitle: L10n.text("status.details") + "…", action: #selector(showHostDetails(_:)), target: self)
         return view
@@ -298,10 +288,11 @@ extension AppDelegate {
 
     /// Rebuilt from the configuration as the menu opens, so a theme defined
     /// at runtime appears.
-    private var themeMenu: NSMenu {
+    private func makeThemeMenu() -> NSMenu {
         let menu = NSMenu(title: L10n.text("settings.label.theme"))
         menu.delegate = self
         rebuildThemeMenu(menu)
+        AppDelegate.themeMenu = menu
         return menu
     }
 
@@ -347,7 +338,7 @@ extension AppDelegate {
         for item in menu.items {
             if let submenu = item.submenu { apply(shortcut, to: command, in: submenu) }
             guard item.action == command.action else { continue }
-            // Five Find items share `performFindPanelAction:`; match the tag.
+            // Four Find items share `performFindPanelAction:`; match the tag.
             if let tag = command.menuTag, item.tag != tag { continue }
             item.keyEquivalent = shortcut?.menuKeyEquivalent ?? ""
             item.keyEquivalentModifierMask = shortcut?.menuModifierMask ?? []
@@ -361,16 +352,25 @@ extension AppDelegate: NSMenuDelegate {
             pruneInjectedEditItems(menu)
             return
         }
-        if menu.title == AppDelegate.presetMenuTitle {
+        if menu === AppDelegate.presetMenu {
             rebuildPresetMenu(menu)
             return
         }
-        guard menu.title == L10n.text("settings.label.theme") else { return }
+        guard menu === AppDelegate.themeMenu else { return }
         rebuildThemeMenu(menu)
     }
 }
 
 extension NSMenu {
+    /// A parent item for `submenu`, titled as it is.
+    @discardableResult
+    func addSubmenu(_ submenu: NSMenu) -> NSMenuItem {
+        let item = NSMenuItem(title: submenu.title, action: nil, keyEquivalent: "")
+        item.submenu = submenu
+        addItem(item)
+        return item
+    }
+
     /// An item with a key equivalent, ⌘ unless `modifiers` says otherwise.
     @discardableResult
     fileprivate func addItem(

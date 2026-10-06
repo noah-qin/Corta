@@ -30,6 +30,8 @@ extension AppDelegate {
     /// the config file defines no presets. Weak: the menu bar owns them.
     fileprivate static weak var presetItem: NSMenuItem?
     fileprivate static weak var presetSeparator: NSMenuItem?
+    /// The submenu itself, for `menuNeedsUpdate` to recognise by identity.
+    static weak var presetMenu: NSMenu?
 
     fileprivate var presetMenuItem: NSMenuItem? {
         get { AppDelegate.presetItem }
@@ -41,19 +43,18 @@ extension AppDelegate {
         set { AppDelegate.presetSeparator = newValue }
     }
 
-    /// The submenu's title, used to recognise it in `menuNeedsUpdate`
-    /// without matching on a stored reference.
+    /// The submenu's title.
     static var presetMenuTitle: String { L10n.text("menu.presets") }
 
+    /// Appends the preset row and its separator to `shell`.
     func installPresetMenu(in shell: NSMenu) {
-        let item = NSMenuItem(title: Self.presetMenuTitle, action: nil, keyEquivalent: "")
         let submenu = NSMenu(title: Self.presetMenuTitle)
         submenu.delegate = self
-        item.submenu = submenu
         rebuildPresetMenu(submenu)
+        Self.presetMenu = submenu
+        let item = shell.addSubmenu(submenu)
         let separator = NSMenuItem.separator()
-        shell.insertItem(separator, at: 0)
-        shell.insertItem(item, at: 0)
+        shell.addItem(separator)
         presetMenuItem = item
         presetMenuSeparator = separator
         updatePresetMenuVisibility()
