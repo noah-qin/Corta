@@ -32,6 +32,10 @@ public struct Parser: Sendable {
     /// what stops their payload being printed as text.
     public enum State: Sendable {
         case ground
+        /// Ground, part-way through a UTF-8 sequence. A state of its own so
+        /// the ASCII fast path, which runs only in `.ground`, cannot print
+        /// past an open sequence without paying a check per run for it.
+        case groundUTF8
         case escape
         case escapeIntermediate
         case csiEntry
@@ -144,13 +148,18 @@ public struct Parser: Sendable {
     public mutating func advance<P: ParserPerformer>(_ byte: UInt8, performer: inout P) {
         // "Anywhere" transitions, which outrank the current state. CAN and
         // SUB abort whatever is in progress; ESC restarts it. Without these a
-        // malformed sequence would capture every byte after it.
+        // malformed sequence would capture every byte after it. A UTF-8
+        // sequence they cut short ends here too, as one U+FFFD: left open,
+        // its lead byte joined the continuation bytes after the escape
+        // sequence into a character nobody sent.
         switch byte {
         case 0x18, 0x1A:
+            if state == .groundUTF8 { endTruncatedSequence(performer: &performer) }
             state = .ground
             performer.execute(byte)
             return
         case 0x1B:
+            if state == .groundUTF8 { endTruncatedSequence(performer: &performer) }
             if state == .oscString { dispatchString(performer: &performer) }
             if state == .apcString { dispatchAPCString(performer: &performer) }
             clear()
@@ -162,6 +171,7 @@ public struct Parser: Sendable {
 
         switch state {
         case .ground: ground(byte, performer: &performer)
+        case .groundUTF8: groundUTF8(byte, performer: &performer)
         case .escape: escape(byte, performer: &performer)
         case .escapeIntermediate: escapeIntermediate(byte, performer: &performer)
         case .csiEntry: csiEntry(byte, performer: &performer)
@@ -186,9 +196,8 @@ public struct Parser: Sendable {
         case 0x00...0x1F:
             performer.execute(byte)
         case 0x20...0x7F:
-            // Including DEL, as the diagram has it. An invisible control
-            // byte is what makes an injected sequence readable as ordinary
-            // text, so it is drawn rather than dropped (`SECURITY.md` §2.5).
+            // Including DEL, as the diagram has it; the grid ignores DEL, as
+            // xterm does, since it has no glyph to draw.
             performer.print(UInt32(byte))
         default:
             // 0x80 and above is UTF-8. A C1 control byte therefore arrives
@@ -206,7 +215,22 @@ public struct Parser: Sendable {
                 performer.print(UTF8Decoder.replacement)
                 performer.print(scalar)
             }
+            state = decoder.isPending ? .groundUTF8 : .ground
         }
+    }
+
+    /// Inside a UTF-8 sequence. A non-ASCII byte goes to the decoder, which
+    /// judges it; an ASCII byte cannot continue a sequence (WHATWG), so the
+    /// open one ends as U+FFFD and the byte is itself.
+    private mutating func groundUTF8<P: ParserPerformer>(_ byte: UInt8, performer: inout P) {
+        if byte < 0x80 { endTruncatedSequence(performer: &performer) }
+        ground(byte, performer: &performer)
+    }
+
+    private mutating func endTruncatedSequence<P: ParserPerformer>(performer: inout P) {
+        _ = decoder.flush()
+        performer.print(UTF8Decoder.replacement)
+        state = .ground
     }
 
     private mutating func escape<P: ParserPerformer>(_ byte: UInt8, performer: inout P) {

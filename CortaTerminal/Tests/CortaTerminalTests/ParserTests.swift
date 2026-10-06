@@ -84,6 +84,28 @@ struct ParserTests {
         #expect(try actions("\\xe4\\xbd\\xa0") == [.print(0x4F60)])
     }
 
+    /// A truncated sequence is one U+FFFD and never swallows what follows
+    /// (WHATWG). The open lead byte used to survive an ASCII run, a control
+    /// or a whole escape sequence and join the next continuation bytes: the
+    /// stream `E2 'a' 82 AC` showed "a€".
+    @Test(
+        "a truncated sequence ends at ASCII, a control or an escape",
+        arguments: [
+            ("\\xe2a\\x82\\xac", "\u{FFFD}a\u{FFFD}\u{FFFD}"),
+            ("\\xe2\\x82\\r\\x82\\xac", "\u{FFFD}\u{FFFD}\u{FFFD}"),
+            ("\\xe2\\e[m\\x82\\xac", "\u{FFFD}\u{FFFD}\u{FFFD}"),
+            ("\\xf0\\x9f\\x18\\x98\\x80", "\u{FFFD}\u{FFFD}\u{FFFD}"),
+        ])
+    func truncatedSequenceEnds(input: String, expected: String) throws {
+        // The generic path, byte by byte.
+        var parser = Parser()
+        var performer = RecordingPerformer()
+        parser.parse(try Golden.decode(input).lazy.map { $0 }, performer: &performer)
+        #expect(printed(performer.actions) == expected)
+        // The contiguous path the PTY uses, with its ASCII-run fast path.
+        #expect(printed(try actions(input)) == expected)
+    }
+
     // MARK: - CSI
 
     @Test("a CSI sequence dispatches its parameters and final byte")
