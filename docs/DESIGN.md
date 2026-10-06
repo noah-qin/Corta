@@ -89,7 +89,7 @@ way: **key/IME → PTY → child**. Nothing else crosses those arrows.
 
 Windows are cheap composition: each window is a `SplitViewController`
 owning a binary split tree whose leaves are `ViewController` +
-`TerminalSession` pairs (⌘N instantiates the storyboard scene again;
+`TerminalSession` pairs (⌘N builds another `TerminalWindowController`;
 `AppDelegate` retains the window controllers until their windows close).
 Nothing is shared between windows — that is what D07 buys.
 
@@ -148,9 +148,9 @@ is full. Pinned by `ScrollbackCoordinatesTests` and
 column change reflows (`Grid.resize` rebuilds `Scrollback`, resetting
 `totalPushed`), so `resizeSessionToFitView` clears both when the new column
 count differs from the last requested one; a row-only resize is ordinary
-scrollback growth and is left alone. The path is gated on
-`SplitViewController.sizeSettled`, which the offscreen test target never
-reaches, so it is verified by launching the app and narrowing a window
+scrollback growth and is left alone. The path is gated on the pane's
+`didSizeWindow`, which only a window prepared by `TerminalWindowController`
+sets, so it is verified by launching the app and narrowing a window
 (`CONFORMANCE.md` §4.4).
 
 **`scrollOffset` is a document position, not a row count.**

@@ -89,7 +89,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     var failureView: PaneFailureView?
     /// A fallback shell or directory, reported once the toast can be seen.
     private var pendingSessionNotice: String?
-    /// Keeps transient startup layouts from reaching the child
+    /// The window is sized (`SplitViewController.prepareWindow`); until then a
+    /// layout runs at a placeholder size and must not reach the child
     /// (`resizeSessionToFitView`).
     var didSizeWindow = false
     private var resizeDebouncer: ResizeDebouncer!
@@ -224,10 +225,11 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         return UInt16(min(max(1, quotient), CGFloat(UInt16.max)))
     }
 
-    /// The *frame* size (`setContentSize` sizes the frame here) for the initial
-    /// grid, so the session is born at its final size. Whole chrome, not
-    /// `topInset`: before constraints settle, the root pane can look as if it
-    /// does not touch the top.
+    /// The window's frame size for the initial grid, so the session is born at
+    /// its final size: the content covers the whole frame
+    /// (`.fullSizeContentView`), so the chrome is part of it. Whole chrome,
+    /// not `topInset`: before constraints settle, the root pane can look as if
+    /// it does not touch the top.
     var initialWindowContentSize: NSSize {
         let metrics = cellMetrics
         let grid = initialGridSize ?? configuredGridSize
@@ -674,13 +676,10 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// and waiting out the drag debounce drew a frame of the new font over
     /// the old grid first.
     func resizeSessionToFitView(coalesce: Bool = true) {
-        // Nothing reaches the child before `sizeSettled`: earlier layouts run at
-        // transient sizes (the first after `setContentSize` is one titlebar short)
-        // and would strand blank rows under the prompt. The session is born at the
-        // target size, so nothing is lost. The check is the split controller's —
-        // a pane in a split never fills the frame.
-        guard didSizeWindow, session != nil, let terminalRenderer, view.window != nil,
-            let splitController, splitController.sizeSettled
+        // Nothing reaches the child before the window is sized: a layout of the
+        // view at its placeholder size would strand blank rows under the
+        // prompt. The session is born at the target size, so nothing is lost.
+        guard didSizeWindow, session != nil, let terminalRenderer, view.window != nil
         else { return }
         let grid = gridSize(fitting: view.bounds.size)
         let pixels = pixelSize(

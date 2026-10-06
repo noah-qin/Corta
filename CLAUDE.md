@@ -64,11 +64,10 @@ line each:
   anything the file could carry. **D11** Curated themes and one system monospaced primary font;
   additional themes resolved from config. **D12** A font family is verified, never trusted.
 - **D13** Never change the machine to test. **D14** App-layer changes
-  are verified by launching the app. **D15** Never size the session from
-  a transient layout. **D16** Window setup is staged before the
-  storyboard runs. **D17** Re-measure the frame-CPU baseline, under
-  Release, after touching the render loop. **D18** No tool or session
-  identifier in a commit message. **D19** Selection is hand-rolled;
+  are verified by launching the app. **D15**, **D16** *superseded* by the
+  window built in code (see "A window is born sized"). **D17**
+  Re-measure the frame-CPU baseline, under Release, after touching the
+  render loop. **D18** No tool or session identifier in a commit message. **D19** Selection is hand-rolled;
   TextKit is not adopted. **D20** The update feed is signed from CI; the
   key lives in the reviewed `release` environment.
 - **D21** Apple silicon only; Intel Macs stay on 1.0.1. **D22** The Debug
@@ -122,23 +121,19 @@ responder by default; `SplitViewController.viewWillAppear` calls
 targeting First Responder (⌘V, ⌘=, …) silently dead-end — keep that
 call intact.
 
-**Never size the session from a transient layout.** With
-`.fullSizeContentView`, the first layout after window setup runs at the
-content-rect height (frame minus titlebar). Delivering that winsize
-shrinks the grid and strands content (D.1). `resizeSessionToFitView`
-waits for `SplitViewController.sizeSettled` — the content view filling
-its window's frame *and* the one-time frame correction having run —
-because a pane in a split tree legitimately never fills it — do not
-bypass the gate.
-
-**`setContentSize` sizes the frame once `.fullSizeContentView` is in the
-mask.** On macOS 26, inserting that style flag changes what
-`setContentSize` means mid-flight: the value lands as the *frame* size,
-and the first call mismeasures the chrome by a full titlebar height.
-`SplitViewController` corrects the frame once in `viewDidAppear`
-(`correctInitialWindowSize`), after AppKit's final adjustment; do not
-"fix" the size earlier in `viewWillAppear` or `viewWillLayout`, where the
-measurement is stale.
+**A window is born sized.** `TerminalWindowController(setup:asPanel:)`
+creates the window with its final style mask and passes the root pane's
+setup — a restore, a preset, a working directory — to
+`SplitViewController(setup:)` by initializer, because the root pane spawns
+as the view loads. `SplitViewController.prepareWindow` sizes the window
+from the pane's cell metrics before anything shows it, then sets
+`didSizeWindow`; `resizeSessionToFitView` sends nothing before that. A new
+window's child receives exactly one winsize; a restored window, a new tab
+and the Quick Terminal still spawn at the configured grid and resize once
+to their frame. Size a window there, not in a
+later layout pass, and do not insert style-mask flags after creation —
+that one act was the source of every transient size D15 and D16 worked
+around.
 
 **Testing.** Golden-file grid tests: feed a byte stream, serialise the
 grid to text, diff against a checked-in expectation. Record the `esctest`
@@ -165,12 +160,6 @@ AppKit (`makeFirstResponder`), not `@FocusState`. In UI tests, a toolbar
 updates `docs/brand/` — `screenshot.png`, `sftp-browser.png`,
 `settings.png` — by the recipe in `docs/brand/README.md`: the development
 build, a scratch `CORTA_STAGE_DIR` and `ZDOTDIR`, public content only.
-
-**Window setup is staged, not assigned.** `instantiateInitialController`
-loads the content view and spawns the root pane before it returns. A
-restore, a preset or a working directory for the root pane goes through
-`AppDelegate.instantiateWindowController(setup:)`, never onto the
-controller afterwards (D16).
 
 **Packaging has one check.** `corta-release-check` (a SwiftPM executable
 in `CortaTerminal`, its judgements in the `ReleaseCheck` library) is the
