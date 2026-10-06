@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Darwin
+import CoreServices
 import Foundation
 import Synchronization
 
@@ -88,6 +89,13 @@ public final class SFTPTransferEngine: @unchecked Sendable {
 
         /// Failed/cancelled transfers cannot wait forever for peer cleanup.
         public var cleanupTimeout: Duration = .seconds(1)
+
+        /// Marks each committed download with `com.apple.quarantine`, as a
+        /// browser does: a remote `.app`, `.command` or `.pkg` opened from
+        /// Finder then gets Gatekeeper's first-open check instead of skipping
+        /// it. Through LaunchServices, never `LSFileQuarantineEnabled`, which
+        /// every shell the app spawns would inherit.
+        public var quarantinesDownloads = false
 
         public init() {}
     }
@@ -340,6 +348,18 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         }
     }
 
+    /// Best effort: a volume without extended attributes cannot carry the
+    /// mark, and refusing the download over it would help nobody.
+    static func markQuarantined(_ path: String) {
+        var url = URL(fileURLWithPath: path)
+        var values = URLResourceValues()
+        values.quarantineProperties = [
+            kLSQuarantineTypeKey as String: kLSQuarantineTypeOtherDownload as String,
+            kLSQuarantineAgentNameKey as String: "Corta",
+        ]
+        try? url.setResourceValues(values)
+    }
+
     // MARK: - Retry
 
     /// The attempt loop. A transport-class failure is retried — bounded,
@@ -460,6 +480,9 @@ public final class SFTPTransferEngine: @unchecked Sendable {
             Darwin.close(descriptor)
             descriptorOpen = false
             try await session.close(handle)
+            // On the partial, so the file appears at its name already marked:
+            // marked after the rename, it sat there unmarked for a moment.
+            if configuration.quarantinesDownloads { Self.markQuarantined(partialPath) }
             // Commit: rename over the destination atomically — or, when the
             // policy forbids replacing it, only if it is still absent: a file
             // that appeared since the check is not ours to overwrite.

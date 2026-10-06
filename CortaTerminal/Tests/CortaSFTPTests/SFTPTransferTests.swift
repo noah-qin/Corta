@@ -484,6 +484,30 @@ struct SFTPTransferTests {
         #expect(localContents(destination) == [1, 2, 3])
     }
 
+    @Test("downloads are quarantined only when the engine is configured to")
+    func quarantinedDownloads() async throws {
+        func quarantine(_ url: URL) -> String? {
+            let size = getxattr(url.path, "com.apple.quarantine", nil, 0, 0, 0)
+            guard size > 0 else { return nil }
+            var bytes = [UInt8](repeating: 0, count: size)
+            _ = getxattr(url.path, "com.apple.quarantine", &bytes, size, 0, 0)
+            return String(decoding: bytes, as: UTF8.self)
+        }
+        let marked = try await makeRig { $0.quarantinesDownloads = true }
+        defer { teardown(marked) }
+        marked.fileSystem.createFile("/tool.command", data: [1, 2, 3])
+        let destination = marked.directory.appendingPathComponent("tool.command")
+        try await marked.engine.download(remotePath: "/tool.command", to: destination)
+        #expect(quarantine(destination)?.contains(";Corta;") == true)
+
+        let plain = try await makeRig()
+        defer { teardown(plain) }
+        plain.fileSystem.createFile("/tool.command", data: [1, 2, 3])
+        let unmarked = plain.directory.appendingPathComponent("tool.command")
+        try await plain.engine.download(remotePath: "/tool.command", to: unmarked)
+        #expect(quarantine(unmarked) == nil)
+    }
+
     @Test("the decide policy receives the conflict and its decision is honoured")
     func decidePolicy() async throws {
         let rig = try await makeRig()

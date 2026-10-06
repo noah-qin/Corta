@@ -127,6 +127,14 @@ struct RemoteReferenceResolutionTests {
             "one remote file is one managed copy, however spelled")
     }
 
+    @Test("a reported host that could not have been typed resolves nothing")
+    func unacceptableHostIsRefused() {
+        for host in ["evil`touch x`", "-oProxyCommand=x", "a b", "h\u{202E}x"] {
+            let state = PaneRemoteState.remote(host: host, directory: "/srv", provenance: .osc7)
+            #expect(PaneRemote.resolve(Self.reference("src/main.rs"), state: state) == nil, "\(host)")
+        }
+    }
+
     @Test("line and column ride along")
     func lineAndColumn() {
         let resolved = PaneRemote.resolve(
@@ -675,7 +683,17 @@ struct RemoteEditCoordinatorTests {
         fixture.store.updateRemoteStamp(
             fixture.store.copies[fixture.copyID]!, size: 100, mtime: 1000)
         conflict = try await stageConflict("edit two")
+        // A copy that cannot be written is said, and the decision asked again.
+        let prompted = fixture.recorder.conflicts.count
+        let errorsBefore = fixture.recorder.errors.count
+        let unwritable = fixture.root.appendingPathComponent("missing/dir/saved.rs")
+        fixture.coordinator.resolveConflict(conflict.id, choice: .saveCopyElsewhere(unwritable))
+        #expect(fixture.recorder.errors.count == errorsBefore + 1)
+        #expect(fixture.recorder.conflicts.count == prompted + 1)
+        #expect(fixture.coordinator.pendingConflicts.count == 1)
+        // A file the save panel agreed to replace is replaced.
         let elsewhere = fixture.root.appendingPathComponent("saved.rs")
+        try "old".write(to: elsewhere, atomically: true, encoding: .utf8)
         fixture.coordinator.resolveConflict(conflict.id, choice: .saveCopyElsewhere(elsewhere))
         #expect((try? String(contentsOf: elsewhere, encoding: .utf8)) == "edit two")
         #expect(fixture.coordinator.pendingConflicts.isEmpty)

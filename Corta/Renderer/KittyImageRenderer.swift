@@ -96,7 +96,20 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     /// Images skipped for a full global budget, with the budget generation
     /// seen; retried once it moves, since another pane's release is otherwise
     /// invisible here.
-    private var budgetBlocked: [KittyGraphics.ImageID: (storeGeneration: UInt64, globalGeneration: Int, paneGeneration: Int)] = [:]
+    private var budgetBlocked: [KittyGraphics.ImageID: (
+        storeGeneration: UInt64, globalGeneration: Int, paneGeneration: Int, visibilityGeneration: Int
+    )] = [:]
+    /// Images the last `update` found potentially on screen. Never evicted to
+    /// make room: when visible images alone overflow the pane budget, evicting
+    /// one to install another made the next frame decode it again, and the
+    /// pair took turns for as long as both were on screen — a 64 MB decode a
+    /// frame from a few kilobytes of output. The overflow waits instead.
+    private var visibleIDs: Set<KittyGraphics.ImageID> = []
+    /// Bumped when `visibleIDs` changes, which retries what overflow blocked.
+    private var visibilityGeneration = 0
+    /// Bytes a PNG decoded to, by store generation: its size is unknown until
+    /// then, and knowing it lets a blocked PNG wait without decoding again.
+    private var knownDecodedBytes: [KittyGraphics.ImageID: (generation: UInt64, bytes: Int)] = [:]
     /// Running decodes and their store generation; a stale completion
     /// discards its result.
     private var inFlight: [KittyGraphics.ImageID: UInt64] = [:]
@@ -163,6 +176,22 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         desiredGenerations = Dictionary(uniqueKeysWithValues: liveIDs.compactMap { id in
             table.storeGeneration(for: id).map { (id, $0) }
         })
+        // One pass, and none at all (no allocation) for a pane without images.
+        var visible = Set<KittyGraphics.ImageID>()
+        for placement in placements where !visible.contains(placement.imageID) {
+            guard let data = table.image(placement.imageID),
+                Self.isPotentiallyVisible(
+                    placement, pixelHeight: data.height > 0 ? data.height : textures[placement.imageID]?.height,
+                    rows: rows, offset: offset,
+                    scrollbackTotalPushed: scrollbackTotalPushed, cellHeight: cellHeight)
+            else { continue }
+            visible.insert(placement.imageID)
+        }
+        knownDecodedBytes = knownDecodedBytes.filter { liveIDs.contains($0.key) }
+        if visible != visibleIDs {
+            visibleIDs = visible
+            visibilityGeneration &+= 1
+        }
 
         for placement in placements {
             let id = placement.imageID
@@ -178,15 +207,23 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
             guard inFlight[id] == nil else { continue }
             if let blocked = budgetBlocked[id], blocked.storeGeneration == generation {
                 guard blocked.globalGeneration != globalBudget.generation
-                    || blocked.paneGeneration != paneBudget.generation else { continue }
+                    || blocked.paneGeneration != paneBudget.generation
+                    || blocked.visibilityGeneration != visibilityGeneration else { continue }
                 budgetBlocked[id] = nil
             }
-            guard Self.isPotentiallyVisible(
-                placement, data: data, rows: rows, offset: offset,
-                scrollbackTotalPushed: scrollbackTotalPushed, cellHeight: cellHeight)
-            else { continue }
+            guard visible.contains(id) else { continue }
             guard data.bytes.count <= 64 * 1024 * 1024 else {
                 failedGenerations[id] = generation
+                continue
+            }
+            // Known not to fit beside the visible textures, which are never
+            // evicted: wait without decoding — a blocked image retried on every
+            // visibility change was a full decode each time.
+            if let needed = decodedBytes(of: data, id: id, generation: generation),
+                needed > textureByteBudget - visibleTextureBytes(excluding: id)
+            {
+                budgetBlocked[id] = (
+                    generation, globalBudget.generation, paneBudget.generation, visibilityGeneration)
                 continue
             }
             guard Self.decodeBudget.tryReserve(1) else { continue }
@@ -203,18 +240,35 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         }
     }
 
+    /// Texture bytes an image needs, before decoding it: from the header for
+    /// raw pixels, from an earlier decode for a PNG. `nil` until a PNG decodes.
+    private func decodedBytes(
+        of data: KittyGraphics.ImageData, id: KittyGraphics.ImageID, generation: UInt64
+    ) -> Int? {
+        if data.format != .png, data.width > 0, data.height > 0 { return data.width * data.height * 4 }
+        guard let known = knownDecodedBytes[id], known.generation == generation else { return nil }
+        return known.bytes
+    }
+
+    /// What the visible textures other than `id` hold; caller holds `lock`.
+    private func visibleTextureBytes(excluding id: KittyGraphics.ImageID) -> Int {
+        visibleIDs.reduce(0) { $0 + ($1 == id ? 0 : textureBytes[$1] ?? 0) }
+    }
+
     /// Conservative check for scheduling only: provably offscreen placements
-    /// wait. A PNG without `c=`/`r=` has no known extent and answers true, or
-    /// it would never decode. `draw` checks exactly.
+    /// wait. A PNG without `c=`/`r=` has no known extent until it has decoded
+    /// once (`pixelHeight` is then its texture's) and answers true, or it would
+    /// never decode — nor, being "visible", ever be evicted. `draw` checks
+    /// exactly.
     private static func isPotentiallyVisible(
-        _ placement: KittyGraphics.Placement, data: KittyGraphics.ImageData,
+        _ placement: KittyGraphics.Placement, pixelHeight: Int?,
         rows: Int, offset: Int, scrollbackTotalPushed: Int, cellHeight: Float
     ) -> Bool {
         let placementRows: Int?
         if let rows = placement.rows {
             placementRows = rows
-        } else if data.height > 0 {
-            placementRows = max(1, Int((Float(data.height) / cellHeight).rounded(.up)))
+        } else if let pixelHeight, pixelHeight > 0 {
+            placementRows = max(1, Int((Float(pixelHeight) / cellHeight).rounded(.up)))
         } else {
             placementRows = nil
         }
@@ -265,6 +319,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
             return false
         }
         let bytes = decoded.width * decoded.height * 4
+        knownDecodedBytes[id] = (generation, bytes)
         // Over the whole pane budget: fail permanently rather than evict
         // everything every frame.
         guard bytes <= textureByteBudget else {
@@ -272,17 +327,21 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
             return false
         }
         releaseTextureLocked(id)
-        while paneBudget.reservedBytes + bytes > textureByteBudget, let oldest = textureAccessOrder.first {
+        while paneBudget.reservedBytes + bytes > textureByteBudget,
+            let oldest = textureAccessOrder.first(where: { !visibleIDs.contains($0) })
+        {
             releaseTextureLocked(oldest)
         }
         guard paneBudget.tryReserve(bytes) else {
-            budgetBlocked[id] = (generation, globalBudget.generation, paneBudget.generation)
+            budgetBlocked[id] = (
+                generation, globalBudget.generation, paneBudget.generation, visibilityGeneration)
             return false
         }
         guard globalBudget.tryReserve(bytes) else {
             paneBudget.release(bytes)
             // The global budget is transient: retry when its generation moves.
-            budgetBlocked[id] = (generation, globalBudget.generation, paneBudget.generation)
+            budgetBlocked[id] = (
+                generation, globalBudget.generation, paneBudget.generation, visibilityGeneration)
             return false
         }
         guard let texture = makeTexture(from: decoded) else {

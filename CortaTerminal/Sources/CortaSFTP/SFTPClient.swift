@@ -145,10 +145,15 @@ public final class SFTPConnection: SFTPClient, @unchecked Sendable {
     /// The ssh child's environment — see `SFTPSubprocessChannel.spawn`.
     private let environment: [String: String]
 
+    /// For the transfer engine each session gets (`quarantinesDownloads`).
+    private let engineConfiguration: SFTPTransferEngine.Configuration
+
     public init(
         host: String, sshExecutable: String = SFTPSubprocessChannel.defaultSSHPath,
-        arguments: [String]? = nil, environment: [String: String]
+        arguments: [String]? = nil, environment: [String: String],
+        engineConfiguration: SFTPTransferEngine.Configuration = .init()
     ) {
+        self.engineConfiguration = engineConfiguration
         self.host = host
         self.sshExecutable = sshExecutable
         self.arguments = arguments
@@ -173,7 +178,7 @@ public final class SFTPConnection: SFTPClient, @unchecked Sendable {
         if let existing = try admission.get() { return existing }
         defer { state.withLock { $0.connecting = false } }
         let (channel, session) = try await openSession()
-        let engine = SFTPTransferEngine(session: session) { [weak self] in
+        let reconnect: SFTPTransferEngine.ReconnectHandler = { [weak self] in
             // The engine calls this between attempts, after a transport
             // failure: a fresh ssh, a fresh session, and the connection's
             // channel pointer moved to the live child.
@@ -187,6 +192,8 @@ public final class SFTPConnection: SFTPClient, @unchecked Sendable {
             guard installed else { session.close(); throw SFTPError.cancelled }
             return session
         }
+        let engine = SFTPTransferEngine(
+            session: session, reconnect: reconnect, configuration: engineConfiguration)
         // connect() inside openSession() already stored the capabilities.
         guard let capabilities = session.capabilities else {
             throw SFTPError.protocolViolation("connected session reported no capabilities")

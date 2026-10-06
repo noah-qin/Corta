@@ -148,6 +148,44 @@ struct OpenFileCommandTests {
         #expect(arguments == ["/usr/bin/xed", "--line", "42", "/tmp/a b.swift"])
     }
 
+    /// A remote file is the server's to name: substituted one after another,
+    /// `a{line}` became `a42`, a different file from the one checked.
+    @Test("placeholders inside the substituted path are not expanded again")
+    func pathPlaceholdersStayLiteral() {
+        let arguments = PanePointer.openFileArguments(
+            template: "/bin/e +{line} {file}:{column}", path: "/tmp/a{line}{column}{file}", line: 42,
+            column: 7)
+        #expect(arguments == ["/bin/e", "+42", "/tmp/a{line}{column}{file}:7"])
+    }
+
+    @Test("private state files are written owner-only from the first byte")
+    func privateFilesAreOwnerOnly() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("corta-private-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("state.json")
+        try PrivateFile.write(Data("one".utf8), to: url)
+        try PrivateFile.write(Data("two".utf8), to: url)
+        let mode = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int
+        #expect(mode == 0o600)
+        #expect(try String(contentsOf: url, encoding: .utf8) == "two")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path) == ["state.json"],
+            "no temporary left behind")
+    }
+
+    @Test("a link opens, and is shown as, the URL the browser receives")
+    func linkTargets() {
+        #expect(PanePointer.target(of: "https://\u{0430}pple.com/login")?.absoluteString
+            == "https://xn--pple-43d.com/login")
+        #expect(PanePointer.target(of: "https://github.com@evil.example/x")?.absoluteString
+            == "https://evil.example/x")
+        #expect(PanePointer.target(of: "https://example.com/\u{202E}gpj.exe")?.absoluteString
+            == "https://example.com/%E2%80%AEgpj.exe")
+        #expect(PanePointer.target(of: "mailto:a@example.com")?.absoluteString == "mailto:a@example.com")
+        #expect(PanePointer.target(of: "file:///etc/passwd") == nil)
+        #expect(PanePointer.target(of: "x-apple.systempreferences:x") == nil)
+    }
+
     /// The template is split, the *value* never is — so a path with a space
     /// stays one argument. Nothing is passed through a shell, so the path's
     /// metacharacters never mean anything again.

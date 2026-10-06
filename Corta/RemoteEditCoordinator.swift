@@ -177,6 +177,10 @@ final class RemoteEditCoordinator {
         // first connection to it is the user's decision, not the far
         // end's (`RemoteHostConsent`). A reused copy still goes through
         // this: opening it starts a watch whose upload would connect.
+        // Nor is a name passed on that could not have been typed.
+        guard RemoteHostName.isAcceptable(host) else {
+            throw .protocolViolation("not a host name ssh is given: \(host)")
+        }
         if !RemoteHostConsent.isConfirmed(host) {
             guard await presenter.confirmConnection(host, remotePath) else {
                 throw .cancelled
@@ -486,9 +490,24 @@ final class RemoteEditCoordinator {
             removeSnapshot(copy.id)
             Task { [weak self] in await self?.redownload(copy) }
         case .saveCopyElsewhere(let destination):
+            do {
+                // The save panel already asked about replacing an existing
+                // file; `copyItem` alone refuses one.
+                if FileManager.default.fileExists(atPath: destination.path) {
+                    try FileManager.default.removeItem(at: destination)
+                }
+                try FileManager.default.copyItem(at: store.localURL(for: copy), to: destination)
+            } catch {
+                // Said, and the decision asked again: dropped, it told the user
+                // nothing; kept silently, it blocked every later upload prompt.
+                let code = ((error as NSError).userInfo[NSUnderlyingErrorKey] as? NSError)?.code
+                presenter.showError(SFTPBrowserModel.errorMessage(
+                    .localIOFailed(operation: "save copy", code: Int32(code ?? Int(EIO))),
+                    host: copy.host))
+                presenter.promptConflict(conflict)
+                return
+            }
             removeSnapshot(copy.id)
-            try? FileManager.default.copyItem(
-                at: store.localURL(for: copy), to: destination)
             pendingConflicts.removeAll { $0.id == conflictID }
             pendingUploads.removeAll { $0.id == conflictID }
         case .dismiss:

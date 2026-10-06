@@ -172,7 +172,11 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
     nonisolated static func resolve(
         _ reference: FileReferenceDetection.Reference, state: PaneRemoteState
     ) -> ResolvedReference? {
-        guard case .remote(let host, let directory, _) = state else { return nil }
+        guard case .remote(let host, let directory, _) = state,
+            // The host is a remote shell's report; it reaches ssh only if it
+            // could have been typed (`RemoteHostName`).
+            RemoteHostName.isAcceptable(host)
+        else { return nil }
         let path = reference.path
         guard !path.hasPrefix("~") else { return nil }
         let absolute =

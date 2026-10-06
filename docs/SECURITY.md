@@ -96,6 +96,13 @@ pattern detection — the program said what the target is — and the ⌘-hover
 tooltip names *that* target, not the text under the pointer, which is the
 only thing that makes the "show the real target" rule mean anything.
 
+The target shown is the URL that opens, not the text the stream sent
+(`PanePointer.target(of:)`, S17): the host in IDNA form, anything invisible
+percent-encoded, and userinfo removed — from what is shown *and* what is
+opened. `https://аpple.com` with a Cyrillic `а` reads as Apple until it is
+written `xn--pple-43d.com`, and `user@host` puts a familiar name before the
+real one.
+
 ### 2.4.1 Text sent to the shell
 
 Dropping a file on a pane types its path at the prompt (M7.6). A
@@ -317,7 +324,8 @@ Save panel. The destination and any later sharing are the user's choice.
 **Custom session restoration saves plaintext metadata, not terminal text.**
 `restore-windows` defaults to `true`. `state.json` can contain window geometry,
 split layout, focused pane, working directories, preset identifiers and
-launch metadata. Setting `restore-windows = false` disables restoration.
+launch metadata. Setting `restore-windows = false` disables restoration. The file is
+owner-only (`0600`), as are `directory-history.json` and `recent-hosts.json`.
 Saved directories and host/preset metadata may themselves be sensitive.
 
 This is separate from AppKit restoration. Terminal windows set
@@ -384,6 +392,17 @@ which records S01–S04 and S07 in full); the entries below are the ones
 whose write-up belongs with the design rather than with the release that
 made them.
 
+- **S17 — 2026-10-07: the audit's application-layer findings.** Link
+  tooltips show the URL that opens (§2.4). SFTP downloads are quarantined
+  through LaunchServices — not `LSFileQuarantineEnabled`, which would mark
+  every file the shells Corta spawns create — so Gatekeeper checks a remote
+  app, script or installer opened from Finder. `open-file-command`
+  substitutes its placeholders in one pass; a path naming `{line}` was
+  rewritten into a different file than the one checked. Every host that
+  reaches `ssh` passes `SSHDestination`'s character check: the SFTP browser's
+  field and a remote pane's OSC 7 host had relied on OpenSSH's own hostname
+  rules (9.6+) alone. Directory history and session state are `0600`. A
+  remote-edit "save copy elsewhere" failure is reported instead of dropped.
 - **S16 — 2026-10-07: a whole-repository audit's terminal-core findings.**
   The `path:line` detector's pattern, `[\w.+\-/]*[\w.+\-]+:`, had two
   overlapping quantifiers; a 100,000-character token with no colon took 54 s

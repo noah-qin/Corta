@@ -269,9 +269,8 @@ final class DirectoryHistoryStore {
         let fileURL = fileURL
         writeQueue.async {
             guard let data = try? JSONEncoder().encode(persisted) else { return }
-            try? FileManager.default.createDirectory(
-                at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? data.write(to: fileURL, options: .atomic)
+            // Owner-only, as `recent-hosts.json`: directories say where you work.
+            try? PrivateFile.write(data, to: fileURL)
         }
     }
 }

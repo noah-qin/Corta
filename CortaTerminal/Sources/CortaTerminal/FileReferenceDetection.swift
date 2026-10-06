@@ -60,12 +60,24 @@ public enum FileReferenceDetection {
     public static let maxPatternScanCells = LinkDetection.maxPatternScanCells
 
     public static func reference(at point: SelectionPoint, in grid: Grid) -> Reference? {
-        let span = grid.logicalLineRowSpan(containing: point.row)
-        guard (span.last - span.first + 1) * grid.columns <= maxPatternScanCells
-        else { return nil }
-        let line = grid.logicalLine(containing: point.row)
-        guard !line.text.isEmpty else { return nil }
-        return references(in: line).first { $0.range.start <= point && point <= $0.range.end }
+        references(inLineContaining: point.row, in: grid).references
+            .first { $0.range.start <= point && point <= $0.range.end }
+    }
+
+    /// The references in the logical line holding `row`, and the row it
+    /// starts on — so a caller walking a command's output can step to the
+    /// line above. A line over `maxPatternScanCells` is not joined or scanned:
+    /// both run on the main thread.
+    public static func references(inLineContaining row: Int, in grid: Grid)
+        -> (firstRow: Int, references: [Reference])
+    {
+        let span = grid.logicalLineRowSpan(containing: row)
+        guard (span.last - span.first + 1) * grid.columns <= maxPatternScanCells else {
+            return (span.first, [])
+        }
+        let line = grid.logicalLine(firstRow: span.first, lastRow: span.last)
+        guard !line.text.isEmpty else { return (span.first, []) }
+        return (span.first, references(in: line))
     }
 
     public static func references(in line: LogicalLine) -> [Reference] {

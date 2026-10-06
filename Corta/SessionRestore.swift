@@ -336,10 +336,9 @@ struct SessionRestore {
     func save(_ states: [WindowState]) {
         let url = fileURL
         do {
-            try FileManager.default.createDirectory(
-                at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             let data = try JSONEncoder().encode(states)
-            try data.write(to: url, options: .atomic)
+            // Owner-only, as `recent-hosts.json`: directories say where you work.
+            try PrivateFile.write(data, to: url)
         } catch {
             // Losing the arrangement is not worth interrupting a quit for.
         }
