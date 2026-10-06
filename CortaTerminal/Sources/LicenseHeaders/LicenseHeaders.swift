@@ -73,7 +73,6 @@ public enum LicenseHeaders {
         ("AppIconDev.icon/**", .reuse),
         ("Corta/Acknowledgements/**", .reuse),
         ("Corta.xcodeproj/**", .reuse),
-        ("Corta/Base.lproj/**", .reuse),
         ("Corta/Assets.xcassets/**", .reuse),
         ("Corta/Localizable.xcstrings", .reuse),
         ("TestPlans/*.xctestplan", .reuse),

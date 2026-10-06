@@ -547,7 +547,6 @@
 				INFOPLIST_FILE = "Sparkle-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Corta Dev";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Noah Qin. Apache License 2.0.";
-				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -583,7 +582,6 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Sparkle-Info.plist";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Noah Qin. Apache License 2.0.";
-				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -771,7 +769,6 @@
 				INFOPLIST_FILE = "Sparkle-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Corta Dev";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Noah Qin. Apache License 2.0.";
-				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

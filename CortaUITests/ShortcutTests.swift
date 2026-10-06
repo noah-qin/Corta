@@ -23,7 +23,7 @@ import XCTest
 /// Note on method: the keyboard path is exercised with ⌘=; the other two
 /// actions are driven through the View menu's items because XCUI's
 /// `typeKey("-", ...)` never produces a key event this app's menu matches
-/// (the storyboard key equivalent is identical in form to the working ⌘=
+/// (the menu's key equivalent is identical in form to the working ⌘=
 /// one — the failure is in the synthetic event, not the app).
 final class ShortcutTests: XCTestCase {
     override func setUpWithError() throws {
