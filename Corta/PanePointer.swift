@@ -374,14 +374,10 @@ final class PanePointer: NSObject {
     func handleLinkClick(_ event: NSEvent, in terminalView: TerminalView) -> Bool {
         guard event.modifierFlags.contains(.command) else { return false }
         if let link = linkUnder(event, in: terminalView) { return open(link) }
-        // A `path:line` resolving to a local file. URLs win; the detectors
-        // don't overlap in practice, and the order makes that explicit.
-        if let reference = fileReferenceUnder(event, in: terminalView) {
+        // A `path:line`, local or remote. URLs win; the detectors don't
+        // overlap in practice, and the order makes that explicit.
+        if let reference = openableReference(detectedReferenceUnder(event, in: terminalView)) {
             return open(reference)
-        }
-        // Remote: open the host file's managed local copy.
-        if let remoteReference = host?.remote.resolve(detectedReferenceUnder(event, in: terminalView)) {
-            return host?.remote.open(remoteReference) ?? false
         }
         return false
     }
@@ -392,11 +388,8 @@ final class PanePointer: NSObject {
         guard opensLinksOnPlainClick, !event.modifierFlags.contains(.shift)
         else { return false }
         if let link = linkUnder(event, in: terminalView) { return open(link) }
-        if let reference = fileReferenceUnder(event, in: terminalView) {
+        if let reference = openableReference(detectedReferenceUnder(event, in: terminalView)) {
             return open(reference)
-        }
-        if let remoteReference = host?.remote.resolve(detectedReferenceUnder(event, in: terminalView)) {
-            return host?.remote.open(remoteReference) ?? false
         }
         return false
     }
@@ -404,11 +397,24 @@ final class PanePointer: NSObject {
     /// Re-checks the scheme at the boundary where output launches another
     /// app (`SECURITY.md` §2.4).
     private func open(_ link: LinkDetection.Link) -> Bool {
-        guard let url = URL(string: link.url), let scheme = url.scheme?.lowercased(),
-            ["http", "https", "mailto"].contains(scheme)
-        else { return false }
+        guard let url = Self.target(of: link.url) else { return false }
         NSWorkspace.shared.open(url)
         return true
+    }
+
+    /// The URL a link opens, and so the one its tooltip names: allowlisted
+    /// scheme, host in IDNA form, anything invisible percent-encoded, and no
+    /// userinfo. Shown raw, `https://аpple.com` read as Apple while opening
+    /// `xn--pple-43d.com`, and `https://github.com@evil.example` named the
+    /// wrong host first; the destination is what `SECURITY.md` §2.4 says to show.
+    nonisolated static func target(of raw: String) -> URL? {
+        guard let url = URL(string: raw), let scheme = url.scheme?.lowercased(),
+            ["http", "https", "mailto"].contains(scheme),
+            var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        else { return nil }
+        components.user = nil
+        components.password = nil
+        return components.url
     }
 
     /// Hand cursor, underline and a tooltip with the real target
@@ -426,37 +432,32 @@ final class PanePointer: NSObject {
                 NSCursor.arrow.set()
                 hoveringLink = false
             }
+            let target = Self.target(of: link.url)?.absoluteString ?? link.url
             let tip = opensLinksOnPlainClick
-                ? link.url : L10n.format("link.commandClick", link.url)
+                ? target : L10n.format("link.commandClick", target)
             if terminalView.toolTip != tip { terminalView.toolTip = tip }
             setHoveredLink(armed ? link.range : nil)
         } else if armed, session != nil,
-            let reference = fileReferenceUnder(event, in: terminalView)
+            let reference = openableReference(detectedReferenceUnder(event, in: terminalView))
         {
-            // The tooltip names the path and the required editor setting.
             if !hoveringLink {
                 NSCursor.pointingHand.set()
                 hoveringLink = true
             }
-            let target = "\(reference.url.path):\(reference.line)"
-            let tip =
-                ConfigurationStore.shared.configuration.openFileCommand.isEmpty
-                ? L10n.format("link.fileNoLine", target) : target
+            let tip: String
+            switch reference {
+            case .local(let local):
+                // The path and the required editor setting.
+                let target = "\(local.url.path):\(local.line)"
+                tip = ConfigurationStore.shared.configuration.openFileCommand.isEmpty
+                    ? L10n.format("link.fileNoLine", target) : target
+            case .remote(let remote):
+                // Host and path, and that a managed copy opens.
+                tip = L10n.format(
+                    "link.remoteFile", "\(remote.host):\(remote.remotePath):\(remote.line)")
+            }
             if terminalView.toolTip != tip { terminalView.toolTip = tip }
             setHoveredLink(reference.range)
-        } else if armed, session != nil,
-            let remoteReference = host?.remote.resolve(detectedReferenceUnder(event, in: terminalView))
-        {
-            // Remote: host and path, and that a managed copy opens.
-            if !hoveringLink {
-                NSCursor.pointingHand.set()
-                hoveringLink = true
-            }
-            let tip = L10n.format(
-                "link.remoteFile",
-                "\(remoteReference.host):\(remoteReference.remotePath):\(remoteReference.line)")
-            if terminalView.toolTip != tip { terminalView.toolTip = tip }
-            setHoveredLink(remoteReference.range)
         } else {
             resetLinkHover(terminalView)
         }
@@ -536,11 +537,35 @@ final class PanePointer: NSObject {
             column: reference.column, range: reference.range)
     }
 
-    func fileReferenceUnder(_ event: NSEvent, in terminalView: TerminalView)
-        -> ResolvedFileReference?
-    {
-        guard let reference = detectedReferenceUnder(event, in: terminalView) else { return nil }
-        return Self.resolve(reference, directory: session.workingDirectory)
+    /// What a detected `path:line` opens: the local file it names, else the
+    /// remote host's. One detection serves both — the pattern scan runs on the
+    /// main thread, and it ran twice per ⌘ press over text that matched nothing.
+    enum OpenableReference {
+        case local(ResolvedFileReference)
+        case remote(PaneRemote.ResolvedReference)
+
+        var range: SelectionRange {
+            switch self {
+            case .local(let reference): reference.range
+            case .remote(let reference): reference.range
+            }
+        }
+    }
+
+    func openableReference(_ detected: FileReferenceDetection.Reference?) -> OpenableReference? {
+        guard let detected else { return nil }
+        if let local = Self.resolve(detected, directory: session.workingDirectory) {
+            return .local(local)
+        }
+        return host?.remote.resolve(detected).map(OpenableReference.remote)
+    }
+
+    @discardableResult
+    func open(_ reference: OpenableReference) -> Bool {
+        switch reference {
+        case .local(let local): open(local)
+        case .remote(let remote): host?.remote.open(remote) ?? false
+        }
     }
 
     /// Detection before resolution, shared with the remote path
@@ -612,14 +637,10 @@ final class PanePointer: NSObject {
     }
 
     /// The last reference in `record`'s output, walking backwards: closest to
-    /// where a build tool says what went wrong. Bounded in rows scanned, so a
-    /// huge log without one isn't a full scan on the main thread.
-    func fileReferenceInCommand(_ record: CommandRecord?) -> ResolvedFileReference? {
-        guard let reference = detectedReferenceInCommand(record) else { return nil }
-        return Self.resolve(reference, directory: session.workingDirectory)
-    }
-
-    /// Detection before resolution, shared with the remote path.
+    /// where a build tool says what went wrong. Bounded in rows scanned, and a
+    /// line longer than a hover may scan is skipped unjoined, so a huge log
+    /// without one isn't a full scan on the main thread — menu validation
+    /// runs this.
     func detectedReferenceInCommand(_ record: CommandRecord?)
         -> FileReferenceDetection.Reference?
     {
@@ -632,12 +653,15 @@ final class PanePointer: NSObject {
         var row = end - base - 1
         var rowsScanned = 0
         while row >= startDoc, rowsScanned < Self.maxCommandOutputRowsScanned {
-            let line = grid.logicalLine(containing: row)
-            rowsScanned += row - line.firstRow + 1
-            if let reference = FileReferenceDetection.references(in: line).last {
+            let span = grid.logicalLineRowSpan(containing: row)
+            rowsScanned += row - span.first + 1
+            if (span.last - span.first + 1) * grid.columns <= FileReferenceDetection.maxPatternScanCells,
+                let reference = FileReferenceDetection.references(
+                    in: grid.logicalLine(containing: row)).last
+            {
                 return reference
             }
-            row = line.firstRow - 1
+            row = span.first - 1
         }
         return nil
     }
@@ -650,11 +674,22 @@ final class PanePointer: NSObject {
     nonisolated static func openFileArguments(
         template: String, path: String, line: Int, column: Int?
     ) -> [String] {
-        template.split(whereSeparator: \.isWhitespace).map { part in
-            String(part)
-                .replacingOccurrences(of: "{file}", with: path)
-                .replacingOccurrences(of: "{line}", with: String(line))
-                .replacingOccurrences(of: "{column}", with: String(column ?? 1))
+        let values = ["{file}": path, "{line}": String(line), "{column}": String(column ?? 1)]
+        // One pass over the template's own text: replaced one after another, a
+        // file named `a{line}` became `a12` — a different file from the one
+        // checked to exist, and remote names are the server's to choose.
+        return template.split(whereSeparator: \.isWhitespace).map { part in
+            var result = ""
+            var rest = part[...]
+            while !rest.isEmpty {
+                if let (token, value) = values.first(where: { rest.hasPrefix($0.key) }) {
+                    result += value
+                    rest = rest.dropFirst(token.count)
+                } else {
+                    result.append(rest.removeFirst())
+                }
+            }
+            return result
         }
     }
 

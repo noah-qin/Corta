@@ -286,6 +286,15 @@ final class SFTPBrowserModel {
             host = trimmed
             name = trimmed
         }
+        // The check every other way to name a host passes (`SSHDestination`):
+        // this field and a pane's OSC 7 report reached ssh's argv without it,
+        // leaving ssh's own hostname rules as the only guard.
+        guard RemoteHostName.isAcceptable(name) else {
+            host = nil
+            hostField = name
+            connectionState = .failed(message: L10n.text("ui.connect.invalidHost"))
+            return
+        }
         guard shouldStartConnection?(name) != false else { return }
         connectionState = .connecting
         listingError = nil

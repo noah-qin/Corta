@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Darwin
+import CoreServices
 import Foundation
 import Synchronization
 
@@ -88,6 +89,13 @@ public final class SFTPTransferEngine: @unchecked Sendable {
 
         /// Failed/cancelled transfers cannot wait forever for peer cleanup.
         public var cleanupTimeout: Duration = .seconds(1)
+
+        /// Marks each committed download with `com.apple.quarantine`, as a
+        /// browser does: a remote `.app`, `.command` or `.pkg` opened from
+        /// Finder then gets Gatekeeper's first-open check instead of skipping
+        /// it. Through LaunchServices, never `LSFileQuarantineEnabled`, which
+        /// every shell the app spawns would inherit.
+        public var quarantinesDownloads = false
 
         public init() {}
     }
@@ -340,6 +348,18 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         }
     }
 
+    /// Best effort: a volume without extended attributes cannot carry the
+    /// mark, and refusing the download over it would help nobody.
+    static func markQuarantined(_ path: String) {
+        var url = URL(fileURLWithPath: path)
+        var values = URLResourceValues()
+        values.quarantineProperties = [
+            kLSQuarantineTypeKey as String: kLSQuarantineTypeOtherDownload as String,
+            kLSQuarantineAgentNameKey as String: "Corta",
+        ]
+        try? url.setResourceValues(values)
+    }
+
     // MARK: - Retry
 
     /// The attempt loop. A transport-class failure is retried — bounded,
@@ -472,6 +492,7 @@ public final class SFTPTransferEngine: @unchecked Sendable {
                 if code == EEXIST { throw SFTPError.destinationConflict(path: destinationPath) }
                 throw SFTPError.localIOFailed(operation: "rename", code: code)
             }
+            if configuration.quarantinesDownloads { Self.markQuarantined(destinationPath) }
             return SFTPTransferReceipt(
                 bytesTransferred: receipt, resumedFromOffset: offset, attempts: 0)
         } catch {

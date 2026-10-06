@@ -177,6 +177,10 @@ final class RemoteEditCoordinator {
         // first connection to it is the user's decision, not the far
         // end's (`RemoteHostConsent`). A reused copy still goes through
         // this: opening it starts a watch whose upload would connect.
+        // Nor is a name passed on that could not have been typed.
+        guard RemoteHostName.isAcceptable(host) else {
+            throw .protocolViolation("not a host name ssh is given: \(host)")
+        }
         if !RemoteHostConsent.isConfirmed(host) {
             guard await presenter.confirmConnection(host, remotePath) else {
                 throw .cancelled

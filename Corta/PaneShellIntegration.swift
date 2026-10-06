@@ -160,15 +160,11 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
     @objc func openFileReferenceInCommand(_ sender: Any?) {
         guard isOperable else { return }
         guard let host else { return }
-        if let reference = host.pointer.fileReferenceInCommand(effectiveCommand) {
-            host.pointer.open(reference)
-            return
-        }
-        // Remote: open the managed local copy at the same line.
-        if let remoteReference = host.remote.resolve(
+        // Local, or the remote file's managed copy at the same line.
+        if let reference = host.pointer.openableReference(
             host.pointer.detectedReferenceInCommand(effectiveCommand))
         {
-            host.remote.open(remoteReference)
+            host.pointer.open(reference)
             return
         }
         terminalView?.showToast(L10n.text("toast.noFileReferenceInCommand"), kind: .warning)
@@ -378,8 +374,8 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
         case #selector(openFileReferenceInCommand(_:)):
             guard isOperable else { return false }
             guard let host else { return false }
-            return host.pointer.fileReferenceInCommand(effectiveCommand) != nil
-                || host.remote.resolve(host.pointer.detectedReferenceInCommand(effectiveCommand)) != nil
+            return host.pointer.openableReference(
+                host.pointer.detectedReferenceInCommand(effectiveCommand)) != nil
         case #selector(searchCommandHistory(_:)):
             return isOperable
         default:

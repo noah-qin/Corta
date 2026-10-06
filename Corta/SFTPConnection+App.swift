@@ -27,10 +27,14 @@ import Foundation
 extension SFTPConnection {
     static func forApp(host: String) -> SFTPConnection {
         let environment = ChildEnvironment.default()
+        // Remote bytes landing on this Mac get Gatekeeper's first-open check.
+        var engine = SFTPTransferEngine.Configuration()
+        engine.quarantinesDownloads = true
         if let override = DiagnosticsEnvironment.sftpSSHExecutable() {
             return SFTPConnection(
-                host: host, sshExecutable: override, environment: environment)
+                host: host, sshExecutable: override, environment: environment,
+                engineConfiguration: engine)
         }
-        return SFTPConnection(host: host, environment: environment)
+        return SFTPConnection(host: host, environment: environment, engineConfiguration: engine)
     }
 }
