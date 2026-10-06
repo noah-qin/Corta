@@ -222,24 +222,101 @@ import Testing
         #expect(Self.matches(rule, overlay.linkUnderline, over: background), "link: \(rule)")
     }
 
-    /// The prompt marks: the theme's green and red for an outcome, and the
-    /// midpoint of foreground and background for an interrupted command.
-    @Test func promptMarksAreDerivedFromTheTheme() throws {
-        let variant = try Self.probeVariant()
-        let overlay = variant.overlayColors
+    /// Renders `grid` into a rect `margin` pixels in from the left, as
+    /// `PaneFrameLoop` leaves the inset: the command-status rules draw there.
+    private static func renderWithMargin(
+        _ grid: Grid, variant: Theme.Variant, margin: Int = 8,
+        configure: (TerminalRenderer) -> Void = { _ in }
+    ) throws -> (frame: Frame, margin: Int) {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
+        let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
+        renderer.themeVariant = variant
+        configure(renderer)
+        let cellWidth = Int(renderer.metrics.cellWidth)
+        let cellHeight = Int(renderer.metrics.cellHeight)
+        let width = margin + cellWidth * grid.columns
+        let height = cellHeight * grid.rows
+        let texture = MetalRenderTarget.make(device: device, width: width, height: height)
+        let background = variant.background
+        renderer.renderAndWait(
+            grid: grid, rect: CGRect(x: margin, y: 0, width: cellWidth * grid.columns, height: height),
+            drawableSize: CGSize(width: width, height: height), cursorVisible: false,
+            selection: nil, target: texture,
+            clearColor: MTLClearColorMake(
+                Double(background.x), Double(background.y), Double(background.z), 1))
+        return (Frame(texture: texture, cellWidth: cellWidth, cellHeight: cellHeight), margin)
+    }
+
+    private static func markedGrid() -> Grid {
         var grid = Grid(rows: 4, columns: 10)
         grid.setMark(.promptSucceeded, atAbsoluteRow: grid.absoluteRow(ofScreenRow: 0))
         grid.setMark(.promptFailed, atAbsoluteRow: grid.absoluteRow(ofScreenRow: 1))
         grid.setMark(.promptInterrupted, atAbsoluteRow: grid.absoluteRow(ofScreenRow: 2))
-        let frame = try Self.render(grid, variant: variant)
+        return grid
+    }
+
+    /// The prompt marks: the theme's green and red for an outcome, and the
+    /// midpoint of foreground and background for an interrupted command —
+    /// drawn in the Metal pass, 6 points left of the grid, so they move with
+    /// the text they belong to (#238).
+    @Test func promptMarksAreDerivedFromTheTheme() throws {
+        let variant = try Self.probeVariant()
+        let overlay = variant.overlayColors
+        let (frame, margin) = try Self.renderWithMargin(Self.markedGrid(), variant: variant)
         let background = variant.background
-        for (row, color, name) in [
-            (0, overlay.markSucceeded, "succeeded"), (1, overlay.markFailed, "failed"),
-            (2, overlay.markInterrupted, "interrupted"),
+        let ruleX = margin - 6
+        for (row, color, name, y) in [
+            (0, overlay.markSucceeded, "succeeded", frame.cellHeight / 2),
+            (1, overlay.markFailed, "failed", frame.cellHeight / 2),
+            // Split around its middle: sample the top half.
+            (2, overlay.markInterrupted, "interrupted", 4),
         ] {
-            let edge = Self.pixel(of: frame.texture, x: 0, y: row * frame.cellHeight + frame.cellHeight / 2)
-            #expect(Self.matches(edge, color, over: background), "\(name): \(edge)")
+            for x in [ruleX, ruleX + 1] {
+                let edge = Self.pixel(of: frame.texture, x: x, y: row * frame.cellHeight + y)
+                #expect(Self.matches(edge, color, over: background), "\(name) at x \(x): \(edge)")
+            }
         }
+        // Never over a cell, and the rule is two points wide.
+        for row in 0..<3 {
+            let y = row * frame.cellHeight + 4
+            let cell = Self.pixel(of: frame.texture, x: margin, y: y)
+            #expect(Self.matches(cell, background, over: background), "row \(row) first cell: \(cell)")
+            let beside = Self.pixel(of: frame.texture, x: ruleX + 2, y: y)
+            #expect(Self.matches(beside, background, over: background), "row \(row) beside: \(beside)")
+        }
+        // An interruption is two pieces: its middle is clear.
+        let gap = Self.pixel(of: frame.texture, x: ruleX, y: 2 * frame.cellHeight + frame.cellHeight / 2)
+        #expect(Self.matches(gap, background, over: background), "interrupted middle: \(gap)")
+        // Two points shorter than the row at each end: neighbours stay apart.
+        let between = Self.pixel(of: frame.texture, x: ruleX, y: frame.cellHeight)
+        #expect(Self.matches(between, background, over: background), "between rows: \(between)")
+    }
+
+    /// `command-status-marks = false` and the alternate screen draw no rule.
+    @Test func promptMarksHonourTheSettingAndTheAlternateScreen() throws {
+        let variant = try Self.probeVariant()
+        let background = variant.background
+        func ruleCount(_ frame: Frame, margin: Int) -> Int {
+            (0..<3).filter { row in
+                !Self.matches(
+                    Self.pixel(of: frame.texture, x: margin - 6, y: row * frame.cellHeight + 4),
+                    background, over: background)
+            }.count
+        }
+        let on = try Self.renderWithMargin(Self.markedGrid(), variant: variant)
+        #expect(ruleCount(on.frame, margin: on.margin) == 3)
+        let off = try Self.renderWithMargin(Self.markedGrid(), variant: variant) {
+            $0.drawsCommandMarks = false
+        }
+        #expect(ruleCount(off.frame, margin: off.margin) == 0)
+
+        var terminal = Terminal(rows: 4, columns: 10)
+        terminal.feed(Array("\u{1B}[?1049h".utf8))
+        var grid = terminal.grid
+        grid.setMark(.promptFailed, atAbsoluteRow: grid.absoluteRow(ofScreenRow: 0))
+        let alternate = try Self.renderWithMargin(grid, variant: variant)
+        #expect(ruleCount(alternate.frame, margin: alternate.margin) == 0)
     }
 
     // MARK: - The block cursor

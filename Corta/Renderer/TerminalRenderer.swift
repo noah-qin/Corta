@@ -152,7 +152,16 @@ public nonisolated final class TerminalRenderer {
     private var framePalette: Theme.Variant = Theme.corta.dark
     /// `framePalette`'s derived colours, worked out once per frame.
     private var frameOverlay = Theme.corta.dark.overlayColors
-    var drawsCommandMarks = true
+    /// The command-status rules beside prompts (`command-status-marks`).
+    /// Drawn in this pass, in the left margin, so a rule shows the frame's
+    /// own rows: drawn by AppKit they led the text by a frame or two and took
+    /// the colour of the command below (#238).
+    var drawsCommandMarks = true {
+        didSet { if drawsCommandMarks != oldValue { needsFullRebuild = true } }
+    }
+    /// The rules, in the margin rect's space (`markRect`); rebuilt with the
+    /// rows.
+    private var cachedMarks: [QuadInstance] = []
 
     /// Rows in the cached frame: the grid height `draw` lays out.
     var cachedRowCount: Int { cachedLines.count }
@@ -291,6 +300,7 @@ public nonisolated final class TerminalRenderer {
         cachedCurrentSearchMatchIndex = currentSearchMatchIndex
         cachedHoveredLink = hoveredLink
         needsFullRebuild = false
+        if changed { rebuildMarks(alternateScreen: grid.isAlternateScreenActive) }
         return changed
     }
 
@@ -336,6 +346,9 @@ public nonisolated final class TerminalRenderer {
     ) -> Bool {
         let drawing = backend.beginFrame(target: target, clearColor: clearColor, label: label)
         backend.drawSolidQuads(cachedBackground, rect: rect, drawableSize: drawableSize)
+        if !cachedMarks.isEmpty {
+            backend.drawSolidQuads(cachedMarks, rect: markRect(beside: rect), drawableSize: drawableSize)
+        }
         backend.drawGlyphQuads(
             cachedGlyphs, atlas: glyphAtlas.texture, rect: rect, drawableSize: drawableSize)
         if !cachedColorGlyphs.isEmpty {
@@ -673,17 +686,6 @@ public nonisolated final class TerminalRenderer {
                         size: .init(cellWidth, cellHeight), color: palette.cursor))
             }
         }
-        // The mark: a rule down a prompt row's left edge, coloured by outcome —
-        // which of the last twenty failed, at a glance. Inside the first cell:
-        // the inset is outside this renderer's rect.
-        if drawsCommandMarks && (line.mark == .promptSucceeded || line.mark == .promptFailed || line.mark == .promptInterrupted) {
-            let width = max(2, Float(scale) * 2)
-            background.append(
-                QuadInstance(
-                    origin: .init(0, Float(row) * cellHeight),
-                    size: .init(width, cellHeight),
-                    color: Self.markColor(line.mark, frameOverlay)))
-        }
         for column in 0..<line.count {
             let cell = line[column]
             let attributes = cell.attributes
@@ -881,6 +883,44 @@ public nonisolated final class TerminalRenderer {
             QuadInstance(
                 origin: .init(left + width - thickness, top), size: .init(thickness, height),
                 color: color))
+    }
+
+    /// The rule's column: 2 points wide, 6 points left of the grid, in the
+    /// inset — never over a cell. As tall as the grid.
+    func markRect(beside rect: CGRect) -> CGRect {
+        CGRect(x: rect.minX - 6 * scale, y: rect.minY, width: 2 * scale, height: rect.height)
+    }
+
+    /// One rule per prompt row with an outcome, from the rows this frame
+    /// draws: 2 points shorter than the row at each end, so neighbouring
+    /// prompts' rules stay apart. An interruption is the rule split in two
+    /// around its middle — a gap of 4 points.
+    private func rebuildMarks(alternateScreen: Bool) {
+        cachedMarks.removeAll(keepingCapacity: true)
+        guard drawsCommandMarks, !alternateScreen else { return }
+        let cellHeight = Float(metrics.cellHeight)
+        let point = Float(scale)
+        let width = 2 * point
+        let height = cellHeight - 4 * point
+        for row in cachedLines.indices {
+            let mark = cachedLines[row].mark
+            guard mark == .promptSucceeded || mark == .promptFailed || mark == .promptInterrupted
+            else { continue }
+            let color = Self.markColor(mark, frameOverlay)
+            let top = Float(row) * cellHeight + 2 * point
+            if mark == .promptInterrupted {
+                let half = max(point, height / 2 - 2 * point)
+                cachedMarks.append(
+                    QuadInstance(origin: .init(0, top), size: .init(width, half), color: color))
+                cachedMarks.append(
+                    QuadInstance(
+                        origin: .init(0, top + height / 2 + 2 * point), size: .init(width, half),
+                        color: color))
+            } else {
+                cachedMarks.append(
+                    QuadInstance(origin: .init(0, top), size: .init(width, height), color: color))
+            }
+        }
     }
 
     /// Only an outcome is drawn (the caller's test). A prompt whose command

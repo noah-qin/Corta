@@ -52,21 +52,23 @@ import Testing
     }
 
 
+    /// `margin`: the left inset the grid sits in, where the status rules draw.
     private static func draw(
-        _ fixture: Fixture, grid: Grid, hoveredLink: TerminalSelection? = nil
+        _ fixture: Fixture, grid: Grid, hoveredLink: TerminalSelection? = nil, margin: Int = 0
     ) -> MTLTexture {
         let texture = MetalRenderTarget.make(
-            device: fixture.renderer.backend.device, width: fixture.width, height: fixture.height)
+            device: fixture.renderer.backend.device, width: margin + fixture.width,
+            height: fixture.height)
         fixture.renderer.renderAndWait(
             grid: grid, scrollOffset: 0,
-            rect: CGRect(x: 0, y: 0, width: fixture.width, height: fixture.height),
-            drawableSize: CGSize(width: fixture.width, height: fixture.height),
+            rect: CGRect(x: margin, y: 0, width: fixture.width, height: fixture.height),
+            drawableSize: CGSize(width: margin + fixture.width, height: fixture.height),
             cursorVisible: false, selection: nil, hoveredLink: hoveredLink,
             target: texture)
         return texture
     }
 
-    /// A prompt row gets a rule down its left edge, coloured by how the
+    /// A prompt row gets a rule in the margin beside it, coloured by how the
     /// command ended — green for success, red for failure. Without it there
     /// is no way to see which of the last twenty commands failed.
     @Test func promptMarksPaintTheirStatusColour() throws {
@@ -77,12 +79,12 @@ import Testing
         var grid = Grid(rows: 4, columns: 10)
         grid.setMark(.promptSucceeded, atAbsoluteRow: grid.absoluteRow(ofScreenRow: 1))
         grid.setMark(.promptFailed, atAbsoluteRow: grid.absoluteRow(ofScreenRow: 2))
-        let texture = Self.draw(fixture, grid: grid)
+        let texture = Self.draw(fixture, grid: grid, margin: 8)
 
         let rowHeight = Int(fixture.renderer.metrics.cellHeight)
-        let succeeded = Self.pixel(of: texture, x: 0, y: rowHeight + rowHeight / 2)
-        let failed = Self.pixel(of: texture, x: 0, y: 2 * rowHeight + rowHeight / 2)
-        let unmarked = Self.pixel(of: texture, x: 0, y: rowHeight / 2)
+        let succeeded = Self.pixel(of: texture, x: 2, y: rowHeight + rowHeight / 2)
+        let failed = Self.pixel(of: texture, x: 2, y: 2 * rowHeight + rowHeight / 2)
+        let unmarked = Self.pixel(of: texture, x: 2, y: rowHeight / 2)
 
         #expect(succeeded.g > succeeded.r)
         #expect(failed.r > failed.g)
@@ -100,15 +102,15 @@ import Testing
         var grid = Grid(rows: 4, columns: 10)
         grid.setMark(.prompt, atAbsoluteRow: grid.absoluteRow(ofScreenRow: 1))
         grid.setMark(.outputStart, atAbsoluteRow: grid.absoluteRow(ofScreenRow: 2))
-        let texture = Self.draw(fixture, grid: grid)
+        let texture = Self.draw(fixture, grid: grid, margin: 8)
         let rowHeight = Int(fixture.renderer.metrics.cellHeight)
         for row in 1...2 {
-            let edge = Self.pixel(of: texture, x: 0, y: row * rowHeight + rowHeight / 2)
+            let edge = Self.pixel(of: texture, x: 2, y: row * rowHeight + rowHeight / 2)
             #expect(edge.r == 0 && edge.g == 0 && edge.b == 0)
         }
     }
 
-    /// The mark is one rule at the left edge, not a wash over the row: text
+    /// The mark is one rule in the margin, not a wash over the row: text
     /// has to stay readable.
     @Test func aMarkDoesNotTintTheWholeRow() throws {
         guard let fixture = try Self.fixture() else {
@@ -117,10 +119,10 @@ import Testing
         }
         var grid = Grid(rows: 4, columns: 10)
         grid.setMark(.promptFailed, atAbsoluteRow: grid.absoluteRow(ofScreenRow: 1))
-        let texture = Self.draw(fixture, grid: grid)
+        let texture = Self.draw(fixture, grid: grid, margin: 8)
         let rowHeight = Int(fixture.renderer.metrics.cellHeight)
         let middle = Self.pixel(
-            of: texture, x: fixture.width / 2, y: rowHeight + rowHeight / 2)
+            of: texture, x: 8 + fixture.width / 2, y: rowHeight + rowHeight / 2)
         #expect(middle.r == 0 && middle.g == 0 && middle.b == 0)
     }
 

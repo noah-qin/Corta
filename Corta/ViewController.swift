@@ -533,6 +533,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         let inputSnapshot = configuration.inputSourceIndicator == .off ? nil : session.inputLineSnapshot()
         let grid = inputSnapshot?.grid ?? session.snapshot()
         splitController?.placeInputSourceIndicator(from: self, configuration: configuration)
+        terminalRenderer.drawsCommandMarks = configuration.commandStatusMarks
         shell.updateShellOverlay(grid: grid)
         if let inputSnapshot {
             let metrics = terminalRenderer.pointMetrics
@@ -731,7 +732,6 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
                 device: device,
                 font: TerminalFont.primary(ofSize: fontSize, family: fontFamily), scale: scale)
         }
-        renderer.drawsCommandMarks = false
         // A finished decode schedules a frame; otherwise it waits for unrelated
         // output.
         renderer.kittyImageRenderer.onImagesReady = { [weak self] in
