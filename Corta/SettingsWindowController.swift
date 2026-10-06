@@ -97,6 +97,6 @@ final class SettingsWindowController: NSWindowController {
         model.windowWillShow()
         showWindow(sender)
         window?.makeKeyAndOrderFront(sender)
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
     }
 }

@@ -35,6 +35,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// Set at quit, so closing windows don't save an empty arrangement over
     /// the one just flushed.
     private var isTerminating = false
+    /// A quit confirmation sheet is up; see `applicationShouldTerminate`.
+    private var isAskingToTerminate = false
 
     /// File > New Window (⌘N).
     @objc func newDocument(_ sender: Any?) {
@@ -404,15 +406,37 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     /// Confirms ⌘Q with something running; quitting bypasses
-    /// `windowShouldClose`.
+    /// `windowShouldClose`. A sheet on the key terminal window (or the first
+    /// visible one), answered later; app-modal, answered now, when none is
+    /// visible.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let running = windowControllers.compactMap {
             ($0.contentViewController as? SplitViewController)
         }.flatMap(\.panesWithRunningJobs)
         guard let split = windowControllers.first?.contentViewController as? SplitViewController,
-            !running.isEmpty
+            split.needsCloseConfirmation(for: running)
         else { return .terminateNow }
-        return split.confirmClose(of: running, scope: L10n.text("close.scope.app")) ? .terminateNow : .terminateCancel
+        // Already asking: that sheet answers this quit too.
+        guard !isAskingToTerminate else { return .terminateCancel }
+        // Not the Quick Terminal, which hides — sheet and all — when Corta
+        // loses activation, nor a window already showing a sheet.
+        let windows = windowControllers.compactMap { controller -> NSWindow? in
+            guard let terminal = controller as? TerminalWindowController, !terminal.isQuickTerminal
+            else { return nil }
+            return terminal.window
+        }.filter { NSAlert.canPresentSheet(on: $0) }
+        guard let window = windows.first(where: \.isKeyWindow) ?? windows.first,
+            let presenter = window.contentViewController as? SplitViewController
+        else {
+            let alert = split.closeAlert(for: running, scope: L10n.text("close.scope.app"))
+            return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
+        }
+        isAskingToTerminate = true
+        presenter.confirmClose(of: running, scope: L10n.text("close.scope.app"), in: window) { [weak self] in
+            self?.isAskingToTerminate = false
+            NSApp.reply(toApplicationShouldTerminate: $0)
+        }
+        return .terminateLater
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {

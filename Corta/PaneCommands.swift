@@ -271,21 +271,30 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     /// stripped, bracketed paste when asked, and a newline warning without
     /// `?2004` — service text and filenames can hold newlines.
     func insertAsPaste(_ text: String) {
-        guard let host, let session = host.session else { return }
+        guard let host, host.session != nil else { return }
         let sanitized = Paste.sanitized(text)
         guard !sanitized.isEmpty else { return }
-        if Paste.needsWarning(text: sanitized, bracketedPasteEnabled: bracketedPasteEnabled()) {
-            let alert = NSAlert()
-            alert.messageText = L10n.text("paste.newlines.title")
-            alert.informativeText = L10n.text("paste.newlines.message")
-            alert.addButton(withTitle: L10n.text("common.paste"))
-            alert.addButton(withTitle: L10n.text("common.cancel"))
-            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        guard Paste.needsWarning(text: sanitized, bracketedPasteEnabled: bracketedPasteEnabled()) else {
+            pasteNow(sanitized)
+            return
         }
-        // A paste in every way that matters, as in `pasteFromClipboard` —
-        // including saying so when the child is not reading, rather than
-        // dropping the drop without a word.
-        host.pointer.returnToBottomOnInput()
+        let alert = NSAlert()
+        alert.messageText = L10n.text("paste.newlines.title")
+        alert.informativeText = L10n.text("paste.newlines.message")
+        alert.addButton(withTitle: L10n.text("common.paste"))
+        alert.addButton(withTitle: L10n.text("common.cancel"))
+        alert.present(for: host.view.window) { [weak self] response in
+            // The pane may have closed while the sheet was up.
+            guard response == .alertFirstButtonReturn, self?.host?.session != nil else { return }
+            self?.pasteNow(sanitized)
+        }
+    }
+
+    /// A paste in every way that matters, as in `pasteFromClipboard` —
+    /// including saying so when the child is not reading, rather than
+    /// dropping the drop without a word.
+    private func pasteNow(_ sanitized: String) {
+        host?.pointer.returnToBottomOnInput()
         sendPaste(sanitized)
     }
 
@@ -737,23 +746,29 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     }
 
     @objc func clearHistory(_ sender: Any?) {
-        guard confirmDiscardingHistory(titleKey: "clear.history.title") else { return }
-        applyTerminalState(.clearHistory, notice: "toast.clearedHistory")
+        confirmDiscardingHistory(titleKey: "clear.history.title") { [weak self] in
+            self?.applyTerminalState(.clearHistory, notice: "toast.clearedHistory")
+        }
     }
 
     @objc func resetTerminal(_ sender: Any?) {
-        guard confirmDiscardingHistory(titleKey: "clear.reset.title") else { return }
-        applyTerminalState(.reset, notice: "toast.resetTerminal")
+        confirmDiscardingHistory(titleKey: "clear.reset.title") { [weak self] in
+            self?.applyTerminalState(.reset, notice: "toast.resetTerminal")
+        }
     }
 
     /// Asks before discarding history, which can't be undone — never for Clear
     /// Screen or an empty scrollback, so the dialog keeps its meaning. States
-    /// the line count. Honours `confirm-close` rather than a second key.
-    private func confirmDiscardingHistory(titleKey: String) -> Bool {
+    /// the line count. Honours `confirm-close` rather than a second key. A
+    /// sheet on the pane's window; `proceed` runs once confirmed, or at once
+    /// when nothing needs asking.
+    private func confirmDiscardingHistory(
+        titleKey: String, then proceed: @escaping @MainActor () -> Void
+    ) {
         guard let host, host.isOperable, ConfigurationStore.shared.configuration.confirmClose
-        else { return true }
+        else { return proceed() }
         let lines = host.session.snapshot().scrollback.count
-        guard lines > 0 else { return true }
+        guard lines > 0 else { return proceed() }
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = L10n.text(titleKey)
@@ -761,7 +776,10 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         alert.addButton(withTitle: L10n.text("clear.history.discard"))
         alert.addButton(withTitle: L10n.text("common.cancel"))
         alert.buttons.first?.hasDestructiveAction = true
-        return alert.runModal() == .alertFirstButtonReturn
+        alert.present(for: host.view.window) { [weak self] response in
+            guard response == .alertFirstButtonReturn, self?.host?.isOperable == true else { return }
+            proceed()
+        }
     }
 
     /// Applies the command, then drops a selection or viewport pointing into

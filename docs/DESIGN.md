@@ -356,7 +356,8 @@ touching `String`, allocating, or retaining can deadlock. Resolved by
 not calling `fork()` at all: `CortaTerminal/Spawn.swift` `posix_spawn`s
 a small helper executable (`corta-exec`, its own SwiftPM product) onto
 the pty replica, with `POSIX_SPAWN_SETSID` and file actions dup'ing the
-replica to fds 0/1/2. `posix_spawn_file_actions_t` cannot express
+replica to fds 0/1/2 and changing to the working directory.
+`posix_spawn_file_actions_t` cannot express
 `ioctl(TIOCSCTTY)` — required on Darwin because a session leader does
 not acquire a controlling terminal merely by having the tty on fd 0 —
 so `corta-exec` does that one call and then `execve`s over itself into

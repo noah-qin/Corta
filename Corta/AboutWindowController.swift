@@ -55,6 +55,6 @@ final class AboutWindowController: NSWindowController {
         showWindow(sender)
         window?.center()
         window?.makeKeyAndOrderFront(sender)
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
     }
 }

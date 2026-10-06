@@ -88,6 +88,10 @@ what to edit.
   connection tools into submenus while keeping splitting and clearing direct.
 - Keyboard Shortcuts uses aligned columns, clearer section boundaries and
   explicit labels for commands without bindings. About links have separators.
+- Confirmations that belong to a window — closing a window, tab or pane with
+  something running, quitting, clearing history or resetting, and pasting
+  text with newlines — appear as a sheet on that window instead of a dialog
+  that blocks the whole app.
 
 ### Fixed
 
