@@ -61,3 +61,29 @@ nonisolated enum UserFile {
         return current
     }
 }
+
+/// Corta's own state files that say where the user works — recent hosts,
+/// directory history, window state. Owner-only from the first byte: written
+/// at the default umask and `chmod`ed after, each was readable by others for
+/// a moment, and stayed so if the second step never ran.
+nonisolated enum PrivateFile {
+    /// Atomic: a `0600` temporary beside `url`, renamed over it.
+    static func write(_ data: Data, to url: URL) throws {
+        let directory = url.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let temporary = directory.appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString)")
+        let descriptor = open(temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
+        guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        do {
+            try handle.write(contentsOf: data)
+            try handle.close()
+            guard rename(temporary.path, url.path) == 0 else {
+                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            }
+        } catch {
+            unlink(temporary.path)
+            throw error
+        }
+    }
+}

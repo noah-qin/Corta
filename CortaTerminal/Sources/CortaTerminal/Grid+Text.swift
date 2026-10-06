@@ -137,7 +137,7 @@ extension Grid {
     /// Reads only each row's wrap flag: a 2 MB single-line file is one chain
     /// through the whole scrollback, and copying every row out on each mouse
     /// move made hovering it stutter.
-    public func logicalLineRowSpan(containing row: Int) -> (first: Int, last: Int) {
+    func logicalLineRowSpan(containing row: Int) -> (first: Int, last: Int) {
         var top = row
         while isDocumentLineWrapped(top - 1) { top -= 1 }
         var bottom = row

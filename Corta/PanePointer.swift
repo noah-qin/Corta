@@ -432,7 +432,7 @@ final class PanePointer: NSObject {
                 NSCursor.arrow.set()
                 hoveringLink = false
             }
-            let target = Self.target(of: link.url)?.absoluteString ?? link.url
+            let target = Self.target(of: link.url)?.absoluteString ?? ""
             let tip = opensLinksOnPlainClick
                 ? target : L10n.format("link.commandClick", target)
             if terminalView.toolTip != tip { terminalView.toolTip = tip }
@@ -497,7 +497,11 @@ final class PanePointer: NSObject {
         guard session != nil, terminalRenderer != nil else { return nil }
         let grid = session.snapshot()
         let point = documentPosition(for: event, in: terminalView, grid: grid)
-        return LinkDetection.link(at: point, in: grid)
+        // A link that cannot open — an OSC 8 `ftp:` or `file:` target — is no
+        // link: no hand, no underline, and no tooltip showing its raw text.
+        guard let link = LinkDetection.link(at: point, in: grid), Self.target(of: link.url) != nil
+        else { return nil }
+        return link
     }
 
     /// A reference known to name an existing local file.
@@ -653,15 +657,10 @@ final class PanePointer: NSObject {
         var row = end - base - 1
         var rowsScanned = 0
         while row >= startDoc, rowsScanned < Self.maxCommandOutputRowsScanned {
-            let span = grid.logicalLineRowSpan(containing: row)
-            rowsScanned += row - span.first + 1
-            if (span.last - span.first + 1) * grid.columns <= FileReferenceDetection.maxPatternScanCells,
-                let reference = FileReferenceDetection.references(
-                    in: grid.logicalLine(containing: row)).last
-            {
-                return reference
-            }
-            row = span.first - 1
+            let line = FileReferenceDetection.references(inLineContaining: row, in: grid)
+            rowsScanned += row - line.firstRow + 1
+            if let reference = line.references.last { return reference }
+            row = line.firstRow - 1
         }
         return nil
     }

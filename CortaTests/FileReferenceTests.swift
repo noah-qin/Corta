@@ -158,6 +158,21 @@ struct OpenFileCommandTests {
         #expect(arguments == ["/bin/e", "+42", "/tmp/a{line}{column}{file}:7"])
     }
 
+    @Test("private state files are written owner-only from the first byte")
+    func privateFilesAreOwnerOnly() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("corta-private-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("state.json")
+        try PrivateFile.write(Data("one".utf8), to: url)
+        try PrivateFile.write(Data("two".utf8), to: url)
+        let mode = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int
+        #expect(mode == 0o600)
+        #expect(try String(contentsOf: url, encoding: .utf8) == "two")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path) == ["state.json"],
+            "no temporary left behind")
+    }
+
     @Test("a link opens, and is shown as, the URL the browser receives")
     func linkTargets() {
         #expect(PanePointer.target(of: "https://\u{0430}pple.com/login")?.absoluteString

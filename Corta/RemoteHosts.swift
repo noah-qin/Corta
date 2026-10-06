@@ -241,9 +241,6 @@ final class RecentHostsStore {
             let data = try? JSONEncoder().encode(
                 Persisted(version: Persisted.currentVersion, hosts: hosts))
         else { return }
-        try? FileManager.default.createDirectory(
-            at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        guard (try? data.write(to: fileURL, options: .atomic)) != nil else { return }
-        chmod(fileURL.path, 0o600)
+        try? PrivateFile.write(data, to: fileURL)
     }
 }

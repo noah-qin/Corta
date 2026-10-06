@@ -480,6 +480,9 @@ public final class SFTPTransferEngine: @unchecked Sendable {
             Darwin.close(descriptor)
             descriptorOpen = false
             try await session.close(handle)
+            // On the partial, so the file appears at its name already marked:
+            // marked after the rename, it sat there unmarked for a moment.
+            if configuration.quarantinesDownloads { Self.markQuarantined(partialPath) }
             // Commit: rename over the destination atomically — or, when the
             // policy forbids replacing it, only if it is still absent: a file
             // that appeared since the check is not ours to overwrite.
@@ -492,7 +495,6 @@ public final class SFTPTransferEngine: @unchecked Sendable {
                 if code == EEXIST { throw SFTPError.destinationConflict(path: destinationPath) }
                 throw SFTPError.localIOFailed(operation: "rename", code: code)
             }
-            if configuration.quarantinesDownloads { Self.markQuarantined(destinationPath) }
             return SFTPTransferReceipt(
                 bytesTransferred: receipt, resumedFromOffset: offset, attempts: 0)
         } catch {

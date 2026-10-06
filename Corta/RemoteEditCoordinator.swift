@@ -491,14 +491,20 @@ final class RemoteEditCoordinator {
             Task { [weak self] in await self?.redownload(copy) }
         case .saveCopyElsewhere(let destination):
             do {
+                // The save panel already asked about replacing an existing
+                // file; `copyItem` alone refuses one.
+                if FileManager.default.fileExists(atPath: destination.path) {
+                    try FileManager.default.removeItem(at: destination)
+                }
                 try FileManager.default.copyItem(at: store.localURL(for: copy), to: destination)
             } catch {
-                // Said, and the decision stays owed: dropping it here told
-                // the user nothing while no copy existed where they chose.
+                // Said, and the decision asked again: dropped, it told the user
+                // nothing; kept silently, it blocked every later upload prompt.
                 let code = ((error as NSError).userInfo[NSUnderlyingErrorKey] as? NSError)?.code
                 presenter.showError(SFTPBrowserModel.errorMessage(
                     .localIOFailed(operation: "save copy", code: Int32(code ?? Int(EIO))),
                     host: copy.host))
+                presenter.promptConflict(conflict)
                 return
             }
             removeSnapshot(copy.id)
