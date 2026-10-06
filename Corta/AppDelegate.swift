@@ -292,22 +292,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private func restoreWindowsIfConfigured() {
         guard Self.isRestoreEnabled else { return }
         let states: [WindowState]
-        switch SessionRestore.decideRestore() {
+        switch SessionRestore.standard.decideRestore() {
         case .skipAfterFailure:
             // The marker survives only a launch that died mid-restore; that layout
             // is the suspect, so drop it.
-            SessionRestore.clear()
-            SessionRestore.endRestore()
+            SessionRestore.standard.clear()
+            SessionRestore.standard.endRestore()
             return
         case .nothingToRestore:
             return
         case .restore(let saved):
             states = saved
         }
-        SessionRestore.beginRestore()
+        SessionRestore.standard.beginRestore()
         // Keep the state file: `noteLayoutChanged` rewrites it, so a later
         // crash still has a last-known-good layout.
-        defer { SessionRestore.endRestore() }
+        defer { SessionRestore.standard.endRestore() }
 
         // The storyboard's window already spawned its shell in the home
         // directory, which a restore can't move. Every saved state gets a fresh
@@ -369,10 +369,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     private func saveWindowStates() {
         guard Self.isRestoreEnabled else {
-            SessionRestore.clear()
+            SessionRestore.standard.clear()
             return
         }
-        SessionRestore.save(
+        SessionRestore.standard.save(
             windowControllers.compactMap { ($0 as? TerminalWindowController)?.restorableState })
     }
 

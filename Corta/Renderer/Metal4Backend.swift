@@ -18,6 +18,7 @@ import CoreGraphics
 import Foundation
 import Metal
 import OSLog
+import Synchronization
 
 enum Metal4BackendError: Error {
     /// The GPU has no `MTLGPUFamily.metal4` — a virtual machine's
@@ -35,16 +36,20 @@ enum Metal4BackendError: Error {
 nonisolated enum Metal4Diagnostics {
     static let log = OSLog(subsystem: "dev.noahqin.Corta", category: "render")
 
-    private static let lock = NSLock()
     /// Bounded, or a faulting queue logs once per frame forever.
-    nonisolated(unsafe) private static var reportedFaults = 0
+    private static let reportedFaults = Atomic<Int>(0)
+    private static let faultReportLimit = 8
 
     static func reportCommitFault(_ error: any Error) {
-        lock.lock()
-        let reported = reportedFaults
-        if reportedFaults < 8 { reportedFaults += 1 }
-        lock.unlock()
-        guard reported < 8 else { return }
+        // Claim a slot below the limit; at the limit the counter stops.
+        var reported = reportedFaults.load(ordering: .relaxed)
+        while reported < faultReportLimit {
+            let (exchanged, original) = reportedFaults.compareExchange(
+                expected: reported, desired: reported + 1, ordering: .relaxed)
+            if exchanged { break }
+            reported = original
+        }
+        guard reported < faultReportLimit else { return }
         os_log(.error, log: log, "Metal 4 commit faulted: %{public}@", String(describing: error))
     }
 
@@ -130,20 +135,13 @@ public nonisolated final class Metal4Backend {
     private let completion = FrameCompletion()
 
     /// Written by the feedback handler, read by `beginFrame`.
-    private final class FrameCompletion: @unchecked Sendable {
-        private let lock = NSLock()
-        private var completedFrame: UInt64 = 0
+    private final class FrameCompletion: Sendable {
+        private let completedFrame = Atomic<UInt64>(0)
 
-        var completed: UInt64 {
-            lock.lock()
-            defer { lock.unlock() }
-            return completedFrame
-        }
+        var completed: UInt64 { completedFrame.load(ordering: .acquiring) }
 
         func note(_ frame: UInt64) {
-            lock.lock()
-            if frame > completedFrame { completedFrame = frame }
-            lock.unlock()
+            completedFrame.max(frame, ordering: .releasing)
         }
     }
 

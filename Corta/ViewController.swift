@@ -632,7 +632,9 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// collaborator that owns actions joins both lists, in the same order
     /// (`PaneCommandsTests` holds them equal). `focus` and `appearance` have
     /// only notification selectors and stay out.
-    var actionOwners: [NSObject] { [search, remote, commands, pointer, shell] }
+    /// Main-actor classes, so `Sendable`: `forwardingTarget(for:)` can carry
+    /// one out of its `assumeIsolated`.
+    var actionOwners: [any NSObject & Sendable] { [search, remote, commands, pointer, shell] }
     /// The same owners as classes, for a question that may come from any
     /// thread and so must not touch the instances.
     nonisolated static let actionOwnerClasses: [NSObject.Type] = [
@@ -662,10 +664,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         guard let aSelector, Thread.isMainThread else {
             return super.forwardingTarget(for: aSelector)
         }
-        // Handed straight back to the runtime on this thread.
-        nonisolated(unsafe) var owner: NSObject?
-        MainActor.assumeIsolated {
-            owner = actionOwners.first { $0.responds(to: aSelector) }
+        let owner = MainActor.assumeIsolated {
+            actionOwners.first { $0.responds(to: aSelector) }
         }
         return owner ?? super.forwardingTarget(for: aSelector)
     }

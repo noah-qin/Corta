@@ -16,6 +16,7 @@
 
 import Foundation
 import Metal
+import Synchronization
 
 enum QuadPipelineError: Error {
     case libraryUnavailable
@@ -38,15 +39,16 @@ enum QuadPipelineError: Error {
 /// Keyed by device alone: the library is `makeDefaultLibrary()`, fixed for
 /// the process, and Metal doesn't promise the same library object twice.
 ///
-/// `lock` covers lookup and one-time creation, including the archive
-/// work, which happens nowhere else.
+/// `entries`' lock covers lookup and one-time creation, including the
+/// archive work, which happens nowhere else.
 public nonisolated enum QuadPipelineCache {
     /// Every render target's format; the pipelines are built against it.
     public static let pixelFormat: MTLPixelFormat = .bgra8Unorm
 
-    /// The immutable bundle every pane draws with; `let`-only, so sharing
-    /// needs no further synchronisation.
-    nonisolated final class Entry {
+    /// The immutable bundle every pane draws with; `let`-only, and Metal's
+    /// device, pipeline and sampler objects are thread-safe, so sharing needs
+    /// no further synchronisation.
+    nonisolated final class Entry: Sendable {
         /// Retained so the `ObjectIdentifier` key can't be recycled.
         let device: MTLDevice
         let solidPipeline: MTLRenderPipelineState
@@ -69,27 +71,23 @@ public nonisolated enum QuadPipelineCache {
         }
     }
 
-    private static let lock = NSLock()
-    // Mutated only under `lock`.
-    nonisolated(unsafe) private static var entries: [ObjectIdentifier: Entry] = [:]
+    private static let entries = Mutex<[ObjectIdentifier: Entry]>([:])
 
     /// The shared entry, created on first ask; a hit is a locked lookup.
     static func entry(for device: MTLDevice) throws -> Entry {
         let key = ObjectIdentifier(device)
-        lock.lock()
-        defer { lock.unlock() }
-        if let entry = entries[key] { return entry }
-        let entry = try makeEntry(device: device)
-        entries[key] = entry
-        return entry
+        return try entries.withLock { entries in
+            if let entry = entries[key] { return entry }
+            let entry = try makeEntry(device: device)
+            entries[key] = entry
+            return entry
+        }
     }
 
     /// Test hook: forces the cold path, so `QuadPipelineCacheTests` sees the
     /// archive rewritten.
     public static func resetForTesting() {
-        lock.lock()
-        entries.removeAll()
-        lock.unlock()
+        entries.withLock { $0.removeAll() }
     }
 
     /// Builds the pipelines through the previous launch's binary archive, then

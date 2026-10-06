@@ -816,8 +816,9 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     }
 }
 
-/// The presented panel, for `onCancel` to dismiss. `@unchecked Sendable`:
-/// every access is on the main actor, `onCancel` included via its hop.
-private final class PresentedPanelBox: @unchecked Sendable {
+/// The presented panel, for `onCancel` to dismiss. Main-actor isolated, so
+/// `onCancel` reaches it through its hop.
+@MainActor
+private final class PresentedPanelBox {
     var panel: NSSavePanel?
 }

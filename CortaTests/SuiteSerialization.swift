@@ -28,14 +28,6 @@ import Testing
 ///   a full parallel run aborted the runner in `ColorEmojiRenderTests` with a
 ///   texture descriptor Metal refused. Nothing reproduced it in
 ///   isolation; the suites that build an atlas now take turns.
-/// - **`.sessionRestoreSerialized`** — `SessionRestore.directory` is a
-///   mutable static, opened up for exactly this reason. Two suites point it
-///   at their own temporary directory and put it back afterwards, so with
-///   both running at once one suite reads the other's fixture, or restores a
-///   value the other had already replaced. Today both are `@MainActor` with
-///   fully synchronous bodies, which is what has kept them apart so far — an
-///   `await` added anywhere inside either one would end that silently. The
-///   gate states the requirement instead of leaving it to be rediscovered.
 ///
 /// Applied alongside `.serialized`, not instead of it: `@Suite(.serialized,
 /// .metalSerialized)`.
@@ -70,8 +62,6 @@ struct SuiteSerializationTrait: SuiteTrait, TestTrait, TestScoping {
 extension Trait where Self == SuiteSerializationTrait {
     /// See `SuiteSerializationTrait`.
     static var metalSerialized: Self { Self(gate: .metal) }
-    /// See `SuiteSerializationTrait`.
-    static var sessionRestoreSerialized: Self { Self(gate: .sessionRestore) }
 }
 
 /// A one-holder gate per kind of shared state. Not a lock: the scope it
@@ -79,7 +69,6 @@ extension Trait where Self == SuiteSerializationTrait {
 /// stall the pool rather than order it.
 actor SuiteGate {
     static let metal = SuiteGate()
-    static let sessionRestore = SuiteGate()
 
     private var isHeld = false
     private var waiters: [CheckedContinuation<Void, Never>] = []

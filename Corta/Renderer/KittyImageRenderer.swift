@@ -20,6 +20,7 @@ import Foundation
 import ImageIO
 import Metal
 import ObjectiveC
+import Synchronization
 import simd
 
 /// Decodes Kitty graphics images into textures and draws each placement as
@@ -71,7 +72,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     private static let decodeBudget = GlobalTextureBudget(limit: 2)
     private static let decodeFinished = Notification.Name("Corta.imageDecodeFinished")
     private var decodeObserver: NSObjectProtocol?
-    private final class TextureLeaseKey: @unchecked Sendable {}
+    private final class TextureLeaseKey: Sendable {}
     private static let textureLeaseKey = TextureLeaseKey()
 
     /// A background decode installed a texture; schedule a frame. Called on
@@ -441,15 +442,10 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     }
 
     /// Scheduler abandonment and renderer teardown return admission too.
-    private final class DecodePermit: @unchecked Sendable {
-        private let lock = NSLock()
-        private var released = false
+    private final class DecodePermit: Sendable {
+        private let released = Atomic<Bool>(false)
         func release() {
-            lock.lock()
-            let shouldRelease = !released
-            released = true
-            lock.unlock()
-            guard shouldRelease else { return }
+            guard !released.exchange(true, ordering: .acquiringAndReleasing) else { return }
             KittyImageRenderer.decodeBudget.release(1)
             NotificationCenter.default.post(name: KittyImageRenderer.decodeFinished, object: nil)
         }
@@ -536,39 +532,29 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
 /// The app-wide image texture budget: VRAM is shared, and per-pane caps
 /// don't stop N panes exhausting it. Texture leases release reservations
 /// only when the last texture owner disappears, including GPU retention.
-nonisolated final class GlobalTextureBudget: @unchecked Sendable {
+nonisolated final class GlobalTextureBudget: Sendable {
     static let shared = GlobalTextureBudget(limit: KittyGraphics.maximumGlobalTextureBytes)
 
     let limit: Int
-    private let lock = NSLock()
-    private var reserved = 0
-    private var retired = 0
-    private var releaseCount = 0
+
+    private struct State {
+        var reserved = 0
+        var retired = 0
+        var releaseCount = 0
+    }
+
+    private let state = Mutex(State())
 
     /// Bumped on every release, so a renderer that skipped an image learns
     /// cheaply that space may exist.
-    var generation: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return releaseCount
-    }
+    var generation: Int { state.withLock { $0.releaseCount } }
 
-    var reservedBytes: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return reserved
-    }
+    var reservedBytes: Int { state.withLock { $0.reserved } }
 
-    var retiredBytes: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return retired
-    }
+    var retiredBytes: Int { state.withLock { $0.retired } }
 
     func markRetired(_ bytes: Int) {
-        lock.lock()
-        retired += bytes
-        lock.unlock()
+        state.withLock { $0.retired += bytes }
     }
 
     init(limit: Int) {
@@ -576,18 +562,18 @@ nonisolated final class GlobalTextureBudget: @unchecked Sendable {
     }
 
     func tryReserve(_ bytes: Int) -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        guard bytes <= limit - reserved else { return false }
-        reserved += bytes
-        return true
+        state.withLock { state in
+            guard bytes <= limit - state.reserved else { return false }
+            state.reserved += bytes
+            return true
+        }
     }
 
     func release(_ bytes: Int, retired wasRetired: Bool = false) {
-        lock.lock()
-        defer { lock.unlock() }
-        reserved -= bytes
-        if wasRetired { retired -= bytes }
-        releaseCount &+= 1
+        state.withLock { state in
+            state.reserved -= bytes
+            if wasRetired { state.retired -= bytes }
+            state.releaseCount &+= 1
+        }
     }
 }
