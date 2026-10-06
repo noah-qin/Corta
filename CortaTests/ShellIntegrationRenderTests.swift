@@ -111,6 +111,30 @@ import Testing
         #expect(cleared.r == 0 && cleared.g == 0 && cleared.b == 0)
     }
 
+    /// Output that scrolls the screen moves each rule with its prompt on the
+    /// incremental path — the shifted rows are not rebuilt, so the rules
+    /// must be (#238).
+    @Test func aRuleScrollsWithItsPrompt() throws {
+        guard let fixture = try Self.fixture() else {
+            Issue.record("No Metal device available in this environment")
+            return
+        }
+        var terminal = Terminal(rows: 4, columns: 10)
+        terminal.feed(Array("\r\n\u{1B}]133;A\u{07}$ x\r\n\u{1B}]133;C\u{07}out\r\n\u{1B}]133;D;1\u{07}".utf8))
+        let rowHeight = Int(fixture.renderer.metrics.cellHeight)
+        func ruledRows() -> [Int] {
+            let texture = Self.draw(fixture, grid: terminal.grid, margin: 8)
+            return (0..<4).filter { row in
+                let pixel = Self.pixel(of: texture, x: 2, y: row * rowHeight + rowHeight / 2)
+                return pixel.r > 0 || pixel.g > 0 || pixel.b > 0
+            }
+        }
+        #expect(ruledRows() == [1])
+        terminal.feed(Array("\r\n".utf8))
+        #expect(ruledRows() == [0])
+        #expect(fixture.renderer.lastRebuiltRowCount < 4, "the scroll took the incremental path")
+    }
+
     /// A prompt still waiting on its command, and the row output starts on,
     /// draw nothing: after `clear` the grey rule on the lone current prompt
     /// looked like a stray line (#165).
