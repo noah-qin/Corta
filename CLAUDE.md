@@ -75,6 +75,9 @@ line each:
   directory, no updater, no move-to-Applications prompt. **D23** Sparkle is
   the one accepted third-party runtime dependency; the Mac App Store is
   closed to an unsandboxed terminal.
+- **D24** The canvas stays below an opaque titlebar; no background
+  extension. **D25** Metal frames present on their own, not with the
+  Core Animation transaction.
 
 ## Working Rules
 

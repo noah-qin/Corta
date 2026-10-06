@@ -875,6 +875,58 @@ CPU-only rows are where this change is read.
 
 Apple M5, macOS 27.0 (26A428), Xcode 27.0 (27A266a), on battery.
 
+### 5.12 Overlays against the Metal frame, and `presentsWithTransaction` (#124)
+
+The question #124 left: do AppKit overlays drawn over the Metal layer
+fall out of step with the text by a frame, and does presenting inside the
+Core Animation transaction fix it? A screen recording is not available to
+an automated check, so the measurement uses what a screenshot is — one
+composited frame — and makes a one-frame gap visible in a single still.
+
+**Method.** A scratch `ZDOTDIR` whose `.zshrc` prints, every 16 ms (about
+one frame), `OSC 133 A`, `$ step N`, `OSC 133 C`, `output line N` and
+`OSC 133 D;s`, with `s = 1` when `N % 3 == 0`. Every command is two rows,
+so the status rule of a prompt that is one frame stale lands exactly on
+the previous command's prompt: the positions stay right and the colour
+pattern moves. A throwaway XCUITest launches the staged development build
+and takes `window.screenshot()` repeatedly while the output scrolls; a
+Swift script reads each prompt's number with Vision and the rule's colour
+beside it, and reports the shift `s` (0, 1 or 2) for which every rule's
+colour is the status of command `N + s`. `presentsWithTransaction` was a
+launch-time switch in the spike, not in the tree.
+
+| Configuration | Frames | Shift 0 | Shift 1 | Shift 2 |
+| --- | --- | --- | --- | --- |
+| Default | 8 | 0 | 5 | 3 |
+| `presentsWithTransaction` | 8 | 0 | 5 | 3 |
+| `CORTA_FRAME_LATENCY=1` | 12 | 0 | 5 | 7 |
+| Both | 12 | 0 | 7 | 5 |
+
+The core's mapping of records to marked rows is correct, checked against
+a grid snapshot older than the records. The rules lead because
+`ShellOverlayView` commits with this run-loop pass while the drawable for
+the same snapshot lands one to two frames later; neither property changes
+that. The fix is to draw what must stay locked to the text in the Metal
+pass (#238).
+
+**Cost.** `MeasurementUITests/testKeypressToGlass`, Benchmark
+configuration, 200 samples, two rounds alternating:
+
+| `presentsWithTransaction` | p50 | p95 | p99 |
+| --- | --- | --- | --- |
+| Off | 117.3 / 109.8 ms | 134.4 / 133.5 ms | 135.6 / 136.0 ms |
+| On | 118.6 / 111.5 ms | 134.7 / 133.8 ms | 135.8 / 135.2 ms |
+
+These absolute figures are not comparable with §5.7's (another session,
+another load on the machine); the A/B within the session is. On costs a
+millisecond and a half at the median and buys nothing, so it stays off
+(D25).
+
+**The titlebar.** The same session tried `NSBackgroundExtensionView`
+under the titlebar; that is a visual result, recorded in D24.
+
+Apple M5, macOS 27.0 (26A428), Xcode 27.0 (27A266a), on battery.
+
 ## Follow-up performance checks
 
 ASCII queries now retain a cell-based path for Unicode scalars whose case
