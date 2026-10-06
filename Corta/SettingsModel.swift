@@ -59,7 +59,6 @@ final class SettingsModel {
     var suggestApplicationsFolder = true
     var presets: [Preset] = []
     var keybindings = Keybindings()
-    var availableFonts: [String] = []
 
     var statusBar = false
     var statusItems = Set(SystemMetrics.Item.allCases)
@@ -107,7 +106,6 @@ final class SettingsModel {
     // MARK: - Status rows
 
     var saveStatus = RowStatus()
-    var fontStatus = RowStatus()
     var shellIntegrationStatus = RowStatus()
     var directoryHistoryStatus = RowStatus()
     var recentHostsStatus = RowStatus()
@@ -123,12 +121,6 @@ final class SettingsModel {
     /// without this the page refreshed twice per control change. An
     /// external edit differs from this and still refreshes.
     private var mirrored: Configuration?
-
-    /// The family `fontStatus` was resolved for. Resolving is four CoreText
-    /// faces and an advance measurement across the printable ASCII range
-    /// (`MonospacedFontCatalog.isUsable`), so it is redone only when the
-    /// family changes or `retryFontResolution` asks.
-    private var resolvedFontFamily: String?
 
     /// What `previewFont` was built for, so a change to any other setting
     /// does not rebuild the face.
@@ -240,7 +232,6 @@ final class SettingsModel {
             refreshPreviewFont()
         }
         refreshQuickTerminalStatus()
-        if fontFamily != resolvedFontFamily { refreshFontStatus() }
         refreshNotificationPermissionNotice()
     }
 
@@ -271,11 +262,6 @@ final class SettingsModel {
         }
     }
     private(set) var followsSystemDark = false
-
-    var fontFamilyDisplay: String {
-        fontFamily == Configuration.systemFontFamily
-            ? L10n.text("settings.font.systemMonospaced") : fontFamily
-    }
 
     /// Stored rather than computed: a computed `previewFont` re-resolved
     /// the face — the same measurement `refreshFontStatus` does — on every
@@ -642,37 +628,6 @@ final class SettingsModel {
         NSWorkspace.shared.activateFileViewerSelecting([ConfigurationStore.fileURL])
     }
 
-    // MARK: - Font status
-
-    /// Distinguishes a family AppKit knows nothing about from one that
-    /// exists but fails the grid's uniform-advance check, rather than
-    /// leaving both as an unexplained silent substitution.
-    private func refreshFontStatus() {
-        resolvedFontFamily = fontFamily
-        switch TerminalFont.resolution(forFamily: fontFamily) {
-        case .resolved:
-            fontStatus = RowStatus()
-        case .missing(let requested):
-            fontStatus = RowStatus(
-                kind: .failed, message: L10n.format("settings.status.fontMissing", requested),
-                actionTitle: L10n.text("settings.status.retry"))
-        case .invalidForGrid(let requested):
-            fontStatus = RowStatus(
-                kind: .failed,
-                message: L10n.format("settings.status.fontInvalidForGrid", requested),
-                actionTitle: L10n.text("settings.status.retry"))
-        }
-    }
-
-    /// The first call site `MonospacedFontCatalog.refresh()` has ever had —
-    /// a font installed (or repaired) after this window opened is picked up
-    /// on request rather than only after a relaunch.
-    func retryFontResolution() {
-        MonospacedFontCatalog.refresh()
-        refreshFontStatus()
-        refreshPreviewFont()
-    }
-
     // MARK: - Shell integration
 
     /// Reflects `ShellIntegration`'s states as an icon,
@@ -794,22 +749,6 @@ final class SettingsModel {
 
 // Editors share the existing config-file write and rollback path.
 extension SettingsModel {
-    func editConfigFile() {
-        if ConfigurationStore.shared.write() { NSWorkspace.shared.open(ConfigurationStore.fileURL) }
-        else { reportWriteFailure() }
-    }
-
-    func loadFonts() async {
-        availableFonts = []
-    }
-
-    func setFontFamily(_ value: String) {
-        commit { configuration in
-            configuration.fontFamily = Configuration.systemFontFamily
-            return nil
-        }
-    }
-
     func setCommandHistoryLimit(_ value: Int) {
         commit { configuration in
             let (limit, message) = Self.clamp(value, 0, 10_000, label: L10n.text("ui.history.commands"))

@@ -157,7 +157,7 @@ struct MenuShortcutTests {
         #expect(rebound.keybindings[.splitRight] == Shortcut.parse("cmd+e"))
         // Hosted CI has no Metal 4 device, so the pane may show a fallback
         // instead of installing terminalView. Menu construction needs no GPU.
-        let terminalView = TerminalView(frame: .zero)
+        _ = TerminalView(frame: .zero)
         for config in [original, rebound] {
             let menu = pane.commands.contextMenu(bindings: config.keybindings)
             for command in commands {

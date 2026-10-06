@@ -33,7 +33,6 @@ struct SettingsModelTests {
         #expect(model.previewIsDark)
         model.setAppearance(.light)
         #expect(!model.previewIsDark)
-        model.setFontFamily("PT Mono")
         #expect(model.fontFamily == Configuration.systemFontFamily)
     }
 

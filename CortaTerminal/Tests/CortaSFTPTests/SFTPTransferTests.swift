@@ -273,6 +273,74 @@ struct SFTPTransferTests {
         #expect(receipt.attempts == 1)
     }
 
+    /// The protocol lets a server answer a READ with less than was asked
+    /// anywhere in a file. Taken for end of file, every short reply
+    /// committed a truncated download as a success.
+    @Test("a server that reads short mid-file still delivers the whole file")
+    func shortReadsAreNotEndOfFile() async throws {
+        let rig = try await makeRig(configureServer: { $0.maximumReadReply = 100 })
+        defer { teardown(rig) }
+        let contents = (0..<3000).map { UInt8($0 % 241) }
+        rig.fileSystem.createFile("/remote.bin", data: contents)
+        let destination = rig.directory.appendingPathComponent("out.bin")
+
+        let receipt = try await rig.engine.download(
+            remotePath: "/remote.bin", to: destination, policy: .overwrite)
+        #expect(localContents(destination) == contents)
+        #expect(receipt.bytesTransferred == UInt64(contents.count))
+    }
+
+    /// `.fail` was checked once, before the transfer, and the commit was a
+    /// plain `rename(2)`, which replaced a file that appeared meanwhile.
+    @Test("the fail policy does not replace a destination that appeared mid-transfer")
+    func failPolicyHoldsAtCommit() async throws {
+        let rig = try await makeRig()
+        defer { teardown(rig) }
+        rig.fileSystem.createFile("/remote", data: [1, 2, 3])
+        let destination = rig.directory.appendingPathComponent("out")
+        let path = destination.path
+        rig.server.interceptor = { message in
+            if case .read = message.payload, !FileManager.default.fileExists(atPath: path) {
+                FileManager.default.createFile(atPath: path, contents: Data([7]))
+            }
+            return .proceed
+        }
+        do {
+            _ = try await rig.engine.download(remotePath: "/remote", to: destination, policy: .fail)
+            Issue.record("the new destination should have failed the commit")
+        } catch {
+            #expect(error == .destinationConflict(path: path))
+        }
+        #expect(localContents(destination) == [7])
+    }
+
+    /// Every path is sent as a `String`'s UTF-8, so a name that is not
+    /// valid UTF-8 cannot be addressed: its lossy form names another file.
+    @Test("a directory download skips a name that is not UTF-8")
+    func nonUTF8NamesAreSkipped() async throws {
+        let rig = try await makeRig()
+        defer { teardown(rig) }
+        rig.fileSystem.createDirectory("/tree")
+        let listed = Mutex(false)
+        rig.server.interceptor = { message in
+            guard case .readdir = message.payload else { return .proceed }
+            let first = listed.withLock { done in
+                defer { done = true }
+                return !done
+            }
+            guard first else { return .reply(.status(SFTPStatus(code: .endOfFile))) }
+            return .reply(.name([
+                SFTPEntry(
+                    filename: [0x61, 0xFF, 0x62],
+                    attributes: SFTPAttributes(size: 1, permissions: 0o100_644)),
+            ]))
+        }
+        let target = rig.directory.appendingPathComponent("tree")
+        let receipt = try await rig.engine.downloadDirectory(remotePath: "/tree", to: target)
+        #expect(receipt.filesTransferred == 0)
+        #expect(receipt.skipped.map(\.reason) == [.unsafeName])
+    }
+
     @Test("a download interrupted mid-transfer resumes from the partial's size")
     func downloadResumesAfterTransportFailure() async throws {
         // The first server answers one READ, then drops the connection on
@@ -457,7 +525,7 @@ struct SFTPTransferTests {
         let contents = (0..<2048).map { UInt8($0 % 247) }
         let source = try localFile(rig, "up.bin", contents: contents)
 
-        try await rig.engine.upload(from: source, to: "/dest/up.bin", policy: .fail)
+        try await rig.engine.upload(from: source, to: "/dest/up.bin", policy: .overwrite)
 
         let partialPath = "/dest/up.bin" + rig.partialName
         let log = rig.server.log
@@ -471,6 +539,35 @@ struct SFTPTransferTests {
         #expect(closeIndex != nil && renameIndex != nil && closeIndex! < renameIndex!)
         #expect(rig.fileSystem.file("/dest/up.bin")?.data == contents)
         #expect(!rig.fileSystem.exists(partialPath))
+    }
+
+    /// `posix-rename` replaces its destination, so under `.fail` the commit
+    /// is version 3's RENAME, which refuses one that appeared after the check.
+    @Test("an upload under the fail policy commits without replacing")
+    func uploadFailPolicyHoldsAtCommit() async throws {
+        let rig = try await makeRig(configureServer: { server in
+            server.advertisedExtensions = [SFTPCodec.posixRenameExtensionName]
+        })
+        defer { teardown(rig) }
+        let source = try localFile(rig, "up.bin", contents: [1, 2, 3, 4])
+        let fileSystem = rig.fileSystem
+        rig.server.interceptor = { message in
+            if case .write = message.payload, !fileSystem.exists("/dest/up.bin") {
+                fileSystem.createFile("/dest/up.bin", data: [0xee])
+            }
+            return .proceed
+        }
+        do {
+            _ = try await rig.engine.upload(from: source, to: "/dest/up.bin", policy: .fail)
+            Issue.record("the new destination should have failed the commit")
+        } catch {
+            guard case SFTPError.server = error else {
+                Issue.record("expected the server's refusal, got \(error)")
+                return
+            }
+        }
+        #expect(rig.fileSystem.file("/dest/up.bin")?.data == [0xee])
+        #expect(!rig.server.log.operations.contains("extended \(SFTPCodec.posixRenameExtensionName)"))
     }
 
     @Test("without posix-rename, overwriting falls back to remove then rename")

@@ -60,14 +60,6 @@ import Testing
         #expect(MonospacedFontCatalog.uniformAdvance(of: helvetica) == nil)
     }
 
-    @Test func everyOfferedFamilyPassesItsOwnCheck() {
-        let families = MonospacedFontCatalog.families()
-        #expect(!families.isEmpty)
-        for family in families {
-            #expect(MonospacedFontCatalog.isUsable(family: family), "\(family) was offered")
-        }
-    }
-
     /// A hand-edited config can name anything, so the same check runs at the
     /// font's construction site and falls back to System Monospaced.
     @Test func primaryFontRefusesAnUnusableFamily() {
@@ -76,26 +68,6 @@ import Testing
         #expect(
             CTFontCopyPostScriptName(fallback) as String
                 == CTFontCopyPostScriptName(system) as String)
-    }
-
-    // MARK: - Resolution
-
-    @Test func resolutionIsResolvedForNilAndForTheSystemFamily() {
-        #expect(TerminalFont.resolution(forFamily: nil) == .resolved)
-        #expect(TerminalFont.resolution(forFamily: Configuration.systemFontFamily) == .resolved)
-    }
-
-    @Test func resolutionIsResolvedForAKnownGoodFamily() {
-        #expect(TerminalFont.resolution(forFamily: "Menlo") == .resolved)
-    }
-
-    @Test func resolutionDistinguishesMissingFromInvalidForGrid() {
-        #expect(
-            TerminalFont.resolution(forFamily: "No Such Family At All")
-                == .missing(requested: "No Such Family At All"))
-        #expect(
-            TerminalFont.resolution(forFamily: "Helvetica")
-                == .invalidForGrid(requested: "Helvetica"))
     }
 
     // MARK: - Styles

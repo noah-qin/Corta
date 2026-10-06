@@ -51,8 +51,9 @@ public enum SFTPCodec {
     /// The hard limit on one frame — the largest allocation a peer's length
     /// prefix can ever ask for. Sized to what a well-formed peer sends:
     /// OpenSSH's own client and server cap a message at 256 KiB, and the
-    /// largest thing this client requests is a `maximumReadLength` data
-    /// block of that size plus its header. Four times that leaves room for
+    /// largest thing this client requests is one transfer block
+    /// (`SFTPTransferEngine.Configuration.blockSize`, 32 KiB) plus its
+    /// header. Four times OpenSSH's cap leaves room for
     /// a generous server's `READDIR` batch; a length prefix beyond it is a
     /// desynchronised or hostile peer, rejected before a byte is read
     /// rather than honoured with a hundreds-of-megabytes buffer.
@@ -271,6 +272,12 @@ public struct SFTPEntry: Equatable, Sendable {
     /// The name as UTF-8, for display only. Lossy by design — a name that
     /// is not UTF-8 must still survive a round trip through `filename`.
     public var filenameUTF8: String { String(decoding: filename, as: UTF8.self) }
+
+    /// The name when it is valid UTF-8, else `nil`. Every path this client
+    /// sends is a `String`'s UTF-8, so a lossy name addresses a different
+    /// file — `a\u{FFFD}b`, which a hostile server can also create — and only
+    /// a valid one can be acted on.
+    public var filenameIfUTF8: String? { String(validating: filename, as: UTF8.self) }
 }
 
 /// STATUS (§8.1): the server's answer to every request that has no payload
