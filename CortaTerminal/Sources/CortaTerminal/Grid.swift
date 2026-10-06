@@ -145,6 +145,12 @@ public struct Grid: Sendable {
     private var savedPendingWrap: Bool = false
     private var savedOriginMode: Bool = false
 
+    /// Image bytes on both screens, the parked main one included — what
+    /// `KittyGraphics.maximumPaneImageBytes` bounds.
+    public var retainedImageBytes: Int {
+        imagePlacements.storedBytes + (suspendedMain?.grid.imagePlacements.storedBytes ?? 0)
+    }
+
     /// True while the alternate screen is live.
     public private(set) var isAlternateScreenActive: Bool = false
 
@@ -214,6 +220,12 @@ public struct Grid: Sendable {
         }
         // A control has width 0 and would corrupt the combining path.
         guard let value = Unicode.Scalar(scalar), !Self.isControl(value) else { return }
+        // Drawn, not folded invisibly into the previous cell: invisible is
+        // what makes a bidi override or a hidden ZWSP work (`SECURITY.md` §2.5).
+        if ConcealingScalars.contains(scalar), !continuesFlagTagSequence(scalar) {
+            writeNarrow(UTF8Decoder.replacement)
+            return
+        }
         // After a ZWJ, the scalar continues the cluster: an emoji ZWJ sequence
         // is one wide cell, not a pair per emoji.
         if scalar != 0x200D, let target = clusterJoinTarget(), clusterEndsWithZWJ(target) {
@@ -277,6 +289,14 @@ public struct Grid: Sendable {
             }
             index = end
         }
+    }
+
+    /// A tag continuing a cluster that starts with U+1F3F4: a subdivision flag.
+    private func continuesFlagTagSequence(_ scalar: UInt32) -> Bool {
+        guard ConcealingScalars.isTag(scalar), let target = clusterJoinTarget() else { return false }
+        let cell = lines[target.row][target.column]
+        let cluster = graphemes.scalars(for: cell.grapheme) ?? [cell.scalar]
+        return ConcealingScalars.continuesFlag(cluster, with: scalar)
     }
 
     private static func isControl(_ scalar: Unicode.Scalar) -> Bool {
@@ -1114,7 +1134,13 @@ public struct Grid: Sendable {
         lines = ScreenLines(repeating: Line(), count: rows)
         scrollback = Scrollback(limit: 0)
         graphemes = GraphemeTable()
+        // One pane budget across both screens: the parked main screen keeps
+        // its images, so the alternate screen gets only what they left —
+        // a table of its own doubled what one hostile stream could retain.
+        let parkedImages = imagePlacements
         imagePlacements = ImagePlacementTable()
+        imagePlacements.maximumStoredBytes = max(
+            0, parkedImages.maximumStoredBytes - parkedImages.storedBytes)
         marginTop = 0
         marginBottom = rows - 1
         isAlternateScreenActive = true

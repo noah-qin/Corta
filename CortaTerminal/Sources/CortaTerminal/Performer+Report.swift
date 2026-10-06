@@ -92,6 +92,9 @@ public struct PerformerState: Sendable {
     /// child and stays unimplemented (`SECURITY.md` §6).
     public internal(set) var pendingClipboardCopy: String?
     var pendingImageTransmission: PendingImageTransmission?
+    /// Image bytes this terminal may retain across both screens, from the
+    /// session's `ImageMemoryBudget`; unlimited (the pane cap alone) without one.
+    var imageByteAllowance = Int.max
 
     public init() {}
 }

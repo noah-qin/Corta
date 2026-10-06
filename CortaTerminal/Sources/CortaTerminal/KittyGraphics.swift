@@ -177,13 +177,18 @@ public enum KittyGraphics {
     /// header, in the app's `KittyImageRenderer`.
     public static let maximumImagePixels = 16 * 1024 * 1024
 
-    /// Stored (encoded) bytes per pane — kitty's own quota. Past it a new
+    /// Stored (encoded) bytes per pane, both screens together, an unfinished
+    /// transmission counted at its decoded size — kitty's own quota. Past it a new
     /// transmission gets `ENOSPC`; a visible image is never evicted for it.
     public static let maximumPaneImageBytes = 320 * 1024 * 1024
 
     /// Decoded texture bytes per pane, below the encoded quota because bgra
     /// is up to 4× a PNG; the excess is evicted LRU, not crashed on.
     public static let maximumPaneTextureBytes = 256 * 1024 * 1024
+
+    /// Image bytes across every terminal sharing an `ImageMemoryBudget` —
+    /// the app's one budget. Three panes' worth of the pane cap.
+    public static let maximumProcessImageBytes = 1024 * 1024 * 1024
 
     /// Texture bytes across every pane: VRAM is shared system-wide.
     public static let maximumGlobalTextureBytes = 1024 * 1024 * 1024

@@ -46,8 +46,14 @@ public enum FileReferenceDetection {
     /// Digit runs capped at nine and not followed by a tenth, or a long run
     /// reports a number the output never named. Anchored so `foo.rs:12` inside a
     /// URL is left to the URL detector.
+    ///
+    /// The path run is possessive, its last character checked by lookbehind:
+    /// written as `[\w.+\-/]*[\w.+\-]+`, two overlapping quantifiers, a
+    /// 100,000-character token with no colon backtracked quadratically — 54 s on
+    /// the main thread per ⌘ press. `:` is in neither class, so the run can only
+    /// end at the colon either way and the matches are the same.
     private static let pattern = try! NSRegularExpression(
-        pattern: #"(?<![^\s(\[<'"])([~./]?[\w.+\-/]*[\w.+\-]+):(\d{1,9})(?!\d)(?::(\d{1,9})(?!\d))?"#,
+        pattern: #"(?<![^\s(\[<'"])([~./]?[\w.+\-/]*+(?<=[\w.+\-])):(\d{1,9})(?!\d)(?::(\d{1,9})(?!\d))?"#,
         options: [])
 
     /// As in `LinkDetection`: this runs on every ⌘-hover.
@@ -66,6 +72,7 @@ public enum FileReferenceDetection {
         let text = line.text
         let ns = text as NSString
         var found: [Reference] = []
+        var cursor = CharacterOffsetCursor(text)
         pattern.enumerateMatches(
             in: text, options: [], range: NSRange(location: 0, length: ns.length)
         ) { match, _, _ in
@@ -81,7 +88,8 @@ public enum FileReferenceDetection {
             if match.numberOfRanges >= 4, match.range(at: 3).location != NSNotFound {
                 column = Int(ns.substring(with: match.range(at: 3)))
             }
-            let startOffset = ns.substring(to: match.range.location).count
+            guard let startOffset = cursor.characterOffset(atUTF16Offset: match.range.location)
+            else { return }
             let endOffset = startOffset + ns.substring(with: match.range).count - 1
             guard let start = line.position(at: startOffset),
                 let end = line.position(at: endOffset)

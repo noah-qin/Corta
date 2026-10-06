@@ -126,6 +126,19 @@ The remaining requirement: **do not render bidi and other invisible
 control characters as nothing.** Draw them as a visible replacement
 glyph. Invisible-by-default is what makes the attack work.
 
+**As implemented (S16, 2026-10-07).** `ConcealingScalars` is the one list:
+U+202A–202E and U+2066–2069 (embeddings, overrides, isolates), U+180E,
+U+200B, U+2060–2064, U+206A–206F and U+FEFF (zero-width and deprecated
+format characters), and the tag characters U+E0001 and U+E0020–E007F, which
+encode ASCII invisibly. Tags pass only as a subdivision flag — U+1F3F4, at
+most seven tags, nothing after the cancel tag — so a flag cannot carry a
+hidden message. The
+grid draws each as U+FFFD in a cell of its own, so a copy of what was shown
+holds what was shown; OSC 52 strips them. ZWJ, ZWNJ and LRM/RLM stay
+zero-width — emoji sequences and real bidi text need them. Before S16 they
+were folded invisibly into the previous cell, which is exactly the failure
+this section describes.
+
 ### 2.6 OSC 52 clipboard
 
 Useful — it is how copying from Neovim on a remote host reaches the local
@@ -143,6 +156,9 @@ clipboard — and genuinely dangerous.
   any host that can print bytes. There is no configuration for this; it
   is simply absent. `OSC 52 ; c ; ?` is parsed only far enough to be
   discarded, and answers nothing.
+- **What a write may carry:** the decoded text loses `ConcealingScalars`
+  and every control but tab, LF and CR. Corta's paste strips controls again,
+  but the pasteboard reaches other applications.
 
 ---
 
@@ -157,12 +173,14 @@ allocating without bound. These caps are asserted in the fuzz harness
 | -------------------------- | ----------------------------------------------------- |
 | OSC / DCS string length    | Hard limit; discard the sequence on overflow and resynchronise |
 | APC (Kitty graphics) chunk | 132 KiB — one `kitten icat` chunk plus its header; discard the sequence on overflow and resynchronise. A whole image is capped separately, as is a pane's image memory |
+| Kitty image memory         | 64 MB per image; 320 MB per pane across *both* screens (the alternate screen gets what the parked main screen left) with an unfinished transmission charged at its decoded size; 1 GB across every pane (`ImageMemoryBudget`, each session charged after every feed slice — exceeded by at most one image per session storing at the same instant) |
 | Compressed Kitty image (`o=z`) | Inflates to exactly its declared pixels (RGB, RGBA) or at most the 64 MB image cap (PNG); the stream stops at the ceiling and the image is refused, so the expansion is never allocated. The zlib header and Adler-32 must check out; any other `o=` value is refused |
 | CSI parameter count        | 16 (xterm's limit); ignore the remainder               |
 | CSI parameter value        | Clamp to a sane maximum before use                     |
 | Repeat counts (e.g. `REP`) | Clamp to the screen or scrollback dimension            |
 | Scrollback                 | Configured line cap, enforced by the ring buffer       |
 | Glyph atlas                | Bounded with eviction                                  |
+| Pattern detection over output | Linear in the text: URL and `path:line` detectors have no overlapping quantifiers, and a hover scans at most 100,000 cells — the main thread runs them |
 
 An unterminated OSC string is the canonical case: a stream that opens one
 and never closes it must not accumulate gigabytes in a buffer.
@@ -366,6 +384,20 @@ which records S01–S04 and S07 in full); the entries below are the ones
 whose write-up belongs with the design rather than with the release that
 made them.
 
+- **S16 — 2026-10-07: a whole-repository audit's terminal-core findings.**
+  The `path:line` detector's pattern, `[\w.+\-/]*[\w.+\-]+:`, had two
+  overlapping quantifiers; a 100,000-character token with no colon took 54 s
+  on the main thread, run twice per ⌘ press over it, and the menu validation
+  of Open File Reference ran it with no length cap at all — hours, for a
+  long enough line. It is possessive now, and linear. Kitty images on the
+  alternate screen had a 320 MB table of their own beside the parked main
+  screen's, an unfinished transmission held ~89 MB of base64 outside every
+  budget, and nothing bounded all panes together: under a megabyte of
+  compressed output reached 0.9 GB in one pane. One budget per pane now
+  spans both screens and the pending text, and `ImageMemoryBudget` bounds the
+  app. §2.5's visible-replacement rule was not implemented — bidi and
+  zero-width characters were folded invisibly into the previous cell — and
+  now is; OSC 52 writes lose control characters as well.
 - **S15 — 2026-10-05: the SFTP `ssh` override is Debug-only.** Seven
   `CORTA_*` switches were read in six files; they are now one type,
   `DiagnosticsEnvironment`. `CORTA_SFTP_SSH`, which picks the program

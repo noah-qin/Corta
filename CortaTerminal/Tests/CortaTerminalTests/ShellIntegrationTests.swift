@@ -348,6 +348,25 @@ import Testing
         #expect(terminal.takeClipboardCopy() == "abc\u{200D}d\u{200C}e")
     }
 
+    /// The pasteboard reaches other applications, whose paste may not strip
+    /// controls: an ESC there can close another terminal's bracketed paste.
+    @Test("controls other than tab and newlines are stripped from the copy")
+    func controlsAreStrippedFromTheCopy() {
+        var terminal = self.terminal()
+        let payload = Data("a\u{1B}[201~b\u{7F}c\u{9B}d\te\nf\rg".utf8).base64EncodedString()
+        terminal.feed(Array("\u{1B}]52;c;\(payload)\u{1B}\\".utf8))
+        #expect(terminal.takeClipboardCopy() == "a[201~bcd\te\nf\rg")
+    }
+
+    @Test("tag characters survive only as part of a subdivision flag")
+    func tagCharactersAreStrippedOutsideFlags() {
+        var terminal = self.terminal()
+        let scotland = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}"
+        let payload = Data("a\u{E0068}\u{E0069}b\(scotland)\u{E0068}c\u{206A}d".utf8).base64EncodedString()
+        terminal.feed(Array("\u{1B}]52;c;\(payload)\u{1B}\\".utf8))
+        #expect(terminal.takeClipboardCopy() == "ab\(scotland)cd")
+    }
+
     /// A payload of nothing but spoofing characters sanitises to empty,
     /// and empty copies nothing.
     @Test("a payload of only spoofing characters copies nothing")

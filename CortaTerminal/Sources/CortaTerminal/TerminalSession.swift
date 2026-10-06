@@ -172,6 +172,12 @@ public final class TerminalSession: @unchecked Sendable {
 
     private let writerSink: (@Sendable ([UInt8]) throws -> Void)?
 
+    /// Shared with the app's other sessions; charged after every slice and
+    /// released when this session stops.
+    private let imageBudget: ImageMemoryBudget?
+    /// The last figure reported, written under `state`'s lock.
+    private let reportedImageBytes = Mutex(0)
+
     /// Render-path callers waiting on `state`; bumped before blocking, so an
     /// over-count only costs the reader one gap.
     private let stateWaiters = Mutex(0)
@@ -247,12 +253,13 @@ public final class TerminalSession: @unchecked Sendable {
         size: TerminalSize = TerminalSize(),
         workingDirectory: String? = nil,
         scrollbackLimit: Int = Scrollback.defaultLimit,
-        commandHistoryLimit: Int = CommandRecordStore.defaultCapacity
+        commandHistoryLimit: Int = CommandRecordStore.defaultCapacity,
+        imageBudget: ImageMemoryBudget? = nil
     ) throws(PTYError) {
         try self.init(
             executable: executable, arguments: arguments, environment: environment, size: size,
             workingDirectory: workingDirectory, scrollbackLimit: scrollbackLimit,
-            commandHistoryLimit: commandHistoryLimit, seams: Seams())
+            commandHistoryLimit: commandHistoryLimit, imageBudget: imageBudget, seams: Seams())
     }
 
     init(
@@ -263,8 +270,10 @@ public final class TerminalSession: @unchecked Sendable {
         workingDirectory: String? = nil,
         scrollbackLimit: Int = Scrollback.defaultLimit,
         commandHistoryLimit: Int = CommandRecordStore.defaultCapacity,
+        imageBudget: ImageMemoryBudget? = nil,
         seams: Seams
     ) throws(PTYError) {
+        self.imageBudget = imageBudget
         readerSource = seams.readerSource
         writerSink = seams.writerSink
         resizeWorkGate = seams.resizeWorkGate
@@ -355,7 +364,14 @@ public final class TerminalSession: @unchecked Sendable {
                     let slice = batch[offset..<end]
                     let applied = state.withLock { current -> (responses: [UInt8], episode: Int?) in
                         let episodeBefore = current.terminal.synchronizedOutputEpisode
+                        // Only a slice that can start or end an APC (`ESC _`,
+                        // `ESC \`) can store an image; others skip the shared lock.
+                        if let imageBudget, slice.contains(0x5F) || slice.contains(0x5C) {
+                            current.terminal.imageByteAllowance =
+                                imageBudget.allowance(for: ObjectIdentifier(self))
+                        }
                         current.terminal.feed(slice)
+                        reportImageBytes(current.terminal)
                         let sliceResponses = current.terminal.takeOutput()
                         // Rising edges, so DECRST+BSU in one batch arms a fresh timeout.
                         // A repeated BSU does not extend it, or a child that never sends
@@ -490,8 +506,20 @@ public final class TerminalSession: @unchecked Sendable {
                 case .clearHistory: $0.terminal.grid.clearScrollback()
                 case .reset: $0.terminal.reset()
                 }
+                reportImageBytes($0.terminal)
             }
         }
+    }
+
+    /// Under `state`'s lock. Not after `stop()`: a last slice racing it would
+    /// charge the shared budget again for a pane that is gone.
+    private func reportImageBytes(_ terminal: Terminal) {
+        guard let imageBudget else { return }
+        // Most slices hold no image: skip the shared lock unless the figure moved.
+        let bytes = terminal.retainedImageBytes
+        guard bytes != reportedImageBytes.withLock({ $0 }), !stopped.withLock({ $0 }) else { return }
+        reportedImageBytes.withLock { $0 = bytes }
+        imageBudget.report(bytes, for: ObjectIdentifier(self))
     }
 
     /// Lets a caller (a paste) tell "queued" from "dropped, child not reading"
@@ -766,6 +794,16 @@ public final class TerminalSession: @unchecked Sendable {
         }
         guard !wasStopped else { return }
         pendingWrites.withLock { $0.removeAll() }
+        // The grid stays readable, but its images no longer count against
+        // panes that are still live. Under `state`, so a slice the reader is
+        // applying cannot report again after this.
+        if let imageBudget {
+            // As a waiter, or the reader holds the lock through the rest of
+            // its batch and closing a flooding pane stalls the main thread.
+            registerStateWaiter {
+                state.withLock { _ in imageBudget.release(ObjectIdentifier(self)) }
+            }
+        }
         pty.terminate()
         pty.close()
     }

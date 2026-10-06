@@ -21,6 +21,40 @@ import Testing
 /// The grid API, driven directly. No parser, no escape sequences.
 @Suite("Grid")
 struct GridTests {
+    @Test("bidi overrides and hidden zero-width characters draw as U+FFFD, joiners stay invisible")
+    func concealingScalarsAreVisible() {
+        var grid = Grid(rows: 2, columns: 20)
+        for scalar in "l\u{202E}s\u{200B}x\u{2066}y\u{FEFF}z".unicodeScalars { grid.write(scalar.value) }
+        // Each concealing scalar takes a cell of its own, so the eye sees it.
+        #expect(grid.cursor.column == 9)
+        #expect(grid.lines[0][1].scalar == 0xFFFD)
+        #expect(grid.lines[0][3].scalar == 0xFFFD)
+
+        var joined = Grid(rows: 2, columns: 20)
+        for scalar in "a\u{200D}b\u{200C}c\u{200E}d".unicodeScalars { joined.write(scalar.value) }
+        #expect(joined.cursor.column == 4, "ZWJ, ZWNJ and LRM are real text and stay zero-width")
+    }
+
+    @Test("tag characters are visible except inside a subdivision flag, which stays bounded")
+    func tagCharactersOutsideAFlagAreVisible() {
+        let scotland = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}"
+        var flag = Grid(rows: 2, columns: 20)
+        for scalar in scotland.unicodeScalars { flag.write(scalar.value) }
+        #expect(flag.cursor.column == 2, "a subdivision flag is one wide cluster")
+
+        var smuggled = Grid(rows: 2, columns: 20)
+        for scalar in "a\u{E0068}\u{E0069}".unicodeScalars { smuggled.write(scalar.value) }
+        #expect(smuggled.cursor.column == 3, "tags after a letter each show as U+FFFD")
+
+        var stuffed = Grid(rows: 2, columns: 40)
+        for scalar in (scotland + "\u{E0068}").unicodeScalars { stuffed.write(scalar.value) }
+        #expect(stuffed.cursor.column == 3, "nothing hides after the cancel tag")
+
+        var others = Grid(rows: 2, columns: 20)
+        for scalar in "a\u{206A}b\u{180E}c".unicodeScalars { others.write(scalar.value) }
+        #expect(others.cursor.column == 5)
+    }
+
     @Test("an ASCII run matches scalar writes across wraps")
     func asciiRunMatchesScalarWrites() {
         let bytes = Array("abcdefghij".utf8)

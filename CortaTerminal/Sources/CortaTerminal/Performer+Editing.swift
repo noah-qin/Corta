@@ -112,9 +112,13 @@ extension Performer {
         // Recovery timers identify episodes across RIS. Reusing an identity
         // can hide a new begin in the same parse slice or match a stale timer.
         let synchronizedOutputEpisode = state.synchronizedOutputEpisode
+        // The session's share of the app's image budget, not terminal state:
+        // reset to unlimited, an image later in the same slice ignored it.
+        let imageByteAllowance = state.imageByteAllowance
         grid.resetToInitialState()
         state = PerformerState()
         state.synchronizedOutputEpisode = synchronizedOutputEpisode
+        state.imageByteAllowance = imageByteAllowance
         state.hostnamesAtStart = hostnames
         state.commandRecords = CommandRecordStore(capacity: historyCapacity)
         state.dynamicColors = colors

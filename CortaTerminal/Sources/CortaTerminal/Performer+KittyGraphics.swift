@@ -80,16 +80,26 @@ extension Performer {
             state.pendingImageTransmission = PendingImageTransmission(
                 header: resolved, display: display, base64: [])
         }
-        // Checked per chunk, so a stream cannot park just under the limit.
-        let budget = KittyGraphics.maximumImageBytes / 3 * 4 + 4
-        guard state.pendingImageTransmission!.base64.count + payloadBase64.count <= budget else {
+        // Checked per chunk, so a stream cannot park just under the limit. The
+        // text is charged to the pane as the image it will become: held until
+        // another transmission replaces it, it was ~89 MB outside every budget.
+        applyImageAllowance()
+        let room = min(
+            KittyGraphics.maximumImageBytes,
+            grid.imagePlacements.availableBytes(for: state.pendingImageTransmission!.header.imageID))
+        let budget = room / 3 * 4 + 4
+        let held = state.pendingImageTransmission!.base64.count + payloadBase64.count
+        guard held <= budget else {
             // Still acknowledged, with the pending header's `quiet` — a continuation
             // carries no `q=`, and re-parsing it would un-quiet the transmission.
+            // Too large for any image is the client's error; too large for the
+            // room left is a full quota, which a client may free and retry.
             let pending = state.pendingImageTransmission!
             state.pendingImageTransmission = nil
+            let anyImage = KittyGraphics.maximumImageBytes / 3 * 4 + 4
             respond(
                 imageID: pending.header.imageID, placementID: nil, quiet: pending.header.quiet,
-                error: "EINVAL:too large")
+                error: held > anyImage ? "EINVAL:too large" : "ENOSPC:image data too large")
             return
         }
         state.pendingImageTransmission!.base64.append(contentsOf: payloadBase64)
@@ -180,6 +190,18 @@ extension Performer {
             placeAtCursor(display, respond: false)
         }
         respond(imageID: imageID, placementID: nil, quiet: quiet, error: nil)
+    }
+
+    /// What the process-wide budget leaves this terminal, less what the
+    /// parked screen holds, is all the live table may hold.
+    private mutating func applyImageAllowance() {
+        let allowance = state.imageByteAllowance
+        guard allowance != .max else {
+            grid.imagePlacements.externalLimit = .max
+            return
+        }
+        let parked = grid.retainedImageBytes - grid.imagePlacements.storedBytes
+        grid.imagePlacements.externalLimit = max(0, allowance - parked)
     }
 
     private mutating func placeAtCursor(_ display: KittyGraphics.DisplayHeader, respond respondFlag: Bool = true) {

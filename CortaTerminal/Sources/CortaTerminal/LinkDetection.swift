@@ -69,25 +69,9 @@ public enum LinkDetection {
     public static func links(in line: LogicalLine) -> [Link] {
         let text = line.text
         let nsText = text as NSString
-        // Walk UTF-16 and character offsets forward together — O(line);
-        // converting each match from the start is quadratic, and a CJK prefix
-        // makes the two units differ.
-        var utf16Cursor = text.utf16.startIndex
-        var utf16CursorOffset = 0
-        var characterCursor = text.startIndex
-        var characterCursorOffset = 0
+        var cursor = CharacterOffsetCursor(text)
         func characterOffset(atUTF16Offset target: Int) -> Int? {
-            guard target >= utf16CursorOffset,
-                let newUTF16 = text.utf16.index(
-                    utf16Cursor, offsetBy: target - utf16CursorOffset,
-                    limitedBy: text.utf16.endIndex),
-                let newCharacter = String.Index(newUTF16, within: text)
-            else { return nil }
-            characterCursorOffset += text.distance(from: characterCursor, to: newCharacter)
-            characterCursor = newCharacter
-            utf16Cursor = newUTF16
-            utf16CursorOffset = target
-            return characterCursorOffset
+            cursor.characterOffset(atUTF16Offset: target)
         }
 
         var links: [Link] = []
@@ -130,5 +114,38 @@ public enum LinkDetection {
                         end: SelectionPoint(row: endPosition.row, column: endPosition.column))))
         }
         return links
+    }
+}
+
+/// Character offsets of ascending UTF-16 offsets, walking both forward
+/// together — O(line) for all the matches in a line. Converting each match
+/// from the start is quadratic (25,000 `a:1` matches on one line took 7 s on
+/// the main thread), and a CJK prefix makes the two units differ.
+struct CharacterOffsetCursor {
+    private let text: String
+    private var utf16Cursor: String.Index
+    private var utf16CursorOffset = 0
+    private var characterCursor: String.Index
+    private var characterCursorOffset = 0
+
+    init(_ text: String) {
+        self.text = text
+        utf16Cursor = text.utf16.startIndex
+        characterCursor = text.startIndex
+    }
+
+    /// `nil` for an offset behind the cursor or inside a character.
+    mutating func characterOffset(atUTF16Offset target: Int) -> Int? {
+        guard target >= utf16CursorOffset,
+            let newUTF16 = text.utf16.index(
+                utf16Cursor, offsetBy: target - utf16CursorOffset,
+                limitedBy: text.utf16.endIndex),
+            let newCharacter = String.Index(newUTF16, within: text)
+        else { return nil }
+        characterCursorOffset += text.distance(from: characterCursor, to: newCharacter)
+        characterCursor = newCharacter
+        utf16Cursor = newUTF16
+        utf16CursorOffset = target
+        return characterCursorOffset
     }
 }
