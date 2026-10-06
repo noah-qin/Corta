@@ -17,6 +17,39 @@
 import AppKit
 import SwiftUI
 
+/// The two accessibility settings the glass views answer to, normally read
+/// from SwiftUI's environment. Fixed only by the development build's glass
+/// preview (`GlassAppearancePreview`), which shows every combination at once;
+/// SwiftUI offers no way to set Reduce Transparency for one view.
+struct GlassAccessibility: Equatable {
+    var reduceTransparency: Bool
+    var increaseContrast: Bool
+
+    /// The edge an opaque or high-contrast surface draws; nil for plain
+    /// glass, whose material is its edge.
+    var panelBorder: NSColor? {
+        if increaseContrast { return .labelColor }
+        if reduceTransparency { return .separatorColor }
+        return nil
+    }
+}
+
+extension View {
+    /// Liquid Glass in `shape`, or under Reduce Transparency an opaque
+    /// window-background fill instead. Not tinted glass: a tinted glass
+    /// surface is composited above the view's overlays, and covered the
+    /// drawn border both settings together call for (seen in the glass
+    /// preview).
+    @ViewBuilder
+    func cortaGlass<S: Shape>(in shape: S, opaque: Bool) -> some View {
+        if opaque {
+            background(Color(nsColor: .windowBackgroundColor), in: shape)
+        } else {
+            glassEffect(.regular, in: shape)
+        }
+    }
+}
+
 /// What the search bar shows, written by `PaneSearch` and read by
 /// `SearchBarView`. The field's text is not here: it lives in the
 /// `NSSearchField` the bar wraps, which `PaneSearch` owns.
@@ -46,9 +79,19 @@ final class SearchBarModel {
 struct SearchBarView: View {
     let model: SearchBarModel
     let field: NSSearchField
+    /// Nil: the system's settings.
+    var accessibilityOverride: GlassAccessibility?
 
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
+    @Environment(\.colorSchemeContrast) private var systemContrast
+
+    private var accessibility: GlassAccessibility {
+        accessibilityOverride ?? GlassAccessibility(
+            reduceTransparency: systemReduceTransparency,
+            increaseContrast: systemContrast == .increased)
+    }
+    private var reduceTransparency: Bool { accessibility.reduceTransparency }
+    private var increasedContrast: Bool { accessibility.increaseContrast }
 
     var body: some View {
         GlassEffectContainer {
@@ -82,7 +125,9 @@ struct SearchBarView: View {
                 button("xmark", "Close Find", action: model.onClose)
             }
             .padding(EdgeInsets(top: 7, leading: 12, bottom: 7, trailing: 8))
-            .glassEffect(glass, in: Capsule())
+            // Untinted: a window-background tint matched the terminal's own
+            // background and the pill vanished into it.
+            .cortaGlass(in: Capsule(), opaque: reduceTransparency)
             // Glass over a flat terminal background has nothing to refract,
             // so on its own it read as no bar at all: a hairline and a soft
             // shadow lift it off the output. Increase Contrast gets the
@@ -103,15 +148,6 @@ struct SearchBarView: View {
     }
 
     private static let symbolFont = Font.system(size: 12, weight: .semibold).leading(.tight)
-
-    /// Untinted: a window-background tint matched the terminal's own
-    /// background and the pill vanished into it. Reduce Transparency means
-    /// nothing shows through, so the fill goes opaque there.
-    private var glass: Glass {
-        reduceTransparency ? .regular.tint(Color(nsColor: .windowBackgroundColor)) : .regular
-    }
-
-    private var increasedContrast: Bool { contrast == .increased }
 
     private var secondary: Color {
         increasedContrast ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor)

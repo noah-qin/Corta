@@ -435,6 +435,14 @@ of the launch you control, never through `launchctl setenv`. Then run the
 five-point check in
 [conformance §4.4](CONFORMANCE.md#44-app-layer-verification-requires-a-launched-app).
 
+**Glass under the accessibility settings.** Reduce Transparency and
+Increase Contrast are system settings, so they are not switched to check
+the find bar and the command palette. The development build's
+`--glass-preview` launch argument opens one window with both in all four
+combinations over a terminal background; light or dark follows the
+`appearance` in the stage's `config`. The system's own glass still follows the machine's real settings, so the preview shows the four rows truthfully only with both settings off. Capture it with a throwaway XCUITest's
+`window.screenshot()` rather than the whole screen.
+
 Never change global hotkeys, secure-input state, shell startup files or
 `launchctl` environment variables just to test (D13). Prefer injected
 dependencies and per-process environments. Use temporary directories for
