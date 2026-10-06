@@ -37,7 +37,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     /// or drags the user out of the Space. Measured on macOS 27 over
     /// full-screen TextEdit: `kCGWindowIsOnscreen` stayed false for every
     /// `NSWindow` variant and became true for a `.nonactivatingPanel`.
-    convenience init(setup: SplitViewController.Setup = .init(), asPanel: Bool = false) {
+    convenience init(setup: SplitViewController.Setup, asPanel: Bool = false) {
         let placeholder = NSRect(x: 0, y: 0, width: 480, height: 270)
         let window: NSWindow
         if asPanel {
