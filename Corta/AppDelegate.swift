@@ -32,8 +32,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
     /// The debounced arrangement write; see `noteLayoutChanged`.
     var pendingLayoutSave: DispatchWorkItem?
-    /// The saved arrangement's store.
-    let sessionStore = SessionRestore.standard
     /// Set at quit, so closing windows don't save an empty arrangement over
     /// the one just flushed.
     private var isTerminating = false
@@ -294,22 +292,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private func restoreWindowsIfConfigured() {
         guard Self.isRestoreEnabled else { return }
         let states: [WindowState]
-        switch sessionStore.decideRestore() {
+        switch SessionRestore.standard.decideRestore() {
         case .skipAfterFailure:
             // The marker survives only a launch that died mid-restore; that layout
             // is the suspect, so drop it.
-            sessionStore.clear()
-            sessionStore.endRestore()
+            SessionRestore.standard.clear()
+            SessionRestore.standard.endRestore()
             return
         case .nothingToRestore:
             return
         case .restore(let saved):
             states = saved
         }
-        sessionStore.beginRestore()
+        SessionRestore.standard.beginRestore()
         // Keep the state file: `noteLayoutChanged` rewrites it, so a later
         // crash still has a last-known-good layout.
-        defer { sessionStore.endRestore() }
+        defer { SessionRestore.standard.endRestore() }
 
         // The storyboard's window already spawned its shell in the home
         // directory, which a restore can't move. Every saved state gets a fresh
@@ -371,10 +369,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     private func saveWindowStates() {
         guard Self.isRestoreEnabled else {
-            sessionStore.clear()
+            SessionRestore.standard.clear()
             return
         }
-        sessionStore.save(
+        SessionRestore.standard.save(
             windowControllers.compactMap { ($0 as? TerminalWindowController)?.restorableState })
     }
 

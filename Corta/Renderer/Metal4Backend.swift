@@ -36,13 +36,20 @@ enum Metal4BackendError: Error {
 nonisolated enum Metal4Diagnostics {
     static let log = OSLog(subsystem: "dev.noahqin.Corta", category: "render")
 
-    /// Bounded, or a faulting queue logs once per frame forever. Counts every
-    /// fault; 64 bits outlast any process.
+    /// Bounded, or a faulting queue logs once per frame forever.
     private static let reportedFaults = Atomic<Int>(0)
+    private static let faultReportLimit = 8
 
     static func reportCommitFault(_ error: any Error) {
-        let reported = reportedFaults.wrappingAdd(1, ordering: .relaxed).oldValue
-        guard reported < 8 else { return }
+        // Claim a slot below the limit; at the limit the counter stops.
+        var reported = reportedFaults.load(ordering: .relaxed)
+        while reported < faultReportLimit {
+            let (exchanged, original) = reportedFaults.compareExchange(
+                expected: reported, desired: reported + 1, ordering: .relaxed)
+            if exchanged { break }
+            reported = original
+        }
+        guard reported < faultReportLimit else { return }
         os_log(.error, log: log, "Metal 4 commit faulted: %{public}@", String(describing: error))
     }
 

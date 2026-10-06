@@ -51,9 +51,9 @@ nonisolated enum RenderMetrics {
     /// `CORTA_RENDER_METRICS_KEYSTROKES=<n>`.
     private static let keystrokeCapacity = DiagnosticsEnvironment.renderMetricsKeystrokes() ?? 200
 
-    /// Everything mutable, behind one lock; an actor would make render-path
-    /// calls `async`.
-    private struct State: ~Copyable {
+    /// The samples and the pending keystroke, behind one lock; an actor would
+    /// make render-path calls `async`. The summary file has its own.
+    private struct State {
         var samples: [Metric: [Double]] = [:]
         var pending: PendingKeystroke?
     }
@@ -68,12 +68,11 @@ nonisolated enum RenderMetrics {
     static func record(_ metric: Metric, milliseconds: Double) {
         guard isEnabled else { return }
         let full: [Double]? = state.withLock { state in
-            var values = state.samples[metric, default: []]
-            values.append(milliseconds)
-            guard values.count >= (metric == .keypressToPresent ? keystrokeCapacity : capacity) else {
-                state.samples[metric] = values
-                return nil
-            }
+            // In place: a copy out of the dictionary would copy the ring per
+            // sample.
+            state.samples[metric, default: []].append(milliseconds)
+            let limit = metric == .keypressToPresent ? keystrokeCapacity : capacity
+            guard let values = state.samples[metric], values.count >= limit else { return nil }
             state.samples[metric] = []
             return values
         }
