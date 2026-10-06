@@ -133,12 +133,19 @@ final class SplitViewController: NSViewController {
             window.setFrame(restore.frame.onScreen(), display: false)
         } else {
             // The frame for the initial grid: cells, insets, the chrome the
-            // toolbar just set, and the status bar. The top edge stays put.
+            // toolbar just set, and the status bar — centred on the main
+            // screen and kept inside its visible frame, so AppKit never
+            // shrinks it after the child has its size. The opener may
+            // cascade it from there (`AppDelegate.cascade`).
             var size = pane.initialWindowContentSize
             size.height += statusBarHeight
-            let frame = window.frame
+            let screen = NSScreen.main ?? NSScreen.screens.first
+            let visible = screen?.visibleFrame ?? NSRect(origin: .zero, size: size)
+            let centred = NSRect(
+                x: (visible.midX - size.width / 2).rounded(), y: (visible.midY - size.height / 2).rounded(),
+                width: size.width, height: size.height)
             window.setFrame(
-                NSRect(x: frame.minX, y: frame.maxY - size.height, width: size.width, height: size.height),
+                WindowState.Frame(centred).onScreen(preferredScreen: screen, minimumSize: .zero),
                 display: false)
         }
         pane.didSizeWindow = true

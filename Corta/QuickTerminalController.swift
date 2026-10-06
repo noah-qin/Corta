@@ -231,10 +231,11 @@ final class QuickTerminalController {
             setup: SplitViewController.Setup(restore: state), asPanel: true)
         guard let window = controller.window else { return nil }
         controller.isQuickTerminal = true
-        controller.showWindow(nil)
-        // After `prepareWindow` set `.automatic`: ⌘T from here opens a normal
-        // window (`AppDelegate.newTab`).
+        // Before it shows, or "prefer tabs" could merge it into the key
+        // window's tab group; after `prepareWindow` set `.automatic`. ⌘T from
+        // here opens a normal window (`AppDelegate.newTab`).
         window.tabbingMode = .disallowed
+        controller.showWindow(nil)
         window.level = .floating
         // Every Space, beside full-screen apps; `.transient` keeps it out of
         // Mission Control.

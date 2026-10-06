@@ -152,6 +152,7 @@ extension AppDelegate {
         // preset goes in with the setup rather than opening a second pane and
         // closing the first — which is what an extra split would be.
         let controller = makeWindowController(setup: SplitViewController.Setup(preset: preset))
+        cascade(controller)
         controller.showWindow(self)
         controller.window?.makeKeyAndOrderFront(self)
     }

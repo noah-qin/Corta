@@ -258,9 +258,12 @@ pane's setup as an initializer argument. `SplitViewController.prepareWindow`
 dresses and sizes it from the root pane's cell metrics *before it is
 shown*, and only then sets the pane's `didSizeWindow`: a layout at the
 placeholder size before that never reaches the child, and none after it is
-transient. The session is born at the grid it keeps — a new window's child
-receives exactly one winsize. Size a window in `prepareWindow`, not later,
-and never deliver a winsize before `didSizeWindow`.
+transient. A new window's session is born at the grid it keeps — its child
+receives exactly one winsize. A restored window, a new tab and the Quick
+Terminal know their frame only after the root pane spawns, so their child
+starts at the configured grid and is resized once to it, as before. Size a
+window in `prepareWindow`, not later, and never deliver a winsize before
+`didSizeWindow`.
 
 ## D17 — The frame-CPU baseline is re-measured, under Release, after touching the render loop
 

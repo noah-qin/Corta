@@ -128,7 +128,9 @@ setup — a restore, a preset, a working directory — to
 as the view loads. `SplitViewController.prepareWindow` sizes the window
 from the pane's cell metrics before anything shows it, then sets
 `didSizeWindow`; `resizeSessionToFitView` sends nothing before that. A new
-window's child receives exactly one winsize. Size a window there, not in a
+window's child receives exactly one winsize; a restored window, a new tab
+and the Quick Terminal still spawn at the configured grid and resize once
+to their frame. Size a window there, not in a
 later layout pass, and do not insert style-mask flags after creation —
 that one act was the source of every transient size D15 and D16 worked
 around.

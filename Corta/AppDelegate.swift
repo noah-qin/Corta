@@ -49,20 +49,26 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     func openWindow(workingDirectory: String?) -> TerminalWindowController? {
         let controller = makeWindowController(
             setup: SplitViewController.Setup(workingDirectory: workingDirectory))
-        // Cascade from the opening window, or ⌘N looks like it did nothing —
-        // except from the Quick Terminal's screen-edge band.
-        if let previous = NSApp.keyWindow, let window = controller.window,
+        cascade(controller)
+        controller.showWindow(nil)
+        controller.window?.makeKeyAndOrderFront(nil)
+        return controller
+    }
+
+    /// Cascades a new window from the key window, or a second ⌘N looks like
+    /// it did nothing — except from the Quick Terminal's screen-edge band —
+    /// and keeps it on screen.
+    func cascade(_ controller: TerminalWindowController) {
+        guard let window = controller.window else { return }
+        if let previous = NSApp.keyWindow, previous !== window,
             !QuickTerminalController.shared.owns(previous)
         {
             window.setFrameTopLeftPoint(
                 NSPoint(x: previous.frame.minX + 24, y: previous.frame.maxY - 24))
         }
-        if let window = controller.window, window.tabbedWindows == nil {
-            window.setFrame(WindowState.Frame(window.frame).onScreen(preferredScreen: window.screen, minimumSize: .zero), display: false)
-        }
-        controller.showWindow(nil)
-        controller.window?.makeKeyAndOrderFront(nil)
-        return controller
+        window.setFrame(
+            WindowState.Frame(window.frame).onScreen(preferredScreen: window.screen, minimumSize: .zero),
+            display: false)
     }
 
     /// Brings a window forward by identity for the App Intent, activating the
@@ -109,6 +115,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                 split.isJoiningTabGroup = false
             }
         } else {
+            cascade(controller)
             controller.showWindow(sender)
             window.makeKeyAndOrderFront(sender)
         }

@@ -28,8 +28,8 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     ]
 
     /// A window whose root pane spawns from `setup`, dressed and sized for
-    /// its first grid before anything shows it. Unpositioned windows are
-    /// centred; the caller cascades or places them after.
+    /// its first grid before anything shows it. Unrestored windows are
+    /// centred on the main screen; the caller cascades or places them after.
     ///
     /// `asPanel` makes the window a non-activating `NSPanel`, for the Quick
     /// Terminal: an inactive app's window never reaches a full-screen Space,
@@ -52,6 +52,9 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
                 contentRect: placeholder, styleMask: Self.styleMask, backing: .buffered, defer: false)
         }
         window.isReleasedWhenClosed = false
+        // Link and tab tooltips only while Corta is active, as the storyboard
+        // window had it.
+        window.allowsToolTipsWhenApplicationIsInactive = false
         self.init(window: window)
         window.delegate = self
         installSecureInputIndicator()
@@ -60,7 +63,6 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         let split = SplitViewController(setup: setup)
         window.contentViewController = split
         split.prepareWindow(window)
-        if setup.restore == nil { window.center() }
     }
 
     private var splitController: SplitViewController? {
@@ -126,7 +128,9 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         window.isOpaque = true
         window.backgroundColor = NSColor(srgbRed: CGFloat(color.x), green: CGFloat(color.y),
                                          blue: CGFloat(color.z), alpha: 1)
-        window.titlebarAppearsTransparent = false
+        // The Quick Terminal hides its titlebar; a theme change must not
+        // bring the band back.
+        if !isQuickTerminal { window.titlebarAppearsTransparent = false }
     }
 
     /// A titlebar lock while Secure Keyboard Entry is engaged — the effect is
