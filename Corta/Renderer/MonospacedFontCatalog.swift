@@ -16,7 +16,6 @@
 
 import AppKit
 import CoreText
-import Synchronization
 
 /// Which installed families a grid can actually lay out (D12). The
 /// renderer assumes every glyph in the regular, bold, italic and
@@ -24,9 +23,8 @@ import Synchronization
 /// doesn't promise. Common failures: a wider bold face, digits or
 /// box-drawing off the grid, and bitmap or colour faces with no outlines.
 ///
-/// Families come from AppKit, so installed fonts appear, and are verified
-/// on the faces Corta uses. Measuring hundreds is slow, so the result is
-/// cached; `refresh()` drops it.
+/// Since D11 only System Monospaced is offered, so this checks the family a
+/// hand-edited config names rather than listing what is installed.
 nonisolated enum MonospacedFontCatalog {
     /// Advances scale linearly; this only sets the tolerance's units.
     private static let measurementSize: CGFloat = 12
@@ -35,23 +33,6 @@ nonisolated enum MonospacedFontCatalog {
 
     /// Printable ASCII: prompts, borders and numbers.
     private static let measuredCharacters: [UniChar] = (0x20...0x7E).map(UniChar.init)
-
-    /// Read from the main thread and concurrently from tests.
-    private static let cache = Mutex<[String]?>(nil)
-
-    static func families() -> [String] {
-        cache.withLock { cached in
-            if let cached { return cached }
-            let manager = NSFontManager.shared
-            let families = manager.availableFontFamilies.filter(isUsable(family:)).sorted()
-            cached = families
-            return families
-        }
-    }
-
-    static func refresh() {
-        cache.withLock { $0 = nil }
-    }
 
     /// An outline face with uniform ASCII advances that its bold, italic and
     /// bold-italic faces keep. A missing italic passes (the regular face is

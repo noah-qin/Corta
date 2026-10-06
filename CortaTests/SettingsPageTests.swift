@@ -68,7 +68,7 @@ struct SettingsPageTests {
     func everyRowLabelFitsInEveryLocalization() throws {
         let keys = [
             "settings.label.theme", "settings.label.lightOrDark", "settings.label.font",
-            "settings.label.fontStatus", "settings.label.size", "settings.label.preview",
+            "settings.label.size", "settings.label.preview",
             "settings.label.scrollback", "settings.label.bell", "settings.label.optionAsMeta",
             "settings.label.copyOnSelect", "settings.label.openLinksWith",
             "settings.label.allowClipboardCopy", "settings.label.openFileCommand",

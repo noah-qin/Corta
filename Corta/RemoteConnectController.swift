@@ -398,7 +398,3 @@ struct RemoteConnectForm: View {
         return min(190, content)
     }
 }
-
-extension AppDelegate {
-    @objc func showSSHConnection(_ sender: Any?) { RemoteConnectController.shared.show(.ssh, sender: sender) }
-}

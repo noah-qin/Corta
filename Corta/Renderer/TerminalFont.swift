@@ -55,26 +55,6 @@ nonisolated enum TerminalFont {
         return NSFont(descriptor: descriptor, size: size)
     }
 
-    /// Why a family did or didn't resolve, for the settings page; never on the
-    /// render path.
-    enum FontResolution: Equatable {
-        case resolved
-        case missing(requested: String)
-        /// Exists but doesn't advance evenly, so it would misalign the grid.
-        case invalidForGrid(requested: String)
-    }
-
-    static func resolution(forFamily family: String?) -> FontResolution {
-        guard let family, family != Configuration.systemFontFamily else { return .resolved }
-        guard namedFamily(family, size: 12) != nil || NSFont(name: family, size: 12) != nil else {
-            return .missing(requested: family)
-        }
-        guard MonospacedFontCatalog.isUsable(family: family) else {
-            return .invalidForGrid(requested: family)
-        }
-        return .resolved
-    }
-
     /// A styled variant for the atlas, and whether its bold is synthetic.
     /// Neither style may vanish: a missing italic is sheared (advance
     /// unchanged), and a missing bold is stroked at rasterisation, hence the
