@@ -93,10 +93,10 @@ import Testing
             }
             terminal.feed(Array(text.utf8))
             renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: cursorVisible, selection: nil)
-            let incremental = flatten(renderer.cachedInstancesForTesting)
+            let incremental = flatten(renderer.cachedInstances)
             renderer.invalidate()
             renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: cursorVisible, selection: nil)
-            let full = flatten(renderer.cachedInstancesForTesting)
+            let full = flatten(renderer.cachedInstances)
             #expect(incremental == full, "step \(step)")
             if incremental != full { return }
         }

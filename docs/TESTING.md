@@ -464,6 +464,7 @@ single reader to the code.
 | --- | --- | --- | --- |
 | `CORTA_FRAME_LATENCY` | number ≥ 1 | all | The display link's `preferredFrameLatency` (default 2; `PERFORMANCE.md` §5.7) |
 | `CORTA_MAX_DRAWABLES` | `2` or `3` | all | The Metal layer's drawable count (default 3), for a double-buffering A/B |
+| `CORTA_PIPELINE_ARCHIVE` | `0` | all | Compiles the render pipelines without reading the previous launch's binary archive. The `Unit` and `Release` plans set it: a hosted test bundle once segfaulted on the read, and the construction benchmark's cold figure must be a compile (`QuadPipelineCache.readsPreviousArchive`) |
 | `CORTA_RENDER_METRICS` | any; an absolute path also writes there | all | Frame-timing percentiles to the `render-metrics` log category, and to the file |
 | `CORTA_RENDER_METRICS_KEYSTROKES` | integer > 0 | all | Keystrokes per keypress-to-present summary (default 200) |
 | `CORTA_RESTORE_WINDOWS` | `0` | all | Skips reopening last run's windows |

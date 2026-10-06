@@ -35,15 +35,15 @@ extension PerformanceSuites {
                 return
             }
 
-            // Construction #1 is forced cold (`resetForTesting`) so the report
+            // Construction #1 is forced cold (`discardPipelines`) so the report
             // shows the compile cost panes no longer pay past the first;
             // #2...#8 are the warm-cache cost every split pane actually hits.
-            // Under XCTest the binary-archive read path is disabled
-            // (`QuadPipelineCache.isRunningUnderXCTest`), so cold here means a real
+            // The Release plan switches the binary-archive read off
+            // (`CORTA_PIPELINE_ARCHIVE=0`), so cold here means a real
             // compile — an upper bound on what a real launch's first pane pays.
             let constructions = 8
             var durations: [Double] = []
-            QuadPipelineCache.resetForTesting()
+            QuadPipelineCache.discardPipelines()
             for _ in 0..<constructions {
                 let start = DispatchTime.now()
                 _ = try Metal4Backend(device: device)

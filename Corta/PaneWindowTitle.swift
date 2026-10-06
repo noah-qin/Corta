@@ -38,9 +38,19 @@ final class PaneWindowTitle {
     /// Whether a deferred rebuild may still apply: the pane is open and
     /// focused. An unfocused pane's title applies on focus.
     var canApplyDeferred: () -> Bool = { false }
-    /// Test hook: replaces the directory `stat`, so a test can stage a mount
-    /// that never answers.
-    var directoryCheckerForTesting: (@Sendable (String) -> Bool)?
+    /// Whether a path is a directory — a `stat`, which can block on a mount
+    /// that never answers, so it runs off the main actor.
+    private let isDirectory: @Sendable (String) -> Bool
+
+    init(isDirectory: @escaping @Sendable (String) -> Bool = PaneWindowTitle.isDirectoryOnDisk) {
+        self.isDirectory = isDirectory
+    }
+
+    nonisolated static func isDirectoryOnDisk(_ path: String) -> Bool {
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
+            && isDirectory.boolValue
+    }
 
     private var cachedProcessName: String?
     private var cachedDirectory: String?
@@ -165,16 +175,9 @@ final class PaneWindowTitle {
             }
             return
         }
-        let checker = directoryCheckerForTesting
+        let isDirectory = isDirectory
         Task.detached(priority: .utility) { [weak self] in
-            let exists: Bool
-            if let checker {
-                exists = checker(path)
-            } else {
-                var isDirectory: ObjCBool = false
-                exists = FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
-                    && isDirectory.boolValue
-            }
+            let exists = isDirectory(path)
             Self.directoryProbes.withLock { $0 -= 1 }
             await MainActor.run { [weak self] in
                 guard let self, !self.isStopped,

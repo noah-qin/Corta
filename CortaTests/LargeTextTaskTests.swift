@@ -66,13 +66,13 @@ struct LargeTextTaskTests {
             baseScrollbackTotal: grid.scrollback.totalPushed)
 
         // A private pasteboard, not `.general` (the real system clipboard):
-        // `pasteboardForTesting` is exactly the seam
+        // `PaneCommands.pasteboard` is exactly the seam
         // `NativeIntegrationTests` already uses `.withUniqueName()` for, so
         // this never touches — and can never be raced by, or clobber — the
         // developer's own clipboard contents.
         let pasteboard = NSPasteboard.withUniqueName()
         defer { pasteboard.releaseGlobally() }
-        pane.commands.pasteboardForTesting = pasteboard
+        pane.commands.pasteboard = pasteboard
 
         let markerBefore = "sentinel-\(UUID().uuidString)"
         pasteboard.clearContents()
@@ -85,9 +85,10 @@ struct LargeTextTaskTests {
         // asynchronous. The gate makes that deterministic.
         let buildEntered = Mutex(false)
         let releaseBuild = Mutex(false)
-        pane.commands.largeTextBuildGateForTesting = {
+        pane.commands.buildSelectionText = { range, grid in
             buildEntered.withLock { $0 = true }
             while !releaseBuild.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.002) }
+            return Selection.text(of: range, in: grid)
         }
 
         pane.commands.copy(nil)
@@ -128,13 +129,14 @@ struct LargeTextTaskTests {
 
         let pasteboard = NSPasteboard.withUniqueName()
         defer { pasteboard.releaseGlobally() }
-        pane.commands.pasteboardForTesting = pasteboard
+        pane.commands.pasteboard = pasteboard
 
         let buildEntered = Mutex(false)
         let releaseBuild = Mutex(false)
-        pane.commands.largeTextBuildGateForTesting = {
+        pane.commands.buildSelectionText = { range, grid in
             buildEntered.withLock { $0 = true }
             while !releaseBuild.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.002) }
+            return Selection.text(of: range, in: grid)
         }
 
         pane.commands.copy(nil)

@@ -60,11 +60,15 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     /// `largeTextTaskGeneration` keeps a late one from clearing its successor.
     var largeTextTask: Task<Void, Never>?
     var largeTextTaskGeneration = 0
-    /// Test hook: a private pasteboard, so tests never touch the real one.
-    var pasteboardForTesting: NSPasteboard?
-    /// Test hook: holds the detached build, which has no scheduling barrier —
-    /// otherwise "not landed yet" depends on the scheduler.
-    var largeTextBuildGateForTesting: (@Sendable () -> Void)?
+    /// Where a copy lands: the system clipboard, or a private one a pane is
+    /// given instead.
+    var pasteboard: NSPasteboard = .general
+    /// A copy's text build, run on the detached task: `Selection.text`. A
+    /// dependency so a caller can hold the build at a known point — the task
+    /// has no scheduling barrier of its own.
+    var buildSelectionText: @Sendable (SelectionRange, Grid) -> String = {
+        Selection.text(of: $0, in: $1)
+    }
     /// Pinch magnification not yet spent on a whole point.
     private var pinchAccumulator: CGFloat = 0
     /// The current pinch changed the size, so its end settles the window.
@@ -339,7 +343,6 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         guard let host, let selection = host.selection, let session = host.session else { return }
         let grid = session.snapshot()
         let range = host.pointer.selectionRange(for: selection, in: grid)
-        let pasteboard = pasteboardForTesting ?? .general
         // The pasteboard is shared by every pane and app: recheck `changeCount`
         // before writing so a slow copy never clobbers a newer write.
         let changeCountAtStart = pasteboard.changeCount
@@ -348,10 +351,9 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         let generation = largeTextTaskGeneration
         // `.detached`, so the build is off the main actor by construction
         // rather than by inference; the pasteboard write hops back.
-        let gate = largeTextBuildGateForTesting
+        let buildText = buildSelectionText
         largeTextTask = Task.detached(priority: .userInitiated) { [weak self] in
-            gate?()
-            let text = Selection.text(of: range, in: grid)
+            let text = buildText(range, grid)
             await MainActor.run {
                 // Only this generation may clear the handle a newer copy installed.
                 guard let self, self.host?.didTeardown == false,
@@ -359,7 +361,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
                 else { return }
                 self.largeTextTask = nil
                 guard !Task.isCancelled, !text.isEmpty else { return }
-                let pasteboard = self.pasteboardForTesting ?? .general
+                let pasteboard = self.pasteboard
                 guard pasteboard.changeCount == changeCountAtStart else {
                     // Someone wrote since; their write is newer than this selection.
                     return

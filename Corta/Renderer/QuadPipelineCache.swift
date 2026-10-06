@@ -84,15 +84,15 @@ public nonisolated enum QuadPipelineCache {
         }
     }
 
-    /// Test hook: forces the cold path, so `QuadPipelineCacheTests` sees the
-    /// archive rewritten.
-    public static func resetForTesting() {
+    /// Drops every device's pipelines, so the next renderer compiles them
+    /// again and re-serialises the archive — a cold start without a new
+    /// process, which the archive tests and the construction benchmark need.
+    public static func discardPipelines() {
         entries.withLock { $0.removeAll() }
     }
 
     /// Builds the pipelines through the previous launch's binary archive, then
-    /// re-serialises it. Under XCTest the archive read stays off
-    /// (`isRunningUnderXCTest`).
+    /// re-serialises it. The read can be switched off (`readsPreviousArchive`).
     private static func makeEntry(device: MTLDevice) throws -> Entry {
         guard let library = device.makeDefaultLibrary() else {
             throw QuadPipelineError.libraryUnavailable
@@ -208,23 +208,23 @@ public nonisolated enum QuadPipelineCache {
         }
     }
 
-    /// True under XCTest (`XCTestConfigurationFilePath`), where reading an
-    /// archive back segfaults inside Metal
-    /// (`-[_MTLDevice recordBinaryArchiveUsage:]`, a null C string reaching
-    /// `strlen`). Neither a standalone repro nor two real launches crash, and
-    /// an upstream report ties the signature to `MTLGetShaderCachePath()`
-    /// returning nil — plausibly the hosted-test launch. Only that harness
-    /// skips the read.
-    private static var isRunningUnderXCTest: Bool {
-        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
-    }
+    /// False with `CORTA_PIPELINE_ARCHIVE=0`, which the unit-test and Release
+    /// plans set, for two reasons. A hosted test bundle once segfaulted
+    /// reading an archive back (`-[_MTLDevice recordBinaryArchiveUsage:]`, a
+    /// null C string reaching `strlen`; an upstream report ties it to
+    /// `MTLGetShaderCachePath()` returning nil), though neither a standalone
+    /// repro nor two real launches did, and a hosted read on macOS 27.0.1 no
+    /// longer did either. And `RendererConstructionCostTests`' cold figure
+    /// must be a real compile, not an archive hit (~37 ms against ~9 ms).
+    static let readsPreviousArchive = !DiagnosticsEnvironment.isPipelineArchiveReadSuppressed()
 
-    /// Opens the previous launch's archive, or a fresh one under XCTest;
-    /// `makeEntry` adds this launch's pipelines and re-serialises it. Nil on
-    /// failure, falling back to a plain compile.
+    /// Opens the previous launch's archive, or a fresh one when there is none
+    /// or `readsPreviousArchive` is off; `makeEntry` adds this launch's
+    /// pipelines and re-serialises it. Nil on failure, falling back to a
+    /// plain compile.
     static func loadOrCreateBinaryArchive(device: MTLDevice) -> (any MTLBinaryArchive)? {
         let descriptor = MTLBinaryArchiveDescriptor()
-        if !isRunningUnderXCTest, let url = binaryArchiveURL,
+        if readsPreviousArchive, let url = binaryArchiveURL,
             FileManager.default.fileExists(atPath: url.path)
         {
             descriptor.url = url

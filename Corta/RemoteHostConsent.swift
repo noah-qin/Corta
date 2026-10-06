@@ -36,9 +36,4 @@ enum RemoteHostConsent {
     static func confirm(_ host: String) {
         confirmedHosts.insert(host)
     }
-
-    /// Test hook: consent is process-global.
-    static func resetForTesting() {
-        confirmedHosts.removeAll()
-    }
 }

@@ -227,7 +227,7 @@ final class DirectoryHistoryStore {
         writeQueue.sync {}
     }
 
-    /// Test hook.
+    /// A save is scheduled and has not run.
     var hasPendingSave: Bool { pendingSave != nil }
 
     private func scheduleSave() {
