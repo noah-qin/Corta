@@ -84,15 +84,16 @@ public nonisolated enum QuadPipelineCache {
         }
     }
 
-    /// Test hook: forces the cold path, so `QuadPipelineCacheTests` sees the
-    /// archive rewritten.
-    public static func resetForTesting() {
+    /// Drops every device's pipelines, so the next renderer compiles them
+    /// again — without the archive (`firstCreationDone`) — and re-serialises it:
+    /// a cold start without a new process, which the archive tests and the
+    /// construction benchmark need.
+    public static func discardPipelines() {
         entries.withLock { $0.removeAll() }
     }
 
     /// Builds the pipelines through the previous launch's binary archive, then
-    /// re-serialises it. Under XCTest the archive read stays off
-    /// (`isRunningUnderXCTest`).
+    /// re-serialises it.
     private static func makeEntry(device: MTLDevice) throws -> Entry {
         guard let library = device.makeDefaultLibrary() else {
             throw QuadPipelineError.libraryUnavailable
@@ -208,23 +209,29 @@ public nonisolated enum QuadPipelineCache {
         }
     }
 
-    /// True under XCTest (`XCTestConfigurationFilePath`), where reading an
-    /// archive back segfaults inside Metal
-    /// (`-[_MTLDevice recordBinaryArchiveUsage:]`, a null C string reaching
-    /// `strlen`). Neither a standalone repro nor two real launches crash, and
-    /// an upstream report ties the signature to `MTLGetShaderCachePath()`
-    /// returning nil — plausibly the hosted-test launch. Only that harness
-    /// skips the read.
-    private static var isRunningUnderXCTest: Bool {
-        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
-    }
+    /// Only a launch's first creation reads the archive. After it the file
+    /// is this process's own, not the previous launch's, so a creation after
+    /// `discardPipelines()` compiles: the cold start the archive tests and the
+    /// construction benchmark ask for (~38 ms, against 6–9 ms through the
+    /// archive). It also keeps a hosted test bundle off the read that once
+    /// segfaulted inside Metal (`-[_MTLDevice recordBinaryArchiveUsage:]`, a
+    /// null C string reaching `strlen`; an upstream report ties it to
+    /// `MTLGetShaderCachePath()` returning nil; not reproduced on macOS
+    /// 27.0.1): the host's own first creation finds no archive in its
+    /// throwaway stage (`AppPaths`). A hosted run with an explicit, reused
+    /// `CORTA_STAGE_DIR` reads the last run's at launch, as the app would.
+    private static let firstCreationDone = Mutex(false)
 
-    /// Opens the previous launch's archive, or a fresh one under XCTest;
-    /// `makeEntry` adds this launch's pipelines and re-serialises it. Nil on
-    /// failure, falling back to a plain compile.
+    /// Opens the previous launch's archive on the first creation, or a fresh
+    /// one; `makeEntry` adds this launch's pipelines and re-serialises it.
+    /// Nil on failure, falling back to a plain compile.
     static func loadOrCreateBinaryArchive(device: MTLDevice) -> (any MTLBinaryArchive)? {
         let descriptor = MTLBinaryArchiveDescriptor()
-        if !isRunningUnderXCTest, let url = binaryArchiveURL,
+        let isFirst = firstCreationDone.withLock { done in
+            defer { done = true }
+            return !done
+        }
+        if isFirst, let url = binaryArchiveURL,
             FileManager.default.fileExists(atPath: url.path)
         {
             descriptor.url = url

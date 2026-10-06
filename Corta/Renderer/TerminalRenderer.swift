@@ -167,9 +167,9 @@ public nonisolated final class TerminalRenderer {
     /// Rows in the cached frame: the grid height `draw` lays out.
     var cachedRowCount: Int { cachedLines.count }
 
-    /// For tests: the cached instances, so an incremental build can be
-    /// compared with a full one.
-    var cachedInstancesForTesting: [[QuadInstance]] {
+    /// The cached instances — background, glyphs, colour glyphs — so an
+    /// incremental build can be compared with a full one.
+    var cachedInstances: [[QuadInstance]] {
         [cachedBackground, cachedGlyphs, cachedColorGlyphs]
     }
 

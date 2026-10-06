@@ -80,21 +80,33 @@ public final class TerminalSession: @unchecked Sendable {
     private let stopped = Mutex(false)
     private let started = Mutex(false)
 
-    /// Test hook: a scripted byte source. Assign before `start()`.
-    var readerSource: ReaderSource?
-    /// How long `?2026` may gate presents — the one-second cap terminals
-    /// commonly use; the core reads no configuration. Tests may shorten it
-    /// before `start()`.
-    var synchronizedOutputTimeout: Duration = .seconds(1)
+    /// Stand-ins for the PTY's two directions, a step every queued resize
+    /// passes before it applies, and the `?2026` cap: how a caller sets exact
+    /// chunk boundaries, holds a write backlog, opens the window between a
+    /// resize's request and its commit, or waits out an abandoned
+    /// synchronized update in less than a second. The app passes none.
+    struct Seams {
+        /// Replaces the PTY read.
+        var readerSource: ReaderSource?
+        /// Replaces the PTY write.
+        var writerSink: (@Sendable ([UInt8]) throws -> Void)?
+        /// Runs first in each queued resize, on the resize queue.
+        var resizeWorkGate: (@Sendable () -> Void)?
+        /// How long `?2026` may gate presents — the one-second cap terminals
+        /// commonly use; the core reads no configuration.
+        var synchronizedOutputTimeout: Duration = .seconds(1)
+    }
+
+    private let readerSource: ReaderSource?
+    /// `Seams.synchronizedOutputTimeout`.
+    private let synchronizedOutputTimeout: Duration
     /// Serial: resizes apply in request order.
     private let resizeQueue = DispatchQueue(label: "dev.corta.terminal-session.resize")
 
     /// The newest requested size; older queued resizes are skipped.
     private let requestedResize = Mutex<(serial: UInt64, size: TerminalSize)?>(nil)
 
-    /// Test hook: holds queued resize work open. Assign before the first
-    /// `resize(to:)`.
-    var resizeWorkGate: (@Sendable () -> Void)?
+    private let resizeWorkGate: (@Sendable () -> Void)?
     private let syncTimeoutQueue = DispatchQueue(label: "dev.corta.terminal-session.sync-timeout")
 
     /// A FIFO with a head index: popping one chunk at a time keeps `bytes` an
@@ -144,8 +156,7 @@ public final class TerminalSession: @unchecked Sendable {
     /// Per lock acquisition; ≈ 4 ms at the worst measured feed rate.
     private static let feedLockSliceSize = 16 * 1024
 
-    /// Test hook: records outbound writes. Assign before the first `write`.
-    var writerSink: (@Sendable ([UInt8]) throws -> Void)?
+    private let writerSink: (@Sendable ([UInt8]) throws -> Void)?
 
     /// Render-path callers waiting on `state`; bumped before blocking, so an
     /// over-count only costs the reader one gap.
@@ -186,7 +197,7 @@ public final class TerminalSession: @unchecked Sendable {
         }
     }
 
-    public init(
+    public convenience init(
         executable: String,
         arguments: [String] = [],
         environment: [String: String] = ChildEnvironment.default(),
@@ -195,6 +206,26 @@ public final class TerminalSession: @unchecked Sendable {
         scrollbackLimit: Int = Scrollback.defaultLimit,
         commandHistoryLimit: Int = CommandRecordStore.defaultCapacity
     ) throws(PTYError) {
+        try self.init(
+            executable: executable, arguments: arguments, environment: environment, size: size,
+            workingDirectory: workingDirectory, scrollbackLimit: scrollbackLimit,
+            commandHistoryLimit: commandHistoryLimit, seams: Seams())
+    }
+
+    init(
+        executable: String,
+        arguments: [String] = [],
+        environment: [String: String] = ChildEnvironment.default(),
+        size: TerminalSize = TerminalSize(),
+        workingDirectory: String? = nil,
+        scrollbackLimit: Int = Scrollback.defaultLimit,
+        commandHistoryLimit: Int = CommandRecordStore.defaultCapacity,
+        seams: Seams
+    ) throws(PTYError) {
+        readerSource = seams.readerSource
+        writerSink = seams.writerSink
+        resizeWorkGate = seams.resizeWorkGate
+        synchronizedOutputTimeout = seams.synchronizedOutputTimeout
         let pty = try PTY.spawn(
             executable: executable,
             arguments: arguments,

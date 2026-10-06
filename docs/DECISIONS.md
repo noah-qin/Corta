@@ -451,6 +451,15 @@ stage instead (`TESTING.md`, "The test host cannot reach your own
 configuration"). A test that wrote a setting and was killed before its
 `defer` had left that value in the developer's file.
 
+`AppPaths` is the one type that asks whether it is under test — to choose
+the stage and, under a test host only, to prune earlier runs' stages —
+and it kept the probe when #122 removed `QuadPipelineCache`'s
+(2026-10-06). Everything else a test changes it passes in, a dependency
+at construction, because the test runs before that code does. The stage is chosen as the host launches, before any test
+code runs, so the only thing a test could set in time is a launch
+variable, and a variable only protects the launches that remember it: the
+reason this entry derives the stage from the bundle identifier at all.
+
 ## D23 — Sparkle is the one accepted third-party runtime dependency
 
 **Decision.** Corta updates itself with Sparkle, and Sparkle is the only

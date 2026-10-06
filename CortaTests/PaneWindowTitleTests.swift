@@ -59,27 +59,25 @@ struct PaneWindowTitleTests {
     func refusedProbeIsRetried() async {
         let release = DispatchSemaphore(value: 0)
         let entered = Mutex(0)
-        let stuck = [PaneWindowTitle(), PaneWindowTitle()]
-        for title in stuck {
-            title.directoryCheckerForTesting = { _ in
+        let stuck = (0..<2).map { _ in
+            PaneWindowTitle(isDirectory: { _ in
                 entered.withLock { $0 += 1 }
                 release.wait()
                 return true
-            }
-            title.probeRepresentedDirectory("/slow-mount")
+            })
         }
+        for title in stuck { title.probeRepresentedDirectory("/slow-mount") }
         var deadline = ContinuousClock.now + .seconds(3) * testTimeoutScale
         while entered.withLock({ $0 }) < 2, ContinuousClock.now < deadline {
             try? await Task.sleep(for: .milliseconds(10))
         }
         #expect(entered.withLock { $0 } == 2)
 
-        let third = PaneWindowTitle()
         let asked = Mutex(false)
-        third.directoryCheckerForTesting = { _ in
+        let third = PaneWindowTitle(isDirectory: { _ in
             asked.withLock { $0 = true }
             return true
-        }
+        })
         third.probeRepresentedDirectory("/fine")
         try? await Task.sleep(for: .milliseconds(200))
         #expect(!asked.withLock { $0 }, "no room yet: two probes hold the admission")
@@ -97,14 +95,13 @@ struct PaneWindowTitleTests {
 
     @Test("a blocked directory probe does not block the main actor")
     func slowDirectoryProbeIsBackgroundWork() async {
-        let title = PaneWindowTitle()
         let entered = Mutex(false)
         let release = DispatchSemaphore(value: 0)
-        title.directoryCheckerForTesting = { _ in
+        let title = PaneWindowTitle(isDirectory: { _ in
             entered.withLock { $0 = true }
             release.wait()
             return true
-        }
+        })
         defer { release.signal() }
         title.probeRepresentedDirectory("/slow-mount")
         let deadline = ContinuousClock.now + .seconds(3)
