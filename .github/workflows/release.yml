@@ -16,76 +16,140 @@
 
 name: Release
 
-# Cutting a release: follow the checklist in docs/RELEASING.md,
-# then push a tag. This builds from the tag and opens a DRAFT release for
-# review — nothing is ever published automatically. Once a person
-# publishes the draft, `appcast.yml` signs it into the update feed (D20).
-#
-# Signing and notarisation run only when the `release` environment
-# carries all five values below. Without them — a fork, or a repository
-# that has not set them up — the workflow still produces an ad-hoc signed
-# build, and the release notes say so plainly rather than handing users a
-# download that Gatekeeper will silently refuse.
-#
-#   DEVELOPER_ID_P12           secret   Developer ID Application .p12, base64
-#   DEVELOPER_ID_P12_PASSWORD  secret   its password
-#   ASC_KEY                    secret   App Store Connect team API key (.p8)
-#   ASC_KEY_ID                 variable that key's Key ID
-#   ASC_ISSUER_ID              variable the team's Issuer ID
-#
-# The certificate signs and the API key notarises. The key cannot sign:
-# cloud-managed Developer ID signing is refused to API keys whatever their
-# role ("Cloud signing permission error", #134), and a hosted runner cannot
-# sign in to an Xcode account, so the certificate has to reach the runner.
-# It lives in a throwaway keychain for the length of the job.
-#
-# The job runs in the `release` environment, so a build that can reach
-# either secret waits for the maintainer's approval and runs only from a
-# `v*` tag — the same gate the Sparkle key sits behind (D20). Rotating
-# either is in docs/RELEASING.md.
-
+# Manually running Release on main prepares a version PR, waits for CI,
+# and releases its exact merge commit. Signing, notarisation and checks gate
+# publication. The reusable feed workflow runs in this same pipeline;
+# GITHUB_TOKEN-created releases do not raise another workflow's event.
 on:
-  push:
-    tags: ["v*"]
-  # A re-run of an existing tag (`gh workflow run release.yml --ref vX.Y.Z`),
-  # or a rehearsal (`--ref <branch> -f dry_run=true`). The job builds the
-  # ref it was dispatched on and nothing else: the `release` environment
-  # admits a run by that ref, so a free-text tag input would let a run
-  # admitted as a `v*` tag check out and sign any other ref. `dry_run`
-  # builds, signs, notarises and checks the ref at the version its project
-  # carries, keeps the archive as a workflow artifact, and drafts no release.
   workflow_dispatch:
     inputs:
       dry_run:
-        description: Sign, notarise and check only; draft no release
+        description: Test, sign and notarise only; change no remote state
         type: boolean
         default: false
+      bump:
+        description: "Version increment (default: patch)"
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+
+# Includes the feed update, so a newer version cannot overtake this one.
+# The prepare job reads the latest main when the requested run starts.
+concurrency:
+  group: corta-release
+  cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   # The shipping artifact is the one place the toolchain matters most; see
   # the same pin in `ci.yml`.
   XCODE_PIN: "26.6.0"
-  # The team the Developer ID certificate belongs to. A fork that signs with
-  # its own certificate changes this; one with no signing secrets builds ad
-  # hoc and never reads it.
+  # The team the Developer ID certificate belongs to.
   TEAM_ID: 646VSJ9K5F
 
 jobs:
+  prepare:
+    name: Prepare the version and merge it after CI
+    if: >-
+      github.repository == 'noah-qin/Corta' &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    outputs:
+      tag: ${{ steps.prepare.outputs.tag }}
+      commit: ${{ steps.prepare.outputs.commit }}
+      published: ${{ steps.prepare.outputs.published }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Prepare or resume the version PR
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          BUMP: ${{ inputs.bump || 'patch' }}
+        run: bash scripts/prepare-release.sh
+      - name: Keep the rehearsal source changes
+        if: inputs.dry_run
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rehearsal-source
+          path: rehearsal.patch
+          if-no-files-found: error
+
   release:
-    name: Build and draft a release
+    name: Test, sign, notarise and publish
+    needs: prepare
+    if: needs.prepare.outputs.published != 'true'
     runs-on: macos-26
     timeout-minutes: 90
     environment: release
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.prepare.outputs.commit }}
           fetch-depth: 0
 
+      # Re-run failed jobs may reuse prepare's old outputs. Probe GitHub
+      # again before building, so a publication followed by a lost response
+      # is recovered without ever replacing the published signed bytes.
+      - name: Check whether this release was already published
+        id: published
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          exists=false
+          if [ "$DRY_RUN" != true ] && \
+             gh release view "$TAG" --json isDraft --jq .isDraft > "$RUNNER_TEMP/is-draft"; then
+            if [ "$(cat "$RUNNER_TEMP/is-draft")" = false ]; then
+              test "$(git rev-parse "refs/tags/$TAG^{commit}")" = "$(git rev-parse HEAD)" || {
+                echo "::error::$TAG was published from another commit"; exit 1;
+              }
+              exists=true
+            fi
+          fi
+          if [ "$exists" = false ] && [ "$DRY_RUN" != true ]; then
+            python3 - <<'PYTHON'
+          import os
+          import re
+          import subprocess
+          version = tuple(map(int, os.environ['TAG'][1:].split('.')))
+          tags = subprocess.check_output(['git', 'tag'], text=True).splitlines()
+          if any(tuple(map(int, tag[1:].split('.'))) > version
+                 for tag in tags if re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+', tag)):
+              raise SystemExit('A newer release tag exists; refusing to publish an older release.')
+          PYTHON
+          fi
+          echo "exists=$exists" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the rehearsal source changes
+        if: ${{ steps.published.outputs.exists != 'true' && (inputs.dry_run) }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: rehearsal-source
+          path: ${{ runner.temp }}/rehearsal
+      - name: Apply the rehearsal source changes
+        if: ${{ steps.published.outputs.exists != 'true' && (inputs.dry_run) }}
+        run: git apply "$RUNNER_TEMP/rehearsal/rehearsal.patch"
+
       - name: Select the pinned Xcode
+        if: steps.published.outputs.exists != 'true'
         run: |
           pinned="/Applications/Xcode_${XCODE_PIN}.app"
           if [ ! -d "$pinned" ]; then
@@ -97,65 +161,39 @@ jobs:
           sudo xcode-select -s "$pinned"
           xcodebuild -version
 
-      # A real run is a `v*` tag, and the tag is the version. A dry run has
-      # no tag, so it takes the version the project builds with — the one
-      # `corta-release-check` holds the CHANGELOG and README to.
       - name: Work out the version
+        if: steps.published.outputs.exists != 'true'
         id: version
         env:
-          DRY_RUN: ${{ inputs.dry_run }}
+          TAG: ${{ needs.prepare.outputs.tag }}
         run: |
-          if [ "$DRY_RUN" = "true" ]; then
-            version=$(xcodebuild -project Corta.xcodeproj -scheme Corta \
-              -configuration Release -showBuildSettings 2>/dev/null | \
-              awk '$1 == "MARKETING_VERSION" { print $3; exit }')
-            if [ -z "$version" ]; then
-              echo "::error::Could not read MARKETING_VERSION from the project."
-              exit 1
-            fi
-            tag="v$version"
-          elif [ "$GITHUB_REF_TYPE" = "tag" ] && [[ "$GITHUB_REF_NAME" == v* ]]; then
-            tag="$GITHUB_REF_NAME"
-          else
-            echo "::error::A release builds a v* tag. Dispatch on one (--ref vX.Y.Z), or ask for a dry run."
-            exit 1
-          fi
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
-      # None of the five is a fork: build ad hoc. All five: sign. Anything
-      # in between is a misconfigured environment — an emptied secret reads
-      # exactly like a missing one — and would otherwise ship an unsigned
-      # draft without a word, so it fails and names what is missing. A dry
-      # run exists to rehearse signing, so it never falls back to ad hoc.
-      - name: Check whether signing secrets are available
+      # Automatic publication must never fall back to an unsigned build.
+      - name: Check the signing configuration
+        if: steps.published.outputs.exists != 'true'
         id: signing
         env:
-          DRY_RUN: ${{ inputs.dry_run }}
           P12: ${{ secrets.DEVELOPER_ID_P12 }}
           P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
           ASC_KEY: ${{ secrets.ASC_KEY }}
           ASC_KEY_ID: ${{ vars.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ vars.ASC_ISSUER_ID }}
+          SPARKLE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
           missing=""
-          [ -n "$P12" ] || missing="$missing DEVELOPER_ID_P12"
-          [ -n "$P12_PASSWORD" ] || missing="$missing DEVELOPER_ID_P12_PASSWORD"
-          [ -n "$ASC_KEY" ] || missing="$missing ASC_KEY"
-          [ -n "$ASC_KEY_ID" ] || missing="$missing ASC_KEY_ID"
-          [ -n "$ASC_ISSUER_ID" ] || missing="$missing ASC_ISSUER_ID"
-          count=$(echo $missing | wc -w | tr -d ' ')
-          if [ "$count" -eq 0 ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          elif [ "$count" -eq 5 ] && [ "$DRY_RUN" != "true" ]; then
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::No signing secrets. Producing an ad-hoc signed, un-notarised build."
-          else
-            echo "::error::The release environment is missing or has emptied:$missing"
+          for name in P12 P12_PASSWORD ASC_KEY ASC_KEY_ID ASC_ISSUER_ID SPARKLE_KEY; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::The release environment is missing:$missing"
             exit 1
           fi
+          echo "available=true" >> "$GITHUB_OUTPUT"
 
       - name: Run the tests before shipping anything
+        if: steps.published.outputs.exists != 'true'
         env:
           # The core suite reads this directly (`swift test` is in-process);
           # the app suite needs the prefix, which xcodebuild strips on the
@@ -176,13 +214,9 @@ jobs:
             DEVELOPMENT_TEAM="" \
             -quiet
 
-      # Kept whether or not the tests passed. A draft release is reviewed by
-      # a person before it is published, and "the tests passed" is a claim
-      # that review should be able to check rather than take on faith — the
-      # bundle is the evidence. On a failure it is the only record of what
-      # went wrong, since the run stops here.
+      # Preserve the evidence on both success and failure.
       - name: Keep the test results
-        if: always()
+        if: ${{ steps.published.outputs.exists != 'true' && (always()) }}
         uses: actions/upload-artifact@v7
         with:
           name: xcresult-release-${{ steps.version.outputs.tag }}
@@ -198,7 +232,7 @@ jobs:
       # MenuShortcutTests.noKeystrokeIsClaimedByTwoMenuItems on this
       # runner; a dozen local attempts across two machines have not).
       - name: Print test failure details
-        if: failure()
+        if: ${{ steps.published.outputs.exists != 'true' && (failure()) }}
         run: |
           # 'Failure Message' is a *child node type* here, not a field on
           # the failing test — confirmed against this schema locally
@@ -213,7 +247,7 @@ jobs:
               (.testNodes // [])[] | failures(null)'
 
       - name: Import the signing certificate
-        if: steps.signing.outputs.available == 'true'
+        if: ${{ steps.published.outputs.exists != 'true' && (steps.signing.outputs.available == 'true') }}
         env:
           P12: ${{ secrets.DEVELOPER_ID_P12 }}
           P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
@@ -252,7 +286,7 @@ jobs:
       # as a secret: the keychain holds exactly one Developer ID
       # Application certificate, so the name is unambiguous.
       - name: Build (signed)
-        if: steps.signing.outputs.available == 'true'
+        if: ${{ steps.published.outputs.exists != 'true' && (steps.signing.outputs.available == 'true') }}
         run: |
           options="$RUNNER_TEMP/ExportOptions.plist"
           trap 'rm -f "$options"' EXIT
@@ -293,21 +327,6 @@ jobs:
             -exportOptionsPlist "$options" \
             -quiet
 
-      - name: Build (ad-hoc)
-        if: steps.signing.outputs.available != 'true'
-        run: |
-          xcodebuild build \
-            -project Corta.xcodeproj \
-            -scheme Corta \
-            -configuration Release \
-            -derivedDataPath build \
-            ARCHS=arm64 \
-            CODE_SIGN_IDENTITY="-" \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGNING_REQUIRED=NO \
-            DEVELOPMENT_TEAM="" \
-            -quiet
-
       # The same command a maintainer runs locally (`corta-release-check
       # package`): the archive, its SHA-256 sidecar, then the release check —
       # versions, build number, deployment target, CHANGELOG/README
@@ -315,10 +334,10 @@ jobs:
       # implementation of the rules, so the two routes reject the same
       # artifact (B15).
       #
-      # A dry run passes `--rehearsal`: it rebuilds the version the project
-      # carries, which the feed usually already publishes, and that is the
-      # one rule the package check would otherwise refuse it on.
+      # A dry run transfers the prepared metadata as a patch, without a PR,
+      # tag or publication. The rehearsal flag also permits existing versions.
       - name: Package and check
+        if: steps.published.outputs.exists != 'true'
         id: package
         env:
           REHEARSAL: ${{ inputs.dry_run && '--rehearsal' || '' }}
@@ -331,7 +350,7 @@ jobs:
           echo "zip=$zip" >> "$GITHUB_OUTPUT"
 
       - name: Notarise and staple
-        if: steps.signing.outputs.available == 'true'
+        if: ${{ steps.published.outputs.exists != 'true' && (steps.signing.outputs.available == 'true') }}
         env:
           REHEARSAL: ${{ inputs.dry_run && '--rehearsal' || '' }}
           ASC_KEY: ${{ secrets.ASC_KEY }}
@@ -361,6 +380,7 @@ jobs:
       # The minimum OS is read from the app, not typed here: a note that
       # said "26.5" while the app said 26.0 is exactly the drift T11 found.
       - name: Write the release notes
+        if: steps.published.outputs.exists != 'true'
         run: |
           sha=$(shasum -a 256 "${{ steps.package.outputs.zip }}" | cut -d' ' -f1)
           minimum=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' \
@@ -368,19 +388,12 @@ jobs:
           {
             echo "## Corta ${{ steps.version.outputs.tag }}"
             echo
-            echo "See [CHANGELOG.md](https://github.com/noah-qin/Corta/blob/${{ steps.version.outputs.tag }}/CHANGELOG.md) for what changed."
+            python3 scripts/prepare-release.py --notes "${{ steps.version.outputs.version }}"
+            echo
+            echo "See [CHANGELOG.md](https://github.com/noah-qin/Corta/blob/${{ steps.version.outputs.tag }}/CHANGELOG.md) for the full history."
             echo
             echo "Requires macOS $minimum or later."
             echo
-            if [ "${{ steps.signing.outputs.available }}" != "true" ]; then
-              echo "> [!WARNING]"
-              echo "> **This build is not signed or notarised.** macOS will refuse to"
-              echo "> open it until you clear the quarantine attribute yourself:"
-              echo "> \`xattr -dr com.apple.quarantine /Applications/Corta.app\`."
-              echo "> Only do that if you trust this build. Building from source is"
-              echo "> the alternative, and is documented in the README."
-              echo
-            fi
             echo "\`\`\`"
             echo "SHA-256  $sha"
             # Which compiler produced *this* binary. The numbers in
@@ -396,7 +409,7 @@ jobs:
       # A rehearsal's archive is kept for a week for inspection, never
       # attached to a release.
       - name: Keep the rehearsal's archive
-        if: inputs.dry_run
+        if: ${{ steps.published.outputs.exists != 'true' && (inputs.dry_run) }}
         uses: actions/upload-artifact@v7
         with:
           name: rehearsal-${{ steps.package.outputs.zip }}
@@ -406,17 +419,35 @@ jobs:
             release-notes.md
           retention-days: 7
 
-      - name: Open a draft release
-        if: ${{ !inputs.dry_run }}
+      # Create the tag only after the exact commit's archive passed checks.
+      # A rerun may find the tag left by a failed upload, never move it.
+      - name: Tag and publish the release
+        if: ${{ steps.published.outputs.exists != 'true' && (!inputs.dry_run) }}
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          gh release create "${{ steps.version.outputs.tag }}" \
-            --draft \
-            --title "Corta ${{ steps.version.outputs.tag }}" \
-            --notes-file release-notes.md \
-            "${{ steps.package.outputs.zip }}" \
-            "${{ steps.package.outputs.zip }}.sha256"
+          set -euo pipefail
+          commit=$(git rev-parse HEAD)
+          if git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
+            test "$(git rev-parse "$TAG^{commit}")" = "$commit" || {
+              echo "::error::$TAG already names another commit"; exit 1;
+            }
+          else
+            git tag "$TAG" "$commit"
+            git push origin "refs/tags/$TAG"
+          fi
+          if gh release view "$TAG" --json isDraft --jq .isDraft > "$RUNNER_TEMP/is-draft"; then
+            test "$(cat "$RUNNER_TEMP/is-draft")" = true || {
+              echo "::error::$TAG is already published; do not replace its signed bytes"; exit 1;
+            }
+          else
+            gh release create "$TAG" --verify-tag --draft \
+              --title "Corta $TAG" --notes-file release-notes.md
+          fi
+          gh release upload "$TAG" \
+            "${{ steps.package.outputs.zip }}" "${{ steps.package.outputs.zip }}.sha256" --clobber
+          gh release edit "$TAG" --draft=false --latest
 
       # Always, including when an earlier step failed: a signing keychain
       # left on the runner outlives the job that needed it. The hosted
@@ -424,7 +455,22 @@ jobs:
       # than a fix, but a workflow that only cleans up on success teaches
       # the wrong habit to whatever runs it next.
       - name: Remove the signing keychain
-        if: always() && steps.signing.outputs.available == 'true'
+        if: ${{ steps.published.outputs.exists != 'true' && (always() && steps.signing.outputs.available == 'true') }}
         run: |
           security list-keychains -d user -s login.keychain-db || true
           security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
+
+  update-feed:
+    name: Sign and publish the automatic update
+    needs: [prepare, release]
+    if: >-
+      always() && !cancelled() && !inputs.dry_run &&
+      needs.prepare.result == 'success' &&
+      (needs.release.result == 'success' || needs.release.result == 'skipped')
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    uses: ./.github/workflows/appcast.yml
+    with:
+      tag: ${{ needs.prepare.outputs.tag }}

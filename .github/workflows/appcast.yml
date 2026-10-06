@@ -16,36 +16,21 @@
 
 name: Update feed
 
-# Signs a *published* release into appcast.xml (D20). `release.yml` builds,
-# signs, notarises and drafts the release when a `v*` tag is pushed; a
-# person reviews and publishes the draft; this workflow then signs the
-# archive with the Sparkle EdDSA key, holds the feed to
-# `corta-release-check`, and merges it to `main` through a pull request
-# that runs the ordinary checks. It is the only route that signs the feed.
-#
-# The key is a secret of the `release` environment: only `v*` tags may use
-# it and every run waits for the maintainer's approval. It reaches
-# `generate_appcast` through a pipe and is never written to disk. The
-# `sign` job is the only job that can see it; `publish` works from the
-# signed feed it uploads.
-#
-# Third-party actions are pinned by commit SHA and Sparkle's tools by the
-# tarball's SHA-256: this workflow decides what an installed Corta will
-# accept as an update, so nothing it runs is allowed to change under it.
-#
-# Two things that look odd and are deliberate:
-#   - `publish` runs CI on the branch with `gh workflow run` instead of
-#     relying on the pull request to trigger it: events raised with the
-#     workflow's own token do not start workflows, and `workflow_dispatch`
-#     is the documented exception. The checks land on the commit, which is
-#     what the branch ruleset's required status checks read.
-#   - The merge is a squash, with auto-merge enabled if GitHub is still
-#     refreshing required checks or merge eligibility after CI passes.
-#     A failed CI run still leaves the pull request open for a person.
+# Called by Release after publication, and manually for recovery/rehearsal.
+# Uses the release tag's code and metadata but carries over the latest feed
+# from main. The signing key remains an environment secret piped to stdin.
+# Publishing the feed still uses a PR and explicitly dispatched CI.
 
 on:
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      tag:
+        description: Published release tag
+        type: string
+        required: true
+      dry_run:
+        type: boolean
+        default: false
   # For a re-run after a failure, or a rehearsal: `dry_run` stops after
   # the sign job has signed and checked the feed, so nothing is pushed.
   workflow_dispatch:
@@ -57,6 +42,12 @@ on:
         description: Sign and check only; open no pull request
         type: boolean
         default: false
+
+# Also serializes manual recovery with the automatic feed call. This group
+# must differ from the caller's corta-release group to avoid a deadlock.
+concurrency:
+  group: corta-update-feed
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -76,22 +67,26 @@ jobs:
     environment: release
     # A pre-release is a build a person chose not to offer everyone; the
     # feed offers everyone.
-    if: ${{ github.event_name == 'workflow_dispatch' || !github.event.release.prerelease }}
+    if: ${{ github.repository == 'noah-qin/Corta' && github.ref == 'refs/heads/main' }}
     outputs:
       version: ${{ steps.version.outputs.version }}
+      changed: ${{ steps.sign.outputs.changed }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
 
       - name: Work out the version
         id: version
+        env:
+          TAG: ${{ inputs.tag }}
         run: |
-          tag="${{ github.event.inputs.tag || github.event.release.tag_name }}"
-          case "$tag" in
-            v*) ;;
-            *) echo "::error::release tag '$tag' is not a v* tag"; exit 1 ;;
-          esac
+          tag="$TAG"
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::Expected a stable vX.Y.Z release tag"; exit 1;
+          }
+          test "$(git rev-parse "refs/tags/$tag^{commit}")" = "$(git rev-parse HEAD)"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
 
@@ -99,6 +94,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          gh release view "${{ steps.version.outputs.tag }}" --json isDraft,isPrerelease \
+            --jq 'if (.isDraft or .isPrerelease) then error("The feed requires a published stable release") else "Published stable release" end'
           mkdir -p feed
           gh release download "${{ steps.version.outputs.tag }}" \
             --pattern "Corta-${{ steps.version.outputs.version }}.zip*" \
@@ -115,22 +112,43 @@ jobs:
           tar -xJf sparkle.tar.xz -C sparkle ./bin/generate_appcast
           test -x sparkle/bin/generate_appcast
 
-      # The key goes in through stdin: not on the command line (visible to
-      # `ps`), not in a file (left on the runner). `generate_appcast`
-      # writes only the item for the archive in `feed/`, so the existing
-      # items are carried over untouched.
+      - name: Carry over the latest update feed
+        run: |
+          git fetch origin main
+          git show origin/main:appcast.xml > appcast.xml
+          cp appcast.xml "$RUNNER_TEMP/original-appcast.xml"
+
+      # A rerun of an already published feed verifies its existing item;
+      # it never regenerates dates or signatures and never replaces bytes.
       - name: Sign the archive into appcast.xml
+        id: sign
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          test -n "$SPARKLE_PRIVATE_KEY" || { echo "::error::SPARKLE_PRIVATE_KEY is empty"; exit 1; }
-          cp appcast.xml feed/appcast.xml
-          echo "$SPARKLE_PRIVATE_KEY" | sparkle/bin/generate_appcast \
-            --ed-key-file - \
-            --download-url-prefix "https://github.com/noah-qin/Corta/releases/download/${{ steps.version.outputs.tag }}/" \
-            feed
-          cp feed/appcast.xml appcast.xml
-          git --no-pager diff --stat appcast.xml
+          exists=$(python3 - <<'PYTHON'
+          import os
+          import xml.etree.ElementTree as ET
+          ns = '{http://www.andymatuschak.org/xml-namespaces/sparkle}'
+          print('true' if any(n.text == os.environ['VERSION']
+                for n in ET.parse('appcast.xml').iter(ns + 'shortVersionString')) else 'false')
+          PYTHON
+          )
+          if [ "$exists" != true ]; then
+            test -n "$SPARKLE_PRIVATE_KEY" || { echo "::error::SPARKLE_PRIVATE_KEY is empty"; exit 1; }
+            cp appcast.xml feed/appcast.xml
+            printf '%s\n' "$SPARKLE_PRIVATE_KEY" | sparkle/bin/generate_appcast \
+              --ed-key-file - \
+              --download-url-prefix "https://github.com/noah-qin/Corta/releases/download/$TAG/" \
+              feed
+            cp feed/appcast.xml appcast.xml
+          fi
+          if cmp -s appcast.xml "$RUNNER_TEMP/original-appcast.xml"; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          fi
 
       # The release check, against the unpacked archive:
       # the item's build, URL, length and signature agree with the app the
@@ -157,9 +175,9 @@ jobs:
   publish:
     name: Merge the feed to main
     needs: sign
-    if: ${{ github.event.inputs.dry_run != 'true' }}
+    if: ${{ !inputs.dry_run && needs.sign.outputs.changed == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     permissions:
       contents: write
       pull-requests: write
@@ -185,29 +203,46 @@ jobs:
           git checkout -b "$branch"
           git add appcast.xml
           if git diff --cached --quiet; then
-            echo "::error::appcast.xml is unchanged — the feed already carries ${version}?"
+            echo "::error::The feed changed while signing; rerun to verify the latest feed."
             exit 1
           fi
           git commit -m "chore: publish ${version} to the update feed" -m \
-            "Signed from the published v${version} release by the update-feed workflow (D20); corta-release-check --appcast --require-notarized passed in the sign job."
-          git push -u origin "$branch"
-          gh pr create --base main --head "$branch" \
-            --title "chore: publish ${version} to the update feed" \
-            --body "Release checklist step 5, from CI (D20, #101). The \`sign\` job downloaded the published \`Corta-${version}.zip\`, verified its checksum, signed it into \`appcast.xml\` and passed \`corta-release-check check --appcast --require-notarized\`. This pull request is merged by the same workflow once CI on this commit is green." \
-            > pr-url.txt
+            "Verified against the published archive by corta-release-check --appcast --require-notarized."
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            git fetch origin "$branch"
+            test "$(git diff --stat HEAD FETCH_HEAD -- appcast.xml)" = "" || {
+              echo "::error::Existing feed branch differs; inspect it before retrying."; exit 1;
+            }
+            git reset --hard FETCH_HEAD
+          else
+            git push -u origin "$branch"
+          fi
+          url=$(gh pr list --head "$branch" --base main --state open --json url --jq '.[0].url // empty')
+          if [ -z "$url" ]; then
+            cat > "$RUNNER_TEMP/feed-pr.md" <<'BODY'
+          Updates the signed Sparkle feed from the published release. The archive checksum, Developer ID signature, Apple notarisation and feed signature have been verified by corta-release-check. CI must pass before this PR merges.
+          BODY
+            url=$(gh pr create --base main --head "$branch" \
+              --title "chore: publish ${version} to the update feed" \
+              --body-file "$RUNNER_TEMP/feed-pr.md")
+          fi
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
-          echo "url=$(cat pr-url.txt)" >> "$GITHUB_OUTPUT"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Run CI on the branch and wait
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           branch="${{ steps.pr.outputs.branch }}"
+          started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          expected="${{ steps.pr.outputs.head }}"
           gh workflow run ci.yml --ref "$branch"
           # The dispatch is asynchronous; give the run a moment to exist.
           for _ in $(seq 1 12); do
             run_id=$(gh run list --workflow ci.yml --branch "$branch" --event workflow_dispatch \
-              --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+              --limit 20 --json databaseId,headSha,createdAt \
+              --jq ".[] | select(.headSha == \"$expected\" and .createdAt >= \"$started\") | .databaseId" | head -1)
             [ -n "$run_id" ] && break
             sleep 5
           done
@@ -223,4 +258,13 @@ jobs:
             --json number,url,mergeable,mergeStateStatus
           gh pr merge "${{ steps.pr.outputs.url }}" --squash --auto --delete-branch \
             --subject "chore: publish ${{ needs.sign.outputs.version }} to the update feed" \
+            --match-head-commit "${{ steps.pr.outputs.head }}" \
             --body "Signed from the published v${{ needs.sign.outputs.version }} release by the update-feed workflow (D20)."
+          # Keep the caller's release lock until this update is actually live.
+          for _ in $(seq 1 120); do
+            state=$(gh pr view "${{ steps.pr.outputs.url }}" --json state --jq .state)
+            [ "$state" != MERGED ] || break
+            [ "$state" != CLOSED ] || { echo '::error::Feed PR was closed.'; exit 1; }
+            sleep 10
+          done
+          test "$state" = MERGED || { echo '::error::Feed PR is still awaiting merge; rerun after resolving its checks.'; exit 1; }

@@ -368,6 +368,23 @@ General › Workflow permissions); 1.0.1's feed had to be merged by hand
 because that switch was off, and it is the one thing the dry run cannot
 exercise.
 
+**Amended 2026-10-06 — one-click releases.** The maintainer chose a manual
+Run workflow request on protected `main` as the release decision. Merges
+continue to run CI without publishing. After the request, `Release`
+prepares and auto-merges a version PR after CI, builds its exact merge
+commit, tests/signs/notarises/checks it, then tags and publishes. There are
+no hand-edited versions, tag pushes, draft publication or repeated
+approvals. It calls `appcast.yml` in the same pipeline because releases
+created with `GITHUB_TOKEN` do not trigger another workflow. The feed still
+uses the environment key through stdin, validates the published archive,
+and merges through a PR with CI. The release environment admits only
+`main` and no longer requires a reviewer; the earlier `v*` tag policy is
+removed. This intentionally moves the approval boundary to code admitted
+to protected main and the manual workflow request, rather than approval of
+each job. Missing signing configuration fails; published archive bytes
+are never replaced. A serialized pipeline prevents releases overtaking
+each other, and neither merges nor feed updates trigger another release.
+
 ## D21 — Corta builds for Apple silicon only
 
 **Decision.** From 1.1.0 the application and `corta-exec` are `arm64`

@@ -52,6 +52,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Check automatic release preparation
+        run: python3 -B -m unittest discover -s scripts/tests -v
+
       - name: Select the pinned Xcode
         run: |
           pinned="/Applications/Xcode_${XCODE_PIN}.app"
