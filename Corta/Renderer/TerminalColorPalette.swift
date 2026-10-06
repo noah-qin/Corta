@@ -45,7 +45,8 @@ nonisolated enum TerminalColorPalette {
     static var cursorColor: SIMD4<Float> { active.cursor }
 
     /// Opaque: the canvas is content, not glass. At 0.72 every colour lost a
-    /// fifth of its contrast. The window and layer still permit lowering it.
+    /// fifth of its contrast. The window and the layer are opaque too, so
+    /// lowering this alone would only darken the colours.
     static let backgroundOpacity: Float = 1.0
 
     static var clearColor: SIMD4<Float> {

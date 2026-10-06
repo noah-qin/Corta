@@ -148,8 +148,8 @@ final class SplitViewController: NSViewController {
         // Nothing else claims first responder; without it keyDown never fires
         // and First Responder menu actions (⌘V, ⌘=, ⌘D) dead-end.
         window.makeFirstResponder(pane.terminalView)
-        // Paint one frame before the window shows, or it flashes the desktop
-        // until the Metal layer first presents.
+        // Ask for the first frame at the final size before the window shows;
+        // until it lands the layer shows the theme's background.
         view.layoutSubtreeIfNeeded()
         pane.terminalView?.drawNow()
 
