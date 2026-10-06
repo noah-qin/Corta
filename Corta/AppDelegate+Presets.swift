@@ -45,9 +45,7 @@ extension AppDelegate {
     /// without matching on a stored reference.
     static var presetMenuTitle: String { L10n.text("menu.presets") }
 
-    func installPresetMenu(in mainMenu: NSMenu) {
-        guard let shell = mainMenu.items.first(where: { $0.title == "Shell" })?.submenu
-        else { return }
+    func installPresetMenu(in shell: NSMenu) {
         let item = NSMenuItem(title: Self.presetMenuTitle, action: nil, keyEquivalent: "")
         let submenu = NSMenu(title: Self.presetMenuTitle)
         submenu.delegate = self

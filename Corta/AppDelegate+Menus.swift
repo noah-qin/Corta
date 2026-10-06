@@ -16,103 +16,219 @@
 
 import Cocoa
 
-/// The menu bar: items the storyboard can't carry, and every key
-/// equivalent. Shortcuts are applied from `Keybindings` after the menu
-/// exists and on every config change, because a nib's key equivalent can't
-/// be rebound. Menu items still dispatch through the responder chain, and
-/// the menus show the shortcut that actually works.
+/// The menu bar, built here in full: no nib, so no template item to prune
+/// or re-title. Items for a `TerminalCommand` take its title and action;
+/// every key equivalent a command has comes from `Keybindings`, applied
+/// after the menu exists and on every config change. The rest — AppKit's
+/// own items (Hide, Quit, Minimize, …) — keep the standard shortcuts set
+/// here. Items dispatch through the responder chain unless they name a
+/// target.
 extension AppDelegate {
     /// Lets `menuNeedsUpdate` tell Edit from the theme menu without a
     /// localized title.
     fileprivate static weak var editMenu: NSMenu?
 
     func installMenus() {
-        guard let mainMenu = NSApp.mainMenu else { return }
-        installAboutItem(in: mainMenu)
-        installUpdateItem(in: mainMenu)
-        installFileMenuItems(in: mainMenu)
-        installShellMenuItems(in: mainMenu)
-        installPresetMenu(in: mainMenu)
-        installViewMenuItems(in: mainMenu)
-        installHelpMenuItems(in: mainMenu)
-        pruneInapplicableEditItems(in: mainMenu)
+        let mainMenu = NSMenu(title: "Main Menu")
+        let services = NSMenu(title: L10n.text("menu.services"))
+        let window = makeWindowMenu()
+        let help = makeHelpMenu()
+        for menu in [
+            makeAppMenu(services: services), makeFileMenu(), makeShellMenu(), makeEditMenu(),
+            makeViewMenu(), window, help,
+        ] {
+            let item = NSMenuItem(title: menu.title, action: nil, keyEquivalent: "")
+            item.submenu = menu
+            mainMenu.addItem(item)
+        }
+        NSApp.mainMenu = mainMenu
+        // AppKit fills these: the Services list, the window list and tab
+        // items, and the Help search field.
+        NSApp.servicesMenu = services
+        NSApp.windowsMenu = window
+        NSApp.helpMenu = help
         // Also here, not only in `menuNeedsUpdate`: a test host reading
         // `NSApp.mainMenu` never opens the menu.
         if let edit = AppDelegate.editMenu { pruneInjectedEditItems(edit) }
-        localizeStoryboardMenuTitles(in: mainMenu)
         applyKeybindings()
         NotificationCenter.default.addObserver(
             self, selector: #selector(applyKeybindings), name: ConfigurationStore.didChange,
             object: nil)
     }
 
-    /// Storyboard items stay in the base storyboard for their responder-chain
-    /// wiring; titles are localized here from the String Catalog.
-    private func localizeStoryboardMenuTitles(in menu: NSMenu) {
-        let titles: [String: String] = [
-            "Corta": "menu.corta", "About Corta": "menu.aboutCorta", "Settings…": "command.settings",
-            "Services": "menu.services", "Hide Corta": "menu.hideCorta", "Hide Others": "menu.hideOthers",
-            "Show All": "menu.showAll", "Quit Corta": "menu.quitCorta", "File": "menu.file",
-            // "New" says New Window, as the palette and shortcuts sheet do.
-            "New": "command.newWindow", "New Tab": "command.newTab", "Close": "command.close",
-            "Shell": "menu.shell", "Split Pane Right": "command.splitRight", "Split Pane Down": "command.splitDown",
-            "Move Focus Left": "command.focusLeft", "Move Focus Right": "command.focusRight",
-            "Move Focus Up": "command.focusUp", "Move Focus Down": "command.focusDown", "Edit": "menu.edit",
-            "Undo": "menu.undo", "Redo": "menu.redo", "Cut": "menu.cut", "Copy": "common.copy",
-            "Paste": "common.paste", "Paste and Match Style": "menu.pasteAndMatchStyle", "Delete": "menu.delete",
-            "Select All": "common.selectAll", "Find": "menu.find", "Find…": "command.find",
-            "Find Next": "menu.findNext", "Find Previous": "menu.findPrevious",
-            "Use Selection for Find": "menu.useSelectionForFind", "Jump to Selection": "menu.jumpToSelection",
-            "View": "menu.view", "Bigger": "command.increaseFontSize", "Smaller": "command.decreaseFontSize",
-            "Actual Size": "command.resetFontSize", "Enter Full Screen": "menu.enterFullScreen", "Window": "menu.window",
-            "Minimize": "menu.minimize", "Zoom": "menu.zoom", "Bring All to Front": "menu.bringAllToFront",
-            "Help": "menu.help", "Corta Help": "menu.cortaHelp", "Spelling and Grammar": "menu.spellingGrammar",
-            "Spelling": "menu.spelling", "Show Spelling and Grammar": "menu.showSpellingGrammar",
-            "Check Document Now": "menu.checkDocument", "Check Spelling While Typing": "menu.checkSpelling",
-            "Check Grammar With Spelling": "menu.checkGrammar", "Correct Spelling Automatically": "menu.correctSpelling",
-            "Substitutions": "menu.substitutions", "Show Substitutions": "menu.showSubstitutions",
-            "Smart Copy/Paste": "menu.smartCopyPaste", "Smart Quotes": "menu.smartQuotes",
-            "Smart Dashes": "menu.smartDashes", "Smart Links": "menu.smartLinks",
-            "Data Detectors": "menu.dataDetectors", "Text Replacement": "menu.textReplacement",
-            "Transformations": "menu.transformations", "Make Upper Case": "menu.upperCase",
-            "Make Lower Case": "menu.lowerCase", "Capitalize": "menu.capitalize", "Speech": "menu.speech",
-            "Start Speaking": "menu.startSpeaking", "Stop Speaking": "menu.stopSpeaking"
-        ]
-        for item in menu.items {
-            if let key = titles[item.title] { item.title = L10n.text(key) }
-            if let submenu = item.submenu {
-                // The bar shows a submenu's title, not its item's; localize both.
-                if let key = titles[submenu.title] { submenu.title = L10n.text(key) }
-                localizeStoryboardMenuTitles(in: submenu)
-            }
+    private func makeAppMenu(services: NSMenu) -> NSMenu {
+        let menu = NSMenu(title: L10n.text("menu.corta"))
+        menu.addItem(withTitle: L10n.text("menu.aboutCorta"), action: #selector(showAboutWindow(_:)), target: self)
+        // "Check for Updates…" directly under About, where Sparkle apps put it.
+        if UpdateController.isAvailable {
+            let update = menu.addItem(
+                withTitle: L10n.text("menu.checkForUpdates"),
+                action: #selector(UpdateController.checkForUpdates(_:)), target: UpdateController.shared)
+            update.image = NSImage(
+                systemSymbolName: "arrow.triangle.2.circlepath", accessibilityDescription: nil)
         }
+        menu.addItem(.separator())
+        menu.addItem(item(for: .settings))
+        menu.addItem(.separator())
+        let servicesItem = NSMenuItem(title: services.title, action: nil, keyEquivalent: "")
+        servicesItem.submenu = services
+        menu.addItem(servicesItem)
+        menu.addItem(.separator())
+        menu.addItem(withTitle: L10n.text("menu.hideCorta"), action: #selector(NSApplication.hide(_:)), key: "h")
+        menu.addItem(
+            withTitle: L10n.text("menu.hideOthers"),
+            action: #selector(NSApplication.hideOtherApplications(_:)), key: "h", modifiers: [.command, .option])
+        menu.addItem(withTitle: L10n.text("menu.showAll"), action: #selector(NSApplication.unhideAllApplications(_:)))
+        menu.addItem(.separator())
+        menu.addItem(withTitle: L10n.text("menu.quitCorta"), action: #selector(NSApplication.terminate(_:)), key: "q")
+        return menu
     }
 
-    /// Help > Keyboard Shortcuts (⌘/, as elsewhere) opens
-    /// `ShortcutsWindowController`.
-    private func installHelpMenuItems(in mainMenu: NSMenu) {
-        guard let help = mainMenu.items.first(where: { $0.title == "Help" })?.submenu
-        else { return }
-        // The template's "Corta Help" opens a help book Corta never shipped;
-        // retarget it at the documentation, matched by action.
-        if let cortaHelp = help.items.first(where: {
-            $0.action == #selector(NSApplication.showHelp(_:))
-        }) {
-            cortaHelp.action = #selector(showHelpDocumentation(_:))
-            cortaHelp.target = self
+    /// Export Text… sits here; the palette groups it with Edit by what it
+    /// does.
+    private func makeFileMenu() -> NSMenu {
+        let menu = NSMenu(title: L10n.text("menu.file"))
+        menu.addItem(item(for: .newWindow))
+        menu.addItem(item(for: .newTab))
+        menu.addItem(.separator())
+        menu.addItem(item(for: .close))
+        menu.addItem(.separator())
+        menu.addItem(item(for: .exportText))
+        menu.addItem(.separator())
+        for command in [TerminalCommand.previousTab, .nextTab, .renameTab] {
+            menu.addItem(item(for: command))
         }
-        let item = NSMenuItem(
-            title: L10n.text("shortcuts.title"), action: #selector(showShortcutsWindow(_:)),
-            keyEquivalent: "/")
-        item.keyEquivalentModifierMask = [.command]
-        item.target = self
+        return menu
+    }
+
+    /// Keep frequent actions direct; related tools remain one submenu away.
+    private func makeShellMenu() -> NSMenu {
+        let shell = NSMenu(title: L10n.text("menu.shell"))
+        installPresetMenu(in: shell)
+        for command in [TerminalCommand.splitRight, .splitDown, .reopenClosedPane] {
+            shell.addItem(item(for: command))
+        }
+        shell.addItem(.separator())
+        func group(_ key: String, _ commands: [TerminalCommand]) {
+            let title = L10n.text(key)
+            let parent = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            let submenu = NSMenu(title: title)
+            for command in commands { submenu.addItem(item(for: command)) }
+            parent.submenu = submenu
+            shell.addItem(parent)
+        }
+        group("menu.focus", [.focusLeft, .focusRight, .focusUp, .focusDown])
+        group("menu.commandsAndOutput", [
+            .previousCommand, .nextCommand, .previousFailedCommand, .nextFailedCommand,
+            .copyLastCommandOutput, .snapshotRunningCommandOutput, .exportCommandOutput,
+            .openFileReferenceInCommand, .searchCommandHistory,
+        ])
+        group("menu.workingDirectory", [
+            .revealWorkingDirectory, .copyWorkingDirectoryPath,
+            .changeDirectoryToParent, .changeDirectoryToProjectRoot,
+            .openParentDirectoryInNewPane, .openProjectRootInNewPane, .browseRemoteFiles,
+        ])
+        group("menu.paneLayout", [
+            .zoomPane, .growPaneHorizontally, .shrinkPaneHorizontally,
+            .growPaneVertically, .shrinkPaneVertically, .equalizePanes,
+        ])
+        shell.addItem(.separator())
+        shell.addItem(item(for: .clearScreen))
+        group("menu.terminalState", [.clearHistory, .resetTerminal, .reconnectRemote])
+        shell.addItem(.separator())
+        shell.addItem(item(for: .secureKeyboardEntry))
+        return shell
+    }
+
+    /// Only what a terminal can honour. The child owns every byte on screen,
+    /// so the text-system groups (Spelling, Substitutions, Transformations,
+    /// Speech), Paste and Match Style and Find and Replace are not offered;
+    /// the Find items are the four `PaneSearch.performFindPanelAction`
+    /// handles (tags 1, 2, 3, 7).
+    private func makeEditMenu() -> NSMenu {
+        let menu = NSMenu(title: L10n.text("menu.edit"))
+        menu.addItem(withTitle: L10n.text("menu.undo"), action: Selector(("undo:")), key: "z")
+        menu.addItem(withTitle: L10n.text("menu.redo"), action: Selector(("redo:")), key: "Z")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: L10n.text("menu.cut"), action: #selector(NSText.cut(_:)), key: "x")
+        menu.addItem(item(for: .copy))
+        menu.addItem(item(for: .paste))
+        menu.addItem(withTitle: L10n.text("menu.delete"), action: #selector(NSText.delete(_:)))
+        menu.addItem(item(for: .selectAll))
+        menu.addItem(.separator())
+        let find = NSMenu(title: L10n.text("menu.find"))
+        find.addItem(item(for: .find))
+        for (key, tag, keyEquivalent) in [
+            ("menu.findNext", 2, "g"), ("menu.findPrevious", 3, "G"), ("menu.useSelectionForFind", 7, "e"),
+        ] {
+            let item = find.addItem(
+                withTitle: L10n.text(key), action: #selector(PaneSearch.performFindPanelAction(_:)),
+                key: keyEquivalent)
+            item.tag = tag
+        }
+        let findItem = NSMenuItem(title: find.title, action: nil, keyEquivalent: "")
+        findItem.submenu = find
+        menu.addItem(findItem)
+        // AppKit injects AutoFill, Dictation and Emoji & Symbols later, and
+        // again; see `menuNeedsUpdate`.
+        menu.delegate = self
+        AppDelegate.editMenu = menu
+        return menu
+    }
+
+    /// Theme, appearance, scrolling and the palette. Theme and appearance
+    /// share one submenu — they are one daily choice — and a separate
+    /// Settings menu would duplicate the app menu's ⌘,.
+    private func makeViewMenu() -> NSMenu {
+        let view = NSMenu(title: L10n.text("menu.view"))
+        for command in [TerminalCommand.increaseFontSize, .decreaseFontSize, .resetFontSize] {
+            view.addItem(item(for: command))
+        }
+        view.addItem(
+            withTitle: L10n.text("menu.enterFullScreen"), action: #selector(NSWindow.toggleFullScreen(_:)),
+            key: "f", modifiers: [.command, .control])
+        view.addItem(.separator())
+        for command in [
+            TerminalCommand.scrollPageUp, .scrollPageDown, .scrollToTop, .scrollToBottom,
+        ] {
+            view.addItem(item(for: command))
+        }
+        view.addItem(.separator())
+        view.addItem(item(for: .commandPalette))
+        // No key equivalent: the system-wide hotkey is `quick-terminal-key`,
+        // held by `GlobalHotKey`.
+        view.addItem(item(for: .quickTerminal))
+        view.addItem(.separator())
+
+        let themeItem = NSMenuItem(title: L10n.text("settings.label.theme"), action: nil, keyEquivalent: "")
+        themeItem.submenu = themeMenu
+        view.addItem(themeItem)
+        view.addItem(withTitle: L10n.text("theme.editor") + "…", action: #selector(showThemeEditor(_:)), target: self)
+        view.addItem(withTitle: L10n.text("status.details") + "…", action: #selector(showHostDetails(_:)), target: self)
+        return view
+    }
+
+    /// `NSApp.windowsMenu`: AppKit appends the window list and the tab items.
+    private func makeWindowMenu() -> NSMenu {
+        let menu = NSMenu(title: L10n.text("menu.window"))
+        menu.addItem(withTitle: L10n.text("menu.minimize"), action: #selector(NSWindow.performMiniaturize(_:)), key: "m")
+        menu.addItem(withTitle: L10n.text("menu.zoom"), action: #selector(NSWindow.performZoom(_:)))
+        menu.addItem(.separator())
+        menu.addItem(withTitle: L10n.text("menu.bringAllToFront"), action: #selector(NSApplication.arrangeInFront(_:)))
+        return menu
+    }
+
+    /// "Corta Help" (⌘?) opens the documentation — Corta ships no help book;
+    /// Keyboard Shortcuts (⌘/, as elsewhere) opens `ShortcutsWindowController`.
+    private func makeHelpMenu() -> NSMenu {
+        let help = NSMenu(title: L10n.text("menu.help"))
+        help.addItem(withTitle: L10n.text("menu.cortaHelp"), action: #selector(showHelpDocumentation(_:)), key: "?", target: self)
         help.addItem(.separator())
-        help.addItem(item)
+        help.addItem(withTitle: L10n.text("shortcuts.title"), action: #selector(showShortcutsWindow(_:)), key: "/", target: self)
         #if DEBUG
-        let preview = NSMenuItem(title: L10n.text("ui.demo.title"), action: #selector(showSFTPDevelopmentPreview(_:)), keyEquivalent: "")
-        preview.target = self
-        help.addItem(preview)
+        help.addItem(withTitle: L10n.text("ui.demo.title"), action: #selector(showSFTPDevelopmentPreview(_:)), target: self)
         #endif
+        return help
     }
 
     /// "Corta Help" (⌘?) opens the README, which links on to `docs/`.
@@ -126,70 +242,8 @@ extension AppDelegate {
         ShortcutsWindowController.shared.show(sender)
     }
 
-    /// Removes template Edit items only an `NSTextView` can honour: Spelling
-    /// and Grammar, Substitutions, Transformations, Speech, Paste and Match
-    /// Style, and Find and Replace. The child owns every byte on screen, so
-    /// these were greyed out or silently did nothing
-    /// (`PaneSearch.performFindPanelAction` handles only tags 1, 2, 3, 7).
-    ///
-    /// Removed by action (or, for the three template submenus, by their
-    /// children's actions), so localized menus prune the same items.
-    private func pruneInapplicableEditItems(in mainMenu: NSMenu) {
-        guard let edit = mainMenu.items.first(where: { $0.title == "Edit" })?.submenu
-        else { return }
-
-        // Spelling and Grammar, Substitutions, Transformations, Speech.
-        let templateActions: Set<Selector> = [
-            #selector(NSText.showGuessPanel(_:)),
-            #selector(NSText.checkSpelling(_:)),
-            #selector(NSTextView.toggleAutomaticQuoteSubstitution(_:)),
-            #selector(NSTextView.uppercaseWord(_:)),
-            #selector(NSTextView.startSpeaking(_:)),
-        ]
-        func isTemplateGroup(_ item: NSMenuItem) -> Bool {
-            guard let submenu = item.submenu else { return false }
-            return submenu.items.contains { child in
-                guard let action = child.action else { return false }
-                if templateActions.contains(action) { return true }
-                return child.submenu?.items.contains {
-                    $0.action.map(templateActions.contains) ?? false
-                } ?? false
-            }
-        }
-
-        // Paste and Match Style: a PTY has no style.
-        let removableActions: Set<Selector> = [
-            #selector(NSTextView.pasteAsPlainText(_:))
-        ]
-        // Find, Next, Previous, Use Selection (`performFindPanelAction`).
-        let keptFindTags: Set<Int> = [1, 2, 3, 7]
-
-        for item in edit.items.reversed() {
-            if isTemplateGroup(item) {
-                edit.removeItem(item)
-                continue
-            }
-            if let action = item.action, removableActions.contains(action) {
-                edit.removeItem(item)
-                continue
-            }
-            guard let find = item.submenu,
-                find.items.contains(where: {
-                    $0.action == #selector(NSResponder.performTextFinderAction(_:))
-                        || $0.action
-                            == #selector(PaneSearch.performFindPanelAction(_:))
-                })
-            else { continue }
-            for candidate in find.items.reversed()
-            where candidate.action != nil && !keptFindTags.contains(candidate.tag) {
-                find.removeItem(candidate)
-            }
-        }
-        tidySeparators(in: edit)
-        // AppKit injects AutoFill and Dictation later, and again; see
-        // `menuNeedsUpdate`.
-        edit.delegate = self
-        AppDelegate.editMenu = edit
+    @objc func showAboutWindow(_ sender: Any?) {
+        AboutWindowController.shared.show(sender)
     }
 
     /// Drops AutoFill and Start Dictation as the Edit menu opens; AppKit
@@ -242,124 +296,6 @@ extension AppDelegate {
         }
     }
 
-    /// Points "About Corta" at Corta's About window. AppKit's template
-    /// attaches `orderFrontStandardAboutPanel:`; matched by that action, since
-    /// the title is localized.
-    private func installAboutItem(in mainMenu: NSMenu) {
-        guard let appMenu = mainMenu.items.first?.submenu,
-            let about = appMenu.items.first(where: {
-                $0.action == #selector(NSApplication.orderFrontStandardAboutPanel(_:))
-            })
-        else { return }
-        about.action = #selector(showAboutWindow(_:))
-        about.target = self
-    }
-
-    @objc func showAboutWindow(_ sender: Any?) {
-        AboutWindowController.shared.show(sender)
-    }
-
-    /// "Check for Updates…", inserted directly under About, where Sparkle apps
-    /// put it.
-    private func installUpdateItem(in mainMenu: NSMenu) {
-        guard UpdateController.isAvailable else { return }
-        guard let appMenu = mainMenu.items.first?.submenu,
-            let about = appMenu.items.first(where: {
-                $0.action == #selector(showAboutWindow(_:))
-            }),
-            let aboutIndex = appMenu.items.firstIndex(of: about)
-        else { return }
-        let item = NSMenuItem(
-            title: L10n.text("menu.checkForUpdates"),
-            action: #selector(UpdateController.checkForUpdates(_:)), keyEquivalent: "")
-        item.target = UpdateController.shared
-        item.image = NSImage(
-            systemSymbolName: "arrow.triangle.2.circlepath", accessibilityDescription: nil)
-        appMenu.insertItem(item, at: aboutIndex + 1)
-    }
-
-    /// Keep frequent actions direct; related tools remain one submenu away.
-    private func installShellMenuItems(in mainMenu: NSMenu) {
-        guard let shell = mainMenu.items.first(where: { $0.title == "Shell" })?.submenu
-        else { return }
-        shell.removeAllItems()
-        for command in [TerminalCommand.splitRight, .splitDown, .reopenClosedPane] {
-            shell.addItem(item(for: command))
-        }
-        shell.addItem(.separator())
-        func group(_ key: String, _ commands: [TerminalCommand]) {
-            let title = L10n.text(key)
-            let parent = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-            let submenu = NSMenu(title: title)
-            for command in commands { submenu.addItem(item(for: command)) }
-            parent.submenu = submenu
-            shell.addItem(parent)
-        }
-        group("menu.focus", [.focusLeft, .focusRight, .focusUp, .focusDown])
-        group("menu.commandsAndOutput", [
-            .previousCommand, .nextCommand, .previousFailedCommand, .nextFailedCommand,
-            .copyLastCommandOutput, .snapshotRunningCommandOutput, .exportCommandOutput,
-            .openFileReferenceInCommand, .searchCommandHistory,
-        ])
-        group("menu.workingDirectory", [
-            .revealWorkingDirectory, .copyWorkingDirectoryPath,
-            .changeDirectoryToParent, .changeDirectoryToProjectRoot,
-            .openParentDirectoryInNewPane, .openProjectRootInNewPane, .browseRemoteFiles,
-        ])
-        group("menu.paneLayout", [
-            .zoomPane, .growPaneHorizontally, .shrinkPaneHorizontally,
-            .growPaneVertically, .shrinkPaneVertically, .equalizePanes,
-        ])
-        shell.addItem(.separator())
-        shell.addItem(item(for: .clearScreen))
-        group("menu.terminalState", [.clearHistory, .resetTerminal, .reconnectRemote])
-        shell.addItem(.separator())
-        shell.addItem(item(for: .secureKeyboardEntry))
-    }
-
-    /// Export Text…, under File. (The palette groups it with Edit by what it
-    /// does.)
-    private func installFileMenuItems(in mainMenu: NSMenu) {
-        guard let file = mainMenu.items.first(where: { $0.title == "File" })?.submenu
-        else { return }
-        file.addItem(.separator())
-        file.addItem(item(for: .exportText))
-        file.addItem(.separator())
-        for command in [TerminalCommand.previousTab, .nextTab, .renameTab] {
-            file.addItem(item(for: command))
-        }
-    }
-
-    /// Theme, appearance, scrolling and the palette, under View. Theme and
-    /// appearance share one submenu — they are one daily choice — and a
-    /// separate Settings menu would duplicate the app menu's ⌘,.
-    private func installViewMenuItems(in mainMenu: NSMenu) {
-        guard let view = mainMenu.items.first(where: { $0.title == "View" })?.submenu
-        else { return }
-        view.addItem(.separator())
-        for command in [
-            TerminalCommand.scrollPageUp, .scrollPageDown, .scrollToTop, .scrollToBottom,
-        ] {
-            view.addItem(item(for: command))
-        }
-        view.addItem(.separator())
-        view.addItem(item(for: .commandPalette))
-        // No key equivalent: the system-wide hotkey is `quick-terminal-key`,
-        // held by `GlobalHotKey`.
-        view.addItem(item(for: .quickTerminal))
-        view.addItem(.separator())
-
-        let themeItem = NSMenuItem(title: L10n.text("settings.label.theme"), action: nil, keyEquivalent: "")
-        themeItem.submenu = themeMenu
-        view.addItem(themeItem)
-        let editor = NSMenuItem(title: L10n.text("theme.editor") + "…", action: #selector(showThemeEditor(_:)), keyEquivalent: "")
-        editor.target = self
-        view.addItem(editor)
-        let details = NSMenuItem(title: L10n.text("status.details") + "…", action: #selector(showHostDetails(_:)), keyEquivalent: "")
-        details.target = self
-        view.addItem(details)
-    }
-
     /// Rebuilt from the configuration as the menu opens, so a theme defined
     /// at runtime appears.
     private var themeMenu: NSMenu {
@@ -391,7 +327,9 @@ extension AppDelegate {
 
     private func item(for command: TerminalCommand) -> NSMenuItem {
         // No target: the responder chain picks the focused window and pane.
-        NSMenuItem(title: command.title, action: command.action, keyEquivalent: "")
+        let item = NSMenuItem(title: command.title, action: command.action, keyEquivalent: "")
+        if let tag = command.menuTag { item.tag = tag }
+        return item
     }
 
     /// Applies every command's shortcut to its menu items, at launch and on
@@ -429,6 +367,21 @@ extension AppDelegate: NSMenuDelegate {
         }
         guard menu.title == L10n.text("settings.label.theme") else { return }
         rebuildThemeMenu(menu)
+    }
+}
+
+extension NSMenu {
+    /// An item with a key equivalent, ⌘ unless `modifiers` says otherwise.
+    @discardableResult
+    fileprivate func addItem(
+        withTitle title: String, action: Selector, key: String = "",
+        modifiers: NSEvent.ModifierFlags = .command, target: AnyObject? = nil
+    ) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
+        if !key.isEmpty { item.keyEquivalentModifierMask = modifiers }
+        item.target = target
+        addItem(item)
+        return item
     }
 }
 
