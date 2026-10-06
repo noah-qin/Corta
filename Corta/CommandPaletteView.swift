@@ -41,13 +41,12 @@ struct CommandPaletteView: View {
     @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
     @Environment(\.colorSchemeContrast) private var systemContrast
 
-    private var reduceTransparency: Bool {
-        accessibilityOverride?.reduceTransparency ?? systemReduceTransparency
+    private var accessibility: GlassAccessibility {
+        accessibilityOverride ?? GlassAccessibility(
+            reduceTransparency: systemReduceTransparency,
+            increaseContrast: systemContrast == .increased)
     }
-
-    private var increasedContrast: Bool {
-        accessibilityOverride?.increaseContrast ?? (systemContrast == .increased)
-    }
+    private var reduceTransparency: Bool { accessibility.reduceTransparency }
 
     /// The window-corner radius (as `TerminalView`), not a pill: a panel
     /// reads as a window.
@@ -58,12 +57,9 @@ struct CommandPaletteView: View {
             content
                 .cortaGlass(in: Self.shape, opaque: reduceTransparency)
                 .overlay {
-                    // An opaque panel has no material edge: the same line as
-                    // `SystemAccessibility.panelBorder`, from these flags.
-                    if increasedContrast || reduceTransparency {
-                        Self.shape.strokeBorder(
-                            Color(nsColor: increasedContrast ? .labelColor : .separatorColor),
-                            lineWidth: 1)
+                    // An opaque panel has no material edge.
+                    if let border = accessibility.panelBorder {
+                        Self.shape.strokeBorder(Color(nsColor: border), lineWidth: 1)
                     }
                 }
         }

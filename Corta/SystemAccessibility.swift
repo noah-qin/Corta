@@ -47,14 +47,6 @@ enum SystemAccessibility {
         increaseContrast ? .labelColor : .secondaryLabelColor
     }
 
-    /// A visible line under Increase Contrast or Reduce Transparency, where
-    /// an opaque panel has no material edge.
-    static var panelBorder: (color: NSColor, width: CGFloat) {
-        if increaseContrast { return (.labelColor, 1) }
-        if reduceTransparency { return (.separatorColor, 1) }
-        return (NSColor.white.withAlphaComponent(0.12), 1)
-    }
-
     /// Calls `handler` now and on any change, so setup and updates share one
     /// path. Retain the token; releasing it unregisters.
     static func observe(_ handler: @escaping @MainActor () -> Void) -> Any {

@@ -24,6 +24,14 @@ import SwiftUI
 struct GlassAccessibility: Equatable {
     var reduceTransparency: Bool
     var increaseContrast: Bool
+
+    /// The edge an opaque or high-contrast surface draws; nil for plain
+    /// glass, whose material is its edge.
+    var panelBorder: NSColor? {
+        if increaseContrast { return .labelColor }
+        if reduceTransparency { return .separatorColor }
+        return nil
+    }
 }
 
 extension View {
@@ -77,13 +85,13 @@ struct SearchBarView: View {
     @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
     @Environment(\.colorSchemeContrast) private var systemContrast
 
-    private var reduceTransparency: Bool {
-        accessibilityOverride?.reduceTransparency ?? systemReduceTransparency
+    private var accessibility: GlassAccessibility {
+        accessibilityOverride ?? GlassAccessibility(
+            reduceTransparency: systemReduceTransparency,
+            increaseContrast: systemContrast == .increased)
     }
-
-    private var increasedContrast: Bool {
-        accessibilityOverride?.increaseContrast ?? (systemContrast == .increased)
-    }
+    private var reduceTransparency: Bool { accessibility.reduceTransparency }
+    private var increasedContrast: Bool { accessibility.increaseContrast }
 
     var body: some View {
         GlassEffectContainer {

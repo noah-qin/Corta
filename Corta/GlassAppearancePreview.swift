@@ -35,7 +35,10 @@ enum GlassAppearancePreview {
             GlassAccessibility(reduceTransparency: false, increaseContrast: true),
             GlassAccessibility(reduceTransparency: true, increaseContrast: true),
         ]
-        let hosting = NSHostingView(rootView: PreviewGrid(combinations: combinations))
+        let rows = combinations.map {
+            PreviewRow(flags: $0, bar: barModel(), field: field(), palette: CommandPaletteModel())
+        }
+        let hosting = NSHostingView(rootView: PreviewGrid(rows: rows))
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: hosting.fittingSize),
             styleMask: [.titled, .closable], backing: .buffered, defer: false)
@@ -47,10 +50,35 @@ enum GlassAppearancePreview {
         window.makeKeyAndOrderFront(nil)
         Self.window = window
     }
+
+    private static func barModel() -> SearchBarModel {
+        let model = SearchBarModel()
+        model.countText = "3/12"
+        model.caseSensitive = true
+        return model
+    }
+
+    private static func field() -> NSSearchField {
+        let field = NSSearchField()
+        field.stringValue = "README"
+        field.isBezeled = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        (field.cell as? NSSearchFieldCell)?.searchButtonCell = nil
+        (field.cell as? NSSearchFieldCell)?.cancelButtonCell = nil
+        return field
+    }
+}
+
+private struct PreviewRow {
+    let flags: GlassAccessibility
+    let bar: SearchBarModel
+    let field: NSSearchField
+    let palette: CommandPaletteModel
 }
 
 private struct PreviewGrid: View {
-    let combinations: [GlassAccessibility]
+    let rows: [PreviewRow]
 
     var body: some View {
         let background = TerminalColorPalette.defaultBackground
@@ -60,13 +88,13 @@ private struct PreviewGrid: View {
         let text = Color(
             .sRGB, red: Double(foreground.x), green: Double(foreground.y), blue: Double(foreground.z))
         Grid(horizontalSpacing: 24, verticalSpacing: 20) {
-            ForEach(Array(combinations.enumerated()), id: \.offset) { _, flags in
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 GridRow {
-                    Text(label(flags)).font(.system(size: 11, weight: .semibold)).foregroundStyle(text)
+                    Text(label(row.flags)).font(.system(size: 11, weight: .semibold)).foregroundStyle(text)
                         .frame(width: 130, alignment: .leading)
-                    SearchBarView(model: barModel(), field: field(), accessibilityOverride: flags)
+                    SearchBarView(model: row.bar, field: row.field, accessibilityOverride: row.flags)
                         .frame(width: 430)
-                    CommandPaletteView(model: CommandPaletteModel(), accessibilityOverride: flags)
+                    CommandPaletteView(model: row.palette, accessibilityOverride: row.flags)
                         .frame(width: 360, height: 150)
                 }
             }
@@ -90,24 +118,6 @@ private struct PreviewGrid: View {
         case (false, true): "Increase Contrast"
         case (true, true): "Both"
         }
-    }
-
-    private func barModel() -> SearchBarModel {
-        let model = SearchBarModel()
-        model.countText = "3/12"
-        model.caseSensitive = true
-        return model
-    }
-
-    private func field() -> NSSearchField {
-        let field = NSSearchField()
-        field.stringValue = "README"
-        field.isBezeled = false
-        field.drawsBackground = false
-        field.focusRingType = .none
-        (field.cell as? NSSearchFieldCell)?.searchButtonCell = nil
-        (field.cell as? NSSearchFieldCell)?.cancelButtonCell = nil
-        return field
     }
 }
 #endif
