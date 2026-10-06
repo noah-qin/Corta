@@ -85,13 +85,19 @@ extension Performer {
         case 12: color = state.dynamicColors.cursor
         default: return
         }
+        state.outputBuffer.append(
+            contentsOf: Array("\u{1B}]\(code);\(Self.colorReport(color))\u{1B}\\".utf8))
+    }
+
+    /// `rgb:RRRR/GGGG/BBBB`, each 8-bit channel doubled to xterm's 16 bits —
+    /// the body of every colour query's answer.
+    private static func colorReport(_ color: (red: UInt8, green: UInt8, blue: UInt8)) -> String {
         func channel(_ value: UInt8) -> String {
             let hex = String(value, radix: 16)
             let byte = hex.count == 1 ? "0" + hex : hex
             return byte + byte
         }
-        let body = "rgb:\(channel(color.red))/\(channel(color.green))/\(channel(color.blue))"
-        state.outputBuffer.append(contentsOf: Array("\u{1B}]\(code);\(body)\u{1B}\\".utf8))
+        return "rgb:\(channel(color.red))/\(channel(color.green))/\(channel(color.blue))"
     }
 
     /// OSC 10/11/12 set; a malformed spec leaves the colour alone.
@@ -147,17 +153,8 @@ extension Performer {
     /// OSC 10/11/12), anything else sets. A malformed pair is skipped, not the
     /// rest of the sequence, as xterm does.
     mutating func handleIndexedColor(_ payload: ArraySlice<UInt8>) {
-        var start = payload.startIndex
-        while start < payload.endIndex {
-            // No `;` left: nothing more to apply.
-            guard let firstSeparator = payload[start...].firstIndex(of: 0x3B) else { return }
-            let specStart = payload.index(after: firstSeparator)
-            let specEnd = payload[specStart...].firstIndex(of: 0x3B) ?? payload.endIndex
-            defer {
-                start = specEnd < payload.endIndex ? payload.index(after: specEnd) : payload.endIndex
-            }
-            guard let index = Self.parseByte(payload[start..<firstSeparator]) else { continue }
-            let spec = payload[specStart..<specEnd]
+        Self.forEachColorPair(in: payload) { slot, spec in
+            guard let index = Self.parseByte(slot) else { return }
             if spec.count == 1, spec.first == 0x3F {
                 reportIndexedColor(index)
             } else if let color = Self.parseColorSpecification(spec) {
@@ -172,25 +169,42 @@ extension Performer {
             state.indexedPalette.resetAllOverrides()
             return
         }
-        var start = payload.startIndex
-        while start < payload.endIndex {
-            let end = payload[start...].firstIndex(of: 0x3B) ?? payload.endIndex
-            if let index = Self.parseByte(payload[start..<end]) {
-                state.indexedPalette.resetOverride(index)
-            }
-            start = end < payload.endIndex ? payload.index(after: end) : payload.endIndex
+        Self.forEachField(in: payload) { field in
+            if let index = Self.parseByte(field) { state.indexedPalette.resetOverride(index) }
         }
     }
 
     private mutating func reportIndexedColor(_ index: UInt8) {
-        let color = state.indexedPalette.color(at: index)
-        func channel(_ value: UInt8) -> String {
-            let hex = String(value, radix: 16)
-            let byte = hex.count == 1 ? "0" + hex : hex
-            return byte + byte
-        }
-        let body = "rgb:\(channel(color.red))/\(channel(color.green))/\(channel(color.blue))"
+        let body = Self.colorReport(state.indexedPalette.color(at: index))
         state.outputBuffer.append(contentsOf: Array("\u{1B}]4;\(index);\(body)\u{1B}\\".utf8))
+    }
+
+    /// OSC 4's and 5's `slot ; spec ; slot ; spec …`, a pair at a time; a
+    /// trailing slot with no spec is nothing to apply.
+    private static func forEachColorPair(
+        in payload: ArraySlice<UInt8>,
+        _ body: (_ slot: ArraySlice<UInt8>, _ spec: ArraySlice<UInt8>) -> Void
+    ) {
+        var start = payload.startIndex
+        while start < payload.endIndex {
+            guard let separator = payload[start...].firstIndex(of: 0x3B) else { return }
+            let specStart = payload.index(after: separator)
+            let specEnd = payload[specStart...].firstIndex(of: 0x3B) ?? payload.endIndex
+            body(payload[start..<separator], payload[specStart..<specEnd])
+            start = specEnd < payload.endIndex ? payload.index(after: specEnd) : payload.endIndex
+        }
+    }
+
+    /// OSC 104's and 105's `;`-separated slots.
+    private static func forEachField(
+        in payload: ArraySlice<UInt8>, _ body: (ArraySlice<UInt8>) -> Void
+    ) {
+        var start = payload.startIndex
+        while start < payload.endIndex {
+            let end = payload[start...].firstIndex(of: 0x3B) ?? payload.endIndex
+            body(payload[start..<end])
+            start = end < payload.endIndex ? payload.index(after: end) : payload.endIndex
+        }
     }
 
     // MARK: - OSC 5 / 105 — the special colours
@@ -198,18 +212,8 @@ extension Performer {
     /// OSC 5: OSC 4's shape over five slots. An unset slot queries as black —
     /// a query always gets a numeric answer.
     mutating func handleSpecialColor(_ payload: ArraySlice<UInt8>) {
-        var start = payload.startIndex
-        while start < payload.endIndex {
-            guard let firstSeparator = payload[start...].firstIndex(of: 0x3B) else { return }
-            let specStart = payload.index(after: firstSeparator)
-            let specEnd = payload[specStart...].firstIndex(of: 0x3B) ?? payload.endIndex
-            defer {
-                start = specEnd < payload.endIndex ? payload.index(after: specEnd) : payload.endIndex
-            }
-            guard let slot = Self.parseSpecialColorSlot(payload[start..<firstSeparator]) else {
-                continue
-            }
-            let spec = payload[specStart..<specEnd]
+        Self.forEachColorPair(in: payload) { field, spec in
+            guard let slot = Self.parseSpecialColorSlot(field) else { return }
             if spec.count == 1, spec.first == 0x3F {
                 reportSpecialColor(slot)
             } else if let color = Self.parseColorSpecification(spec) {
@@ -223,24 +227,13 @@ extension Performer {
             state.specialColors.resetAllOverrides()
             return
         }
-        var start = payload.startIndex
-        while start < payload.endIndex {
-            let end = payload[start...].firstIndex(of: 0x3B) ?? payload.endIndex
-            if let slot = Self.parseSpecialColorSlot(payload[start..<end]) {
-                state.specialColors.resetOverride(slot)
-            }
-            start = end < payload.endIndex ? payload.index(after: end) : payload.endIndex
+        Self.forEachField(in: payload) { field in
+            if let slot = Self.parseSpecialColorSlot(field) { state.specialColors.resetOverride(slot) }
         }
     }
 
     private mutating func reportSpecialColor(_ slot: SpecialColors.Slot) {
-        let color = state.specialColors.color(at: slot) ?? (0, 0, 0)
-        func channel(_ value: UInt8) -> String {
-            let hex = String(value, radix: 16)
-            let byte = hex.count == 1 ? "0" + hex : hex
-            return byte + byte
-        }
-        let body = "rgb:\(channel(color.red))/\(channel(color.green))/\(channel(color.blue))"
+        let body = Self.colorReport(state.specialColors.color(at: slot) ?? (0, 0, 0))
         state.outputBuffer.append(
             contentsOf: Array("\u{1B}]5;\(slot.rawValue);\(body)\u{1B}\\".utf8))
     }

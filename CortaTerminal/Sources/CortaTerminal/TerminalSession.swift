@@ -441,10 +441,7 @@ public final class TerminalSession: @unchecked Sendable {
     /// Ends a `?2026` episode the child never closes, unless a later episode
     /// has begun.
     private func scheduleSynchronizedOutputTimeout(episode: Int) {
-        let components = synchronizedOutputTimeout.components
-        let nanoseconds = components.seconds * 1_000_000_000
-            + components.attoseconds / 1_000_000_000
-        let deadline = DispatchTime.now() + .nanoseconds(Int(nanoseconds))
+        let deadline = DispatchTime.now() + synchronizedOutputTimeout.dispatchInterval
         syncTimeoutQueue.asyncAfter(deadline: deadline) { [self] in
             let ended = state.withLock { current -> Bool in
                 guard current.synchronizedOutputEpisode == episode,
