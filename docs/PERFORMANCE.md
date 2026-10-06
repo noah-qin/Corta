@@ -925,7 +925,7 @@ millisecond and a half at the median and buys nothing, so it stays off
 **The titlebar.** The same session tried `NSBackgroundExtensionView`
 under the titlebar; that is a visual result, recorded in D24.
 
-Apple M5, macOS 27.0 (26A428), Xcode 27.0 (27A266a), on battery.
+Apple M5, macOS 27.0.1 (26A434), Xcode 27.0 (27A266a), on battery.
 
 ## Follow-up performance checks
 
