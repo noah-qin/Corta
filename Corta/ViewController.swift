@@ -624,7 +624,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
 
     // MARK: - Forwarding
 
-    /// Menu items, the palette, key bindings and the storyboard send their
+    /// Menu items, the palette, key bindings and AppKit's own items send their
     /// actions to the first responder or to the pane by name; the pane
     /// answers for the collaborator that implements each, through the
     /// Objective-C runtime's forwarding, and `validateMenuItem` asks it too.

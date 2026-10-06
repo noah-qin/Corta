@@ -79,7 +79,7 @@ final class TerminalView: NSView, CALayerDelegate {
 
     /// Search shortcuts, offered first in `keyDown`: while the bar is open Esc
     /// must dismiss it rather than reach the child. Returns whether the event
-    /// was handled. ⌘G / ⇧⌘G are storyboard items with no `bind.` key.
+    /// was handled. ⌘G / ⇧⌘G are fixed menu items with no `bind.` key.
     var onSearchKey: ((NSEvent) -> Bool)?
     var onCompletionKey: ((NSEvent) -> Bool)?
     let shellOverlay = ShellOverlayView()

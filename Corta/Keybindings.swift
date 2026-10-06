@@ -139,8 +139,8 @@ nonisolated struct Shortcut: Equatable, Sendable {
 
     /// AppKit's convention: an uppercase key equivalent *is* the shift
     /// modifier, and a menu item that sets both shows "⇧⇧". Normalises to the
-    /// uppercase-letter form for single letters, which is what the storyboard
-    /// items already use.
+    /// uppercase-letter form for single letters, which is what the menu's own
+    /// items use.
     var menuKeyEquivalent: String {
         guard modifiers.contains(.shift), key.count == 1, key.first?.isLetter == true
         else { return key }
@@ -156,7 +156,7 @@ nonisolated struct Shortcut: Equatable, Sendable {
 /// Everything Corta can be asked to do that is worth a key, a menu item, or a
 /// row in the command palette.
 ///
-/// One table, three consumers. A shortcut in the storyboard and an action in
+/// One table, three consumers. A shortcut in a nib and an action in
 /// whichever controller implements it cannot be enumerated — nothing could
 /// rebind them and a palette would have nothing to list. The table is the
 /// single place all three read from, so a command added here appears in the
@@ -285,7 +285,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     }
 
     /// The message sent through the responder chain. Sharing selectors with
-    /// the storyboard's items is deliberate: rebinding then means rewriting
+    /// AppKit's standard items is deliberate: rebinding then means rewriting
     /// one menu item's key equivalent, not intercepting keys behind AppKit's
     /// back.
     var action: Selector {
@@ -553,7 +553,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     var configurationKey: String { "bind.\(rawValue)" }
 
     /// The menu item tag that tells this command apart from others sharing
-    /// its action. Only the Find family needs one: five storyboard items send
+    /// its action. Only the Find family needs one: four menu items send
     /// `performFindPanelAction:` and are distinguished by tag, so rebinding
     /// "Find…" must not also rebind "Find Next".
     var menuTag: Int? {

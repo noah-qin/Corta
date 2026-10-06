@@ -245,7 +245,7 @@ A collaborator that owns menu actions implements them as `@objc`
 methods, and the pane answers for them through the Objective-C runtime:
 `responds(to:)` says yes for a selector a collaborator's class implements,
 and `forwardingTarget(for:)` hands the message on, so menu items, the
-palette, key bindings and the storyboard reach the owner whether they
+palette, key bindings and AppKit's own items reach the owner whether they
 target the first responder or the pane by name. The pane's
 `validateMenuItem` asks the owners the same way. Not
 `supplementalTarget(forAction:sender:)`: an item whose target is the pane

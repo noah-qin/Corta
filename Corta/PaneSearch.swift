@@ -114,7 +114,7 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
             return true
         }
         // Find comes from the bindings, so a rebind or unbind really removes ⌘F.
-        // ⌘G / ⇧⌘G are storyboard items with no `bind.` key.
+        // ⌘G / ⇧⌘G are fixed menu items with no `bind.` key.
         let bindings = ConfigurationStore.shared.configuration.keybindings
         if bindings[.find]?.matches(event) == true {
             show()
@@ -154,7 +154,7 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
         return false
     }
 
-    /// Storyboard tags: 1 show, 2 next, 3 previous, 7 use selection. Replace
+    /// Menu tags: 1 show, 2 next, 3 previous, 7 use selection. Replace
     /// actions are ignored.
     @objc func performFindPanelAction(_ sender: Any?) {
         switch (sender as? NSMenuItem)?.tag {
