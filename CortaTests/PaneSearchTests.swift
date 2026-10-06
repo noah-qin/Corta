@@ -352,10 +352,26 @@ struct PaneSearchTests {
         #expect(await waitUpTo(5) { !host.search.matches.isEmpty })
     }
 
+    /// The bar is SwiftUI around the AppKit field the search drives: the
+    /// field that takes focus, Return and Esc is inside the bar, and closing
+    /// removes both. (The controls' VoiceOver names are SwiftUI's
+    /// accessibility tree, built only for an assistive client; they are
+    /// checked with Accessibility Inspector, not here.)
+    @Test func theBarHostsTheSearchField() throws {
+        let host = makeHost()
+        host.search.show()
+        let bar = try #require(host.search.bar)
+        #expect(bar.superview === host.view)
+        #expect(host.search.field?.isDescendant(of: bar) == true)
+        host.search.close()
+        #expect(host.search.bar == nil)
+        #expect(bar.superview == nil)
+    }
+
     @Test("a stale or closed search cannot change its successor's status")
     func staleStatusIsDiscarded() {
         let orphan = PaneSearch()
-        orphan.bar = NSGlassEffectView()
+        orphan.bar = NSView()
         orphan.generation = 2
         orphan.status = .invalidPattern
         orphan.applyResults(.init(matches: [], status: .complete),
