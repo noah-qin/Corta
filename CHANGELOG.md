@@ -147,6 +147,9 @@ what to edit.
   cursor from the scroll region's top. DECRQM reports all three as they are;
   it had answered "permanently set" for the first two. CNL and CPL stop at
   the scroll region's margins, as cursor up and down do.
+- Narrowing a window while a full-screen program runs no longer leaves text
+  past the new right edge in its rows, where it was invisible but still
+  copied and found by search.
 - A UTF-8 sequence cut short by plain text, a control character or an escape
   sequence shows as one replacement character instead of combining with bytes
   that arrive after it into a character the program never sent.

@@ -935,6 +935,11 @@ public struct Grid: Sendable {
         }
         rows = newRows
         resizeTabStops(to: newColumns)
+        if newColumns < columns {
+            // Not reflowed, so cut: a row wider than the screen held cells
+            // that selection, search and copy read but nothing showed.
+            for row in 0..<lines.count { lines[row].truncate(toWidth: newColumns) }
+        }
         columns = newColumns
         cursor.row = min(cursor.row, rows - 1)
         cursor.column = min(cursor.column, columns - 1)

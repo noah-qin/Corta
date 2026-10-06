@@ -140,6 +140,18 @@ public struct Line: Equatable, Sendable {
         fill(template, in: lower..<range.upperBound)
     }
 
+    /// A narrower screen that does not reflow (the alternate screen): cells
+    /// past the new width go, and so does a pair the margin now cuts, whose
+    /// lead would otherwise stand alone in the last column.
+    mutating func truncate(toWidth width: Int) {
+        guard cells.count > width else { return }
+        cells.removeSubrange(max(0, width)...)
+        if let last = cells.indices.last, cells[last].attributes.contains(.wide) {
+            cells[last] = .blank
+        }
+        trimTrailingBlanks()
+    }
+
     /// Keeps the allocation; a cleared row continues nothing.
     public mutating func clear() {
         cells.removeAll(keepingCapacity: true)
