@@ -2,88 +2,112 @@
 
 [Documentation index](README.md) · [Contributing](../CONTRIBUTING.md)
 
-The steps the maintainer takes to cut a release. The rules a release must
-satisfy are enforced by `corta-release-check`, the one implementation
-of them; this page is the order of operations around it. Decision D20
-(`DECISIONS.md`) explains why the update feed is signed from CI.
+Merging code to `main` runs CI without publishing. When ready to ship,
+open **Actions → Release → Run workflow**, select **main**, leave `bump`
+at `patch` and `dry_run` unchecked, and click **Run workflow**. That single
+request starts the complete pipeline; no manual version edit, tag push,
+draft review or additional environment approval is needed. Tests,
+signatures, notarisation and archive/feed checks still gate delivery.
 
-## Release checklist
+## One-click releases
 
-For the maintainer, cutting any release:
+1. `Release` checks out the latest `main`, chooses the next patch version
+   (for example, `1.1.1` → `1.1.2`) and advances the integer Sparkle build
+   number past both the project and the existing feed. Stable ancestor tags
+   are compared numerically; prerelease tags do not set the next version.
+2. It synchronizes every `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`
+   in the Xcode project, `CortaVersion.string`, the README download/status
+   block and CHANGELOG. Unreleased notes move under the new dated version;
+   commit subjects since the previous release are included automatically.
+   Historical installation instructions and older changelog entries stay intact.
+3. It opens a version PR, explicitly dispatches the ordinary CI (bot-token
+   PR creation does not trigger CI), waits for the matching commit's run,
+   and squash-merges only after the branch's required checks allow it.
+4. It checks out that exact merge commit, reruns core/app tests, archives
+   with the pinned Xcode and Developer ID, exports, packages, notarises,
+   staples and checks the app with `corta-release-check --require-notarized`.
+   Missing signing or Sparkle configuration fails the run; automatic
+   releases never fall back to ad-hoc signing.
+5. Only after those checks does it create the version tag, upload the ZIP
+   and SHA-256 sidecar to a temporary draft, and publish it automatically.
+   A draft is only an upload staging area, never an approval step.
+6. The same pipeline calls `Update feed` as a reusable workflow. It checks
+   the published archive, carries over the latest feed from `main`, signs
+   the new item with Sparkle, validates it against the app, and opens an
+   automatically merged feed PR after CI. The pipeline waits until the
+   feed PR has actually merged, so installed users can see the update.
 
-1. Move the relevant `[Unreleased]` entries under a new `## [x.y.z]`
-   heading with the date, and leave `[Unreleased]` empty above it. At the
-   bottom of `CHANGELOG.md`, point `[Unreleased]` at `vx.y.z...main` and
-   add an `[x.y.z]` link to the new tag.
-2. Update the three hand-written version numbers, in
-   `Corta.xcodeproj/project.pbxproj` (all six build configurations) and
-   the core. **Two of them carry the release's semantic version and must
-   read exactly the same; the third is a build counter and only has to go
-   up:**
-   - `MARKETING_VERSION` — the semantic version, e.g. `0.1.1`. What the
-     bundle and the About panel show.
-   - `CortaVersion.string` in `CortaTerminal/Sources/CortaTerminal/Version.swift`
-     — the same string again, and what XTVERSION answers a program with.
-   - **`CURRENT_PROJECT_VERSION`** — *not* the semantic version. A plain
-     integer that increments once per release (0.1.0 shipped 1, 0.1.1
-     ships 2), and the one Sparkle actually compares. Two releases sharing a build number means
-     the second is invisible to everyone running the first, and
-     `generate_appcast` overwrites the earlier feed entry rather than
-     adding one. 0.1.1 hit this: it was built, signed, notarised and
-     published carrying build 1, exactly like 0.1.0, and the mistake only
-     surfaced at step 5 when the feed came out with one item in it.
-   `VersionAgreementTests` fails if the marketing version and the core
-   constant disagree, or if the build number is one a 0.1.0 install could
-   not be offered.
-3. Add the release's column to `docs/PERFORMANCE.md` §5.6 and its full
-   run as a dated file under `docs/history/`; record test results in
-   `docs/CONFORMANCE.md`. Point the
-   README's download instructions at `Corta-x.y.z.zip` in the same
-   commit — `corta-release-check` verifies that name at the tag, so
-   it cannot wait for publication.
-4. Commit as `chore: release x.y.z`, then tag `vx.y.z` and push the tag.
-   The release workflow builds from the tag and opens a **draft** release
-   for review — it is never published automatically. The run waits for
-   the maintainer's approval first (**Review deployments** → `release` →
-   **Approve and deploy**): it runs in the `release` environment because
-   it can reach the signing key (below).
-5. Review the draft's archive and **publish** the release. Publishing
-   starts the `Update feed` workflow (`.github/workflows/appcast.yml`),
-   which pauses for one approval: GitHub notifies the maintainer, and
-   the run's page under **Actions** shows **Review deployments** →
-   `release` → **Approve and deploy**. The approval is the gate on the
-   Sparkle private key (D20): nothing that can push a tag can sign an
-   update without a person saying so. An unapproved run waits, then
-   expires; nothing is signed or pushed until it is approved. Once
-   approved, the workflow signs the archive into `appcast.xml`, checks
-   the item against the app, and merges the file to `main` through a
-   pull request whose CI it runs and waits for — that is what makes the
-   update visible to every already-installed Corta. If CI passes while
-   GitHub is still refreshing merge eligibility, the workflow enables
-   squash auto-merge; the pull request stays open until the requirements
-   are satisfied. A failed check leaves it open for review; the run's log
-   reports CI failures and the PR merge state. To rehearse or
-   re-run: `gh workflow run appcast.yml --ref main -f tag=vX.Y.Z
-   -f dry_run=true` (a dry run stops after signing and checking), with
-   `main` temporarily allowed in the environment's deployment policy.
-   The pull request is opened with the workflow's own token, which the
-   repository must allow: Settings › Actions › General › Workflow
-   permissions › *Allow GitHub Actions to create and approve pull
-   requests*. With it off, the `sign` job still pushes the signed
-   `chore/appcast-vX.Y.Z` branch and the `merge` job fails at
-   `gh pr create`; opening the pull request from that branch by hand
-   is the recovery (1.0.1 shipped that way).
-   The workflow is the only route that signs the feed (D20); if it cannot
-   run, fix it and re-run it rather than signing by hand.
+The pipeline is serialized with `cancel-in-progress: false`: an active
+release finishes rather than being interrupted during publication. It reads
+the latest `main` when preparation starts. Ordinary merges, dependency or
+documentation updates, and the generated version/feed commits do not trigger
+Release. Only a manual dispatch on this upstream repository's `main` can
+prepare a release. GitHub can coalesce multiple pending dispatches, so avoid
+clicking Run workflow repeatedly while a release is in progress.
+
+For a deliberate minor or major increment, select `minor` or `major` in the
+Run workflow form. The default is `patch`.
+A manually chosen higher, not-yet-prepared project version is respected by
+the default patch route. Performance measurements and conformance records
+are added when measured; the automation does not invent evidence.
+
+## Recovery
+
+Re-run the **same Actions run** (failed jobs or all jobs) after a transient CI, signing, upload or
+feed failure. The preparation PR is keyed by run ID, so retries reuse its
+version and exact merge commit. A published archive is never rebuilt or
+replaced; a retry proceeds to feed verification/publication instead.
+A tag that already names another commit is refused. An older failed run
+cannot publish after a newer stable tag exists; start a new main run to
+release the fix instead. A new dispatch is a new release, not a retry.
+
+The feed workflow can also be dispatched on `main` with `tag=vX.Y.Z` to
+repair just the feed. If the feed already carries that version, it verifies
+the published bytes and the existing signed item without generating
+another PR. A preparation/feed PR left blocked by strict branch checks
+stays open; resolve its checks and rerun. Closed unmerged version PRs and
+unexpected changes to an existing automation branch fail explicitly.
+
+## One-time GitHub configuration
+
+Configure the `release` environment to keep the existing certificate,
+notary and Sparkle secrets. Its deployment policy must admit only the
+protected `main` branch; remove the former `v*` tag policy and disable
+required reviewers and wait timers. The manual Run workflow request is the
+release decision. Workflow edits do not change these GitHub settings.
+Signing a main-branch build is an intentional change from D20's
+original tag-only, per-run-review policy. `docs/DECISIONS.md` records it.
+Other branches and pull request refs are not admitted to this environment.
+
+The repository must permit Actions to create PRs and enable squash and
+auto-merge. The main ruleset continues to require `Terminal core (SwiftPM)`
+and `App, tests and the update feed`. Both generated PRs run those checks;
+the automation does not bypass the ruleset or push directly to `main`.
+
+## Validation
+
+```sh
+python3 -B -m unittest discover -s scripts/tests -v
+bash -n scripts/prepare-release.sh
+```
+
+Validate workflow expressions/dependencies with `actionlint`. An end-to-end
+rehearsal, once the workflow is on main, tests/signs/notarises the proposed
+next version and retains the source patch and archive without creating a
+PR, tag, release or feed change:
+
+```sh
+gh workflow run release.yml --ref main -f dry_run=true
+```
 
 ## The signing secrets
 
 `release.yml` signs with the Developer ID Application certificate and
 notarises with an App Store Connect API key. All of it lives in the
-`release` GitHub environment, beside the Sparkle key, so a run that can
-reach it waits for the maintainer's approval and starts only from a `v*`
-tag. No copy is kept anywhere else — a lost secret is replaced, not
-restored:
+`release` GitHub environment, beside the Sparkle key. Its branch policy
+admits only `main` without another review after the manual run request.
+No copy is kept anywhere else — a lost secret is replaced,
+not restored:
 
 | Name                        | Kind                 | Value                                  |
 | --------------------------- | -------------------- | -------------------------------------- |
@@ -93,13 +117,10 @@ restored:
 | `ASC_KEY_ID`                | environment variable | its Key ID                             |
 | `ASC_ISSUER_ID`             | environment variable | the team's Issuer ID                   |
 
-With none of the five — a fork — the workflow produces an ad-hoc build
-and its release notes say so. With only some of them it fails and names
-the missing ones: an emptied secret reads exactly like a missing one,
-and an unsigned draft is not what a tag in this repository should
-produce. A dry run fails without all five, since signing is what it
-rehearses. Check the file before storing it — `base64` of a path that
-does not exist prints nothing, and `gh secret set` stores that nothing.
+All five signing values and `SPARKLE_PRIVATE_KEY` must be present. A
+missing or empty value fails both real releases and rehearsals rather than
+publishing an unsigned build. Check the file before storing it — `base64`
+of a nonexistent path prints nothing, and `gh secret set` stores that nothing.
 
 **Why a certificate and not the key alone.** An App Store Connect API
 key cannot sign with the team's cloud-managed Developer ID certificate:
@@ -146,50 +167,25 @@ to 2031-09-04) or if it may have leaked:
    revoked: Gatekeeper can then refuse software signed with it, so an
    old one is otherwise left to expire.
 
-**Rehearsing** a signing change without a release:
-
-```sh
-gh workflow run release.yml --ref <branch> -f dry_run=true
-```
-
-A dry run builds the ref at the version the project carries, signs,
-notarises and runs `corta-release-check package --require-notarized
---rehearsal` — the flag skips only the rule that the feed must not yet
-publish the version, since a rehearsal usually rebuilds one it does —
-then keeps the archive as a workflow artifact for a week instead of
-drafting a release.
-
-The `release` environment only admits `v*` tags, so the branch has to be
-added to its deployment policy for the rehearsal. While it is there, a
-run from that branch can reach the signing certificate and the Sparkle
-key with one approval, and the approval page shows the branch, not the
-workflow it runs. Rehearse from a short-lived branch nobody else can push
-to, and remove it from the policy as soon as the run finishes.
-
-**Re-running a tag** (a failed draft, say) is a dispatch on the tag
-itself — the workflow builds exactly the ref it runs on, and has no input
-that could name another:
-
-```sh
-gh workflow run release.yml --ref vX.Y.Z
-```
-
-It runs the workflow as that tag has it, so a tag cut before a signing
-change re-runs with the old signing steps.
+**Rehearsing** a signing change uses the dry-run command above on `main`.
+It prepares the proposed next version as a patch, signs and notarises it,
+runs the ordinary release checks, then retains the archive for a week.
+No temporary environment branch exception is needed.
 
 ## Platform protection evidence
 
-Verified through GitHub's API on 2026-10-02: the active main ruleset requires
-`Terminal core (SwiftPM)` and `App, tests and the update feed`, blocks deletion
-and non-fast-forward pushes, and has an administrator bypass. The `release`
-environment requires maintainer review, permits `v*` tags only, and stores
-ASC_KEY, DEVELOPER_ID_P12, DEVELOPER_ID_P12_PASSWORD and SPARKLE_PRIVATE_KEY;
-no repository-level Actions secrets were listed. The sole listed collaborator
-is the maintainer/admin. Environment administrators may bypass review and
-self-review is allowed. These are actual boundaries, not a promise of
-independent approval or protection from a compromised maintainer account.
-Recheck platform settings before releases because they can change separately
-from this repository. Do not expose or download secret values to verify them.
+Before the automation change, GitHub's API on 2026-10-06 confirmed that the
+main ruleset required both CI checks and blocked deletion/non-fast-forward
+pushes; squash/auto-merge and Actions PR creation were enabled. The release
+environment was tag-only and required maintainer review. The automatic
+configuration removes that per-run review and replaces the tag policy with
+an explicit `main` branch policy, while retaining the environment secrets
+and main checks.
+Readback on 2026-10-06 confirmed the applied environment has only the `main`
+branch policy and no required-reviewer or wait-timer rule.
+Platform settings can change independently from this repository; recheck
+them when diagnosing a blocked workflow. Never download secret values to
+verify their presence.
 
 Sparkle 2.10.0 is pinned to revision
 eef1a539a373c1f1a320624b1130fc5de7b2e100. Follow-up source review covered
