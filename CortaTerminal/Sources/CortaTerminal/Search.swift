@@ -25,9 +25,9 @@ public enum Search {
     public static let defaultMatchLimit = 5_000
 
     /// Bounds an ordinary pattern's per-line cost (`cat` of a binary yields
-    /// megabyte lines). Not the guard against catastrophic patterns — `(a+)+b`
-    /// took 8 s at 28 characters; `isCatastrophic` is. Skipped lines are counted
-    /// so the UI says the search was incomplete.
+    /// megabyte lines). Catastrophic patterns have an early shape check and
+    /// progress-callback cancellation. Skipped lines are counted so the UI
+    /// says the search was incomplete.
     public static let regexLineLimit = 64_000
 
     /// `shouldStop` catches a superseded query, not a pattern slow on every
@@ -57,8 +57,9 @@ public enum Search {
     }
 
     /// Unbounded repetition of a group that repeats or alternates (`(a+)+`,
-    /// `(a|a)+`). A shape check, because neither `NSRegularExpression` nor `Regex`
-    /// can interrupt one ICU match attempt. Conservative: `(\w+\s*)+` is refused
+    /// `(a|a)+`). A conservative early rejection; progress callbacks also
+    /// enforce cancellation and the time budget for shapes this check misses.
+    /// Conservative: `(\w+\s*)+` is refused
     /// too — every such pattern has a linear form (`[\w\s]+`) — and a refusal is
     /// reported as too slow, not as a typo.
     public static func isCatastrophic(_ pattern: String) -> Bool {
@@ -195,6 +196,7 @@ public enum Search {
         var result = RegexResult()
         let deadline = ContinuousClock.now + timeBudget
         lineLoop: for logicalLine in grid.reversedLogicalLines() {
+            guard !shouldStop() else { break }
             let text = logicalLine.text
             guard !text.isEmpty else { continue }
             // Here too: a line with no match never calls the block.
@@ -209,8 +211,19 @@ public enum Search {
             let ns = text as NSString
             var found: [SelectionRange] = []
             regex.enumerateMatches(
-                in: text, options: [], range: NSRange(location: 0, length: ns.length)
+                in: text, options: [.reportProgress], range: NSRange(location: 0, length: ns.length)
             ) { match, _, stop in
+                // Progress callbacks have no match. Check them before the
+                // match guard so a failing backtracking attempt can stop too.
+                if shouldStop() {
+                    stop.pointee = true
+                    return
+                }
+                if ContinuousClock.now >= deadline {
+                    result.timedOut = true
+                    stop.pointee = true
+                    return
+                }
                 guard let match, match.range.length > 0 else { return }
                 // NSRange is UTF-16; the position table is by character.
                 let prefix = ns.substring(to: match.range.location)

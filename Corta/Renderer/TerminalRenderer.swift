@@ -53,7 +53,12 @@ public nonisolated struct TerminalSelection: Equatable, Sendable {
 /// imports the app without `@testable`, because `-enable-testing` inhibits
 /// the optimisation its Release figure exists to measure (#110).
 public nonisolated final class TerminalRenderer {
-    let backend: Metal4Backend
+    private(set) var backend: Metal4Backend
+    private(set) var backendGeneration = 0
+    private var recoveryAttempts = 0
+    /// Keep resources of old in-flight frames alive while the new queue draws.
+    /// At most three replaced queues are retained per renderer.
+    private var retiredBackends: [Metal4Backend] = []
     let glyphAtlas: GlyphAtlas
     public private(set) var metrics: CellMetrics
     /// Its own texture cache: images share no eviction policy with glyphs.
@@ -214,6 +219,21 @@ public nonisolated final class TerminalRenderer {
     /// For the frame-CPU baseline's worst case.
     public func invalidate() {
         needsFullRebuild = true
+    }
+
+    /// Reconstructs a faulted/stalled queue, preserving the session and caches.
+    /// An unusable device cannot cause an unlimited reconstruction loop.
+    @discardableResult
+    func recoverBackendIfNeeded() throws -> Bool {
+        retiredBackends.removeAll { !$0.hasFramesInFlight }
+        guard backend.requiresRecovery else { return false }
+        guard recoveryAttempts < 3 else { throw Metal4BackendError.recoveryExhausted }
+        recoveryAttempts += 1
+        let replacement = try Metal4Backend(device: backend.device)
+        retiredBackends.append(backend)
+        backend = replacement
+        backendGeneration += 1
+        return true
     }
 
     /// `false`: the cache still matches and the frame can be skipped. A

@@ -158,7 +158,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
 
     /// False when `setUpPane` failed: everything the window and split tree call
     /// must survive that rather than trap on an implicitly unwrapped nil.
-    var isOperable: Bool { terminalRenderer != nil && session != nil }
+    var isOperable: Bool { failureView == nil && terminalRenderer != nil && session != nil }
 
     /// An estimate when the renderer failed, so a broken pane cannot take the
     /// window's layout down.
@@ -360,6 +360,19 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
                 self?.noteChildExit(childExit, generation: generation)
             }
         }
+        session.onIOFailure = { [weak self] failure in
+            Task(priority: .userInitiated) { @MainActor in
+                guard let self, !self.didTeardown, self.frameLoop.isCurrent(generation) else { return }
+                let reconnect = self.remote.reconnectCommand.map {
+                    PaneRemoteState.isRemoteLauncher(executable: $0.executable)
+                } ?? false
+                self.frameLoop.suspendRendering()
+                self.terminalView?.stopRendering()
+                self.presentFailure(title: L10n.text("failure.title.runtimeSession"),
+                    detail: "\(failure.description)\n\n\(L10n.text("failure.runtimeHint"))",
+                    canRetry: !reconnect, canReconnect: reconnect, takesFocus: self.isFocusedPane)
+            }
+        }
     }
 
     private func installTerminalCallbacks(on view: TerminalView) {
@@ -378,10 +391,16 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         inputSourceIndicator.start()
         view.onCompletionKey = { [weak self] event in self?.shell.handleDirectoryCompletionKey(event) ?? false }
         view.onKeyBytes = { [weak self, weak view] bytes in
-            guard let self else { return }
+            guard let self, self.isOperable else { return }
             if bytes.contains(0x0D) { taskNotifier.noteCommandSubmitted(in: view?.window) }
             pointer.returnToBottomOnInput()
-            session.write(bytes)
+            switch session.write(bytes) {
+            case .accepted, .failed: break // An async failure has its persistent recovery UI.
+            case .backpressured:
+                view?.showToast(L10n.text("toast.inputBackpressured"), kind: .warning)
+            case .stopped:
+                view?.showToast(L10n.text("toast.shellExited"), kind: .warning)
+            }
         }
         view.onLiveResizeEnded = { [weak self] in
             self?.endLiveResize()
@@ -449,6 +468,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         commands.stop()
         taskNotifier.cancel()
         appearance.stop()
+        frameLoop.suspendRendering()
         terminalView?.stopRendering()
         session?.stop()
     }
@@ -468,6 +488,18 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         loop.onOutputBatch = { [weak self] in self?.noteOutputBatch() }
         loop.content = { [weak self] hasOutput in self?.frameContent(hasOutput: hasOutput) }
         loop.onNeedsDisplay = { [weak self] in self?.terminalView?.setNeedsRedraw() }
+        loop.onRenderingFailure = { [weak self] error in
+            guard let self, !self.didTeardown, self.failureView == nil else { return }
+            Metal4Diagnostics.reportCommitFault(error)
+            self.frameLoop.suspendRendering()
+            self.terminalView?.stopRendering()
+            let reconnect = self.remote.reconnectCommand.map {
+                PaneRemoteState.isRemoteLauncher(executable: $0.executable)
+            } ?? false
+            self.presentFailure(title: L10n.text("failure.title.runtimeRenderer"),
+                detail: L10n.text("failure.runtimeHint"),
+                canRetry: !reconnect, canReconnect: reconnect, takesFocus: self.isFocusedPane)
+        }
         loop.topInset = { [weak self] in self?.topInset ?? 0 }
         return loop
     }
@@ -743,21 +775,29 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// With `isOperable` false every geometry and render entry short-circuits.
     /// `canReconnect` adds Reconnect, described as a new connection.
     private func presentFailure(
-        title: String, detail: String, canRetry: Bool, canReconnect: Bool = false
+        title: String, detail: String, canRetry: Bool, canReconnect: Bool = false,
+        takesFocus: Bool = true
     ) {
         failureView?.removeFromSuperview()
         let failure = PaneFailureView(
             title: title, detail: detail, canRetry: canRetry, canReconnect: canReconnect)
         failure.onRetry = { [weak self] in self?.rebuildPane(strictRespawn: false) }
-        failure.onReconnect = { [weak self] in self?.remote.reconnectRemote(nil) }
+        // A runtime failure may leave a live child. This explicit recovery
+        // button, with its new-session warning, can replace it too.
+        failure.onReconnect = { [weak self] in self?.rebuildPane(strictRespawn: true) }
         failure.onOpenSettings = { SettingsWindowController.shared.show(nil) }
-        failure.present(in: view)
+        failure.present(in: view, takesFocus: takesFocus)
         failureView = failure
     }
 
 
     /// Behind Try Again (the ladder) and Reconnect (the exact command).
     func rebuildPane(strictRespawn: Bool) {
+        terminalView?.stopRendering()
+        frameLoop.detach()
+        session?.stop()
+        session = nil
+        terminalRenderer = nil
         failureView?.removeFromSuperview()
         failureView = nil
         terminalView?.removeFromSuperview()

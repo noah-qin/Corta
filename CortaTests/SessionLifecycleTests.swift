@@ -19,7 +19,7 @@ import Darwin
 import Testing
 
 @testable import Corta
-import CortaTerminal
+@testable import CortaTerminal
 
 /// A child that exits on its own (`exit`, a crash, `kill`) must produce
 /// a UI reaction — before this, `onChildExit` was never installed and the
@@ -37,6 +37,64 @@ struct SessionLifecycleTests {
         pane.preset = preset
         _ = pane.view
         return pane
+    }
+
+    @Test(arguments: [TerminalSession.IOFailure.Operation.read, .write])
+    func anIOFailureOffersExplicitRetryAndIgnoresOldCallbacks(operation: TerminalSession.IOFailure.Operation) async throws {
+        var preset = Preset(name: "runtime-failure")
+        preset.shell = "/bin/sh"
+        preset.arguments = ["-c", "exec /bin/cat"]
+        let pane = makePane(preset: preset)
+        defer { pane.teardown() }
+        let old = try #require(pane.session)
+        let callback = try #require(old.onIOFailure)
+        callback(TerminalSession.IOFailure(operation: operation, message: "injected test fault"))
+        #expect(await waitUntilTrue(timeout: .seconds(5)) { pane.failureView != nil })
+        #expect(!pane.isOperable)
+        #expect(old.pty.waitForExit(timeout: .seconds(0)) == nil)
+        let failure = try #require(pane.failureView)
+        failure.onRetry?()
+        #expect(pane.isOperable)
+        #expect(pane.session !== old)
+        #expect(await waitUntilTrue(timeout: .seconds(5)) {
+            old.pty.waitForExit(timeout: .seconds(0)) != nil
+        })
+        callback(TerminalSession.IOFailure(operation: operation, message: "stale test fault"))
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(pane.failureView == nil)
+    }
+
+    @Test func aRendererFailureKeepsTheChildUntilExplicitRetry() throws {
+        var preset = Preset(name: "renderer-failure")
+        preset.shell = "/bin/sh"
+        preset.arguments = ["-c", "exec /bin/cat"]
+        let pane = makePane(preset: preset)
+        defer { pane.teardown() }
+        let old = try #require(pane.session)
+        pane.frameLoop.onRenderingFailure?(Metal4BackendError.gpuCompletionTimedOut)
+        let failure = try #require(pane.failureView)
+        #expect(!pane.isOperable)
+        #expect(!pane.frameLoop.prepareFrame())
+        #expect(old.pty.waitForExit(timeout: .seconds(0)) == nil)
+        failure.onRetry?()
+        #expect(pane.isOperable)
+        #expect(pane.session !== old)
+    }
+
+    @Test func aBackgroundFailureDoesNotTakeTheActiveRespondersReturnKey() throws {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
+            styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        let root = try #require(window.contentView)
+        let activeField = NSTextField(frame: NSRect(x: 0, y: 0, width: 100, height: 30))
+        root.addSubview(activeField)
+        window.makeFirstResponder(activeField)
+        let activeResponder = window.firstResponder
+        let failure = PaneFailureView(title: "Test failure", detail: "Test detail", canRetry: true)
+        failure.present(in: root, takesFocus: false)
+        #expect(window.firstResponder === activeResponder)
+        #expect(failure.primaryAction?.keyEquivalent == "")
     }
 
     @Test func childExitOnItsOwnShowsAToast() async throws {

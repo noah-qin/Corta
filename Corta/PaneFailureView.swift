@@ -37,7 +37,7 @@ final class PaneFailureView: NSView {
 
     /// Covers `view`, takes the keyboard — or nothing is focused and
     /// assistive technology hears nothing — and is announced.
-    func present(in view: NSView) {
+    func present(in view: NSView, takesFocus: Bool = true) {
         translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(self)
         NSLayoutConstraint.activate([
@@ -46,7 +46,12 @@ final class PaneFailureView: NSView {
             topAnchor.constraint(equalTo: view.topAnchor),
             bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
-        view.window?.makeFirstResponder(primaryAction)
+        if takesFocus {
+            view.window?.makeFirstResponder(primaryAction)
+        } else {
+            // A failed background pane must not consume another pane's Return.
+            primaryAction?.keyEquivalent = ""
+        }
         NSAccessibility.post(element: self, notification: .layoutChanged)
         if NSWorkspace.shared.isVoiceOverEnabled {
             NSAccessibility.post(

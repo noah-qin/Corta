@@ -714,7 +714,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         case .backpressured:
             // The child stopped reading; nothing was sent. Say why.
             host?.terminalView?.showToast(L10n.text("toast.pasteStopped"), kind: .warning)
-        case .stopped:
+        case .stopped, .failed:
             // The session is gone; nobody would read the toast.
             break
         }

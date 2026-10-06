@@ -10,6 +10,21 @@ what to edit.
 
 ## [Unreleased]
 
+### Terminal recovery (#228)
+
+- PTY read/write failures show a persistent recovery action instead of silently
+  losing input or output. A failed write discards the remaining queued input;
+  keyboard backpressure is reported. Trying again or reconnecting explicitly
+  starts a new session and closes the current one.
+- Faulted or persistently stalled Metal queues can be replaced up to three
+  times without replacing the terminal session or render caches. Missing GPU
+  completion feedback and exhausted recovery show a recovery action.
+- A terminal reset no longer reuses synchronized-output episode identities,
+  so a new output hold retains its timeout and ignores older timeout callbacks.
+- Regex search checks cancellation and its time budget during engine progress,
+  including expensive failed matches missed by the early pattern check.
+- Escape consumed while closing search no longer reaches the terminal child.
+
 ### Terminal feedback (#213)
 
 - Standardized VS16 emoji sequences (such as ⚠️) occupy two columns so

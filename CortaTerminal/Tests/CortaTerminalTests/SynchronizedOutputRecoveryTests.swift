@@ -25,6 +25,49 @@ import Testing
 /// `.serialized` and condition-based waits, for the same reasons as
 /// `TerminalSessionTests`: every test spawns a real child.
 @Suite(.serialized) struct SynchronizedOutputRecoveryTests {
+    @Test func resetAndBeginInOneBatchStillArmRecovery() throws {
+        let session = try TerminalSession(executable: "/bin/sh", arguments: ["-c",
+            "printf '\\033[?2026hFIRST\\033[?2026l'; IFS= read -r line; printf '\\033c\\033[?2026hRESET-HELD'; sleep 30"], seams: .init(synchronizedOutputTimeout: .milliseconds(200)))
+        defer { session.stop() }
+        session.start()
+        #expect(waitForGrid(session) { $0.contains("FIRST") }.contains("FIRST"))
+        // Let the first, already-ended episode's timer retire before RIS.
+        Thread.sleep(forTimeInterval: 0.6)
+        session.write(Array("go\n".utf8))
+        #expect(waitForGrid(session) { $0.contains("RESET-HELD") }.contains("RESET-HELD"))
+        let recovered = waitForCondition(!session.isSynchronizedOutputEnabled, timeout: .seconds(5))
+        #expect(recovered)
+    }
+
+    @Test func risNeverReusesAnEpisodeIdentity() {
+        var terminal = Terminal()
+        terminal.feed(Array("\u{1B}[?2026h\u{1B}[?2026l".utf8))
+        let first = terminal.synchronizedOutputEpisode
+        terminal.feed(Array("\u{1B}c\u{1B}[?2026h".utf8))
+        #expect(terminal.synchronizedOutputEpisode > first)
+        #expect(terminal.isSynchronizedOutputEnabled)
+        let second = terminal.synchronizedOutputEpisode
+        terminal.feed(Array("\u{1B}c".utf8))
+        #expect(!terminal.isSynchronizedOutputEnabled)
+        #expect(terminal.synchronizedOutputEpisode == second)
+    }
+
+    @Test func anOldTimerCannotEndANewEpisodeAfterRIS() throws {
+        let session = try TerminalSession(executable: "/bin/sh", arguments: ["-c",
+            "printf '\\033[?2026hFIRST\\033[?2026l'; IFS= read -r line; printf '\\033c\\033[?2026hNEW-HELD'; sleep 30"], seams: .init(synchronizedOutputTimeout: .seconds(2)))
+        defer { session.stop() }
+        session.start()
+        #expect(waitForGrid(session) { $0.contains("FIRST") }.contains("FIRST"))
+        Thread.sleep(forTimeInterval: 1.2)
+        session.write(Array("go\n".utf8))
+        #expect(waitForGrid(session) { $0.contains("NEW-HELD") }.contains("NEW-HELD"))
+        // Past the old deadline, but well before the new two-second deadline.
+        Thread.sleep(forTimeInterval: 1.2)
+        #expect(session.isSynchronizedOutputEnabled)
+        let recovered = waitForCondition(!session.isSynchronizedOutputEnabled, timeout: .seconds(5))
+        #expect(recovered)
+    }
+
     /// A child that begins an episode and never sends the DECRST: after the
     /// (shortened) timeout the session must end the episode itself and
     /// signal output again, so the shell's latched owed-present draws the

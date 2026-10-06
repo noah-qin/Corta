@@ -51,6 +51,13 @@ import Synchronization
 /// output mode and the palette as well, and one unregistered read is enough
 /// to stall it. `TerminalSessionLockWaitTests`.
 public final class TerminalSession: @unchecked Sendable {
+    /// A terminal I/O failure, without retaining input or output bytes.
+    public struct IOFailure: Sendable, Equatable, CustomStringConvertible {
+        public enum Operation: String, Sendable { case read, write }
+        public let operation: Operation
+        public let message: String
+        public var description: String { "PTY \(operation.rawValue) failed: \(message)" }
+    }
     /// Per `read`; internal so lifecycle tests can feed exact boundaries.
     static let readChunkSize = 64 * 1024
     private static let batchByteCap = 1024 * 1024
@@ -73,6 +80,8 @@ public final class TerminalSession: @unchecked Sendable {
         var onChildExit: (@Sendable (ChildExit) -> Void)?
         /// Replayed to a callback installed after the exit.
         var childExit: ChildExit?
+        var ioFailure: IOFailure?
+        var onIOFailure: (@Sendable (IOFailure) -> Void)?
     }
 
     private let state: Mutex<State>
@@ -183,6 +192,35 @@ public final class TerminalSession: @unchecked Sendable {
         set { callbacks.withLock { $0.onOutput = newValue } }
     }
 
+    /// Delivered once, outside locks; replayed to a late subscriber. A failed
+    /// session rejects further input, but keeps its child/grid until the owner
+    /// explicitly retries or closes it.
+    public var onIOFailure: (@Sendable (IOFailure) -> Void)? {
+        get { callbacks.withLock { $0.onIOFailure } }
+        set {
+            let replay = callbacks.withLock { current in
+                current.onIOFailure = newValue
+                return newValue == nil ? nil : current.ioFailure
+            }
+            if let replay { newValue?(replay) }
+        }
+    }
+
+    public var ioFailure: IOFailure? { callbacks.withLock { $0.ioFailure } }
+
+    private func reportIOFailure(_ error: any Error, operation: IOFailure.Operation) {
+        guard !stopped.withLock({ $0 }) else { return }
+        let failure = IOFailure(operation: operation, message: String(describing: error))
+        let delivery = callbacks.withLock { current -> ((@Sendable (IOFailure) -> Void)?, Bool) in
+            guard current.ioFailure == nil else { return (nil, false) }
+            current.ioFailure = failure
+            return (current.onIOFailure, true)
+        }
+        guard delivery.1 else { return }
+        pendingWrites.withLock { $0.removeAll() }
+        delivery.0?(failure)
+    }
+
     /// On the reader thread, after the loop stops; an earlier exit is replayed
     /// on the installing thread.
     public var onChildExit: (@Sendable (ChildExit) -> Void)? {
@@ -283,6 +321,7 @@ public final class TerminalSession: @unchecked Sendable {
                 do {
                     read = try source.read(region)
                 } catch {
+                    reportIOFailure(error, operation: .read)
                     reachedEOF = true
                     break
                 }
@@ -352,6 +391,9 @@ public final class TerminalSession: @unchecked Sendable {
             callbacks.withLock { $0.onOutput }?()
         }
 
+        // An I/O fault is not child exit. Report it immediately rather than
+        // park here for ten seconds and silently lose the only reader.
+        guard ioFailure == nil else { return }
         if let exit = pty.waitForExit() {
             let callback = callbacks.withLock { state -> (@Sendable (ChildExit) -> Void)? in
                 state.childExit = exit
@@ -447,6 +489,7 @@ public final class TerminalSession: @unchecked Sendable {
         /// Dropped: the backlog was already over the cap.
         case backpressured
         case stopped
+        case failed
     }
 
     /// Keyboard input only — never PTY output (`SECURITY.md` §6). Enqueues and
@@ -472,6 +515,8 @@ public final class TerminalSession: @unchecked Sendable {
         let chunks = chunks.filter { !$0.isEmpty }
         guard !chunks.isEmpty else { return .accepted }
         guard !stopped.withLock({ $0 }) else { return .stopped }
+        guard ioFailure == nil else { return .failed }
+        guard callbacks.withLock({ $0.childExit == nil }) else { return .stopped }
         var shouldSchedule = false
         let outcome = pendingWrites.withLock { pending -> WriteOutcome in
             guard pending.bytes <= Self.maxPendingWriteBytes else { return .backpressured }
@@ -488,11 +533,12 @@ public final class TerminalSession: @unchecked Sendable {
         return outcome
     }
 
-    /// A failed chunk is dropped, so a dead child empties the queue fast.
+    /// A failed chunk fails the session; later chunks must not silently follow
+    /// a partial write (particularly a bracketed paste).
     /// Popped before writing, so a `stop()` mid-write cannot be observed twice.
     private func drainPendingWrites() {
         while true {
-            guard !stopped.withLock({ $0 }) else {
+            guard !stopped.withLock({ $0 }), ioFailure == nil else {
                 pendingWrites.withLock { pending in
                     pending.removeAll()
                     pending.isDraining = false
@@ -507,10 +553,14 @@ public final class TerminalSession: @unchecked Sendable {
                 return chunk
             }
             guard let chunk else { return }
-            if let writerSink {
-                try? writerSink(chunk)
-            } else {
-                chunk.withUnsafeBytes { _ = try? pty.writeAll($0) }
+            do {
+                if let writerSink {
+                    try writerSink(chunk)
+                } else {
+                    try chunk.withUnsafeBytes { _ = try pty.writeAll($0) }
+                }
+            } catch {
+                reportIOFailure(error, operation: .write)
             }
         }
     }

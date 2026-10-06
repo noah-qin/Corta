@@ -174,6 +174,36 @@ struct SearchTests {
 /// substring path already had, plus the per-line bound that makes the
 /// cancellation reachable at all.
 @Suite struct RegexSearchTests {
+    @Test func aMissedBacktrackingShapeStopsDuringTheMatchAttempt() {
+        var terminal = Terminal(rows: 2, columns: 100)
+        terminal.feed(Array(String(repeating: "a", count: 32).utf8))
+        let start = ContinuousClock.now
+        let result = Search.findRegex("^(a{1,3})+b$", in: terminal.grid,
+            timeBudget: .milliseconds(30))
+        #expect(result.timedOut)
+        #expect(result.matches.isEmpty)
+        #expect(start.duration(to: .now) < .seconds(1))
+    }
+
+    @Test func cancellationInterruptsAFailingMatchAttempt() {
+        var terminal = Terminal(rows: 2, columns: 100)
+        terminal.feed(Array(String(repeating: "a", count: 32).utf8))
+        let start = ContinuousClock.now
+        let result = Search.findRegex("^(a{1,3})+b$", in: terminal.grid,
+            timeBudget: .seconds(2), shouldStop: { start.duration(to: .now) >= .milliseconds(30) })
+        #expect(!result.timedOut)
+        #expect(result.matches.isEmpty)
+        #expect(start.duration(to: .now) < .seconds(1))
+    }
+
+    @Test func anAlreadyCancelledSearchDoesNotEnterTheEngine() {
+        var terminal = Terminal(rows: 2, columns: 100)
+        terminal.feed(Array(String(repeating: "a", count: 32).utf8))
+        let result = Search.findRegex("^(a{1,3})+b$", in: terminal.grid,
+            shouldStop: { true })
+        #expect(result.matches.isEmpty)
+        #expect(!result.timedOut)
+    }
     private static func terminal(_ lines: [String], columns: Int = 40) -> Terminal {
         var terminal = Terminal(rows: 8, columns: columns, scrollbackLimit: 500)
         for line in lines { terminal.feed(Array("\(line)\r\n".utf8)) }
@@ -264,7 +294,7 @@ struct SearchTests {
 }
 
 /// The shape check that stops a pattern before it reaches a
-/// backtracking engine that cannot be interrupted.
+/// backtracking engine, before the progress-callback guard is needed.
 ///
 /// The measurements behind it: `(a+)+b` against a run of "a" took 0.016 s at
 /// 18 characters, 0.52 s at 24 and 8.0 s at 28 on this machine — doubling
