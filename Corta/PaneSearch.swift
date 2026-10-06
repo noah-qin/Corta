@@ -143,6 +143,13 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
         return nil
     }
 
+    static func keyMonitorHandler(for search: PaneSearch) -> (NSEvent) -> NSEvent? {
+        { [weak search] event in
+            guard let search else { return event }
+            return search.handleGlobalEscape(event)
+        }
+    }
+
     /// Whether the first responder belongs to this pane's search bar: either
     /// the field editor, whose delegate is our `field`, or a bar
     /// control focused by Full Keyboard Access, found by ancestry.
@@ -239,9 +246,8 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
         self.bar = container
         self.field = field
         placeClearOfContent()
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.handleGlobalEscape(event) ?? event
-        }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown,
+            handler: Self.keyMonitorHandler(for: self))
         view.window?.makeFirstResponder(field)
     }
 

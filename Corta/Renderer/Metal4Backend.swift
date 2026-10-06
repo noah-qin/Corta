@@ -29,6 +29,9 @@ enum Metal4BackendError: Error {
     /// Handed to `onCompleted` for a frame that was presented without being
     /// drawn, because its slot's previous frame had not completed.
     case frameDropped
+    case recoveryExhausted
+    case commandEncoderUnavailable
+    case gpuCompletionTimedOut
 }
 
 /// Where backend faults are logged; the silent failure mode would be a
@@ -137,6 +140,7 @@ public nonisolated final class Metal4Backend {
     /// Written by the feedback handler, read by `beginFrame`.
     private final class FrameCompletion: Sendable {
         private let completedFrame = Atomic<UInt64>(0)
+        let failed = Atomic(false)
 
         var completed: UInt64 { completedFrame.load(ordering: .acquiring) }
 
@@ -153,8 +157,17 @@ public nonisolated final class Metal4Backend {
     private var currentSlot = 0
     /// Frames dropped in a row; while non-zero, the next frame does not wait.
     private var consecutiveDroppedFrames = 0
+    private var stallStarted: ContinuousClock.Instant?
     private static let stalledQueueReportThreshold = 3
     private(set) var droppedFrameCount = 0
+
+    /// A few slow frames are not a failed queue. Read on the render thread.
+    var requiresRecovery: Bool {
+        completion.failed.load(ordering: .acquiring)
+            || stallStarted.map { $0.duration(to: .now) >= .seconds(1) } == true
+    }
+
+    var hasFramesInFlight: Bool { completion.completed < frameNumber }
 
     /// Valid between `beginFrame` and `endFrame`; nil for a dropped frame.
     private var encoder: (any MTL4RenderCommandEncoder)?
@@ -326,6 +339,7 @@ public nonisolated final class Metal4Backend {
         let slot = nextSlot
         let wait: DispatchTime = consecutiveDroppedFrames > 0 ? .now() : .now() + slotWaitLimit
         guard slotSemaphores[slot].wait(timeout: wait) == .success else {
+            if stallStarted == nil { stallStarted = .now }
             consecutiveDroppedFrames += 1
             droppedFrameCount += 1
             if consecutiveDroppedFrames == Self.stalledQueueReportThreshold {
@@ -335,6 +349,7 @@ public nonisolated final class Metal4Backend {
             return false
         }
         consecutiveDroppedFrames = 0
+        stallStarted = nil
         frameNumber += 1
         currentSlot = slot
         nextSlot = (slot + 1) % Self.frameSlotCount
@@ -354,6 +369,8 @@ public nonisolated final class Metal4Backend {
             commandBuffer.endCommandBuffer()
             slotSemaphores[slot].signal()
             completion.note(frameNumber)
+            completion.failed.store(true, ordering: .releasing)
+            Metal4Diagnostics.reportCommitFault(Metal4BackendError.commandEncoderUnavailable)
             return false
         }
         encoder.label = label
@@ -423,6 +440,7 @@ public nonisolated final class Metal4Backend {
         let slotReleased = slotSemaphores[currentSlot]
         options.addFeedbackHandler { feedback in
             if let error = feedback.error {
+                completion.failed.store(true, ordering: .releasing)
                 Metal4Diagnostics.reportCommitFault(error)
             }
             completion.note(frame)

@@ -257,7 +257,7 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
         // backpressure cannot execute a partially inserted command.
         switch session.write(chunks: Paste.chunked(bytes)) {
         case .accepted: return true
-        case .backpressured, .stopped: return false
+        case .backpressured, .stopped, .failed: return false
         }
     }
 

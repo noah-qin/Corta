@@ -1037,3 +1037,15 @@ Menlo 14 at 1×. Instance upload p50/p95: typing **0.020 / 0.047 ms**, scroll
 post-change measurement including the earlier working-tree changes; native
 status-bar UI and idle CPU were not separately measured. See the
 [completion record](test-results/2026-10-04-system-status-theme-editor.md).
+
+### Terminal recovery verification (#228, 2026-10-06)
+
+Three alternating Release runs against main `a4883ab` on the Apple M5 host
+(macOS 27.0.1, Xcode 27.0) measured frame round-trip averages of
+0.800 / 0.698 / 0.684 ms before and 0.816 / 0.793 / 0.724 ms after.
+CPU-only full-rebuild p50 was 0.137 / 0.156 / 0.151 ms before and
+0.143 / 0.142 / 0.146 ms after. The round-trip averages trend higher with
+overlapping ranges; the CPU-only ranges overlap. These offscreen measurements
+exclude the AppKit completion tracker and failure UI. See the
+[repair verification record](test-results/2026-10-06-issue-228-fix.md) for all
+three performance workloads, interactive recovery checks and scope limits.

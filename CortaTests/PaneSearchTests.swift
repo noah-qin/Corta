@@ -52,6 +52,56 @@ final class SearchTestHost: PaneSearchHost {
 @MainActor
 @Suite(.serialized)
 struct PaneSearchTests {
+    @Test func dispatchedEscapeClosesSearchWithoutSendingTerminalBytes() async throws {
+        let host = SearchTestHost()
+        let terminal = TerminalView(frame: host.view.bounds)
+        host.terminalView = terminal
+        host.view.addSubview(terminal)
+        let window = NSWindow(contentRect: host.view.bounds,
+            styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host.view
+        var delivered: [[UInt8]] = []
+        terminal.onKeyBytes = { delivered.append($0) }
+        defer { host.search.close(); window.close() }
+        host.search.show()
+        let escape = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero,
+            modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: window.windowNumber, context: nil,
+            characters: "\u{1B}", charactersIgnoringModifiers: "\u{1B}",
+            isARepeat: false, keyCode: 53))
+        NSApp.postEvent(escape, atStart: true)
+        #expect(await waitUpTo(5) { host.search.bar == nil })
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(delivered.isEmpty)
+    }
+
+    @Test func installedMonitorPreservesAConsumedEscape() throws {
+        let host = SearchTestHost()
+        let window = NSWindow(contentRect: host.view.bounds,
+            styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentView = host.view
+        defer { host.search.close(); withExtendedLifetime(window) {} }
+        host.search.show()
+        let event = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero,
+            modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber,
+            context: nil, characters: "\u{1B}", charactersIgnoringModifiers: "\u{1B}",
+            isARepeat: false, keyCode: 53))
+        let handler = PaneSearch.keyMonitorHandler(for: host.search)
+        #expect(handler(event) == nil)
+        #expect(host.search.bar == nil)
+    }
+
+    @Test func aMonitorWithAReleasedOwnerPassesTheEventThrough() throws {
+        var search: PaneSearch? = PaneSearch()
+        let handler = PaneSearch.keyMonitorHandler(for: search!)
+        search = nil
+        let event = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero,
+            modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil,
+            characters: "x", charactersIgnoringModifiers: "x", isARepeat: false, keyCode: 7))
+        #expect(handler(event) === event)
+    }
+
     private func waitUpTo(_ seconds: Double, _ condition: @MainActor () -> Bool) async -> Bool {
         let deadline = ContinuousClock.now + .seconds(seconds * Double(testTimeoutScale))
         while ContinuousClock.now < deadline {

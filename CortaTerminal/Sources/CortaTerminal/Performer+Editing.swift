@@ -105,8 +105,12 @@ extension Performer {
         let paletteDefaults = state.indexedPalette.defaults
         // A fact about the session's shell, not terminal state.
         let hostnames = state.hostnamesAtStart
+        // Recovery timers identify episodes across RIS. Reusing an identity
+        // can hide a new begin in the same parse slice or match a stale timer.
+        let synchronizedOutputEpisode = state.synchronizedOutputEpisode
         grid.resetToInitialState()
         state = PerformerState()
+        state.synchronizedOutputEpisode = synchronizedOutputEpisode
         state.hostnamesAtStart = hostnames
         state.dynamicColors = colors
         state.indexedPalette = IndexedPalette(defaults: paletteDefaults)

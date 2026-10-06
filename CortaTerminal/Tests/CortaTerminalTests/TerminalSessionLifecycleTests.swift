@@ -100,6 +100,38 @@ import Testing
         #expect(fired.withLock { $0 })
     }
 
+    /// #228: real input must still reach a live child after repeated quiet
+    /// periods. Disable line-discipline echo so seeing a marker proves the
+    /// child read it, rather than just the kernel echoing the write.
+    @Test func inputAndOutputResumeAfterRepeatedIdlePeriods() async throws {
+        let session = try TerminalSession(
+            executable: "/bin/sh",
+            arguments: ["-c", "stty -echo; printf 'CORTA-IDLE-READY\\n'; while IFS= read -r line; do printf 'CHILD:%s\\n' \"$line\"; done"])
+        defer { session.stop() }
+        let outputs = Mutex(0)
+        session.onOutput = { outputs.withLock { $0 += 1 } }
+        session.start()
+        #expect(waitForGrid(session) { $0.contains("CORTA-IDLE-READY") }
+            .contains("CORTA-IDLE-READY"))
+
+        for cycle in 0..<3 {
+            // This silence is the test stimulus: it spans several 250 ms
+            // reader polls. Completion is still awaited by condition.
+            try await Task.sleep(for: .seconds(1))
+            let before = outputs.withLock { $0 }
+            let marker = "IDLE-\(cycle)"
+            #expect(session.write(Array("\(marker)\n".utf8)) == .accepted)
+            let text = waitForGrid(session) { $0.contains("CHILD:\(marker)") }
+            #expect(text.contains("CHILD:\(marker)"))
+            let deadline = ContinuousClock.now + .seconds(5)
+            while outputs.withLock({ $0 }) == before, ContinuousClock.now < deadline {
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            #expect(outputs.withLock { $0 } > before,
+                "resumed output must also notify the frame loop")
+        }
+    }
+
     // MARK: Chunk-boundary batching
 
     /// An exact chunk-multiple burst must be applied without waiting for

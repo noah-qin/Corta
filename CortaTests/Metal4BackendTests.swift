@@ -16,6 +16,7 @@
 
 import CoreGraphics
 import CoreText
+import CortaTerminal
 import Foundation
 import Metal
 import Synchronization
@@ -32,6 +33,35 @@ import Testing
     "Metal4Backend", .serialized, .metalSerialized,
     .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct Metal4BackendTests {
+    @Test func aProlongedStallRebuildsTheQueueWithoutDiscardingInstances() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let font = CTFontCreateWithName("Menlo" as CFString, 12, nil)
+        let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
+        let target = MetalRenderTarget.make(device: device, width: Self.width, height: Self.height)
+        var terminal = Terminal(rows: 2, columns: 10)
+        terminal.feed(Array("retained".utf8))
+        _ = renderer.updateInstances(grid: terminal.grid, scrollOffset: 0,
+            cursorVisible: false, selection: nil)
+        let instances = renderer.cachedInstances.map { $0.withUnsafeBytes { Data($0) } }
+        let old = renderer.backend
+        let gate = try #require(device.makeSharedEvent())
+        defer { gate.signaledValue = 1 }
+        old.holdQueue(until: gate, reaches: 1)
+        for _ in 0..<Metal4Backend.frameSlotCount {
+            #expect(old.beginFrame(target: target, clearColor: MTLClearColorMake(0, 0, 0, 1), label: "stalled"))
+            old.endFrame(presenting: nil, onCompleted: nil)
+        }
+        #expect(!old.beginFrame(target: target, clearColor: MTLClearColorMake(0, 0, 0, 1), label: "dropped"))
+        old.endFrame(presenting: nil, onCompleted: nil)
+        #expect(!old.requiresRecovery)
+        Thread.sleep(forTimeInterval: 1.1)
+        #expect(try renderer.recoverBackendIfNeeded())
+        #expect(renderer.backend !== old)
+        #expect(renderer.backendGeneration == 1)
+        #expect(renderer.cachedInstances.map { $0.withUnsafeBytes { Data($0) } } == instances)
+        #expect(renderer.backend.renderFrameAndWait(into: target))
+    }
+
     /// Reads back one BGRA8 pixel from `texture` at `x, y`.
     private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (
         r: UInt8, g: UInt8, b: UInt8, a: UInt8

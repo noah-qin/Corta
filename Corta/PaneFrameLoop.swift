@@ -72,6 +72,10 @@ final class PaneFrameLoop {
     var content: ((_ hasOutput: Bool) -> Content?)?
     /// Asks the view for a vsync (`TerminalView.setNeedsRedraw`).
     var onNeedsDisplay: (() -> Void)?
+    var onRenderingFailure: ((any Error) -> Void)?
+    private var renderingStopped = false
+    private var feedback = GPUFrameFeedback()
+    private var watchdog: DispatchWorkItem?
     /// The pane's top inset, which only a pane under the window's chrome
     /// has (`ViewController.topInset`).
     var topInset: () -> CGFloat = { 0 }
@@ -89,6 +93,10 @@ final class PaneFrameLoop {
         self.renderer = renderer
         needsRedraw = true
         wasSynchronizedOutputActive = false
+        renderingStopped = false
+        watchdog?.cancel()
+        watchdog = nil
+        feedback = GPUFrameFeedback()
         session.onOutput = { [weak self] in
             self?.noteOutput(generation: generation, wake: wake)
         }
@@ -115,6 +123,42 @@ final class PaneFrameLoop {
         generation == self.generation
     }
 
+    func detach() {
+        suspendRendering()
+        generation += 1
+        session = nil
+        renderer = nil
+        outputWake = OutputWakeGate()
+    }
+
+    func suspendRendering() {
+        renderingStopped = true
+        watchdog?.cancel()
+        watchdog = nil
+    }
+
+    private func watchGPU(generation: Int, backendGeneration: Int) {
+        guard watchdog == nil, feedback.hasPending else { return }
+        let feedback = feedback
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, !self.renderingStopped, self.generation == generation,
+                    self.renderer?.backendGeneration == backendGeneration else { return }
+                self.watchdog = nil
+                if feedback.hasExpired() {
+                    // No drawable callback may arrive to recover this queue.
+                    // Offer explicit session recovery rather than silently hang.
+                    self.suspendRendering()
+                    self.onRenderingFailure?(Metal4BackendError.gpuCompletionTimedOut)
+                } else {
+                    self.watchGPU(generation: generation, backendGeneration: backendGeneration)
+                }
+            }
+        }
+        watchdog = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: work)
+    }
+
     /// For local changes that produce no output.
     func invalidate() {
         needsRedraw = true
@@ -124,7 +168,7 @@ final class PaneFrameLoop {
     /// Per vsync. Returns whether a frame is owed: forced by `invalidate`
     /// or a `?2026` release, or damage the diff found.
     func prepareFrame() -> Bool {
-        guard let session, let renderer else { return false }
+        guard !renderingStopped, let session, let renderer else { return false }
         if session.takeBell() {
             onBell?()
         }
@@ -181,11 +225,27 @@ final class PaneFrameLoop {
     /// Returns false for a frame the backend dropped, which the scheduler
     /// owes another tick.
     func render(drawableSize: CGSize, drawable: CAMetalDrawable) -> Bool {
-        guard let renderer else {
+        guard !renderingStopped, let renderer else {
             // Never hold a drawable: an unpresented one is never recycled.
             drawable.present()
             return true
         }
+        do {
+            if try renderer.recoverBackendIfNeeded() {
+                watchdog?.cancel()
+                watchdog = nil
+                feedback = GPUFrameFeedback()
+            }
+        } catch {
+            renderingStopped = true
+            drawable.present()
+            onRenderingFailure?(error)
+            return true
+        }
+        let generation = generation
+        let backendGeneration = renderer.backendGeneration
+        let feedback = feedback
+        let submission = feedback.begin()
         let rect = Self.contentRect(
             in: drawableSize, scale: renderer.scale,
             gridHeight: CGFloat(renderer.cachedRowCount) * renderer.metrics.cellHeight,
@@ -194,18 +254,25 @@ final class PaneFrameLoop {
         let gpuStart = RenderMetrics.isEnabled ? DispatchTime.now() : nil
         // `gpu` spans submission to completion — the only place GPU time and a
         // drawable wait become visible.
-        let onCompleted: (@Sendable ((any Error)?) -> Void)? =
-            (gpu != nil || gpuStart != nil)
-            ? { @Sendable _ in
-                InputLatencySignposts.end(.gpu, gpu)
-                if let gpuStart {
-                    let ms =
-                        Double(DispatchTime.now().uptimeNanoseconds - gpuStart.uptimeNanoseconds)
-                        / 1_000_000
-                    RenderMetrics.record(.gpu, milliseconds: ms)
-                }
+        let onCompleted: @Sendable ((any Error)?) -> Void = { [weak self] error in
+            feedback.complete(submission)
+            InputLatencySignposts.end(.gpu, gpu)
+            if let gpuStart {
+                let ms =
+                    Double(DispatchTime.now().uptimeNanoseconds - gpuStart.uptimeNanoseconds)
+                    / 1_000_000
+                RenderMetrics.record(.gpu, milliseconds: ms)
             }
-            : nil
+            // Feedback may arrive after the scheduler parks. A callback
+            // from an old session/queue must not invalidate a replacement.
+            guard let error else { return }
+            if case Metal4BackendError.frameDropped = error { return }
+            Task(priority: .userInitiated) { @MainActor [weak self] in
+                guard let self, self.generation == generation,
+                    self.renderer?.backendGeneration == backendGeneration else { return }
+                self.invalidate()
+            }
+        }
         let background = TerminalColorPalette.clearColor
         let commit = InputLatencySignposts.begin(.commit)
         let drawn = renderer.draw(
@@ -217,6 +284,7 @@ final class PaneFrameLoop {
             drawable: drawable, label: "Corta.frame.\(ObjectIdentifier(self).hashValue)",
             onCompleted: onCompleted)
         InputLatencySignposts.end(.commit, commit)
+        watchGPU(generation: generation, backendGeneration: backendGeneration)
         return drawn
     }
 
