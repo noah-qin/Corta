@@ -18,11 +18,18 @@ import AppKit
 
 extension NSAlert {
     /// As a sheet on `window`, so it blocks that window and nothing else;
-    /// app-modal only when there is no window to attach to. `completion`
-    /// runs with the response either way — after this returns for a sheet,
-    /// before it returns for the app-modal fallback.
+    /// app-modal when there is no window to attach to, or when it already
+    /// has a sheet — a second sheet queues behind the first, and never
+    /// runs if the first closes the window. `completion` runs with the
+    /// response either way — after this returns for a sheet, before it
+    /// returns for the app-modal fallback.
+    static func canPresentSheet(on window: NSWindow?) -> Bool {
+        guard let window else { return false }
+        return window.isVisible && !window.isMiniaturized && window.attachedSheet == nil
+    }
+
     func present(for window: NSWindow?, completion: @escaping @MainActor (NSApplication.ModalResponse) -> Void) {
-        guard let window, window.isVisible, !window.isMiniaturized else {
+        guard let window, Self.canPresentSheet(on: window) else {
             completion(runModal())
             return
         }

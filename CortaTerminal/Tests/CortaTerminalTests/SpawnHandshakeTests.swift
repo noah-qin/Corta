@@ -21,8 +21,8 @@ import Testing
 @testable import CortaTerminal
 
 /// The `corta-exec` handshake: bounded, `EINTR`-tolerant, fully
-/// decoded. The pipe tests drive `readHelperStatus` directly; only the last
-/// test spawns a real child (hence `.serialized`).
+/// decoded. The pipe tests drive `readHelperStatus` directly; the last
+/// three spawn real children (hence `.serialized`).
 @Suite(.serialized) struct SpawnHandshakeTests {
     @Test func decodesAFullErrnoStatus() throws {
         let ends = try makePipe()

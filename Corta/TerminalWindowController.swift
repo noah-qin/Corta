@@ -249,7 +249,13 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         let running = splitController.panesWithRunningJobs
         guard splitController.needsCloseConfirmation(for: running) else { return true }
         // A second ⌘W while the sheet is up: the sheet already asks.
-        guard sender.attachedSheet == nil else { return false }
+        if sender.attachedSheet != nil, sender.isVisible { return false }
+        // A background tab or a minimised window has nowhere to show a sheet:
+        // ask now and answer now, rather than close it from inside this call.
+        guard NSAlert.canPresentSheet(on: sender) else {
+            let alert = splitController.closeAlert(for: running, scope: L10n.text("close.scope.window"))
+            return alert.runModal() == .alertFirstButtonReturn
+        }
         splitController.confirmClose(
             of: running, scope: L10n.text("close.scope.window"), in: sender
         ) { [weak sender] confirmed in if confirmed { sender?.close() } }
