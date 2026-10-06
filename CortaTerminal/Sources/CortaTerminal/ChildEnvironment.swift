@@ -68,14 +68,35 @@ public enum ChildEnvironment {
         return result
     }
 
-    /// Falls back to `en_US.UTF-8`, present on every install.
-    static var utf8Locale: String {
-        let identifier = Locale.current.identifier
-            .split(separator: "@").first.map(String.init) ?? ""
-        let normalised = identifier.replacingOccurrences(of: "-", with: "_")
-        // A bare language is not a locale name; language_REGION is.
-        guard normalised.contains("_") else { return "en_US.UTF-8" }
-        return "\(normalised).UTF-8"
+    /// The fallback, present on every install.
+    static let fallbackLocale = "en_US.UTF-8"
+
+    static var utf8Locale: String { utf8Locale(for: .current) }
+
+    /// `language_REGION.UTF-8` when the system has it, else `en_US.UTF-8`.
+    ///
+    /// Built from the language and region codes, never from the identifier:
+    /// a script-tagged one (`zh-Hans_CN`, the default for Simplified
+    /// Chinese) became `zh_Hans_CN.UTF-8`, which names no locale, so the
+    /// child fell back to C and zsh counted 中文 as six characters — the
+    /// failure this variable exists to prevent. Checked with `newlocale`,
+    /// since a well-formed pair (`en_CN`) can be missing too.
+    static func utf8Locale(
+        for locale: Locale, isAvailable: (String) -> Bool = isAvailableLocale
+    ) -> String {
+        guard let language = locale.language.languageCode?.identifier,
+            let region = locale.region?.identifier
+        else { return fallbackLocale }
+        let name = "\(language)_\(region).UTF-8"
+        return isAvailable(name) ? name : fallbackLocale
+    }
+
+    /// Whether the C library can load `name` for character classification —
+    /// what the child's `setlocale` will be asked.
+    static func isAvailableLocale(_ name: String) -> Bool {
+        guard let handle = newlocale(LC_CTYPE_MASK, name, nil) else { return false }
+        freelocale(handle)
+        return true
     }
 
     public static func processEnvironment() -> [String: String] {
