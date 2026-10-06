@@ -217,7 +217,7 @@ jobs:
       # Preserve the evidence on both success and failure.
       - name: Keep the test results
         if: ${{ steps.published.outputs.exists != 'true' && (always()) }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: xcresult-release-${{ steps.version.outputs.tag }}
           path: test-results.xcresult
@@ -410,7 +410,7 @@ jobs:
       # attached to a release.
       - name: Keep the rehearsal's archive
         if: ${{ steps.published.outputs.exists != 'true' && (inputs.dry_run) }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: rehearsal-${{ steps.package.outputs.zip }}
           path: |
