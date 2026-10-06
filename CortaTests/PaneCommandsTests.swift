@@ -20,10 +20,11 @@ import Testing
 @testable import Corta
 @testable import CortaTerminal
 
-/// A pane as its commands see it, with no session, renderer or window: a
-/// font size the commands can change, and a remote side that is local.
+/// A pane as its commands see it, with no renderer or window: a font size
+/// the commands can change, a remote side that is local, and a session only
+/// if a test gives it one (`LargeTextTaskTests`).
 @MainActor
-private final class CommandsTestHost: PaneCommandsHost {
+final class CommandsTestHost: PaneCommandsHost {
     let view = NSView()
     var session: TerminalSession! = nil
     var isOperable = false

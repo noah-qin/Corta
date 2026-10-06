@@ -158,10 +158,18 @@ import Testing
     /// one signals only after the commit, so the text lands at column 100.
     @Test func childIsNotSignalledASizeTheGridHasNotAdopted() throws {
         let script = #"printf '\033[?1049h'; trap 'printf "\033[2J\033[1;1HTOP120"; printf "\033[5;100HEND120"; printf "WINCH-DONE\n"' WINCH; printf 'ARMED\n'; while :; do sleep 0.05; done"#
+        // Holds every queued resize until the test opens it; the only one
+        // is the test's own.
+        let gateOpen = Mutex(false)
+        var seams = TerminalSession.Seams()
+        seams.resizeWorkGate = {
+            while !gateOpen.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.001) }
+        }
         let session = try TerminalSession(
             executable: "/bin/sh",
             arguments: ["-c", script],
-            size: TerminalSize(rows: 24, columns: 80))
+            size: TerminalSize(rows: 24, columns: 80),
+            seams: seams)
         defer { session.stop() }
         session.start()
 
@@ -170,10 +178,6 @@ import Testing
             armed.contains("ARMED"),
             "precondition: the child should have armed its WINCH trap; grid held:\n\(armed)")
 
-        let gateOpen = Mutex(false)
-        session.resizeWorkGate = {
-            while !gateOpen.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.001) }
-        }
         session.resize(to: TerminalSize(rows: 24, columns: 120))
 
         // With the resize held, a wrongly-ordered implementation still

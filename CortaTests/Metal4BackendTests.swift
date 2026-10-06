@@ -257,14 +257,15 @@ struct QuadPipelineCacheTests {
             return
         }
         try? FileManager.default.removeItem(at: url)
+        QuadPipelineCache.readsPreviousArchive = false
+        defer { QuadPipelineCache.readsPreviousArchive = true }
         QuadPipelineCache.discardPipelines()
         _ = try Metal4Backend(device: device)
         #expect(FileManager.default.fileExists(atPath: url.path))
     }
 
     /// A second backend is a cache hit and builds with an archive already on
-    /// disk. The test plans keep the archive from being read back
-    /// (`QuadPipelineCache.readsPreviousArchive` explains why).
+    /// disk. The archive is not read back (`readsPreviousArchive` says why).
     @Test func aSecondBackendBuildsWithTheArchiveOnDisk() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
         guard let url = QuadPipelineCache.binaryArchiveURL else {
@@ -272,6 +273,8 @@ struct QuadPipelineCacheTests {
             return
         }
         try? FileManager.default.removeItem(at: url)
+        QuadPipelineCache.readsPreviousArchive = false
+        defer { QuadPipelineCache.readsPreviousArchive = true }
         QuadPipelineCache.discardPipelines()
         let first = try Metal4Backend(device: device)
         #expect(FileManager.default.fileExists(atPath: url.path))

@@ -31,7 +31,6 @@ nonisolated enum DiagnosticsEnvironment {
     enum Switch: String, CaseIterable {
         case frameLatency = "CORTA_FRAME_LATENCY"
         case maxDrawables = "CORTA_MAX_DRAWABLES"
-        case pipelineArchive = "CORTA_PIPELINE_ARCHIVE"
         case renderMetrics = "CORTA_RENDER_METRICS"
         case renderMetricsKeystrokes = "CORTA_RENDER_METRICS_KEYSTROKES"
         case restoreWindows = "CORTA_RESTORE_WINDOWS"
@@ -71,17 +70,6 @@ nonisolated enum DiagnosticsEnvironment {
             (2...3).contains(count)
         else { return nil }
         return count
-    }
-
-    /// `CORTA_PIPELINE_ARCHIVE=0`: compile the render pipelines without
-    /// reading the previous launch's binary archive (`QuadPipelineCache`);
-    /// the archive is still written. The unit-test and Release plans set it:
-    /// in a hosted test bundle, reading one back segfaults inside Metal. Any
-    /// other value, or none, reads it. All builds.
-    static func isPipelineArchiveReadSuppressed(
-        in environment: Environment = ProcessInfo.processInfo.environment
-    ) -> Bool {
-        value(.pipelineArchive, in: environment) == "0"
     }
 
     /// `CORTA_RENDER_METRICS`, any value: `RenderMetrics` records frame

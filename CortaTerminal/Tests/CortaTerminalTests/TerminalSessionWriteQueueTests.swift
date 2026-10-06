@@ -22,7 +22,7 @@ import Testing
 
 // The write path is a bounded, ordered, cancellable queue drained by a
 // serial writer queue — `write` itself only enqueues. These tests use the
-// `writerSink` hook to gate and record outbound bytes deterministically;
+// `writerSink` seam to gate and record outbound bytes deterministically;
 // like `TerminalSessionTests` they wait on conditions, never on the clock,
 // and the only deadlines are hang ceilings (see that suite's header).
 @Suite(.serialized) struct TerminalSessionWriteQueueTests {
@@ -32,11 +32,10 @@ import Testing
     /// the reader thread could interleave with a main-thread `write` byte
     /// stream.
     @Test func userInputAndProtocolRepliesKeepTheirEnqueueOrder() throws {
-        let session = try TerminalSession(executable: "/bin/cat")
-        defer { session.stop() }
+        var seams = TerminalSession.Seams()
 
         let recorded = Mutex<[[UInt8]]>([])
-        session.writerSink = { chunk in recorded.withLock { $0.append(chunk) } }
+        seams.writerSink = { chunk in recorded.withLock { $0.append(chunk) } }
 
         // Feed exactly one primary-DA query (ESC [ c), then end of file —
         // but not before the first user write has been recorded. Without
@@ -48,7 +47,7 @@ import Testing
         // race reliably, which is how the gap was found.
         let queryDelivered = Mutex(false)
         let mayDeliverQuery = Mutex(false)
-        session.readerSource = ReaderSource(
+        seams.readerSource = ReaderSource(
             read: { buffer in
                 // Waits rather than returning 0: a zero-length read is end
                 // of file to the reader, which would stop it before the gate
@@ -70,6 +69,8 @@ import Testing
             },
             isReadable: { false }
         )
+        let session = try TerminalSession(executable: "/bin/cat", seams: seams)
+        defer { session.stop() }
         session.start()
 
         let userBefore: [UInt8] = [0x41]  // "A"
@@ -103,17 +104,18 @@ import Testing
     /// first chunk; the test thread then calling `write` again *returning at
     /// all* is the assertion — a synchronous implementation hangs here.
     @Test func writeDoesNotBlockBehindAStalledWrite() throws {
-        let session = try TerminalSession(executable: "/bin/cat")
-        defer { session.stop() }
+        var seams = TerminalSession.Seams()
 
         let gateOpen = Mutex(false)
         let sinkEntered = Mutex(false)
         let recorded = Mutex<[[UInt8]]>([])
-        session.writerSink = { chunk in
+        seams.writerSink = { chunk in
             sinkEntered.withLock { $0 = true }
             while !gateOpen.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.001) }
             recorded.withLock { $0.append(chunk) }
         }
+        let session = try TerminalSession(executable: "/bin/cat", seams: seams)
+        defer { session.stop() }
         session.start()
 
         let first: [UInt8] = [1, 1, 1]
@@ -137,16 +139,17 @@ import Testing
     /// parked on chunk A by the gate; B is pending behind it and C is
     /// submitted after the stop — neither may ever reach the sink.
     @Test func stopDiscardsPendingWrites() throws {
-        let session = try TerminalSession(executable: "/bin/cat")
+        var seams = TerminalSession.Seams()
 
         let gateOpen = Mutex(false)
         let sinkEntered = Mutex(false)
         let recorded = Mutex<[[UInt8]]>([])
-        session.writerSink = { chunk in
+        seams.writerSink = { chunk in
             sinkEntered.withLock { $0 = true }
             while !gateOpen.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.001) }
             recorded.withLock { $0.append(chunk) }
         }
+        let session = try TerminalSession(executable: "/bin/cat", seams: seams)
         session.start()
 
         let chunkA: [UInt8] = [0x0A]
@@ -176,17 +179,18 @@ import Testing
     /// arrives while the backlog already exceeds the cap is dropped —
     /// keyboard input is never buffered without bound.
     @Test func backlogBeyondTheCapIsDropped() throws {
-        let session = try TerminalSession(executable: "/bin/cat")
-        defer { session.stop() }
+        var seams = TerminalSession.Seams()
 
         let gateOpen = Mutex(false)
         let sinkEntered = Mutex(false)
         let recorded = Mutex<[[UInt8]]>([])
-        session.writerSink = { chunk in
+        seams.writerSink = { chunk in
             sinkEntered.withLock { $0 = true }
             while !gateOpen.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.001) }
             recorded.withLock { $0.append(chunk) }
         }
+        let session = try TerminalSession(executable: "/bin/cat", seams: seams)
+        defer { session.stop() }
         session.start()
 
         let megabyte = 1024 * 1024
@@ -221,15 +225,16 @@ import Testing
     /// (a paste chunking itself) needs to know a chunk was dropped without
     /// waiting to see whether it was ever echoed back.
     @Test func writeReportsAcceptedBackpressuredAndStopped() throws {
-        let session = try TerminalSession(executable: "/bin/cat")
+        var seams = TerminalSession.Seams()
 
         let gateOpen = Mutex(false)
         let sinkEntered = Mutex(false)
-        session.writerSink = { chunk in
+        seams.writerSink = { chunk in
             sinkEntered.withLock { $0 = true }
             while !gateOpen.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.001) }
             _ = chunk
         }
+        let session = try TerminalSession(executable: "/bin/cat", seams: seams)
         session.start()
 
         let megabyte = 1024 * 1024
@@ -258,17 +263,18 @@ import Testing
     /// A paste is queued whole or not at all: cut short after `ESC[200~`, the
     /// shell would wait in paste mode for an `ESC[201~` that never comes.
     @Test func aChunkedPasteIsQueuedWholeOrNotAtAll() throws {
-        let session = try TerminalSession(executable: "/bin/cat")
-        defer { session.stop() }
+        var seams = TerminalSession.Seams()
 
         let gateOpen = Mutex(false)
         let sinkEntered = Mutex(false)
         let recorded = Mutex<[[UInt8]]>([])
-        session.writerSink = { chunk in
+        seams.writerSink = { chunk in
             sinkEntered.withLock { $0 = true }
             while !gateOpen.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.001) }
             recorded.withLock { $0.append(chunk) }
         }
+        let session = try TerminalSession(executable: "/bin/cat", seams: seams)
+        defer { session.stop() }
         session.start()
 
         let megabyte = 1024 * 1024

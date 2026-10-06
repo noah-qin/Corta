@@ -9,10 +9,6 @@
   "defaultOptions": {
     "environmentVariableEntries": [
       {
-        "key": "CORTA_PIPELINE_ARCHIVE",
-        "value": "0"
-      },
-      {
         "key": "CORTA_RESTORE_WINDOWS",
         "value": "0"
       },

@@ -208,15 +208,21 @@ public nonisolated enum QuadPipelineCache {
         }
     }
 
-    /// False with `CORTA_PIPELINE_ARCHIVE=0`, which the unit-test and Release
-    /// plans set, for two reasons. A hosted test bundle once segfaulted
-    /// reading an archive back (`-[_MTLDevice recordBinaryArchiveUsage:]`, a
-    /// null C string reaching `strlen`; an upstream report ties it to
-    /// `MTLGetShaderCachePath()` returning nil), though neither a standalone
-    /// repro nor two real launches did, and a hosted read on macOS 27.0.1 no
-    /// longer did either. And `RendererConstructionCostTests`' cold figure
-    /// must be a real compile, not an archive hit (~37 ms against ~9 ms).
-    static let readsPreviousArchive = !DiagnosticsEnvironment.isPipelineArchiveReadSuppressed()
+    /// Whether a cold creation compiles through the previous launch's archive.
+    /// On unless a caller turns it off, as the archive tests and the
+    /// construction benchmark do before `discardPipelines()`: the benchmark's
+    /// cold figure must be a compile, not an archive hit (~37 ms against
+    /// ~9 ms), and a hosted test bundle once segfaulted reading an archive
+    /// back (`-[_MTLDevice recordBinaryArchiveUsage:]`, a null C string
+    /// reaching `strlen`; an upstream report ties it to
+    /// `MTLGetShaderCachePath()` returning nil) — not reproduced on macOS
+    /// 27.0.1. A test host's own launch reads nothing: its throwaway stage
+    /// (`AppPaths`) has no archive yet.
+    public static var readsPreviousArchive: Bool {
+        get { readsArchive.withLock { $0 } }
+        set { readsArchive.withLock { $0 = newValue } }
+    }
+    private static let readsArchive = Mutex(true)
 
     /// Opens the previous launch's archive, or a fresh one when there is none
     /// or `readsPreviousArchive` is off; `makeEntry` adds this launch's

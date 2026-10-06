@@ -60,22 +60,26 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     /// `largeTextTaskGeneration` keeps a late one from clearing its successor.
     var largeTextTask: Task<Void, Never>?
     var largeTextTaskGeneration = 0
-    /// Where a copy lands: the system clipboard, or a private one a pane is
-    /// given instead.
-    var pasteboard: NSPasteboard = .general
-    /// A copy's text build, run on the detached task: `Selection.text`. A
-    /// dependency so a caller can hold the build at a known point — the task
-    /// has no scheduling barrier of its own.
-    var buildSelectionText: @Sendable (SelectionRange, Grid) -> String = {
-        Selection.text(of: $0, in: $1)
-    }
+    /// What copy, paste and Copy Path use: the system clipboard unless the
+    /// pane is given another.
+    let pasteboard: NSPasteboard
+    /// How a copy builds its text, on the detached task: `Selection.text`.
+    /// Given, so a caller can hold the build at a known point — the task has
+    /// no scheduling barrier of its own.
+    private let buildSelectionText: @Sendable (SelectionRange, Grid) -> String
     /// Pinch magnification not yet spent on a whole point.
     private var pinchAccumulator: CGFloat = 0
     /// The current pinch changed the size, so its end settles the window.
     private var pinchChangedSize = false
 
-    init(host: PaneCommandsHost? = nil) {
+    init(
+        host: PaneCommandsHost? = nil, pasteboard: NSPasteboard = .general,
+        buildSelectionText: @escaping @Sendable (SelectionRange, Grid) -> String =
+            Selection.text(of:in:)
+    ) {
         self.host = host
+        self.pasteboard = pasteboard
+        self.buildSelectionText = buildSelectionText
     }
 
     /// The pane closed: a build in flight must not land.
@@ -557,7 +561,6 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
             host?.terminalView?.showToast(L10n.text("toast.noWorkingDirectory"), kind: .warning)
             return
         }
-        let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(directory, forType: .string)
         host?.terminalView?.showToast(L10n.text("toast.copiedWorkingDirectory"))
@@ -693,7 +696,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     /// ⌘V: the one paste path drops and Services also take
     /// (`insertAsPaste`).
     func pasteFromClipboard() {
-        guard let text = NSPasteboard.general.string(forType: .string) else { return }
+        guard let text = pasteboard.string(forType: .string) else { return }
         insertAsPaste(text)
     }
 

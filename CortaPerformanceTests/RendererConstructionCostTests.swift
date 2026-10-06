@@ -38,11 +38,13 @@ extension PerformanceSuites {
             // Construction #1 is forced cold (`discardPipelines`) so the report
             // shows the compile cost panes no longer pay past the first;
             // #2...#8 are the warm-cache cost every split pane actually hits.
-            // The Release plan switches the binary-archive read off
-            // (`CORTA_PIPELINE_ARCHIVE=0`), so cold here means a real
-            // compile — an upper bound on what a real launch's first pane pays.
+            // The binary-archive read is off (`readsPreviousArchive`), so cold
+            // here means a real compile — an upper bound on what a real
+            // launch's first pane pays.
             let constructions = 8
             var durations: [Double] = []
+            QuadPipelineCache.readsPreviousArchive = false
+            defer { QuadPipelineCache.readsPreviousArchive = true }
             QuadPipelineCache.discardPipelines()
             for _ in 0..<constructions {
                 let start = DispatchTime.now()

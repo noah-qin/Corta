@@ -107,9 +107,9 @@ import Testing
     /// real pty's kernel buffering cannot be made to guarantee — this is the
     /// deterministic half.
     @Test func exactChunkBoundaryIsAppliedWithoutFurtherInput() throws {
-        let session = try TerminalSession(executable: "/bin/cat")
         let source = ScriptedReaderSource()
-        session.readerSource = source.source
+        let session = try TerminalSession(
+            executable: "/bin/cat", seams: .init(readerSource: source.source))
         // stop() first, then endOfFile(): the reader is blocked in the
         // scripted read, and stop()'s SIGCHLD lets waitForExit return the
         // moment the read unblocks.
