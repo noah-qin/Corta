@@ -273,15 +273,19 @@ nonisolated extension PaneLayout: Codable {
 /// config file: it is state, not settings, and would churn the file on
 /// every move. `restore-windows = false` stops reads and writes alike.
 @MainActor
-enum SessionRestore {
-    static var fileURL: URL { directory.appendingPathComponent("state.json") }
+struct SessionRestore {
+    /// Where the state lives: Application Support for the app, a temporary
+    /// directory for a test.
+    let directory: URL
 
-    /// Overridable so tests don't touch the user's Application Support.
-    nonisolated(unsafe) static var directory: URL = AppPaths.applicationSupportDirectory
+    /// The app's own store.
+    static let standard = SessionRestore(directory: AppPaths.applicationSupportDirectory)
+
+    var fileURL: URL { directory.appendingPathComponent("state.json") }
 
     /// The saved windows, oldest first. A malformed file counts as none:
     /// better a fresh window than a terminal that won't launch.
-    static func load() -> [WindowState] {
+    func load() -> [WindowState] {
         guard let data = try? Data(contentsOf: fileURL),
             let states = try? JSONDecoder().decode([WindowState].self, from: data)
         else { return [] }
@@ -298,20 +302,20 @@ enum SessionRestore {
     /// Present only while a restore is applied. A crash during restore leaves
     /// it, and the next launch starts fresh; a crash at any other time leaves
     /// the debounced state to restore from.
-    static var markerURL: URL { directory.appendingPathComponent("restore-in-progress") }
+    var markerURL: URL { directory.appendingPathComponent("restore-in-progress") }
 
     /// The previous launch died mid-restore; that layout is not retried.
-    static var previousRestoreFailed: Bool {
+    var previousRestoreFailed: Bool {
         FileManager.default.fileExists(atPath: markerURL.path)
     }
 
-    static func beginRestore() {
+    func beginRestore() {
         try? FileManager.default.createDirectory(
             at: markerURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         FileManager.default.createFile(atPath: markerURL.path, contents: nil)
     }
 
-    static func endRestore() {
+    func endRestore() {
         try? FileManager.default.removeItem(at: markerURL)
     }
 
@@ -323,13 +327,13 @@ enum SessionRestore {
         case restore([WindowState])
     }
 
-    static func decideRestore() -> RestoreDecision {
+    func decideRestore() -> RestoreDecision {
         if previousRestoreFailed { return .skipAfterFailure }
         let states = load()
         return states.isEmpty ? .nothingToRestore : .restore(states)
     }
 
-    static func save(_ states: [WindowState]) {
+    func save(_ states: [WindowState]) {
         let url = fileURL
         do {
             try FileManager.default.createDirectory(
@@ -341,7 +345,7 @@ enum SessionRestore {
         }
     }
 
-    static func clear() {
+    func clear() {
         try? FileManager.default.removeItem(at: fileURL)
     }
 }

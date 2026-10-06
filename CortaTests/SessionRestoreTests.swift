@@ -217,19 +217,17 @@ struct RestoreValidationTests {
     func anInterruptedRestoreIsNotRetried() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("corta-restore-\(UUID().uuidString)")
-        let saved = SessionRestore.directory
-        SessionRestore.directory = directory
+        let store = SessionRestore(directory: directory)
         defer {
-            SessionRestore.directory = saved
             try? FileManager.default.removeItem(at: directory)
         }
 
-        #expect(!SessionRestore.previousRestoreFailed)
-        SessionRestore.beginRestore()
-        #expect(SessionRestore.previousRestoreFailed)
+        #expect(!store.previousRestoreFailed)
+        store.beginRestore()
+        #expect(store.previousRestoreFailed)
         // A completed restore clears it, so the next launch restores again.
-        SessionRestore.endRestore()
-        #expect(!SessionRestore.previousRestoreFailed)
+        store.endRestore()
+        #expect(!store.previousRestoreFailed)
     }
 
     /// The arrangement survives a write and a read, so a crash after launch
@@ -238,10 +236,8 @@ struct RestoreValidationTests {
     func savedStateRoundTrips() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("corta-restore-\(UUID().uuidString)")
-        let saved = SessionRestore.directory
-        SessionRestore.directory = directory
+        let store = SessionRestore(directory: directory)
         defer {
-            SessionRestore.directory = saved
             try? FileManager.default.removeItem(at: directory)
         }
 
@@ -250,10 +246,10 @@ struct RestoreValidationTests {
             layout: .split(
                 vertical: true, position: 0.4,
                 first: .pane(directory: "/tmp"), second: .pane(directory: nil)))
-        SessionRestore.save([state])
-        #expect(SessionRestore.load() == [state])
-        SessionRestore.clear()
-        #expect(SessionRestore.load().isEmpty)
+        store.save([state])
+        #expect(store.load() == [state])
+        store.clear()
+        #expect(store.load().isEmpty)
     }
 
     // MARK: - Versioning
@@ -281,10 +277,8 @@ struct RestoreValidationTests {
     func futureVersionIsSkippedNotCrashed() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("corta-restore-\(UUID().uuidString)")
-        let saved = SessionRestore.directory
-        SessionRestore.directory = directory
+        let store = SessionRestore(directory: directory)
         defer {
-            SessionRestore.directory = saved
             try? FileManager.default.removeItem(at: directory)
         }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -293,8 +287,8 @@ struct RestoreValidationTests {
             [{"version": 999, "frame": {"x": 0, "y": 0, "width": 900, "height": 560},
               "layout": {"pane": {"directory": null}}, "isSelectedTab": true}]
             """#.utf8)
-        try json.write(to: SessionRestore.fileURL)
-        #expect(SessionRestore.load().isEmpty)
+        try json.write(to: store.fileURL)
+        #expect(store.load().isEmpty)
     }
 
     // MARK: - Tab group
@@ -303,18 +297,16 @@ struct RestoreValidationTests {
     func tabGroupFieldsRoundTrip() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("corta-restore-\(UUID().uuidString)")
-        let saved = SessionRestore.directory
-        SessionRestore.directory = directory
+        let store = SessionRestore(directory: directory)
         defer {
-            SessionRestore.directory = saved
             try? FileManager.default.removeItem(at: directory)
         }
         let state = WindowState(
             frame: WindowState.Frame(NSRect(x: 0, y: 0, width: 900, height: 560)),
             layout: .pane(directory: nil), tabGroupID: "group-1", tabIndex: 1,
             isSelectedTab: false)
-        SessionRestore.save([state])
-        let loaded = try #require(SessionRestore.load().first)
+        store.save([state])
+        let loaded = try #require(store.load().first)
         #expect(loaded.tabGroupID == "group-1")
         #expect(loaded.tabIndex == 1)
         #expect(!loaded.isSelectedTab)
@@ -342,18 +334,16 @@ struct RestoreValidationTests {
 /// state directory — the launch after a crash *during* a restore, and the
 /// launch after a crash at any other time, which must still find its windows.
 @MainActor
-@Suite(.serialized, .sessionRestoreSerialized)
+@Suite(.serialized)
 struct RestoreCrashRecoveryTests {
-    private func withTemporaryStateDirectory(_ body: () throws -> Void) rethrows {
+    private func withTemporaryStateDirectory(_ body: (SessionRestore) throws -> Void) rethrows {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("corta-crash-\(UUID().uuidString)")
-        let saved = SessionRestore.directory
-        SessionRestore.directory = directory
+        let store = SessionRestore(directory: directory)
         defer {
-            SessionRestore.directory = saved
             try? FileManager.default.removeItem(at: directory)
         }
-        try body()
+        try body(store)
     }
 
     private var state: WindowState {
@@ -365,10 +355,10 @@ struct RestoreCrashRecoveryTests {
     /// **A crash during a restore.** The marker is still there, so the layout
     /// that was being applied is the suspect and is not applied again.
     @Test func aLaunchAfterACrashDuringRestoreStartsFresh() throws {
-        withTemporaryStateDirectory {
-            SessionRestore.save([state])
-            SessionRestore.beginRestore()  // and then the process dies here
-            #expect(SessionRestore.decideRestore() == .skipAfterFailure)
+        withTemporaryStateDirectory { store in
+            store.save([state])
+            store.beginRestore()  // and then the process dies here
+            #expect(store.decideRestore() == .skipAfterFailure)
         }
     }
 
@@ -376,35 +366,35 @@ struct RestoreCrashRecoveryTests {
     /// the arrangement on disk — which is the case the whole feature exists
     /// for and the one the old delete-at-launch made impossible.
     @Test func aLaunchAfterACrashElsewhereRestores() throws {
-        withTemporaryStateDirectory {
-            SessionRestore.save([state])
-            SessionRestore.beginRestore()
-            SessionRestore.endRestore()  // the restore finished; later, a crash
-            #expect(SessionRestore.decideRestore() == .restore([state]))
+        withTemporaryStateDirectory { store in
+            store.save([state])
+            store.beginRestore()
+            store.endRestore()  // the restore finished; later, a crash
+            #expect(store.decideRestore() == .restore([state]))
         }
     }
 
     /// A clean first run.
     @Test func nothingSavedMeansNothingToRestore() throws {
-        withTemporaryStateDirectory {
-            #expect(SessionRestore.decideRestore() == .nothingToRestore)
+        withTemporaryStateDirectory { store in
+            #expect(store.decideRestore() == .nothingToRestore)
         }
     }
 
     /// The skip is once, not forever: the next launch after it restores
     /// normally, because the marker was cleared on the way past.
     @Test func theSkipHappensOnce() throws {
-        withTemporaryStateDirectory {
-            SessionRestore.save([state])
-            SessionRestore.beginRestore()
-            #expect(SessionRestore.decideRestore() == .skipAfterFailure)
+        withTemporaryStateDirectory { store in
+            store.save([state])
+            store.beginRestore()
+            #expect(store.decideRestore() == .skipAfterFailure)
             // What the app does on that branch.
-            SessionRestore.clear()
-            SessionRestore.endRestore()
-            #expect(SessionRestore.decideRestore() == .nothingToRestore)
+            store.clear()
+            store.endRestore()
+            #expect(store.decideRestore() == .nothingToRestore)
 
-            SessionRestore.save([state])
-            #expect(SessionRestore.decideRestore() == .restore([state]))
+            store.save([state])
+            #expect(store.decideRestore() == .restore([state]))
         }
     }
 }

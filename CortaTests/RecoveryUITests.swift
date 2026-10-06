@@ -28,7 +28,7 @@ import Testing
 /// unmounted" on a working machine takes deliberate effort, and the panel is
 /// invisible in every render test. The contract is asserted here instead.
 @MainActor
-@Suite(.serialized, .sessionRestoreSerialized)
+@Suite(.serialized)
 struct RecoveryUITests {
     // MARK: - The failure panel
 
@@ -118,17 +118,15 @@ struct RecoveryUITests {
     @Test func corruptRestoreStateReadsAsNothingToRestore() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("corta-recovery-\(UUID().uuidString)")
-        let saved = SessionRestore.directory
-        SessionRestore.directory = directory
+        let store = SessionRestore(directory: directory)
         defer {
-            SessionRestore.directory = saved
             try? FileManager.default.removeItem(at: directory)
         }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
         for corrupt in ["", "{", "[{\"frame\":", "null", "{\"windows\":[]}"] {
-            try corrupt.write(to: SessionRestore.fileURL, atomically: true, encoding: .utf8)
-            #expect(SessionRestore.load().isEmpty, "\(corrupt.debugDescription) should not throw")
+            try corrupt.write(to: store.fileURL, atomically: true, encoding: .utf8)
+            #expect(store.load().isEmpty, "\(corrupt.debugDescription) should not throw")
         }
     }
 }

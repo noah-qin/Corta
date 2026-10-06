@@ -17,6 +17,7 @@
 import Foundation
 import Metal
 import OSLog
+import Synchronization
 
 /// Per-frame render timing in fixed-size buffers, summarised as
 /// percentiles, so a before/after comparison is a log line. Pairs with
@@ -50,26 +51,33 @@ nonisolated enum RenderMetrics {
     /// `CORTA_RENDER_METRICS_KEYSTROKES=<n>`.
     private static let keystrokeCapacity = DiagnosticsEnvironment.renderMetricsKeystrokes() ?? 200
 
-    private static let lock = NSLock()
-    // Mutated only under `lock`; an actor would make render-path calls
-    // `async`.
-    nonisolated(unsafe) private static var samples: [Metric: [Double]] = [:]
+    /// Everything mutable, behind one lock; an actor would make render-path
+    /// calls `async`.
+    private struct State: ~Copyable {
+        var samples: [Metric: [Double]] = [:]
+        var pending: PendingKeystroke?
+    }
+
+    private static let state = Mutex(State())
+    /// Serialises appends to `outputFile`; held only for the write, never
+    /// with `state`.
+    private static let fileLock = Mutex(())
 
     /// Records a sample; a full buffer is dumped and cleared, so a force-quit
     /// loses at most one window.
     static func record(_ metric: Metric, milliseconds: Double) {
         guard isEnabled else { return }
-        lock.lock()
-        var values = samples[metric, default: []]
-        values.append(milliseconds)
-        let full = values.count >= (metric == .keypressToPresent ? keystrokeCapacity : capacity)
-        if full {
-            samples[metric] = []
-        } else {
-            samples[metric] = values
+        let full: [Double]? = state.withLock { state in
+            var values = state.samples[metric, default: []]
+            values.append(milliseconds)
+            guard values.count >= (metric == .keypressToPresent ? keystrokeCapacity : capacity) else {
+                state.samples[metric] = values
+                return nil
+            }
+            state.samples[metric] = []
+            return values
         }
-        lock.unlock()
-        if full { dump(metric: metric, values: values) }
+        if let full { dump(metric: metric, values: full) }
     }
 
     /// Times `body` when enabled; `body` always runs.
@@ -105,8 +113,10 @@ nonisolated enum RenderMetrics {
     /// Once per full ring, never per frame; a failed write loses a line of
     /// measurement, which the reader reports as a ring that never filled.
     private static func append(_ line: String, to file: URL) {
-        lock.lock()
-        defer { lock.unlock() }
+        fileLock.withLock { _ in write(line, to: file) }
+    }
+
+    private static func write(_ line: String, to file: URL) {
         if !FileManager.default.fileExists(atPath: file.path) {
             FileManager.default.createFile(atPath: file.path, contents: nil)
         }
@@ -120,14 +130,12 @@ nonisolated enum RenderMetrics {
 
     /// One keystroke in flight. A newer one replaces one that never echoed;
     /// that sample is dropped, never guessed.
-    private struct PendingKeystroke {
+    private struct PendingKeystroke: Sendable {
         var timestamp: TimeInterval
         var outputLanded = false
         /// Asks the pane for another frame (`TerminalView.setNeedsRedraw`).
         var requestFrame: @Sendable () -> Void
     }
-
-    nonisolated(unsafe) private static var pending: PendingKeystroke?
 
     /// Called at `TerminalView`'s three delivery sites. `NSEvent.timestamp`
     /// shares `presentedTime`'s clock. Synthetic events are stamped at
@@ -136,31 +144,26 @@ nonisolated enum RenderMetrics {
     /// the glass (see `notePresent`).
     static func noteKeystroke(at timestamp: TimeInterval, requestFrame: @escaping @Sendable () -> Void) {
         guard isEnabled else { return }
-        lock.lock()
-        pending = PendingKeystroke(timestamp: timestamp, requestFrame: requestFrame)
-        lock.unlock()
+        state.withLock { $0.pending = PendingKeystroke(timestamp: timestamp, requestFrame: requestFrame) }
     }
 
     /// A parse batch landed (reader thread); the first after a keystroke is
     /// taken as its echo.
     static func noteOutputForKeystroke() {
         guard isEnabled else { return }
-        lock.lock()
-        if pending != nil { pending?.outputLanded = true }
-        lock.unlock()
+        state.withLock { $0.pending?.outputLanded = true }
     }
 
     /// Before presenting: if an echo is on the grid, this drawable's presented
     /// handler closes the sample when it is actually on screen.
     static func notePresent(of drawable: MTLDrawable) {
         guard isEnabled else { return }
-        lock.lock()
-        guard let keystroke = pending, keystroke.outputLanded else {
-            lock.unlock()
-            return
+        let landed: PendingKeystroke? = state.withLock { state in
+            guard let keystroke = state.pending, keystroke.outputLanded else { return nil }
+            state.pending = nil
+            return keystroke
         }
-        pending = nil
-        lock.unlock()
+        guard let keystroke = landed else { return }
         drawable.addPresentedHandler { presented in
             // Zero when the compositor replaced this drawable (about half a burst's
             // frames); re-pend rather than drop, which would flatter the number.
@@ -168,10 +171,11 @@ nonisolated enum RenderMetrics {
             // display link parks, and without one the sample waits for the next
             // keystroke, which replaces it — under XCTest that lost five in six.
             guard presented.presentedTime > 0 else {
-                lock.lock()
-                let repended = pending == nil
-                if repended { pending = keystroke }
-                lock.unlock()
+                let repended = state.withLock { state in
+                    guard state.pending == nil else { return false }
+                    state.pending = keystroke
+                    return true
+                }
                 if repended { keystroke.requestFrame() }
                 return
             }
