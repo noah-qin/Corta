@@ -54,8 +54,9 @@ extension Performer {
         case 1004: return state.focusReportingEnabled ? 1 : 2
         case 1007: return state.alternateScrollEnabled ? 1 : 2
         case 45: return grid.reverseWraparoundEnabled ? 1 : 2
-        // Autowrap and a cursor are always present: permanently set.
-        case 7, 25: return 3
+        case 6: return grid.originMode ? 1 : 2
+        case 7: return grid.autowrapEnabled ? 1 : 2
+        case 25: return grid.isCursorVisible ? 1 : 2
         default: return 0
         }
     }

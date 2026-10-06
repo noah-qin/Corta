@@ -153,7 +153,7 @@ extension Performer {
             state.outputBuffer.append(contentsOf: Array("\u{1B}[0n".utf8))
         case 6:
             state.outputBuffer.append(
-                contentsOf: Array("\u{1B}[\(grid.cursor.row + 1);\(grid.cursor.column + 1)R".utf8)
+                contentsOf: Array("\u{1B}[\(grid.reportedCursorRow);\(grid.cursor.column + 1)R".utf8)
             )
         default:
             break
@@ -165,7 +165,7 @@ extension Performer {
         guard parameters.value(0, default: 0) == 6 else { return }
         state.outputBuffer.append(
             contentsOf: Array(
-                "\u{1B}[?\(grid.cursor.row + 1);\(grid.cursor.column + 1);1R".utf8)
+                "\u{1B}[?\(grid.reportedCursorRow);\(grid.cursor.column + 1);1R".utf8)
         )
     }
 

@@ -259,7 +259,8 @@ final class PaneFocus: NSObject {
     /// a changed style or new output restarts it visible.
     func updateCursorBlink(grid: Grid, style: CursorStyle, reset: Bool) {
         let blinking = style == .blinkingBlock || style == .blinkingBar || style == .blinkingUnderline
-        guard blinking && canBlinkCursor else {
+        // A hidden cursor (`?25l`) has nothing to blink: no 2 Hz redraws.
+        guard blinking && canBlinkCursor && grid.isCursorVisible else {
             stopCursorBlink()
             return
         }

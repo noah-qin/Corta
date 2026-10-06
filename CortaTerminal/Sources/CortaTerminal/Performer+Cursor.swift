@@ -33,7 +33,7 @@ extension Performer {
         case 0x46:  // CPL
             grid.moveToPreviousLine(parameters.value(0, default: 1))
         case 0x48, 0x66:  // CUP, HVP — one-based on the wire, zero-based here
-            grid.moveCursor(
+            grid.moveCursorAddressed(
                 row: parameters.value(0, default: 1) - 1,
                 column: parameters.value(1, default: 1) - 1
             )
@@ -45,7 +45,7 @@ extension Performer {
         case 0x61:  // HPR — relative column, same effect as CUF
             grid.moveCursorRight(parameters.value(0, default: 1))
         case 0x64:  // VPA — absolute row, column unchanged
-            grid.moveCursor(
+            grid.moveCursorAddressed(
                 row: parameters.value(0, default: 1) - 1,
                 column: grid.cursor.column
             )

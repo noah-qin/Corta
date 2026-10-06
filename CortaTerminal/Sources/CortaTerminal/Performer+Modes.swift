@@ -23,6 +23,15 @@ extension Performer {
             switch parameters[index] {
             case 1:  // DECCKM — application cursor keys
                 state.applicationCursorKeysEnabled = enabled
+            case 6:  // DECOM — origin mode
+                grid.setOriginMode(enabled)
+            case 7:  // DECAWM — autowrap
+                grid.autowrapEnabled = enabled
+                // An armed wrap is a promise to wrap; without autowrap the
+                // next character overwrites the last column instead.
+                if !enabled { grid.pendingWrap = false }
+            case 25:  // DECTCEM — cursor visible
+                grid.isCursorVisible = enabled
             case 2004:  // bracketed paste
                 state.bracketedPasteEnabled = enabled
             case 1000, 1002, 1003:

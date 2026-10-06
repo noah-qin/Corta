@@ -53,10 +53,16 @@ struct ModeQueryTests {
         #expect(response(to: "\u{1B}[?1049$p") == "\u{1B}[?1049;2$y")
     }
 
-    @Test("autowrap and cursor visibility report as permanently set")
-    func decrqmReportsPermanentModes() {
-        #expect(response(to: "\u{1B}[?7$p") == "\u{1B}[?7;3$y")
-        #expect(response(to: "\u{1B}[?25$p") == "\u{1B}[?25;3$y")
+    /// They were answered "permanently set" while `?25l` and `?7l` did
+    /// nothing; a program believed the cursor it hid was hidden.
+    @Test("origin mode, autowrap and cursor visibility report their live state")
+    func decrqmReportsCursorModes() {
+        #expect(response(to: "\u{1B}[?7$p") == "\u{1B}[?7;1$y")
+        #expect(response(to: "\u{1B}[?7l\u{1B}[?7$p") == "\u{1B}[?7;2$y")
+        #expect(response(to: "\u{1B}[?25$p") == "\u{1B}[?25;1$y")
+        #expect(response(to: "\u{1B}[?25l\u{1B}[?25$p") == "\u{1B}[?25;2$y")
+        #expect(response(to: "\u{1B}[?6$p") == "\u{1B}[?6;2$y")
+        #expect(response(to: "\u{1B}[?6h\u{1B}[?6$p") == "\u{1B}[?6;1$y")
     }
 
     @Test("an unimplemented mode is answered 0 rather than left to time out")

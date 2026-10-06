@@ -120,6 +120,20 @@ public struct Grid: Sendable {
     /// in xterm.
     public var reverseWraparoundEnabled: Bool = false
 
+    /// DECTCEM (`?25`). Terminal-wide, like the cursor style: a program hides
+    /// the cursor while it draws and shows it again on the way out, and a
+    /// screen switch in between must not undo either.
+    public var isCursorVisible: Bool = true
+
+    /// DECAWM (`?7`). Off, a character written in the last column stays
+    /// there and the next one overwrites it: nothing wraps.
+    public var autowrapEnabled: Bool = true
+
+    /// DECOM (`?6`): cursor addressing (CUP, HVP, VPA) and the position
+    /// report count from the scroll region's top, and the cursor cannot
+    /// leave the region.
+    public private(set) var originMode: Bool = false
+
     /// Deferred wrap: printing into the last column arms this; the next
     /// character wraps first. Otherwise filling the last column and moving the
     /// cursor would scroll the screen.
@@ -129,6 +143,7 @@ public struct Grid: Sendable {
     private var savedCursor: Cursor?
     private var savedPen: Pen?
     private var savedPendingWrap: Bool = false
+    private var savedOriginMode: Bool = false
 
     /// True while the alternate screen is live.
     public private(set) var isAlternateScreenActive: Bool = false
@@ -154,6 +169,7 @@ public struct Grid: Sendable {
         self.savedCursor = nil
         self.savedPen = nil
         self.savedPendingWrap = false
+        self.savedOriginMode = false
         self.isAlternateScreenActive = false
         self.suspendedMain = nil
         self.marginBottom = self.rows - 1
@@ -234,14 +250,27 @@ public struct Grid: Sendable {
                 lineFeedWithoutClearingWrap()
             }
             let available = columns - cursor.column
-            let count = min(available, bytes.distance(from: index, to: bytes.endIndex))
+            var count = min(available, bytes.distance(from: index, to: bytes.endIndex))
+            if !autowrapEnabled, count == available, available < bytes.distance(from: index, to: bytes.endIndex) {
+                // Nothing wraps: everything past the margin lands on the last
+                // column in turn, so the run's last byte is what stays there.
+                count -= 1
+                if count > 0 {
+                    if insertMode { insertBlankCells(count, row: cursor.row, column: cursor.column) }
+                    lines[cursor.row].overwriteASCII(
+                        bytes[index..<bytes.index(index, offsetBy: count)], at: cursor.column, pen: pen)
+                }
+                cursor.column = columns - 1
+                writeNarrow(UInt32(bytes[bytes.index(before: bytes.endIndex)]))
+                return
+            }
             let end = bytes.index(index, offsetBy: count)
             // Insert mode shifts once per chunk, not per character.
             if insertMode { insertBlankCells(count, row: cursor.row, column: cursor.column) }
             lines[cursor.row].overwriteASCII(bytes[index..<end], at: cursor.column, pen: pen)
             if cursor.column + count >= columns {
                 cursor.column = columns - 1
-                pendingWrap = true
+                pendingWrap = autowrapEnabled
             } else {
                 cursor.column += count
                 pendingWrap = false
@@ -266,7 +295,7 @@ public struct Grid: Sendable {
         blankWidePairHalves(row: cursor.row, column: cursor.column)
         lines[cursor.row][cursor.column] = pen.cell(scalar)
         if cursor.column + 1 >= columns {
-            pendingWrap = true
+            pendingWrap = autowrapEnabled
         } else {
             cursor.column += 1
             pendingWrap = false
@@ -275,6 +304,9 @@ public struct Grid: Sendable {
 
     /// Width 2: a `.wide` lead plus a blank `.wideSpacer`.
     private mutating func writeWide(_ scalar: UInt32) {
+        // Without autowrap a pair cannot move to the next row, and half of
+        // one is not a character: it is not written.
+        if !autowrapEnabled, cursor.column == columns - 1 { return }
         if !pendingWrap, cursor.column == columns - 1 {
             // A pair may not straddle the margin: blank the last column and wrap
             // (as xterm does).
@@ -302,7 +334,7 @@ public struct Grid: Sendable {
             // The pair ended in the last column: the cursor rests on the
             // spacer with the wrap armed, exactly as a narrow write does.
             cursor.column = columns - 1
-            pendingWrap = true
+            pendingWrap = autowrapEnabled
         } else {
             cursor.column += 2
             pendingWrap = false
@@ -331,6 +363,8 @@ public struct Grid: Sendable {
         else { return }
         lead.attributes.insert(.wide)
         if target.column == columns - 1 {
+            // Moving the pair to the next row is a wrap.
+            guard autowrapEnabled else { return }
             lines[target.row][target.column] = pen.eraseCell
             cursor.row = target.row
             cursor.column = target.column
@@ -351,7 +385,7 @@ public struct Grid: Sendable {
         if cursor.row == target.row {
             if target.column + 2 >= columns {
                 cursor.column = columns - 1
-                pendingWrap = true
+                pendingWrap = autowrapEnabled
             } else {
                 cursor.column = target.column + 2
             }
@@ -522,12 +556,39 @@ public struct Grid: Sendable {
         moveCursor(row: cursor.row, column: cursor.column + max(0, count))
     }
 
+    /// CNL: CUD's movement, scroll region included, then column 0.
     public mutating func moveToNextLine(_ count: Int = 1) {
-        moveCursor(row: cursor.row + max(1, count), column: 0)
+        moveCursorDown(max(1, count))
+        carriageReturn()
     }
 
+    /// CPL: CUU's movement, scroll region included, then column 0.
     public mutating func moveToPreviousLine(_ count: Int = 1) {
-        moveCursor(row: cursor.row - max(1, count), column: 0)
+        moveCursorUp(max(1, count))
+        carriageReturn()
+    }
+
+    /// CUP, HVP and VPA: zero-based, and under DECOM relative to the scroll
+    /// region and confined to it. `moveCursor` is the screen-absolute move
+    /// everything else (DECRC, reflow, images) means.
+    public mutating func moveCursorAddressed(row: Int, column: Int) {
+        guard originMode else {
+            moveCursor(row: row, column: column)
+            return
+        }
+        moveCursor(row: min(marginTop + max(0, row), marginBottom), column: column)
+    }
+
+    /// DECOM set or reset; either homes the cursor to the new origin.
+    public mutating func setOriginMode(_ enabled: Bool) {
+        originMode = enabled
+        moveCursorAddressed(row: 0, column: 0)
+    }
+
+    /// The row a position report (CPR, DECXCPR) gives, one-based: counted
+    /// from the region's top under DECOM, as the program addresses it.
+    public var reportedCursorRow: Int {
+        cursor.row - (originMode ? marginTop : 0) + 1
     }
 
     public mutating func carriageReturn() {
@@ -613,6 +674,11 @@ public struct Grid: Sendable {
         savedPendingWrap = false
         cursorStyle = .blinkingBlock
         cursorStyleIsExplicit = false
+        // VT510's DECSTR table: cursor shown, absolute addressing, replace.
+        isCursorVisible = true
+        originMode = false
+        savedOriginMode = false
+        insertMode = false
     }
 
     /// DECALN: `E` everywhere, margins reset, cursor home, in the default pen.
@@ -891,7 +957,8 @@ public struct Grid: Sendable {
         guard top < bottom else { return }
         marginTop = top
         marginBottom = bottom
-        moveCursor(row: 0, column: 0)
+        // Home is the region's top under DECOM.
+        moveCursorAddressed(row: 0, column: 0)
     }
 
     // MARK: - Scrolling
@@ -1003,16 +1070,18 @@ public struct Grid: Sendable {
 
     // MARK: - Save and restore
 
-    /// DECSC: cursor, pen, pending wrap. No DECOM or character sets.
+    /// DECSC: cursor, pen, pending wrap and DECOM. No character sets.
     public mutating func saveCursor() {
         savedCursor = cursor
         savedPen = pen
         savedPendingWrap = pendingWrap
+        savedOriginMode = originMode
     }
 
     /// DECRC; with nothing saved, home and the default rendition.
     public mutating func restoreCursor() {
         guard let savedCursor, let savedPen else {
+            originMode = false
             moveCursor(row: 0, column: 0)
             pen.reset()
             return
@@ -1020,6 +1089,7 @@ public struct Grid: Sendable {
         moveCursor(row: savedCursor.row, column: savedCursor.column)
         pen = savedPen
         pendingWrap = savedPendingWrap
+        originMode = savedOriginMode
     }
 
     // MARK: - Alternate screen
@@ -1058,6 +1128,8 @@ public struct Grid: Sendable {
         // Terminal-wide, not per screen: `self = main` would restore the old
         // value.
         main.reverseWraparoundEnabled = reverseWraparoundEnabled
+        main.isCursorVisible = isCursorVisible
+        main.autowrapEnabled = autowrapEnabled
         if main.rows != rows || main.columns != columns {
             main.resize(rows: rows, columns: columns)
         }

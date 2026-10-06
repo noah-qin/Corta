@@ -592,7 +592,9 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         focus.updateCursorBlink(grid: grid, style: cursorStyle, reset: hasOutput)
         return PaneFrameLoop.Content(
             grid: grid, scrollOffset: scrollOffset,
-            cursorVisible: scrollOffset == 0 && isFocusedPane && focus.cursorBlinkVisible,
+            // `?25l`: a program drawing its own screen hid the cursor.
+            cursorVisible: scrollOffset == 0 && isFocusedPane && grid.isCursorVisible
+                && focus.cursorBlinkVisible,
             selection: selection,
             searchMatches: search.matches.map { TerminalSelection($0, grid: grid) },
             currentSearchMatchIndex: search.currentMatchIndex, hoveredLink: pointer.hoveredLink,
