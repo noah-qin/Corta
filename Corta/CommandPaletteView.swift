@@ -36,8 +36,18 @@ struct CommandPaletteView: View {
 
     @Bindable var model: CommandPaletteModel
     @FocusState private var searchFocused: Bool
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.colorSchemeContrast) private var contrast
+    /// Nil: the system's settings (`GlassAccessibility`).
+    var accessibilityOverride: GlassAccessibility?
+    @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
+    @Environment(\.colorSchemeContrast) private var systemContrast
+
+    private var reduceTransparency: Bool {
+        accessibilityOverride?.reduceTransparency ?? systemReduceTransparency
+    }
+
+    private var increasedContrast: Bool {
+        accessibilityOverride?.increaseContrast ?? (systemContrast == .increased)
+    }
 
     /// The window-corner radius (as `TerminalView`), not a pill: a panel
     /// reads as a window.
@@ -46,14 +56,14 @@ struct CommandPaletteView: View {
     var body: some View {
         GlassEffectContainer {
             content
-                .glassEffect(
-                    reduceTransparency
-                        ? .regular.tint(Color(nsColor: .windowBackgroundColor)) : .regular,
-                    in: Self.shape)
+                .cortaGlass(in: Self.shape, opaque: reduceTransparency)
                 .overlay {
-                    if contrast == .increased || reduceTransparency {
-                        let border = SystemAccessibility.panelBorder
-                        Self.shape.strokeBorder(Color(nsColor: border.color), lineWidth: border.width)
+                    // An opaque panel has no material edge: the same line as
+                    // `SystemAccessibility.panelBorder`, from these flags.
+                    if increasedContrast || reduceTransparency {
+                        Self.shape.strokeBorder(
+                            Color(nsColor: increasedContrast ? .labelColor : .separatorColor),
+                            lineWidth: 1)
                     }
                 }
         }

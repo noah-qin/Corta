@@ -270,6 +270,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         if !restoreWindowsIfConfigured() { openWindow(workingDirectory: nil) }
         #if DEBUG
         if CommandLine.arguments.contains("--sftp-preview") { SFTPBrowserController.showDevelopmentPreview() }
+        if CommandLine.arguments.contains("--glass-preview") { GlassAppearancePreview.show() }
         #endif
         // A notification click jumps back to its command
         // (`AppDelegate+Notifications.swift`).
