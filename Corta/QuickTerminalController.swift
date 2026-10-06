@@ -19,14 +19,13 @@ import AppKit
 /// The Quick Terminal: one window summoned and dismissed by a system-wide
 /// hotkey.
 ///
-/// **An ordinary window, dressed differently.** It is the storyboard's
-/// `TerminalWindowController` — same panes, sizing gate (D15) and teardown
-/// as ⌘N — configured afterwards: no titlebar, floating, on every Space,
-/// and outside tabbing, the Window menu and the saved arrangement. A second
-/// window class would duplicate `viewWillAppear`'s rules. Only the window
-/// object differs: a non-activating `NSPanel`, since an inactive app's
-/// window never reaches a full-screen Space
-/// (`TerminalWindowController.adoptNonactivatingPanel`).
+/// **An ordinary window, dressed differently.** It is a
+/// `TerminalWindowController` — same panes, sizing and teardown as ⌘N —
+/// configured afterwards: no titlebar, floating, on every Space, and outside
+/// tabbing, the Window menu and the saved arrangement. A second window class
+/// would duplicate `prepareWindow`'s rules. Only the window object differs:
+/// a non-activating `NSPanel`, since an inactive app's window never reaches
+/// a full-screen Space (`TerminalWindowController.init(setup:asPanel:)`).
 ///
 /// **Focus goes back where it came from.** Dismissing by hotkey
 /// re-activates the app that was frontmost at summon; losing activation
@@ -224,19 +223,16 @@ final class QuickTerminalController {
     // MARK: - The window
 
     private func makeWindow(frame: NSRect) -> TerminalWindowController? {
-        // Born at its frame via the restore path, so the session's first
-        // winsize is one it keeps (D15).
+        // Placed through the restore path: its frame is set before it shows.
         let state = WindowState(
             frame: WindowState.Frame(frame), layout: .pane(directory: nil, isFocused: true))
-        guard let delegate = NSApp.delegate as? AppDelegate,
-            let controller = delegate.instantiateWindowController(
-                setup: SplitViewController.Setup(restore: state), asPanel: true)
-                as? TerminalWindowController,
-            let window = controller.window
-        else { return nil }
+        guard let delegate = NSApp.delegate as? AppDelegate else { return nil }
+        let controller = delegate.makeWindowController(
+            setup: SplitViewController.Setup(restore: state), asPanel: true)
+        guard let window = controller.window else { return nil }
         controller.isQuickTerminal = true
         controller.showWindow(nil)
-        // After `viewWillAppear` set `.automatic`: ⌘T from here opens a normal
+        // After `prepareWindow` set `.automatic`: ⌘T from here opens a normal
         // window (`AppDelegate.newTab`).
         window.tabbingMode = .disallowed
         window.level = .floating

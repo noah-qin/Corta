@@ -209,30 +209,58 @@ test stayed green.
 
 ## D15 — Never size the session from a transient layout
 
-**Decision.** `resizeSessionToFitView` waits for
+**Status: superseded 2026-10-06** (#123). The window is now created in code
+with its final style mask, so there is no transient layout to wait out; the
+rule that remains is in *What replaced D15 and D16* below.
+
+**Decision (as was).** `resizeSessionToFitView` waited for
 `SplitViewController.sizeSettled` — the content view filling its window's
-frame *and* the one-time frame correction having run. On macOS 26,
-inserting `.fullSizeContentView` mid-flight changes what `setContentSize`
-means, and the first call mismeasures the chrome by a titlebar height;
-`correctInitialWindowSize` runs once in `viewDidAppear`, after AppKit's
+frame *and* a one-time frame correction having run. On macOS 26,
+inserting `.fullSizeContentView` mid-flight changed what `setContentSize`
+meant, and the first call mismeasured the chrome by a titlebar height;
+`correctInitialWindowSize` ran once in `viewDidAppear`, after AppKit's
 final adjustment.
 
-**Why.** Delivering the transient winsize shrinks the grid and strands
-content in the child (D.1 in the 0.1 roadmap).
+**Why it held.** Delivering the transient winsize shrinks the grid and
+strands content in the child (D.1 in the 0.1 roadmap).
 
-**Consequence.** Do not bypass the gate, and do not "fix" the size earlier
-in `viewWillAppear` or `viewWillLayout`, where the measurement is stale.
+**Why it went.** Every transient came from one act: the storyboard built a
+window without `.fullSizeContentView`, and `viewWillAppear` inserted it.
+`frameBeforeStyleChange`, `layoutSettled`, `didCorrectWindowSize`,
+`correctInitialWindowSize` and the tab-shrink repair in `viewWillAppear`
+all followed from that insert. A window born with the flag has one chrome
+measurement from the start, and the gate had nothing left to guard.
 
 ## D16 — Window setup is staged before the storyboard runs
 
-**Decision.** Anything the root pane needs at spawn time — a restored
-layout, a preset, an intent's working directory — is placed in
-`SplitViewController.pendingSetup` before `instantiateInitialController`,
-which loads the content view and spawns the pane before returning.
+**Status: superseded 2026-10-06** (#123). There is no storyboard window to
+stage for.
 
-**Why.** A value assigned to the controller afterwards reached only the
-splits. The first pane of every restored window came up in the home
+**Decision (as was).** Anything the root pane needs at spawn time — a
+restored layout, a preset, an intent's working directory — was placed in
+`SplitViewController.pendingSetup` before `instantiateInitialController`,
+which loaded the content view and spawned the pane before returning.
+
+**Why it held.** A value assigned to the controller afterwards reached only
+the splits. The first pane of every restored window came up in the home
 directory under the default shell until B16 found it.
+
+**Why it went.** `TerminalWindowController(setup:)` builds the window and
+hands the setup to `SplitViewController(setup:)` by initializer, so the
+value is in the controller before its view can load; a static that every
+window passed through is no longer needed.
+
+### What replaced D15 and D16
+
+A terminal window is created by `TerminalWindowController(setup:asPanel:)`
+with its final style mask (`.fullSizeContentView` included) and its root
+pane's setup as an initializer argument. `SplitViewController.prepareWindow`
+dresses and sizes it from the root pane's cell metrics *before it is
+shown*, and only then sets the pane's `didSizeWindow`: a layout at the
+placeholder size before that never reaches the child, and none after it is
+transient. The session is born at the grid it keeps — a new window's child
+receives exactly one winsize. Size a window in `prepareWindow`, not later,
+and never deliver a winsize before `didSizeWindow`.
 
 ## D17 — The frame-CPU baseline is re-measured, under Release, after touching the render loop
 

@@ -47,11 +47,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// `workingDirectory` is a spawn cwd, never written to the child's stdin.
     @discardableResult
     func openWindow(workingDirectory: String?) -> TerminalWindowController? {
-        guard
-            let controller = instantiateWindowController(
-                setup: SplitViewController.Setup(workingDirectory: workingDirectory))
-                as? TerminalWindowController
-        else { return nil }
+        let controller = makeWindowController(
+            setup: SplitViewController.Setup(workingDirectory: workingDirectory))
         // Cascade from the opening window, or ⌘N looks like it did nothing —
         // except from the Quick Terminal's screen-edge band.
         if let previous = NSApp.keyWindow, let window = controller.window,
@@ -84,8 +81,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// group, so it can be dragged out again.
     @objc func newTab(_ sender: Any?) {
         let existing = NSApp.keyWindow
-        guard let controller = instantiateWindowController(),
-            let window = controller.window else { return }
+        let controller = makeWindowController()
+        guard let window = controller.window else { return }
         window.tabbingMode = .automatic
         if let keyWindow = existing, keyWindow !== window,
             !QuickTerminalController.shared.owns(keyWindow),
@@ -122,19 +119,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         newTab(sender)
     }
 
-    /// One tracked storyboard window controller. `setup` reaches the root
-    /// pane before it spawns (D16, `SplitViewController.pendingSetup`).
-    /// `asPanel` swaps in a non-activating panel for the Quick Terminal
-    /// (`TerminalWindowController.adoptNonactivatingPanel`).
-    func instantiateWindowController(
-        setup: SplitViewController.Setup? = nil, asPanel: Bool = false
-    ) -> NSWindowController? {
-        SplitViewController.pendingSetup = setup
-        defer { SplitViewController.pendingSetup = nil }
-        guard let controller = NSStoryboard(name: "Main", bundle: nil)
-            .instantiateInitialController() as? NSWindowController
-        else { return nil }
-        if asPanel { (controller as? TerminalWindowController)?.adoptNonactivatingPanel() }
+    /// One tracked terminal window controller, its root pane spawned from
+    /// `setup` and its window sized, not yet shown. `asPanel` makes it the
+    /// Quick Terminal's non-activating panel.
+    func makeWindowController(
+        setup: SplitViewController.Setup = .init(), asPanel: Bool = false
+    ) -> TerminalWindowController {
+        let controller = TerminalWindowController(setup: setup, asPanel: asPanel)
         track(controller)
         return controller
     }
@@ -254,13 +245,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
-        // Track the storyboard's first window like any ⌘N window.
-        for window in NSApp.windows {
-            if let controller = window.windowController {
-                track(controller)
-            }
-        }
-        restoreWindowsIfConfigured()
+        // The saved arrangement, or one window; restored windows are born in
+        // their saved directories, so no first window is opened to replace.
+        if !restoreWindowsIfConfigured() { openWindow(workingDirectory: nil) }
         #if DEBUG
         if CommandLine.arguments.contains("--sftp-preview") { SFTPBrowserController.showDevelopmentPreview() }
         #endif
@@ -290,9 +277,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return ConfigurationStore.shared.configuration.restoreWindows
     }
 
-    /// Reopens last run's windows and splits.
-    private func restoreWindowsIfConfigured() {
-        guard Self.isRestoreEnabled else { return }
+    /// Reopens last run's windows and splits; false when nothing was.
+    private func restoreWindowsIfConfigured() -> Bool {
+        guard Self.isRestoreEnabled else { return false }
         let states: [WindowState]
         switch SessionRestore.standard.decideRestore() {
         case .skipAfterFailure:
@@ -300,9 +287,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             // is the suspect, so drop it.
             SessionRestore.standard.clear()
             SessionRestore.standard.endRestore()
-            return
+            return false
         case .nothingToRestore:
-            return
+            return false
         case .restore(let saved):
             states = saved
         }
@@ -311,31 +298,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // crash still has a last-known-good layout.
         defer { SessionRestore.standard.endRestore() }
 
-        // The storyboard's window already spawned its shell in the home
-        // directory, which a restore can't move. Every saved state gets a fresh
-        // window with `pendingRestore` staged before its view loads, and the
-        // pre-opened one closes once a replacement is up.
-        let preopened = windowControllers.first
         var restored: [(state: WindowState, controller: NSWindowController)] = []
         for state in states {
-            // Staged before the view loads (D16).
-            guard
-                let controller = instantiateWindowController(
-                    setup: SplitViewController.Setup(restore: state))
-            else { continue }
+            let controller = makeWindowController(setup: SplitViewController.Setup(restore: state))
             // Keep the saved identity for intents resolved last run.
-            if let id = state.id, let terminal = controller as? TerminalWindowController {
-                terminal.windowID = id
-            }
+            if let id = state.id { controller.windowID = id }
             controller.showWindow(nil)
             controller.window?.makeKeyAndOrderFront(nil)
             restored.append((state, controller))
         }
-        // Only if replaced; never leave the app with no window.
-        if !restored.isEmpty, let preopened, preopened.window?.isVisible == true {
-            preopened.window?.close()
-        }
         regroupRestoredTabs(restored)
+        return !restored.isEmpty
     }
 
     /// Regroups restored windows by `tabGroupID`, in saved order, reselecting

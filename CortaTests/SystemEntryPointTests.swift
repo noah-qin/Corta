@@ -376,8 +376,8 @@ struct WindowIdentityStateTests {
 
 /// The intents are exercised against programmatic window controllers — an
 /// `NSWindow` with a plain view controller, tracked by the delegate exactly
-/// as a storyboard window is — rather than by opening real terminal
-/// windows. A storyboard window brings a Metal layer, a first present and a
+/// as a terminal window is — rather than by opening real terminal
+/// windows. A terminal window brings a Metal layer, a first present and a
 /// spawned shell with it, and on the hosted CI runner that held the main
 /// thread for long enough to time out every other main-actor suite in the
 /// run (the same starvation PR #76 closed for the teardown tests). What
@@ -465,20 +465,17 @@ struct AppIntentTests {
     }
 }
 
-/// The storyboard loads the window's content view — and with it spawns the
-/// root pane's shell — *inside* `instantiateInitialController`. A restore or
-/// a preset assigned to the controller afterwards therefore never reached
-/// the root pane; only the splits (rebuilt in `viewWillAppear`) got their
-/// directories. `SplitViewController.pendingSetup` stages the values first,
-/// and `viewDidLoad` is what consumes them — so the consumption is tested
-/// here on a bare `SplitViewController`, the way `PaneTeardownTests` build
-/// panes: loading its view spawns a real shell but opens no window and
-/// touches no Metal layer.
+/// The root pane spawns as the window's content view loads, so a restore,
+/// a preset or an intent's directory has to be in the controller before
+/// that: `SplitViewController(setup:)` takes it by initializer, and
+/// `viewDidLoad` is what consumes it — so the consumption is tested here on a
+/// bare `SplitViewController`, the way `PaneTeardownTests` build panes:
+/// loading its view spawns a real shell but opens no window and touches no
+/// Metal layer.
 @MainActor
 struct WindowSetupStagingTests {
     private func makeSplit(_ setup: SplitViewController.Setup) -> SplitViewController {
-        SplitViewController.pendingSetup = setup
-        let split = SplitViewController()
+        let split = SplitViewController(setup: setup)
         _ = split.view
         return split
     }
@@ -523,11 +520,10 @@ struct WindowSetupStagingTests {
         #expect(restored.panes.first?.inheritedWorkingDirectory == "/")
     }
 
-    @Test("the staging is consumed: the next plain window gets nothing left over")
-    func stagingIsConsumed() throws {
+    @Test("a setup belongs to its window: the next plain window gets nothing left over")
+    func setupIsPerWindow() throws {
         let first = makeSplit(SplitViewController.Setup(workingDirectory: NSTemporaryDirectory()))
         defer { first.teardown() }
-        #expect(SplitViewController.pendingSetup == nil)
         let second = SplitViewController()
         _ = second.view
         defer { second.teardown() }

@@ -92,6 +92,9 @@ what to edit.
   something running, quitting, clearing history or resetting, and pasting
   text with newlines — appear as a sheet on that window instead of a dialog
   that blocks the whole app.
+- The first terminal window opens centred on the screen. Restoring the
+  previous arrangement opens only the saved windows, instead of first
+  starting a shell in a home-directory window and closing it.
 
 ### Fixed
 

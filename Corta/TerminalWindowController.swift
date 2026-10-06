@@ -16,10 +16,53 @@
 
 import Cocoa
 
-/// The window controller behind every terminal window, chiefly for
-/// `windowShouldClose`: the red button and ⌘W end at the window's delegate,
-/// and this is where the "still running" confirmation lives.
+/// The window controller behind every terminal window: it builds the window
+/// with its final style mask and its content, and is its delegate —
+/// `windowShouldClose` is where the "still running" confirmation lives.
 final class TerminalWindowController: NSWindowController, NSWindowDelegate {
+    /// The mask every terminal window has from creation. Content runs under
+    /// the titlebar; the grid's top inset follows the chrome
+    /// (`ViewController.windowChrome`).
+    static let styleMask: NSWindow.StyleMask = [
+        .titled, .closable, .miniaturizable, .resizable, .fullSizeContentView,
+    ]
+
+    /// A window whose root pane spawns from `setup`, dressed and sized for
+    /// its first grid before anything shows it. Unpositioned windows are
+    /// centred; the caller cascades or places them after.
+    ///
+    /// `asPanel` makes the window a non-activating `NSPanel`, for the Quick
+    /// Terminal: an inactive app's window never reaches a full-screen Space,
+    /// whatever its collection behaviour, and `NSApp.activate()` is refused
+    /// or drags the user out of the Space. Measured on macOS 27 over
+    /// full-screen TextEdit: `kCGWindowIsOnscreen` stayed false for every
+    /// `NSWindow` variant and became true for a `.nonactivatingPanel`.
+    convenience init(setup: SplitViewController.Setup = .init(), asPanel: Bool = false) {
+        let placeholder = NSRect(x: 0, y: 0, width: 480, height: 270)
+        let window: NSWindow
+        if asPanel {
+            let panel = NSPanel(
+                contentRect: placeholder, styleMask: Self.styleMask.union(.nonactivatingPanel),
+                backing: .buffered, defer: false)
+            // `QuickTerminalController` owns dismissal and focus return.
+            panel.hidesOnDeactivate = false
+            window = panel
+        } else {
+            window = NSWindow(
+                contentRect: placeholder, styleMask: Self.styleMask, backing: .buffered, defer: false)
+        }
+        window.isReleasedWhenClosed = false
+        self.init(window: window)
+        window.delegate = self
+        installSecureInputIndicator()
+        installTabInteractions()
+        // Loads the view, which spawns the root pane from `setup`.
+        let split = SplitViewController(setup: setup)
+        window.contentViewController = split
+        split.prepareWindow(window)
+        if setup.restore == nil { window.center() }
+    }
+
     private var splitController: SplitViewController? {
         contentViewController as? SplitViewController
     }
@@ -96,12 +139,6 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         if let tabEventMonitor { NSEvent.removeMonitor(tabEventMonitor) }
     }
 
-    override func windowDidLoad() {
-        super.windowDidLoad()
-        installSecureInputIndicator()
-        installTabInteractions()
-    }
-
     /// A local monitor sees clicks before AppKit's native tab cell starts its
     /// tracking loop. Public accessibility frames identify the tab; no private
     /// classes, selectors or replacement tab bar are required.
@@ -165,41 +202,8 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         return nil
     }
 
-    /// Swaps the storyboard's `NSWindow` for a non-activating `NSPanel` with
-    /// the same content, before it is shown.
-    ///
-    /// An inactive app's window never reaches a full-screen Space, whatever
-    /// its collection behaviour, and `NSApp.activate()` is refused or drags
-    /// the user out of the Space. Measured on macOS 27 over full-screen
-    /// TextEdit: `kCGWindowIsOnscreen` stayed false for every `NSWindow`
-    /// variant and became true for a `.nonactivatingPanel`.
-    ///
-    /// Done here because this controller knows what `windowDidLoad` put on the
-    /// old window (the lock); `viewWillAppear` then runs against the panel as
-    /// usual.
-    func adoptNonactivatingPanel() {
-        guard let old = window, !(old is NSPanel) else { return }
-        let panel = NSPanel(
-            contentRect: old.contentRect(forFrameRect: old.frame),
-            styleMask: old.styleMask.union(.nonactivatingPanel),
-            backing: .buffered, defer: false)
-        panel.isReleasedWhenClosed = false
-        // `QuickTerminalController` owns dismissal and focus return.
-        panel.hidesOnDeactivate = false
-        panel.title = old.title
-        let content = old.contentViewController
-        old.delegate = nil
-        old.contentViewController = nil
-        panel.contentViewController = content
-        panel.delegate = self
-        window = panel
-        installSecureInputIndicator()
-    }
-
     private func installSecureInputIndicator() {
-        guard let window else { return }
-        // Once per window owned: drop the previous window's observer.
-        if let secureInputObserver { NotificationCenter.default.removeObserver(secureInputObserver) }
+        guard let window, secureInputObserver == nil else { return }
         let image = NSButton(image: NSImage(systemSymbolName: "lock.fill", accessibilityDescription: nil)
             ?? NSImage(), target: self, action: #selector(showSecureInputSettings(_:)))
         image.isBordered = false

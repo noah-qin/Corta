@@ -33,20 +33,11 @@ final class SplitViewController: NSViewController {
     /// through one place; `SplitViewController+Restore` sets it to rebuild a
     /// saved layout through the same split path as ⌘D.
     var focusedPane: ViewController?
-    /// Window setup ran (`viewWillAppear`); later split panes take
-    /// `didSizeWindow` from this.
-    private var didSetUpWindow = false
-    /// True once the content view fills its window's frame — the
-    /// transient-layout gate (D15). Checked here because a pane in a split
-    /// legitimately doesn't fill the window. Set in `viewWillLayout` so panes
-    /// see it in the pass that settles.
-    private(set) var layoutSettled = false
-    /// The one-time frame correction ran, or the window is a tab and takes the
-    /// group's frame.
-    private var didCorrectWindowSize = false
-    /// Both startup gates: laid out at full height, frame corrected to fit the
-    /// initial grid.
-    var sizeSettled: Bool { layoutSettled && didCorrectWindowSize }
+    /// The window is dressed and sized (`prepareWindow`); later split panes
+    /// take `didSizeWindow` from this.
+    private(set) var didSetUpWindow = false
+    /// The splits were rebuilt and first responder taken (`viewWillAppear`).
+    private var didAppear = false
     /// The chrome height at the last layout, for absorbing tab-bar changes
     /// into the frame.
     private var lastChromeHeight: CGFloat?
@@ -55,13 +46,8 @@ final class SplitViewController: NSViewController {
     var panes: [ViewController] { children.compactMap { $0 as? ViewController } }
     var hasMultiplePanes: Bool { tree?.leafCount ?? 1 > 1 }
 
-    /// What the next storyboard-instantiated window's root pane spawns as.
-    ///
-    /// **Set before `instantiateInitialController`, not after (D16).** The
-    /// storyboard loads the content view — and the root pane spawns its shell
-    /// — inside that call, so a value assigned to the controller afterwards
-    /// never reaches the root pane. `AppDelegate.instantiateWindowController(setup:)`
-    /// stages it here and `viewDidLoad` takes it.
+    /// What the window's root pane spawns as: given at construction, since
+    /// the root pane spawns as the view loads.
     struct Setup {
         var restore: WindowState?
         var preset: Preset?
@@ -69,24 +55,34 @@ final class SplitViewController: NSViewController {
         /// `preset` names one.
         var workingDirectory: String?
     }
-    static var pendingSetup: Setup?
+    private let setup: Setup
 
     /// The layout being restored: taken in `viewDidLoad` (the root pane needs
-    /// its directory at spawn), consumed in `viewWillAppear` (the splits need
-    /// the final frame).
+    /// its directory at spawn), its frame in `prepareWindow`, its splits in
+    /// `viewWillAppear` (they need the final frame).
     var pendingRestore: WindowState?
 
     /// The preset the first pane spawned from.
     var pendingPreset: Preset?
 
+    init(setup: Setup = Setup()) {
+        self.setup = setup
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    override func loadView() {
+        view = WindowContentView(frame: NSRect(x: 0, y: 0, width: 480, height: 270))
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        let setup = Self.pendingSetup
-        Self.pendingSetup = nil
-        // Staged values win; a value set on a hand-built controller before its
-        // view loads (tests do this) is kept.
-        if let restore = setup?.restore { pendingRestore = restore }
-        if let preset = setup?.preset { pendingPreset = preset }
+        // A value set on a hand-built controller before its view loads (tests
+        // do this) is kept unless the setup names one.
+        if let restore = setup.restore { pendingRestore = restore }
+        if let preset = setup.preset { pendingPreset = preset }
         // Resolved by name against the current config, so a restored window gets
         // its preset's shell and environment back; a preset renamed since degrades
         // to directory-only.
@@ -94,7 +90,7 @@ final class SplitViewController: NSViewController {
             ConfigurationStore.shared.configuration.presets.first { $0.name == name }
         }
         let pane = makePane(
-            workingDirectory: pendingRestore?.layout.firstDirectory ?? setup?.workingDirectory,
+            workingDirectory: pendingRestore?.layout.firstDirectory ?? setup.workingDirectory,
             initialGridSize: nil, preset: pendingPreset ?? restoredPreset)
         focusedPane = pane
         tree = SplitTree(root: pane.view)
@@ -102,49 +98,60 @@ final class SplitViewController: NSViewController {
         installRoot()
     }
 
-    override func viewWillAppear() {
-        super.viewWillAppear()
-        guard !didSetUpWindow, let window = view.window, let pane = focusedPane else { return }
+    /// Dresses and sizes the window before it is first shown. Called by
+    /// `TerminalWindowController` once the content view — and with it the
+    /// root pane and its renderer — exists, so the frame is measured from the
+    /// pane's real cell metrics and the session is born at the size it keeps.
+    ///
+    /// The style mask is final from the window's creation, so the chrome
+    /// measured here is the chrome the window shows: no layout before or
+    /// after this runs at a transient size (what D15 used to gate).
+    func prepareWindow(_ window: NSWindow) {
+        guard !didSetUpWindow, let pane = focusedPane else { return }
         didSetUpWindow = true
-        pane.didSizeWindow = true
-        // A pane that failed to build (`PaneFailureView`) has no atlas to
-        // measure; keep the storyboard's size.
-        guard let metrics = pane.terminalRenderer?.pointMetrics else {
-            didSetUpWindow = false
-            return
-        }
         window.title = "Corta"
         installToolbar(on: window)
         window.tabbingMode = .automatic
         // Chrome follows the system appearance; the terminal surface stays dark.
         window.appearance = nil
-        // Content runs under the titlebar (`.fullSizeContentView`); the grid's
-        // top inset is measured at runtime (`windowChrome`). Set here, not in
-        // `viewDidAppear`: the style mask must be final before the first layout
-        // (D15). Inserting the flag loses a chrome height from the frame, so the
-        // frame is captured to restore below.
-        let frameBeforeStyleChange = window.frame
-        window.styleMask.insert(.fullSizeContentView)
         // Its content is a live process, not a document. Left restorable, AppKit
         // re-applied a stale saved frame after the sizing below.
         window.isRestorable = false
         // AppKit may expose areas outside the drawable after appearance/tab
         // transitions. Back them with the same opaque canvas as the terminal.
         (window.windowController as? TerminalWindowController)?.applyCanvasAppearance()
-        window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
-        updateWindowMinSize()
-        // With `.fullSizeContentView`, `setContentSize` sizes the frame and
-        // mismeasures the chrome by a titlebar on the first call; the size is
-        // corrected once in `viewDidAppear`, and `sizeSettled` holds back every
-        // winsize until then. A window joining a tab group takes the group's
-        // frame; sizing it would move the whole window.
-        if window.tabbedWindows == nil {
-            window.setContentSize(pane.initialWindowContentSize)
-        } else if window.frame != frameBeforeStyleChange {
-            // Undo the chrome height the style-mask insert took. A tab keeps the
-            // group's frame, so without this every ⌘T shrank the shared window.
-            window.setFrame(frameBeforeStyleChange, display: false)
+        // A pane that failed to build (`PaneFailureView`) has no atlas; it is
+        // sized from estimated metrics and resizes freely.
+        if let metrics = pane.terminalRenderer?.pointMetrics {
+            window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
         }
+        updateWindowMinSize()
+        if let restore = pendingRestore {
+            (window.windowController as? TerminalWindowController)?.customTabTitle = restore.customTabTitle
+            // The saved frame is authoritative; clamped to a display that
+            // exists now — see `Frame.onScreen`.
+            window.setFrame(restore.frame.onScreen(), display: false)
+        } else {
+            // The frame for the initial grid: cells, insets, the chrome the
+            // toolbar just set, and the status bar. The top edge stays put.
+            var size = pane.initialWindowContentSize
+            size.height += statusBarHeight
+            let frame = window.frame
+            window.setFrame(
+                NSRect(x: frame.minX, y: frame.maxY - size.height, width: size.width, height: size.height),
+                display: false)
+        }
+        pane.didSizeWindow = true
+        view.layoutSubtreeIfNeeded()
+    }
+
+    override func viewWillAppear() {
+        super.viewWillAppear()
+        guard !didAppear, let window = view.window, let pane = focusedPane else { return }
+        didAppear = true
+        // A window not built by `TerminalWindowController` (tests) is prepared
+        // here instead.
+        prepareWindow(window)
         // Nothing else claims first responder; without it keyDown never fires
         // and First Responder menu actions (⌘V, ⌘=, ⌘D) dead-end.
         window.makeFirstResponder(pane.terminalView)
@@ -155,36 +162,9 @@ final class SplitViewController: NSViewController {
 
         // The splits go last: they halve the window's final frame.
         if let restore = pendingRestore {
-            (window.windowController as? TerminalWindowController)?.customTabTitle = restore.customTabTitle
             pendingRestore = nil
-            // The saved frame is authoritative; skip the default-grid correction.
-            didCorrectWindowSize = true
-            // Clamped to a display that exists now — see `Frame.onScreen`.
-            if window.tabbedWindows == nil {
-                window.setFrame(restore.frame.onScreen(), display: false)
-            }
             view.layoutSubtreeIfNeeded()
             self.restore(layout: restore.layout)
-        }
-    }
-
-    override func viewDidAppear() {
-        super.viewDidAppear()
-        // AppKit's final `.fullSizeContentView` frame adjustment lands after
-        // the last pre-display layout; correcting earlier turned 120×30 into
-        // 120×27. The session is still behind the `sizeSettled` gate.
-        correctInitialWindowSize()
-        view.layoutSubtreeIfNeeded()
-    }
-
-    override func viewWillLayout() {
-        super.viewWillLayout()
-        // See `layoutSettled`. Anything short of the frame is the pre-style-mask
-        // transient (observed: 522pt content in a 554pt frame).
-        if !layoutSettled, let window = view.window,
-            abs(view.bounds.height - window.frame.height) < 1
-        {
-            layoutSettled = true
         }
     }
 
@@ -200,9 +180,9 @@ final class SplitViewController: NSViewController {
     /// Called from `viewDidLayout`, and from `AppDelegate.newTab` for the
     /// window a new tab covers, which never lays out again on its own.
     func absorbChromeChange() {
-        // Before setup is over `contentLayoutRect` is still the pre-sizing area
-        // (observed at origin -302), and absorbing it jumps the window.
-        guard !isJoiningTabGroup, let window = view.window, didSetUpWindow, sizeSettled, window.isVisible
+        // Not before the window is sized and shown: until then there is no
+        // chrome to keep.
+        guard !isJoiningTabGroup, let window = view.window, didSetUpWindow, window.isVisible
         else { return }
         let chrome = window.frame.height - window.contentLayoutRect.height
         let last = lastChromeHeight
@@ -232,27 +212,6 @@ final class SplitViewController: NSViewController {
             pane.resizeSessionToFitView()
             pane.invalidateDisplay()
         }
-    }
-
-    /// The one-time correction for `setContentSize` mismeasuring the chrome
-    /// (see `viewWillAppear`), sized by frame.
-    private func correctInitialWindowSize() {
-        guard !didCorrectWindowSize, let window = view.window, let pane = focusedPane
-        else { return }
-        // A tab takes the group's frame; nothing to correct.
-        guard window.tabbedWindows == nil else {
-            didCorrectWindowSize = true
-            return
-        }
-        var target = pane.initialWindowContentSize
-        target.height += statusBarHeight
-        didCorrectWindowSize = true
-        var frame = window.frame
-        frame.origin.y += frame.height - target.height
-        frame.size = target
-        // Initial sizing and restoration share the same Dock/menu-bar bounds.
-        // Clamp after AppKit's final chrome correction and before PTY sizing.
-        window.setFrame(WindowState.Frame(frame).onScreen(preferredScreen: window.screen, minimumSize: .zero), display: true)
     }
 
     // MARK: - Panes
@@ -643,10 +602,10 @@ final class SplitViewController: NSViewController {
     /// maximised window, the Quick Terminal's docked panel, native tabs (one
     /// frame for every tab), a window overhanging its screen, one whose
     /// bottom or right edge is flush with the screen's edge or middle (tiled
-    /// or docked), and a window not yet past its startup layout (D15).
+    /// or docked), and a window not yet sized (`prepareWindow`).
     func fitWindowToWholeCells(metrics: CellMetrics) {
         guard let window = view.window, panes.count == 1, let pane = panes.first,
-            sizeSettled, !window.styleMask.contains(.fullScreen), !window.isZoomed,
+            didSetUpWindow, !window.styleMask.contains(.fullScreen), !window.isZoomed,
             !(window is NSPanel), (window.tabbedWindows?.count ?? 1) <= 1,
             metrics.cellWidth > 0, metrics.cellHeight > 0
         else {
