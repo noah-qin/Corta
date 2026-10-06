@@ -167,6 +167,24 @@ what to edit.
 - Closing a pane whose process ignores hangup (`trap '' HUP`) ends it ten
   seconds later with `SIGKILL`, as `SECURITY.md` §4.4 intends; it ran on
   without a terminal and was never reaped.
+- An SFTP download from a server that answers a read with less than was
+  asked — the protocol allows it anywhere, and some servers cap reads below
+  Corta's block size — no longer stops at the first short reply and saves a
+  truncated file as complete.
+- An SFTP transfer under the "fail if it exists" policy no longer replaces a
+  destination that appeared while it ran, locally or on the server.
+- The SFTP browser and folder downloads leave out a remote name that is not
+  valid UTF-8: Corta could only address a lossy copy of it, which names a
+  different file.
+
+### Security
+
+- Kitty images sent as PNG (`f=100`) must be PNG. Image I/O recognises
+  formats by content, so any program's output could reach its TIFF, JPEG,
+  HEIC and other decoders under the name of a PNG.
+- Pasted text drops DEL and C1 control characters along with C0 ones. A
+  line editor treats DEL as backspace, so a pasted DEL erased text that had
+  been on the clipboard and left a different command in its place.
 
 ## [1.1.1] - 2026-10-03
 
