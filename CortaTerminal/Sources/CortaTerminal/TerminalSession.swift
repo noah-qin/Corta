@@ -80,11 +80,11 @@ public final class TerminalSession: @unchecked Sendable {
     private let stopped = Mutex(false)
     private let started = Mutex(false)
 
-    /// Stand-ins for the PTY's two directions, and a step every queued
-    /// resize passes before it applies: how a caller sets exact chunk
-    /// boundaries, holds a write backlog or opens the window between a
-    /// resize's request and its commit. All nil in the app, which reads and
-    /// writes the PTY.
+    /// Stand-ins for the PTY's two directions, a step every queued resize
+    /// passes before it applies, and the `?2026` cap: how a caller sets exact
+    /// chunk boundaries, holds a write backlog, opens the window between a
+    /// resize's request and its commit, or waits out an abandoned
+    /// synchronized update in less than a second. The app passes none.
     struct Seams {
         /// Replaces the PTY read.
         var readerSource: ReaderSource?
@@ -92,13 +92,14 @@ public final class TerminalSession: @unchecked Sendable {
         var writerSink: (@Sendable ([UInt8]) throws -> Void)?
         /// Runs first in each queued resize, on the resize queue.
         var resizeWorkGate: (@Sendable () -> Void)?
+        /// How long `?2026` may gate presents — the one-second cap terminals
+        /// commonly use; the core reads no configuration.
+        var synchronizedOutputTimeout: Duration = .seconds(1)
     }
 
     private let readerSource: ReaderSource?
-    /// How long `?2026` may gate presents — the one-second cap terminals
-    /// commonly use; the core reads no configuration. Tests may shorten it
-    /// before `start()`.
-    var synchronizedOutputTimeout: Duration = .seconds(1)
+    /// `Seams.synchronizedOutputTimeout`.
+    private let synchronizedOutputTimeout: Duration
     /// Serial: resizes apply in request order.
     private let resizeQueue = DispatchQueue(label: "dev.corta.terminal-session.resize")
 
@@ -224,6 +225,7 @@ public final class TerminalSession: @unchecked Sendable {
         readerSource = seams.readerSource
         writerSink = seams.writerSink
         resizeWorkGate = seams.resizeWorkGate
+        synchronizedOutputTimeout = seams.synchronizedOutputTimeout
         let pty = try PTY.spawn(
             executable: executable,
             arguments: arguments,

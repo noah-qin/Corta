@@ -64,17 +64,17 @@ struct LargeTextTaskTests {
     /// after `copy(_:)` would pass or fail with the scheduler, not with
     /// whether the build is asynchronous. The park makes it deterministic.
     @MainActor private final class HeldCopy {
-        let host = CommandsTestHost()
+        let host: CommandsTestHost
         let session: TerminalSession
         let pasteboard = NSPasteboard.withUniqueName()
         let gate = BuildGate()
-        let commands: PaneCommands
+        var commands: PaneCommands { host.commands }
 
         init() throws {
             session = try TerminalSession(
                 executable: "/bin/sh", arguments: ["-c", "echo COPYTASKMARKER; exec sleep 60"])
             let gate = gate
-            commands = PaneCommands(host: host, pasteboard: pasteboard) { range, grid in
+            host = CommandsTestHost(pasteboard: pasteboard) { range, grid in
                 gate.park()
                 return Selection.text(of: range, in: grid)
             }

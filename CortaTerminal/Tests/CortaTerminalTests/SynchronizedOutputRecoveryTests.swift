@@ -32,9 +32,9 @@ import Testing
     @Test func missedResetIsRecoveredAfterTimeout() throws {
         let session = try TerminalSession(
             executable: "/bin/sh",
-            arguments: ["-c", "printf '\\033[?2026hCORTA-SYNC-HELD'; sleep 30"])
+            arguments: ["-c", "printf '\\033[?2026hCORTA-SYNC-HELD'; sleep 30"],
+            seams: .init(synchronizedOutputTimeout: .milliseconds(200)))
         defer { session.stop() }
-        session.synchronizedOutputTimeout = .milliseconds(200)
         let outputCount = Mutex(0)
         session.onOutput = { outputCount.withLock { $0 += 1 } }
         session.start()
@@ -62,9 +62,9 @@ import Testing
     @Test func normalBeginEndIsNotAffectedByTimeout() throws {
         let session = try TerminalSession(
             executable: "/bin/sh",
-            arguments: ["-c", "printf '\\033[?2026hCORTA-SYNCED\\033[?2026l'; sleep 30"])
+            arguments: ["-c", "printf '\\033[?2026hCORTA-SYNCED\\033[?2026l'; sleep 30"],
+            seams: .init(synchronizedOutputTimeout: .milliseconds(200)))
         defer { session.stop() }
-        session.synchronizedOutputTimeout = .milliseconds(200)
         let outputCount = Mutex(0)
         session.onOutput = { outputCount.withLock { $0 += 1 } }
         session.start()
@@ -89,9 +89,9 @@ import Testing
     @Test func childExitClearsSynchronizedOutput() throws {
         let session = try TerminalSession(
             executable: "/bin/sh",
-            arguments: ["-c", "printf '\\033[?2026hCORTA-SYNC-ORPHAN'"])
+            arguments: ["-c", "printf '\\033[?2026hCORTA-SYNC-ORPHAN'"],
+            seams: .init(synchronizedOutputTimeout: .seconds(30)))
         defer { session.stop() }
-        session.synchronizedOutputTimeout = .seconds(30)
         let exited = Mutex<ChildExit?>(nil)
         session.onChildExit = { exit in exited.withLock { $0 = exit } }
         session.start()

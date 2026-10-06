@@ -21,8 +21,9 @@ import Testing
 @testable import CortaTerminal
 
 /// A pane as its commands see it, with no renderer or window: a font size
-/// the commands can change, a remote side that is local, and a session only
-/// if a test gives it one (`LargeTextTaskTests`).
+/// the commands can change, a remote side that is local, and a session, a
+/// pasteboard and a text build only if a test gives it them
+/// (`LargeTextTaskTests`).
 @MainActor
 final class CommandsTestHost: PaneCommandsHost {
     let view = NSView()
@@ -40,7 +41,19 @@ final class CommandsTestHost: PaneCommandsHost {
     let remote = PaneRemote()
     var fontSize: CGFloat = 12
     var isFontSizeZoomed = false
-    private(set) lazy var commands = PaneCommands(host: self)
+    private let pasteboard: NSPasteboard
+    private let buildSelectionText: @Sendable (SelectionRange, Grid) -> String
+    private(set) lazy var commands = PaneCommands(
+        host: self, pasteboard: pasteboard, buildSelectionText: buildSelectionText)
+
+    init(
+        pasteboard: NSPasteboard = .general,
+        buildSelectionText: @escaping @Sendable (SelectionRange, Grid) -> String =
+            Selection.text(of:in:)
+    ) {
+        self.pasteboard = pasteboard
+        self.buildSelectionText = buildSelectionText
+    }
 
     private(set) var settles = 0
     func setFontSize(_ newSize: CGFloat, settle: Bool) {
@@ -54,9 +67,9 @@ final class CommandsTestHost: PaneCommandsHost {
 }
 
 /// Font size, the context menu, the `cd` gate and the menu items, against
-/// `PaneCommands` alone. Copy, export and the Finder actions are covered
-/// through real panes (`LargeTextTaskTests`, `ReopenAndExportTests`,
-/// `CommandHistoryWiringTests`).
+/// `PaneCommands` alone. Copy is covered over a real session
+/// (`LargeTextTaskTests`); export and the Finder actions through real panes
+/// (`ReopenAndExportTests`, `CommandHistoryWiringTests`).
 @MainActor
 struct PaneCommandsTests {
     @Test("⌘+ and ⌘− zoom a lone pane; ⌘0 ends the zoom at the configured size")

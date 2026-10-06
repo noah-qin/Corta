@@ -85,14 +85,15 @@ public nonisolated enum QuadPipelineCache {
     }
 
     /// Drops every device's pipelines, so the next renderer compiles them
-    /// again and re-serialises the archive — a cold start without a new
-    /// process, which the archive tests and the construction benchmark need.
+    /// again — without the archive (`firstCreationDone`) — and re-serialises it:
+    /// a cold start without a new process, which the archive tests and the
+    /// construction benchmark need.
     public static func discardPipelines() {
         entries.withLock { $0.removeAll() }
     }
 
     /// Builds the pipelines through the previous launch's binary archive, then
-    /// re-serialises it. The read can be switched off (`readsPreviousArchive`).
+    /// re-serialises it.
     private static func makeEntry(device: MTLDevice) throws -> Entry {
         guard let library = device.makeDefaultLibrary() else {
             throw QuadPipelineError.libraryUnavailable
@@ -208,29 +209,29 @@ public nonisolated enum QuadPipelineCache {
         }
     }
 
-    /// Whether a cold creation compiles through the previous launch's archive.
-    /// On unless a caller turns it off, as the archive tests and the
-    /// construction benchmark do before `discardPipelines()`: the benchmark's
-    /// cold figure must be a compile, not an archive hit (~38 ms against
-    /// 6–9 ms), and a hosted test bundle once segfaulted reading an archive
-    /// back (`-[_MTLDevice recordBinaryArchiveUsage:]`, a null C string
-    /// reaching `strlen`; an upstream report ties it to
-    /// `MTLGetShaderCachePath()` returning nil) — not reproduced on macOS
-    /// 27.0.1. A test host's own launch reads nothing: its throwaway stage
-    /// (`AppPaths`) has no archive yet.
-    public static var readsPreviousArchive: Bool {
-        get { readsArchive.withLock { $0 } }
-        set { readsArchive.withLock { $0 = newValue } }
-    }
-    private static let readsArchive = Mutex(true)
+    /// Only a launch's first creation reads the archive. After it the file
+    /// is this process's own, not the previous launch's, so a creation after
+    /// `discardPipelines()` compiles: the cold start the archive tests and the
+    /// construction benchmark ask for (~38 ms, against 6–9 ms through the
+    /// archive). It also keeps a hosted test bundle off the read that once
+    /// segfaulted inside Metal (`-[_MTLDevice recordBinaryArchiveUsage:]`, a
+    /// null C string reaching `strlen`; an upstream report ties it to
+    /// `MTLGetShaderCachePath()` returning nil; not reproduced on macOS
+    /// 27.0.1): the host's own first creation finds no archive in its
+    /// throwaway stage (`AppPaths`). A hosted run with an explicit, reused
+    /// `CORTA_STAGE_DIR` reads the last run's at launch, as the app would.
+    private static let firstCreationDone = Mutex(false)
 
-    /// Opens the previous launch's archive, or a fresh one when there is none
-    /// or `readsPreviousArchive` is off; `makeEntry` adds this launch's
-    /// pipelines and re-serialises it. Nil on failure, falling back to a
-    /// plain compile.
+    /// Opens the previous launch's archive on the first creation, or a fresh
+    /// one; `makeEntry` adds this launch's pipelines and re-serialises it.
+    /// Nil on failure, falling back to a plain compile.
     static func loadOrCreateBinaryArchive(device: MTLDevice) -> (any MTLBinaryArchive)? {
         let descriptor = MTLBinaryArchiveDescriptor()
-        if readsPreviousArchive, let url = binaryArchiveURL,
+        let isFirst = firstCreationDone.withLock { done in
+            defer { done = true }
+            return !done
+        }
+        if isFirst, let url = binaryArchiveURL,
             FileManager.default.fileExists(atPath: url.path)
         {
             descriptor.url = url
