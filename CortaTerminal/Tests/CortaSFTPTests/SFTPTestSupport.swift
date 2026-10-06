@@ -261,6 +261,10 @@ final class FakeSFTPServer: @unchecked Sendable {
     /// How many entries one READDIR batch carries.
     var readDirBatchSize = 4
 
+    /// The most one READ answers, whatever was asked: the protocol lets a
+    /// server reply short anywhere, not only at end of file.
+    var maximumReadReply = Int.max
+
     /// Delay before answering READ/READDIR: gives the client's window time
     /// to fill so `maxOutstandingReads` measures the real concurrency.
     var replyDelay: Duration = .zero
@@ -533,7 +537,7 @@ final class FakeSFTPServer: @unchecked Sendable {
                 fail(.endOfFile, "eof")
                 return
             }
-            let end = min(Int(offset) + Int(length), file.data.count)
+            let end = min(Int(offset) + min(Int(length), maximumReadReply), file.data.count)
             send(.data(Array(file.data[Int(offset)..<end])), requestID: requestID)
 
         case .write(let handle, let offset, let data):

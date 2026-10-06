@@ -303,7 +303,7 @@ extension SFTPTransferEngine {
                 entryCount += 1
                 pathBytes += relativeBytes
                 let relative = directory.isEmpty ? name : "\(directory)/\(name)"
-                guard Self.isPlainComponent(name) else {
+                guard entry.filenameIfUTF8 != nil, Self.isPlainComponent(name) else {
                     plan.skipped.append(.init(relativePath: relative, reason: .unsafeName))
                     continue
                 }

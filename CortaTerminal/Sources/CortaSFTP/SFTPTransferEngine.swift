@@ -460,9 +460,16 @@ public final class SFTPTransferEngine: @unchecked Sendable {
             Darwin.close(descriptor)
             descriptorOpen = false
             try await session.close(handle)
-            // Commit: rename over the destination atomically.
-            guard Darwin.rename(partialPath, destinationPath) == 0 else {
+            // Commit: rename over the destination atomically — or, when the
+            // policy forbids replacing it, only if it is still absent: a file
+            // that appeared since the check is not ours to overwrite.
+            let renamed =
+                resolution == .fail
+                ? renamex_np(partialPath, destinationPath, UInt32(RENAME_EXCL))
+                : Darwin.rename(partialPath, destinationPath)
+            guard renamed == 0 else {
                 let code = errno
+                if code == EEXIST { throw SFTPError.destinationConflict(path: destinationPath) }
                 throw SFTPError.localIOFailed(operation: "rename", code: code)
             }
             return SFTPTransferReceipt(
@@ -539,10 +546,16 @@ public final class SFTPTransferEngine: @unchecked Sendable {
             completed = first.offset + UInt64(data.count)
             progress?(SFTPTransferProgress(completedBytes: completed, totalBytes: total))
             if data.count < first.length {
-                // A short read is end of file as far as OpenSSH's server
-                // is concerned; outstanding requests past it answer EOF.
-                endOfFile = true
+                // OpenSSH's server reads short only at end of file, but the
+                // protocol lets any server return less than asked — some cap
+                // a READ below the block size — and taking that for the end
+                // committed a truncated file as a success. The rest of the
+                // window was asked past a point the server has not reached:
+                // drop it and ask again from here. Only the server's EOF, or
+                // the size the file had, ends the transfer.
                 for item in pending { item.task.cancel() }
+                pending.removeAll()
+                nextOffset = completed
             }
         }
         return moved
@@ -620,7 +633,7 @@ public final class SFTPTransferEngine: @unchecked Sendable {
             try await session.close(handle)
             try await commitUpload(
                 session: session, partialPath: partialPath, destinationPath: remotePath,
-                overwriting: destinationAttributes != nil)
+                mayReplace: resolution != .fail)
             return SFTPTransferReceipt(
                 bytesTransferred: moved, resumedFromOffset: offset, attempts: 0)
         } catch {
@@ -681,23 +694,26 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         return moved
     }
 
-    /// RENAME the partial over the destination. `posix-rename` is used
-    /// when the server advertises it; otherwise version 3's RENAME fails
-    /// against an existing destination, and the fallback — REMOVE, then
-    /// RENAME — is the best the protocol offers. It is not atomic, and it
-    /// is only taken when the resolution already decided to overwrite.
+    /// RENAME the partial over the destination. When the policy allows
+    /// replacing it, `posix-rename` is used if the server advertises it;
+    /// otherwise version 3's RENAME fails against an existing destination,
+    /// and the fallback — REMOVE, then RENAME — is the best the protocol
+    /// offers. It is not atomic, and it is only taken when the resolution
+    /// already decided to overwrite. When it does not (`.fail`), version 3's
+    /// RENAME is the point: it refuses a destination that appeared after the
+    /// check, where `posix-rename` replaced it.
     private func commitUpload(
         session: SFTPSession,
         partialPath: String,
         destinationPath: String,
-        overwriting: Bool
+        mayReplace: Bool
     ) async throws(SFTPError) {
-        if try await session.posixRename(from: partialPath, to: destinationPath) {
+        if mayReplace, try await session.posixRename(from: partialPath, to: destinationPath) {
             return
         }
         do {
             try await session.rename(from: partialPath, to: destinationPath)
-        } catch SFTPError.server(let status) where overwriting {
+        } catch SFTPError.server(let status) where mayReplace {
             // OpenSSH's server answers SSH_FX_FAILURE here; the code is
             // not checked because draft-02 assigns no specific one.
             _ = status

@@ -534,11 +534,13 @@ final class SFTPBrowserModel {
             listing
             // `.` and `..` are the server's bookkeeping, not content; a
             // name that is not one component is not content either.
-            .filter { Self.isPlainEntryName($0.filenameUTF8) }
-            .map { entry in
+            // Not valid UTF-8 is not addressable either: every path sent is
+            // a `String`'s UTF-8, and a lossy name names another file.
+            .compactMap { entry in
+                guard let name = entry.filenameIfUTF8, Self.isPlainEntryName(name) else { return nil }
                 let attributes = entry.attributes
                 return Entry(
-                    name: entry.filenameUTF8,
+                    name: name,
                     kind: Self.kind(ofPermissions: attributes.permissions),
                     size: attributes.size,
                     modified: attributes.modificationTime.map {
