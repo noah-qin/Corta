@@ -62,6 +62,31 @@ struct AnsiModeTests {
         #expect(terminal.grid.rowText(0) == "a\u{4E16}bcdef")
     }
 
+    /// A pair shifted against the margin lost its spacer, and the next
+    /// column-changing reflow read past the end of the row and crashed.
+    @Test("IRM never leaves a wide lead without its spacer")
+    func insertModeKeepsPairsWhole() throws {
+        var terminal = Terminal(rows: 2, columns: 10)
+        terminal.feed(try Golden.decode("abcdefgh\u{4E2D}\\r\\e[4hx"))
+        let row = terminal.grid.line(0)
+        for column in 0..<row.count where row[column].attributes.contains(.wide) {
+            #expect(row[column + 1].attributes.contains(.wideSpacer), "orphan lead at \(column)")
+        }
+        #expect(terminal.grid.rowText(0) == "xabcdefgh")
+        terminal.resize(rows: 2, columns: 20)
+        terminal.resize(rows: 2, columns: 4)
+        #expect(terminal.grid.columns == 4)
+    }
+
+    @Test("an insert between a lead and its spacer blanks both halves")
+    func insertModeInsideAPair() throws {
+        var terminal = Terminal(rows: 2, columns: 10)
+        terminal.feed(try Golden.decode("a\u{4E2D}b\\e[1;3H\\e[4hx"))
+        let row = terminal.grid.line(0)
+        #expect(!row[1].attributes.contains(.wide))
+        #expect(terminal.grid.rowText(0).hasPrefix("a x"))
+    }
+
     @Test("LNM starts off: a bare LF keeps the column")
     func newLineModeDefaultsOff() throws {
         var terminal = Terminal(rows: 3, columns: 10)

@@ -156,4 +156,18 @@ struct AlternateScreenTests {
         #expect(grid.columns == 4)
         #expect(grid[0, 0].scalar == 0x6D)
     }
+    /// The alternate screen does not reflow, and a narrower one kept every
+    /// cell past the new margin: invisible, yet copied and searched.
+    @Test("narrowing the alternate screen cuts rows to the new width")
+    func narrowingTruncatesAlternateRows() {
+        var terminal = Terminal(rows: 3, columns: 10)
+        terminal.feed(Array("\u{1B}[?1049habcdefg\u{4E2D}\r\n0123456789".utf8))
+        terminal.resize(rows: 3, columns: 8)
+        #expect(terminal.grid.line(0).count <= 8)
+        #expect(terminal.grid.rowText(0) == "abcdefg")
+        #expect(terminal.grid.rowText(1) == "01234567")
+        // A cut pair leaves no lone lead behind.
+        let row = terminal.grid.line(0)
+        #expect(!(0..<row.count).contains { row[$0].attributes.contains(.wide) })
+    }
 }

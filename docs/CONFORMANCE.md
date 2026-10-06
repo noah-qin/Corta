@@ -36,6 +36,8 @@ measured. Priorities:
 | Reflow on resize                                        | P1   | Must be incremental; live window drag fires continuously |
 | **Synchronized output** (`?2026`)                       | P1   | Neovim, tmux ≥ 3.4 and fzf use it; absence causes visible tearing |
 | Cursor style (`DECSCUSR`)                               | P1   |                                                         |
+| Cursor visibility (`?25`, DECTCEM)                      | P0   | vim, htop, fzf and Ink programs (Claude Code) hide the cursor while they draw; terminal-wide, kept across the alternate screen, shown again by RIS and DECSTR |
+| Autowrap (`?7`, DECAWM) and origin mode (`?6`, DECOM)   | P1   | Without autowrap the last column is overwritten and a wide character that would cross the margin is not written; under DECOM, CUP/HVP/VPA and the position reports count from the scroll region's top, and DECSC saves the mode |
 | OSC 0 / 2 — set window and tab title                    | P1   | Set only. Query is **never** implemented, see `SECURITY.md` §2.2 |
 | **OSC 7** — report working directory                    | P1   | Prerequisite for new tabs and splits inheriting the cwd |
 | **OSC 4 / 104** — indexed palette query, set, reset (B06) | P1 | 256-entry palette, seeded from the theme (0–15) and xterm's cube/greyscale (16–255); an override now repaints, not just answers a query — `docs/DESIGN.md` §7 |
@@ -87,6 +89,11 @@ is worse than answering 0. The four modifiable ANSI modes therefore split:
 | LNM (20)  | 1 / 2  | Implemented (`PerformerState.newLineModeEnabled`) — LF/VT/FF also return the carriage, and Return sends CR LF |
 | KAM (2)   | 4      | Deliberately not implemented: a terminal that stops accepting input on a byte from the child is one a runaway program can wedge, with no way for the user to tell it from a hang |
 | SRM (12)  | 4      | Deliberately not implemented: Corta never echoes keystrokes itself, so there is no local echo to switch off |
+
+The same rule covers the private modes: DECOM (6), DECAWM (7) and DECTCEM
+(25) report their live state. Until they were implemented, 7 and 25
+answered 3, "permanently set", while `?7l` still wrapped and `?25l` still
+drew the cursor — the contract above, broken.
 
 4 is "permanently reset", which is a stronger answer than 0 — a program
 learns not to ask again.

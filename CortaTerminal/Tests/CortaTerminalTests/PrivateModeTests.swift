@@ -62,12 +62,13 @@ struct PrivateModeTests {
         #expect(!terminal.isSgrMouseEncodingEnabled)
     }
 
-    /// Modes this terminal does not implement — `?7` auto-wrap, `?25` cursor
-    /// visibility — must not disturb the screen or produce output.
+    /// Modes this terminal does not implement — `?12` cursor blink (a
+    /// DECSCUSR job here), `?1048` — must not disturb the screen or produce
+    /// output.
     @Test("unimplemented modes are ignored cleanly")
     func unknownModesAreIgnored() throws {
         var terminal = Terminal(rows: 4, columns: 10)
-        terminal.feed(try Golden.decode("hi\\e[?7h\\e[?25lb"))
+        terminal.feed(try Golden.decode("hi\\e[?12h\\e[?1048lb"))
         #expect(terminal.grid[0, 0].scalar == 0x68)
         #expect(terminal.grid[0, 1].scalar == 0x69)
         #expect(terminal.grid[0, 2].scalar == 0x62)

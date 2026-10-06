@@ -180,6 +180,39 @@ import Testing
         }
     }
 
+    // MARK: Closing
+
+    /// `SECURITY.md` §4.4: closing a pane stops what was in it. A group that
+    /// ignored `SIGHUP` ran on after the pane closed, unreaped once it ended.
+    @Test func aGroupThatIgnoresHangupIsKilledAfterTheGracePeriod() throws {
+        let session = try TerminalSession(
+            executable: "/bin/sh",
+            arguments: ["-c", "trap '' HUP; printf 'CORTA-IGNORING'; while :; do sleep 1; done"],
+            seams: .init(hangupGracePeriod: .milliseconds(300)))
+        let exited = Mutex<ChildExit?>(nil)
+        session.onChildExit = { exit in exited.withLock { $0 = exit } }
+        session.start()
+        _ = waitForGrid(session) { $0.contains("CORTA-IGNORING") }
+        session.stop()
+
+        let deadline = ContinuousClock.now + .seconds(10)
+        while exited.withLock({ $0 }) == nil, ContinuousClock.now < deadline {
+            Thread.sleep(forTimeInterval: 0.02)
+        }
+        #expect(exited.withLock { $0 } == .signalled(signal: SIGKILL))
+        #expect(session.pty.exitStatus == .signalled(signal: SIGKILL))
+    }
+
+    @Test func aChildThatHonoursHangupIsNotKilled() throws {
+        let session = try TerminalSession(
+            executable: "/bin/sh", arguments: ["-c", "printf 'CORTA-READY'; sleep 30"],
+            seams: .init(hangupGracePeriod: .seconds(5)))
+        session.start()
+        _ = waitForGrid(session) { $0.contains("CORTA-READY") }
+        session.stop()
+        #expect(session.pty.waitForExit(timeout: .seconds(5)) == .signalled(signal: SIGHUP))
+    }
+
     /// Polls the grid until `condition` accepts its dump, or the hang
     /// ceiling expires. Returns the last dump either way.
     private func waitForGrid(

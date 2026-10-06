@@ -105,6 +105,10 @@ extension Performer {
         let paletteDefaults = state.indexedPalette.defaults
         // A fact about the session's shell, not terminal state.
         let hostnames = state.hostnamesAtStart
+        // The user's `command-history-limit`, not terminal state: a fresh
+        // store at the default capacity recorded commands again for someone
+        // who had set it to 0. The records go, with the rows they point at.
+        let historyCapacity = state.commandRecords.capacity
         // Recovery timers identify episodes across RIS. Reusing an identity
         // can hide a new begin in the same parse slice or match a stale timer.
         let synchronizedOutputEpisode = state.synchronizedOutputEpisode
@@ -112,6 +116,7 @@ extension Performer {
         state = PerformerState()
         state.synchronizedOutputEpisode = synchronizedOutputEpisode
         state.hostnamesAtStart = hostnames
+        state.commandRecords = CommandRecordStore(capacity: historyCapacity)
         state.dynamicColors = colors
         state.indexedPalette = IndexedPalette(defaults: paletteDefaults)
     }

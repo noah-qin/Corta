@@ -679,4 +679,18 @@ import Testing
         terminal.feed(Array("\u{1B}[?2004h".utf8))
         #expect(terminal.isBracketedPasteEnabled)
     }
+
+    /// The limit is the user's setting, not terminal state: RIS replaced the
+    /// store with one at the default capacity, so `command-history-limit = 0`
+    /// started recording again after `reset`.
+    @Test("a reset keeps the configured command-history limit", arguments: [0, 3])
+    func resetKeepsHistoryLimit(limit: Int) {
+        var terminal = Terminal(rows: 4, columns: 20, commandHistoryLimit: limit)
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\$ ".utf8))
+        terminal.reset()
+        #expect(terminal.commandRecords.capacity == limit)
+        #expect(terminal.commandRecords.records.isEmpty)
+        terminal.feed(Array("\u{1B}]133;A\u{1B}\\$ ls\r\n\u{1B}]133;C\u{1B}\\".utf8))
+        #expect(terminal.commandRecords.records.count == min(limit, 1))
+    }
 }

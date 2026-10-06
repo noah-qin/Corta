@@ -97,6 +97,7 @@ enum KittyGraphicsParser {
         guard medium == "d" else { return nil }
         // Absent `i=` is 0: `kitten icat` omits it for a one-shot display, and
         // requiring one dropped every such command.
+        let namesImage = fields[UInt8(ascii: "i")] != nil
         guard let rawImageID = uint32ID(intValue(fields, "i") ?? 0) else { return nil }
         // First chunk only; `Performer.receiveChunk` applies the defaults.
         let format = intValue(fields, "f").flatMap(KittyGraphics.PixelFormat.init(code:))
@@ -113,8 +114,8 @@ enum KittyGraphicsParser {
             compressed = true
         }
         return KittyGraphics.TransmitHeader(
-            imageID: KittyGraphics.ImageID(rawValue: rawImageID), format: format, width: width,
-            height: height, quiet: quiet, compressed: compressed)
+            imageID: KittyGraphics.ImageID(rawValue: rawImageID), namesImage: namesImage,
+            format: format, width: width, height: height, quiet: quiet, compressed: compressed)
     }
 
     private static func displayHeader(

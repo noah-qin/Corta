@@ -137,6 +137,36 @@ what to edit.
   They were drawn a frame or two ahead of the text, so during continuous
   output a prompt briefly showed the green or red of a command below it.
   They are now drawn with the text, in the theme's green and red (#238).
+- Resizing a window no longer crashes Corta after a program typed in insert
+  mode (`CSI 4 h`) over a line ending in a wide character: the shift pushed
+  the character's second half off the row, and the next reflow read past it.
+- A program that hides the cursor (`CSI ? 25 l`) — vim, htop, fzf, Claude
+  Code — no longer has a block cursor drawn wherever it last left it, and a
+  hidden cursor stops blinking. Autowrap off (`CSI ? 7 l`) overwrites the last
+  column instead of wrapping, and origin mode (`CSI ? 6 h`) addresses the
+  cursor from the scroll region's top. DECRQM reports all three as they are;
+  it had answered "permanently set" for the first two. CNL and CPL stop at
+  the scroll region's margins, as cursor up and down do.
+- Narrowing a window while a full-screen program runs no longer leaves text
+  past the new right edge in its rows, where it was invisible but still
+  copied and found by search.
+- A UTF-8 sequence cut short by plain text, a control character or an escape
+  sequence shows as one replacement character instead of combining with bytes
+  that arrive after it into a character the program never sent.
+- Chunked Kitty images whose later chunks carry only `m=` — the protocol's own
+  form, sent by `timg`, `chafa` and terminal file managers — are displayed;
+  they were discarded with `EINVAL:bad size`.
+- With macOS set to a script-tagged language such as Simplified Chinese
+  (`zh-Hans`), a shell started from the Dock got an invalid `LANG`
+  (`zh_Hans_CN.UTF-8`) and ran in the C locale, so CJK text was handled one
+  byte at a time. The locale is now `language_REGION.UTF-8` when the system
+  has it, otherwise `en_US.UTF-8`.
+- A terminal reset (`reset`, or Shell ▸ Reset Terminal) keeps the configured
+  `command-history-limit`; with history turned off, it had started recording
+  commands again.
+- Closing a pane whose process ignores hangup (`trap '' HUP`) ends it ten
+  seconds later with `SIGKILL`, as `SECURITY.md` §4.4 intends; it ran on
+  without a terminal and was never reaped.
 
 ## [1.1.1] - 2026-10-03
 

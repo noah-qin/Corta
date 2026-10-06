@@ -104,11 +104,16 @@ public final class TerminalSession: @unchecked Sendable {
         /// How long `?2026` may gate presents — the one-second cap terminals
         /// commonly use; the core reads no configuration.
         var synchronizedOutputTimeout: Duration = .seconds(1)
+        /// How long a stopped session's process group has to leave after
+        /// `SIGHUP` before it gets `SIGKILL`.
+        var hangupGracePeriod: Duration = .seconds(10)
     }
 
     private let readerSource: ReaderSource?
     /// `Seams.synchronizedOutputTimeout`.
     private let synchronizedOutputTimeout: Duration
+    /// `Seams.hangupGracePeriod`.
+    private let hangupGracePeriod: Duration
     /// Serial: resizes apply in request order.
     private let resizeQueue = DispatchQueue(label: "dev.corta.terminal-session.resize")
 
@@ -264,6 +269,7 @@ public final class TerminalSession: @unchecked Sendable {
         writerSink = seams.writerSink
         resizeWorkGate = seams.resizeWorkGate
         synchronizedOutputTimeout = seams.synchronizedOutputTimeout
+        hangupGracePeriod = seams.hangupGracePeriod
         let pty = try PTY.spawn(
             executable: executable,
             arguments: arguments,
@@ -394,7 +400,17 @@ public final class TerminalSession: @unchecked Sendable {
         // An I/O fault is not child exit. Report it immediately rather than
         // park here for ten seconds and silently lose the only reader.
         guard ioFailure == nil else { return }
-        if let exit = pty.waitForExit() {
+        var exit = pty.waitForExit(timeout: hangupGracePeriod)
+        if exit == nil, stopped.withLock({ $0 }) {
+            // Closed, and the group ignored `SIGHUP` (`trap '' HUP`, a daemon
+            // that kept the terminal): closing a pane stops what was in it
+            // (`SECURITY.md` §4.4). Left alone it ran on with no terminal,
+            // and nothing was left to reap it once it did exit. Only this
+            // group: a job the shell put in its own is not this pane's to end.
+            pty.signalProcessGroup(SIGKILL)
+            exit = pty.waitForExit(timeout: .seconds(2))
+        }
+        if let exit {
             let callback = callbacks.withLock { state -> (@Sendable (ChildExit) -> Void)? in
                 state.childExit = exit
                 return state.onChildExit
@@ -425,10 +441,7 @@ public final class TerminalSession: @unchecked Sendable {
     /// Ends a `?2026` episode the child never closes, unless a later episode
     /// has begun.
     private func scheduleSynchronizedOutputTimeout(episode: Int) {
-        let components = synchronizedOutputTimeout.components
-        let nanoseconds = components.seconds * 1_000_000_000
-            + components.attoseconds / 1_000_000_000
-        let deadline = DispatchTime.now() + .nanoseconds(Int(nanoseconds))
+        let deadline = DispatchTime.now() + synchronizedOutputTimeout.dispatchInterval
         syncTimeoutQueue.asyncAfter(deadline: deadline) { [self] in
             let ended = state.withLock { current -> Bool in
                 guard current.synchronizedOutputEpisode == episode,

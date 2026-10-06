@@ -229,7 +229,9 @@ relocate state and substitute nothing.
 On window or tab close, send `SIGHUP` to the child's **process group**,
 not just the direct child. Leaking orphaned process groups is both a
 resource leak and a surprise for the user, who reasonably believes
-closing a window stopped what was in it.
+closing a window stopped what was in it. A group still there ten seconds
+later — it ignored `SIGHUP` — gets `SIGKILL`, and is reaped. Only that
+group: a job the shell moved into its own group is the shell's to end.
 
 ---
 

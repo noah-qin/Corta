@@ -126,6 +126,10 @@ public enum KittyGraphics {
     /// `Performer.receiveChunk` defaults them, on a first chunk.
     struct TransmitHeader {
         var imageID: ImageID
+        /// Whether `i=` was written. The protocol's continuation chunks carry
+        /// only `m=` (and `q=`), so a chunk without one continues whatever
+        /// transmission is open rather than starting image 0.
+        var namesImage = true
         var format: PixelFormat?
         var width: Int?
         var height: Int?

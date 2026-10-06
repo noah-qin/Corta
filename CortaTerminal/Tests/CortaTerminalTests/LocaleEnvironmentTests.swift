@@ -42,6 +42,24 @@ import Testing
         #expect(ChildEnvironment.utf8Locale.hasSuffix(".UTF-8"))
     }
 
+    /// The name must load, not just look right: `zh-Hans_CN` became
+    /// `zh_Hans_CN.UTF-8`, which `setlocale` rejects, and the child ran in C.
+    @Test(arguments: [
+        ("zh-Hans_CN", "zh_CN.UTF-8"), ("zh-Hant_TW", "zh_TW.UTF-8"),
+        ("en_US@rg=cnzzzz", "en_US.UTF-8"), ("fr_FR", "fr_FR.UTF-8"),
+        ("ja_JP", "ja_JP.UTF-8"), ("en", "en_US.UTF-8"), ("en_CN", "en_US.UTF-8"),
+    ])
+    func theLocaleNameLoads(identifier: String, expected: String) {
+        let name = ChildEnvironment.utf8Locale(for: Locale(identifier: identifier))
+        #expect(name == expected)
+        #expect(ChildEnvironment.isAvailableLocale(name))
+    }
+
+    @Test func theCurrentLocaleLoads() {
+        #expect(ChildEnvironment.isAvailableLocale(ChildEnvironment.utf8Locale))
+        #expect(!ChildEnvironment.isAvailableLocale("zh_Hans_CN.UTF-8"))
+    }
+
     /// The end of the chain: a real spawned child reports the variable.
     @Test func aSpawnedChildSeesTheLocale() throws {
         let session = try TerminalSession(

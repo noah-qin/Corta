@@ -62,12 +62,17 @@ extension Performer {
 
     /// A new image id abandons an unfinished transmission — newest wins. Format
     /// and size are resolved only when starting: a continuation's header
-    /// carries just `i=`/`m=`.
+    /// carries just `m=` — the protocol's form, which `timg`, `chafa` and
+    /// image previewers send after an `i=` on the first chunk — or repeats
+    /// the first chunk's `i=`.
     private mutating func receiveChunk(
         header: KittyGraphics.TransmitHeader, display: KittyGraphics.DisplayHeader?,
         payloadBase64: ArraySlice<UInt8>, moreChunks: Bool
     ) {
-        if state.pendingImageTransmission?.header.imageID != header.imageID {
+        let continues = state.pendingImageTransmission.map {
+            !header.namesImage || $0.header.imageID == header.imageID
+        } ?? false
+        if !continues {
             var resolved = header
             resolved.format = header.format ?? .rgba
             resolved.width = header.width ?? 0

@@ -343,9 +343,7 @@ public final class PTY: @unchecked Sendable {
     /// `nil` on timeout. For tests and teardown.
     @discardableResult
     public func waitForExit(timeout: Duration = .seconds(10)) -> ChildExit? {
-        let nanoseconds = timeout.components.seconds * 1_000_000_000
-            + timeout.components.attoseconds / 1_000_000_000
-        if exited.wait(timeout: .now() + .nanoseconds(Int(nanoseconds))) == .success {
+        if exited.wait(timeout: .now() + timeout.dispatchInterval) == .success {
             return exitStatus
         }
         return reap(blocking: false)

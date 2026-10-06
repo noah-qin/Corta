@@ -34,21 +34,33 @@ import Foundation
 ///
 /// A small 24×80 grid makes scrollback, reflow and wrapping reachable within
 /// the few hundred bytes a fuzzer explores.
-private let rows = 24
-private let columns = 80
+private let initialRows = 24
+private let initialColumns = 80
 private let scrollbackLimit = 64
 
 /// A violated cap traps, which is what the fuzzer reports.
 @discardableResult
 func fuzzOne(_ bytes: [UInt8]) -> Int32 {
-    var terminal = Terminal(rows: rows, columns: columns, scrollbackLimit: scrollbackLimit)
+    var terminal = Terminal(
+        rows: initialRows, columns: initialColumns, scrollbackLimit: scrollbackLimit)
+    var rows = initialRows
+    var columns = initialColumns
     // Split at input-derived boundaries: mid-character and mid-sequence
-    // splits are where decoder state goes wrong.
+    // splits are where decoder state goes wrong. Some boundaries also
+    // resize, from the next two bytes: a reflow runs over whatever the
+    // stream left in the grid, and a stream that cannot crash the parser
+    // could still leave a row that crashed the next window resize. Derived
+    // from the input, so a failure still replays from its file.
     var offset = 0
     while offset < bytes.count {
         let step = 1 + Int(bytes[offset]) % 17
         let end = min(bytes.count, offset + step)
         terminal.feed(bytes[offset..<end])
+        if bytes[offset] % 11 == 0, end + 1 < bytes.count {
+            rows = 1 + Int(bytes[end]) % 30
+            columns = 1 + Int(bytes[end + 1]) % 100
+            terminal.resize(rows: rows, columns: columns)
+        }
         offset = end
     }
 
