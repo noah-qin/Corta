@@ -85,6 +85,38 @@ import Testing
         }
     }
 
+    /// The working directory is a `posix_spawn` file action: the child —
+    /// and so the shell `corta-exec` execs — starts there.
+    @Test func theChildStartsInTheWorkingDirectory() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("corta-spawn-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        // `realpath`, not `resolvingSymlinksInPath`, which drops `/private`.
+        let resolved = try #require(realpath(directory.path, nil).map { pointer in
+            defer { free(pointer) }
+            return String(cString: pointer)
+        })
+        let exited = DispatchSemaphore(value: 0)
+        let pty = try PTY.spawn(
+            executable: "/bin/sh", arguments: ["-c", "pwd -P > out"],
+            workingDirectory: resolved, terminationHandler: { _ in exited.signal() })
+        #expect(exited.wait(timeout: .now() + 10) == .success)
+        _ = pty
+        let written = try String(contentsOfFile: resolved + "/out", encoding: .utf8)
+        #expect(written.trimmingCharacters(in: .newlines) == resolved)
+    }
+
+    /// A directory that is gone fails the spawn with `chdir`'s errno, rather
+    /// than starting the shell somewhere else.
+    @Test func aMissingWorkingDirectoryFailsTheSpawn() {
+        #expect(throws: PTYError.spawnFailed(code: ENOENT)) {
+            try PTY.spawn(
+                executable: "/bin/sh", arguments: ["-c", "true"],
+                workingDirectory: "/nonexistent/corta-no-such-directory")
+        }
+    }
+
     private func makePipe() throws -> (read: Int32, write: Int32) {
         var fds: [Int32] = [0, 0]
         guard pipe(&fds) == 0 else {

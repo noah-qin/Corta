@@ -242,10 +242,18 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         secureInputIndicator?.view.isHidden = hidden
     }
 
+    /// Asks as a sheet, so the answer comes after this returns: refuse now,
+    /// and close once confirmed. `close()` does not ask again.
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         guard let splitController else { return true }
         let running = splitController.panesWithRunningJobs
-        return splitController.confirmClose(of: running, scope: L10n.text("close.scope.window"))
+        guard splitController.needsCloseConfirmation(for: running) else { return true }
+        // A second ⌘W while the sheet is up: the sheet already asks.
+        guard sender.attachedSheet == nil else { return false }
+        splitController.confirmClose(
+            of: running, scope: L10n.text("close.scope.window"), in: sender
+        ) { [weak sender] confirmed in if confirmed { sender?.close() } }
+        return false
     }
 
     /// Read at quit and on every window close.

@@ -85,12 +85,31 @@ extension SplitViewController {
         panes.filter { $0.session?.hasForegroundJob == true }
     }
 
-    /// Asks before discarding work; true to proceed. Checks the pty's
-    /// foreground process group, not output, so a bare prompt never asks.
-    func confirmClose(of running: [ViewController], scope: String) -> Bool {
-        guard ConfigurationStore.shared.configuration.confirmClose, !running.isEmpty else {
-            return true
+    /// Whether closing `running` asks first: something is running and
+    /// `confirm-close` is on. Checks the pty's foreground process group, not
+    /// output, so a bare prompt never asks.
+    func needsCloseConfirmation(for running: [ViewController]) -> Bool {
+        ConfigurationStore.shared.configuration.confirmClose && !running.isEmpty
+    }
+
+    /// Asks before discarding work, as a sheet on `window`, and reports
+    /// whether to proceed — at once, true, when nothing needs asking.
+    /// `window` nil asks app-modally.
+    func confirmClose(
+        of running: [ViewController], scope: String, in window: NSWindow?,
+        completion: @escaping @MainActor (Bool) -> Void
+    ) {
+        guard needsCloseConfirmation(for: running) else {
+            completion(true)
+            return
         }
+        closeAlert(for: running, scope: scope).present(for: window) { response in
+            completion(response == .alertFirstButtonReturn)
+        }
+    }
+
+    /// The "still running" alert; Return is Cancel.
+    func closeAlert(for running: [ViewController], scope: String) -> NSAlert {
         let names = running.compactMap { $0.session?.foregroundProcessName }
         let alert = NSAlert()
         alert.alertStyle = .warning
@@ -105,7 +124,7 @@ extension SplitViewController {
         alert.buttons.first?.hasDestructiveAction = true
         alert.buttons.first?.keyEquivalent = ""
         alert.buttons.last?.keyEquivalent = "\r"
-        return alert.runModal() == .alertFirstButtonReturn
+        return alert
     }
 }
 

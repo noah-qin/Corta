@@ -62,6 +62,11 @@ enum Spawn {
         posix_spawn_file_actions_adddup2(&fileActions, 0, 1)
         posix_spawn_file_actions_adddup2(&fileActions, 0, 2)
         posix_spawn_file_actions_addinherit_np(&fileActions, writeEnd)
+        // The spawn fails with the `chdir` errno when the directory is gone,
+        // as it did when `corta-exec` changed directory itself.
+        if let workingDirectory {
+            posix_spawn_file_actions_addchdir(&fileActions, workingDirectory)
+        }
 
         var attributes: posix_spawnattr_t?
         posix_spawnattr_init(&attributes)
@@ -84,7 +89,7 @@ enum Spawn {
         sigemptyset(&noSignals)
         posix_spawnattr_setsigmask(&attributes, &noSignals)
 
-        var childArguments = [helperPath, String(writeEnd), workingDirectory ?? "", executable]
+        var childArguments = [helperPath, String(writeEnd), executable]
         childArguments.append(contentsOf: arguments)
         let environmentLines = environment.map { "\($0.key)=\($0.value)" }.sorted()
 

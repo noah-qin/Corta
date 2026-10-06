@@ -483,11 +483,15 @@ final class SplitViewController: NSViewController {
             view.window?.performClose(sender)
             return
         }
-        guard confirmClose(
+        guard view.window?.attachedSheet == nil else { return }
+        confirmClose(
             of: focusedPane.session?.hasForegroundJob == true ? [focusedPane] : [],
-            scope: L10n.text("close.scope.pane"))
-        else { return }
-        closePane(focusedPane)
+            scope: L10n.text("close.scope.pane"), in: view.window
+        ) { [weak self, weak focusedPane] confirmed in
+            // The pane may have exited while the sheet was up.
+            guard confirmed, let self, let focusedPane, self.panes.contains(focusedPane) else { return }
+            self.closePane(focusedPane)
+        }
     }
 
     func closePane(_ pane: ViewController) {

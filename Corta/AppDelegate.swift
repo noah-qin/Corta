@@ -404,15 +404,29 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     /// Confirms ⌘Q with something running; quitting bypasses
-    /// `windowShouldClose`.
+    /// `windowShouldClose`. A sheet on the key terminal window (or the first
+    /// visible one), answered later; app-modal, answered now, when none is
+    /// visible.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let running = windowControllers.compactMap {
             ($0.contentViewController as? SplitViewController)
         }.flatMap(\.panesWithRunningJobs)
         guard let split = windowControllers.first?.contentViewController as? SplitViewController,
-            !running.isEmpty
+            split.needsCloseConfirmation(for: running)
         else { return .terminateNow }
-        return split.confirmClose(of: running, scope: L10n.text("close.scope.app")) ? .terminateNow : .terminateCancel
+        let windows = windowControllers.compactMap(\.window).filter {
+            $0.isVisible && !$0.isMiniaturized && $0.contentViewController is SplitViewController
+        }
+        guard let window = windows.first(where: \.isKeyWindow) ?? windows.first,
+            let presenter = window.contentViewController as? SplitViewController
+        else {
+            let alert = split.closeAlert(for: running, scope: L10n.text("close.scope.app"))
+            return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
+        }
+        presenter.confirmClose(of: running, scope: L10n.text("close.scope.app"), in: window) {
+            NSApp.reply(toApplicationShouldTerminate: $0)
+        }
+        return .terminateLater
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
