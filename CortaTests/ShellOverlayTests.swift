@@ -24,7 +24,7 @@ import Testing
         let overlay = ShellOverlayView()
         let rect = CGRect(x: 7, y: 60, width: 2, height: 20)
         let message = L10n.text("commandHistory.statusInterrupted")
-        overlay.updateStatuses([.init(rect: rect, code: 130, description: message)])
+        overlay.updateStatuses([.init(rect: rect, description: message)])
         #expect(rect.maxX < TerminalLayout.insets.left)
         #expect(overlay.view(overlay, stringForToolTip: 0, point: CGPoint(x: 8, y: 65), userData: nil) == message)
         overlay.updateStatuses([])

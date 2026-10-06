@@ -24,7 +24,6 @@ import CortaTerminal
 final class ShellOverlayView: NSView {
     struct Status: Equatable {
         var rect: CGRect
-        var code: Int
         var description: String
     }
     var statuses: [Status] = []

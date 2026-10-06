@@ -91,6 +91,26 @@ import Testing
         #expect(unmarked.r == 0 && unmarked.g == 0 && unmarked.b == 0)
     }
 
+    /// Turning `command-status-marks` off takes the rules away on the next
+    /// frame although no row changed.
+    @Test func turningTheMarksOffNeedsNoOtherChange() throws {
+        guard let fixture = try Self.fixture() else {
+            Issue.record("No Metal device available in this environment")
+            return
+        }
+        var grid = Grid(rows: 4, columns: 10)
+        grid.setMark(.promptFailed, atAbsoluteRow: grid.absoluteRow(ofScreenRow: 1))
+        let rowHeight = Int(fixture.renderer.metrics.cellHeight)
+        let on = Self.draw(fixture, grid: grid, margin: 8)
+        let ruled = Self.pixel(of: on, x: 2, y: rowHeight + rowHeight / 2)
+        #expect(ruled.r > ruled.g)
+
+        fixture.renderer.drawsCommandMarks = false
+        let off = Self.draw(fixture, grid: grid, margin: 8)
+        let cleared = Self.pixel(of: off, x: 2, y: rowHeight + rowHeight / 2)
+        #expect(cleared.r == 0 && cleared.g == 0 && cleared.b == 0)
+    }
+
     /// A prompt still waiting on its command, and the row output starts on,
     /// draw nothing: after `clear` the grey rule on the lone current prompt
     /// looked like a stray line (#165).

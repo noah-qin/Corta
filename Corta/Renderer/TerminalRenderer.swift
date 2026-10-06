@@ -157,11 +157,12 @@ public nonisolated final class TerminalRenderer {
     /// own rows: drawn by AppKit they led the text by a frame or two and took
     /// the colour of the command below (#238).
     var drawsCommandMarks = true {
-        didSet { if drawsCommandMarks != oldValue { needsFullRebuild = true } }
+        didSet { if drawsCommandMarks != oldValue { marksAreStale = true } }
     }
-    /// The rules, in the margin rect's space (`markRect`); rebuilt with the
-    /// rows.
+    /// The rules, in the margin rect's space (`markRect`); rebuilt when the
+    /// rows are, or when `drawsCommandMarks` changes.
     private var cachedMarks: [QuadInstance] = []
+    private var marksAreStale = true
 
     /// Rows in the cached frame: the grid height `draw` lays out.
     var cachedRowCount: Int { cachedLines.count }
@@ -240,6 +241,7 @@ public nonisolated final class TerminalRenderer {
             || cachedIndexedOverridesGeneration != indexedOverridesGeneration
 
         var changed = fullRebuild
+        var rowsChanged = fullRebuild
         let previousBlockCursor = blockCursor
         let isBlock = effectiveCursorStyle == .block || effectiveCursorStyle == .blinkingBlock
         blockCursor =
@@ -253,10 +255,12 @@ public nonisolated final class TerminalRenderer {
         } else {
             changed = rebuildDamagedRows(
                 grid: grid, offset: offset, previousBlockCursor: previousBlockCursor)
+            rowsChanged = changed
         }
         if glyphAtlas.generation != atlasGeneration {
             rebuildAllRows(grid: grid, offset: offset)
             changed = true
+            rowsChanged = true
         }
 
         if fullRebuild || !Self.selectionsEqual(cachedSelection, selection)
@@ -300,7 +304,12 @@ public nonisolated final class TerminalRenderer {
         cachedCurrentSearchMatchIndex = currentSearchMatchIndex
         cachedHoveredLink = hoveredLink
         needsFullRebuild = false
-        if changed { rebuildMarks(alternateScreen: grid.isAlternateScreenActive) }
+        // Not on a cursor blink or a selection drag: only the rows carry marks.
+        if rowsChanged || marksAreStale {
+            changed = changed || marksAreStale
+            rebuildMarks(alternateScreen: grid.isAlternateScreenActive)
+            marksAreStale = false
+        }
         return changed
     }
 
@@ -885,10 +894,12 @@ public nonisolated final class TerminalRenderer {
                 color: color))
     }
 
-    /// The rule's column: 2 points wide, 6 points left of the grid, in the
-    /// inset — never over a cell. As tall as the grid.
+    /// The rule's column (`TerminalLayout.statusRuleOffset`, `Width`), in
+    /// the inset — never over a cell. As tall as the grid.
     func markRect(beside rect: CGRect) -> CGRect {
-        CGRect(x: rect.minX - 6 * scale, y: rect.minY, width: 2 * scale, height: rect.height)
+        CGRect(
+            x: rect.minX - TerminalLayout.statusRuleOffset * scale, y: rect.minY,
+            width: TerminalLayout.statusRuleWidth * scale, height: rect.height)
     }
 
     /// One rule per prompt row with an outcome, from the rows this frame
@@ -900,12 +911,12 @@ public nonisolated final class TerminalRenderer {
         guard drawsCommandMarks, !alternateScreen else { return }
         let cellHeight = Float(metrics.cellHeight)
         let point = Float(scale)
-        let width = 2 * point
-        let height = cellHeight - 4 * point
+        let width = Float(TerminalLayout.statusRuleWidth) * point
+        // At least a point, however small the font.
+        let height = max(point, cellHeight - 4 * point)
         for row in cachedLines.indices {
             let mark = cachedLines[row].mark
-            guard mark == .promptSucceeded || mark == .promptFailed || mark == .promptInterrupted
-            else { continue }
+            guard mark.hasOutcome else { continue }
             let color = Self.markColor(mark, frameOverlay)
             let top = Float(row) * cellHeight + 2 * point
             if mark == .promptInterrupted {
