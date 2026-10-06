@@ -137,6 +137,9 @@ what to edit.
   They were drawn a frame or two ahead of the text, so during continuous
   output a prompt briefly showed the green or red of a command below it.
   They are now drawn with the text, in the theme's green and red (#238).
+- Resizing a window no longer crashes Corta after a program typed in insert
+  mode (`CSI 4 h`) over a line ending in a wide character: the shift pushed
+  the character's second half off the row, and the next reflow read past it.
 
 ## [1.1.1] - 2026-10-03
 

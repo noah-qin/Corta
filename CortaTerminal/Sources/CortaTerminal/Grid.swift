@@ -237,10 +237,7 @@ public struct Grid: Sendable {
             let count = min(available, bytes.distance(from: index, to: bytes.endIndex))
             let end = bytes.index(index, offsetBy: count)
             // Insert mode shifts once per chunk, not per character.
-            if insertMode {
-                lines[cursor.row].insertCells(
-                    count, at: cursor.column, template: pen.eraseCell, width: columns)
-            }
+            if insertMode { insertBlankCells(count, row: cursor.row, column: cursor.column) }
             lines[cursor.row].overwriteASCII(bytes[index..<end], at: cursor.column, pen: pen)
             if cursor.column + count >= columns {
                 cursor.column = columns - 1
@@ -265,10 +262,7 @@ public struct Grid: Sendable {
             cursor.column = 0
             lineFeedWithoutClearingWrap()
         }
-        if insertMode {
-            lines[cursor.row].insertCells(
-                1, at: cursor.column, template: pen.eraseCell, width: columns)
-        }
+        if insertMode { insertBlankCells(1, row: cursor.row, column: cursor.column) }
         blankWidePairHalves(row: cursor.row, column: cursor.column)
         lines[cursor.row][cursor.column] = pen.cell(scalar)
         if cursor.column + 1 >= columns {
@@ -293,11 +287,8 @@ public struct Grid: Sendable {
             cursor.column = 0
             lineFeedWithoutClearingWrap()
         }
-        if insertMode {
-            // Make room for both columns, or the second overwrites what shifted.
-            lines[cursor.row].insertCells(
-                2, at: cursor.column, template: pen.eraseCell, width: columns)
-        }
+        // Make room for both columns, or the second overwrites what shifted.
+        if insertMode { insertBlankCells(2, row: cursor.row, column: cursor.column) }
         blankWidePairHalves(row: cursor.row, column: cursor.column)
         // The spacer may land on the lead of a later pair; blank it too.
         blankWidePairHalves(row: cursor.row, column: cursor.column + 1)
@@ -348,9 +339,7 @@ public struct Grid: Sendable {
             if let moved = clusterJoinTarget() { lines[moved.row][moved.column] = lead }
             return
         }
-        if insertMode {
-            lines[target.row].insertCells(1, at: target.column + 1, template: pen.eraseCell, width: columns)
-        }
+        if insertMode { insertBlankCells(1, row: target.row, column: target.column + 1) }
         blankWidePairHalves(row: target.row, column: target.column + 1)
         var spacer = lead
         spacer.scalar = 0x20
@@ -457,6 +446,15 @@ public struct Grid: Sendable {
         } else if cell.attributes.contains(.wide), column + 1 < columns {
             lines[row][column + 1] = pen.eraseCell
         }
+    }
+
+    /// IRM's shift. A pair pushed against the margin loses its spacer, and an
+    /// insert between a lead and its spacer parts them; either orphan made the
+    /// next column-changing reflow read past the end of its row.
+    private mutating func insertBlankCells(_ count: Int, row: Int, column: Int) {
+        let template = pen.eraseCell
+        lines[row].insertCells(count, at: column, template: template, width: columns)
+        repairWidePairs(row: row, template: template)
     }
 
     /// After ICH/DCH, blanks every half that lost its partner.
@@ -970,8 +968,7 @@ public struct Grid: Sendable {
     }
 
     public mutating func insertCharacters(_ count: Int) {
-        lines[cursor.row].insertCells(count, at: cursor.column, template: pen.eraseCell, width: columns)
-        repairWidePairs(row: cursor.row, template: pen.eraseCell)
+        insertBlankCells(count, row: cursor.row, column: cursor.column)
         pendingWrap = false
     }
 

@@ -52,16 +52,23 @@ struct FuzzCorpusTests {
 
     /// Feeds `bytes` in chunks derived from the input itself — a chunk
     /// boundary may fall in the middle of a UTF-8 character or an escape
-    /// sequence, which is where the decoder's state machine goes wrong.
+    /// sequence, which is where the decoder's state machine goes wrong —
+    /// and resizes at some boundaries, by `corta-fuzz`'s rule, so a row the
+    /// stream left behind meets a reflow.
     private func feedAndCheckCaps(_ bytes: [UInt8], name: String) {
-        let rows = 24
-        let columns = 80
+        var rows = 24
+        var columns = 80
         let scrollbackLimit = 64
         var terminal = Terminal(rows: rows, columns: columns, scrollbackLimit: scrollbackLimit)
         var offset = 0
         while offset < bytes.count {
             let end = min(bytes.count, offset + 1 + Int(bytes[offset]) % 17)
             terminal.feed(bytes[offset..<end])
+            if bytes[offset] % 11 == 0, end + 1 < bytes.count {
+                rows = 1 + Int(bytes[end]) % 30
+                columns = 1 + Int(bytes[end + 1]) % 100
+                terminal.resize(rows: rows, columns: columns)
+            }
             offset = end
         }
 

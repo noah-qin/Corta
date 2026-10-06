@@ -275,10 +275,15 @@ extension Grid {
         var i = 0
         while i < cells.count {
             let cell = cells[i]
-            let width = cell.attributes.contains(.wide) ? 2 : 1
-            if width > newColumns {
+            // A lead whose spacer is missing is drawn narrow rather than read
+            // past: the grid never writes one, but a reflow must not trust
+            // that, since an out-of-range read here takes the app down.
+            let hasSpacer = i + 1 < cells.count && cells[i + 1].attributes.contains(.wideSpacer)
+            let width = cell.attributes.contains(.wide) && hasSpacer ? 2 : 1
+            if width > newColumns || (width == 1 && cell.attributes.contains(.wide)) {
                 // Degenerate: a pair that could never fit even alone (a
-                // 1-column grid). Demote to narrow rather than loop forever.
+                // 1-column grid), or an orphaned lead. Demote to narrow
+                // rather than loop forever.
                 var demoted = cell
                 demoted.attributes.remove(.wide)
                 if column >= newColumns {
@@ -291,7 +296,7 @@ extension Grid {
                 record(i)
                 current[column] = demoted
                 column += 1
-                i += 2
+                i += hasSpacer ? 2 : 1
                 continue
             }
             if column + width > newColumns {
