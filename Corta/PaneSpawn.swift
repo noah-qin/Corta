@@ -109,10 +109,19 @@ enum PaneSpawn {
             environment: configuration.directoryCompletion
                 ? ZshBootstrap.environment(environment, executable: command.executable, arguments: command.arguments)
                 : environment, size: size,
-            workingDirectory: preset?.directory ?? workingDirectory ?? NSHomeDirectory(),
+            workingDirectory: usableDirectory(preset?.directory ?? workingDirectory),
             scrollbackLimit: configuration.scrollbackLines,
             commandHistoryLimit: configuration.commandHistoryLimit,
             imageBudget: .app)
+    }
+
+    /// `directory` if it answers as one within the check's bound, else home:
+    /// spawning into a mount that stopped answering blocks the main thread.
+    private static func usableDirectory(_ directory: String?) -> String {
+        let home = NSHomeDirectory()
+        guard let directory, directory != home else { return home }
+        let found = PathProbe.directories(among: [directory], timeout: .milliseconds(500))
+        return found.isEmpty ? home : directory
     }
 
     /// Casts to `PTYError`, not `CustomStringConvertible`: every `Error` now

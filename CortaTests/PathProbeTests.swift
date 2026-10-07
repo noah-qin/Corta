@@ -35,17 +35,35 @@ struct PathProbeTests {
         }
     }
 
+    @Test("checks still blocked are capped; past the cap a path counts as absent")
+    func blockedDirectoryChecksAreCapped() {
+        let gate = Gate()
+        defer { gate.released.withLock { $0 = true } }
+        let started = Mutex(0)
+        let paths = (0..<(PathProbe.maximumOutstanding + 10)).map { "/hung/\($0)" }
+        // Its own budget: the shared one is the app's, which other suites use.
+        let found = PathProbe.directories(
+            among: paths, timeout: .milliseconds(100),
+            isDirectory: { _ in
+                started.withLock { $0 += 1 }
+                gate.wait()
+                return true
+            }, budget: PathProbe.Budget(limit: PathProbe.maximumOutstanding))
+        #expect(found.isEmpty)
+        #expect(started.withLock { $0 } <= PathProbe.maximumOutstanding)
+    }
+
     @Test("a directory that never answers counts as absent once the timeout passes")
     func hungDirectoryIsAbsentAfterTheTimeout() {
         let gate = Gate()
         defer { gate.released.withLock { $0 = true } }
         let started = ContinuousClock.now
         let found = PathProbe.directories(
-            among: ["/fine", "/hung", "/fine"], timeout: .milliseconds(200)
-        ) { path in
-            if path == "/hung" { gate.wait() }
-            return true
-        }
+            among: ["/fine", "/hung", "/fine"], timeout: .milliseconds(200),
+            isDirectory: { path in
+                if path == "/hung" { gate.wait() }
+                return true
+            }, budget: PathProbe.Budget(limit: 4))
         #expect(found == ["/fine"])
         #expect(started.duration(to: .now) < .seconds(5))
     }
@@ -79,22 +97,33 @@ struct PathProbeTests {
         #expect(calls.withLock { $0 } == 1, "one check for both callers")
     }
 
+    /// A check that never returns: its callers are answered "no" after the
+    /// timeout, later paths are still answered (never left pending for good),
+    /// and the blocked threads stay capped.
     @MainActor
-    @Test("checks that never return hold a bounded number of slots, never the caller")
-    func hungReferenceChecksAreBounded() {
+    @Test("checks that never return are answered no and stay capped")
+    func hungReferenceChecksAreAnsweredAndCapped() async {
         let gate = Gate()
         defer { gate.released.withLock { $0 = true } }
         let started = Mutex(0)
-        let probe = FileReferenceProbe(check: { _ in
-            started.withLock { $0 += 1 }
-            gate.wait()
-            return false
-        })
-        for index in 0..<(FileReferenceProbe.maximumInFlight + 5) {
-            probe.probe("/hung/\(index)") { _ in }
+        let probe = FileReferenceProbe(
+            check: { _ in
+                started.withLock { $0 += 1 }
+                gate.wait()
+                return true
+            }, timeout: .milliseconds(100))
+        var answers: [Bool] = []
+        let count = FileReferenceProbe.maximumOutstanding + 5
+        for index in 0..<count {
+            probe.probe("/hung/\(index)") { answers.append($0) }
         }
-        Thread.sleep(forTimeInterval: 0.2)
-        #expect(started.withLock { $0 } <= FileReferenceProbe.maximumInFlight)
+        await waitUntil("every caller answered") { answers.count == count }
+        #expect(answers.allSatisfy { !$0 })
+        #expect(started.withLock { $0 } <= FileReferenceProbe.maximumOutstanding)
+        // Many hovers on one hung path are not queued without bound.
+        var extra = 0
+        for _ in 0..<50 { probe.probe("/hung/0") { _ in extra += 1 } }
+        await waitUntil("hover callbacks answered") { extra == 50 }
     }
 
     @Test("progress reports are let through at most once per interval")

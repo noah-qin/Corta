@@ -49,6 +49,8 @@ final class PanePointer: NSObject {
     private var hoveringLink = false
     /// The last hover, replayed when a pending file check answers.
     private var lastHover: (event: NSEvent, view: TerminalView)?
+    /// What the last hover showed, kept while its answer is checked again.
+    private var lastHoverReference: OpenableReference?
     /// Injected so tests answer without the filesystem.
     var fileProbe = FileReferenceProbe.shared
     /// Underlined, so the target shows before a click opens it.
@@ -466,10 +468,19 @@ final class PanePointer: NSObject {
     /// checked shows nothing yet; its answer replays the hover, if the
     /// pointer has not moved on.
     private func hoverReference(_ event: NSEvent, in terminalView: TerminalView) -> OpenableReference? {
-        switch lookUpReference(detectedReferenceUnder(event, in: terminalView)) {
+        let detected = detectedReferenceUnder(event, in: terminalView)
+        switch lookUpReference(detected) {
         case .resolved(let reference):
+            lastHoverReference = reference
             return reference
         case .pending(let path):
+            // The same reference still under the pointer as its answer ages
+            // out: keep showing it while it is checked again, or the
+            // underline flickered every `lifetime`.
+            if let last = lastHoverReference, let detected, last.range == detected.range {
+                fileProbe.probe(path) { _ in }
+                return last
+            }
             lastHover = (event, terminalView)
             fileProbe.probe(path) { [weak self] _ in
                 guard let self, let hover = self.lastHover, hover.event === event else { return }
@@ -536,11 +547,7 @@ final class PanePointer: NSObject {
     ///   there too.
     static func resolve(
         _ reference: FileReferenceDetection.Reference, directory: String?,
-        isRegularFile: (String) -> Bool = { path in
-            var isDirectory = ObjCBool(false)
-            let exists = FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
-            return exists && !isDirectory.boolValue
-        }
+        isRegularFile: (String) -> Bool = PathProbe.isRegularFile
     ) -> ResolvedFileReference? {
         guard let path = candidatePath(reference, directory: directory), isRegularFile(path)
         else { return nil }

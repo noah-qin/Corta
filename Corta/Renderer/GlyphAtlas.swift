@@ -21,6 +21,19 @@ import CoreText
 import Metal
 import simd
 
+/// The device could not allocate the atlas's textures even at the smallest
+/// size: GPU memory is exhausted, or the device is gone.
+nonisolated enum GlyphAtlasError: Error, CustomStringConvertible {
+    case textureUnavailable(minimumPixelSize: Int)
+
+    var description: String {
+        switch self {
+        case .textureUnavailable(let size):
+            "the GPU could not allocate a \(size)-pixel glyph atlas"
+        }
+    }
+}
+
 /// Rasterises glyphs into an `r8Unorm` atlas, cached by scalar, cluster
 /// and weight; color glyphs go to a second, `bgra8Unorm` atlas.
 ///
@@ -50,24 +63,12 @@ import simd
 /// than a page draws blank after the retry.
 ///
 /// **Allocation failure.** `init` halves the size down to
-/// `minimumAtlasPixelSize` and sets `isDegraded`; only failing at the
-/// minimum traps, since such a device can render nothing.
+/// `minimumAtlasPixelSize` and sets `isDegraded`; failing at the minimum
+/// throws `GlyphAtlasError`, and the pane shows its renderer failure.
 ///
 /// **Single-threaded.** No synchronisation, and Core Text objects are not
 /// shareable — two threads segfault in `CTRunGetImageBounds`. The app
 /// drives it from the main thread; tests that build one are serialised.
-/// The device could not allocate the atlas's textures even at the smallest
-/// size: GPU memory is exhausted, or the device is gone.
-nonisolated enum GlyphAtlasError: Error, CustomStringConvertible {
-    case textureUnavailable(minimumPixelSize: Int)
-
-    var description: String {
-        switch self {
-        case .textureUnavailable(let size):
-            "the GPU could not allocate a \(size)-pixel glyph atlas"
-        }
-    }
-}
 
 nonisolated final class GlyphAtlas {
     /// The four faces, as two bits: part of the glyph-cache key looked up
