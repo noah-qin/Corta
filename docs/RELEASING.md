@@ -23,6 +23,11 @@ signatures, notarisation and archive/feed checks still gate delivery.
 3. It opens a version PR, explicitly dispatches the ordinary CI (bot-token
    PR creation does not trigger CI), waits for the matching commit's run,
    and squash-merges only after the branch's required checks allow it.
+   GitHub does not count a dispatched run's checks toward a PR, so
+   `scripts/report-ci-statuses.sh` copies each CI job's conclusion onto the
+   PR's head commit as a status of the same name, linked to the job; a job
+   that did not succeed is reported as failed. The feed PR (step 6) does the
+   same. Without it the 1.1.5 version PR sat blocked behind green checks.
 4. It checks out that exact merge commit, reruns core/app tests, archives
    with the pinned Xcode and Developer ID, exports, packages, notarises,
    staples and checks the app with `corta-release-check --require-notarized`.
@@ -52,6 +57,11 @@ the default patch route. Performance measurements and conformance records
 are added when measured; the automation does not invent evidence.
 
 ## Recovery
+
+A version or feed PR blocked with its CI green is missing those statuses:
+check that the job had `statuses: write`, then re-run. As a one-off, closing
+and reopening the PR as a maintainer starts an ordinary `pull_request` CI
+run instead; reopening cancels its auto-merge, so merge it afterwards.
 
 Re-run the **same Actions run** (failed jobs or all jobs) after a transient CI, signing, upload or
 feed failure. The preparation PR is keyed by run ID, so retries reuse its

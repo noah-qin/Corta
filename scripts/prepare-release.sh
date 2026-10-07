@@ -84,6 +84,7 @@ if [ "$state" != MERGED ]; then
   done
   test -n "$run_id" || { echo '::error::Preparation CI did not start.'; exit 1; }
   gh run watch "$run_id" --exit-status --interval 30
+  bash "$(dirname "$0")/report-ci-statuses.sh" "$run_id" "$expected"
   gh pr merge "$pr" --squash --auto --delete-branch --match-head-commit "$expected"
   # Do not sign while auto-merge is merely pending (strict required checks).
   for _ in $(seq 1 120); do
