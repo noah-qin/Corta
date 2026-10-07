@@ -64,8 +64,8 @@ installed when you say so.
   from its right-click menu. Return saves, Esc cancels, and an empty name
   restores the automatic title. Custom names survive shell output and session
   restoration. The tab and terminal right-click menus also offer New Tab, and
-  the toolbar's **+** button opens one even while a window has a single tab
-  and no tab bar.
+  the toolbar's **+** button opens one whether or not the tab bar shows; the
+  tab bar has no **+** of its own.
 - **Zoom Pane** is temporary: nothing closes and no process is disturbed.
 - **Reopen Closed Pane** restores the pane's place, size and working
   directory — not the program that was running in it.

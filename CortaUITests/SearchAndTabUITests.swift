@@ -66,6 +66,11 @@ final class SearchAndTabUITests: XCTestCase {
         let twoTabs = NSPredicate(format: "label CONTAINS '2 tabs'")
         expectation(for: twoTabs, evaluatedWith: tabGroup)
         waitForExpectations(timeout: 5)
+
+        // One "+", the toolbar's: the tab bar must not add a second.
+        let plus = window.buttons.matching(
+            NSPredicate(format: "label ==[c] 'New Tab' OR title ==[c] 'New Tab'"))
+        XCTAssertEqual(plus.count, 1, "toolbar and tab bar both show a +: \(plus.debugDescription)")
     }
 
     /// A ⌘T must not take a chrome height off the shared window frame —

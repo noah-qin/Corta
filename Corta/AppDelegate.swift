@@ -140,11 +140,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
     }
 
-    /// The tab bar's "+" button; implementing this is also what shows it.
-    @objc func newWindowForTab(_ sender: Any?) {
-        newTab(sender)
-    }
-
     /// One tracked terminal window controller, its root pane spawned from
     /// `setup` and its window sized, not yet shown. `asPanel` makes it the
     /// Quick Terminal's non-activating panel.
