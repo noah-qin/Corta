@@ -117,12 +117,12 @@ checksum, unzip the archive and move `Corta.app` to `/Applications`.
 
 ```sh
 # Run in the directory containing both downloaded files.
-shasum -a 256 -c Corta-1.1.6.zip.sha256
-unzip Corta-1.1.6.zip
+shasum -a 256 -c Corta-1.1.7.zip.sha256
+unzip Corta-1.1.7.zip
 ```
 
 > [!NOTE]
-> **Release status:** [1.1.6](https://github.com/noah-qin/Corta/releases/tag/v1.1.6),
+> **Release status:** [1.1.7](https://github.com/noah-qin/Corta/releases/tag/v1.1.7),
 > prepared on 2026-10-07. Manually running Release on `main` starts tests,
 > build, sign and notarise the app, publish a release, and update
 > the signed update feed. See [GitHub Releases](https://github.com/noah-qin/Corta/releases/latest)

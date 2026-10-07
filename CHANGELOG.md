@@ -10,6 +10,8 @@ what to edit.
 
 ## [Unreleased]
 
+## [1.1.7] — 2026-10-07
+
 ### Added
 
 - A **+** button in the toolbar, beside the network and folder buttons,
@@ -51,6 +53,10 @@ what to edit.
 - The input-source indicator's default mode is called **Automatically**
   (was "While entering commands"): in the toolbar it now shows while
   programs run too.
+
+### Commits
+
+- fix(app): show the IME caret, keep the badge, fix palette and find (#269)
 
 ## [1.1.6] — 2026-10-07
 
@@ -1567,7 +1573,8 @@ M1–M10.
   same-conditions end-to-end re-measurement against the 45.5 ms baseline
   is still open.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.1.6...main
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.1.7...main
+[1.1.7]: https://github.com/noah-qin/Corta/releases/tag/v1.1.7
 [1.1.6]: https://github.com/noah-qin/Corta/releases/tag/v1.1.6
 [1.1.5]: https://github.com/noah-qin/Corta/releases/tag/v1.1.5
 [1.1.1]: https://github.com/noah-qin/Corta/releases/tag/v1.1.1
