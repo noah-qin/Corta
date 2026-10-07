@@ -29,6 +29,7 @@ what to edit.
 - Move to Applications no longer fails every time when opened straight from
   the download (App Translocation), and never replaces a newer installed
   Corta with an older copy.
+
 ### Keyboard (reliability review, 2026-10-07)
 
 - ⌥← and ⌥→, ⌥⌫, Home, End, Page Up, Page Down, forward delete, F1–F12 and
