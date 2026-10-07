@@ -20,7 +20,7 @@ import Synchronization
 /// `stat` without trusting it to return: on a network mount whose server
 /// has gone, it can block for minutes, and on the main thread that is the
 /// whole app frozen — at every launch, when the saved arrangement names
-/// such a directory. The calls run on their own queue and the caller waits
+/// such a directory. The calls run on threads of their own and the caller waits
 /// at most `timeout`; a path that has not answered by then counts as
 /// absent, and its thread is left to finish whenever the mount does.
 nonisolated enum PathProbe {
@@ -46,8 +46,17 @@ nonisolated enum PathProbe {
     static let maximumOutstanding = 16
     static let sharedBudget = Budget(limit: maximumOutstanding)
 
-    private static let queue = DispatchQueue(
-        label: "dev.noahqin.Corta.path-probe", qos: .userInitiated, attributes: .concurrent)
+    /// A thread of its own per check, not a GCD queue: a check that may
+    /// block for minutes must not take a worker from the shared pool, and a
+    /// saturated pool must not delay a check past its caller's deadline (the
+    /// budget bounds how many exist).
+    static func run(_ body: @escaping @Sendable () -> Void) {
+        let thread = Thread(block: body)
+        thread.name = "dev.noahqin.Corta.path-probe"
+        thread.qualityOfService = .userInitiated
+        thread.stackSize = 256 * 1024
+        thread.start()
+    }
 
     /// The paths among `paths` that are directories, as far as `timeout`
     /// allows. `isDirectory` is the check itself, injected for tests.
@@ -64,7 +73,7 @@ nonisolated enum PathProbe {
             // drain the pool every other queue in the app draws on.
             guard budget.take() else { continue }
             group.enter()
-            queue.async {
+            run {
                 if isDirectory(path) { found.withLock { _ = $0.insert(path) } }
                 budget.give()
                 group.leave()
@@ -155,7 +164,7 @@ final class FileReferenceProbe {
         waiting[path] = [then]
         outstanding += 1
         let check = check
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        PathProbe.run { [weak self] in
             let isFile = check(path)
             Task { @MainActor [weak self] in
                 guard let self else { return }
