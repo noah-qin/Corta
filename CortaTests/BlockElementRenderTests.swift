@@ -110,6 +110,82 @@ struct BlockElementRenderTests {
         }
     }
 
+    /// Claude Code draws its boxes with ╭╮╰╯. Drawn from the font, the
+    /// corners neither met the grid-drawn sides nor matched their weight:
+    /// every rounded box had four broken corners. The border must be one
+    /// connected stroke, through every corner.
+    @Test func roundedCornersJoinTheirSides() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        for size: CGFloat in [12, 14, 17, 40] {
+            for scale: CGFloat in [1, 2] {
+                let renderer = try TerminalRenderer(device: device,
+                    font: TerminalFont.primary(ofSize: size), scale: scale)
+                var terminal = Terminal(rows: 3, columns: 5)
+                terminal.feed(Array("\u{1B}[37m╭───╮\r\n│   │\r\n╰───╯".utf8))
+                let w = Int(renderer.metrics.cellWidth), h = Int(renderer.metrics.cellHeight)
+                let width = 5 * w, height = 3 * h
+                let texture = MetalRenderTarget.make(device: device, width: width, height: height)
+                renderer.renderAndWait(grid: terminal.grid,
+                    rect: CGRect(x: 0, y: 0, width: width, height: height),
+                    drawableSize: CGSize(width: width, height: height), cursorVisible: false,
+                    selection: nil, target: texture)
+                var bytes = [UInt8](repeating: 0, count: width * height * 4)
+                texture.getBytes(&bytes, bytesPerRow: width * 4,
+                    from: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)
+                func ink(_ x: Int, _ y: Int) -> Bool {
+                    let i = (y * width + x) * 4
+                    return Int(bytes[i]) + Int(bytes[i + 1]) + Int(bytes[i + 2]) > 100
+                }
+                let stroke = max(1, Int(scale))
+                let midX = (w - stroke) / 2, midY = (h - stroke) / 2
+                // Every ink pixel reachable from the middle of the top side.
+                var seen = [Bool](repeating: false, count: width * height)
+                var queue = [(2 * w, midY)]
+                seen[midY * width + 2 * w] = true
+                while let (x, y) = queue.popLast() {
+                    for dy in -1...1 {
+                        for dx in -1...1 {
+                            let nx = x + dx, ny = y + dy
+                            guard nx >= 0, ny >= 0, nx < width, ny < height,
+                                !seen[ny * width + nx], ink(nx, ny) else { continue }
+                            seen[ny * width + nx] = true
+                            queue.append((nx, ny))
+                        }
+                    }
+                }
+                let context = "size \(size), scale \(scale)"
+                #expect(seen[(h + h / 2) * width + midX], "left side cut off, \(context)")
+                #expect(seen[(h + h / 2) * width + 4 * w + midX], "right side cut off, \(context)")
+                #expect(seen[(2 * h + midY) * width + 2 * w], "bottom side cut off, \(context)")
+                // A corner is a curve, not a square: its cell's outer corner is bare.
+                for (x, y) in [(0, 0), (width - 1, 0), (0, height - 1), (width - 1, height - 1)] {
+                    #expect(!ink(x, y), "ink in a rounded corner at \(x),\(y), \(context)")
+                }
+                if !(seen[(h + h / 2) * width + midX] && seen[(h + h / 2) * width + 4 * w + midX]) {
+                    MetalRenderTarget.attachPNG(texture, named: "rounded-box-\(Int(size))-\(Int(scale)).png")
+                }
+            }
+        }
+    }
+
+    /// Every corner's pieces stay inside the cell and inside the inline storage.
+    @Test func roundedCornerPiecesStayInTheirCell() {
+        for scalar: UInt32 in 0x256D...0x2570 {
+            for (width, height, scale): (Float, Float, Float) in
+                [(7, 15, 1), (17, 33, 2), (60, 120, 2), (115, 230, 3), (2, 4, 1)] {
+                let pieces = try? #require(BoxDrawing.pieces(for: scalar, width: width,
+                    height: height, scale: scale))
+                guard let pieces else { continue }
+                #expect(pieces.count <= BoxDrawing.capacity)
+                for rect in pieces {
+                    #expect(rect.x >= 0 && rect.y >= 0 && rect.z > 0 && rect.w > 0)
+                    #expect(rect.x + rect.z <= width && rect.y + rect.w <= height,
+                        "U+\(String(scalar, radix: 16)) \(rect) outside \(width)x\(height)")
+                }
+            }
+        }
+    }
+
     @Test func faintTableStrokeHasUniformColorAcrossItsJunction() throws {
         let (_, _, _, optionalTexture) = try Self.render("\u{1B}[2m─")
         let texture = try #require(optionalTexture)
