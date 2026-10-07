@@ -654,6 +654,10 @@ final class SettingsModel {
                 message: L10n.format(
                     "settings.status.shellIntegrationInstalled", integration.displayPath),
                 actionTitle: L10n.text("settings.action.remove"))
+        case .unreadable(let path):
+            shellIntegrationStatus = RowStatus(
+                kind: .failed,
+                message: L10n.format("settings.status.shellIntegrationUnreadable", path))
         case .outdated:
             shellIntegrationStatus = RowStatus(
                 kind: .adjusted,
@@ -672,6 +676,7 @@ final class SettingsModel {
         switch integration.status() {
         case .notInstalled, .conflicting, .outdated: applyShellIntegration(integration.install())
         case .installed: applyShellIntegration(integration.uninstall())
+        case .unreadable: refreshShellIntegrationStatus()
         }
     }
 

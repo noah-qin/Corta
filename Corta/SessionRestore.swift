@@ -335,6 +335,9 @@ struct SessionRestore {
 
     func save(_ states: [WindowState]) {
         let url = fileURL
+        // Windows saved by a newer Corta are skipped on load; written over,
+        // they would be gone when the newer build runs again.
+        guard !holdsNewerState() else { return }
         do {
             let data = try JSONEncoder().encode(states)
             // Owner-only, as `recent-hosts.json`: directories say where you work.
@@ -342,6 +345,15 @@ struct SessionRestore {
         } catch {
             // Losing the arrangement is not worth interrupting a quit for.
         }
+    }
+
+    /// The file on disk has a window from a newer format.
+    func holdsNewerState() -> Bool {
+        struct VersionProbe: Decodable { var version: Int? }
+        guard let data = try? Data(contentsOf: fileURL),
+            let probes = try? JSONDecoder().decode([VersionProbe].self, from: data)
+        else { return false }
+        return probes.contains { ($0.version ?? 0) > WindowState.currentVersion }
     }
 
     func clear() {

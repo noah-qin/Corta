@@ -51,6 +51,11 @@ anywhere; `/Applications` is where Sparkle updates and Spotlight expect it.
 Say no and it stops asking — or set `suggest-applications-folder = false`
 in `~/.config/corta/config`.
 
+Opened straight from the unzipped download, macOS runs Corta from a
+temporary read-only location, so it cannot move itself; it asks you to drag
+it into Applications instead. If a newer Corta is already there, it offers
+to open that one rather than replace it with the older copy.
+
 ### There are two Corta icons in the Dock
 
 One of them is a development build. Finder calls it **Corta Dev**, the
@@ -120,6 +125,15 @@ the config file overrides this per pane.
 `restore-windows = false` in `~/.config/corta/config`, or uncheck it in
 Settings ▸ General. A restore that crashed the app is not retried: the
 saved arrangement is dropped and one fresh window opens.
+
+### Settings says it can't read the config file
+
+`~/.config/corta/config` exists but is not UTF-8 text — usually a byte
+saved by an editor in another encoding — or you cannot read it. Corta keeps
+the settings it has and refuses to write the file, because writing would
+replace everything in it. Re-save the file as UTF-8 (or remove the bad
+line); Corta picks it up as soon as it reads again. Shell integration does
+the same for an rc file it cannot read: it reports it and leaves it alone.
 
 ---
 

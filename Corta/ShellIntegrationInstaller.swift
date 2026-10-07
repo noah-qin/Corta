@@ -115,8 +115,11 @@ struct ShellIntegration {
     /// file is outdated, since `update()` completes it.
     func status() -> ShellIntegrationStatus {
         let each = targets.map { $0.status() }
-        if each.allSatisfy({ $0 == .installed }) { return .installed }
         let all = each + others.map { $0.status() }
+        for status in all {
+            if case .unreadable = status { return status }
+        }
+        if each.allSatisfy({ $0 == .installed }) { return .installed }
         for status in all {
             if case .conflicting = status { return status }
         }
@@ -134,6 +137,7 @@ struct ShellIntegration {
             case .installed: false
             case .outdated: !installer.update()
             case .notInstalled, .conflicting: !installer.install()
+            case .unreadable: true
             }
         }.map(\.displayPath)
     }
@@ -158,6 +162,10 @@ enum ShellIntegrationStatus: Equatable {
     case outdated
     /// No Corta block, but another terminal's integration (named) is sourced.
     case conflicting(String)
+    /// The file (named) exists but cannot be read as UTF-8 text, so nothing
+    /// can be said about it — and nothing is written to it: installing into
+    /// a file read as empty replaced the whole rc file with Corta's block.
+    case unreadable(String)
 }
 
 /// Installs, diagnoses and removes shell integration, which is optional:
@@ -204,10 +212,14 @@ struct ShellIntegrationInstaller {
         ("WEZTERM_SHELL_SKIP_ALL", "WezTerm"),
     ]
 
-    /// Never throws: an unreadable or missing rc file is `.notInstalled`.
+    /// Never throws: a missing rc file is `.notInstalled`, one that exists
+    /// but cannot be read `.unreadable`.
     func status() -> ShellIntegrationStatus {
-        guard let text = try? String(contentsOf: rcFileURL, encoding: .utf8) else {
-            return .notInstalled
+        let text: String
+        switch UserFile.readText(at: rcFileURL) {
+        case .missing: return .notInstalled
+        case .unreadable: return .unreadable(displayPath)
+        case .text(let contents): text = contents
         }
         if text.contains(Self.beginMarker) {
             // A block whose end marker is gone cannot be updated in place;
@@ -230,8 +242,19 @@ struct ShellIntegrationInstaller {
     /// does not exist yet is created with `createdHeader` above the block.
     @discardableResult
     func install() -> Bool {
-        let created = !FileManager.default.fileExists(atPath: rcFileURL.path)
-        var existing = (try? String(contentsOf: rcFileURL, encoding: .utf8)) ?? ""
+        let created: Bool
+        var existing: String
+        switch UserFile.readText(at: rcFileURL) {
+        case .missing:
+            created = true
+            existing = ""
+        case .unreadable:
+            // Read as empty, this wrote the block over the user's whole file.
+            return false
+        case .text(let contents):
+            created = false
+            existing = contents
+        }
         guard !existing.contains(Self.beginMarker) else { return true }
         if created { existing = Self.createdHeader + "\n" }
         if !existing.isEmpty, !existing.hasSuffix("\n") { existing += "\n" }
@@ -273,8 +296,12 @@ struct ShellIntegrationInstaller {
     /// a symbolic link is never deleted.
     @discardableResult
     func uninstall() -> Bool {
-        guard let existing = try? String(contentsOf: rcFileURL, encoding: .utf8) else {
-            return true
+        let existing: String
+        switch UserFile.readText(at: rcFileURL) {
+        case .missing: return true
+        // Whether it holds a block is unknown; say so rather than "removed".
+        case .unreadable: return false
+        case .text(let contents): existing = contents
         }
         guard let range = blockRange(in: existing) else { return true }
         var updated = existing

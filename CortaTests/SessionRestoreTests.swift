@@ -352,6 +352,20 @@ struct RestoreCrashRecoveryTests {
             layout: .pane(directory: nil))
     }
 
+    /// Windows a newer Corta saved are skipped on load; an older build's
+    /// save must not then replace them with only its own.
+    @Test func aNewerFormatsStateIsNotOverwritten() throws {
+        try withTemporaryStateDirectory { store in
+            try FileManager.default.createDirectory(at: store.directory, withIntermediateDirectories: true)
+            let newer = Data(#"[{"version": 99, "frame": {"x":0,"y":0,"width":900,"height":560}, "layout": {"pane": {}}}]"#.utf8)
+            try newer.write(to: store.fileURL)
+            #expect(store.load().isEmpty)
+            #expect(store.holdsNewerState())
+            store.save([state])
+            #expect(try Data(contentsOf: store.fileURL) == newer)
+        }
+    }
+
     /// **A crash during a restore.** The marker is still there, so the layout
     /// that was being applied is the suspect and is not applied again.
     @Test func aLaunchAfterACrashDuringRestoreStartsFresh() throws {

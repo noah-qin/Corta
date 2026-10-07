@@ -203,6 +203,19 @@ struct DirectoryHistoryStoreTests {
         #expect(reloaded.history.entries["/Users/noah/Developer/personal/Corta"]?.visitCount == 1)
     }
 
+    @Test("a history file from a newer Corta is left alone")
+    func newerFileIsPreserved() throws {
+        defer { removeDirectory() }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let newer = Data(#"{"version": 99, "entries": []}"#.utf8)
+        try newer.write(to: file)
+        let store = DirectoryHistoryStore(fileURL: file)
+        #expect(store.preservesNewerFile)
+        store.record("/tmp")
+        store.flush()
+        #expect(try Data(contentsOf: file) == newer)
+    }
+
     @Test("clear removes the file as well as the in-memory history")
     func clearRemovesTheFile() {
         defer { removeDirectory() }

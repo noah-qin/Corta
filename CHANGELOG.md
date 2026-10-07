@@ -10,6 +10,25 @@ what to edit.
 
 ## [Unreleased]
 
+### Your files and remote copies (reliability review, 2026-10-07)
+
+- A config file or shell rc file that is not UTF-8 text (or cannot be read)
+  is no longer overwritten. Before, the config read as empty and the next
+  change in Settings replaced it with defaults; installing shell
+  integration replaced the whole rc file with Corta's block. Both now say
+  why and leave the file alone.
+- A remote-edit upload that fails asks again instead of leaving the edit
+  stuck, when later saves never prompted. An edit never uploaded before
+  quitting is offered for upload when the file is opened again, and a local
+  copy Corta has lost track of is kept aside instead of blocking the open.
+- Deleting in the remote file browser removes what the confirmation named,
+  even if the listing moved to another folder before you confirmed; a
+  download started before navigating fetches the chosen entries.
+- Window arrangement, directory history and the remote-edit records saved
+  by a newer Corta are no longer overwritten by an older one.
+- Move to Applications no longer fails every time when opened straight from
+  the download (App Translocation), and never replaces a newer installed
+  Corta with an older copy.
 ### Keyboard (reliability review, 2026-10-07)
 
 - ⌥← and ⌥→, ⌥⌫, Home, End, Page Up, Page Down, forward delete, F1–F12 and

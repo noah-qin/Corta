@@ -39,6 +39,10 @@ final class ConfigurationStore {
     private(set) var configuration = Configuration()
     /// Why the last write failed; nil after a success.
     private(set) var lastWriteError: Error?
+    /// The file exists but cannot be read as UTF-8 text. Writes are refused
+    /// until it can: writing would replace every setting in it with this
+    /// run's defaults.
+    private(set) var readError: Error?
     /// Other versions' keys, carried through writes.
     private var unknownKeys: [(String, String)] = []
 
@@ -69,22 +73,52 @@ final class ConfigurationStore {
 
     // MARK: - Reading
 
-    /// Reads the file; absent or unreadable means defaults, so nothing reports
-    /// settings no file persists.
+    /// Reads the file; absent means defaults, so nothing reports settings no
+    /// file persists. Present but unreadable — permissions, or bytes that are
+    /// not UTF-8 — keeps what is in memory and refuses writes until the file
+    /// reads again: loaded as defaults, the next change in Settings wrote the
+    /// defaults over every hand-made theme, binding and preset in it.
     func reload() {
-        guard let text = try? String(contentsOf: fileURL, encoding: .utf8) else {
+        let text: String
+        switch UserFile.readText(at: fileURL) {
+        case .missing:
+            setReadError(nil)
             unknownKeys = []
             let defaults = Configuration()
             guard configuration != defaults else { return }
             configuration = defaults
             NotificationCenter.default.post(name: Self.didChange, object: nil)
             return
+        case .unreadable(let error):
+            setReadError(error)
+            return
+        case .text(let contents):
+            setReadError(nil)
+            text = contents
         }
         let (parsed, unknown) = Configuration.parse(text)
         unknownKeys = unknown
         guard parsed != configuration else { return }
         configuration = parsed
         NotificationCenter.default.post(name: Self.didChange, object: nil)
+    }
+
+    /// The refusal a write reports while the file is unreadable.
+    struct UnreadableFileError: LocalizedError {
+        let path: String
+        var errorDescription: String? { L10n.format("settings.status.configUnreadable", path) }
+    }
+
+    /// Reported through the write status, which Settings shows: a change
+    /// there is what the refusal stops.
+    private func setReadError(_ error: Error?) {
+        let wasUnreadable = readError != nil
+        readError = error
+        if error != nil {
+            noteWriteResult(UnreadableFileError(path: fileURL.path))
+        } else if wasUnreadable {
+            noteWriteResult(nil)
+        }
     }
 
     // MARK: - Writing
@@ -112,6 +146,10 @@ final class ConfigurationStore {
     /// discoverable first launch.
     @discardableResult
     func write() -> Bool {
+        guard readError == nil else {
+            noteWriteResult(UnreadableFileError(path: fileURL.path))
+            return false
+        }
         let url = fileURL
         let text = configuration.serialized(preserving: unknownKeys)
         do {

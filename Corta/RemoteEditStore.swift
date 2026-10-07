@@ -66,6 +66,10 @@ final class RemoteEditStore {
 
     /// Copies by `RemoteCopy.id`.
     private(set) var copies: [String: RemoteCopy] = [:]
+    /// The manifest on disk is from a newer Corta: read as empty here, and
+    /// never written, or this build's next save would drop every copy it
+    /// does not know.
+    private(set) var preservesNewerManifest = false
 
     /// Where approved-upload snapshots and pre-upload probes are written.
     var approvalsURL: URL { rootURL.appendingPathComponent("Approvals", isDirectory: true) }
@@ -221,10 +225,14 @@ final class RemoteEditStore {
     }
 
     private func load() {
-        guard let data = try? Data(contentsOf: manifestURL),
-            let persisted = try? JSONDecoder().decode(Persisted.self, from: data),
-            persisted.version <= Persisted.currentVersion
-        else { return }
+        guard let data = try? Data(contentsOf: manifestURL) else { return }
+        if let version = try? JSONDecoder().decode(VersionProbe.self, from: data).version,
+            version > Persisted.currentVersion
+        {
+            preservesNewerManifest = true
+            return
+        }
+        guard let persisted = try? JSONDecoder().decode(Persisted.self, from: data) else { return }
         copies = Dictionary(
             persisted.copies.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
@@ -233,7 +241,34 @@ final class RemoteEditStore {
         rootURL.appendingPathComponent("manifest.json")
     }
 
+    /// Only the version, so a newer shape is recognised as newer.
+    private struct VersionProbe: Decodable {
+        var version: Int
+    }
+
+    /// Moves a copy the manifest does not name out of the way, beside it, as
+    /// `<name> (local copy <date>)`; returns where it went.
+    func setAsideOrphan(at url: URL) throws -> URL {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HHmmss"
+        let name = url.deletingPathExtension().lastPathComponent
+        let ext = url.pathExtension
+        let stamp = formatter.string(from: Date())
+        var candidate = url.deletingLastPathComponent().appendingPathComponent(
+            "\(name) (local copy \(stamp))" + (ext.isEmpty ? "" : ".\(ext)"))
+        var attempt = 2
+        while FileManager.default.fileExists(atPath: candidate.path) {
+            candidate = url.deletingLastPathComponent().appendingPathComponent(
+                "\(name) (local copy \(stamp) \(attempt))" + (ext.isEmpty ? "" : ".\(ext)"))
+            attempt += 1
+        }
+        try FileManager.default.moveItem(at: url, to: candidate)
+        return candidate
+    }
+
     private func save() {
+        guard !preservesNewerManifest else { return }
         let persisted = Persisted(version: Persisted.currentVersion, copies: Array(copies.values))
         guard let data = try? JSONEncoder().encode(persisted) else { return }
         try? secureCopy(at: manifestURL)

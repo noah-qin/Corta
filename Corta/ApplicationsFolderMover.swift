@@ -32,6 +32,22 @@ enum ApplicationsFolderMover {
         let bundleURL = Bundle.main.bundleURL
         guard !isUnderApplications(bundleURL), !isDeveloperBuild(bundleURL) else { return }
 
+        // A newer Corta is already installed: replacing it would downgrade it.
+        if let installed = installedURL(for: bundleURL), let installedVersion = version(at: installed),
+            let ownVersion = Bundle.main.infoDictionary?["CFBundleVersion"] as? String,
+            isVersion(installedVersion, newerThan: ownVersion)
+        {
+            offerNewerInstall(installed)
+            return
+        }
+        // Gatekeeper runs a quarantined download from a read-only random path
+        // (App Translocation): the bundle cannot be moved from there, so the
+        // move failed every time. Ask for the drag that removes translocation.
+        if isTranslocated(bundleURL) {
+            offerManualMove()
+            return
+        }
+
         let alert = NSAlert()
         alert.messageText = L10n.text("moveToApplications.title")
         alert.informativeText = L10n.text("moveToApplications.message")
@@ -55,6 +71,63 @@ enum ApplicationsFolderMover {
 
     private static func isDeveloperBuild(_ url: URL) -> Bool {
         url.path.contains("/Xcode/DerivedData/")
+    }
+
+    /// Under App Translocation's mount: a quarantined app opened where it
+    /// was unpacked. Pure, for tests.
+    nonisolated static func isTranslocated(_ url: URL) -> Bool {
+        url.path.contains("/AppTranslocation/")
+    }
+
+    /// Whether build `candidate` is newer than `current`, compared as
+    /// dotted numbers. Pure, for tests.
+    nonisolated static func isVersion(_ candidate: String, newerThan current: String) -> Bool {
+        candidate.compare(current, options: .numeric) == .orderedDescending
+    }
+
+    private static func installedURL(for source: URL) -> URL? {
+        guard let applications = FileManager.default.urls(
+            for: .applicationDirectory, in: .localDomainMask).first
+        else { return nil }
+        let destination = applications.appendingPathComponent(source.lastPathComponent)
+        return FileManager.default.fileExists(atPath: destination.path) ? destination : nil
+    }
+
+    private static func version(at bundle: URL) -> String? {
+        Bundle(url: bundle)?.infoDictionary?["CFBundleVersion"] as? String
+    }
+
+    private static func offerNewerInstall(_ installed: URL) {
+        let alert = NSAlert()
+        alert.messageText = L10n.text("moveToApplications.newerTitle")
+        alert.informativeText = L10n.text("moveToApplications.newerMessage")
+        alert.addButton(withTitle: L10n.text("moveToApplications.openNewer"))
+        alert.addButton(withTitle: L10n.text("moveToApplications.notNow"))
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: installed, configuration: configuration) { _, _ in
+            Task { @MainActor in NSApp.terminate(nil) }
+        }
+    }
+
+    private static func offerManualMove() {
+        let alert = NSAlert()
+        alert.messageText = L10n.text("moveToApplications.title")
+        alert.informativeText = L10n.text("moveToApplications.translocatedMessage")
+        alert.addButton(withTitle: L10n.text("moveToApplications.openApplicationsFolder"))
+        alert.addButton(withTitle: L10n.text("moveToApplications.notNow"))
+        alert.showsSuppressionButton = true
+        alert.suppressionButton?.title = L10n.text("moveToApplications.dontAskAgain")
+        let response = alert.runModal()
+        if alert.suppressionButton?.state == .on {
+            ConfigurationStore.shared.update { $0.suggestApplicationsFolder = false }
+        }
+        guard response == .alertFirstButtonReturn,
+            let applications = FileManager.default.urls(
+                for: .applicationDirectory, in: .localDomainMask).first
+        else { return }
+        NSWorkspace.shared.open(applications)
     }
 
     /// `replaceItemAt`: one atomic move leaving one copy, and it replaces an
