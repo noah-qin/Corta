@@ -109,7 +109,7 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let atlas = GlyphAtlas(device: device, font: TerminalFont.primary(ofSize: 32))
+        let atlas = try GlyphAtlas(device: device, font: TerminalFont.primary(ofSize: 32))
 
         guard let info = atlas.glyph(shaping: 0x1F600, style: .regular), info.size != .zero  // 😀
         else {
@@ -135,7 +135,7 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let atlas = GlyphAtlas(device: device, font: TerminalFont.primary(ofSize: 32))
+        let atlas = try GlyphAtlas(device: device, font: TerminalFont.primary(ofSize: 32))
 
         let info = atlas.glyph(shaping: 0x4E2D, style: .regular)  // 中
         #expect(info != nil)

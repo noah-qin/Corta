@@ -108,7 +108,7 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let atlas = GlyphAtlas(
+        let atlas = try GlyphAtlas(
             device: device, font: CTFontCreateWithName("Menlo" as CFString, 24, nil))
         let a = UInt32(Character("a").asciiValue!)
         var seen: Set<[Float]> = []
@@ -132,7 +132,7 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let atlas = GlyphAtlas(
+        let atlas = try GlyphAtlas(
             device: device, font: CTFontCreateWithName("Menlo" as CFString, 14, nil))
         // Menlo has no CJK ideograph, and the fast path never consults the
         // cascade list that would find one.
@@ -149,7 +149,7 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let atlas = GlyphAtlas(
+        let atlas = try GlyphAtlas(
             device: device, font: CTFontCreateWithName("Menlo" as CFString, 14, nil))
         let info = try #require(atlas.glyph(shaping: 0x00A0, style: .regular))  // NBSP
         #expect(!info.isMissing)

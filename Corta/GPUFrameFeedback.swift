@@ -19,14 +19,17 @@ import Synchronization
 /// Completion tracking independent of display-link callbacks. A hung queue
 /// can exhaust the drawable pool, preventing even a dropped-frame callback.
 /// Only this mutex-protected value state crosses from main to GPU feedback.
+/// On the suspending clock: time asleep is not GPU time. A frame submitted as
+/// the lid closed was otherwise "two seconds overdue" on wake, and the pane
+/// showed a renderer failure whose Try Again ends the session.
 nonisolated final class GPUFrameFeedback: Sendable {
     private struct State {
         var serial: UInt64 = 0
-        var pending: [UInt64: ContinuousClock.Instant] = [:]
+        var pending: [UInt64: SuspendingClock.Instant] = [:]
     }
     private let state = Mutex(State())
 
-    func begin(now: ContinuousClock.Instant = .now) -> UInt64 {
+    func begin(now: SuspendingClock.Instant = .now) -> UInt64 {
         state.withLock {
             $0.serial &+= 1
             $0.pending[$0.serial] = now
@@ -40,7 +43,7 @@ nonisolated final class GPUFrameFeedback: Sendable {
 
     var hasPending: Bool { state.withLock { !$0.pending.isEmpty } }
 
-    func hasExpired(now: ContinuousClock.Instant = .now, timeout: Duration = .seconds(2)) -> Bool {
+    func hasExpired(now: SuspendingClock.Instant = .now, timeout: Duration = .seconds(2)) -> Bool {
         state.withLock { current in
             guard let oldest = current.pending.values.min() else { return false }
             return oldest.duration(to: now) >= timeout

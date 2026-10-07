@@ -83,6 +83,14 @@ jobs:
           CORTA_TEST_TIMEOUT_SCALE: "3"
         run: swift test --package-path CortaTerminal
 
+      # The step above skips the real-OpenSSH suite: it needs an sshd. This
+      # one starts a throwaway sshd on 127.0.0.1 with its own keys and config
+      # in a temporary directory, runs `SFTPSSHIntegrationTests` against it,
+      # and removes all of it. Nothing else exercised authentication and
+      # host-key failure against real ssh on every change.
+      - name: Real SSH and SFTP against an isolated sshd
+        run: python3 -B script/verify_ssh_integration.py
+
       - name: Replay the fuzz corpus
         run: |
           CortaTerminal/.build/release/corta-fuzz \

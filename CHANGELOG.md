@@ -10,6 +10,25 @@ what to edit.
 
 ## [Unreleased]
 
+### Responsiveness and resilience (reliability review, 2026-10-07)
+
+- A network volume that stops answering no longer freezes Corta. Hovering or
+  ⌘-clicking a `path:line`, restoring windows at launch and opening a pane
+  in such a directory checked it on the main thread, where `stat` could
+  block for minutes — at every launch, when the saved arrangement named it.
+  The checks now run in the background with a short limit; a directory that
+  does not answer in time is treated as missing, and the pane opens in the
+  home folder.
+- Waking the Mac no longer risks a "renderer failed" pane: a frame
+  submitted just before sleep was counted as overdue by the time asleep.
+- A GPU that cannot allocate even the smallest glyph atlas fails that pane
+  with a recovery view instead of quitting the app.
+- With the search bar open over streaming output, refreshes are spaced at
+  least 250 ms apart instead of running back to back.
+- Large SFTP transfers update their progress row a few times a second rather
+  than for every 32 KiB block.
+- CI now runs the real OpenSSH/SFTP suite against a throwaway local sshd on
+  every change.
 ### Your files and remote copies (reliability review, 2026-10-07)
 
 - A config file or shell rc file that is not UTF-8 text (or cannot be read)

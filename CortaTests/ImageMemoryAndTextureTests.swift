@@ -130,7 +130,7 @@ import Testing
             return
         }
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
-        let atlas = GlyphAtlas(device: device, font: font, atlasPixelSize: 2048) { descriptor in
+        let atlas = try GlyphAtlas(device: device, font: font, atlasPixelSize: 2048) { descriptor in
             descriptor.width > 512 ? nil : device.makeTexture(descriptor: descriptor)
         }
         #expect(atlas.isDegraded)
@@ -139,6 +139,17 @@ import Testing
         let glyph = try #require(atlas.glyph(forASCII: UInt32(0x41), style: .regular))  // A
         #expect(glyph.size != .zero)
         #expect(atlas.fastPathHits > 0)
+    }
+
+    /// Below the smallest size there is nothing to fall back to; that is a
+    /// renderer failure for the pane, never a trap that ends the app.
+    @Test("a glyph atlas the device cannot allocate at all throws")
+    func glyphAtlasThatCannotAllocateThrows() throws {
+        let device = try #require(Self.makeDevice())
+        let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
+        #expect(throws: GlyphAtlasError.self) {
+            _ = try GlyphAtlas(device: device, font: font, atlasPixelSize: 2048) { _ in nil }
+        }
     }
 
     // MARK: - GPU byte budgets

@@ -245,7 +245,10 @@ Layout:
 - `CortaTests/`, `CortaUITests/` — app-hosted test targets;
   `CortaPerformanceTests/` — the Release measurements, without `@testable`
 - `Corta.xcodeproj/` — build settings live in `project.pbxproj`
-- `scripts/` — the two Swift scripts CI runs (Metal 4 probe, feed check);
+- `scripts/` — the two Swift scripts CI runs (Metal 4 probe, feed check)
+  and the release workflow's `prepare-release` helpers with their tests;
+  `script/` — local helpers (`build_and_run.sh`) and the isolated-sshd
+  fixture CI runs for the real SSH/SFTP suite;
   packaging is `corta-release-check`, measurement is `TestPlans/Release`
 - `TestPlans/` — `Unit` (the default), `UI` (interactive sessions only)
   and `Release` (`-configuration Benchmark`: the D17 measurement, and

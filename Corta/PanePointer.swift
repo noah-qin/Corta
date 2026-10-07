@@ -47,6 +47,10 @@ final class PanePointer: NSObject {
     /// Cursor changes on transitions only: resetting the arrow every move
     /// fights the divider's resize cursor.
     private var hoveringLink = false
+    /// The last hover, replayed when a pending file check answers.
+    private var lastHover: (event: NSEvent, view: TerminalView)?
+    /// Injected so tests answer without the filesystem.
+    var fileProbe = FileReferenceProbe.shared
     /// Underlined, so the target shows before a click opens it.
     private(set) var hoveredLink: TerminalSelection?
     private(set) var scrollPositionIndicator: ScrollPositionIndicator?
@@ -376,10 +380,7 @@ final class PanePointer: NSObject {
         if let link = linkUnder(event, in: terminalView) { return open(link) }
         // A `path:line`, local or remote. URLs win; the detectors don't
         // overlap in practice, and the order makes that explicit.
-        if let reference = openableReference(detectedReferenceUnder(event, in: terminalView)) {
-            return open(reference)
-        }
-        return false
+        return openReference(under: event, in: terminalView)
     }
 
     /// `link-activation = click` on mouse-up, for a click that never moved.
@@ -388,10 +389,7 @@ final class PanePointer: NSObject {
         guard opensLinksOnPlainClick, !event.modifierFlags.contains(.shift)
         else { return false }
         if let link = linkUnder(event, in: terminalView) { return open(link) }
-        if let reference = openableReference(detectedReferenceUnder(event, in: terminalView)) {
-            return open(reference)
-        }
-        return false
+        return openReference(under: event, in: terminalView)
     }
 
     /// Re-checks the scheme at the boundary where output launches another
@@ -422,6 +420,7 @@ final class PanePointer: NSObject {
     /// on transitions only, or it flickers against `NSSplitView`'s resize
     /// cursor.
     func handleLinkHover(_ event: NSEvent, in terminalView: TerminalView) {
+        if lastHover?.event !== event { lastHover = nil }
         // The underline must mean "this will open".
         let armed = opensLinksOnPlainClick || event.modifierFlags.contains(.command)
         if session != nil, let link = linkUnder(event, in: terminalView) {
@@ -438,7 +437,7 @@ final class PanePointer: NSObject {
             if terminalView.toolTip != tip { terminalView.toolTip = tip }
             setHoveredLink(armed ? link.range : nil)
         } else if armed, session != nil,
-            let reference = openableReference(detectedReferenceUnder(event, in: terminalView))
+            let reference = hoverReference(event, in: terminalView)
         {
             if !hoveringLink {
                 NSCursor.pointingHand.set()
@@ -460,6 +459,23 @@ final class PanePointer: NSObject {
             setHoveredLink(reference.range)
         } else {
             resetLinkHover(terminalView)
+        }
+    }
+
+    /// The reference under a hover, if known now. A local path still being
+    /// checked shows nothing yet; its answer replays the hover, if the
+    /// pointer has not moved on.
+    private func hoverReference(_ event: NSEvent, in terminalView: TerminalView) -> OpenableReference? {
+        switch lookUpReference(detectedReferenceUnder(event, in: terminalView)) {
+        case .resolved(let reference):
+            return reference
+        case .pending(let path):
+            lastHover = (event, terminalView)
+            fileProbe.probe(path) { [weak self] _ in
+                guard let self, let hover = self.lastHover, hover.event === event else { return }
+                self.handleLinkHover(hover.event, in: hover.view)
+            }
+            return nil
         }
     }
 
@@ -526,6 +542,16 @@ final class PanePointer: NSObject {
             return exists && !isDirectory.boolValue
         }
     ) -> ResolvedFileReference? {
+        guard let path = candidatePath(reference, directory: directory), isRegularFile(path)
+        else { return nil }
+        return resolved(reference, at: path)
+    }
+
+    /// The absolute path a reference names from `directory`, before any
+    /// filesystem check; nil without a local directory.
+    nonisolated static func candidatePath(
+        _ reference: FileReferenceDetection.Reference, directory: String?
+    ) -> String? {
         guard let directory else { return nil }
         let expanded = (reference.path as NSString).expandingTildeInPath
         let absolute =
@@ -534,10 +560,14 @@ final class PanePointer: NSObject {
             : (directory as NSString).appendingPathComponent(expanded)
         // Resolves `..`, so the path checked is the path opened. Not a sandbox:
         // the shell can read anything the user can.
-        let standardized = (absolute as NSString).standardizingPath
-        guard isRegularFile(standardized) else { return nil }
-        return ResolvedFileReference(
-            url: URL(fileURLWithPath: standardized), line: reference.line,
+        return (absolute as NSString).standardizingPath
+    }
+
+    private nonisolated static func resolved(
+        _ reference: FileReferenceDetection.Reference, at path: String
+    ) -> ResolvedFileReference {
+        ResolvedFileReference(
+            url: URL(fileURLWithPath: path), line: reference.line,
             column: reference.column, range: reference.range)
     }
 
@@ -556,12 +586,56 @@ final class PanePointer: NSObject {
         }
     }
 
-    func openableReference(_ detected: FileReferenceDetection.Reference?) -> OpenableReference? {
-        guard let detected else { return nil }
-        if let local = Self.resolve(detected, directory: session.workingDirectory) {
-            return .local(local)
+    /// What a detected reference opens, as far as is known without blocking:
+    /// whether a local path is a file comes from `FileReferenceProbe`, off the
+    /// main thread — a `stat` here, per mouse move, froze the app on a mount
+    /// that stopped answering. `pending` is a path still being checked.
+    enum ReferenceLookup {
+        case resolved(OpenableReference?)
+        case pending(path: String)
+    }
+
+    func lookUpReference(_ detected: FileReferenceDetection.Reference?) -> ReferenceLookup {
+        guard let detected else { return .resolved(nil) }
+        if let path = Self.candidatePath(detected, directory: session.workingDirectory) {
+            switch fileProbe.cached(path) {
+            case true?: return .resolved(.local(Self.resolved(detected, at: path)))
+            case nil: return .pending(path: path)
+            case false?: break
+            }
         }
-        return host?.remote.resolve(detected).map(OpenableReference.remote)
+        return .resolved(host?.remote.resolve(detected).map(OpenableReference.remote))
+    }
+
+    /// Opens what is under `event` once the local check has answered; the
+    /// click is taken either way, since it named a reference.
+    private func openReference(under event: NSEvent, in terminalView: TerminalView) -> Bool {
+        let detected = detectedReferenceUnder(event, in: terminalView)
+        if case .resolved(nil) = lookUpReference(detected) { return false }
+        openDetected(detected)
+        return true
+    }
+
+    /// Opens what `detected` names, once a pending local check has answered;
+    /// `otherwise` runs when it names nothing that opens.
+    func openDetected(
+        _ detected: FileReferenceDetection.Reference?, otherwise: @escaping () -> Void = {}
+    ) {
+        switch lookUpReference(detected) {
+        case .resolved(let reference?):
+            open(reference)
+        case .resolved(nil):
+            otherwise()
+        case .pending(let path):
+            fileProbe.probe(path) { [weak self] _ in
+                guard let self else { return }
+                if case .resolved(let reference?) = self.lookUpReference(detected) {
+                    self.open(reference)
+                } else {
+                    otherwise()
+                }
+            }
+        }
     }
 
     @discardableResult

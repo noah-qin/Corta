@@ -196,7 +196,7 @@ public nonisolated final class TerminalRenderer {
         // eviction forces full rebuilds, so sharing would couple every pane's
         // damage tracking to all panes' glyph churn — per frame — to save ~20 MB.
         // A shared read-only ASCII layer would be a new design, not a lookup.
-        self.glyphAtlas = GlyphAtlas(
+        self.glyphAtlas = try GlyphAtlas(
             device: device, font: atlasFont, atlasPixelSize: atlasPixelSize ?? GlyphAtlas.atlasSize)
         self.kittyImageRenderer = KittyImageRenderer(device: device)
         self.pointMetrics = CellMetrics(font: font, scale: scale)

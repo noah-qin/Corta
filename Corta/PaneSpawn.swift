@@ -37,7 +37,8 @@ enum PaneSpawn {
     static func start(
         size: TerminalSize, directory: String?, scrollbackLimit: Int,
         commandHistoryLimit: Int = CommandRecordStore.defaultCapacity, preset: Preset? = nil,
-        configuredShell: String? = nil, directoryCompletion: Bool = true
+        configuredShell: String? = nil, directoryCompletion: Bool = true,
+        directoryCheckTimeout: DispatchTimeInterval = .milliseconds(500)
     ) throws(PTYError) -> Started {
         // An uninstalled preset shell degrades to a working terminal.
         let configured =
@@ -50,13 +51,19 @@ enum PaneSpawn {
         let home = NSHomeDirectory()
         // From Finder the app's cwd is "/"; start where a login shell would.
         let preferred = preset?.directory ?? directory ?? home
+        // `posix_spawn` changes into the directory on this thread — the main
+        // one — and a mount that stopped answering blocks it there. Checked
+        // first, bounded; unconfirmed, it is skipped like a missing one.
+        let preferredUsable =
+            preferred == home
+            || !PathProbe.directories(among: [preferred], timeout: directoryCheckTimeout).isEmpty
         let attempts: [(shell: String, directory: String, notice: String?)] = [
             (configured, preferred, nil),
             (configured, home, L10n.text("failure.notice.fallbackDirectory")),
             ("/bin/zsh", preferred, L10n.format("failure.notice.fallbackShell", "/bin/zsh")),
             ("/bin/zsh", home, L10n.format("failure.notice.fallbackShell", "/bin/zsh")),
             ("/bin/sh", "/", L10n.format("failure.notice.fallbackShell", "/bin/sh")),
-        ]
+        ].filter { preferredUsable || $0.directory != preferred }
         var attempted = Set<String>()
         var lastError = PTYError.spawnFailed(code: ENOENT)
         for attempt in attempts {

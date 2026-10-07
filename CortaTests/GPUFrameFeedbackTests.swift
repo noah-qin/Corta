@@ -20,7 +20,7 @@ import Testing
 struct GPUFrameFeedbackTests {
     @Test func missingFeedbackExpiresWithoutAnyFurtherFrameCallback() {
         let feedback = GPUFrameFeedback()
-        let start = ContinuousClock.now
+        let start = SuspendingClock.now
         _ = feedback.begin(now: start)
         #expect(!feedback.hasExpired(now: start + .seconds(1)))
         #expect(feedback.hasExpired(now: start + .seconds(2)))
@@ -28,7 +28,7 @@ struct GPUFrameFeedbackTests {
 
     @Test func completingANewerFrameCannotHideAnOlderHungFrame() {
         let feedback = GPUFrameFeedback()
-        let start = ContinuousClock.now
+        let start = SuspendingClock.now
         let first = feedback.begin(now: start)
         let second = feedback.begin(now: start + .seconds(1))
         feedback.complete(second)
