@@ -10,6 +10,16 @@ what to edit.
 
 ## [Unreleased]
 
+### Reliability review (2026-10-07)
+
+- Ctrl-C now cancels a paste still queued for the shell: what has not been
+  sent is dropped, keystrokes typed after it are kept, and a bracketed paste
+  the shell had started reading is closed so it leaves paste mode. Before,
+  Ctrl-C waited behind the whole paste, or was refused once more than 4 MiB
+  was queued, and closing the pane was the only way out.
+- Input typed or pasted as the shell exits no longer raises the "terminal
+  session failed" recovery view; the pane reports the exit as usual.
+
 ### Terminal recovery (#228)
 
 - PTY read/write failures show a persistent recovery action instead of silently

@@ -122,4 +122,21 @@ struct PasteTests {
         #expect(Paste.chunked(bytes, maxChunkSize: 0) == [bytes])
         #expect(Paste.chunked(bytes, maxChunkSize: -1) == [bytes])
     }
+
+    @Test func onlyABracketedPasteHasAClosingMarker() {
+        #expect(Paste.closing(bracketedPasteEnabled: true) == Array("\u{1B}[201~".utf8))
+        #expect(Paste.closing(bracketedPasteEnabled: false) == nil)
+    }
+
+    /// Ctrl-C in either encoding cancels a queued paste; nothing else does,
+    /// so typing during a paste never throws it away.
+    @Test func ctrlCInLegacyAndKittyFormIsAnInterrupt() {
+        #expect(Paste.isInterrupt([0x03]))
+        #expect(Paste.isInterrupt(Array("\u{1B}[99;5u".utf8)))
+        #expect(Paste.isInterrupt(Array("\u{1B}[99;5:1u".utf8)))
+        #expect(!Paste.isInterrupt(Array("\u{1B}[99;5:3u".utf8.dropLast(1))))
+        #expect(!Paste.isInterrupt([0x61]))
+        #expect(!Paste.isInterrupt([0x03, 0x03]))
+        #expect(!Paste.isInterrupt(Array("\u{1B}[100;5u".utf8)))
+    }
 }

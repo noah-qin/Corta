@@ -47,6 +47,23 @@ nonisolated enum Paste {
         !bracketedPasteEnabled && text.unicodeScalars.contains { $0.value == 10 || $0.value == 13 }
     }
 
+    /// What ends a paste for the child: the closing marker when bracketed.
+    /// A cancelled paste the child started reading is closed with it, or the
+    /// shell stays in paste mode (`TerminalSession.write(paste:closing:)`).
+    static func closing(bracketedPasteEnabled: Bool) -> [UInt8]? {
+        bracketedPasteEnabled ? bracketEnd : nil
+    }
+
+    /// Ctrl-C as the pane sends it: the C0 byte, or the kitty keyboard
+    /// protocol's `CSI 99 ; 5 u` (with or without an event type) once a
+    /// program asked for disambiguation. The keystroke that cancels a paste
+    /// still queued ahead of it.
+    static func isInterrupt(_ bytes: [UInt8]) -> Bool {
+        if bytes == [0x03] { return true }
+        let text = String(decoding: bytes, as: UTF8.self)
+        return text == "\u{1B}[99;5u" || (text.hasPrefix("\u{1B}[99;5:") && text.hasSuffix("u"))
+    }
+
     /// Wrapped in the ?2004 markers when bracketed, so it reads as data.
     static func bytes(for text: String, bracketedPasteEnabled: Bool) -> [UInt8] {
         let payload = Array(text.utf8)

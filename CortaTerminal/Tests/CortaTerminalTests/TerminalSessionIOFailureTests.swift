@@ -56,7 +56,7 @@ struct TerminalSessionIOFailureTests {
         let attempts = Mutex(0)
         seams.writerSink = { _ in
             attempts.withLock { $0 += 1 }
-            throw PTYError.ioFailed(code: EIO)
+            throw PTYError.ioFailed(code: EBADF)
         }
         let session = try TerminalSession(executable: "/bin/cat", seams: seams)
         defer { session.stop() }
@@ -68,6 +68,29 @@ struct TerminalSessionIOFailureTests {
         #expect(session.ioFailure?.operation == .write)
         #expect(session.write([4]) == .failed)
         #expect(failures.withLock { $0.count } == 1)
+    }
+
+    /// `EIO` on a write is Darwin saying the last replica holder closed it —
+    /// a child that exited (or left its terminal) with input still queued,
+    /// not a fault. It must not raise the runtime-failure view, nor stop the
+    /// reader from reporting the exit.
+    @Test func aWriteAfterTheReplicaClosedIsAHangupNotAFailure() throws {
+        var seams = TerminalSession.Seams()
+        let attempts = Mutex(0)
+        seams.writerSink = { _ in
+            attempts.withLock { $0 += 1 }
+            throw PTYError.ioFailed(code: EIO)
+        }
+        let session = try TerminalSession(executable: "/bin/cat", seams: seams)
+        defer { session.stop() }
+        let failures = Mutex(0)
+        session.onIOFailure = { _ in failures.withLock { $0 += 1 } }
+        #expect(session.write(chunks: [[1], [2], [3]]) == .accepted)
+        #expect(wait { session.write([4]) == .stopped })
+        #expect(attempts.withLock { $0 } == 1, "queued input after the hangup is dropped")
+        #expect(session.ioFailure == nil)
+        Thread.sleep(forTimeInterval: 0.1)
+        #expect(failures.withLock { $0 } == 0)
     }
 
     @Test func ownerShutdownDoesNotReportAnIOFailure() throws {

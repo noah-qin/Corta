@@ -705,10 +705,15 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     /// `ESC[201~`, and the shell — Claude Code, zsh — stayed in paste mode,
     /// taking every later Return as pasted text: the pane looked frozen.
     func sendPaste(_ sanitized: String) {
-        let payload = Paste.bytes(for: sanitized, bracketedPasteEnabled: bracketedPasteEnabled())
-        // Chunks, so the writer hands the child one at a time.
+        let bracketed = bracketedPasteEnabled()
+        let payload = Paste.bytes(for: sanitized, bracketedPasteEnabled: bracketed)
+        // Chunks, so the writer hands the child one at a time; as a paste, so
+        // Ctrl-C can drop what is still queued (`ViewController.onKeyBytes`).
         guard let session = host?.session else { return }
-        switch session.write(chunks: Paste.chunked(payload)) {
+        switch session.write(
+            paste: Paste.chunked(payload),
+            closing: Paste.closing(bracketedPasteEnabled: bracketed))
+        {
         case .accepted:
             break
         case .backpressured:
