@@ -639,6 +639,8 @@ public struct Grid: Sendable {
 
     public mutating func tabForward(_ count: Int) {
         for _ in 0..<max(1, count) {
+            // Once at the margin, further tabs cannot change the cursor.
+            guard cursor.column < columns - 1 else { break }
             var next = cursor.column + 1
             while next < columns - 1, !tabStops[next] { next += 1 }
             cursor.column = min(next, columns - 1)
@@ -648,6 +650,7 @@ public struct Grid: Sendable {
 
     public mutating func tabBackward(_ count: Int) {
         for _ in 0..<max(1, count) {
+            guard cursor.column > 0 else { break }
             var previous = cursor.column - 1
             while previous > 0, !tabStops[previous] { previous -= 1 }
             cursor.column = max(previous, 0)

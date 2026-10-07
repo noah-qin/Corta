@@ -192,8 +192,8 @@ public struct SFTPVolumeInfo: Equatable, Sendable {
 /// refinement for cancellation: an id whose request was cancelled while in
 /// flight is *not* recycled until the server's late reply for it arrives,
 /// because a recycled id would make that late reply indistinguishable from
-/// the new request's. The cancelled set is bounded by the window, so this
-/// costs at most a few dozen ids.
+/// the new request's. Cancelled ids have their own budget: cancellation
+/// frees a window slot, but cannot free an unanswered wire id.
 public final class SFTPSession: @unchecked Sendable {
     public struct Configuration: Sendable {
         /// The bound on requests sent but not yet answered. Past it,
@@ -201,6 +201,11 @@ public final class SFTPSession: @unchecked Sendable {
         /// hiding without letting a stalled server accumulate unbounded
         /// unreplied frames.
         public var maxInFlightRequests = 32
+
+        /// Unanswered cancelled requests retained for late-reply isolation.
+        /// A peer that exhausts this budget ends the session rather than
+        /// growing metadata or recycling ids whose replies could still arrive.
+        public var maxCancelledRequests = 1_024
 
         public init() {}
     }
@@ -267,6 +272,8 @@ public final class SFTPSession: @unchecked Sendable {
     var handshakePending: Bool { state.withLock { $0.handshake != nil } }
 
     var unwrittenFrameCount: Int { state.withLock { $0.unwrittenFrames } }
+
+    var retainedLateReplyCount: Int { state.withLock { $0.ids.retainedLateReplyCount } }
 
     /// The server's capabilities, from its VERSION answer. `nil` until
     /// `connect()` completes.
@@ -648,16 +655,24 @@ public final class SFTPSession: @unchecked Sendable {
     /// `.cancelled` and hold the id out of circulation until the server's
     /// late reply arrives (see the type's doc comment).
     private func cancelRequest(_ ticket: SFTPRequestIDLedger.Ticket) {
-        state.withLock { state in
+        let exhausted = state.withLock { state -> Bool in
+            guard state.closed == nil else { return false }
             // Only if the entry is *this* allocation: with two transfers
             // sharing a session the id may already belong to someone else,
             // and resuming their continuation would cancel a request whose
             // frame is on the wire.
             if let entry = state.inFlight[ticket.id], entry.ticket == ticket {
+                // Do not admit replacement work at the limit. Teardown runs
+                // outside the lock because closing the transport can block.
+                guard state.ids.retainedLateReplyCount < max(1, configuration.maxCancelledRequests)
+                else { return true }
                 state.inFlight[ticket.id] = nil
                 state.ids.cancelledWhileInFlight(ticket)
-                releaseWindowSlot(&state)
                 entry.continuation.resume(returning: .failure(.cancelled))
+                if state.ids.retainedLateReplyCount >= max(1, configuration.maxCancelledRequests) {
+                    return true
+                }
+                releaseWindowSlot(&state)
             } else {
                 // Either cancelled between slot acquisition and
                 // registration — the registration gives the slot and the
@@ -667,6 +682,12 @@ public final class SFTPSession: @unchecked Sendable {
                 // in both cases.
                 state.ids.cancelledBeforeRegistration(ticket)
             }
+            return false
+        }
+        if exhausted {
+            tearDown(
+                with: .protocolViolation("too many cancelled requests awaiting replies"),
+                closingTransport: true)
         }
     }
 
@@ -686,6 +707,7 @@ public final class SFTPSession: @unchecked Sendable {
     /// writer queue has a place for it — the slot passes to it and
     /// `windowUsed` does not move — otherwise to the window.
     private func releaseWindowSlot(_ state: inout State) {
+        guard state.closed == nil else { return }
         guard !state.windowWaiters.isEmpty,
             state.unwrittenFrames < configuration.maxInFlightRequests
         else {
@@ -698,7 +720,9 @@ public final class SFTPSession: @unchecked Sendable {
 
     /// Room for one more sender: in the window, and in the writer queue.
     private func admits(_ state: State) -> Bool {
-        state.windowUsed < configuration.maxInFlightRequests
+        state.closed == nil
+            && state.ids.retainedLateReplyCount < max(1, configuration.maxCancelledRequests)
+            && state.windowUsed < configuration.maxInFlightRequests
             && state.unwrittenFrames < configuration.maxInFlightRequests
     }
 
@@ -768,6 +792,7 @@ public final class SFTPSession: @unchecked Sendable {
             state.handshake = nil
             let requests = state.inFlight.values.map(\.continuation)
             state.inFlight.removeAll()
+            state.ids = SFTPRequestIDLedger()
             let waiters = state.windowWaiters.map { $0.continuation }
             state.windowWaiters.removeAll()
             state.windowUsed = 0

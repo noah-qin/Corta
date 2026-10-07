@@ -24,6 +24,35 @@ import Testing
 /// (`SECURITY.md` §3).
 @Suite("Input amplification")
 struct InputAmplificationTests {
+    @Test("huge tab counts stop at the margin and allow following output")
+    func tabCountsStopAtMargins() {
+        var terminal = Terminal(rows: 2, columns: 80)
+        let start = ContinuousClock.now
+        for _ in 0..<2_000 {
+            terminal.feed(Array("\u{1B}[65535I\u{1B}[65535Z".utf8))
+        }
+        #expect(terminal.grid.cursor.column == 0)
+        terminal.feed(Array("ok".utf8))
+        #expect(terminal.grid.rowText(0).hasPrefix("ok"))
+        #expect(ContinuousClock.now - start < .seconds(1))
+
+        for columns in [1, 17, 80] {
+            var grid = Grid(rows: 2, columns: columns)
+            grid.clearTabStop(atCursorOnly: false)
+            grid.tabForward(Int.max)
+            #expect(grid.cursor.column == columns - 1)
+            grid.tabBackward(Int.max)
+            #expect(grid.cursor.column == 0)
+        }
+        var grid = Grid(rows: 2, columns: 30)
+        grid.tabForward(0)
+        #expect(grid.cursor.column == 8)
+        grid.tabForward(2)
+        #expect(grid.cursor.column == 24)
+        grid.tabBackward(2)
+        #expect(grid.cursor.column == 8)
+    }
+
     @Test("a run of combining marks keeps a bounded cluster")
     func combiningRunIsCapped() throws {
         var terminal = Terminal(rows: 4, columns: 20)

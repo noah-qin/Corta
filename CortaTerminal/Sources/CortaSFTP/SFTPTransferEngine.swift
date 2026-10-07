@@ -125,6 +125,9 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         public var destinationExists: Bool
         /// The interrupted partial's size, when one is present.
         public var partialSize: UInt64?
+        /// The same inode created/explicitly adopted by this download call,
+        /// retained across its transport retries. Never inferred from a name.
+        public internal(set) var partialIsOwned = false
         public var sourceSize: UInt64?
         public var sourceModificationTime: UInt32?
 
@@ -308,6 +311,11 @@ public final class SFTPTransferEngine: @unchecked Sendable {
 
     // MARK: - Transfers
 
+    private struct LocalPartialIdentity: Equatable, Sendable {
+        let device: dev_t
+        let inode: ino_t
+    }
+
     /// Downloads `remotePath` to `localDestination` atomically: through a
     /// partial file, then `rename(2)` over the destination.
     @discardableResult
@@ -320,11 +328,12 @@ public final class SFTPTransferEngine: @unchecked Sendable {
     ) async throws(SFTPError) -> SFTPTransferReceipt {
         try await acquireTransferSlot()
         defer { releaseTransferSlot() }
+        let ownedPartial = Mutex<LocalPartialIdentity?>(nil)
         return try await withAttempts { (session: SFTPSession) async throws(SFTPError) in
             try await self.downloadOnce(
                 remotePath: remotePath, destinationPath: localDestination.path,
                 policy: policy, partialDisposition: partialDisposition,
-                progress: progress, session: session)
+                progress: progress, session: session, ownedPartial: ownedPartial)
         }
     }
 
@@ -410,21 +419,25 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         policy: ConflictPolicy,
         partialDisposition: PartialDisposition,
         progress: ProgressHandler?,
-        session: SFTPSession
+        session: SFTPSession,
+        ownedPartial: borrowing Mutex<LocalPartialIdentity?>
     ) async throws(SFTPError) -> SFTPTransferReceipt {
         let sourceAttributes = try await session.stat(path: remotePath)
         let partialPath = Self.partialPath(for: destinationPath)
         let destinationExists = FileManager.default.fileExists(atPath: destinationPath)
         let partialInfo = localFileInfo(partialPath)
 
-        let resolution = try resolve(
-            policy: policy,
-            conflict: SFTPConflict(
-                destinationExists: destinationExists,
-                partialSize: partialInfo?.size,
-                sourceSize: sourceAttributes.size,
-                sourceModificationTime: sourceAttributes.modificationTime),
-            destinationPath: destinationPath)
+        var conflict = SFTPConflict(
+            destinationExists: destinationExists,
+            partialSize: partialInfo?.size,
+            sourceSize: sourceAttributes.size,
+            sourceModificationTime: sourceAttributes.modificationTime)
+        var partialStat = Darwin.stat()
+        if let identity = ownedPartial.withLock({ $0 }), Darwin.lstat(partialPath, &partialStat) == 0 {
+            conflict.partialIsOwned = identity == LocalPartialIdentity(
+                device: partialStat.st_dev, inode: partialStat.st_ino)
+        }
+        let resolution = try resolve(policy: policy, conflict: conflict, destinationPath: destinationPath)
 
         // Resume validation: the partial is trustworthy only if the source
         // still has the size and mtime the partial recorded in its own
@@ -441,10 +454,12 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         // and nothing open to leak.
         let handle = try await session.open(path: remotePath, flags: .read)
         let descriptor = Darwin.open(
-            partialPath, O_WRONLY | O_CREAT | O_CLOEXEC | O_NOFOLLOW | (offset == 0 ? O_TRUNC : 0), 0o600)
+            partialPath, O_WRONLY | O_CREAT | O_CLOEXEC | O_NOFOLLOW
+                | (partialInfo == nil ? O_EXCL : 0) | (offset == 0 ? O_TRUNC : 0), 0o600)
         guard descriptor >= 0 else {
             let code = errno
             await cleanUpRemote { try? await session.close(handle) }
+            if code == EEXIST { throw .destinationConflict(path: partialPath) }
             throw SFTPError.localIOFailed(operation: "open", code: code)
         }
 
@@ -461,6 +476,16 @@ public final class SFTPTransferEngine: @unchecked Sendable {
             Darwin.close(descriptor)
             await cleanUpRemote { try? await session.close(handle) }
             throw SFTPError.localIOFailed(operation: "private download permissions", code: code)
+        }
+        var openedStat = Darwin.stat()
+        guard Darwin.fstat(descriptor, &openedStat) == 0 else {
+            let code = errno
+            Darwin.close(descriptor)
+            await cleanUpRemote { try? await session.close(handle) }
+            throw .localIOFailed(operation: "fstat partial", code: code)
+        }
+        ownedPartial.withLock {
+            $0 = LocalPartialIdentity(device: openedStat.st_dev, inode: openedStat.st_ino)
         }
 
         let abort = AbortFlag()
@@ -765,6 +790,11 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         }
         if resolution == .fail, conflict.destinationExists {
             throw .destinationConflict(path: destinationPath)
+        }
+        // A suffix alone does not prove a file is our interrupted transfer.
+        // Only an explicit overwrite/resume decision may reuse one.
+        if resolution == .fail, conflict.partialSize != nil {
+            throw .destinationConflict(path: Self.partialPath(for: destinationPath))
         }
         return resolution
     }

@@ -316,6 +316,70 @@ struct SFTPTransferTests {
 
     /// Every path is sent as a `String`'s UTF-8, so a name that is not
     /// valid UTF-8 cannot be addressed: its lossy form names another file.
+    @Test("an unrelated partial is a conflict under the default download policy")
+    func partialIsNotImplicitlyOwned() async throws {
+        let rig = try await makeRig()
+        defer { teardown(rig) }
+        rig.fileSystem.createFile("/remote", data: [1, 2, 3])
+        let partial = try localFile(rig, "out.corta-part", contents: [9, 8, 7])
+        let destination = rig.directory.appendingPathComponent("out")
+        await #expect(throws: SFTPError.destinationConflict(path: partial.path)) {
+            try await rig.engine.download(remotePath: "/remote", to: destination)
+        }
+        #expect(localContents(partial) == [9, 8, 7])
+        #expect(!FileManager.default.fileExists(atPath: destination.path))
+        // An explicitly selected single-file overwrite still replaces a
+        // partial the user chose; directory-wide consent cannot do this.
+        try await rig.engine.download(remotePath: "/remote", to: destination, policy: .overwrite)
+        #expect(localContents(destination) == [1, 2, 3])
+    }
+
+    @Test("a folder merge never consumes an unrelated partial under any blanket policy")
+    func directoryPreservesUnrelatedPartial() async throws {
+        let rig = try await makeRig()
+        defer { teardown(rig) }
+        rig.fileSystem.createFile("/tree/out", data: [1, 2, 3])
+        let partial = try localFile(rig, "out.corta-part", contents: [9, 8, 7])
+        for policy in [SFTPTransferEngine.ConflictPolicy.fail, .overwrite, .resume] {
+            await #expect(throws: SFTPError.destinationConflict(path: partial.path)) {
+                try await rig.engine.downloadDirectory(remotePath: "/tree", to: rig.directory, policy: policy)
+            }
+            #expect(localContents(partial) == [9, 8, 7])
+        }
+        #expect(!FileManager.default.fileExists(atPath: rig.directory.appendingPathComponent("out").path))
+    }
+
+    @Test("colliding remote tree names are rejected before any local file is changed")
+    func directoryRejectsPartialNamespaceCollisions() async throws {
+        let rig = try await makeRig()
+        defer { teardown(rig) }
+        rig.fileSystem.createFile("/tree/out", data: [1])
+        rig.fileSystem.createFile("/tree/out.corta-part", data: [2])
+        let existing = try localFile(rig, "out", contents: [9])
+        let partial = rig.directory.appendingPathComponent("out.corta-part")
+        await #expect(throws: SFTPError.destinationConflict(path: partial.path)) {
+            try await rig.engine.downloadDirectory(remotePath: "/tree", to: rig.directory, policy: .overwrite)
+        }
+        #expect(localContents(existing) == [9])
+        #expect(!FileManager.default.fileExists(atPath: partial.path))
+    }
+
+    @Test("a partial appearing after preflight cannot be truncated or unlinked")
+    func racingPartialIsPreserved() async throws {
+        let rig = try await makeRig()
+        defer { teardown(rig) }
+        rig.fileSystem.createFile("/remote", data: [1])
+        let partial = rig.directory.appendingPathComponent("out.corta-part")
+        rig.server.interceptor = { message in
+            if case .open = message.payload { try? Data([9]).write(to: partial) }
+            return .proceed
+        }
+        await #expect(throws: SFTPError.destinationConflict(path: partial.path)) {
+            try await rig.engine.download(remotePath: "/remote", to: rig.directory.appendingPathComponent("out"))
+        }
+        #expect(localContents(partial) == [9])
+    }
+
     @Test("a directory download skips a name that is not UTF-8")
     func nonUTF8NamesAreSkipped() async throws {
         let rig = try await makeRig()
@@ -341,8 +405,8 @@ struct SFTPTransferTests {
         #expect(receipt.skipped.map(\.reason) == [.unsafeName])
     }
 
-    @Test("a download interrupted mid-transfer resumes from the partial's size")
-    func downloadResumesAfterTransportFailure() async throws {
+    @Test("file and directory downloads resume their own partial after transport failure", arguments: [false, true])
+    func downloadResumesAfterTransportFailure(directoryTransfer: Bool) async throws {
         // The first server answers one READ, then drops the connection on
         // the second. The reconnect hook wires a fresh session to a second
         // server over the same filesystem — the app layer's role, in
@@ -351,7 +415,8 @@ struct SFTPTransferTests {
         // deterministic.
         let fileSystem = FakeRemoteFileSystem()
         let contents = (0..<4096).map { UInt8($0 % 253) }
-        fileSystem.createFile("/big.bin", data: contents, modificationTime: 4242)
+        let remote = directoryTransfer ? "/tree/big.bin" : "/big.bin"
+        fileSystem.createFile(remote, data: contents, modificationTime: 4242)
 
         let firstConnection = SFTPLoopbackConnection()
         let firstServer = FakeSFTPServer(connection: firstConnection, fileSystem: fileSystem)
@@ -398,11 +463,15 @@ struct SFTPTransferTests {
         }
 
         let destination = directory.appendingPathComponent("big.bin")
-        let receipt = try await engine.download(
-            remotePath: "/big.bin", to: destination, policy: .resume)
+        if directoryTransfer {
+            let receipt = try await engine.downloadDirectory(remotePath: "/tree", to: directory, policy: .resume)
+            #expect(receipt.filesTransferred == 1)
+        } else {
+            let receipt = try await engine.download(remotePath: remote, to: destination, policy: .resume)
+            #expect(receipt.attempts == 2)
+            #expect(receipt.resumedFromOffset == 512)
+        }
         #expect(localContents(destination) == contents)
-        #expect(receipt.attempts == 2)
-        #expect(receipt.resumedFromOffset == 512)
 
         // The second attempt's READs began exactly at the partial's size
         // — endpoint validation accepted the partial (its mtime records
@@ -498,7 +567,14 @@ struct SFTPTransferTests {
         marked.fileSystem.createFile("/tool.command", data: [1, 2, 3])
         let destination = marked.directory.appendingPathComponent("tool.command")
         try await marked.engine.download(remotePath: "/tool.command", to: destination)
-        #expect(quarantine(destination)?.contains(";Corta;") == true)
+        let mark = try #require(quarantine(destination))
+        let fields = mark.split(separator: ";", omittingEmptySubsequences: false)
+        #expect(fields.count == 4)
+        // LaunchServices can omit the agent name for a headless test
+        // executable. Assert the actual download mark, not that display name.
+        let flags = try #require(fields.first.flatMap { UInt16($0, radix: 16) })
+        #expect(flags & 1 != 0)
+        #expect(fields.count > 1 && UInt64(fields[1], radix: 16) != nil)
 
         let plain = try await makeRig()
         defer { teardown(plain) }

@@ -116,6 +116,15 @@ what to edit.
 
 ### Fixed
 
+- SFTP progress accepts full-width remote sizes without overflowing the toolbar
+  total, and deeply nested remote paths build only a bounded breadcrumb trail.
+- SFTP sessions stop safely when a peer withholds 1,024 cancelled request
+  replies, releasing retained request metadata instead of growing indefinitely.
+- Folder downloads reject collisions with `.corta-part` staging names before
+  changing local files. Default file transfers refuse existing partials;
+  explicitly chosen single-file overwrite and resume remain available.
+- Large terminal forward/backward tab counts stop at the margin, allowing
+  subsequent output and user interaction to proceed promptly.
 - Visible Kitty images that together exceed a pane's texture budget no longer
   evict and re-decode each other on every frame; the ones that do not fit wait
   until others leave the screen or are deleted.

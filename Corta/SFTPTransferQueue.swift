@@ -164,14 +164,16 @@ final class SFTPTransferQueue {
     /// All running byte counts as one fraction, for the toolbar's ring;
     /// `nil` while nothing with a known size is moving.
     var overallProgress: Double? {
-        var completed: UInt64 = 0
-        var total: UInt64 = 0
+        // Peer sizes span UInt64; even two valid values can overflow an
+        // integer sum. Floating point is sufficient for a display fraction.
+        var completed: Double = 0
+        var total: Double = 0
         for transfer in transfers {
             guard case .active(let done, let size?) = transfer.state, size > 0 else { continue }
-            completed += min(done, size)
-            total += size
+            completed += Double(min(done, size))
+            total += Double(size)
         }
-        return total > 0 ? Double(completed) / Double(total) : nil
+        return total > 0 ? completed / total : nil
     }
 
     /// Clears the rows that are over — done, cancelled, skipped or failed —
