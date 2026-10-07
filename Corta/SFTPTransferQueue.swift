@@ -18,6 +18,7 @@ import CortaSFTP
 import CortaTerminal
 import Foundation
 import Observation
+import Synchronization
 
 /// Owns transfer planning, conflicts, cancellation and retry for one browser connection.
 /// Resolve conflicts before starting: the engine cannot present an asynchronous sheet.
@@ -397,12 +398,34 @@ final class SFTPTransferQueue {
 
     // MARK: - Transfers: running
 
+    /// Lets a progress report through at most every `interval`; called from
+    /// the engine's tasks, so the clock is behind a lock.
+    nonisolated final class ProgressPacer: Sendable {
+        private let last = Mutex<ContinuousClock.Instant?>(nil)
+        private let interval: Duration
+
+        init(interval: Duration = .milliseconds(50)) { self.interval = interval }
+
+        func admits(now: ContinuousClock.Instant = .now) -> Bool {
+            last.withLock { last in
+                if let previous = last, previous.duration(to: now) < interval { return false }
+                last = now
+                return true
+            }
+        }
+    }
+
     private func start(id: UUID, resolution: Resolution) {
         guard let plan = jobs[id]?.plan, let client else { return }
         jobs[id]?.resolution = resolution
         let task = Task { [weak self] in
             guard let self else { return }
+            // The engine reports every 32 KiB block — thousands a second on a
+            // fast link, each a main-actor hop and a list redraw. A row needs a
+            // few a second; the receipt sets the final state.
+            let pacer = ProgressPacer()
             let progress: SFTPTransferEngine.ProgressHandler = { [weak self] progress in
+                guard pacer.admits() else { return }
                 Task { @MainActor [weak self] in
                     self?.applyProgress(progress, to: id)
                 }
@@ -411,6 +434,7 @@ final class SFTPTransferQueue {
                 if plan.isDirectory {
                     let directoryProgress: SFTPTransferEngine.DirectoryProgressHandler = {
                         [weak self] p in
+                        guard pacer.admits() else { return }
                         Task { @MainActor [weak self] in
                             self?.applyDirectoryProgress(p, to: id)
                         }

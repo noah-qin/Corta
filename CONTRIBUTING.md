@@ -35,7 +35,7 @@ first so contributors do not duplicate effort.
 | `CortaTests/`, `CortaUITests/`, `CortaPerformanceTests/` | App-hosted tests, interactive UI tests, and the Release measurements |
 | `docs/` | User guides, architecture and verification evidence |
 | `TestPlans/` | `Unit` (the default), `UI` (interactive sessions only) and `Release` (the Release measurements) |
-| `scripts/`, `.github/` | The two Swift scripts CI runs (Metal 4 probe, update-feed check), and the CI, release and update-feed workflows |
+| `scripts/`, `script/`, `.github/` | The two Swift scripts CI runs (Metal 4 probe, update-feed check), the release workflow's `prepare-release` helpers and their tests; local helpers and the isolated-sshd fixture (`script/`); and the CI, release and update-feed workflows |
 
 ## Tests and documentation
 

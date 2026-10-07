@@ -108,7 +108,7 @@ import Testing
         }
         let primary = TerminalFont.primary(ofSize: 24, family: nil)
         let ligates = Self.shapedGlyphCount("fi", in: primary) < 2
-        let atlas = GlyphAtlas(device: device, font: primary)
+        let atlas = try GlyphAtlas(device: device, font: primary)
         let f = try #require(atlas.glyph(forASCII: UInt32(UInt8(ascii: "f")), style: .regular))
         let i = try #require(atlas.glyph(forASCII: UInt32(UInt8(ascii: "i")), style: .regular))
         #expect(!f.isMissing && !i.isMissing)
@@ -129,7 +129,7 @@ import Testing
             return
         }
         let font = TerminalFont.primary(ofSize: 24, family: nil)
-        let atlas = GlyphAtlas(device: device, font: font)
+        let atlas = try GlyphAtlas(device: device, font: font)
         let equals = try #require(atlas.glyph(forASCII: UInt32(UInt8(ascii: "=")), style: .regular))
         let greater = try #require(atlas.glyph(forASCII: UInt32(UInt8(ascii: ">")), style: .regular))
         #expect(equals.uvRect != greater.uvRect)
@@ -163,7 +163,7 @@ import Testing
         #expect(MonospacedFontCatalog.isUsable(family: family))
         guard let device = Self.makeDevice() else { return }
         let font = TerminalFont.primary(ofSize: 24, family: family)
-        let atlas = GlyphAtlas(device: device, font: font)
+        let atlas = try GlyphAtlas(device: device, font: font)
         let equals = try #require(atlas.glyph(forASCII: UInt32(UInt8(ascii: "=")), style: .regular))
         let greater = try #require(atlas.glyph(forASCII: UInt32(UInt8(ascii: ">")), style: .regular))
         #expect(equals.uvRect != greater.uvRect, "\(family) ligated across two cells")

@@ -771,6 +771,10 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             renderer = try TerminalRenderer(
                 device: device,
                 font: TerminalFont.primary(ofSize: fontSize, family: fontFamily), scale: scale)
+        } catch let error where error is GlyphAtlasError || error is Metal4BackendError {
+            // The GPU, not the face: the default font would fail the same way,
+            // and resetting to it lost the pane's size and family for good.
+            throw error
         } catch {
             fontSize = Self.defaultFontSize
             fontFamily = Configuration.systemFontFamily

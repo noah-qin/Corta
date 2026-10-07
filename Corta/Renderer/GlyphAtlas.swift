@@ -21,6 +21,19 @@ import CoreText
 import Metal
 import simd
 
+/// The device could not allocate the atlas's textures even at the smallest
+/// size: GPU memory is exhausted, or the device is gone.
+nonisolated enum GlyphAtlasError: Error, CustomStringConvertible {
+    case textureUnavailable(minimumPixelSize: Int)
+
+    var description: String {
+        switch self {
+        case .textureUnavailable(let size):
+            "the GPU could not allocate a \(size)-pixel glyph atlas"
+        }
+    }
+}
+
 /// Rasterises glyphs into an `r8Unorm` atlas, cached by scalar, cluster
 /// and weight; color glyphs go to a second, `bgra8Unorm` atlas.
 ///
@@ -50,12 +63,13 @@ import simd
 /// than a page draws blank after the retry.
 ///
 /// **Allocation failure.** `init` halves the size down to
-/// `minimumAtlasPixelSize` and sets `isDegraded`; only failing at the
-/// minimum traps, since such a device can render nothing.
+/// `minimumAtlasPixelSize` and sets `isDegraded`; failing at the minimum
+/// throws `GlyphAtlasError`, and the pane shows its renderer failure.
 ///
 /// **Single-threaded.** No synchronisation, and Core Text objects are not
 /// shareable — two threads segfault in `CTRunGetImageBounds`. The app
 /// drives it from the main thread; tests that build one are serialised.
+
 nonisolated final class GlyphAtlas {
     /// The four faces, as two bits: part of the glyph-cache key looked up
     /// per cell per frame.
@@ -197,15 +211,16 @@ nonisolated final class GlyphAtlas {
     init(
         device: MTLDevice, font: CTFont, atlasPixelSize: Int = GlyphAtlas.atlasSize,
         makeTexture: ((MTLTextureDescriptor) -> MTLTexture?)? = nil
-    ) {
+    ) throws {
         // Pinned here too, so the atlas is the one choke point for the cascade.
         let base = TerminalFont.pinningCascadeList(font, size: CTFontGetSize(font))
         (self.fonts, self.isSyntheticBold) = Self.faces(of: base)
         self.colorBox = Self.colorBox(for: base)
 
         let allocate = makeTexture ?? { device.makeTexture(descriptor: $0) }
-        // Halve and retry down to `minimumAtlasPixelSize`; the trap below it is
-        // deliberate.
+        // Halve and retry down to `minimumAtlasPixelSize`, then give up — as a
+        // thrown error the pane shows as a renderer failure, where a trap took
+        // every window down with it.
         var size = max(1, atlasPixelSize)
         var allocated: (gray: MTLTexture, color: MTLTexture)?
         while true {
@@ -225,8 +240,7 @@ nonisolated final class GlyphAtlas {
             size = max(size / 2, Self.minimumAtlasPixelSize)
         }
         guard let allocated else {
-            preconditionFailure(
-                "Metal device could not allocate even a \(Self.minimumAtlasPixelSize)-pixel glyph atlas")
+            throw GlyphAtlasError.textureUnavailable(minimumPixelSize: Self.minimumAtlasPixelSize)
         }
         self.texture = allocated.gray
         self.colorTexture = allocated.color

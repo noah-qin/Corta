@@ -29,7 +29,7 @@ import Testing
     func rejectedGlyphsDoNotThrash() throws {
         let device = try #require(Self.makeDevice())
         let font = CTFontCreateWithName("Menlo" as CFString, 10000, nil)
-        let atlas = GlyphAtlas(device: device, font: font)
+        let atlas = try GlyphAtlas(device: device, font: font)
         let generation = atlas.generation
         for _ in 0..<10 {
             #expect(atlas.glyph(forCluster: Array(repeating: 0x301, count: 1000), style: .regular) == nil)
@@ -42,7 +42,7 @@ import Testing
     @Test("color-page eviction invalidates emoji keys and preserves shaped keys")
     func emojiCacheFollowsOwningPage() throws {
         let device = try #require(Self.makeDevice())
-        let atlas = GlyphAtlas(device: device, font: CTFontCreateWithName("Menlo" as CFString, 14, nil), atlasPixelSize: 64)
+        let atlas = try GlyphAtlas(device: device, font: CTFontCreateWithName("Menlo" as CFString, 14, nil), atlasPixelSize: 64)
         _ = atlas.glyph(shaping: 0x4E00, style: .regular)
         let first = try #require(atlas.glyph(shaping: 0x1F600, style: .regular))
         #expect(first.isColor)
@@ -77,7 +77,7 @@ import Testing
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
 
         let initStart = DispatchTime.now()
-        let atlas = GlyphAtlas(device: device, font: font)
+        let atlas = try GlyphAtlas(device: device, font: font)
         let initMs =
             Double(DispatchTime.now().uptimeNanoseconds - initStart.uptimeNanoseconds) / 1_000_000
 
@@ -119,7 +119,7 @@ import Testing
             return
         }
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
-        let atlas = GlyphAtlas(device: device, font: font)
+        let atlas = try GlyphAtlas(device: device, font: font)
 
         for scalar in UInt32(0x21)...UInt32(0x7E) {
             _ = atlas.glyph(forASCII: scalar, style: .regular)
@@ -135,7 +135,7 @@ import Testing
             return
         }
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
-        let atlas = GlyphAtlas(device: device, font: font)
+        let atlas = try GlyphAtlas(device: device, font: font)
 
         _ = atlas.glyph(shaping: 0x4E2D, style: .regular)  // 中
         #expect(atlas.shapingHits == 1)
@@ -153,7 +153,7 @@ import Testing
             return
         }
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
-        let atlas = GlyphAtlas(device: device, font: font)
+        let atlas = try GlyphAtlas(device: device, font: font)
 
         let info = atlas.glyph(shaping: 0x4E2D, style: .regular)  // 中
         #expect(info != nil)
@@ -170,7 +170,7 @@ import Testing
             return
         }
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
-        let atlas = GlyphAtlas(device: device, font: font)
+        let atlas = try GlyphAtlas(device: device, font: font)
 
         // 👨‍👩‍👧‍👦 = 👨 ZWJ 👩 ZWJ 👧 ZWJ 👦
         let family: [UInt32] = [0x1F468, 0x200D, 0x1F469, 0x200D, 0x1F467, 0x200D, 0x1F466]
@@ -196,7 +196,7 @@ import Testing
             return
         }
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
-        let atlas = GlyphAtlas(device: device, font: font)
+        let atlas = try GlyphAtlas(device: device, font: font)
 
         let info = atlas.glyph(forCluster: [0x65, 0x301], style: .regular)  // e + combining acute
         #expect(info != nil)
@@ -216,7 +216,7 @@ import Testing
         }
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
         // A 64×64 page holds only a handful of 14 pt CJK glyphs.
-        let atlas = GlyphAtlas(device: device, font: font, atlasPixelSize: 64)
+        let atlas = try GlyphAtlas(device: device, font: font, atlasPixelSize: 64)
 
         let first = atlas.glyph(shaping: 0x4E00, style: .regular)  // 一
         #expect(first != nil)
@@ -247,7 +247,7 @@ import Testing
             return
         }
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
-        let atlas = GlyphAtlas(device: device, font: font, atlasPixelSize: 64)
+        let atlas = try GlyphAtlas(device: device, font: font, atlasPixelSize: 64)
 
         _ = atlas.glyph(forASCII: UInt32(Character("A").asciiValue!), style: .regular)
         let asciiHitsBeforeOverflow = atlas.fastPathHits
@@ -274,7 +274,7 @@ import Testing
             return
         }
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
-        let atlas = GlyphAtlas(device: device, font: font, atlasPixelSize: 64)
+        let atlas = try GlyphAtlas(device: device, font: font, atlasPixelSize: 64)
 
         _ = atlas.glyph(shaping: 0x4E00, style: .regular)
         let shapingHitsBeforeOverflow = atlas.shapingHits
@@ -302,7 +302,7 @@ import Testing
         let device = try #require(Self.makeDevice())
         let backend = try Metal4Backend(device: device)
         let font = CTFontCreateWithName("Menlo" as CFString, 32, nil)
-        let atlas = GlyphAtlas(device: device, font: font)
+        let atlas = try GlyphAtlas(device: device, font: font)
 
         guard let info = atlas.glyph(forASCII: UInt32(Character("X").asciiValue!), style: .bold),
             info.size != .zero

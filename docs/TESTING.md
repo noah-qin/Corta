@@ -571,7 +571,8 @@ counts: passed, known bugs and failed.
 real OpenSSH on encrypted localhost TCP. It creates temporary host/client
 keys, known_hosts and client/server configs, disables agent use and
 forwarding, and reaps the test sshd and deletes credentials afterwards.
-Run it from the repository root with `python3 script/verify_ssh_integration.py`.
+Run it from the repository root with `python3 script/verify_ssh_integration.py`;
+`ci.yml`'s core job runs it on every change, after `swift test`.
 It does not alter the installed SSH service or the user's SSH configuration.
 The suite is explicitly skipped without the fixture environment. A failed
 fixture setup must not be counted as a successful authentication rejection.

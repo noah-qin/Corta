@@ -201,21 +201,28 @@ nonisolated indirect enum PaneLayout: Equatable, Sendable {
 
     /// Drops directories that don't exist locally (a remote path from before
     /// host filtering, an unmounted volume) to nil, which restores home.
-    func droppingMissingDirectories(fileManager: FileManager = .default) -> PaneLayout {
+    func droppingMissingDirectories(
+        isDirectory: (String) -> Bool = PathProbe.isDirectory
+    ) -> PaneLayout {
         switch self {
         case .pane(let directory, let presetName, let isFocused):
-            if let directory {
-                var isDirectory = ObjCBool(false)
-                guard fileManager.fileExists(atPath: directory, isDirectory: &isDirectory),
-                    isDirectory.boolValue
-                else { return .pane(directory: nil, presetName: presetName, isFocused: isFocused) }
+            if let directory, !isDirectory(directory) {
+                return .pane(directory: nil, presetName: presetName, isFocused: isFocused)
             }
             return self
         case .split(let vertical, let position, let first, let second):
             return .split(
                 vertical: vertical, position: position,
-                first: first.droppingMissingDirectories(fileManager: fileManager),
-                second: second.droppingMissingDirectories(fileManager: fileManager))
+                first: first.droppingMissingDirectories(isDirectory: isDirectory),
+                second: second.droppingMissingDirectories(isDirectory: isDirectory))
+        }
+    }
+
+    /// Every directory the layout names.
+    var directories: [String] {
+        switch self {
+        case .pane(let directory, _, _): return directory.map { [$0] } ?? []
+        case .split(_, _, let first, let second): return first.directories + second.directories
         }
     }
 }
@@ -283,6 +290,10 @@ struct SessionRestore {
 
     var fileURL: URL { directory.appendingPathComponent("state.json") }
 
+    /// How long a launch waits for the saved directories to answer; one that
+    /// has not is restored as the home directory.
+    static let directoryCheckTimeout: DispatchTimeInterval = .seconds(1)
+
     /// The saved windows, oldest first. A malformed file counts as none:
     /// better a fresh window than a terminal that won't launch.
     func load() -> [WindowState] {
@@ -290,9 +301,18 @@ struct SessionRestore {
             let states = try? JSONDecoder().decode([WindowState].self, from: data)
         else { return [] }
         // Skip windows from a newer format rather than guess.
-        return states.filter { $0.version <= WindowState.currentVersion }.map { saved in
+        let current = states.filter { $0.version <= WindowState.currentVersion }
+        // All at once, off the main thread and bounded: this runs at launch,
+        // and a saved directory on a mount that stopped answering blocked it
+        // in `stat` — every launch, until the mount came back.
+        let existing = PathProbe.directories(
+            among: current.flatMap { $0.layout.validated().directories },
+            timeout: Self.directoryCheckTimeout)
+        return current.map { saved in
             var state = saved
-            state.layout = saved.layout.validated().droppingMissingDirectories()
+            state.layout = saved.layout.validated().droppingMissingDirectories {
+                existing.contains($0)
+            }
             return state
         }
     }

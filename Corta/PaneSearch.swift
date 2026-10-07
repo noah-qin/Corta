@@ -71,6 +71,15 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
     /// Reject results from superseded sweeps; retain output arriving during a sweep.
     var generation = 0
     var needsRefresh = false
+    /// When the last sweep landed, and the wake that runs a refresh held
+    /// back to `refreshPacing` after it. With the bar open over a stream of
+    /// output, sweeps used to run back to back — a core busy for as long as
+    /// the bar stayed open.
+    private var lastSweepLanded: ContinuousClock.Instant?
+    private var pacingWake: Task<Void, Never>?
+    /// The least time from one output-driven sweep landing to the next one
+    /// starting. A typed query is never held back.
+    static let refreshPacing: Duration = .milliseconds(250)
     /// Optional test barrier for deterministic background-sweep races.
     var sweepGate: (@Sendable () -> Void)?
     var caseSensitive = false
@@ -269,6 +278,8 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
         // result already past its cancellation checks.
         task?.cancel()
         task = nil
+        pacingWake?.cancel()
+        pacingWake = nil
         needsRefresh = false
         generation &+= 1
         if let beforeSearch = previousScrollOffset, let host {
@@ -437,6 +448,22 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
             needsRefresh = true
             return
         }
+        if let landed = lastSweepLanded {
+            let elapsed = landed.duration(to: .now)
+            if elapsed < Self.refreshPacing {
+                needsRefresh = true
+                guard pacingWake == nil else { return }
+                pacingWake = Task { @MainActor [weak self] in
+                    try? await Task.sleep(for: Self.refreshPacing - elapsed)
+                    guard let self, !Task.isCancelled else { return }
+                    self.pacingWake = nil
+                    guard self.needsRefresh else { return }
+                    self.needsRefresh = false
+                    self.scheduleBackgroundRefresh()
+                }
+                return
+            }
+        }
         generation &+= 1
         let generation = self.generation
         let query = searchField.stringValue
@@ -494,6 +521,7 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
         status = outcome.status
         // The generation matched, so `task` is this finished task.
         task = nil
+        lastSweepLanded = .now
         matches = outcome.matches
         matchesTruncated = matches.count >= Search.defaultMatchLimit
         if matches.isEmpty {
