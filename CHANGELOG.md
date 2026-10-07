@@ -10,6 +10,14 @@ what to edit.
 
 ## [Unreleased]
 
+### Fixed
+
+- Rounded box corners (`╭ ╮ ╰ ╯`) — the boxes Claude Code draws — meet
+  their sides. 1.1.5 drew straight borders on the cell grid but still took
+  the corners from the font, whose arcs sat apart from the lines and at
+  another weight, so every rounded box had four broken corners. The arcs
+  are now drawn with the borders, at their position and thickness.
+
 ## [1.1.5] — 2026-10-07
 
 ### Responsiveness and resilience (reliability review, 2026-10-07)
