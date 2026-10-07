@@ -93,9 +93,14 @@ nonisolated enum BlockElements {
 
 /// Common light/heavy table borders are pixel-aligned strokes that reach
 /// their cell edges. Font bearings and fallback advances cannot open gaps.
+/// The rounded corners ╭╮╯╰ — Claude Code's boxes — are drawn the same way:
+/// a font's arc neither meets these strokes nor shares their weight.
 nonisolated enum BoxDrawing {
+    /// Room for an arc's rows: `arc` coarsens its step to stay inside it.
+    static let capacity = 24
+
     struct Pieces: RandomAccessCollection {
-        private var storage = InlineArray<4, SIMD4<Float>>(repeating: .zero)
+        private var storage = InlineArray<24, SIMD4<Float>>(repeating: .zero)
         private(set) var endIndex = 0
         var startIndex: Int { 0 }
         subscript(position: Int) -> SIMD4<Float> { storage[position] }
@@ -133,6 +138,8 @@ nonisolated enum BoxDrawing {
         case 0x257D: arms = 0x90
         case 0x257E: arms = 0x06
         case 0x257F: arms = 0x60
+        case 0x256D...0x2570:
+            return arc(corner: Int(scalar - 0x256D), width: width, height: height, scale: scale)
         default: return nil
         }
         var pieces = Pieces()
@@ -154,6 +161,65 @@ nonisolated enum BoxDrawing {
             default: pieces.append(.init(x, max(0, height / 2 - overlap), thickness,
                                          height - max(0, height / 2 - overlap)))
             }
+        }
+        return pieces
+    }
+
+    /// U+256D–2570, in order ╭ ╮ ╯ ╰: a light quarter circle joining two arms
+    /// at exactly the position and weight the straight strokes use, so a
+    /// rounded box meets its sides. The arc is rasterised one pixel row per
+    /// rectangle — aliased, like the strokes it joins.
+    private static func arc(corner: Int, width: Float, height: Float, scale: Float) -> Pieces {
+        let thickness = min(min(width, height), max(1, scale.rounded(.down)))
+        let x0 = ((width - thickness) / 2).rounded(.down)
+        let y0 = ((height - thickness) / 2).rounded(.down)
+        // The strokes' centre lines, where the arc starts and ends.
+        let kx = x0 + thickness / 2, ky = y0 + thickness / 2
+        let rightward = corner == 0 || corner == 3
+        let downward = corner == 0 || corner == 1
+        let radius = max(thickness, min(min(kx, width - kx), min(ky, height - ky)).rounded(.down))
+        let cx = rightward ? kx + radius : kx - radius
+        let cy = downward ? ky + radius : ky - radius
+
+        var pieces = Pieces()
+        // Arms start on a whole pixel, rounded toward the arc so they overlap
+        // it: a centre on a half pixel left a half-pixel arm that drew nothing.
+        if rightward {
+            let start = cx.rounded(.down)
+            if start < width { pieces.append(.init(start, y0, width - start, thickness)) }
+        } else {
+            let end = min(width, cx.rounded(.up))
+            if end > 0 { pieces.append(.init(0, y0, end, thickness)) }
+        }
+        if downward {
+            let start = cy.rounded(.down)
+            if start < height { pieces.append(.init(x0, start, thickness, height - start)) }
+        } else {
+            let end = min(height, cy.rounded(.up))
+            if end > 0 { pieces.append(.init(x0, 0, thickness, end)) }
+        }
+
+        let outer = radius + thickness / 2, inner = max(0, radius - thickness / 2)
+        // Rows from the arc's far end (the horizontal arm) to its centre row.
+        let top = max(0, downward ? (cy - outer).rounded(.down) : cy.rounded(.down))
+        let bottom = min(height, downward ? cy.rounded(.up) : (cy + outer).rounded(.up))
+        let rows = max(1, Int(bottom - top))
+        let step = Float((rows + capacity - 3) / (capacity - 2))
+        var y = top
+        while y < bottom, pieces.endIndex < capacity {
+            let band = min(step, bottom - y)
+            let distance = abs(y + band / 2 - cy)
+            if distance <= outer {
+                let far = (outer * outer - distance * distance).squareRoot()
+                let near = distance < inner ? (inner * inner - distance * distance).squareRoot() : 0
+                // Toward the corner of the strokes, away from the centre.
+                let a = rightward ? cx - far : cx + near
+                let b = rightward ? cx - near : cx + far
+                let left = max(0, a.rounded())
+                let right = min(width, max(a.rounded() + 1, b.rounded()))
+                if right > left { pieces.append(.init(left, y, right - left, band)) }
+            }
+            y += band
         }
         return pieces
     }
