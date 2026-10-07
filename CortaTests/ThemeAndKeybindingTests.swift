@@ -285,6 +285,34 @@ import Testing
         #expect(visited == commandRows.map(\.id), "each step lands on the next command row")
     }
 
+    @Test("a cleared query selects the top row, not a copy further down")
+    @MainActor func paletteClearedQuerySelectsTheTop() throws {
+        let model = CommandPaletteModel()
+        let command = try #require(model.rows.compactMap(\.command).dropFirst(3).first)
+        model.select(try #require(model.rows.first { $0.command == command }))
+        model.runSelected()
+        model.reset()
+        model.query = command.title
+        #expect(model.selectedCommand == command)
+        model.query = ""
+        #expect(model.selectedRowID == model.rows.first { $0.command != nil }?.id)
+        #expect(model.selectedRowID == "recent-" + command.rawValue)
+    }
+
+    @Test("a title match outranks a config-name match, however long the query")
+    @MainActor func paletteTitleMatchesLead() {
+        let model = CommandPaletteModel()
+        for command in TerminalCommand.allCases {
+            model.query = command.rawValue
+            let rows = model.rows.compactMap(\.command)
+            let titleMatches = rows.map {
+                CommandPaletteModel.score($0.title.lowercased(), query: command.rawValue) != nil
+            }
+            // Every title match comes before every other match.
+            #expect(titleMatches == titleMatches.sorted { $0 && !$1 }, "\(command.rawValue)")
+        }
+    }
+
     @Test("a group name or config name finds its commands")
     @MainActor func paletteMatchesGroupAndConfigNames() throws {
         let model = CommandPaletteModel()

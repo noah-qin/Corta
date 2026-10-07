@@ -33,6 +33,13 @@ extension SplitViewController: NSToolbarDelegate {
         toolbar.autosavesConfiguration = false
         window.toolbarStyle = .unifiedCompact
         window.toolbar = toolbar
+        // The Quick Terminal is one panel, never a tab group: there "+" could
+        // only open an unrelated window behind it.
+        if window is NSPanel,
+            let index = toolbar.items.firstIndex(where: { $0.itemIdentifier == .cortaNewTab })
+        {
+            toolbar.removeItem(at: index)
+        }
     }
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [.flexibleSpace, .cortaConnect, .cortaFiles, .cortaNewTab]
@@ -58,8 +65,7 @@ extension SplitViewController: NSToolbarDelegate {
             let item = NSToolbarItem(itemIdentifier: identifier)
             item.label = TerminalCommand.newTab.title
             item.paletteLabel = item.label
-            let shortcut = ConfigurationStore.shared.configuration.keybindings[.newTab]?.displayText
-            item.toolTip = shortcut.map { "\(item.label) (\($0))" } ?? item.label
+            item.toolTip = item.label
             item.image = NSImage(systemSymbolName: "plus", accessibilityDescription: item.label)
             item.target = self
             item.action = #selector(newTabInThisWindow(_:))

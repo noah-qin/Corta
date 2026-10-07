@@ -633,12 +633,7 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
     private func setMatches(_ found: [SelectionRange], totalPushed: Int) {
         matches = found
         matchesTotalPushed = totalPushed
-        highlights = found.map {
-            TerminalSelection(
-                start: GridPosition(row: $0.start.row, column: $0.start.column),
-                end: GridPosition(row: $0.end.row, column: $0.end.column),
-                baseScrollbackTotal: totalPushed)
-        }
+        highlights = found.map { TerminalSelection($0, baseScrollbackTotal: totalPushed) }
     }
 
     /// A match row where it is now, after the output since its sweep.

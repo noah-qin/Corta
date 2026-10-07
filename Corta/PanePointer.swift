@@ -821,9 +821,14 @@ final class PanePointer: NSObject {
 extension TerminalSelection {
     /// Remembers the scrollback depth, so later output is accounted for.
     init(_ range: SelectionRange, grid: Grid) {
+        self.init(range, baseScrollbackTotal: grid.scrollback.totalPushed)
+    }
+
+    /// `range` as it was when `baseScrollbackTotal` lines had been pushed.
+    init(_ range: SelectionRange, baseScrollbackTotal: Int) {
         self.init(
             start: GridPosition(row: range.start.row, column: range.start.column),
             end: GridPosition(row: range.end.row, column: range.end.column),
-            baseScrollbackTotal: grid.scrollback.totalPushed)
+            baseScrollbackTotal: baseScrollbackTotal)
     }
 }

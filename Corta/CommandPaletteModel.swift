@@ -57,7 +57,14 @@ final class CommandPaletteModel {
     /// Rebuilds `rows`, once per change rather than once per read: the view,
     /// the selection check and the arrow keys all read them.
     var query = "" {
-        didSet { if query != oldValue { rebuildRows() } }
+        didSet {
+            guard query != oldValue else { return }
+            // A new query starts at its best match, and an emptied one at
+            // the top — not wherever the last list's selection happens to
+            // recur further down.
+            selectedRowID = nil
+            rebuildRows()
+        }
     }
     /// What the list shows, kept in step with `query` and the recents.
     private(set) var rows: [Row] = []
@@ -89,10 +96,8 @@ final class CommandPaletteModel {
     /// remembered from last time it closed would show a stale filter. Also
     /// where a rebind made since the last opening reaches the shortcuts.
     func reset() {
-        query = ""
-        rebuildRows()
         selectedRowID = nil
-        selectFirstIfNeeded()
+        if query.isEmpty { rebuildRows() } else { query = "" }
     }
 
     /// If the current selection fell out of `rows` (the query changed
@@ -151,15 +156,16 @@ final class CommandPaletteModel {
         let categoryTitles = Dictionary(
             uniqueKeysWithValues: CommandCategory.allCases.map { ($0, $0.title.lowercased()) })
         return TerminalCommand.allCases
-            .compactMap { command -> (TerminalCommand, Int)? in
-                let alternatives = [
-                    command.rawValue,
-                    String(command.rawValue.map { $0 == "-" ? " " : $0 }),
-                    categoryTitles[command.category] ?? "",
-                ].compactMap { Self.score($0, query: query) }.max()
+            .compactMap { command -> (command: TerminalCommand, onTitle: Bool, score: Int)? in
+                let onTitle = Self.score(command.title.lowercased(), query: query)
+                // Only when the title missed: most keystrokes need none of it.
                 guard
-                    let score = Self.score(command.title.lowercased(), query: query)
-                        ?? alternatives.map({ $0 - Self.alternativePenalty })
+                    let score = onTitle
+                        ?? [
+                            command.rawValue,
+                            String(command.rawValue.map { $0 == "-" ? " " : $0 }),
+                            categoryTitles[command.category] ?? "",
+                        ].compactMap({ Self.score($0, query: query) }).max()
                 else { return nil }
                 // A recently used command wins a tie against one that has
                 // never been run, which is the same argument as the recents
@@ -167,15 +173,13 @@ final class CommandPaletteModel {
                 let recency =
                     recentCommands.firstIndex(of: command)
                     .map { Self.recentLimit - $0 } ?? 0
-                return (command, score + recency)
+                return (command, onTitle != nil, score + recency)
             }
-            .sorted { $0.1 > $1.1 }
-            .map { row($0.0, false) }
+            // A title match leads whatever the scores: they grow with the
+            // query, so no fixed penalty could keep the two apart.
+            .sorted { ($0.onTitle ? 1 : 0, $0.score) > ($1.onTitle ? 1 : 0, $1.score) }
+            .map { row($0.command, false) }
     }
-
-    /// What a match on the config name or the group costs against one on the
-    /// title: more than any title's length, so a title match always leads.
-    private static let alternativePenalty = 10_000
 
     /// Pure, and deliberately not `@MainActor`: the ranking is the part worth
     /// testing, and a scoring function that needs a window to run is one

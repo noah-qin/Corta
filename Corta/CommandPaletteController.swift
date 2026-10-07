@@ -67,7 +67,9 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
 
     @objc func show(_ sender: Any?) {
         guard let window else { return }
-        invokingWindow = NSApp.keyWindow
+        // Asked again while up: the palette is key, and keeps the window it
+        // first opened over — taken as its own opener, Esc reopened it.
+        if NSApp.keyWindow !== window { invokingWindow = NSApp.keyWindow }
         model.reset()
         if let host = invokingWindow {
             // Centred, a third of the way down, clear of the prompt.
