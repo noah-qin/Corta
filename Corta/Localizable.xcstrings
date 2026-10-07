@@ -35167,6 +35167,65 @@
           }
         }
       }
+    },
+    "toast.pasteCancelled": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste cancelled — the rest was not sent."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已取消粘贴——剩余内容未发送。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已取消貼上——其餘內容未傳送。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "貼り付けをキャンセルしました—残りは送信されていません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "붙여넣기를 취소했습니다 — 나머지는 전송되지 않았습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Einfügen abgebrochen – der Rest wurde nicht gesendet."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Collage annulé — le reste n’a pas été envoyé."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Pegado cancelado: el resto no se envió."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Colagem cancelada — o restante não foi enviado."
+          }
+        }
+      }
     }
   }
 }

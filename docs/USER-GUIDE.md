@@ -225,7 +225,9 @@ they appear in a published release. macOS 26+ and Apple silicon are required.
   shell that supports it — zsh, fish, bash 5.1 or later — inserts a pasted
   command without running it until you press Return. When the program has
   not turned bracketed paste on (macOS's own `/bin/bash` 3.2 never does),
-  Corta warns before pasting text that contains a line break.
+  Corta warns before pasting text that contains a line break. A large
+  paste the shell is still working through can be cancelled with ⌃C: the
+  part not yet sent is dropped and the interrupt goes straight through.
 - **Export Text…** (⇧⌘S) saves the selection — or, with nothing selected,
   the whole scrollback and screen — to a file.
 - **Clearing.** Three commands, because they discard different things:
