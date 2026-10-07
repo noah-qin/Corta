@@ -117,17 +117,16 @@ checksum, unzip the archive and move `Corta.app` to `/Applications`.
 
 ```sh
 # Run in the directory containing both downloaded files.
-shasum -a 256 -c Corta-1.1.1.zip.sha256
-unzip Corta-1.1.1.zip
+shasum -a 256 -c Corta-1.1.5.zip.sha256
+unzip Corta-1.1.5.zip
 ```
 
 > [!NOTE]
-> **Release status:** [1.1.1](https://github.com/noah-qin/Corta/releases/tag/v1.1.1),
-> published on 2026-10-03, is the current release. Every release archive
-> is signed with a Developer ID and notarised, and updates reach an
-> installed Corta through a signed feed. Changes on `main` are recorded
-> under `[Unreleased]` in the [changelog](CHANGELOG.md) until the next
-> release.
+> **Release status:** [1.1.5](https://github.com/noah-qin/Corta/releases/tag/v1.1.5),
+> prepared on 2026-10-07. Manually running Release on `main` starts tests,
+> build, sign and notarise the app, publish a release, and update
+> the signed update feed. See [GitHub Releases](https://github.com/noah-qin/Corta/releases/latest)
+> for the latest successfully published build.
 
 For updates, use **Corta ▸ Check for Updates…** or download a newer release.
 After updating to 1.1.1, use **Settings ▸ Terminal ▸ Shell Integration ▸ Update**

@@ -10,6 +10,8 @@ what to edit.
 
 ## [Unreleased]
 
+## [1.1.5] — 2026-10-07
+
 ### Responsiveness and resilience (reliability review, 2026-10-07)
 
 - A network volume that stops answering no longer freezes Corta. Hovering or
@@ -318,6 +320,52 @@ what to edit.
   remote pane's reported host (`⌘`-click on a remote `path:line`) skipped it.
 - `directory-history.json` and `state.json` are owner-only (`0600`), as
   `recent-hosts.json` already was.
+
+### Commits
+
+- chore(project): set the version to 1.1.5 and bring the docs up to it (#258)
+- fix(app): keep the cursor's column through a reflow (#257)
+- fix(app): give the scroll region the whole screen after a resize (#256)
+- fix(app): keep stat off the main thread; harden render and transfer paths (#255)
+- fix(app): never overwrite unreadable user files; keep remote edits recoverable (#254)
+- fix(app): deliver terminal keys that the input context swallowed (#253)
+- fix(terminal): let ctrl-c cancel a queued paste; treat write EIO as exit (#252)
+- fix(app): bound terminal work and protect sftp transfer state (#251)
+- ci: pin the self-hosted render workflow's actions by commit (#250)
+- docs: say what the release environment actually requires (#249)
+- fix(app): harden links, downloads, host checks and image textures (#248)
+- fix(terminal): bound pattern scans, image memory and hidden characters (#247)
+- fix(app): harden image decode, paste and SFTP; remove dead code (#245)
+- fix(terminal): resolve the terminal-core review findings (#244)
+- ci: pin release artifact uploads and pass the fuzz seed via env (#246)
+- ci: make releases a single manual workflow run (#243)
+- fix(terminal): recover failed I/O and rendering and bound search holds (#242)
+- refactor(app): move test hooks out of production code (#241)
+- fix(app): draw the command-status rules in the metal pass (#240)
+- docs(docs): record why the canvas stays below the titlebar and frames present alone (#239)
+- fix(ui): keep the border on opaque glass under both accessibility settings (#237)
+- feat(ui): draw the find bar and command palette with SwiftUI glass (#236)
+- refactor(app): delete the storyboard and start the app in code (#234)
+- refactor(app): build the terminal window in code, born at its size (#233)
+- refactor(app): use sheets, NSApp.activate() and a spawn chdir action (#235)
+- refactor(app): make the terminal canvas opaque and drop the flash guard (#232)
+- refactor(app): build the main menu in code (#231)
+- refactor(app): replace the nonisolated(unsafe) globals with locks (#230)
+- test(tests): run the stage-writing UI tests and match zoom to its rule (#227)
+- refactor(app): split the remaining ViewController extensions (#224)
+- feat(app): derive overlay colours from the theme, invert the block cursor (#226)
+- refactor(app): read every CORTA_ switch through DiagnosticsEnvironment (#225)
+- fix(app): fit a zoomed window to whole cells and refit in one step (#223)
+- refactor(app): move the pane's menu commands into PaneCommands (#222)
+- refactor(app): move the pane's remote side into PaneRemote (#221)
+- refactor(app): move pane search into PaneSearch (#220)
+- refactor(app): move the pane render loop into PaneFrameLoop (#219)
+- refactor(project): move the sftp client into its own package target (#218)
+- fix(app): address terminal rendering and tab feedback (#217)
+- feat(app): pin input source indicator to independent toolbar group (#216)
+- feat(app): add system status and graphical appearance controls (#215)
+- feat(app): add optional directory suggestions and clearer status marks (#212)
+- Fix shortcut hints, Shell menu organization and auxiliary window layout (#210)
 
 ## [1.1.1] - 2026-10-03
 
@@ -1460,7 +1508,8 @@ M1–M10.
   same-conditions end-to-end re-measurement against the 45.5 ms baseline
   is still open.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.1.1...main
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.1.5...main
+[1.1.5]: https://github.com/noah-qin/Corta/releases/tag/v1.1.5
 [1.1.1]: https://github.com/noah-qin/Corta/releases/tag/v1.1.1
 [1.1.0]: https://github.com/noah-qin/Corta/releases/tag/v1.1.0
 [1.0.1]: https://github.com/noah-qin/Corta/releases/tag/v1.0.1
