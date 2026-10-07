@@ -19,7 +19,7 @@
 /// not read from `Bundle.main`: the core has no bundle, and the answer must
 /// never carry bytes from the stream (`SECURITY.md` §2.1).
 public enum CortaVersion {
-    public static let string = "1.1.5"
+    public static let string = "1.1.6"
 
     /// `Name(version)`, the form xterm's `XTerm(<patch>)` set.
     public static let report = "Corta(\(string))"
