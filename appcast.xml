@@ -23,6 +23,15 @@
         <description>Corta release updates.</description>
         <language>en</language>
         <item>
+            <title>1.1.8</title>
+            <pubDate>Wed, 07 Oct 2026 14:55:46 +0000</pubDate>
+            <sparkle:version>10</sparkle:version>
+            <sparkle:shortVersionString>1.1.8</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/noah-qin/Corta/releases/download/v1.1.8/Corta-1.1.8.zip" length="6986054" type="application/octet-stream" sparkle:edSignature="j+XANweck2HwxyavYYXIPVgeXXbmgg9uGPBVzVPvHM9CO419hFWMdeI0UZcny6jEgMH3TVIymWUdgKql2yKlAg=="/>
+        </item>
+        <item>
             <title>1.1.7</title>
             <pubDate>Wed, 07 Oct 2026 14:20:08 +0000</pubDate>
             <sparkle:version>9</sparkle:version>
@@ -39,15 +48,6 @@
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
             <enclosure url="https://github.com/noah-qin/Corta/releases/download/v1.1.6/Corta-1.1.6.zip" length="6978242" type="application/octet-stream" sparkle:edSignature="PjcPaZfoVlzUuMAx6/KPVOoob6TFBfHeKtmBNjWSPNFKsGuzWn881HQFF9nXoyKIq1rxCqD3YjCVDEQdjVLAAg=="/>
-        </item>
-        <item>
-            <title>1.1.5</title>
-            <pubDate>Wed, 07 Oct 2026 10:26:24 +0000</pubDate>
-            <sparkle:version>7</sparkle:version>
-            <sparkle:shortVersionString>1.1.5</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/noah-qin/Corta/releases/download/v1.1.5/Corta-1.1.5.zip" length="6976556" type="application/octet-stream" sparkle:edSignature="S/1VXWnEiN80rMIvsY9JuVVgT9kanO87TdgFxpmXnO7ZE5+s5EhiaF4aN+rOGYiSYvEMuEcMAy5QX/AgvT4gDg=="/>
         </item>
         <item>
             <title>1.0.1</title>
