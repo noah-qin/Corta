@@ -80,6 +80,7 @@ Dated, and not edited except to fix a link.
 - [1.1.1 release checks, 2026-10-03](test-results/2026-10-03-1.1.1-checks.md) — empty-Return regression coverage and launched-app confirmation.
 - [1.1.5 benchmark run, 2026-10-07](history/2026-10-07-V1.1.5-BENCHMARK-RUN.md) — scripted core measurements and the Release frame-CPU re-measurement after the render-loop changes.
 - [1.1.5 release checks, 2026-10-07](test-results/2026-10-07-1.1.5-checks.md) — suites, fuzz, the esctest re-run and the resize fixes' evidence.
+- [1.1.6 release checks, 2026-10-07](test-results/2026-10-07-1.1.6-checks.md) — the rounded-corner patch: render tests, the launched app and a frame-CPU A/B.
 - [esctest results](esctest/) — result files per release.
 - [Interactive test records](test-results/) — dated passes by a person; findings are worked off in the changelog.
 

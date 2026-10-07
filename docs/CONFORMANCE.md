@@ -300,6 +300,12 @@ The scroll-region-on-resize (#256) and reflow-cursor (#257) fixes have no
 esctest case; their own core tests and a replay of Claude Code's recorded
 output cover them. Evidence: [1.1.5 release checks](test-results/2026-10-07-1.1.5-checks.md).
 
+**1.1.6 (2026-10-07):** draws the rounded box corners (`╭ ╮ ╰ ╯`) as geometry
+joined to the grid-drawn borders (#264). A renderer change with no escape-
+sequence handling in it, so esctest2 was not re-run; render tests, the
+launched app and a Release frame-CPU A/B cover it. Evidence:
+[1.1.6 release checks](test-results/2026-10-07-1.1.6-checks.md).
+
 ### 4.3 Fuzzing
 
 The parser consumes untrusted bytes and must never crash, hang, or
@@ -587,3 +593,4 @@ off in the CHANGELOG. The record stays as written.
 | [2026-10-03 — 1.1.0 release checks](test-results/2026-10-03-1.1.0-checks.md) | §4.4 points 1–5 and 7 on the merged tree, the esctest re-run, what was not judged |
 | [2026-10-03 — 1.1.1 release checks](test-results/2026-10-03-1.1.1-checks.md) | Real-shell empty-Return regression tests, full core/Unit suites and user-confirmed launched-app check |
 | [2026-10-07 — 1.1.5 release checks](test-results/2026-10-07-1.1.5-checks.md) | Full core/Unit suites, fuzz, esctest re-run, core benchmark and Release frame CPU, and the user-confirmed resize check |
+| [2026-10-07 — 1.1.6 release checks](test-results/2026-10-07-1.1.6-checks.md) | Rounded box corners: render tests failing on 1.1.5, the launched app, and a Release frame-CPU A/B |

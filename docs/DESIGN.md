@@ -5,7 +5,7 @@
 A native macOS terminal emulator written in Swift, with an AppKit shell,
 Metal rendering and an independent terminal core.
 
-This document describes 1.1.5 and the development tree on `main` since it.
+This document describes 1.1.6 and the development tree on `main` since it.
 The B01–B16 implementation batches shipped in 1.0.0, the 1.1.0
 milestone's work in 1.1.0, and the 1.2.0 milestone's work in 1.1.5; the download is linked
 from [the README](../README.md#install). Historical milestone plans live in
