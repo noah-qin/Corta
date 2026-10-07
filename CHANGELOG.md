@@ -14,14 +14,15 @@ what to edit.
 
 - ⌥← and ⌥→, ⌥⌫, Home, End, Page Up, Page Down, forward delete, F1–F12 and
   the shifted arrows reach the terminal again. The system input context —
-  with any input source, ABC included — consumed them and answered with
-  text-editing commands the terminal dropped. Outside an IME composition
-  they now go straight to the terminal's own encoding, so the plain arrows
-  also honour application cursor mode again.
+  with any input source, ABC included — answered them with text-editing
+  commands the terminal dropped. A command answered for a key is now
+  encoded from the key itself, so the plain arrows also honour application
+  cursor mode again; an IME composing still gets every key first.
 - ⌥⌫ sends `ESC DEL`, which shells bind to deleting the previous word.
 - With the kitty keyboard protocol's disambiguation on, Escape is reported as
-  `CSI 27 u`, and ⌥-as-Meta keys and ⌥⌫ as `CSI code ; 3 u`, as the protocol
-  specifies for keys that legacy encoding cannot tell apart.
+  `CSI 27 u`, and ⌥Return, ⌥Tab, ⌥⌫ and ⌥-as-Meta keys as `CSI code ; 3 u`,
+  as the protocol specifies for keys that legacy encoding cannot tell apart.
+  A key release is reported only for a press the program received.
 
 ### Reliability review (2026-10-07)
 

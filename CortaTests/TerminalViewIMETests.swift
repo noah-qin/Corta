@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
+import CortaTerminal
 import Testing
 
 @testable import Corta
@@ -90,19 +91,59 @@ struct TerminalViewIMETests {
         #expect(!TerminalView.routesEventThroughIME(commandV, optionAsMeta: false))
     }
 
-    /// Terminal keys skip the input context unless a composition is open:
-    /// handed to it, they came back as editing commands the pane dropped.
-    @Test func terminalKeysBypassTheIMEOutsideAComposition() {
+    /// A command the context answers the key it is handling with is that
+    /// key's terminal sequence — whatever the selector, `noop:` and
+    /// `scrollToBeginningOfDocument:` included, which used to be dropped.
+    @Test func aCommandForTheKeyBeingHandledIsEncodedFromTheKey() {
+        let view = Self.makeView()
+        var bytes: [UInt8] = []
+        view.onKeyBytes = { bytes += $0 }
+        view.keyEventInInputContext = Self.keyEvent(
+            characters: "\u{F729}", modifiers: .function, keyCode: 115)
+        view.doCommand(by: #selector(NSResponder.scrollToBeginningOfDocument(_:)))
+        #expect(bytes == Array("\u{1B}[H".utf8))
+        bytes = []
+        view.keyEventInInputContext = Self.keyEvent(
+            characters: "\u{F704}", modifiers: .function, keyCode: 122)
+        view.doCommand(by: NSSelectorFromString("noop:"))
+        #expect(bytes == Array("\u{1B}OP".utf8))
+        // With no key in hand (a candidate window), the selector map stands.
+        bytes = []
+        view.keyEventInInputContext = nil
+        view.doCommand(by: #selector(NSResponder.scrollToBeginningOfDocument(_:)))
+        #expect(bytes.isEmpty)
+    }
+
+    /// Terminal keys still reach the IME first: one composing in its own
+    /// panel (`hasMarkedText()` cannot see it) needs them.
+    @Test func terminalKeysAreStillOfferedToTheIME() {
         let home = Self.keyEvent(characters: "\u{F729}", modifiers: .function, keyCode: 115)
-        let optionLeft = Self.keyEvent(
-            characters: "\u{F702}", modifiers: [.option, .function, .numericPad], keyCode: 123)
-        let returnKey = Self.keyEvent(characters: "\r", keyCode: 36)
-        for event in [home, optionLeft, returnKey] {
-            #expect(!TerminalView.routesEventThroughIME(event))
-            // Mid-composition the IME needs them to pick and commit.
-            #expect(TerminalView.routesEventThroughIME(event, composing: true))
+        #expect(TerminalView.routesEventThroughIME(home))
+        #expect(TerminalView.isTerminalKey(home))
+        #expect(TerminalView.isTerminalKey(Self.keyEvent(characters: "\u{1B}", keyCode: 53)))
+        #expect(!TerminalView.isTerminalKey(Self.keyEvent(characters: "a")))
+    }
+
+    /// A kitty release goes out only for a press the child saw: the search
+    /// bar's Escape, or one an IME used, must not report a release alone.
+    @Test func aReleaseIsReportedOnlyForADeliveredPress() {
+        let view = Self.makeView()
+        var bytes: [UInt8] = []
+        view.onKeyBytes = { bytes += $0 }
+        view.keyboardEnhancements = { [.disambiguate, .reportEventTypes] }
+        func escape(_ type: NSEvent.EventType) -> NSEvent {
+            NSEvent.keyEvent(
+                with: type, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+                context: nil, characters: "\u{1B}", charactersIgnoringModifiers: "\u{1B}",
+                isARepeat: false, keyCode: 53)!
         }
-        #expect(TerminalView.routesEventThroughIME(Self.keyEvent(characters: "a")))
+        view.keyUp(with: escape(.keyUp))
+        #expect(bytes.isEmpty, "no press was delivered")
+        view.deliverBytes(for: escape(.keyDown))
+        #expect(bytes == Array("\u{1B}[27u".utf8))
+        bytes = []
+        view.keyUp(with: escape(.keyUp))
+        #expect(bytes == Array("\u{1B}[27;1:3u".utf8))
     }
 
     /// End to end through a real input context — which, for every input

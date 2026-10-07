@@ -317,30 +317,26 @@ As implemented (M3.1–M3.4, `TerminalView+IME.swift`,
 
 - The conformance must be **declared** on the view — `NSView` does not
   conform by default, and its `inputContext` is nil until it does.
-- Routing: an event carrying ⌘ or ⌃ bypasses the IME entirely, and so
-  does a terminal key — Return, Tab, Delete, Escape, the arrows, Home,
-  End, Page Up/Down, forward delete, F1–F12 — unless a composition is
-  open (`TerminalView.isTerminalKey`). The input context consumes every
-  one of those for any input source, ABC included, and answers with a
-  text-editing command (`moveWordLeft:`, `scrollToBeginningOfDocument:`,
-  `deleteForward:`, `complete:` for F5); the pane dropped all but ten of
-  them, so ⌥←, Home, End, Page Up/Down, forward delete and the function
-  keys never reached the child. Every other event is offered to
-  `inputContext.handleEvent(_:)` first and
-  falls through to direct byte translation only when unconsumed. The
-  input context consumes more than text keys — Return, Delete, Escape,
-  the arrows, Tab and Shift-Tab come back through `doCommand(by:)`, and
-  forwarding those there is load-bearing: without it they are silently
-  eaten. Tab is the sharp case (B02): plain, unmodified Tab and
-  Shift-Tab carry neither ⌘ nor ⌃, so they are always offered to the
-  input context first, and any candidate UI — a shell completion menu,
-  an IME — that resolves the keystroke as a command rather than
-  `insertText` sends it to `doCommand(by:)` as `insertTab(_:)` /
-  `insertBacktab(_:)`. Those two cases forward `0x09` and the same
-  `CSI Z` backtab sequence `TerminalView+Keyboard.swift` already sends
-  for the direct (non-IME) path, and deliberately do not participate in
-  the kitty-protocol disambiguate re-encoding — Tab, Enter and
-  Backspace stay legacy there regardless of which path delivered them.
+- Routing: an event carrying ⌘ or ⌃ bypasses the IME entirely; every
+  other event is offered to `inputContext.handleEvent(_:)` first and
+  falls through to direct byte translation only when unconsumed. Terminal
+  keys are offered too: an IME composing in its own panel, where
+  `hasMarkedText()` cannot see it, needs Return, Delete and the arrows to
+  pick and commit. Outside a composition the input context consumes every
+  terminal key — for any input source, ABC included — and answers with a
+  text-editing command through `doCommand(by:)`: `insertNewline:`,
+  `moveLeft:`, `moveWordLeft:` for ⌥←, `scrollToBeginningOfDocument:` for
+  Home, `deleteForward:`, `complete:` for F5, `noop:` for F1. Forwarding
+  those is load-bearing, and a selector map was not enough: it covered ten
+  and dropped the rest, so ⌥←, Home, End, Page Up/Down, forward delete and
+  the function keys never reached the child, and the arrows it did map
+  lost DECCKM. So `keyDown` records the event it hands the context
+  (`keyEventInInputContext`), and a command answered while that is set is
+  encoded from the key itself by `deliverBytes` — the same bytes, LNM,
+  DECCKM, modifiers and kitty flags as the direct path. The map remains
+  for commands with no key in hand: a candidate UI — a shell completion
+  menu, an IME — resolving Tab or Shift-Tab as `insertTab(_:)` /
+  `insertBacktab(_:)` (B02), which forward `0x09` and `CSI Z`.
 - Committed text arrives via `insertText(_:replacementRange:)` and is
   written to the PTY there. Marked text is app-layer only — never the
   grid, never the PTY — drawn by `MarkedTextOverlayView` over the cells

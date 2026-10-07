@@ -430,4 +430,36 @@ struct TerminalViewKeyEncodingTests {
         // Plain Delete stays DEL.
         #expect(TerminalView.bytes(for: Self.keyEvent(characters: "\u{7F}", keyCode: 51)) == [0x7F])
     }
+
+    /// Caps Lock is a lock modifier, left out of these encodings: ⌥F must
+    /// stay ⌥F to a program matching it exactly.
+    @Test func capsLockDoesNotChangeTheDisambiguatedMetaKey() throws {
+        let optionF = Self.keyEvent(
+            characters: "ƒ", charactersIgnoringModifiers: "f", modifiers: [.option, .capsLock],
+            keyCode: 3)
+        #expect(
+            TerminalView.bytes(for: optionF, enhancements: .disambiguate, optionAsMeta: true)
+                == Array("\u{1B}[102;3u".utf8))
+    }
+
+    /// ⌥ on Return and Tab composes nothing: Alt, encoded like ⌥⌫, rather
+    /// than an `ESC` prefix read as Escape then the key.
+    @Test func disambiguateReportsOptionReturnAndTab() throws {
+        let optionReturn = Self.keyEvent(characters: "\r", modifiers: .option, keyCode: 36)
+        let optionTab = Self.keyEvent(characters: "\t", modifiers: .option, keyCode: 48)
+        #expect(
+            TerminalView.bytes(for: optionReturn, enhancements: .disambiguate)
+                == Array("\u{1B}[13;3u".utf8))
+        #expect(
+            TerminalView.bytes(for: optionTab, enhancements: .disambiguate)
+                == Array("\u{1B}[9;3u".utf8))
+    }
+
+    /// The spec reports a Backspace release only with report-all-keys.
+    @Test func optionDeleteReleaseIsNotReported() throws {
+        let release = Self.keyEvent(
+            characters: "\u{7F}", modifiers: .option, keyCode: 51, type: .keyUp)
+        #expect(TerminalView.bytes(
+            for: release, enhancements: [.disambiguate, .reportEventTypes]) == nil)
+    }
 }
