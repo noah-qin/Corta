@@ -912,8 +912,7 @@ final class SFTPBrowserModel {
     }
 
     nonisolated static func parentPath(of path: String) -> String {
-        var trimmed = path
-        while trimmed.count > 1, trimmed.hasSuffix("/") { trimmed.removeLast() }
+        let trimmed = normalized(path: path)
         guard let slash = trimmed.lastIndex(of: "/"), slash != trimmed.startIndex else {
             return "/"
         }
@@ -923,9 +922,13 @@ final class SFTPBrowserModel {
     /// Strips a trailing slash, so `/usr/` and `/usr` are the same
     /// current-path display; the root survives.
     nonisolated static func normalized(path: String) -> String {
-        var path = path
-        while path.count > 1, path.hasSuffix("/") { path.removeLast() }
-        return path
+        var end = path.endIndex
+        while end > path.startIndex {
+            let previous = path.index(before: end)
+            guard previous > path.startIndex, path[previous] == "/" else { break }
+            end = previous
+        }
+        return String(path[..<end])
     }
 
     /// One keep-both candidate: `report.pdf` → `report 2.pdf` at attempt 1,

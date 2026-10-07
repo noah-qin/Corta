@@ -252,6 +252,40 @@ struct SFTPSessionTests {
         try await session.close(handle)
     }
 
+    @Test("withheld cancelled replies exhaust a bounded budget and a fresh session recovers")
+    func cancelledReplyBudget() async throws {
+        let connection = SFTPLoopbackConnection()
+        let server = FakeSFTPServer(connection: connection, fileSystem: FakeRemoteFileSystem())
+        server.interceptor = { message in
+            if case .read = message.payload { return .ignore }
+            return .proceed
+        }
+        server.start()
+        var configuration = SFTPSession.Configuration()
+        configuration.maxCancelledRequests = 4
+        let session = SFTPSession(transport: connection.clientTransport(), configuration: configuration)
+        defer { session.close() }
+        _ = try await session.connect()
+        let handle = SFTPHandle(rawValue: [1])
+        for offset in 0..<4 {
+            let task = Task { try await session.read(handle: handle, offset: UInt64(offset), length: 1) }
+            #expect(server.waitFor("read on wire") { $0.readOffsets.count == offset + 1 })
+            task.cancel()
+            do {
+                _ = try await task.value
+                Issue.record("cancelled read succeeded")
+            } catch { #expect(error as? SFTPError == .cancelled) }
+            #expect(session.retainedLateReplyCount <= configuration.maxCancelledRequests)
+        }
+        await #expect(throws: SFTPError.protocolViolation("too many cancelled requests awaiting replies")) {
+            try await session.realPath(path: "/")
+        }
+        #expect(session.retainedLateReplyCount == 0, "terminal cleanup releases the ledger")
+        let (fresh, _, _) = try await makePair()
+        defer { fresh.close() }
+        #expect(try await fresh.realPath(path: "/") == Array("/".utf8))
+    }
+
     @Test("a reply for an unsent request-id tears the session down")
     func unknownReplyIDIsAProtocolViolation() async throws {
         // The fake answers an OPEN by first sending, raw, an ATTRS

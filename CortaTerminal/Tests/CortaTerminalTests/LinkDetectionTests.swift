@@ -250,6 +250,30 @@ struct LinkDetectionTests {
         #expect(elapsed < .seconds(1), "took \(elapsed)")
     }
 
+    @Test("dense Unicode references retain correct cell positions in linear time")
+    func denseUnicodeReferences() throws {
+        let token = "(界.swift:12:3) "
+        let text = String(repeating: token, count: 4_000)
+        // Keep a whole number of wide-character tokens on each row.
+        var terminal = Terminal(rows: 50, columns: (token.count + 1) * 14, scrollbackLimit: 1_000)
+        terminal.feed(Array(text.utf8))
+        let line = terminal.grid.logicalLine(containing: terminal.grid.cursor.row)
+        let start = ContinuousClock.now
+        let found = FileReferenceDetection.references(in: line)
+        #expect(ContinuousClock.now - start < .seconds(1))
+        #expect(found.count == 4_000)
+        for index in [0, 1, 3_999] {
+            let reference = try #require(found.indices.contains(index) ? found[index] : nil)
+            #expect(reference.path == "界.swift")
+            #expect(reference.line == 12 && reference.column == 3)
+            #expect(reference.range.start == SelectionPoint(
+                row: line.firstRow + index / 14, column: 1 + (index % 14) * (token.count + 1)))
+        }
+        let combined = FileReferenceDetection.references(in: Self.line("界 e\u{0301}.swift:2"))
+        #expect(combined.first?.path == "e\u{0301}.swift")
+        #expect(combined.first?.range.start.column == 3)
+    }
+
     @Test("the linear pattern finds exactly what the quadratic one did")
     func linearPatternMatchesTheOldOne() {
         var generator = SystemRandomNumberGenerator()

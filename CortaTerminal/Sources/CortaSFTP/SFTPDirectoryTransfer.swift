@@ -113,6 +113,22 @@ extension SFTPTransferEngine {
         progress: DirectoryProgressHandler? = nil
     ) async throws(SFTPError) -> DirectoryTransferReceipt {
         let plan = try await enumerateRemote(root: remotePath)
+        // A blanket merge/overwrite decision never authorizes consuming a
+        // sibling as staging storage. Reject namespace collisions before
+        // writing any entries, independent of the peer's listing order.
+        let targets = Set(plan.files.map(\.relativePath) + plan.directories)
+        for file in plan.files {
+            let partial = Self.partialPath(for: file.relativePath)
+            let partialURL = localDirectory.appendingPathComponent(partial)
+            var info = Darwin.stat()
+            if targets.contains(partial) || Darwin.lstat(partialURL.path, &info) == 0 {
+                throw .destinationConflict(path: partialURL.path)
+            }
+            if errno != ENOENT {
+                throw .localIOFailed(operation: "lstat partial", code: errno)
+            }
+        }
+        let filePolicy = Self.directoryFilePolicy(policy)
         var receipt = DirectoryTransferReceipt(
             filesTransferred: 0, directoriesCreated: 0, bytesTransferred: 0,
             skipped: plan.skipped)
@@ -146,7 +162,7 @@ extension SFTPTransferEngine {
             let fileReceipt = try await download(
                 remotePath: Self.join(remotePath, file.relativePath),
                 to: localDirectory.appendingPathComponent(file.relativePath),
-                policy: policy,
+                policy: filePolicy,
                 partialDisposition: .automatic,
                 progress: progress.map { handler in
                     { @Sendable fileProgress in
@@ -192,6 +208,20 @@ extension SFTPTransferEngine {
                 throw .localIOFailed(operation: "lstat destination", code: errno)
             }
             current.deleteLastPathComponent()
+        }
+    }
+
+    /// Directory-level consent does not identify existing per-file partials.
+    /// Recheck at each file, after preflight, so later collisions also fail.
+    private static func directoryFilePolicy(_ policy: ConflictPolicy) -> ConflictPolicy {
+        .decide { conflict in
+            if conflict.partialSize != nil, !conflict.partialIsOwned { return .fail }
+            switch policy {
+            case .fail: return .fail
+            case .overwrite: return .overwrite
+            case .resume: return .resume
+            case .decide(let choose): return choose(conflict)
+            }
         }
     }
 

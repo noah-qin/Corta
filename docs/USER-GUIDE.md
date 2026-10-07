@@ -375,6 +375,9 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
   upload, download, rename and delete. The first connection to a host asks
   you to confirm the host name. Transfers resume after an interruption and
   never overwrite a file without asking.
+  A folder download stops if a name conflicts with a `.corta-part` staging
+  file, preserving the existing file. Choose a separate destination or resolve
+  that file individually; a folder-wide overwrite cannot consume a partial.
 - **In the browser**, as in Finder: ⌘[ and ⌘] go back and forward, ⌘↑ to
   the enclosing folder, ⌘R refreshes, ⇧⌘G (or a click on the path) types a
   path, ⇧⌘N makes a folder and ⇧⌘. shows hidden files. Click a column title

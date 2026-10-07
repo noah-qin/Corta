@@ -489,18 +489,33 @@ struct SFTPPathBar: View {
     @Bindable var model: SFTPBrowserModel
     @Binding var editing: Bool
 
-    private struct Crumb: Identifiable {
+    nonisolated struct Crumb: Identifiable {
         let title: String
         let path: String
         var id: String { path }
     }
 
     private var crumbs: [Crumb] {
+        Self.breadcrumbs(for: model.currentPath)
+    }
+
+    /// Build only the visible ancestors. Retaining every prefix of a peer
+    /// path before folding made a frame-sized path consume quadratic memory.
+    /// At most root, ellipsis and six trailing components are retained.
+    nonisolated static func breadcrumbs(for path: String, keepingLast count: Int = 6) -> [Crumb] {
+        let components = path.split(separator: "/")
+        let kept = min(6, max(1, count))
         var result = [Crumb(title: "/", path: "/")]
-        var path = ""
-        for component in model.currentPath.split(separator: "/") {
-            path += "/" + component
-            result.append(Crumb(title: String(component), path: path))
+        if components.count > kept + 1 {
+            let ancestor = components[components.count - kept - 1]
+            result.append(Crumb(title: "…", path: String(path[..<ancestor.endIndex])))
+            for component in components.suffix(kept) {
+                result.append(Crumb(title: String(component), path: String(path[..<component.endIndex])))
+            }
+        } else {
+            for component in components {
+                result.append(Crumb(title: String(component), path: String(path[..<component.endIndex])))
+            }
         }
         return result
     }
@@ -539,10 +554,7 @@ struct SFTPPathBar: View {
 
     /// Root, an ellipsis standing for the middle, and the last few.
     private func folded(keepingLast count: Int) -> [Crumb] {
-        let all = crumbs
-        guard all.count > count + 2 else { return all }
-        return [all[0], Crumb(title: "…", path: all[all.count - count - 1].path)]
-            + all.suffix(count)
+        Self.breadcrumbs(for: model.currentPath, keepingLast: count)
     }
 
     private func trail(_ items: [Crumb]) -> some View {

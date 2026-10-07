@@ -569,6 +569,25 @@ and recovery, including work finishing after cancellation.
 The implementation has parser, cluster, image, texture, SFTP frame,
 request/writer, directory-list and tree limits. New paths must name their
 budget explicitly rather than assuming another layer accounts for them.
+Cancelled SFTP requests that still owe a wire reply have a separate 1,024-ID
+budget; exhausting it closes the session with a protocol error and releases
+the ledger. Those IDs are never recycled into live requests before a reply.
+Remote path breadcrumbs retain at most eight items (root, a folded ancestor,
+and six trailing components), constructing only those prefixes. Slash trimming
+walks the path once. Progress fractions sum peer sizes as floating point rather
+than overflowing a fixed-width integer. Forward/backward tab processing stops
+at the corresponding margin, regardless of the output's requested count.
+
+An existing `.corta-part` name is a conflict under the default file-transfer
+policy. Directory downloads reject staging-name collisions in the remote plan
+and existing local partials before writing entries, even under a blanket
+overwrite/resume choice; each file checks again before starting. Newly created
+download partials use exclusive creation, so a file appearing after preflight
+is neither truncated nor removed. Resuming or replacing an existing partial
+requires an explicit single-file decision, except for automatic retries of a
+partial whose device/inode identity belongs to the current download call.
+These checks do not establish a
+sandbox against a compromised local account racing already authorized files.
 Glyph clusters are rejected before shaping beyond the core's 32-scalar
 limit; oversized/non-finite ink is rejected before atlas eviction.
 Directory proxy probes run away from the main actor, with at most two

@@ -89,6 +89,51 @@ struct SFTPBrowserSortingTests {
 }
 
 @MainActor
+struct SFTPPathResourceTests {
+    @Test("deep canonical paths retain only a bounded set of clickable ancestors")
+    func deepCanonicalPath() async throws {
+        let path = String(repeating: "/a", count: 131_072)
+        let fake = FakeSFTPClient()
+        fake.realPathResult = path
+        fake.listings[path] = []
+        let model = SFTPBrowserModel(host: "test", startDirectory: nil) { _ in fake }
+        defer { model.disconnect() }
+        model.connect()
+        await waitUntil("deep path connected") { model.connectionState == .connected }
+        #expect(model.currentPath == path)
+        let start = ContinuousClock.now
+        let crumbs = SFTPPathBar.breadcrumbs(for: model.currentPath)
+        #expect(crumbs.count == 8)
+        #expect(crumbs[0].path == "/" && crumbs[1].title == "…")
+        #expect(crumbs.last?.path == path)
+        #expect(crumbs.reduce(0) { $0 + $1.path.utf8.count } <= path.utf8.count * 8)
+        #expect(ContinuousClock.now - start < .seconds(1))
+        for count in [1, 2] {
+            let folded = SFTPPathBar.breadcrumbs(for: path, keepingLast: count)
+            #expect(folded.count == count + 2)
+            #expect(folded[1].path == String(repeating: "/a", count: 131_072 - count))
+        }
+        #expect(SFTPPathBar.breadcrumbs(for: "/srv/app").map(\.path) == ["/", "/srv", "/srv/app"])
+        model.disconnect()
+        fake.realPathResult = "/srv"
+        fake.listings["/srv"] = []
+        model.connect()
+        await waitUntil("normal reconnection") { model.currentPath == "/srv" }
+    }
+
+    @Test("slash-heavy canonical paths normalize in one walk")
+    func slashHeavyPaths() {
+        let start = ContinuousClock.now
+        let slashes = String(repeating: "/", count: 262_144)
+        #expect(SFTPBrowserModel.normalized(path: slashes) == "/")
+        #expect(SFTPBrowserModel.parentPath(of: "/srv/app" + slashes) == "/srv")
+        #expect(SFTPBrowserModel.normalized(path: "") == "")
+        #expect(SFTPBrowserModel.normalized(path: "/界/é///") == "/界/é")
+        #expect(ContinuousClock.now - start < .seconds(1))
+    }
+}
+
+@MainActor
 struct SFTPBrowserHistoryTests {
     @Test("Back and Forward walk the visited directories; a refresh is not a step")
     func backAndForward() async {
@@ -274,6 +319,41 @@ struct SFTPDragExportTests {
 
 @MainActor
 struct SFTPTransferListTests {
+    @Test("simultaneous peer sizes spanning UInt64 never overflow the toolbar fraction")
+    func fullWidthPeerSizes() async throws {
+        let fake = FakeSFTPClient()
+        let gate = AsyncStream<Void>.makeStream()
+        fake.onTransfer = { _, progress in
+            progress?(.init(completedBytes: UInt64.max / 2, totalBytes: UInt64.max))
+            for await _ in gate.stream { }
+        }
+        let queue = SFTPTransferQueue()
+        queue.client = fake
+        queue.host = "test"
+        let directory = try makeTempDirectory()
+        defer {
+            gate.continuation.finish()
+            queue.disconnect()
+            try? FileManager.default.removeItem(at: directory)
+        }
+        for name in ["a", "b"] {
+            queue.enqueue(.init(isUpload: false, remotePath: "/" + name,
+                                localURL: directory.appendingPathComponent(name)))
+        }
+        await waitUntil("both active") {
+            queue.transfers.count == 2 && queue.transfers.allSatisfy {
+                if case .active(let completed, let total) = $0.state {
+                    return completed == UInt64.max / 2 && total == UInt64.max
+                }
+                return false
+            }
+        }
+        let progress = try #require(queue.overallProgress)
+        #expect(progress.isFinite && abs(progress - 0.5) < 0.000001)
+        queue.disconnect()
+        #expect(queue.overallProgress == nil)
+    }
+
     @Test("the rate needs two samples half a second apart, then follows a third of the way")
     func rateSmoothing() {
         var transfer = SFTPTransferQueue.Transfer(
