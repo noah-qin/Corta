@@ -10,6 +10,11 @@ what to edit.
 
 ## [Unreleased]
 
+### Fixed
+
+- A window with a tab bar showed two **+** buttons, the toolbar's and the
+  tab bar's. The tab bar's is gone; the toolbar's opens a new tab.
+
 ## [1.1.7] — 2026-10-07
 
 ### Added

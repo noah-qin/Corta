@@ -59,9 +59,10 @@ extension SplitViewController: NSToolbarDelegate {
             return item
         }
         if identifier == .cortaNewTab {
-            // Always there: the tab bar's own "+" goes with the bar, which a
-            // window of one tab does not show. The menu's command and title,
-            // joined to this window's group whichever window is key.
+            // The only "+": the tab bar has none (`AppDelegate` does not
+            // implement `newWindowForTab(_:)`), and this one stays whether or
+            // not the bar shows. The menu's command and title, joined to this
+            // window's group whichever window is key.
             let item = NSToolbarItem(itemIdentifier: identifier)
             item.label = TerminalCommand.newTab.title
             item.paletteLabel = item.label
