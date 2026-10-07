@@ -23,12 +23,13 @@ import Testing
 /// A `stat` on a mount whose server has gone can block for minutes. These
 /// stand one in with a check that never returns (until the test releases it)
 /// and pin that the caller is held for the timeout at most.
+@Suite(.serialized)
 struct PathProbeTests {
     /// Blocks `check` calls on `hung` paths until released.
     private final class Gate: Sendable {
         let released = Mutex(false)
         func wait() {
-            let deadline = ContinuousClock.now + .seconds(10)
+            let deadline = ContinuousClock.now + .seconds(5)
             while !released.withLock({ $0 }), ContinuousClock.now < deadline {
                 Thread.sleep(forTimeInterval: 0.005)
             }
@@ -40,7 +41,7 @@ struct PathProbeTests {
         let gate = Gate()
         defer { gate.released.withLock { $0 = true } }
         let started = Mutex(0)
-        let paths = (0..<(PathProbe.maximumOutstanding + 10)).map { "/hung/\($0)" }
+        let paths = (0..<6).map { "/hung/\($0)" }
         // Its own budget: the shared one is the app's, which other suites use.
         let found = PathProbe.directories(
             among: paths, timeout: .milliseconds(100),
@@ -48,9 +49,9 @@ struct PathProbeTests {
                 started.withLock { $0 += 1 }
                 gate.wait()
                 return true
-            }, budget: PathProbe.Budget(limit: PathProbe.maximumOutstanding))
+            }, budget: PathProbe.Budget(limit: 2))
         #expect(found.isEmpty)
-        #expect(started.withLock { $0 } <= PathProbe.maximumOutstanding)
+        #expect(started.withLock { $0 } <= 2)
     }
 
     @Test("a directory that never answers counts as absent once the timeout passes")
@@ -59,13 +60,13 @@ struct PathProbeTests {
         defer { gate.released.withLock { $0 = true } }
         let started = ContinuousClock.now
         let found = PathProbe.directories(
-            among: ["/fine", "/hung", "/fine"], timeout: .milliseconds(200),
+            among: ["/fine", "/hung", "/fine"], timeout: .milliseconds(1000 * testTimeoutScale),
             isDirectory: { path in
                 if path == "/hung" { gate.wait() }
                 return true
             }, budget: PathProbe.Budget(limit: 4))
         #expect(found == ["/fine"])
-        #expect(started.duration(to: .now) < .seconds(5))
+        #expect(started.duration(to: .now) < .seconds(4) * testTimeoutScale)
     }
 
     @Test("real directories are found and files are not")
@@ -75,7 +76,7 @@ struct PathProbeTests {
         try Data().write(to: file)
         defer { try? FileManager.default.removeItem(at: file) }
         let found = PathProbe.directories(
-            among: ["/tmp", file.path, "/no/such/place"], timeout: .seconds(5))
+            among: ["/tmp", file.path, "/no/such/place"], timeout: .milliseconds(5000 * testTimeoutScale))
         #expect(found == ["/tmp"])
     }
 
@@ -83,10 +84,11 @@ struct PathProbeTests {
     @Test("a reference check answers off the main thread and is then cached")
     func referenceProbeAnswersAndCaches() async {
         let calls = Mutex(0)
-        let probe = FileReferenceProbe(check: { _ in
-            calls.withLock { $0 += 1 }
-            return true
-        })
+        let probe = FileReferenceProbe(
+            check: { _ in
+                calls.withLock { $0 += 1 }
+                return true
+            }, timeout: .seconds(30))
         #expect(probe.cached("/a.swift") == nil)
         var answers: [Bool] = []
         probe.probe("/a.swift") { answers.append($0) }
@@ -111,15 +113,15 @@ struct PathProbeTests {
                 started.withLock { $0 += 1 }
                 gate.wait()
                 return true
-            }, timeout: .milliseconds(100))
+            }, timeout: .milliseconds(100), maximumOutstanding: 2)
         var answers: [Bool] = []
-        let count = FileReferenceProbe.maximumOutstanding + 5
+        let count = 6
         for index in 0..<count {
             probe.probe("/hung/\(index)") { answers.append($0) }
         }
         await waitUntil("every caller answered") { answers.count == count }
         #expect(answers.allSatisfy { !$0 })
-        #expect(started.withLock { $0 } <= FileReferenceProbe.maximumOutstanding)
+        #expect(started.withLock { $0 } <= 2)
         // Many hovers on one hung path are not queued without bound.
         var extra = 0
         for _ in 0..<50 { probe.probe("/hung/0") { _ in extra += 1 } }

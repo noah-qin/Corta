@@ -29,6 +29,7 @@ what to edit.
   than for every 32 KiB block.
 - CI now runs the real OpenSSH/SFTP suite against a throwaway local sshd on
   every change.
+
 ### Your files and remote copies (reliability review, 2026-10-07)
 
 - A config file or shell rc file that is not UTF-8 text (or cannot be read)

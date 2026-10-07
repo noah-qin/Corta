@@ -113,15 +113,18 @@ final class FileReferenceProbe {
     private let check: @Sendable (String) -> Bool
     private let now: () -> TimeInterval
     private let timeout: Duration
+    private let outstandingLimit: Int
 
     init(
         check: @escaping @Sendable (String) -> Bool = PathProbe.isRegularFile,
         now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
-        timeout: Duration = FileReferenceProbe.checkTimeout
+        timeout: Duration = FileReferenceProbe.checkTimeout,
+        maximumOutstanding: Int = FileReferenceProbe.maximumOutstanding
     ) {
         self.check = check
         self.now = now
         self.timeout = timeout
+        self.outstandingLimit = maximumOutstanding
     }
 
     /// The cached answer, or nil when there is none (yet).
@@ -145,7 +148,7 @@ final class FileReferenceProbe {
             waiting[path]?.append(then)
             return
         }
-        guard outstanding < Self.maximumOutstanding else {
+        guard outstanding < outstandingLimit else {
             then(false)
             return
         }
