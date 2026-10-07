@@ -24,7 +24,7 @@ import OSLog
 ///
 /// | Stage | Interval | Where |
 /// | --- | --- | --- |
-/// | key event → bytes on the PTY | `keyDown` | `TerminalView.deliverBytes` (⌘/⌃ bypass, or declined by the IME), `.insertText` (most typing), `.doCommand(by:)` (Return, Delete, Escape, arrows) |
+/// | key event → bytes on the PTY | `keyDown` | `TerminalView.deliverBytes` (⌘/⌃ bypass, or declined by the IME), `.insertText` (most typing), `.doCommand(by:)` (terminal keys the IME answered with a command, encoded through `deliverBytes`) |
 /// | reader wakes, parses, writes the grid | `output` | `PaneFrameLoop.noteOutput` |
 /// | MainActor hop that wakes the display link | `wake` | `PaneFrameLoop.noteOutput` |
 /// | vsync callback, damage diff, instance build | `frame` | `FrameScheduler.metalDisplayLink(_:needsUpdate:)` |

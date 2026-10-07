@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
+import CortaTerminal
 import Testing
 
 @testable import Corta
@@ -88,6 +89,111 @@ struct TerminalViewIMETests {
         let commandV = Self.keyEvent(characters: "v", modifiers: [.command, .option])
         #expect(!TerminalView.routesEventThroughIME(commandV, optionAsMeta: true))
         #expect(!TerminalView.routesEventThroughIME(commandV, optionAsMeta: false))
+    }
+
+    /// A command the context answers the key it is handling with is that
+    /// key's terminal sequence — whatever the selector, `noop:` and
+    /// `scrollToBeginningOfDocument:` included, which used to be dropped.
+    @Test func aCommandForTheKeyBeingHandledIsEncodedFromTheKey() {
+        let view = Self.makeView()
+        var bytes: [UInt8] = []
+        view.onKeyBytes = { bytes += $0 }
+        view.keyEventInInputContext = Self.keyEvent(
+            characters: "\u{F729}", modifiers: .function, keyCode: 115)
+        view.doCommand(by: #selector(NSResponder.scrollToBeginningOfDocument(_:)))
+        #expect(bytes == Array("\u{1B}[H".utf8))
+        bytes = []
+        view.keyEventInInputContext = Self.keyEvent(
+            characters: "\u{F704}", modifiers: .function, keyCode: 122)
+        view.doCommand(by: NSSelectorFromString("noop:"))
+        #expect(bytes == Array("\u{1B}OP".utf8))
+        // With no key in hand (a candidate window), the selector map stands.
+        bytes = []
+        view.keyEventInInputContext = nil
+        view.doCommand(by: #selector(NSResponder.scrollToBeginningOfDocument(_:)))
+        #expect(bytes.isEmpty)
+    }
+
+    /// Terminal keys still reach the IME first: one composing in its own
+    /// panel (`hasMarkedText()` cannot see it) needs them.
+    @Test func terminalKeysAreStillOfferedToTheIME() {
+        let home = Self.keyEvent(characters: "\u{F729}", modifiers: .function, keyCode: 115)
+        #expect(TerminalView.routesEventThroughIME(home))
+        #expect(TerminalView.isTerminalKey(home))
+        #expect(TerminalView.isTerminalKey(Self.keyEvent(characters: "\u{1B}", keyCode: 53)))
+        #expect(!TerminalView.isTerminalKey(Self.keyEvent(characters: "a")))
+    }
+
+    /// A kitty release goes out only for a press the child saw: the search
+    /// bar's Escape, or one an IME used, must not report a release alone.
+    @Test func aReleaseIsReportedOnlyForADeliveredPress() {
+        let view = Self.makeView()
+        var bytes: [UInt8] = []
+        view.onKeyBytes = { bytes += $0 }
+        view.keyboardEnhancements = { [.disambiguate, .reportEventTypes] }
+        func escape(_ type: NSEvent.EventType) -> NSEvent {
+            NSEvent.keyEvent(
+                with: type, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+                context: nil, characters: "\u{1B}", charactersIgnoringModifiers: "\u{1B}",
+                isARepeat: false, keyCode: 53)!
+        }
+        view.keyUp(with: escape(.keyUp))
+        #expect(bytes.isEmpty, "no press was delivered")
+        view.deliverBytes(for: escape(.keyDown))
+        #expect(bytes == Array("\u{1B}[27u".utf8))
+        bytes = []
+        view.keyUp(with: escape(.keyUp))
+        #expect(bytes == Array("\u{1B}[27;1:3u".utf8))
+    }
+
+    /// End to end through a real input context — which, for every input
+    /// source, consumes these keys and answers with `moveWordLeft:`,
+    /// `scrollToBeginningOfDocument:`, `deleteForward:`, `complete:` and the
+    /// like. Each must still reach the child as its terminal sequence.
+    @Test func terminalKeysReachTheChildThroughARealInputContext() throws {
+        let window = NSWindow(
+            contentRect: NSRect(x: -10_000, y: -10_000, width: 400, height: 300),
+            styleMask: [.titled], backing: .buffered, defer: false)
+        let view = Self.makeView()
+        window.contentView?.addSubview(view)
+        window.makeFirstResponder(view)
+        try #require(view.inputContext != nil)
+        var sent: [UInt8] = []
+        view.onKeyBytes = { sent += $0 }
+        func press(_ characters: String, _ keyCode: UInt16, _ modifiers: NSEvent.ModifierFlags) -> [UInt8] {
+            sent = []
+            view.keyDown(with: NSEvent.keyEvent(
+                with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0,
+                windowNumber: window.windowNumber, context: nil, characters: characters,
+                charactersIgnoringModifiers: characters, isARepeat: false, keyCode: keyCode)!)
+            return sent
+        }
+        let arrow: NSEvent.ModifierFlags = [.function, .numericPad]
+        #expect(press("\u{F729}", 115, .function) == Array("\u{1B}[H".utf8))
+        #expect(press("\u{F72B}", 119, .function) == Array("\u{1B}[F".utf8))
+        #expect(press("\u{F72C}", 116, .function) == Array("\u{1B}[5~".utf8))
+        #expect(press("\u{F728}", 117, .function) == Array("\u{1B}[3~".utf8))
+        #expect(press("\u{F708}", 96, .function) == Array("\u{1B}[15~".utf8))
+        #expect(press("\u{F704}", 122, .function) == Array("\u{1B}OP".utf8))
+        #expect(press("\u{F702}", 123, arrow.union(.option)) == Array("\u{1B}[1;3D".utf8))
+        #expect(press("\u{F702}", 123, arrow.union(.shift)) == Array("\u{1B}[1;2D".utf8))
+        #expect(press("\u{F700}", 126, arrow) == Array("\u{1B}[A".utf8))
+        #expect(press("\u{7F}", 51, .option) == [0x1B, 0x7F])
+        #expect(press("\r", 36, []) == [0x0D])
+        // Application cursor keys (DECCKM) survive the trip.
+        view.applicationCursorKeys = { true }
+        #expect(press("\u{F700}", 126, arrow) == Array("\u{1B}OA".utf8))
+    }
+
+    /// A command the IME resolved for a terminal key uses the key itself, so
+    /// LNM and DECCKM apply; without a key event the selector map remains.
+    @Test func doCommandHonoursNewLineMode() {
+        let view = Self.makeView()
+        var bytes: [UInt8] = []
+        view.onKeyBytes = { bytes += $0 }
+        view.isNewLineMode = { true }
+        view.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+        #expect(bytes == [0x0D, 0x0A])
     }
 
     /// The other half, end to end through the view: with the setting on, an

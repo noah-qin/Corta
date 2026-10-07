@@ -129,9 +129,24 @@ extension TerminalView: NSTextInputClient {
     /// Return, Delete, Escape and arrows behave the same with any IME.
     /// Signposted like `insertText`.
     override func doCommand(by selector: Selector) {
+        // The key itself, when the context answers the terminal key it is
+        // handling with a command. It does that for every input source —
+        // `moveWordLeft:` for ⌥←, `scrollToBeginningOfDocument:` for Home,
+        // `deleteForward:`, `complete:` for F5, `noop:` for F1 — and the map
+        // below dropped all but ten, so those keys never reached the child.
+        // The direct translation keeps DECCKM, LNM, modifiers and the kitty
+        // flags, which a selector has lost. An IME mid-composition consumes
+        // such keys itself rather than answering with a command.
+        if let event = keyEventInInputContext, Self.isTerminalKey(event) {
+            deliverBytes(for: event)
+            return
+        }
+        // Commands from no key in hand: a candidate window resolving Tab, or
+        // one answered later than the key's own `handleEvent`.
         let bytes: [UInt8]?
         switch selector {
-        case #selector(insertNewline(_:)): bytes = [0x0D]
+        case #selector(insertNewline(_:)):
+            bytes = isNewLineMode?() == true ? [0x0D, 0x0A] : [0x0D]
         case #selector(deleteBackward(_:)): bytes = [0x7F]
         case #selector(cancelOperation(_:)): bytes = [0x1B]
         case #selector(moveUp(_:)): bytes = Array("\u{1B}[A".utf8)

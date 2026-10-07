@@ -70,6 +70,14 @@ final class TerminalView: NSView, CALayerDelegate {
     }
 
     var onKeyBytes: (([UInt8]) -> Void)?
+    /// The key event the input context is handling right now: set around
+    /// `handleEvent`, so a command the IME answers it with is encoded from
+    /// the key itself (`doCommand(by:)`).
+    var keyEventInInputContext: NSEvent?
+    /// Keys whose press reached the child, so a kitty release report is
+    /// never sent for a press something else consumed (the search bar's
+    /// Escape, an IME composition).
+    var keyCodesDelivered: Set<UInt16> = []
 
     var onScroll: ((ScrollGesture) -> Void)?
 
