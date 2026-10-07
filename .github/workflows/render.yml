@@ -30,6 +30,16 @@ name: Render tests (Metal 4 hardware)
 # with write access, and only against a ref that already exists in this
 # repository — a fork's branch cannot reach it. Do not add another trigger
 # here without reopening that reasoning.
+#
+# That covers this file only. A fork's pull request runs the pull request's
+# own copy of every workflow `pull_request` triggers, so one that rewrites
+# `ci.yml`'s `runs-on` to `[self-hosted, macOS, ARM64]` would reach this
+# machine too. What stops it is the repository setting that holds every
+# outside contributor's workflow runs for approval (Settings › Actions ›
+# fork pull request workflows: all external contributors, set 2026-10-07);
+# read a fork's diff of `.github/` before approving it. The actions below
+# are pinned by commit, as release.yml's are: a moved tag would otherwise
+# run on this machine.
 on:
   workflow_dispatch:
     inputs:
@@ -55,7 +65,7 @@ jobs:
     runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Recorded, not silently accepted. A self-hosted machine has whatever
       # Xcode its owner installed, and this job is the only place the Metal 4
@@ -120,7 +130,7 @@ jobs:
 
       - name: Keep the test results when something fails
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: xcresult-render
           path: RenderTests.xcresult
