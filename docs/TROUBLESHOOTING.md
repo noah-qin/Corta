@@ -312,6 +312,15 @@ slow or two checks are already waiting, it leaves the proxy icon absent so
 output and keyboard interaction can continue. Check the mount independently;
 changing directory after it recovers requests a new check.
 
+### A pane opens in the home folder instead of a network directory
+
+A new pane, or a window restored at launch, starts in the directory it was
+asked for only if that directory answers within a short limit. A network
+volume that has stopped answering counts as missing, so the pane opens in
+the home folder rather than freezing Corta. The same limit applies to
+⌘-clicking or hovering a `path:line` reference there: it is not offered as
+a link. Reconnect the volume, then `cd` to it or open a new pane there.
+
 ### Remote editing asks again after an upload prompt
 
 The local file changed after the version shown by the original prompt.
@@ -321,7 +330,7 @@ can identify remote changes even when file size and timestamp are unchanged.
 
 ## Cursor, system status and theme editor
 
-These features are in the development tree until the next release. In Settings
+These features arrived in 1.1.5. In Settings
 (⌘,) → Appearance → Cursor, select a shape and enable Blink cursor separately.
 The default is a nonblinking block. Blinking pauses while the pane is inactive,
 hidden or scrolled back; a terminal program can temporarily override the setting

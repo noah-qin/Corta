@@ -149,7 +149,7 @@ bind.equalize-panes = ctrl+cmd+e
 bind.command-palette = cmd+shift+p
 ```
 
-On the development tree (not yet in 1.1.1), **View ▸ Theme editor…** opens
+Since 1.1.5, **View ▸ Theme editor…** opens
 color pickers and separate light/dark previews. **Settings ▸ Appearance ▸
 Cursor** selects block, bar or underline and an independent blink switch; the
 default is a nonblinking block. The primary font is System Monospaced.
@@ -195,21 +195,20 @@ are snapshots, not guarantees for every machine or workload.
 
 | Check | Recorded result | Evidence |
 | :--- | :--- | :--- |
-| Frame CPU, 120 × 40 full rebuild, Release | 0.87 ms, three-run mean | [Performance](docs/PERFORMANCE.md#58-the-frame-cpu-baseline-under-release-d17) |
+| Frame CPU, 120 × 40 full rebuild, Release | 0.57 ms, three-run mean | [Performance](docs/PERFORMANCE.md#58-the-frame-cpu-baseline-under-release-d17) |
 | Idle CPU, Release, 20 seconds | 0.05% | [Performance](docs/PERFORMANCE.md) |
 | Scrollback memory, 100k × 120 lines | 185.0 MB | [Performance](docs/PERFORMANCE.md) |
-| Core feed throughput | 144.1 MiB/s | [Performance](docs/PERFORMANCE.md) |
-| Search, 100k-line scrollback, one query | 25.6 ms | [Performance](docs/PERFORMANCE.md) |
+| Core feed throughput | 143.8 MiB/s | [Performance](docs/PERFORMANCE.md) |
+| Search, 100k-line scrollback, one query | 25.5 ms | [Performance](docs/PERFORMANCE.md) |
 | Keypress to glass | 66.3 ms average, p95 78.7 ms; above target | [Method and limitations](docs/PERFORMANCE.md) |
-| esctest2 | 126 passed, 334 known bugs, 107 failed; 567 total | [Raw results](docs/esctest/2026-10-03-results.txt) |
+| esctest2 | 131 passed, 334 known bugs, 102 failed; 567 total | [Raw results](docs/esctest/2026-10-07-results.txt) |
 
-The 1.1.1 emergency patch re-ran the scripted core benchmarks; results and
-measurement limits are in [Performance](docs/PERFORMANCE.md#56-numbers-by-release).
-Performance was measured on Apple M5, macOS 27.0.1, for the 1.1.0 release
-on 2026-10-03; idle CPU and keypress to glass are the 1.0.0 run's
-(2026-09-18), not re-measured since. The cited report records power
-conditions by measurement. The esctest2 run is 1.1.0's too; its 81.1%
-figure counts passes **plus known bugs** and is not a pass rate. See
+Performance was measured on Apple M5, macOS 27.0.1, for the 1.1.5 release
+on 2026-10-07, on battery; results and measurement limits are in
+[Performance](docs/PERFORMANCE.md#56-numbers-by-release). Idle CPU and
+keypress to glass are the 1.0.0 run's (2026-09-18), not re-measured since.
+The esctest2 run is 1.1.5's too; its 82.0% figure counts passes **plus
+known bugs** and is not a pass rate. See
 [conformance](docs/CONFORMANCE.md) for interpretation.
 
 Known limitations include above-target input latency, incomplete VT
