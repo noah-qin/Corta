@@ -841,6 +841,124 @@ struct RemoteEditCoordinatorTests {
         #expect(fixture.coordinator.pendingUploads.first?.contentDigest == RemoteEditStore.sha256Hex(Data("later edit".utf8)))
     }
 
+    /// A failed upload left the edit pending with no prompt: later saves
+    /// were swallowed (it was already pending) and nothing offered a retry.
+    @Test("a failed upload asks again")
+    func failedUploadAsksAgain() async throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        _ = try await fixture.coordinator.open(
+            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
+        try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
+        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        let pending = try #require(fixture.recorder.uploads.first)
+        let content = "remote v1"
+        fixture.fake.onTransfer = { call, _ in
+            if call.isUpload { throw SFTPError.transport(.connectionLost) }
+            try content.write(toFile: call.localPath, atomically: true, encoding: .utf8)
+        }
+        fixture.coordinator.upload(pending)
+        await waitUntil("the upload failed and was asked again") {
+            !fixture.recorder.errors.isEmpty && fixture.recorder.uploads.count == 2
+        }
+        #expect(fixture.coordinator.pendingUploads.count == 1)
+        // Answered again, the retry goes through.
+        fixture.fake.onTransfer = { call, _ in
+            guard !call.isUpload else { return }
+            try content.write(toFile: call.localPath, atomically: true, encoding: .utf8)
+        }
+        fixture.coordinator.upload(try #require(fixture.recorder.uploads.last))
+        await waitUntil("the retry finished") { fixture.coordinator.pendingUploads.isEmpty }
+    }
+
+    /// The copy's content at a relaunch used to become the baseline, so an
+    /// edit whose upload failed before the quit was never offered again.
+    @Test("an edit never uploaded is pending when the copy is opened again")
+    func unuploadedEditIsPendingOnReopen() async throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        _ = try await fixture.coordinator.open(
+            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
+        try "edited, never uploaded".write(
+            to: fixture.localCopyURL, atomically: true, encoding: .utf8)
+
+        // A fresh run: a new coordinator over the same store.
+        let recorder = Recorder()
+        let coordinator = RemoteEditCoordinator(
+            store: RemoteEditStore(rootURL: fixture.root), makeClient: { _ in fixture.fake },
+            opener: { _, _, _ in true },
+            presenter: .init(
+                promptUpload: { recorder.uploads.append($0) },
+                promptConflict: { recorder.conflicts.append($0) },
+                showError: { recorder.errors.append($0) }))
+        _ = try await coordinator.open(
+            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
+        #expect(recorder.uploads.count == 1)
+        #expect(fixture.fake.transferCalls.filter { !$0.isUpload }.count == 1, "the copy is reused")
+    }
+
+    /// Dismiss means "not this edit": it must not be offered again on every
+    /// open after a relaunch.
+    @Test("a dismissed edit is not offered again when the copy is reopened")
+    func dismissedEditStaysDismissedAcrossARelaunch() async throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        _ = try await fixture.coordinator.open(
+            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
+        try "edited, then dismissed".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
+        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        fixture.coordinator.dismissUpload(try #require(fixture.recorder.uploads.first))
+
+        let recorder = Recorder()
+        let coordinator = RemoteEditCoordinator(
+            store: RemoteEditStore(rootURL: fixture.root), makeClient: { _ in fixture.fake },
+            opener: { _, _, _ in true },
+            presenter: .init(
+                promptUpload: { recorder.uploads.append($0) },
+                promptConflict: { recorder.conflicts.append($0) },
+                showError: { recorder.errors.append($0) }))
+        _ = try await coordinator.open(
+            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
+        #expect(recorder.uploads.isEmpty)
+    }
+
+    /// A copy the manifest no longer names may hold edits; the download used
+    /// to refuse its path (policy `.fail`), and the file could not be opened.
+    @Test("a copy missing from the manifest is kept aside, not overwritten")
+    func orphanedCopyIsKeptAside() async throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let relative = RemoteEditStore.localRelativePath(host: "build-box", remotePath: "/srv/app/main.rs")
+        let orphan = fixture.root.appendingPathComponent(relative)
+        try FileManager.default.createDirectory(
+            at: orphan.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "local edits".write(to: orphan, atomically: true, encoding: .utf8)
+
+        #expect(try await fixture.coordinator.open(
+            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil))
+        #expect(try String(contentsOf: orphan, encoding: .utf8) == "remote v1")
+        let siblings = try FileManager.default.contentsOfDirectory(
+            atPath: orphan.deletingLastPathComponent().path)
+        let kept = try #require(siblings.first { $0.contains("(local copy ") })
+        #expect(try String(
+            contentsOf: orphan.deletingLastPathComponent().appendingPathComponent(kept),
+            encoding: .utf8) == "local edits")
+        #expect(fixture.recorder.errors.count == 1, "the user is told where it went")
+    }
+
+    @Test("a manifest from a newer Corta is not overwritten")
+    func newerManifestIsPreserved() throws {
+        let root = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let manifest = root.appendingPathComponent("manifest.json")
+        let newer = Data(#"{"version": 99, "copies": [], "future": true}"#.utf8)
+        try newer.write(to: manifest)
+        let store = RemoteEditStore(rootURL: root)
+        #expect(store.preservesNewerManifest)
+        store.recordDownload(host: "h", remotePath: "/p", remoteSize: 1, remoteMTime: 1)
+        #expect(try Data(contentsOf: manifest) == newer)
+    }
+
     @Test("managed copies and their manifest use owner-only modes")
     func managedCopyPermissions() async throws {
         let fixture = try makeFixture()

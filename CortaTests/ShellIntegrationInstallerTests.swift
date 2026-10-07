@@ -47,6 +47,63 @@ struct ShellIntegrationInstallerTests {
         #expect(installer.status() == .notInstalled)
     }
 
+    /// Read as empty, an rc file with one non-UTF-8 byte was replaced by
+    /// Corta's block alone. Nothing may be written to a file Corta cannot read.
+    @Test("an rc file that is not UTF-8 is reported and never written")
+    func undecodableRCFileIsNeverWritten() throws {
+        defer { removeDirectory() }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let bytes = Data([0x65, 0x78, 0x70, 0x6F, 0x72, 0x74, 0x20, 0x41, 0x3D, 0xE9, 0x0A])
+        try bytes.write(to: file)
+        #expect(installer.status() == .unreadable(installer.displayPath))
+        #expect(!installer.install())
+        #expect(!installer.uninstall())
+        #expect(!installer.update())
+        #expect(try Data(contentsOf: file) == bytes)
+
+        let integration = ShellIntegration(targets: [installer])
+        #expect(integration.status() == .unreadable(installer.displayPath))
+        #expect(integration.install() == [installer.displayPath])
+        #expect(try Data(contentsOf: file) == bytes)
+    }
+
+    /// bash's other login candidates are only checked for an old block; one
+    /// that cannot be read must not take away Install or Remove.
+    @Test("an unreadable file bash never reads does not block the targets")
+    func unreadableOtherFileDoesNotBlock() throws {
+        defer { removeDirectory() }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let other = directory.appendingPathComponent(".profile")
+        try Data([0x41, 0xE9, 0x0A]).write(to: other)
+        let integration = ShellIntegration(
+            targets: [installer], others: [ShellIntegrationInstaller(shell: .zsh, rcFileURL: other)])
+        #expect(integration.status() == .notInstalled)
+        #expect(integration.install().isEmpty)
+        #expect(integration.status() == .installed)
+        #expect(integration.uninstall().isEmpty)
+        #expect(try Data(contentsOf: other) == Data([0x41, 0xE9, 0x0A]))
+    }
+
+    @Test("a missing, an unreadable and a readable file read as three different things")
+    func readTextTellsMissingFromUnreadable() throws {
+        defer { removeDirectory() }
+        guard case .missing = UserFile.readText(at: file) else {
+            Issue.record("an absent file is missing")
+            return
+        }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data([0xFF, 0xFE, 0x00]).write(to: file)
+        guard case .unreadable = UserFile.readText(at: file) else {
+            Issue.record("bytes that are not UTF-8 are unreadable")
+            return
+        }
+        try writeFile("ok")
+        guard case .text("ok") = UserFile.readText(at: file) else {
+            Issue.record("UTF-8 text is read")
+            return
+        }
+    }
+
     @Test("installing into an absent rc file creates it with the block")
     func installCreatesTheFile() throws {
         defer { removeDirectory() }

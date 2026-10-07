@@ -340,6 +340,41 @@ struct ConfigurationStoreTests {
         #expect(await waitUpTo(5) { store.configuration.fontSize == 33 })
     }
 
+    /// One byte that is not UTF-8 made the whole file read as absent: the
+    /// store loaded the defaults, and the next change in Settings wrote them
+    /// over every hand-made setting. It must refuse to write instead.
+    @Test("a file that is not UTF-8 is never overwritten")
+    func undecodableFileIsNeverOverwritten() async throws {
+        defer { removeDirectory() }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        // "café" in Latin-1: a lone 0xE9 is not UTF-8.
+        var bytes = Data("theme = solarized\nfont-size = 18\n# caf".utf8)
+        bytes.append(contentsOf: [0xE9, 0x0A])
+        try bytes.write(to: file)
+        #expect(String(data: bytes, encoding: .utf8) == nil, "the fixture must not be UTF-8")
+
+        let store = ConfigurationStore(fileURL: file)
+        #expect(store.readError != nil)
+        #expect(store.lastWriteError != nil, "Settings is told why changes cannot be saved")
+        #expect(!store.update { $0.bell = .audible })
+        #expect(!store.write())
+        #expect(try Data(contentsOf: file) == bytes, "the file is untouched")
+
+        // A fix that leaves no write event (a `chmod`) is seen by the next
+        // write, which reads again first.
+        try writeFile("font-size = 17\n")
+        #expect(store.update { $0.bell = .visual })
+        #expect(store.readError == nil)
+        try Data(bytes).write(to: file)
+        #expect(await waitUpTo(5) { store.readError != nil })
+
+        // Fixed by hand, it reads again and writes are allowed.
+        try writeFile("font-size = 18\n")
+        #expect(await waitUpTo(5) { store.readError == nil && store.configuration.fontSize == 18 })
+        #expect(store.lastWriteError == nil)
+        #expect(store.update { $0.bell = .audible })
+    }
+
     /// Mutated from the notification closure (which is `@Sendable` but, like
     /// everything else here, runs on the main thread).
     private final class ChangeCounter: @unchecked Sendable {

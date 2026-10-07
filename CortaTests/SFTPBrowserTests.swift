@@ -523,6 +523,28 @@ struct SFTPBrowserModelTests {
         #expect(fake.removed.isEmpty, "a directory goes to rmdir, never to remove")
     }
 
+    /// The confirmation names a path; the delete must act on that path even
+    /// when the listing moved on before the user confirmed — the same name
+    /// in the new directory is a different file.
+    @Test("delete removes what the confirmation named, wherever the listing is now")
+    func deleteUsesTheConfirmedDirectory() async throws {
+        let fake = FakeSFTPClient()
+        fake.listings["/srv/app"] = [makeEntry("a.txt")]
+        fake.listings["/srv/other"] = [makeEntry("a.txt")]
+        let model = await connectedModel(fake: fake)
+        defer { model.disconnect() }
+        model.selection = ["a.txt"]
+        model.requestDelete(model.selectedEntries)
+        await waitUntil("confirmation") { model.deleteConfirmation != nil }
+        #expect(model.deleteConfirmation?.message.contains("/srv/app/a.txt") == true)
+
+        model.navigate(to: "/srv/other")
+        await waitUntil("navigated") { model.currentPath == "/srv/other" }
+        model.confirmDelete()
+        await waitUntil("deleted") { !fake.removed.isEmpty }
+        #expect(fake.removed == ["/srv/app/a.txt"])
+    }
+
     // MARK: - Transfers
 
     @Test("a download with no conflict runs under .fail and completes")

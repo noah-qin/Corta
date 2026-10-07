@@ -40,6 +40,40 @@ nonisolated enum UserFile {
         }
     }
 
+    /// What reading a user's text file found. `unreadable` — permissions, or
+    /// bytes that are not UTF-8 — is never the same as `missing`: a caller
+    /// that wrote "defaults" or "just our block" over such a file erased it.
+    enum ReadResult {
+        case missing
+        case unreadable(any Error)
+        case text(String)
+    }
+
+    /// Reads `url` as UTF-8, telling a missing file from one that exists but
+    /// cannot be read or decoded.
+    static func readText(at url: URL) -> ReadResult {
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch {
+            let nsError = error as NSError
+            let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError
+            if nsError.domain == NSCocoaErrorDomain && nsError.code == NSFileReadNoSuchFileError
+                || underlying?.domain == NSPOSIXErrorDomain && underlying?.code == Int(ENOENT)
+            {
+                // A dangling symlink is missing too: writing creates its target.
+                return .missing
+            }
+            return .unreadable(error)
+        }
+        guard let text = String(data: data, encoding: .utf8) else {
+            return .unreadable(CocoaError(.fileReadInapplicableStringEncoding, userInfo: [
+                NSFilePathErrorKey: url.path,
+            ]))
+        }
+        return .text(text)
+    }
+
     /// Follows links, resolving relative targets against the link's
     /// directory; unlike `resolvingSymlinksInPath()` it follows a link to a
     /// missing file.

@@ -182,6 +182,8 @@ final class DirectoryHistoryStore {
     let saveDelay: TimeInterval
 
     private var pendingSave: DispatchWorkItem?
+    /// The file on disk is from a newer Corta; it is left alone.
+    private(set) var preservesNewerFile = false
     /// Serial, so an in-flight write can't undo a clear.
     private let writeQueue = DispatchQueue(label: "Corta.DirectoryHistoryStore", qos: .utility)
 
@@ -248,11 +250,28 @@ final class DirectoryHistoryStore {
         var entries: [DirectoryHistory.Entry]
     }
 
+    private struct VersionProbe: Decodable {
+        var version: Int
+    }
+
     private func load() {
         guard let data = try? Data(contentsOf: fileURL) else { return }
+        // The version alone first: a newer version is usually a new shape,
+        // which the full decode below would fail and then overwrite.
+        if let version = try? JSONDecoder().decode(VersionProbe.self, from: data).version,
+            version > Persisted.currentVersion
+        {
+            preservesNewerFile = true
+            return
+        }
         if let persisted = try? JSONDecoder().decode(Persisted.self, from: data) {
-            // An unknown newer version loads nothing rather than guess.
-            guard persisted.version <= Persisted.currentVersion else { return }
+            // An unknown newer version loads nothing rather than guess, and
+            // is not overwritten: this build's save would replace it with
+            // what little this run records.
+            guard persisted.version <= Persisted.currentVersion else {
+                preservesNewerFile = true
+                return
+            }
             history = DirectoryHistory(entries: persisted.entries)
             return
         }
@@ -264,6 +283,7 @@ final class DirectoryHistoryStore {
 
     /// Snapshots on the main actor; encodes and writes on `writeQueue`.
     private func save() {
+        guard !preservesNewerFile else { return }
         let persisted = Persisted(
             version: Persisted.currentVersion, entries: Array(history.entries.values))
         let fileURL = fileURL

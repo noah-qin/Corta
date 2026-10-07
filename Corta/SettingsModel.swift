@@ -621,6 +621,12 @@ final class SettingsModel {
     /// path whose write just failed points Finder at a file that does not
     /// say what the page says — or at no file at all on a first launch.
     func revealConfigFile() {
+        // An unreadable file is shown as it is: opening it to fix it is the
+        // remedy, and a write is refused until it reads again.
+        if ConfigurationStore.shared.readError != nil {
+            NSWorkspace.shared.activateFileViewerSelecting([ConfigurationStore.fileURL])
+            return
+        }
         guard ConfigurationStore.shared.write() else {
             reportWriteFailure()
             return
@@ -654,6 +660,10 @@ final class SettingsModel {
                 message: L10n.format(
                     "settings.status.shellIntegrationInstalled", integration.displayPath),
                 actionTitle: L10n.text("settings.action.remove"))
+        case .unreadable(let path):
+            shellIntegrationStatus = RowStatus(
+                kind: .failed,
+                message: L10n.format("settings.status.shellIntegrationUnreadable", path))
         case .outdated:
             shellIntegrationStatus = RowStatus(
                 kind: .adjusted,
@@ -672,6 +682,7 @@ final class SettingsModel {
         switch integration.status() {
         case .notInstalled, .conflicting, .outdated: applyShellIntegration(integration.install())
         case .installed: applyShellIntegration(integration.uninstall())
+        case .unreadable: refreshShellIntegrationStatus()
         }
     }
 

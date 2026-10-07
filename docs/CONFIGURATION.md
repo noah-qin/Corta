@@ -37,6 +37,9 @@ key = value        # comment to end of line
   Corta survives a round trip through an older one.
 - An unparseable line is skipped, never fatal. A typo in one setting must
   not cost you every other setting, and the terminal has to start.
+- A file that exists but is not UTF-8 text, or cannot be read, is never
+  written: Corta keeps its current settings and Settings says why changes
+  are not being saved, until the file reads again.
 - An out-of-range value for a known key is **clamped**, not rejected, and
   rewritten in its clamped form.
 

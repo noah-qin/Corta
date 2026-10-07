@@ -35226,6 +35226,537 @@
           }
         }
       }
+    },
+    "settings.status.configUnreadable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corta can’t read %@ as UTF-8 text, so it won’t overwrite it. Fix or remove the file to change settings here."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corta 无法以 UTF-8 文本读取 %@，因此不会覆盖它。请修复或移除该文件后再在这里更改设置。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta 無法以 UTF-8 文字讀取 %@，因此不會覆寫它。請修正或移除該檔案後再於此處更改設定。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta は %@ を UTF-8 テキストとして読み取れないため、上書きしません。ここで設定を変更するには、ファイルを修正するか削除してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta가 %@을(를) UTF-8 텍스트로 읽을 수 없어 덮어쓰지 않습니다. 여기서 설정을 바꾸려면 파일을 고치거나 제거하세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta kann %@ nicht als UTF-8-Text lesen und überschreibt die Datei daher nicht. Korrigieren oder entfernen Sie sie, um hier Einstellungen zu ändern."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta ne peut pas lire %@ comme texte UTF-8 et ne l’écrasera donc pas. Corrigez ou supprimez le fichier pour modifier les réglages ici."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta no puede leer %@ como texto UTF-8, así que no lo sobrescribirá. Corrige o elimina el archivo para cambiar los ajustes aquí."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O Corta não consegue ler %@ como texto UTF-8, então não vai sobrescrevê-lo. Corrija ou remova o arquivo para alterar os ajustes aqui."
+          }
+        }
+      }
+    },
+    "settings.status.shellIntegrationUnreadable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corta can’t read %@ as UTF-8 text, so it won’t change it. Fix the file, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corta 无法以 UTF-8 文本读取 %@，因此不会修改它。请先修复该文件再重试。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta 無法以 UTF-8 文字讀取 %@，因此不會修改它。請先修正該檔案再重試。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta は %@ を UTF-8 テキストとして読み取れないため、変更しません。ファイルを修正してからもう一度お試しください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta가 %@을(를) UTF-8 텍스트로 읽을 수 없어 변경하지 않습니다. 파일을 고친 후 다시 시도하세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta kann %@ nicht als UTF-8-Text lesen und ändert die Datei daher nicht. Korrigieren Sie sie und versuchen Sie es erneut."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta ne peut pas lire %@ comme texte UTF-8 et ne le modifiera donc pas. Corrigez le fichier, puis réessayez."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta no puede leer %@ como texto UTF-8, así que no lo modificará. Corrige el archivo y vuelve a intentarlo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O Corta não consegue ler %@ como texto UTF-8, então não vai alterá-lo. Corrija o arquivo e tente novamente."
+          }
+        }
+      }
+    },
+    "remoteEdit.orphanKept": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An earlier local copy of %1$@ on %2$@ was not in Corta’s records, so it was kept as %3$@ instead of being replaced. It may hold edits that were never uploaded."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$@ 上 %1$@ 的一份较早的本地副本不在 Corta 的记录中，因此已保留为 %3$@，而没有被替换。其中可能有尚未上传的修改。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%2$@ 上 %1$@ 的一份較早本機副本不在 Corta 的記錄中，因此已保留為 %3$@，而未被取代。其中可能有尚未上傳的修改。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%2$@ 上の %1$@ の以前のローカルコピーは Corta の記録になかったため、置き換えずに %3$@ として残しました。アップロードされていない編集が含まれている可能性があります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%2$@의 %1$@에 대한 이전 로컬 사본이 Corta 기록에 없어서 교체하지 않고 %3$@(으)로 보관했습니다. 업로드되지 않은 편집이 들어 있을 수 있습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Eine frühere lokale Kopie von %1$@ auf %2$@ war nicht in Cortas Verzeichnis und wurde daher als %3$@ behalten statt ersetzt. Sie kann nie hochgeladene Änderungen enthalten."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Une copie locale antérieure de %1$@ sur %2$@ n’était pas dans les registres de Corta ; elle a été conservée sous %3$@ au lieu d’être remplacée. Elle peut contenir des modifications jamais envoyées."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Una copia local anterior de %1$@ en %2$@ no figuraba en los registros de Corta, así que se conservó como %3$@ en lugar de reemplazarla. Puede contener cambios que nunca se subieron."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Uma cópia local anterior de %1$@ em %2$@ não estava nos registros do Corta, então foi mantida como %3$@ em vez de ser substituída. Ela pode conter edições nunca enviadas."
+          }
+        }
+      }
+    },
+    "moveToApplications.newerTitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A newer Corta is already in Applications"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“应用程序”中已有更新版本的 Corta"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「應用程式」中已有較新版本的 Corta"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「アプリケーション」にはすでに新しい Corta があります"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "응용 프로그램에 이미 더 새로운 Corta가 있습니다"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "In „Programme“ ist bereits ein neueres Corta"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Une version plus récente de Corta est déjà dans Applications"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ya hay un Corta más reciente en Aplicaciones"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Já existe um Corta mais recente em Aplicativos"
+          }
+        }
+      }
+    },
+    "moveToApplications.newerMessage": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This copy is older. Moving it would replace the newer one, so Corta won’t. You can open the installed version instead."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前这份较旧。移动它会替换较新的版本，因此 Corta 不会这样做。你可以改为打开已安装的版本。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "目前這份較舊。移動它會取代較新的版本，因此 Corta 不會這麼做。你可以改為開啟已安裝的版本。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "このコピーは古いバージョンです。移動すると新しい方が置き換えられるため、Corta は移動しません。代わりにインストール済みのバージョンを開けます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "이 사본이 더 오래되었습니다. 옮기면 더 새로운 버전이 대체되므로 Corta는 옮기지 않습니다. 대신 설치된 버전을 열 수 있습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Diese Kopie ist älter. Sie zu bewegen würde die neuere ersetzen, daher tut Corta das nicht. Sie können stattdessen die installierte Version öffnen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Cette copie est plus ancienne. La déplacer remplacerait la plus récente, Corta ne le fera donc pas. Vous pouvez ouvrir la version installée à la place."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Esta copia es más antigua. Moverla reemplazaría la más reciente, así que Corta no lo hará. Puedes abrir la versión instalada."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Esta cópia é mais antiga. Movê-la substituiria a mais recente, então o Corta não fará isso. Você pode abrir a versão instalada."
+          }
+        }
+      }
+    },
+    "moveToApplications.openNewer": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the Installed Version"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开已安装的版本"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "開啟已安裝的版本"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "インストール済みのバージョンを開く"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "설치된 버전 열기"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Installierte Version öffnen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ouvrir la version installée"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Abrir la versión instalada"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Abrir a versão instalada"
+          }
+        }
+      }
+    },
+    "moveToApplications.translocatedMessage": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS is running this download from a temporary, read-only location, so Corta can’t move itself. Quit Corta, drag it from Finder into the Applications folder, and open it from there."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS 正从一个临时的只读位置运行这份下载，因此 Corta 无法移动自身。请退出 Corta，在“访达”中把它拖到“应用程序”文件夹，再从那里打开。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "macOS 正從暫時的唯讀位置執行此下載項目，因此 Corta 無法移動自身。請結束 Corta，在「Finder」中將它拖到「應用程式」檔案夾，再從那裡開啟。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "macOS はこのダウンロードを一時的な読み取り専用の場所から実行しているため、Corta は自身を移動できません。Corta を終了し、Finder で「アプリケーション」フォルダにドラッグしてから、そこから開いてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "macOS가 이 다운로드를 임시 읽기 전용 위치에서 실행 중이라 Corta가 스스로 옮겨질 수 없습니다. Corta를 종료하고 Finder에서 응용 프로그램 폴더로 드래그한 다음 그곳에서 여세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "macOS führt diesen Download von einem temporären, schreibgeschützten Ort aus, daher kann Corta sich nicht selbst bewegen. Beenden Sie Corta, ziehen Sie es im Finder in den Ordner „Programme“ und öffnen Sie es dort."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "macOS exécute ce téléchargement depuis un emplacement temporaire en lecture seule ; Corta ne peut donc pas se déplacer. Quittez Corta, faites-le glisser dans le dossier Applications depuis le Finder, puis ouvrez-le depuis là."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "macOS está ejecutando esta descarga desde una ubicación temporal de solo lectura, así que Corta no puede moverse. Sal de Corta, arrástralo desde el Finder a la carpeta Aplicaciones y ábrelo desde allí."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O macOS está executando este download de um local temporário somente leitura, então o Corta não pode se mover. Encerre o Corta, arraste-o no Finder para a pasta Aplicativos e abra-o de lá."
+          }
+        }
+      }
+    },
+    "moveToApplications.openApplicationsFolder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Applications Folder"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开“应用程序”文件夹"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "開啟「應用程式」檔案夾"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「アプリケーション」フォルダを開く"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "응용 프로그램 폴더 열기"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ordner „Programme“ öffnen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ouvrir le dossier Applications"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Abrir la carpeta Aplicaciones"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Abrir a pasta Aplicativos"
+          }
+        }
+      }
+    },
+    "remoteEdit.newerManifest": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A newer version of Corta keeps the records of your remote-edit copies, and this one can’t read them. Open the file in the newer Corta, so no copy it manages is replaced."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "远程编辑副本的记录由更新版本的 Corta 保存，当前版本无法读取。请在较新的 Corta 中打开该文件，以免替换它管理的副本。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "遠端編輯副本的記錄由較新版本的 Corta 保存，目前版本無法讀取。請在較新的 Corta 中開啟該檔案，以免取代它管理的副本。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "リモート編集コピーの記録は新しいバージョンの Corta が保存しており、このバージョンでは読み取れません。管理中のコピーを置き換えないよう、新しい Corta でファイルを開いてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "원격 편집 사본의 기록은 더 새로운 버전의 Corta가 보관하고 있어 이 버전에서는 읽을 수 없습니다. 관리 중인 사본이 교체되지 않도록 새 Corta에서 파일을 여세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Die Einträge Ihrer Remote-Bearbeitungskopien stammen von einer neueren Corta-Version, die diese Version nicht lesen kann. Öffnen Sie die Datei in der neueren Version, damit keine verwaltete Kopie ersetzt wird."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Les registres de vos copies de modification distante proviennent d’une version plus récente de Corta, que celle-ci ne sait pas lire. Ouvrez le fichier dans la version plus récente pour ne remplacer aucune copie qu’elle gère."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Los registros de tus copias de edición remota pertenecen a una versión más reciente de Corta que esta no puede leer. Abre el archivo en esa versión para no reemplazar ninguna copia que gestione."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Os registros das suas cópias de edição remota são de uma versão mais recente do Corta, que esta não consegue ler. Abra o arquivo na versão mais recente para não substituir nenhuma cópia que ela gerencia."
+          }
+        }
+      }
     }
   }
 }

@@ -113,6 +113,12 @@ final class SFTPBrowserModel {
     nonisolated struct DeleteConfirmation: Identifiable {
         let id = UUID()
         let entries: [Entry]
+        /// Where the entries are, as named in the message: the listing may
+        /// have moved on while the confirmation was being composed.
+        let directory: String
+        /// The connection the message named: a host change before the
+        /// confirm must not run it against another machine.
+        let connection: Int
         let title: String
         let message: String
     }
@@ -656,6 +662,7 @@ final class SFTPBrowserModel {
     func requestDelete(_ entries: [Entry]) {
         guard connectionState == .connected, !entries.isEmpty, let client, let host else { return }
         let directory = currentPath
+        let connection = connectionGeneration
         Task {
             var contained = 0
             for entry in entries where entry.kind == .directory {
@@ -677,15 +684,18 @@ final class SFTPBrowserModel {
                 message = L10n.format("sftp.delete.message.multiple", entries.count, host)
             }
             deleteConfirmation = DeleteConfirmation(
-                entries: entries, title: title, message: message)
+                entries: entries, directory: directory, connection: connection,
+                title: title, message: message)
         }
     }
 
     func confirmDelete() {
         guard let confirmation = deleteConfirmation else { return }
         deleteConfirmation = nil
-        guard let client, let host else { return }
-        let directory = currentPath
+        guard let client, let host, confirmation.connection == connectionGeneration else { return }
+        // The directory the message named, not wherever the listing is now:
+        // navigating while the count loaded made the same name another file.
+        let directory = confirmation.directory
         Task {
             for entry in confirmation.entries {
                 do {
@@ -749,6 +759,8 @@ final class SFTPBrowserModel {
         guard connectionState == .connected, let pickDownloadDestination else { return }
         let chosen = selectedEntries.filter { $0.kind == .file || $0.kind == .directory }
         guard !chosen.isEmpty else { return }
+        // Where the chosen entries are, before the picker lets the listing move.
+        let directory = currentPath
         Task {
             guard let destination = await pickDownloadDestination(chosen) else { return }
             for entry in chosen {
@@ -766,7 +778,7 @@ final class SFTPBrowserModel {
                 transferQueue.enqueue(
                     SFTPTransferQueue.Plan(
                         isUpload: false, isDirectory: entry.kind == .directory,
-                        remotePath: Self.joinPath(currentPath, entry.name),
+                        remotePath: Self.joinPath(directory, entry.name),
                         localURL: local,
                         sourceSize: entry.kind == .directory ? nil : entry.size,
                         sourceModified: entry.modified))

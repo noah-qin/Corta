@@ -215,10 +215,30 @@ final class RemoteEditCoordinator {
             catch { throw .localIOFailed(operation: "secure local copy", code: EACCES) }
             return copy
         }
-        return try await withClient(for: host) { client in
+        // Records from a newer Corta name copies this build cannot see; its
+        // downloads would set them aside and write where they live.
+        if store.preservesNewerManifest {
+            presenter.showError(L10n.text("remoteEdit.newerManifest"))
+            throw .cancelled
+        }
+        var keptOrphan: URL?
+        let tellAboutOrphan = { [presenter] in
+            if let keptOrphan {
+                presenter.showError(L10n.format("remoteEdit.orphanKept", remotePath, host, keptOrphan.path))
+            }
+        }
+        let copy: RemoteEditStore.RemoteCopy
+        do {
+            copy = try await withClient(for: host) { client in
             let attributes = try await client.lstat(path: remotePath)
             let relative = RemoteEditStore.localRelativePath(host: host, remotePath: remotePath)
             let url = store.rootURL.appendingPathComponent(relative)
+            // A copy the manifest no longer names — it was lost or unreadable
+            // — may hold edits never uploaded. Kept aside, not overwritten,
+            // and the download would otherwise refuse the occupied path.
+            if FileManager.default.fileExists(atPath: url.path) {
+                keptOrphan = try store.setAsideOrphan(at: url)
+            }
             try store.secureCopy(at: url)
             try await client.download(
                 remotePath: remotePath, to: url,
@@ -230,7 +250,15 @@ final class RemoteEditCoordinator {
             try store.secureCopy(at: url)
             digests[copy.id] = RemoteEditStore.sha256Hex(ofFile: url)
             return copy
+            }
+        } catch {
+            // Said even when the download failed: the kept copy may hold
+            // edits, and the next open would find the path empty.
+            tellAboutOrphan()
+            throw error
         }
+        tellAboutOrphan()
+        return copy
     }
 
     private func client(for host: String) async throws(SFTPError) -> any SFTPClient {
@@ -294,7 +322,12 @@ final class RemoteEditCoordinator {
         unwatch(copy.id)
         let url = store.localURL(for: copy)
         if digests[copy.id] == nil {
-            digests[copy.id] = RemoteEditStore.sha256Hex(ofFile: url)
+            // The content last decided on, when the manifest has it: a copy
+            // edited and never uploaded — a failed upload, then a quit — is
+            // then a pending edit on the next open, where the copy's current
+            // content would have made it the baseline; a dismissed one is not.
+            digests[copy.id] =
+                copy.approvedDigest ?? copy.remoteDigest ?? RemoteEditStore.sha256Hex(ofFile: url)
         }
         let descriptor = Darwin.open(url.path, O_EVTONLY | O_CLOEXEC)
         guard descriptor >= 0 else { return }
@@ -392,6 +425,7 @@ final class RemoteEditCoordinator {
         } catch {
             presenter.showError(SFTPBrowserModel.errorMessage(
                 .localIOFailed(operation: "snapshot approved content", code: EIO), host: copy.host))
+            askAgain(copy)
         }
     }
 
@@ -401,6 +435,7 @@ final class RemoteEditCoordinator {
         guard !uploadsInFlight.contains(pending.id) else { return }
         removeSnapshot(pending.id)
         pendingUploads.removeAll { $0.id == pending.id }
+        store.recordApproved(pending.copy, digest: pending.contentDigest)
     }
 
     private func checkRemoteAndUpload(_ copy: RemoteEditStore.RemoteCopy) async {
@@ -441,7 +476,25 @@ final class RemoteEditCoordinator {
             } else {
                 presenter.showError(
                     SFTPBrowserModel.errorMessage(error, host: copy.host))
+                askAgain(copy)
             }
+        }
+    }
+
+    /// After a failed check or upload the decision is still owed: ask it
+    /// again. Left pending without a prompt, the edit was stuck — no later
+    /// save prompted while it stayed pending, and nothing offered a retry.
+    private func askAgain(_ copy: RemoteEditStore.RemoteCopy) {
+        removeSnapshot(copy.id)
+        // After the failing call has unwound and released its in-flight
+        // mark: the production prompt is modal, and an Upload answered inside
+        // it would start before that mark was cleared.
+        Task { @MainActor [weak self] in
+            guard let self,
+                let pending = self.pendingUploads.first(where: { $0.id == copy.id }),
+                !self.uploadsInFlight.contains(copy.id)
+            else { return }
+            self.presenter.promptUpload(pending)
         }
     }
 
@@ -510,10 +563,12 @@ final class RemoteEditCoordinator {
             removeSnapshot(copy.id)
             pendingConflicts.removeAll { $0.id == conflictID }
             pendingUploads.removeAll { $0.id == conflictID }
+            store.recordApproved(copy, digest: digests[copy.id])
         case .dismiss:
             removeSnapshot(copy.id)
             pendingConflicts.removeAll { $0.id == conflictID }
             pendingUploads.removeAll { $0.id == conflictID }
+            store.recordApproved(copy, digest: digests[copy.id])
         }
     }
 
@@ -556,6 +611,7 @@ final class RemoteEditCoordinator {
                 L10n.format(
                     "remoteEdit.uploadFailed", copy.remotePath, copy.host,
                     SFTPBrowserModel.errorMessage(Self.sftpError(error), host: copy.host)))
+            askAgain(copy)
         }
     }
 
