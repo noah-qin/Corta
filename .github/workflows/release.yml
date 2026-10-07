@@ -476,5 +476,9 @@ jobs:
       # report-ci-statuses.sh: the dispatched CI's result, as the PR's checks.
       statuses: write
     uses: ./.github/workflows/appcast.yml
+    # The called sign job names the release environment, but a reusable
+    # workflow sees no secrets its caller does not pass: 1.1.5's feed step
+    # found SPARKLE_PRIVATE_KEY empty and stopped after publication.
+    secrets: inherit
     with:
       tag: ${{ needs.prepare.outputs.tag }}
