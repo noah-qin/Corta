@@ -152,4 +152,68 @@ struct ReflowTests {
         #expect(grid.columns == 5)
         #expect(grid.line(0).wrapped == beforeWrapped)
     }
+
+    // MARK: - The cursor past the last character
+
+    /// A row keeps only up to its last written cell and a reflow trims
+    /// trailing blanks, so a cursor resting after a typed space — a prompt's
+    /// "> " — used to come back one column short.
+    @Test("a cursor after a trailing space keeps its column")
+    func cursorAfterTrailingSpaceKeepsItsColumn() {
+        var grid = Grid(rows: 3, columns: 20)
+        write("> ", to: &grid)
+        grid.resize(rows: 3, columns: 30)
+        #expect(grid.cursor == Cursor(row: 0, column: 2))
+        write("x", to: &grid)
+        #expect(grid[0, 2].scalar == UInt32(UnicodeScalar("x").value))
+    }
+
+    @Test("a cursor moved past a row's cells keeps its column")
+    func cursorPastStoredCellsKeepsItsColumn() {
+        var grid = Grid(rows: 3, columns: 20)
+        write("ab", to: &grid)
+        grid.moveCursor(row: 0, column: 12)
+        grid.resize(rows: 3, columns: 30)
+        #expect(grid.cursor == Cursor(row: 0, column: 12))
+
+        // On a row with nothing on it at all.
+        grid.moveCursor(row: 2, column: 7)
+        grid.resize(rows: 3, columns: 25)
+        #expect(grid.cursor == Cursor(row: 2, column: 7))
+    }
+
+    @Test("a cursor past the new margin stops at it")
+    func cursorPastTheNewMarginIsClamped() {
+        var grid = Grid(rows: 3, columns: 20)
+        write("ab", to: &grid)
+        grid.moveCursor(row: 0, column: 15)
+        grid.resize(rows: 3, columns: 10)
+        #expect(grid.cursor == Cursor(row: 0, column: 9))
+    }
+
+    /// Before, the cursor stayed on the last character it had written, and
+    /// the next character overwrote it.
+    @Test("a pending wrap widened becomes the column after the line")
+    func pendingWrapWidenedMovesPastTheLastCharacter() {
+        var grid = Grid(rows: 3, columns: 6)
+        write("abcdef", to: &grid)
+        #expect(grid.pendingWrap)
+        grid.resize(rows: 3, columns: 10)
+        #expect(grid.cursor == Cursor(row: 0, column: 6))
+        #expect(!grid.pendingWrap)
+        write("g", to: &grid)
+        #expect(joinedText(of: grid).filter { !$0.isEmpty } == ["abcdefg"])
+    }
+
+    @Test("a line that ends at the new margin leaves the wrap pending")
+    func lineEndingAtTheNewMarginKeepsTheWrapPending() {
+        var grid = Grid(rows: 4, columns: 10)
+        write("abcdef", to: &grid)
+        grid.resize(rows: 4, columns: 3)
+        #expect(grid.cursor == Cursor(row: 1, column: 2))
+        #expect(grid.pendingWrap)
+        write("g", to: &grid)
+        #expect(grid.cursor == Cursor(row: 2, column: 1))
+        #expect(joinedText(of: grid).filter { !$0.isEmpty } == ["abcdefg"])
+    }
 }

@@ -80,8 +80,10 @@ extension Grid {
     /// `newRows` screen rows (padding with blanks if the reflowed document
     /// is shorter) and moving everything above that back into scrollback.
     /// The cursor keeps its logical position — the same character, not the
-    /// same (row, column) — by tracking a cell offset through the rewrap
-    /// rather than trying to translate coordinates directly.
+    /// same (row, column) — by tracking a cell index within its logical line
+    /// through the rewrap rather than trying to translate coordinates
+    /// directly. Past the line's last character it keeps its distance from
+    /// it, and a pending wrap stays pending.
     mutating func reflow(toColumns newColumns: Int, newRows: Int) {
         guard newColumns > 0 else { return }
         let oldScrollbackCount = scrollback.count
@@ -94,9 +96,10 @@ extension Grid {
         }
 
         let cursorOldRow = min(oldScrollbackCount + cursor.row, oldRows.count - 1)
-        let cursorOffset = Self.documentCellOffset(ofRow: cursorOldRow, column: cursor.column, in: oldRows)
-
-        let rewrapped = Self.rewrap(oldRows, toColumns: newColumns, trackingOffset: cursorOffset)
+        // A pending wrap sits after the last column's character, not on it.
+        let rewrapped = Self.rewrap(
+            oldRows, toColumns: newColumns, cursorRow: cursorOldRow,
+            cursorColumn: cursor.column + (pendingWrap ? 1 : 0))
         let oldBase = scrollback.totalPushed - oldScrollbackCount
 
         // Mirrors the non-reflowing row-shrink rule below: push only as
@@ -140,34 +143,25 @@ extension Grid {
         let cursorScreenRow = rewrapped.cursorRow - historyCount
         cursor.row = min(max(0, cursorScreenRow), newRows - 1)
         cursor.column = min(max(0, rewrapped.cursorColumn), newColumns - 1)
-        pendingWrap = false
-    }
-
-    /// How many cells precede (`row`, `column`) in the flattened document —
-    /// not just within its own wrap chain, since `rewrap` below walks the
-    /// whole document in one pass and needs one consistent coordinate space.
-    private static func documentCellOffset(ofRow row: Int, column: Int, in rows: [Line]) -> Int {
-        var offset = 0
-        for index in 0..<row { offset += rows[index].count }
-        offset += min(column, rows[row].count)
-        return offset
+        pendingWrap = rewrapped.cursorPendingWrap && autowrapEnabled
     }
 
     /// Rewraps `rows` — already known to obey the `wrapped`-chain
     /// convention — into rows of `newColumns` width, preserving cell
     /// content and attributes, one logical line (one wrap chain) at a time.
-    /// Reports where `trackingOffset` cells into the flattened document
+    /// Reports where the cell at (`cursorRow`, `cursorColumn`) of `rows`
     /// lands afterwards, in the same (row, column) numbering as the
-    /// returned `rows`.
+    /// returned `rows`. The column may lie past the row's stored cells:
+    /// a row keeps only up to its last written cell, and blanks are trimmed.
     ///
     /// Each old row's mark (OSC 133) moves to the new row holding that old
     /// row's first cell; where two land on one row, a prompt mark wins over
     /// an output-start one. `newStartOfOldRow` is where each old row's first
     /// cell went.
     private static func rewrap(
-        _ rows: [Line], toColumns newColumns: Int, trackingOffset: Int
+        _ rows: [Line], toColumns newColumns: Int, cursorRow oldCursorRow: Int, cursorColumn oldCursorColumn: Int
     ) -> (
-        rows: [Line], cursorRow: Int, cursorColumn: Int,
+        rows: [Line], cursorRow: Int, cursorColumn: Int, cursorPendingWrap: Bool,
         newStartOfOldRow: [(row: Int, column: Int)]
     ) {
         var result: [Line] = []
@@ -176,10 +170,9 @@ extension Grid {
         newStartOfOldRow.reserveCapacity(rows.count)
         var cursorRow = 0
         var cursorColumn = 0
+        var cursorPendingWrap = false
 
         var index = 0
-        var globalOffset = 0
-        var foundTarget = false
         // Reuse scratch storage across logical lines instead of allocating
         // two arrays for each of hundreds of thousands of history lines.
         var cells: [Cell] = []
@@ -196,30 +189,20 @@ extension Grid {
                 index += 1
                 if isLast { break }
             }
-            let chainRawCount = cells.count
             while let last = cells.last, last.isBlank { cells.removeLast() }
 
-            // Does the tracked offset fall in this chain? Use the raw
-            // (pre-trim) count, matching how `documentCellOffset` measured
-            // it — a trimmed trailing blank the cursor sat on clamps to the
-            // last real character instead of falling in the next chain. The
-            // upper bound is inclusive (an offset can sit exactly one past
-            // a chain's last cell — the cursor resting right after the last
-            // character typed on that logical line) and the first chain
-            // that claims an offset wins, so a boundary value that is also
-            // the *next* chain's lower bound doesn't get reassigned there.
-            let target: Int?
-            if !foundTarget, trackingOffset >= globalOffset, trackingOffset <= globalOffset + chainRawCount {
-                target = min(trackingOffset - globalOffset, cells.count)
-                foundTarget = true
-            } else {
-                target = nil
-            }
+            // The chain holding the cursor's row claims it, by row rather
+            // than by cell count: the cursor may sit on blanks a row never
+            // stored, past every cell the chain has.
+            let target: Int? =
+                (chainStart..<index).contains(oldCursorRow)
+                ? rowStarts[oldCursorRow - chainStart] + oldCursorColumn : nil
 
             var wrapped = wrapCells(cells, toColumns: newColumns, cursorAt: target, rowStarts: rowStarts)
             if target != nil {
                 cursorRow = result.count + wrapped.cursorRow
                 cursorColumn = wrapped.cursorColumn
+                cursorPendingWrap = wrapped.cursorPendingWrap
             }
             for (offset, start) in wrapped.rowOfStart.enumerated() {
                 let newRow = start.row
@@ -232,9 +215,8 @@ extension Grid {
                 }
             }
             result.append(contentsOf: wrapped.rows)
-            globalOffset += chainRawCount
         }
-        return (result, cursorRow, cursorColumn, newStartOfOldRow)
+        return (result, cursorRow, cursorColumn, cursorPendingWrap, newStartOfOldRow)
     }
 
     /// Packs one logical line's cells into rows of `newColumns` width,
@@ -244,9 +226,17 @@ extension Grid {
     /// `rowStarts` are cell indices, ascending; `rowOfStart` gives the row and
     /// column each lands at — one past the last cell (trimmed blanks) is
     /// where the last row ends.
+    ///
+    /// A `targetIndex` past the last cell is that many blanks after it, laid
+    /// out as though they were cells and kept on the last row, clamped to
+    /// its margin. Exactly at the margin it is a pending wrap: the next
+    /// character continues the line on a new row, as it would have before.
     private static func wrapCells(
         _ cells: [Cell], toColumns newColumns: Int, cursorAt targetIndex: Int?, rowStarts: [Int]
-    ) -> (rows: [Line], cursorRow: Int, cursorColumn: Int, rowOfStart: [(row: Int, column: Int)]) {
+    ) -> (
+        rows: [Line], cursorRow: Int, cursorColumn: Int, cursorPendingWrap: Bool,
+        rowOfStart: [(row: Int, column: Int)]
+    ) {
         var rows: [Line] = []
         var current = Line()
         current.reserveCapacity(min(newColumns, cells.count))
@@ -266,10 +256,13 @@ extension Grid {
         }
 
         if cells.isEmpty {
-            record(0)
             // Rows of blanks trimmed to nothing: every start is this one row.
             while rowOfStart.count < rowStarts.count { rowOfStart.append((0, 0)) }
-            return ([Line()], cursorRow, cursorColumn, rowOfStart)
+            let blanks = targetIndex ?? 0
+            return (
+                [Line()], 0, min(blanks, newColumns - 1), blanks >= newColumns,
+                rowOfStart
+            )
         }
 
         var i = 0
@@ -317,16 +310,13 @@ extension Grid {
         rows.append(current)
         while rowOfStart.count < rowStarts.count { rowOfStart.append((rows.count - 1, column)) }
 
+        var cursorPendingWrap = false
         if let targetIndex, targetIndex >= cells.count {
-            if column >= newColumns {
-                rows.append(Line())
-                cursorRow = rows.count - 1
-                cursorColumn = 0
-            } else {
-                cursorRow = rows.count - 1
-                cursorColumn = column
-            }
+            let target = column + (targetIndex - cells.count)
+            cursorRow = rows.count - 1
+            cursorColumn = min(target, newColumns - 1)
+            cursorPendingWrap = target >= newColumns
         }
-        return (rows, cursorRow, cursorColumn, rowOfStart)
+        return (rows, cursorRow, cursorColumn, cursorPendingWrap, rowOfStart)
     }
 }
