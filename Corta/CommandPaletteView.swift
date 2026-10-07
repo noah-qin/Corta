@@ -84,7 +84,6 @@ struct CommandPaletteView: View {
                     return .handled
                 }
                 .onExitCommand { model.dismiss() }
-                .onChange(of: model.query) { _, _ in model.selectFirstIfNeeded() }
             Divider()
             if model.rows.isEmpty {
                 Text(L10n.text("commandPalette.empty"))
@@ -99,20 +98,22 @@ struct CommandPaletteView: View {
                         LazyVStack(alignment: .leading, spacing: 0) {
                             ForEach(model.rows) { row in
                                 CommandPaletteRowView(
-                                    row: row, isSelected: row.command == model.selectedCommand
+                                    row: row, isSelected: row.id == model.selectedRowID
                                 )
                                 .id(row.id)
                                 .onTapGesture {
-                                    guard let command = row.command else { return }
-                                    model.select(command)
+                                    guard row.command != nil else { return }
+                                    model.select(row)
                                     model.runSelected()
                                 }
                             }
                         }
                     }
-                    .onChange(of: model.selectedCommand) { _, newValue in
+                    // Only far enough to show the row: centring scrolled the list on
+                    // every arrow press, even with the row already in view.
+                    .onChange(of: model.selectedRowID) { _, newValue in
                         guard let newValue else { return }
-                        proxy.scrollTo(CommandPaletteModel.Row.command(newValue).id, anchor: .center)
+                        proxy.scrollTo(newValue)
                     }
                 }
             }
@@ -140,9 +141,7 @@ private struct CommandPaletteRowView: View {
                 .padding(.bottom, 2)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(title)
-        case .command(let command):
-            let shortcut =
-                ConfigurationStore.shared.configuration.keybindings[command]?.displayText ?? ""
+        case .command(let command, _, let shortcut):
             HStack {
                 Text(command.title).font(.system(size: 13))
                 Spacer()

@@ -31044,55 +31044,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "While entering commands"
+            "value": "Automatically"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "输入命令时"
+            "value": "自动"
           }
         },
         "ja": {
           "stringUnit": {
-            "state": "translated",
-            "value": "コマンド入力中"
+            "state": "needs_review",
+            "value": "自動"
           }
         },
         "zh-Hant": {
           "stringUnit": {
-            "state": "translated",
-            "value": "輸入命令時"
+            "state": "needs_review",
+            "value": "自動"
           }
         },
         "ko": {
           "stringUnit": {
-            "state": "translated",
-            "value": "명령 입력 중"
+            "state": "needs_review",
+            "value": "자동"
           }
         },
         "de": {
           "stringUnit": {
-            "state": "translated",
-            "value": "Bei der Befehlseingabe"
+            "state": "needs_review",
+            "value": "Automatisch"
           }
         },
         "fr": {
           "stringUnit": {
-            "state": "translated",
-            "value": "Pendant la saisie de commandes"
+            "state": "needs_review",
+            "value": "Automatique"
           }
         },
         "es": {
           "stringUnit": {
-            "state": "translated",
-            "value": "Al introducir comandos"
+            "state": "needs_review",
+            "value": "Automático"
           }
         },
         "pt-BR": {
           "stringUnit": {
-            "state": "translated",
-            "value": "Ao digitar comandos"
+            "state": "needs_review",
+            "value": "Automático"
           }
         }
       }
@@ -35754,6 +35754,242 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Os registros das suas cópias de edição remota são de uma versão mais recente do Corta, que esta não consegue ler. Abra o arquivo na versão mais recente para não substituir nenhuma cópia que ela gerencia."
+          }
+        }
+      }
+    },
+    "search.noResults": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Results"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无结果"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "無結果"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "結果なし"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "결과 없음"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Keine Treffer"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Aucun résultat"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Sin resultados"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Nenhum resultado"
+          }
+        }
+      }
+    },
+    "search.previousMatch": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previous Match"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一个匹配"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "上一個符合項目"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "前の一致"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "이전 일치 항목"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Vorheriger Treffer"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Résultat précédent"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Coincidencia anterior"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Correspondência anterior"
+          }
+        }
+      }
+    },
+    "search.nextMatch": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next Match"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一个匹配"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "下一個符合項目"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "次の一致"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "다음 일치 항목"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Nächster Treffer"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Résultat suivant"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Coincidencia siguiente"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Próxima correspondência"
+          }
+        }
+      }
+    },
+    "search.close": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close Find"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭查找"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "關閉尋找"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "検索を閉じる"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "찾기 닫기"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Suche schließen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Fermer la recherche"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Cerrar búsqueda"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Fechar busca"
           }
         }
       }

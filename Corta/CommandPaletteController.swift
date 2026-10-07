@@ -83,13 +83,22 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
         window.makeKeyAndOrderFront(sender)
     }
 
+    /// Escape or a command: the palette hands the keyboard back to the
+    /// window it opened over.
     override func close() {
+        // Taken first: ordering out resigns key, which clears it.
+        let returnTo = invokingWindow
         window?.orderOut(nil)
-        invokingWindow?.makeKeyAndOrderFront(nil)
+        returnTo?.makeKeyAndOrderFront(nil)
+        invokingWindow = nil
     }
 
+    /// Something else took the keyboard — a click in another window, another
+    /// app. The palette goes, and that window keeps it: handing it back here
+    /// put the opening window over the one just clicked.
     func windowDidResignKey(_ notification: Notification) {
-        close()
+        window?.orderOut(nil)
+        invokingWindow = nil
     }
 
     // MARK: - Layout

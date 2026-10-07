@@ -56,7 +56,16 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
     var topConstraint: NSLayoutConstraint?
     var bottomConstraint: NSLayoutConstraint?
     var field: NSTextField?
-    var matches: [SelectionRange] = []
+    /// In the coordinates of the sweep that found them: rows as they were
+    /// when `matchesTotalPushed` lines had been pushed.
+    private(set) var matches: [SelectionRange] = []
+    /// `Scrollback.totalPushed` of the grid the matches were found in.
+    private(set) var matchesTotalPushed = 0
+    /// `matches` as the renderer draws them, built once per sweep. Built per
+    /// frame, every frame allocated the whole list and stamped it with that
+    /// frame's `totalPushed`, so output arriving between sweeps both rebuilt
+    /// the overlay and drew each highlight that many rows off its text.
+    private(set) var highlights: [TerminalSelection] = []
     var currentMatchIndex: Int?
 
     /// Absolute row (totalPushed + row), stable while output scrolls.
@@ -212,7 +221,7 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
         field.isBezeled = false
         field.drawsBackground = false
         field.focusRingType = .none
-        field.font = .systemFont(ofSize: 13)
+        field.font = .systemFont(ofSize: 12)
         (field.cell as? NSSearchFieldCell)?.searchButtonCell = nil
         (field.cell as? NSSearchFieldCell)?.cancelButtonCell = nil
         barModel.caseSensitive = caseSensitive
@@ -271,7 +280,7 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
             NSEvent.removeMonitor(searchKeyMonitor)
             keyMonitor = nil
         }
-        matches = []
+        setMatches([], totalPushed: 0)
         matchesTruncated = false
         currentMatchIndex = nil
         // Cancel, so `Search.find` stops burning CPU; the generation bump drops a
@@ -375,7 +384,7 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
         else { return nil }
         let match = matches[index]
         let cell = terminalView.cellSize
-        let screenRow = match.start.row + host.scrollOffset
+        let screenRow = liveRow(match.start.row, in: grid) + host.scrollOffset
         guard screenRow >= 0, screenRow < grid.rows else { return nil }
         // A match that wraps covers the rest of its first row.
         let endColumn =
@@ -406,7 +415,7 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
         let query = searchField.stringValue
         // Clear synchronously, so highlights vanish with the last character.
         guard !query.isEmpty else {
-            matches = []
+            setMatches([], totalPushed: 0)
             matchesTruncated = false
             currentMatchIndex = nil
             // Moot without a query; left set, output would trigger empty sweeps.
@@ -522,7 +531,7 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
         // The generation matched, so `task` is this finished task.
         task = nil
         lastSweepLanded = .now
-        matches = outcome.matches
+        setMatches(outcome.matches, totalPushed: totalPushed)
         matchesTruncated = matches.count >= Search.defaultMatchLimit
         if matches.isEmpty {
             currentMatchIndex = nil
@@ -597,11 +606,11 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
     }
 
     private func stepCurrentMatch(by delta: Int) {
-        guard !matches.isEmpty, let grid = host?.snapshot() else { return }
+        guard !matches.isEmpty else { return }
         let current = currentMatchIndex ?? matches.count - 1
         currentMatchIndex =
             (current + delta + matches.count) % matches.count
-        noteCurrentMatchAnchor(totalPushed: grid.scrollback.totalPushed)
+        noteCurrentMatchAnchor(totalPushed: matchesTotalPushed)
         scrollToCurrentMatch()
         updateCountLabel()
         placeClearOfContent()
@@ -614,11 +623,28 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
         guard let index = currentMatchIndex, matches.indices.contains(index),
             let host, let grid = host.snapshot()
         else { return }
-        let row = matches[index].start.row
+        let row = liveRow(matches[index].start.row, in: grid)
         host.scrollOffset =
             row >= 0
             ? 0
             : min(grid.scrollback.count, max(0, grid.rows / 2 - row))
+    }
+
+    private func setMatches(_ found: [SelectionRange], totalPushed: Int) {
+        matches = found
+        matchesTotalPushed = totalPushed
+        highlights = found.map {
+            TerminalSelection(
+                start: GridPosition(row: $0.start.row, column: $0.start.column),
+                end: GridPosition(row: $0.end.row, column: $0.end.column),
+                baseScrollbackTotal: totalPushed)
+        }
+    }
+
+    /// A match row where it is now, after the output since its sweep.
+    private func liveRow(_ row: Int, in grid: Grid) -> Int {
+        ScrollbackCoordinates.reanchoredRow(
+            row, from: matchesTotalPushed, to: grid.scrollback.totalPushed)
     }
 
     private func updateCountLabel() {
@@ -628,7 +654,7 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
         } else if status == .patternTooSlow {
             barModel.countText = L10n.text("search.patternTooSlow")
         } else if matches.isEmpty {
-            barModel.countText = field?.stringValue.isEmpty == false ? "No Results" : ""
+            barModel.countText = field?.stringValue.isEmpty == false ? L10n.text("search.noResults") : ""
         } else if let current = currentMatchIndex {
             // "+" when the sweep stopped early (the match cap, an over-long line, or
             // the time budget): there may be uncounted matches.

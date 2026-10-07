@@ -63,7 +63,9 @@ installed when you say so.
 - Rename a tab directly in its title: double-click, or choose Rename Tab…
   from its right-click menu. Return saves, Esc cancels, and an empty name
   restores the automatic title. Custom names survive shell output and session
-  restoration. The tab and terminal right-click menus also offer New Tab.
+  restoration. The tab and terminal right-click menus also offer New Tab, and
+  the toolbar's **+** button opens one even while a window has a single tab
+  and no tab bar.
 - **Zoom Pane** is temporary: nothing closes and no process is disturbed.
 - **Reopen Closed Pane** restores the pane's place, size and working
   directory — not the program that was running in it.
@@ -129,14 +131,16 @@ name. A neutral badge identifies sources whose internal input mode is not
 reported by macOS, including third-party IMEs with private English toggles.
 Corta never guesses that mode from typed text and never changes the input source.
 
-Settings ▸ Keyboard & Mouse ▸ Input Source Indicator chooses **While entering
-commands** (default), **Always in focused pane**, or **Off**. The default only
+Settings ▸ Keyboard & Mouse ▸ Input Source Indicator chooses **Automatically**
+(default), **Always in focused pane**, or **Off**. The default only
 enables the indicator for users with an enabled non-Latin keyboard layout or
 an IME; Latin-only keyboard setups remain uncluttered. Switching back to a Latin
 layout keeps a quiet gray `A` on a faint gray background. Non-Latin layouts
-and built-in IME modes use a soft indigo tint; unknown IME modes use gray. With shell
-integration the default hides during command execution; without integration it
-shows in the focused pane. Scrollback and alternate-screen programs hide it.
+and built-in IME modes use a soft indigo tint; unknown IME modes use gray. In the
+toolbar the badge stays while a program runs — Claude Code, an editor — since
+it covers no output. At the right edge of the command line, shell integration
+hides it during command execution, and scrollback and alternate-screen programs
+hide it.
 The **Position** setting chooses **Window toolbar** (default) or **Right edge
 of command line**. The toolbar badge sits independently of the network and
 file buttons and stays fixed as commands grow or wrap. Turning it off or
@@ -414,6 +418,10 @@ pane is scaled to fit it.
 
 ⇧⌘P opens the command palette: every command Corta has, searchable by
 name, with its shortcut beside it. Type a few letters and press Return.
+Letters match in order, not necessarily together (`spr` finds Split Pane
+Right); a group's name (`panes`) or a command's configuration name
+(`new-tab`) finds it too. Commands you ran recently are listed first.
+Clicking another window closes the palette and leaves that window in front.
 It is the quickest way to reach the commands that have no default shortcut.
 
 ## The Quick Terminal

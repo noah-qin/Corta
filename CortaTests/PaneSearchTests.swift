@@ -136,6 +136,30 @@ struct PaneSearchTests {
         #expect(host.redraws > 0)
     }
 
+    /// The highlights are built once per sweep, anchored to the scrollback
+    /// the sweep read. Stamped with each frame's own total instead, output
+    /// between sweeps drew every highlight that many rows off its text.
+    @Test func highlightsKeepTheSweepsAnchorAsOutputArrives() async throws {
+        let host = makeHost()
+        // Into the scrollback, so the sweep's anchor is not the zero a
+        // missing anchor would also read as.
+        host.print((1...20).map { "before \($0)\n" }.joined())
+        defer { host.search.close() }
+        host.search.show()
+        try #require(host.search.field).stringValue = "P04MARKER"
+        host.search.updateResults(scrollsToMatch: false)
+        #expect(await waitUpTo(5) { !host.search.matches.isEmpty })
+        let anchor = host.search.matchesTotalPushed
+        #expect(anchor == host.terminal.grid.scrollback.totalPushed && anchor > 0)
+        let highlights = host.search.highlights
+        #expect(highlights.count == host.search.matches.count)
+        #expect(highlights.allSatisfy { $0.baseScrollbackTotal == anchor })
+
+        host.print((1...30).map { "filler \($0)\n" }.joined())
+        #expect(host.terminal.grid.scrollback.totalPushed > anchor)
+        #expect(host.search.highlights == highlights, "unchanged until the next sweep lands")
+    }
+
     @Test func aNewerQuerySupersedesTheInFlightSweep() async throws {
         let host = makeHost()
         defer { host.search.close() }

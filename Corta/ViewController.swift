@@ -604,11 +604,12 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         focus.updateCursorBlink(grid: grid, style: cursorStyle, reset: hasOutput)
         return PaneFrameLoop.Content(
             grid: grid, scrollOffset: scrollOffset,
-            // `?25l`: a program drawing its own screen hid the cursor.
+            // `?25l`: a program drawing its own screen hid the cursor. A
+            // preedit draws its own caret (`MarkedTextOverlayView`).
             cursorVisible: scrollOffset == 0 && isFocusedPane && grid.isCursorVisible
-                && focus.cursorBlinkVisible,
+                && focus.cursorBlinkVisible && !terminalView.hasMarkedText(),
             selection: selection,
-            searchMatches: search.matches.map { TerminalSelection($0, grid: grid) },
+            searchMatches: search.highlights,
             currentSearchMatchIndex: search.currentMatchIndex, hoveredLink: pointer.hoveredLink,
             cursorStyle: cursorStyle)
     }

@@ -450,6 +450,56 @@ struct TerminalViewIMETests {
         #expect(drawn.attribute(.foregroundColor, at: 0, effectiveRange: nil) != nil)
     }
 
+    /// The caret sits where the IME's selection puts it — the end while
+    /// typing pinyin, inside the text while moving through it — not at the
+    /// preedit's start, where the block cursor covered the first letter.
+    @Test func preeditCaretFollowsTheIMESelection() throws {
+        let view = Self.makeView()
+        view.cursorRectProvider = { CGRect(x: 0, y: 0, width: 8, height: 17) }
+        func caret(at location: Int) throws -> (location: Int, x: CGFloat) {
+            view.setMarkedText(
+                "you", selectedRange: NSRange(location: location, length: 0),
+                replacementRange: NSRange(location: NSNotFound, length: 0))
+            let overlay = try #require(
+                view.subviews.compactMap { $0 as? MarkedTextOverlayView }.first)
+            return (overlay.caretLocation, overlay.caretX)
+        }
+        let atEnd = try caret(at: 3)
+        #expect(atEnd.location == 3)
+        #expect(atEnd.x > 0)
+        let atStart = try caret(at: 0)
+        #expect(atStart.x == 0)
+        let inside = try caret(at: 1)
+        #expect(inside.x > 0 && inside.x < atEnd.x)
+        #expect(try caret(at: NSNotFound).location == 3)
+        #expect(try caret(at: 99).location == 3)
+    }
+
+    /// With no backdrop, what lay under the preedit showed through it: the
+    /// block cursor, and in Claude Code its own inverted cursor cell.
+    @Test func preeditCoversTheCellsUnderIt() throws {
+        let view = Self.makeView()
+        view.cursorRectProvider = { CGRect(x: 0, y: 0, width: 48, height: 17) }
+        let saved = TerminalColorPalette.activeVariant
+        defer { TerminalColorPalette.apply(saved) }
+        var variant = saved
+        variant.background = SIMD4<Float>(1, 0, 0, 1)
+        TerminalColorPalette.apply(variant)
+        view.setMarkedText(
+            "a", selectedRange: NSRange(location: 0, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0))
+        let overlay = try #require(
+            view.subviews.compactMap { $0 as? MarkedTextOverlayView }.first)
+        let bitmap = try #require(overlay.bitmapImageRepForCachingDisplay(in: overlay.bounds))
+        overlay.cacheDisplay(in: overlay.bounds, to: bitmap)
+        // Right of the one letter, clear of the caret at its start.
+        let x = Int(CGFloat(bitmap.pixelsWide) * 0.8)
+        let pixel = try #require(bitmap.colorAt(x: x, y: bitmap.pixelsHigh / 2)?
+            .usingColorSpace(.sRGB))
+        // Red, as the palette says, give or take the bitmap's colour space.
+        #expect(pixel.redComponent > 0.9 && pixel.greenComponent < 0.3 && pixel.blueComponent < 0.3)
+    }
+
     // MARK: - Candidate window placement
 
     /// `NSView.inputContext` is documented to return nil unless the receiver

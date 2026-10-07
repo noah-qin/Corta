@@ -78,16 +78,27 @@ import CortaTerminal
     func update(grid: Grid, hasIntegration: Bool, promptRow: Int?, focused: Bool,
         scrollOffset: Int, configuration: Configuration, cellSize: CGSize,
         topInset: CGFloat, compositionRect: CGRect?, blockedRects: [CGRect] = []) {
-        guard let source, focused, scrollOffset == 0, !grid.isAlternateScreenActive,
+        guard let source, focused,
             configuration.inputSourceIndicator != .off,
-            configuration.inputSourceIndicator != .auto || automaticallyVisible,
-            configuration.inputSourceIndicator == .always || !hasIntegration || promptRow != nil
+            configuration.inputSourceIndicator != .auto || automaticallyVisible
         else {
             view.isHidden = true
             placement.reset()
             return
         }
-        if configuration.inputSourceIndicatorPosition == .toolbar {
+        // The toolbar badge covers no output, so a running program — Claude
+        // Code, an editor on the alternate screen — keeps it: that is where
+        // people type in a second language too. Only the prompt-placed badge,
+        // which sits on the grid, steps aside for them.
+        let promptPlaced = configuration.inputSourceIndicatorPosition != .toolbar
+        guard !promptPlaced || (scrollOffset == 0 && !grid.isAlternateScreenActive
+            && (configuration.inputSourceIndicator == .always || !hasIntegration || promptRow != nil))
+        else {
+            view.isHidden = true
+            placement.reset()
+            return
+        }
+        if !promptPlaced {
             view.update(source: source, configuration: configuration)
             view.frame = CGRect(x: 0, y: 0, width: 28, height: 24)
             view.isHidden = false

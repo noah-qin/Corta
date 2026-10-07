@@ -99,7 +99,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// File > New Tab (⌘T): a full window joined to the key window's tab
     /// group, so it can be dragged out again.
     @objc func newTab(_ sender: Any?) {
-        let existing = NSApp.keyWindow
+        newTab(beside: NSApp.keyWindow, sender: sender)
+    }
+
+    /// A new tab in `existing`'s group, or a new window without one. The
+    /// toolbar's button names its own window: the key window is nil while
+    /// Corta is inactive, and the tab would have opened as a window.
+    func newTab(beside existing: NSWindow?, sender: Any?) {
         let controller = makeWindowController()
         guard let window = controller.window else { return }
         window.tabbingMode = .automatic
