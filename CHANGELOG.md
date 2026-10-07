@@ -16,9 +16,14 @@ what to edit.
   sent is dropped, keystrokes typed after it are kept, and a bracketed paste
   the shell had started reading is closed so it leaves paste mode. Before,
   Ctrl-C waited behind the whole paste, or was refused once more than 4 MiB
-  was queued, and closing the pane was the only way out.
+  was queued, and closing the pane was the only way out. When the shell has
+  stopped reading altogether, the interrupt is delivered as the signal the
+  terminal would raise for it, instead of waiting behind the blocked write.
+  History insertion is cancellable the same way.
 - Input typed or pasted as the shell exits no longer raises the "terminal
-  session failed" recovery view; the pane reports the exit as usual.
+  session failed" recovery view; the pane reports the exit as usual. A
+  program that gives up the terminal without exiting gets the recovery view
+  instead of a pane that silently stops responding.
 
 ### Terminal recovery (#228)
 

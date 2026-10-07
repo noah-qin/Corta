@@ -73,7 +73,7 @@ import Testing
         #expect(session.hasPendingPaste)
         #expect(session.write([0x03]) == .accepted)
 
-        #expect(session.cancelPendingPastes())
+        #expect(session.interruptPendingPaste().cancelledPaste)
         #expect(!session.hasPendingPaste)
         sink.released.withLock { $0 = true }
 
@@ -91,7 +91,7 @@ import Testing
         #expect(session.write(paste: [Array("\u{1B}[200~x\u{1B}[201~".utf8)], closing: Self.closing) == .accepted)
         #expect(session.write([0x62]) == .accepted)
 
-        #expect(session.cancelPendingPastes())
+        #expect(session.interruptPendingPaste().cancelledPaste)
         sink.released.withLock { $0 = true }
 
         #expect(wait { sink.chunks.count == 2 })
@@ -104,11 +104,11 @@ import Testing
         sink.released.withLock { $0 = true }
         let session = try makeSession(sink)
         defer { session.stop() }
-        #expect(!session.cancelPendingPastes())
+        #expect(!session.interruptPendingPaste().cancelledPaste)
         #expect(session.write(paste: [[0x61], [0x62]], closing: nil) == .accepted)
         #expect(wait { sink.chunks.count == 2 })
         #expect(wait { !session.hasPendingPaste }, "a drained paste is no longer pending")
-        #expect(!session.cancelPendingPastes())
+        #expect(!session.interruptPendingPaste().cancelledPaste)
     }
 
     /// Past the back-pressure cap a keystroke is refused; dropping the paste
@@ -123,10 +123,45 @@ import Testing
         #expect(wait { sink.chunks.count == 1 })
         #expect(session.write([0x03]) == .backpressured)
 
-        #expect(session.cancelPendingPastes())
+        #expect(session.interruptPendingPaste().cancelledPaste)
         #expect(session.write([0x03]) == .accepted)
         sink.released.withLock { $0 = true }
         #expect(wait { sink.chunks.count == 2 })
         #expect(sink.chunks.last == [0x03])
+    }
+
+    private func waitForGrid(_ session: TerminalSession, until condition: (String) -> Bool) -> Bool {
+        let deadline = ContinuousClock.now + testTimeout(10)
+        while !condition(session.snapshot().dump()), ContinuousClock.now < deadline {
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        return condition(session.snapshot().dump())
+    }
+
+    /// What `^C` raises when the line discipline has `ISIG`: `SIGINT` to the
+    /// foreground group, delivered directly — the path a paste blocked in
+    /// `write(2)` needs.
+    @Test func theForegroundGroupIsInterruptedWhenSignalsAreEnabled() throws {
+        let session = try TerminalSession(
+            executable: "/bin/sh",
+            arguments: ["-c", "trap 'echo got-int; exit 0' INT; echo ready; while :; do sleep 0.05; done"])
+        defer { session.stop() }
+        session.start()
+        #expect(waitForGrid(session) { $0.contains("ready") })
+        #expect(session.pty.interruptForegroundGroupIfSignalsEnabled())
+        #expect(waitForGrid(session) { $0.contains("got-int") })
+    }
+
+    /// With `ISIG` off `^C` is input to a raw-mode program; no signal is sent.
+    @Test func noSignalIsSentToARawModeProgram() throws {
+        let session = try TerminalSession(
+            executable: "/bin/sh",
+            arguments: ["-c", "stty -isig; trap 'echo got-int' INT; echo ready; sleep 5"])
+        defer { session.stop() }
+        session.start()
+        #expect(waitForGrid(session) { $0.contains("ready") })
+        #expect(!session.pty.interruptForegroundGroupIfSignalsEnabled())
+        Thread.sleep(forTimeInterval: 0.2)
+        #expect(!session.snapshot().dump().contains("got-int"))
     }
 }

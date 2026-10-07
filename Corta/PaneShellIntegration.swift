@@ -244,14 +244,16 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
     }
 
     private func writeHistory(_ text: String, run: Bool) -> Bool {
+        let bracketed = host?.commands.bracketedPasteEnabled() ?? false
         guard host?.commands.canChangeDirectorySafely == true,
-            var bytes = Paste.historyBytes(
-                for: text, bracketedPasteEnabled: host?.commands.bracketedPasteEnabled() ?? false)
+            Paste.historyBytes(for: text, bracketedPasteEnabled: bracketed) != nil
         else { return false }
-        if run { bytes.append(0x0D) }
-        // Admit the closing paste marker and optional Return together, so
-        // backpressure cannot execute a partially inserted command.
-        switch session.write(chunks: Paste.chunked(bytes)) {
+        // A paste, so Ctrl-C can drop it like one; the Return rides with the
+        // closing marker, so neither backpressure nor a cancel can run a
+        // partly inserted command.
+        let chunks = Paste.chunks(
+            for: Paste.sanitized(text), bracketedPasteEnabled: bracketed, trailer: run ? [0x0D] : [])
+        switch session.write(paste: chunks, closing: Paste.closing(bracketedPasteEnabled: bracketed)) {
         case .accepted: return true
         case .backpressured, .stopped, .failed: return false
         }

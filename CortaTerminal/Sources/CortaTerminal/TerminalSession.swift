@@ -88,11 +88,6 @@ public final class TerminalSession: @unchecked Sendable {
     private let callbacks = Mutex(Callbacks())
     private let stopped = Mutex(false)
     private let started = Mutex(false)
-    /// A write returned `EIO`: the replica is closed, which on Darwin means
-    /// the session leader has exited — its controlling-terminal reference
-    /// alone keeps end of file away while it lives — so input is refused
-    /// before the reader has recorded the exit.
-    private let hungUp = Mutex(false)
 
     /// Stand-ins for the PTY's two directions, a step every queued resize
     /// passes before it applies, and the `?2026` cap: how a caller sets exact
@@ -153,6 +148,14 @@ public final class TerminalSession: @unchecked Sendable {
         var isDraining = false
         var pastes: [UInt64: Paste] = [:]
         var nextPasteID: UInt64 = 0
+        /// A write returned `EIO`: the replica is closed, which on Darwin
+        /// means the session leader has gone — its controlling-terminal
+        /// reference alone keeps end of file away while it lives. Input is
+        /// refused from then on, under this lock so none slips in after.
+        var hungUp = false
+        /// A chunk is being written: set from pop to the write's return. A
+        /// write that blocks, on a child not reading, keeps it set.
+        var writing = false
 
         mutating func push(_ chunk: [UInt8], paste: UInt64? = nil) {
             chunks.append(Chunk(bytes: chunk, paste: paste))
@@ -472,6 +475,13 @@ public final class TerminalSession: @unchecked Sendable {
         // park here for ten seconds and silently lose the only reader.
         guard ioFailure == nil else { return }
         var exit = pty.waitForExit(timeout: hangupGracePeriod)
+        if exit == nil, !stopped.withLock({ $0 }) {
+            // End of file, and the child lives on: it gave up its terminal
+            // (`TIOCNOTTY`) and closed it. Nothing it does reaches this pane
+            // again, and no exit is coming to say so — offer recovery.
+            reportIOFailure(PTYError.ioFailed(code: ENXIO), operation: .read)
+            return
+        }
         if exit == nil, stopped.withLock({ $0 }) {
             // Closed, and the group ignored `SIGHUP` (`trap '' HUP`, a daemon
             // that kept the terminal): closing a pane stops what was in it
@@ -595,53 +605,75 @@ public final class TerminalSession: @unchecked Sendable {
         enqueueWrite([bytes])
     }
 
-    /// Every chunk or none, under one backlog check: a paste cut off between
-    /// `ESC[200~` and `ESC[201~` leaves the shell in paste mode, reading
-    /// Return and Ctrl-C as pasted text until reset. Admitted while the
+    /// Every chunk or none, under one backlog check. Admitted while the
     /// backlog is under the cap, however large — the cap pushes back on a
-    /// child that stopped reading, and a paste is the user's own size.
+    /// child that stopped reading. A paste goes through `write(paste:closing:)`
+    /// instead, whose cut is closed rather than left in paste mode.
     @discardableResult
     public func write(chunks: [[UInt8]]) -> WriteOutcome {
         enqueueWrite(chunks)
     }
 
-    /// A paste: as `write(chunks:)`, but cancellable while queued
-    /// (`cancelPendingPastes`). `closing` is what ends it for the child —
+    /// A paste: as `write(chunks:)`, but its queued chunks can be dropped
+    /// (`interruptPendingPaste`). `closing` is what ends it for the child —
     /// `ESC[201~` for a bracketed paste — and is sent in place of the rest
-    /// when a cancel cuts one the child has started reading.
+    /// when a cancel cuts one the child has started reading; it should be
+    /// the paste's last chunk on its own, so a cut never splits it.
     @discardableResult
     public func write(paste chunks: [[UInt8]], closing: [UInt8]?) -> WriteOutcome {
-        enqueueWrite(chunks, pasteClosing: .some(closing))
+        enqueueWrite(chunks, kind: .paste(closing: closing))
     }
 
     /// A paste is still queued for the child.
-    public var hasPendingPaste: Bool {
+    var hasPendingPaste: Bool {
         pendingWrites.withLock { !$0.pastes.isEmpty }
     }
 
-    /// Drops what is still queued of every paste, keeping keystrokes typed
-    /// after it — how Ctrl-C reaches a shell buried under a large paste
-    /// instead of waiting behind it, or being refused by the back-pressure
-    /// cap. Returns whether anything was dropped.
-    @discardableResult
-    public func cancelPendingPastes() -> Bool {
-        pendingWrites.withLock { $0.cancelPastes() }
+    /// What Ctrl-C did to a paste still queued ahead of it.
+    public struct PasteInterrupt: Sendable, Equatable {
+        /// Queued paste chunks were dropped.
+        public var cancelledPaste = false
+        /// The interrupt was delivered as `SIGINT`; do not also write `^C`.
+        public var signalled = false
     }
 
-    /// One queue for input and replies keeps them ordered. `pasteClosing`
-    /// is non-nil for a paste (its inner value the closing bytes, if any).
+    /// Ctrl-C with a paste queued: drops what is still queued of every paste,
+    /// keeping keystrokes typed after it — before, Ctrl-C waited behind the
+    /// whole paste, or was refused by the back-pressure cap. When a chunk is
+    /// still being written — blocked on a child that stopped reading — a `^C`
+    /// queued behind it would wait for that write too; if the line discipline
+    /// would turn `^C` into `SIGINT` (`ISIG`), the signal goes to the
+    /// foreground group now, as the terminal would deliver it.
+    public func interruptPendingPaste() -> PasteInterrupt {
+        let (cancelled, writing) = pendingWrites.withLock { pending in
+            (pending.cancelPastes(), pending.writing)
+        }
+        guard cancelled else { return PasteInterrupt() }
+        guard writing, writerSink == nil, pty.interruptForegroundGroupIfSignalsEnabled() else {
+            return PasteInterrupt(cancelledPaste: true)
+        }
+        return PasteInterrupt(cancelledPaste: true, signalled: true)
+    }
+
+    private enum WriteKind {
+        case input
+        case paste(closing: [UInt8]?)
+    }
+
+    /// One queue for input and replies keeps them ordered.
     @discardableResult
-    private func enqueueWrite(_ chunks: [[UInt8]], pasteClosing: [UInt8]?? = nil) -> WriteOutcome {
+    private func enqueueWrite(_ chunks: [[UInt8]], kind: WriteKind = .input) -> WriteOutcome {
         let chunks = chunks.filter { !$0.isEmpty }
         guard !chunks.isEmpty else { return .accepted }
-        guard !stopped.withLock({ $0 }), !hungUp.withLock({ $0 }) else { return .stopped }
+        guard !stopped.withLock({ $0 }) else { return .stopped }
         guard ioFailure == nil else { return .failed }
         guard callbacks.withLock({ $0.childExit == nil }) else { return .stopped }
         var shouldSchedule = false
         let outcome = pendingWrites.withLock { pending -> WriteOutcome in
+            guard !pending.hungUp else { return .stopped }
             guard pending.bytes <= Self.maxPendingWriteBytes else { return .backpressured }
             var pasteID: UInt64?
-            if let closing = pasteClosing {
+            if case .paste(let closing) = kind {
                 pending.nextPasteID &+= 1
                 pasteID = pending.nextPasteID
                 pending.pastes[pending.nextPasteID] = PendingWrites.Paste(
@@ -675,11 +707,14 @@ public final class TerminalSession: @unchecked Sendable {
             let chunk = pendingWrites.withLock { pending -> [UInt8]? in
                 guard let chunk = pending.pop() else {
                     pending.isDraining = false
+                    pending.writing = false
                     return nil
                 }
+                pending.writing = true
                 return chunk
             }
             guard let chunk else { return }
+            defer { pendingWrites.withLock { $0.writing = false } }
             do {
                 if let writerSink {
                     try writerSink(chunk)
@@ -700,8 +735,10 @@ public final class TerminalSession: @unchecked Sendable {
 
     /// Nothing holds the replica any more: queued input has nowhere to go.
     private func noteHangup() {
-        hungUp.withLock { $0 = true }
-        pendingWrites.withLock { $0.removeAll() }
+        pendingWrites.withLock { pending in
+            pending.hungUp = true
+            pending.removeAll()
+        }
     }
 
     /// Without a full `snapshot()`; read on every scroll and output batch.

@@ -700,18 +700,16 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         insertAsPaste(text)
     }
 
-    /// Queues a sanitised paste whole, or not at all. In pieces, a backlog
-    /// that filled part-way stopped it after `ESC[200~` and before
-    /// `ESC[201~`, and the shell — Claude Code, zsh — stayed in paste mode,
-    /// taking every later Return as pasted text: the pane looked frozen.
+    /// Queues a sanitised paste whole, or not at all — admitted part-way, a
+    /// backlog stopped it after `ESC[200~` and before `ESC[201~`, and the
+    /// shell stayed in paste mode, taking every later Return as pasted text.
+    /// Once queued, Ctrl-C may drop the rest (`ViewController.onKeyBytes`);
+    /// a paste the child started reading is then closed with `ESC[201~`.
     func sendPaste(_ sanitized: String) {
         let bracketed = bracketedPasteEnabled()
-        let payload = Paste.bytes(for: sanitized, bracketedPasteEnabled: bracketed)
-        // Chunks, so the writer hands the child one at a time; as a paste, so
-        // Ctrl-C can drop what is still queued (`ViewController.onKeyBytes`).
         guard let session = host?.session else { return }
         switch session.write(
-            paste: Paste.chunked(payload),
+            paste: Paste.chunks(for: sanitized, bracketedPasteEnabled: bracketed),
             closing: Paste.closing(bracketedPasteEnabled: bracketed))
         {
         case .accepted:

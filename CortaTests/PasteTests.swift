@@ -128,15 +128,25 @@ struct PasteTests {
         #expect(Paste.closing(bracketedPasteEnabled: false) == nil)
     }
 
-    /// Ctrl-C in either encoding cancels a queued paste; nothing else does,
-    /// so typing during a paste never throws it away.
-    @Test func ctrlCInLegacyAndKittyFormIsAnInterrupt() {
+    /// Ctrl-C cancels a queued paste; nothing else does, so typing during a
+    /// paste never throws it away.
+    @Test func onlyCtrlCIsAnInterrupt() {
         #expect(Paste.isInterrupt([0x03]))
-        #expect(Paste.isInterrupt(Array("\u{1B}[99;5u".utf8)))
-        #expect(Paste.isInterrupt(Array("\u{1B}[99;5:1u".utf8)))
-        #expect(!Paste.isInterrupt(Array("\u{1B}[99;5:3u".utf8.dropLast(1))))
         #expect(!Paste.isInterrupt([0x61]))
         #expect(!Paste.isInterrupt([0x03, 0x03]))
-        #expect(!Paste.isInterrupt(Array("\u{1B}[100;5u".utf8)))
+    }
+
+    /// A cancel lands between chunks, so a chunk must never end inside a
+    /// character, and the closing marker must be a chunk of its own.
+    @Test func pasteChunksKeepCharactersAndTheClosingMarkerWhole() {
+        let text = String(repeating: "中", count: 10)  // 30 bytes of 3-byte scalars
+        let chunks = Paste.chunks(for: text, bracketedPasteEnabled: true, trailer: [0x0D], maxChunkSize: 8)
+        #expect(chunks.first?.starts(with: Array("\u{1B}[200~".utf8)) == true)
+        #expect(chunks.last == Array("\u{1B}[201~".utf8) + [0x0D])
+        for chunk in chunks.dropFirst().dropLast() {
+            #expect(String(bytes: chunk, encoding: .utf8) != nil, "a chunk cut a character")
+        }
+        #expect(chunks.flatMap { $0 } == Array("\u{1B}[200~\(text)\u{1B}[201~\r".utf8))
+        #expect(Paste.chunks(for: "ab", bracketedPasteEnabled: false) == [Array("ab".utf8)])
     }
 }

@@ -335,6 +335,24 @@ public final class PTY: @unchecked Sendable {
         return kill(-processIdentifier, signal) == 0
     }
 
+    /// What typing `^C` does when the line discipline has `ISIG`: `SIGINT`
+    /// to the foreground group, delivered now rather than queued behind a
+    /// write a child that stopped reading has blocked. False, sending
+    /// nothing, when `ISIG` is off (a raw-mode program reads `^C` as input)
+    /// or the terminal cannot answer.
+    public func interruptForegroundGroupIfSignalsEnabled() -> Bool {
+        guard state.withLock({ $0.exit == nil }) else { return false }
+        let group: pid_t? = descriptor.withNumber { fd -> pid_t? in
+            var attributes = termios()
+            guard tcgetattr(fd, &attributes) == 0, attributes.c_lflag & tcflag_t(ISIG) != 0
+            else { return nil }
+            let group = tcgetpgrp(fd)
+            return group > 0 ? group : nil
+        } ?? nil
+        guard let group else { return false }
+        return kill(-group, SIGINT) == 0
+    }
+
     @discardableResult
     public func terminate() -> Bool {
         signalProcessGroup(SIGHUP)

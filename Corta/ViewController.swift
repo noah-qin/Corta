@@ -396,9 +396,15 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             pointer.returnToBottomOnInput()
             // Ctrl-C under a large paste: queued behind it, the interrupt
             // waited for the whole paste — or, past the back-pressure cap,
-            // was refused. It drops what is left of the paste and goes next.
-            if Paste.isInterrupt(bytes), session.cancelPendingPastes() {
-                view?.showToast(L10n.text("toast.pasteCancelled"), kind: .warning)
+            // was refused. It drops what is left of the paste and goes next,
+            // or, with a write blocked on a child not reading, is delivered
+            // as the signal the terminal would raise for it.
+            if Paste.isInterrupt(bytes) {
+                let interrupt = session.interruptPendingPaste()
+                if interrupt.cancelledPaste {
+                    view?.showToast(L10n.text("toast.pasteCancelled"), kind: .warning)
+                }
+                if interrupt.signalled { return }
             }
             switch session.write(bytes) {
             case .accepted, .failed: break // An async failure has its persistent recovery UI.

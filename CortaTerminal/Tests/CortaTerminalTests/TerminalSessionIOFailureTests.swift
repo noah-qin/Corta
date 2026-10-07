@@ -93,6 +93,23 @@ struct TerminalSessionIOFailureTests {
         #expect(failures.withLock { $0 } == 0)
     }
 
+    /// End of file with the child still alive: it gave up its terminal, so
+    /// nothing reaches the pane again and no exit will say so. Reported as
+    /// a failure, which offers recovery, once the hangup grace has passed.
+    @Test func endOfFileWithoutAnExitIsReportedAfterTheGrace() throws {
+        var seams = TerminalSession.Seams()
+        seams.readerSource = ReaderSource(read: { _ in 0 }, isReadable: { false })
+        seams.hangupGracePeriod = .milliseconds(200)
+        let session = try TerminalSession(executable: "/bin/cat", seams: seams)
+        defer { session.stop() }
+        let failures = Mutex<[TerminalSession.IOFailure]>([])
+        session.onIOFailure = { failure in failures.withLock { $0.append(failure) } }
+        session.start()
+        #expect(wait { !failures.withLock { $0.isEmpty } })
+        #expect(failures.withLock { $0.first?.operation } == .read)
+        #expect(session.pty.exitStatus == nil)
+    }
+
     @Test func ownerShutdownDoesNotReportAnIOFailure() throws {
         let session = try TerminalSession(executable: "/bin/cat")
         let failures = Mutex(0)
