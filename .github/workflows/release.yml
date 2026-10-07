@@ -62,6 +62,8 @@ jobs:
       contents: write
       pull-requests: write
       actions: write
+      # report-ci-statuses.sh: the dispatched CI's result, as the PR's checks.
+      statuses: write
     outputs:
       tag: ${{ steps.prepare.outputs.tag }}
       commit: ${{ steps.prepare.outputs.commit }}
@@ -471,6 +473,8 @@ jobs:
       contents: write
       pull-requests: write
       actions: write
+      # report-ci-statuses.sh: the dispatched CI's result, as the PR's checks.
+      statuses: write
     uses: ./.github/workflows/appcast.yml
     with:
       tag: ${{ needs.prepare.outputs.tag }}

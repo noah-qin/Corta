@@ -198,6 +198,12 @@ elif args[:2] == ['run', 'list']:
     print('11')
 elif args[:2] == ['run', 'watch']:
     pass
+elif args[:2] == ['run', 'view']:
+    for name in ('Terminal core (SwiftPM)', 'App, tests and the update feed'):
+        print(f"{name}\t{state.get('conclusion', 'success')}\thttps://example.invalid/job")
+elif args[:3] == ['api', '--method', 'POST']:
+    fields = dict(arg.split('=', 1) for arg in args[4:] if '=' in arg)
+    state.setdefault('statuses', []).append([args[3], fields['context'], fields['state']])
 elif args[:2] == ['pr', 'merge']:
     git('--git-dir=remote.git', 'update-ref', 'refs/heads/main', state['head'])
     state['state'] = 'MERGED'
@@ -212,7 +218,8 @@ path.write_text(json.dumps(state))
         gh.chmod(0o755)
         return dict(os.environ, PATH=f"{binaries}:{os.environ['PATH']}",
                     DRY_RUN="false", BUMP="patch", GITHUB_RUN_ID="42",
-                    GITHUB_OUTPUT=str(self.root / "output.txt"), RUNNER_TEMP=str(self.root))
+                    GITHUB_OUTPUT=str(self.root / "output.txt"), RUNNER_TEMP=str(self.root),
+                    GITHUB_REPOSITORY="noah-qin/Corta")
 
     def run_automatic(self, environment):
         return subprocess.run(["bash", str(SCRIPTS / "prepare-release.sh")],
@@ -231,6 +238,27 @@ path.write_text(json.dumps(state))
         output = (self.root / "output.txt").read_text()
         self.assertEqual(output.count("tag=v1.2.4"), 2)
         self.assertEqual(output.count(f"commit={head}"), 2)
+
+    def test_dispatched_ci_is_reported_as_the_pr_head_statuses(self):
+        environment = self.automatic_fixture()
+        result = self.run_automatic(environment)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        state = json.loads((self.root / "github-state.json").read_text())
+        head = state["head"]
+        self.assertEqual(state["statuses"], [
+            [f"repos/noah-qin/Corta/statuses/{head}", "Terminal core (SwiftPM)", "success"],
+            [f"repos/noah-qin/Corta/statuses/{head}", "App, tests and the update feed", "success"],
+        ])
+
+    def test_a_job_that_did_not_succeed_is_never_reported_as_passed(self):
+        environment = self.automatic_fixture()
+        bash = shutil.which("bash")
+        (self.root / "github-state.json").write_text(json.dumps({"head": "abc", "conclusion": "cancelled"}))
+        result = subprocess.run([bash, str(SCRIPTS / "report-ci-statuses.sh"), "11", "abc"],
+                                env=environment, capture_output=True, text=True, cwd=self.root)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        state = json.loads((self.root / "github-state.json").read_text())
+        self.assertEqual([status[2] for status in state["statuses"]], ["failure", "failure"])
 
     def test_retry_of_published_release_only_hands_off_to_feed(self):
         environment = self.automatic_fixture()
