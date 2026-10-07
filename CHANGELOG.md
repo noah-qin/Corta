@@ -191,6 +191,12 @@ what to edit.
   and status lines onto the old last row and left the new rows blank, and
   a shell's output kept scrolling above the window's real bottom. A resize
   now gives the scroll region the whole new screen, as xterm does.
+- Making a window wider or narrower no longer moves the cursor back onto
+  text. A cursor after a typed space, or past the end of a line, came back
+  at the line's last character; one that had just filled a row came back
+  on that row's last character, which the next character then
+  overwrote. It now keeps its place after the line, and a line that ends
+  exactly at the new edge still wraps when typing continues.
 - SFTP progress accepts full-width remote sizes without overflowing the toolbar
   total, and deeply nested remote paths build only a bounded breadcrumb trail.
 - SFTP sessions stop safely when a peer withholds 1,024 cancelled request
