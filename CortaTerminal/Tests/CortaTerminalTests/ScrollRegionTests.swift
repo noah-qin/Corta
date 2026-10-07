@@ -137,6 +137,47 @@ struct ScrollRegionTests {
         #expect(grid.marginBottom == 1)
     }
 
+    /// xterm resets the region on any resize. Clamped instead, a grown
+    /// screen kept its old bottom margin: `CUD` stopped there and output
+    /// scrolled there, leaving the new rows below it blank.
+    @Test(
+        "a resize that grows the screen gives the region the whole new screen",
+        arguments: [(columns: 8, alternate: false), (columns: 8, alternate: true), (columns: 12, alternate: false)])
+    func growingResetsTheRegionToTheWholeScreen(columns: Int, alternate: Bool) {
+        var grid = Grid(rows: 4, columns: 8)
+        if alternate { grid.enterAlternateScreen() }
+        grid.resize(rows: 8, columns: columns)
+        #expect(grid.marginTop == 0)
+        #expect(grid.marginBottom == 7)
+
+        grid.moveCursor(row: 0, column: 0)
+        grid.moveCursorDown(6)
+        #expect(grid.cursor.row == 6)
+    }
+
+    @Test("a region set before a resize does not survive it")
+    func resizeDropsAPartialRegion() {
+        var grid = Grid(rows: 6, columns: 8)
+        grid.setScrollRegion(top: 1, bottom: 3)
+        grid.resize(rows: 10, columns: 8)
+        #expect(grid.marginTop == 0)
+        #expect(grid.marginBottom == 9)
+    }
+
+    @Test("output on a grown screen scrolls at its new last row")
+    func grownScreenScrollsAtTheNewBottom() {
+        var grid = Grid(rows: 4, columns: 8)
+        grid.resize(rows: 8, columns: 8)
+        for index in 0..<10 {
+            write("r\(index)", to: &grid)
+            grid.carriageReturn()
+            grid.lineFeed()
+        }
+        #expect(grid.cursor.row == 7)
+        #expect(grid.scrollback.count == 3)
+        #expect(grid[6, 1].scalar == UInt32(UnicodeScalar("9").value))
+    }
+
     /// The alternate screen starts with full-screen margins; the main
     /// screen's margins are parked with it and come back on exit.
     @Test("the alternate screen has its own full-screen margins")

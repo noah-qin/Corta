@@ -931,12 +931,7 @@ public struct Grid: Sendable {
             resizeTabStops(to: newColumns)
             reflow(toColumns: newColumns, newRows: newRows)
             rows = newRows
-            marginTop = min(marginTop, rows - 1)
-            marginBottom = min(marginBottom, rows - 1)
-            if marginTop >= marginBottom {
-                marginTop = 0
-                marginBottom = rows - 1
-            }
+            resetScrollRegionAfterResize()
             return
         }
 
@@ -967,13 +962,18 @@ public struct Grid: Sendable {
         cursor.row = min(cursor.row, rows - 1)
         cursor.column = min(cursor.column, columns - 1)
         pendingWrap = false
-        marginTop = min(marginTop, rows - 1)
-        marginBottom = min(marginBottom, rows - 1)
-        if marginTop >= marginBottom {
-            // The region no longer fits; fall back to the whole screen.
-            marginTop = 0
-            marginBottom = rows - 1
-        }
+        resetScrollRegionAfterResize()
+    }
+
+    /// The whole new screen, as xterm does: a region set at the old size
+    /// would otherwise stay there. Clamped instead, a window grown from 24
+    /// rows kept scrolling at row 23 and stopped `CUD` there, so a program
+    /// redrawing after `SIGWINCH` (Claude Code) stacked its footer on that
+    /// row and left the rows below it blank. A program that wants a region
+    /// at the new size sets it again.
+    private mutating func resetScrollRegionAfterResize() {
+        marginTop = 0
+        marginBottom = rows - 1
     }
 
     // MARK: - Scroll region

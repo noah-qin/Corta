@@ -185,6 +185,12 @@ what to edit.
 
 ### Fixed
 
+- Making a window bigger while a program is running no longer hides part
+  of what it draws. The scroll region kept its old bottom edge, so a
+  program that redraws after the resize (Claude Code) piled its input box
+  and status lines onto the old last row and left the new rows blank, and
+  a shell's output kept scrolling above the window's real bottom. A resize
+  now gives the scroll region the whole new screen, as xterm does.
 - SFTP progress accepts full-width remote sizes without overflowing the toolbar
   total, and deeply nested remote paths build only a bounded breadcrumb trail.
 - SFTP sessions stop safely when a peer withholds 1,024 cancelled request
