@@ -360,6 +360,14 @@ struct ConfigurationStoreTests {
         #expect(!store.write())
         #expect(try Data(contentsOf: file) == bytes, "the file is untouched")
 
+        // A fix that leaves no write event (a `chmod`) is seen by the next
+        // write, which reads again first.
+        try writeFile("font-size = 17\n")
+        #expect(store.update { $0.bell = .visual })
+        #expect(store.readError == nil)
+        try Data(bytes).write(to: file)
+        #expect(await waitUpTo(5) { store.readError != nil })
+
         // Fixed by hand, it reads again and writes are allowed.
         try writeFile("font-size = 18\n")
         #expect(await waitUpTo(5) { store.readError == nil && store.configuration.fontSize == 18 })

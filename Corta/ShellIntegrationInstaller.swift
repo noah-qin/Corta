@@ -115,8 +115,14 @@ struct ShellIntegration {
     /// file is outdated, since `update()` completes it.
     func status() -> ShellIntegrationStatus {
         let each = targets.map { $0.status() }
-        let all = each + others.map { $0.status() }
-        for status in all {
+        // A file bash never reads (`others`) that cannot be read says nothing
+        // about the targets, and must not take away Install or Remove.
+        let readableOthers = others.map { $0.status() }.filter {
+            if case .unreadable = $0 { return false }
+            return true
+        }
+        let all = each + readableOthers
+        for status in each {
             if case .unreadable = status { return status }
         }
         if each.allSatisfy({ $0 == .installed }) { return .installed }
@@ -146,7 +152,11 @@ struct ShellIntegration {
     /// files it could not write.
     @discardableResult
     func uninstall() -> [String] {
-        (targets + others).filter { !$0.uninstall() }.map(\.displayPath)
+        let readableOthers = others.filter {
+            if case .unreadable = $0.status() { return false }
+            return true
+        }
+        return (targets + readableOthers).filter { !$0.uninstall() }.map(\.displayPath)
     }
 }
 

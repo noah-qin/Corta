@@ -621,6 +621,12 @@ final class SettingsModel {
     /// path whose write just failed points Finder at a file that does not
     /// say what the page says — or at no file at all on a first launch.
     func revealConfigFile() {
+        // An unreadable file is shown as it is: opening it to fix it is the
+        // remedy, and a write is refused until it reads again.
+        if ConfigurationStore.shared.readError != nil {
+            NSWorkspace.shared.activateFileViewerSelecting([ConfigurationStore.fileURL])
+            return
+        }
         guard ConfigurationStore.shared.write() else {
             reportWriteFailure()
             return

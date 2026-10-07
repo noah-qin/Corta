@@ -106,8 +106,20 @@ enum ApplicationsFolderMover {
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.createsNewApplicationInstance = true
-        NSWorkspace.shared.openApplication(at: installed, configuration: configuration) { _, _ in
-            Task { @MainActor in NSApp.terminate(nil) }
+        NSWorkspace.shared.openApplication(at: installed, configuration: configuration) { _, error in
+            Task { @MainActor in
+                // Only once the installed copy is running: quitting after a
+                // failed launch left no Corta at all.
+                guard let error else {
+                    NSApp.terminate(nil)
+                    return
+                }
+                let failure = NSAlert()
+                failure.alertStyle = .warning
+                failure.messageText = L10n.text("moveToApplications.failedTitle")
+                failure.informativeText = error.localizedDescription
+                failure.runModal()
+            }
         }
     }
 

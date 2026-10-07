@@ -67,6 +67,23 @@ struct ShellIntegrationInstallerTests {
         #expect(try Data(contentsOf: file) == bytes)
     }
 
+    /// bash's other login candidates are only checked for an old block; one
+    /// that cannot be read must not take away Install or Remove.
+    @Test("an unreadable file bash never reads does not block the targets")
+    func unreadableOtherFileDoesNotBlock() throws {
+        defer { removeDirectory() }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let other = directory.appendingPathComponent(".profile")
+        try Data([0x41, 0xE9, 0x0A]).write(to: other)
+        let integration = ShellIntegration(
+            targets: [installer], others: [ShellIntegrationInstaller(shell: .zsh, rcFileURL: other)])
+        #expect(integration.status() == .notInstalled)
+        #expect(integration.install().isEmpty)
+        #expect(integration.status() == .installed)
+        #expect(integration.uninstall().isEmpty)
+        #expect(try Data(contentsOf: other) == Data([0x41, 0xE9, 0x0A]))
+    }
+
     @Test("a missing, an unreadable and a readable file read as three different things")
     func readTextTellsMissingFromUnreadable() throws {
         defer { removeDirectory() }

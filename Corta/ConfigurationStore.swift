@@ -129,6 +129,7 @@ final class ConfigurationStore {
     /// not `didChange`. Returns whether it persisted.
     @discardableResult
     func update(_ mutate: (inout Configuration) -> Void) -> Bool {
+        if readError != nil { reload() }
         var updated = configuration
         mutate(&updated)
         guard updated != configuration else { return true }
@@ -146,6 +147,9 @@ final class ConfigurationStore {
     /// discoverable first launch.
     @discardableResult
     func write() -> Bool {
+        // Read again first: a fix that leaves no write event — a `chmod` —
+        // would otherwise keep writes refused until the next launch.
+        if readError != nil { reload() }
         guard readError == nil else {
             noteWriteResult(UnreadableFileError(path: fileURL.path))
             return false
@@ -179,7 +183,8 @@ final class ConfigurationStore {
     private func startWatching() {
         fileSource?.cancel()
         directorySource?.cancel()
-        fileSource = watch(fileURL, mask: [.write, .extend, .delete, .rename])
+        // `.attrib` too: a `chmod` that makes an unreadable file readable.
+        fileSource = watch(fileURL, mask: [.write, .extend, .delete, .rename, .attrib])
         directorySource = watch(
             Self.deepestExistingDirectory(under: fileURL.deletingLastPathComponent()),
             mask: [.write, .delete, .rename])

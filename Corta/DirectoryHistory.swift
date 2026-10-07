@@ -250,8 +250,20 @@ final class DirectoryHistoryStore {
         var entries: [DirectoryHistory.Entry]
     }
 
+    private struct VersionProbe: Decodable {
+        var version: Int
+    }
+
     private func load() {
         guard let data = try? Data(contentsOf: fileURL) else { return }
+        // The version alone first: a newer version is usually a new shape,
+        // which the full decode below would fail and then overwrite.
+        if let version = try? JSONDecoder().decode(VersionProbe.self, from: data).version,
+            version > Persisted.currentVersion
+        {
+            preservesNewerFile = true
+            return
+        }
         if let persisted = try? JSONDecoder().decode(Persisted.self, from: data) {
             // An unknown newer version loads nothing rather than guess, and
             // is not overwritten: this build's save would replace it with

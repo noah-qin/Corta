@@ -48,6 +48,11 @@ final class RemoteEditStore {
         var remoteSize: UInt64?
         var remoteMTime: UInt32?
         var remoteDigest: String? = nil
+        /// The local content last decided on — downloaded, uploaded, or
+        /// dismissed as "not this edit" — the baseline a reopened copy's
+        /// change is measured against. Persisted, so a dismissed edit is not
+        /// offered again after a relaunch, and an undecided one is.
+        var approvedDigest: String? = nil
         var lastOpenedAt: Date
         var openCount: Int
 
@@ -163,6 +168,7 @@ final class RemoteEditStore {
         copy.remoteSize = remoteSize
         copy.remoteMTime = remoteMTime
         copy.remoteDigest = remoteDigest
+        copy.approvedDigest = remoteDigest
         copies[id] = copy
         save()
         return copy
@@ -176,6 +182,15 @@ final class RemoteEditStore {
         current.remoteSize = size
         current.remoteMTime = mtime
         current.remoteDigest = digest
+        current.approvedDigest = digest
+        copies[copy.id] = current
+        save()
+    }
+
+    /// The local content the user decided on without uploading it.
+    func recordApproved(_ copy: RemoteCopy, digest: String?) {
+        guard var current = copies[copy.id] else { return }
+        current.approvedDigest = digest
         copies[copy.id] = current
         save()
     }

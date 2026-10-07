@@ -215,8 +215,21 @@ final class RemoteEditCoordinator {
             catch { throw .localIOFailed(operation: "secure local copy", code: EACCES) }
             return copy
         }
+        // Records from a newer Corta name copies this build cannot see; its
+        // downloads would set them aside and write where they live.
+        if store.preservesNewerManifest {
+            presenter.showError(L10n.text("remoteEdit.newerManifest"))
+            throw .cancelled
+        }
         var keptOrphan: URL?
-        let copy = try await withClient(for: host) { client in
+        let tellAboutOrphan = { [presenter] in
+            if let keptOrphan {
+                presenter.showError(L10n.format("remoteEdit.orphanKept", remotePath, host, keptOrphan.path))
+            }
+        }
+        let copy: RemoteEditStore.RemoteCopy
+        do {
+            copy = try await withClient(for: host) { client in
             let attributes = try await client.lstat(path: remotePath)
             let relative = RemoteEditStore.localRelativePath(host: host, remotePath: remotePath)
             let url = store.rootURL.appendingPathComponent(relative)
@@ -237,10 +250,14 @@ final class RemoteEditCoordinator {
             try store.secureCopy(at: url)
             digests[copy.id] = RemoteEditStore.sha256Hex(ofFile: url)
             return copy
+            }
+        } catch {
+            // Said even when the download failed: the kept copy may hold
+            // edits, and the next open would find the path empty.
+            tellAboutOrphan()
+            throw error
         }
-        if let keptOrphan {
-            presenter.showError(L10n.format("remoteEdit.orphanKept", remotePath, host, keptOrphan.path))
-        }
+        tellAboutOrphan()
         return copy
     }
 
@@ -305,11 +322,12 @@ final class RemoteEditCoordinator {
         unwatch(copy.id)
         let url = store.localURL(for: copy)
         if digests[copy.id] == nil {
-            // The content last agreed with the remote, when the manifest has
-            // it: a copy edited and never uploaded — a failed upload, then a
-            // quit — is then a pending edit on the next open, where the
-            // copy's current content would have made it the baseline.
-            digests[copy.id] = copy.remoteDigest ?? RemoteEditStore.sha256Hex(ofFile: url)
+            // The content last decided on, when the manifest has it: a copy
+            // edited and never uploaded — a failed upload, then a quit — is
+            // then a pending edit on the next open, where the copy's current
+            // content would have made it the baseline; a dismissed one is not.
+            digests[copy.id] =
+                copy.approvedDigest ?? copy.remoteDigest ?? RemoteEditStore.sha256Hex(ofFile: url)
         }
         let descriptor = Darwin.open(url.path, O_EVTONLY | O_CLOEXEC)
         guard descriptor >= 0 else { return }
@@ -407,6 +425,7 @@ final class RemoteEditCoordinator {
         } catch {
             presenter.showError(SFTPBrowserModel.errorMessage(
                 .localIOFailed(operation: "snapshot approved content", code: EIO), host: copy.host))
+            askAgain(copy)
         }
     }
 
@@ -416,6 +435,7 @@ final class RemoteEditCoordinator {
         guard !uploadsInFlight.contains(pending.id) else { return }
         removeSnapshot(pending.id)
         pendingUploads.removeAll { $0.id == pending.id }
+        store.recordApproved(pending.copy, digest: pending.contentDigest)
     }
 
     private func checkRemoteAndUpload(_ copy: RemoteEditStore.RemoteCopy) async {
@@ -543,10 +563,12 @@ final class RemoteEditCoordinator {
             removeSnapshot(copy.id)
             pendingConflicts.removeAll { $0.id == conflictID }
             pendingUploads.removeAll { $0.id == conflictID }
+            store.recordApproved(copy, digest: digests[copy.id])
         case .dismiss:
             removeSnapshot(copy.id)
             pendingConflicts.removeAll { $0.id == conflictID }
             pendingUploads.removeAll { $0.id == conflictID }
+            store.recordApproved(copy, digest: digests[copy.id])
         }
     }
 

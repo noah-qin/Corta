@@ -35694,6 +35694,65 @@
           }
         }
       }
+    },
+    "remoteEdit.newerManifest": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A newer version of Corta keeps the records of your remote-edit copies, and this one can’t read them. Open the file in the newer Corta, so no copy it manages is replaced."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "远程编辑副本的记录由更新版本的 Corta 保存，当前版本无法读取。请在较新的 Corta 中打开该文件，以免替换它管理的副本。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "遠端編輯副本的記錄由較新版本的 Corta 保存，目前版本無法讀取。請在較新的 Corta 中開啟該檔案，以免取代它管理的副本。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "リモート編集コピーの記録は新しいバージョンの Corta が保存しており、このバージョンでは読み取れません。管理中のコピーを置き換えないよう、新しい Corta でファイルを開いてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "원격 편집 사본의 기록은 더 새로운 버전의 Corta가 보관하고 있어 이 버전에서는 읽을 수 없습니다. 관리 중인 사본이 교체되지 않도록 새 Corta에서 파일을 여세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Die Einträge Ihrer Remote-Bearbeitungskopien stammen von einer neueren Corta-Version, die diese Version nicht lesen kann. Öffnen Sie die Datei in der neueren Version, damit keine verwaltete Kopie ersetzt wird."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Les registres de vos copies de modification distante proviennent d’une version plus récente de Corta, que celle-ci ne sait pas lire. Ouvrez le fichier dans la version plus récente pour ne remplacer aucune copie qu’elle gère."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Los registros de tus copias de edición remota pertenecen a una versión más reciente de Corta que esta no puede leer. Abre el archivo en esa versión para no reemplazar ninguna copia que gestione."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Os registros das suas cópias de edição remota são de uma versão mais recente do Corta, que esta não consegue ler. Abra o arquivo na versão mais recente para não substituir nenhuma cópia que ela gerencia."
+          }
+        }
+      }
     }
   }
 }

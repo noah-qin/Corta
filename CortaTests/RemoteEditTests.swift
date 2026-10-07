@@ -897,6 +897,31 @@ struct RemoteEditCoordinatorTests {
         #expect(fixture.fake.transferCalls.filter { !$0.isUpload }.count == 1, "the copy is reused")
     }
 
+    /// Dismiss means "not this edit": it must not be offered again on every
+    /// open after a relaunch.
+    @Test("a dismissed edit is not offered again when the copy is reopened")
+    func dismissedEditStaysDismissedAcrossARelaunch() async throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        _ = try await fixture.coordinator.open(
+            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
+        try "edited, then dismissed".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
+        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        fixture.coordinator.dismissUpload(try #require(fixture.recorder.uploads.first))
+
+        let recorder = Recorder()
+        let coordinator = RemoteEditCoordinator(
+            store: RemoteEditStore(rootURL: fixture.root), makeClient: { _ in fixture.fake },
+            opener: { _, _, _ in true },
+            presenter: .init(
+                promptUpload: { recorder.uploads.append($0) },
+                promptConflict: { recorder.conflicts.append($0) },
+                showError: { recorder.errors.append($0) }))
+        _ = try await coordinator.open(
+            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
+        #expect(recorder.uploads.isEmpty)
+    }
+
     /// A copy the manifest no longer names may hold edits; the download used
     /// to refuse its path (policy `.fail`), and the file could not be opened.
     @Test("a copy missing from the manifest is kept aside, not overwritten")
