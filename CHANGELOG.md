@@ -10,10 +10,16 @@ what to edit.
 
 ## [Unreleased]
 
+## [1.1.8] — 2026-10-07
+
 ### Fixed
 
 - A window with a tab bar showed two **+** buttons, the toolbar's and the
   tab bar's. The tab bar's is gone; the toolbar's opens a new tab.
+
+### Commits
+
+- fix(ui): drop the tab bar's + in favour of the toolbar's (#273)
 
 ## [1.1.7] — 2026-10-07
 
@@ -1578,7 +1584,8 @@ M1–M10.
   same-conditions end-to-end re-measurement against the 45.5 ms baseline
   is still open.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.1.7...main
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.1.8...main
+[1.1.8]: https://github.com/noah-qin/Corta/releases/tag/v1.1.8
 [1.1.7]: https://github.com/noah-qin/Corta/releases/tag/v1.1.7
 [1.1.6]: https://github.com/noah-qin/Corta/releases/tag/v1.1.6
 [1.1.5]: https://github.com/noah-qin/Corta/releases/tag/v1.1.5
