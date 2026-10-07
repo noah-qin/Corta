@@ -317,8 +317,16 @@ As implemented (M3.1–M3.4, `TerminalView+IME.swift`,
 
 - The conformance must be **declared** on the view — `NSView` does not
   conform by default, and its `inputContext` is nil until it does.
-- Routing: an event carrying ⌘ or ⌃ bypasses the IME entirely; every
-  other event is offered to `inputContext.handleEvent(_:)` first and
+- Routing: an event carrying ⌘ or ⌃ bypasses the IME entirely, and so
+  does a terminal key — Return, Tab, Delete, Escape, the arrows, Home,
+  End, Page Up/Down, forward delete, F1–F12 — unless a composition is
+  open (`TerminalView.isTerminalKey`). The input context consumes every
+  one of those for any input source, ABC included, and answers with a
+  text-editing command (`moveWordLeft:`, `scrollToBeginningOfDocument:`,
+  `deleteForward:`, `complete:` for F5); the pane dropped all but ten of
+  them, so ⌥←, Home, End, Page Up/Down, forward delete and the function
+  keys never reached the child. Every other event is offered to
+  `inputContext.handleEvent(_:)` first and
   falls through to direct byte translation only when unconsumed. The
   input context consumes more than text keys — Return, Delete, Escape,
   the arrows, Tab and Shift-Tab come back through `doCommand(by:)`, and

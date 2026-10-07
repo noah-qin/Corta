@@ -135,7 +135,7 @@ be **fixed-format and never echo attacker-controlled text** — see
 | Configurable key bindings                        | P1   | `bind.<command>` in the config file, one table for menus, palette and file — `CONFIGURATION.md` §5 |
 | Click-to-position, drag-to-select                | P1   | Drag selects; a TUI that owns the mouse is overridden with `mouse-override-modifier` |
 | ⌘-click to open a URL                            | P1   | Scheme allowlist required — `SECURITY.md` §2.4      |
-| Kitty keyboard protocol                          | P2   | Implemented; progressive enhancement flags and protocol stack, one per screen (the alternate screen's is dropped when it closes), and the main screen's cleared when a command finishes (OSC 133 D) |
+| Kitty keyboard protocol                          | P2   | Implemented; `disambiguate` re-encodes the colliding keys only — Ctrl+I/M/H/[, Escape (`CSI 27 u`), ⌥-as-Meta text keys and ⌥⌫ — not the whole keyboard; progressive enhancement flags and protocol stack, one per screen (the alternate screen's is dropped when it closes), and the main screen's cleared when a command finishes (OSC 133 D) |
 | Tab / Shift-Tab through a candidate UI            | P0   | A completion menu or IME that resolves Tab as a command sends `insertTab(_:)` / `insertBacktab(_:)` to `doCommand(by:)`; both are forwarded to the child (B02) — `DESIGN.md` §7.1, `TerminalViewIMETests.doCommandForwardsTabAndBacktab` |
 
 The candidate-UI row is the one whose evidence is incomplete. The code gap

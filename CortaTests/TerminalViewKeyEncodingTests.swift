@@ -388,4 +388,46 @@ struct TerminalViewKeyEncodingTests {
         let release = Self.keyEvent(characters: "a", type: .keyUp)
         #expect(TerminalView.bytes(for: release, enhancements: .reportEventTypes) == nil)
     }
+
+    /// Escape alone is the one key legacy encoding cannot tell from the
+    /// start of an Alt sequence, so `disambiguate` reports it as `CSI 27 u`.
+    @Test func disambiguateReportsEscapeAsACodepoint() throws {
+        let escape = Self.keyEvent(characters: "\u{1B}", keyCode: 53)
+        #expect(TerminalView.bytes(for: escape) == [0x1B])
+        #expect(TerminalView.bytes(for: escape, enhancements: .disambiguate) == Array("\u{1B}[27u".utf8))
+        // A press needs no event type: the short form stands.
+        #expect(
+            TerminalView.bytes(for: escape, enhancements: [.disambiguate, .reportEventTypes])
+                == Array("\u{1B}[27u".utf8))
+        let shiftEscape = Self.keyEvent(characters: "\u{1B}", modifiers: .shift, keyCode: 53)
+        #expect(
+            TerminalView.bytes(for: shiftEscape, enhancements: .disambiguate)
+                == Array("\u{1B}[27;2u".utf8))
+    }
+
+    /// ⌥ as Meta prefixes `ESC`, which reads as Escape then the key; with
+    /// `disambiguate` the pair is one `CSI code ; 3 u`. ⌥ as text is untouched.
+    @Test func disambiguateReportsMetaKeysAsCodepoints() throws {
+        let optionF = Self.keyEvent(
+            characters: "ƒ", charactersIgnoringModifiers: "f", modifiers: .option, keyCode: 3)
+        #expect(
+            TerminalView.bytes(for: optionF, enhancements: .disambiguate, optionAsMeta: true)
+                == Array("\u{1B}[102;3u".utf8))
+        #expect(
+            TerminalView.bytes(for: optionF, enhancements: .disambiguate, optionAsMeta: false)
+                == Array("ƒ".utf8))
+    }
+
+    /// ⌥⌫ deletes a word: `ESC DEL` in legacy encoding whether or not ⌥ is
+    /// Meta, `CSI 127 ; 3 u` with `disambiguate`.
+    @Test func optionDeleteDeletesAWord() throws {
+        let optionDelete = Self.keyEvent(characters: "\u{7F}", modifiers: .option, keyCode: 51)
+        #expect(TerminalView.bytes(for: optionDelete) == [0x1B, 0x7F])
+        #expect(TerminalView.bytes(for: optionDelete, optionAsMeta: true) == [0x1B, 0x7F])
+        #expect(
+            TerminalView.bytes(for: optionDelete, enhancements: .disambiguate)
+                == Array("\u{1B}[127;3u".utf8))
+        // Plain Delete stays DEL.
+        #expect(TerminalView.bytes(for: Self.keyEvent(characters: "\u{7F}", keyCode: 51)) == [0x7F])
+    }
 }

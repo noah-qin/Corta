@@ -41,7 +41,8 @@ extension TerminalView {
             return
         }
         // A consumed event ends here; the IME answers via `insertText`.
-        if Self.routesEventThroughIME(event, optionAsMeta: optionAsMeta?() ?? false),
+        if Self.routesEventThroughIME(
+            event, optionAsMeta: optionAsMeta?() ?? false, composing: hasMarkedText()),
             inputContext?.handleEvent(event) == true
         {
             return
@@ -84,10 +85,39 @@ extension TerminalView {
 
     /// ⌘/⌃ bypass the IME, and so does ⌥ under `option-as-meta` — otherwise
     /// macOS composes ⌥F into `ƒ`. With the setting off ⌥ stays text input,
-    /// which dead keys and international layouts need. Pure, for tests.
-    static func routesEventThroughIME(_ event: NSEvent, optionAsMeta: Bool = false) -> Bool {
+    /// which dead keys and international layouts need.
+    ///
+    /// A terminal key (`isTerminalKey`) bypasses it too unless a composition
+    /// is open. The input context consumes every such key — any input source,
+    /// ABC included — and hands it back as a text-editing command
+    /// (`moveWordLeft:`, `scrollToBeginningOfDocument:`, `deleteForward:`,
+    /// `complete:` for F5, …) that a terminal has no use for: ⌥←, Home, End,
+    /// Page Up/Down, forward delete, F1–F12 and the shifted arrows reached
+    /// the child as nothing, and the plain arrows lost DECCKM. While
+    /// composing, the IME needs them to move through and commit candidates.
+    /// Pure, for tests.
+    static func routesEventThroughIME(
+        _ event: NSEvent, optionAsMeta: Bool = false, composing: Bool = false
+    ) -> Bool {
+        if !composing, isTerminalKey(event) { return false }
         if optionAsMeta, event.modifierFlags.contains(.option) { return false }
         return event.modifierFlags.isDisjoint(with: [.command, .control])
+    }
+
+    /// The keys `bytes(for:)` encodes as a terminal does rather than as text:
+    /// Return, Tab, Delete, Escape, keypad Enter, the arrows, the editing
+    /// block and the function keys. By key code, which names the physical key
+    /// whatever the input source.
+    static func isTerminalKey(_ event: NSEvent) -> Bool {
+        switch event.keyCode {
+        case 36, 48, 51, 53, 76,  // Return, Tab, Delete, Escape, keypad Enter
+            115, 116, 117, 119, 121,  // Home, Page Up, forward delete, End, Page Down
+            123, 124, 125, 126,  // the arrows
+            122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111:  // F1–F12
+            return true
+        default:
+            return false
+        }
     }
 
     /// The keystroke bound to Paste, checked before `bytes(for:)`. From the
@@ -136,7 +166,8 @@ extension TerminalView {
         if enhancements.contains(.disambiguate),
             let disambiguated = disambiguatedBytes(
                 for: event,
-                eventType: enhancements.contains(.reportEventTypes) ? eventType : nil)
+                eventType: enhancements.contains(.reportEventTypes) ? eventType : nil,
+                optionAsMeta: optionAsMeta)
         {
             return disambiguated
         }
@@ -190,6 +221,15 @@ extension TerminalView {
         // ⌥ as Meta; ⌘ belongs to the app and disqualifies it.
         let meta: [UInt8] =
             optionAsMeta && flags.contains(.option) && !flags.contains(.command) ? [0x1B] : []
+
+        // ⌥⌫ deletes a word: `ESC DEL`, the meta form shells bind to
+        // backward-kill-word, whether or not ⌥ is Meta — on Delete ⌥ composes
+        // nothing, and plain DEL would erase one character instead.
+        if event.keyCode == 51, flags.contains(.option), !flags.contains(.command),
+            !flags.contains(.control)
+        {
+            return [0x1B, 0x7F]
+        }
 
         // DECKPAM, by keyCode: ⌤ reports "\u{3}" like Ctrl+C, and keypad digits
         // match the main row. Modified keypad keys use the ordinary encoding;
@@ -258,10 +298,39 @@ extension TerminalView {
     /// `disambiguate` doesn't re-encode the keyboard
     /// (`reportAllKeysAsEscapeCodes`, unclaimed, would). The collisions:
     /// Ctrl+I/Tab (0x09), Ctrl+M/Return (0x0D), Ctrl+[/Esc (0x1B),
-    /// Ctrl+H/Backspace (0x08).
-    private static func disambiguatedBytes(for event: NSEvent, eventType: Int?) -> [UInt8]? {
+    /// Ctrl+H/Backspace (0x08); Escape itself, which legacy encoding cannot
+    /// tell from the start of an Alt sequence (`CSI 27 u`); and ⌥ as Meta on
+    /// a text key, whose `ESC` prefix reads as Escape then the key.
+    private static func disambiguatedBytes(
+        for event: NSEvent, eventType: Int?, optionAsMeta: Bool
+    ) -> [UInt8]? {
         let flags = event.modifierFlags
-        guard flags.contains(.control), !flags.contains(.command),
+        guard !flags.contains(.command) else { return nil }
+        let modifiers = kittyModifiers(flags)
+        func encoded(_ code: UInt32, modifiers: Int) -> [UInt8] {
+            // `CSI code u` when there is nothing to add, as the spec writes it.
+            if modifiers == 1, eventType == nil || eventType == 1 {
+                return Array("\u{1B}[\(code)u".utf8)
+            }
+            let suffix = eventType.map { ":\($0)" } ?? ""
+            return Array("\u{1B}[\(code);\(modifiers)\(suffix)u".utf8)
+        }
+        if event.keyCode == 53 {
+            return encoded(27, modifiers: modifiers)
+        }
+        // ⌥⌫: a modified Backspace, which the spec encodes (only the plain
+        // key stays legacy).
+        if event.keyCode == 51, flags.contains(.option), !flags.contains(.control) {
+            return encoded(127, modifiers: modifiers)
+        }
+        if optionAsMeta, flags.contains(.option), !flags.contains(.control),
+            !isTerminalKey(event),
+            let base = event.characters(byApplyingModifiers: [])?.lowercased().unicodeScalars.first,
+            (0x20...0x7E).contains(base.value)
+        {
+            return encoded(base.value, modifiers: modifiers)
+        }
+        guard flags.contains(.control),
             let characters = event.charactersIgnoringModifiers?.lowercased(),
             let scalar = characters.unicodeScalars.first
         else { return nil }
@@ -274,7 +343,6 @@ extension TerminalView {
         ]
         guard ambiguous.contains(scalar.value) else { return nil }
         // `CSI code ; modifiers u`, bitmask shift 1, alt 2, ctrl 4, super 8.
-        let modifiers = kittyModifiers(flags)
         let suffix = eventType.map { ":\($0)" } ?? ""
         return Array("\u{1B}[\(scalar.value);\(modifiers)\(suffix)u".utf8)
     }
