@@ -21,7 +21,7 @@ document is right and the record is a record.
 
 Start with the [personalization tutorial](USER-GUIDE.md#personalizing-the-terminal)
 for cursor defaults, the optional system bar, host details and graphical themes.
-These development-tree features are listed under Unreleased in the changelog.
+These features arrived in 1.1.5; its changelog section lists them.
 
 ## For contributors
 
@@ -78,6 +78,8 @@ Dated, and not edited except to fix a link.
 - [1.1.0 benchmark run, 2026-10-03](history/2026-10-03-V1.1.0-BENCHMARK-RUN.md) — the first Release-configuration frame-CPU column, and the search and reflow gains.
 - [1.1.1 benchmark run, 2026-10-03](history/2026-10-03-V1.1.1-BENCHMARK-RUN.md) — scripted core measurements for the emergency patch.
 - [1.1.1 release checks, 2026-10-03](test-results/2026-10-03-1.1.1-checks.md) — empty-Return regression coverage and launched-app confirmation.
+- [1.1.5 benchmark run, 2026-10-07](history/2026-10-07-V1.1.5-BENCHMARK-RUN.md) — scripted core measurements and the Release frame-CPU re-measurement after the render-loop changes.
+- [1.1.5 release checks, 2026-10-07](test-results/2026-10-07-1.1.5-checks.md) — suites, fuzz, the esctest re-run and the resize fixes' evidence.
 - [esctest results](esctest/) — result files per release.
 - [Interactive test records](test-results/) — dated passes by a person; findings are worked off in the changelog.
 

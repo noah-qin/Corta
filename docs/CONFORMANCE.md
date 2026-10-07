@@ -286,12 +286,19 @@ so the next run is a diff rather than a re-reading.
 | 0.1.1 (2026-09-08) | v0.1.1 | 112 | 335 | 121 | 568 | 78.7% | Six more passing, none regressed; classified by application impact in [the quality plan](history/V0.1.1-QUALITY-PLAN.md) Q01; names in [`esctest/0.1.1-results.txt`](esctest/0.1.1-results.txt). 45 of the 121 were OSC 4/5 palette set and query, then unimplemented |
 | 2026-09-17 | `main`, esctest2 `2798f12` | 126 | 334 | 107 | 567 | 81.1% | 14 tests moved to pass — B06's OSC 4/104 and 5/105 set/query/reset, SCORC, and the multi-column reverse-wraparound case — none regressed; the suite itself lost one test and one known bug, so the totals are not identical columns. Names in [`esctest/2026-09-17-results.txt`](esctest/2026-09-17-results.txt); XtermWinops (28) is still the largest class and still deliberate |
 | 1.1.0 (2026-10-03) | `main` at `ef11a93`, esctest2 `2798f12` | 126 | 334 | 107 | 567 | 81.1% | Identical failing list, name for name: nothing regressed through the 1.1.0 milestone and nothing moved — its terminal-side changes (Kitty `o=z`, emoji drawing, bounded glyph clusters) have no esctest case. Names in [`esctest/2026-10-03-results.txt`](esctest/2026-10-03-results.txt) |
+| 1.1.5 (2026-10-07) | `main` at `c9432a9`, esctest2 `2798f12` | 131 | 334 | 102 | 567 | 82.0% | Six moved to pass: #244 made autowrap off (`CSI ? 7 l`) overwrite the last column instead of wrapping, origin mode address from the region's top, and DECRQM report DECAWM, DECOM and DECTCEM as they are. One moved to fail without regressing: `XtermSave_SaveSetState` had passed only because ASCII text wrapped with autowrap off — XTSAVE/XTRESTORE are still not implemented. Names in [`esctest/2026-10-07-results.txt`](esctest/2026-10-07-results.txt) |
 
 **1.1.1 (2026-10-03):** the empty-Return patch adds real-shell PTY regression
 coverage and was confirmed in the launched development app after updating
 the installed integration. Full core and Unit suites passed; esctest2 was
 not re-run because this patch changes shell hooks rather than terminal
 escape-sequence handling. Evidence: [1.1.1 release checks](test-results/2026-10-03-1.1.1-checks.md).
+
+**1.1.5 (2026-10-07):** esctest2 re-run on the release tree: 131 passed, 334
+known bugs, 102 failed (82.0%); the row above has the per-test difference.
+The scroll-region-on-resize (#256) and reflow-cursor (#257) fixes have no
+esctest case; their own core tests and a replay of Claude Code's recorded
+output cover them. Evidence: [1.1.5 release checks](test-results/2026-10-07-1.1.5-checks.md).
 
 ### 4.3 Fuzzing
 
@@ -579,3 +586,4 @@ off in the CHANGELOG. The record stays as written.
 | [2026-10-02 — audit follow-up](test-results/2026-10-02-follow-up.md) | Search, SFTP lifecycle, local storage and reflow follow-ups, with the A/B measurements |
 | [2026-10-03 — 1.1.0 release checks](test-results/2026-10-03-1.1.0-checks.md) | §4.4 points 1–5 and 7 on the merged tree, the esctest re-run, what was not judged |
 | [2026-10-03 — 1.1.1 release checks](test-results/2026-10-03-1.1.1-checks.md) | Real-shell empty-Return regression tests, full core/Unit suites and user-confirmed launched-app check |
+| [2026-10-07 — 1.1.5 release checks](test-results/2026-10-07-1.1.5-checks.md) | Full core/Unit suites, fuzz, esctest re-run, core benchmark and Release frame CPU, and the user-confirmed resize check |

@@ -202,8 +202,7 @@ Portuguese. Restart Corta after changing its app-language preference in macOS.
 Numeric formatting follows the current locale. Existing explicit cursor and
 status settings are preserved; defaults apply when those keys are absent.
 
-These features are in the development tree and remain **Unreleased** until
-they appear in a published release. macOS 26+ and Apple silicon are required.
+These features arrived in 1.1.5. macOS 26+ and Apple silicon are required.
 
 ## Scrollback, search and selection
 

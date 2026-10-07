@@ -1,0 +1,149 @@
+esctest2 (ThomasDickey/esctest2 2798f12, 2026-09-13) against Corta main at c9432a9, 2026-10-07 — the 1.1.5 release run
+Invocation: docs/CONFORMANCE.md 4.2 — python3 esctest.py --expected-terminal xterm --max-vt-level 3
+Build: Debug CortaDev.app, launched with SHELL pointing at the esctest wrapper and CORTA_STAGE_DIR at a throwaway config.
+
+131 passed, 334 known bugs, 102 failed of 567.
+xterm-compatibility (passed + known bugs) = 82.0%. Same suite commit as the 2026-10-03 run.
+
+Against 2026-10-03: six moved to pass, one moved to fail, no other change.
+
+Now passing — since #244, autowrap off (CSI ? 7 l) overwrites the last
+column instead of wrapping, origin mode addresses from the scroll region,
+and DECRQM reports DECAWM, DECOM and DECTCEM as they are:
+    DECRCTests.test_SaveRestoreCursor_Wrap
+    DECRQMTests.test_DECRQM_DEC_DECAWM
+    DECRQMTests.test_DECRQM_DEC_DECOM
+    DECRQMTests.test_DECRQM_DEC_DECTCEM
+    DECSETTiteInhibitTests.test_SaveRestoreCursor_Wrap
+    SCORCTests.test_SaveRestoreCursor_Wrap
+
+Now failing, not a regression:
+    XtermSaveTests.test_XtermSave_SaveSetState
+Corta does not implement XTSAVE/XTRESTORE (CSI ? Pm s / CSI ? Pm r). The
+test passed before only because 1.1.0 wrapped ASCII text at the margin
+even with autowrap off, so the check it ends with held by accident. Its
+pair, test_XtermSave_SaveResetState, has failed in every recorded run.
+
+Failures by test class:
+    28 XtermWinopsTests
+    11 ChangeDynamicColorTests
+    11 DECRQMTests
+    10 ChangeColorTests
+    10 ChangeSpecialColorTests
+     4 BSTests
+     4 DECDSRTests
+     3 DECRQSSTests
+     3 DECSETTests
+     3 DECSETTiteInhibitTests
+     3 ResetSpecialColorTests
+     2 CUBTests
+     2 DA2Tests
+     2 DATests
+     2 RISTests
+     2 XtermSaveTests
+     1 DECRCTests
+     1 SCORCTests
+
+Failing tests:
+    BSTests.test_BS_AfterNoWrappedInlines
+    BSTests.test_BS_AfterOneWrappedInline
+    BSTests.test_BS_ReverseWrapGoesToBottom
+    BSTests.test_BS_WrapsInWraparoundMode
+    ChangeColorTests.test_ChangeColor_CIELab
+    ChangeColorTests.test_ChangeColor_CIELuv
+    ChangeColorTests.test_ChangeColor_CIEuvY
+    ChangeColorTests.test_ChangeColor_CIExyY
+    ChangeColorTests.test_ChangeColor_CIEXYZ
+    ChangeColorTests.test_ChangeColor_Hash12
+    ChangeColorTests.test_ChangeColor_Hash3
+    ChangeColorTests.test_ChangeColor_Hash9
+    ChangeColorTests.test_ChangeColor_RGBI
+    ChangeColorTests.test_ChangeColor_TekHVC
+    ChangeDynamicColorTests.test_ChangeDynamicColor_CIELab
+    ChangeDynamicColorTests.test_ChangeDynamicColor_CIELuv
+    ChangeDynamicColorTests.test_ChangeDynamicColor_CIEuvY
+    ChangeDynamicColorTests.test_ChangeDynamicColor_CIExyY
+    ChangeDynamicColorTests.test_ChangeDynamicColor_CIEXYZ
+    ChangeDynamicColorTests.test_ChangeDynamicColor_Hash12
+    ChangeDynamicColorTests.test_ChangeDynamicColor_Hash3
+    ChangeDynamicColorTests.test_ChangeDynamicColor_Hash9
+    ChangeDynamicColorTests.test_ChangeDynamicColor_Multiple
+    ChangeDynamicColorTests.test_ChangeDynamicColor_RGBI
+    ChangeDynamicColorTests.test_ChangeDynamicColor_TekHVC
+    ChangeSpecialColorTests.test_ChangeSpecialColor_CIELab
+    ChangeSpecialColorTests.test_ChangeSpecialColor_CIELuv
+    ChangeSpecialColorTests.test_ChangeSpecialColor_CIEuvY
+    ChangeSpecialColorTests.test_ChangeSpecialColor_CIExyY
+    ChangeSpecialColorTests.test_ChangeSpecialColor_CIEXYZ
+    ChangeSpecialColorTests.test_ChangeSpecialColor_Hash12
+    ChangeSpecialColorTests.test_ChangeSpecialColor_Hash3
+    ChangeSpecialColorTests.test_ChangeSpecialColor_Hash9
+    ChangeSpecialColorTests.test_ChangeSpecialColor_RGBI
+    ChangeSpecialColorTests.test_ChangeSpecialColor_TekHVC
+    CUBTests.test_CUB_AfterNoWrappedInlines
+    CUBTests.test_CUB_AfterOneWrappedInline
+    DA2Tests.test_DA2_0
+    DA2Tests.test_DA2_NoParameter
+    DATests.test_DA_0
+    DATests.test_DA_NoParameter
+    DECDSRTests.test_DECDSR_DECXCPR
+    DECDSRTests.test_DECDSR_DSRKeyboard
+    DECDSRTests.test_DECDSR_DSRPrinterPort
+    DECDSRTests.test_DECDSR_DSRUDKLocked
+    DECRCTests.test_SaveRestoreCursor_AltVsMain
+    DECRQMTests.test_DECRQM_ANSI_KAM
+    DECRQMTests.test_DECRQM_ANSI_SRM
+    DECRQMTests.test_DECRQM_DEC_DECBKM
+    DECRQMTests.test_DECRQM_DEC_DECCOLM
+    DECRQMTests.test_DECRQM_DEC_DECHCCM
+    DECRQMTests.test_DECRQM_DEC_DECNKM
+    DECRQMTests.test_DECRQM_DEC_DECNRCM
+    DECRQMTests.test_DECRQM_DEC_DECPEX
+    DECRQMTests.test_DECRQM_DEC_DECPFF
+    DECRQMTests.test_DECRQM_DEC_DECSCLM
+    DECRQMTests.test_DECRQM_DEC_DECSCNM
+    DECRQSSTests.test_DECRQSS_DECSASD
+    DECRQSSTests.test_DECRQSS_DECSCA
+    DECRQSSTests.test_DECRQSS_DECSSDT
+    DECSETTests.test_DECSET_Allow80To132
+    DECSETTests.test_DECSET_ReverseWraparound_BS
+    DECSETTests.test_DECSET_SaveRestoreCursor
+    DECSETTiteInhibitTests.test_SaveRestoreCursor_AltVsMain
+    DECSETTiteInhibitTests.test_SaveRestoreCursor_Basic
+    DECSETTiteInhibitTests.test_SaveRestoreCursor_MoveToHomeWhenNotSaved
+    ResetSpecialColorTests.test_ResetSpecialColor_Dynamic
+    ResetSpecialColorTests.test_ResetSpecialColor_Multiple
+    ResetSpecialColorTests.test_ResetSpecialColor_Single
+    RISTests.test_RIS_ResetDECCOLM
+    RISTests.test_RIS_ResetTitleMode
+    SCORCTests.test_SaveRestoreCursor_AltVsMain
+    XtermSaveTests.test_XtermSave_SaveResetState
+    XtermSaveTests.test_XtermSave_SaveSetState
+    XtermWinopsTests.test_XtermWinops_DECSLPP
+    XtermWinopsTests.test_XtermWinops_Fullscreen
+    XtermWinopsTests.test_XtermWinops_IconifyDeiconfiy
+    XtermWinopsTests.test_XtermWinops_MaximizeWindow_Horizontally
+    XtermWinopsTests.test_XtermWinops_MaximizeWindow_HorizontallyAndVertically
+    XtermWinopsTests.test_XtermWinops_MaximizeWindow_Vertically
+    XtermWinopsTests.test_XtermWinops_MoveToXY
+    XtermWinopsTests.test_XtermWinops_MoveToXY_Defaults
+    XtermWinopsTests.test_XtermWinops_PushIcon_PopIcon
+    XtermWinopsTests.test_XtermWinops_PushIconAndWindow_PopIcon
+    XtermWinopsTests.test_XtermWinops_PushIconAndWindow_PopIconAndWindow
+    XtermWinopsTests.test_XtermWinops_PushIconAndWindow_PopWindow
+    XtermWinopsTests.test_XtermWinops_PushIconThenWindowThenPopBoth
+    XtermWinopsTests.test_XtermWinops_PushMultiplePopMultiple_Icon
+    XtermWinopsTests.test_XtermWinops_PushMultiplePopMultiple_Window
+    XtermWinopsTests.test_XtermWinops_PushWindow_PopWindow
+    XtermWinopsTests.test_XtermWinops_ReportIconLabel
+    XtermWinopsTests.test_XtermWinops_ReportWindowLabel
+    XtermWinopsTests.test_XtermWinops_ResizeChars_BothParameters
+    XtermWinopsTests.test_XtermWinops_ResizeChars_DefaultHeight
+    XtermWinopsTests.test_XtermWinops_ResizeChars_DefaultWidth
+    XtermWinopsTests.test_XtermWinops_ResizeChars_ZeroHeight
+    XtermWinopsTests.test_XtermWinops_ResizeChars_ZeroWidth
+    XtermWinopsTests.test_XtermWinops_ResizePixels_BothParameters
+    XtermWinopsTests.test_XtermWinops_ResizePixels_OmittedHeight
+    XtermWinopsTests.test_XtermWinops_ResizePixels_OmittedWidth
+    XtermWinopsTests.test_XtermWinops_ResizePixels_ZeroHeight
+    XtermWinopsTests.test_XtermWinops_ResizePixels_ZeroWidth
