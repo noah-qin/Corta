@@ -10,6 +10,8 @@ what to edit.
 
 ## [Unreleased]
 
+## [1.1.6] — 2026-10-07
+
 ### Fixed
 
 - Rounded box corners (`╭ ╮ ╰ ╯`) — the boxes Claude Code draws — meet
@@ -17,6 +19,12 @@ what to edit.
   the corners from the font, whose arcs sat apart from the lines and at
   another weight, so every rounded box had four broken corners. The arcs
   are now drawn with the borders, at their position and thickness.
+
+### Commits
+
+- docs: describe 1.1.6 and record its release checks (#265)
+- fix(app): draw rounded box corners with the borders they join (#264)
+- ci: pass the release secrets to the feed step (#262)
 
 ## [1.1.5] — 2026-10-07
 
@@ -1517,7 +1525,8 @@ M1–M10.
   same-conditions end-to-end re-measurement against the 45.5 ms baseline
   is still open.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.1.5...main
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.1.6...main
+[1.1.6]: https://github.com/noah-qin/Corta/releases/tag/v1.1.6
 [1.1.5]: https://github.com/noah-qin/Corta/releases/tag/v1.1.5
 [1.1.1]: https://github.com/noah-qin/Corta/releases/tag/v1.1.1
 [1.1.0]: https://github.com/noah-qin/Corta/releases/tag/v1.1.0
