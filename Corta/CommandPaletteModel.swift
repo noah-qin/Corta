@@ -31,26 +31,51 @@ final class CommandPaletteModel {
     /// A group heading or a command. Headings are non-selectable and skipped
     /// by the arrow keys, so the list reads as sections without the
     /// selection ever landing on one.
+    ///
+    /// A command run recently is listed twice while browsing — under Recent
+    /// and in its group — so a row's identity is its section as well as its
+    /// command. Keyed by command alone, the two rows shared one SwiftUI id,
+    /// both lit up, and stepping down onto the second jumped back to the
+    /// first: the arrow keys could never get past it.
     enum Row: Identifiable, Equatable {
         case header(String)
-        case command(TerminalCommand)
+        case command(TerminalCommand, recent: Bool, shortcut: String)
 
         var id: String {
             switch self {
             case .header(let title): "header-\(title)"
-            case .command(let command): "command-\(command.rawValue)"
+            case .command(let command, let recent, _):
+                (recent ? "recent-" : "command-") + command.rawValue
             }
         }
 
         var command: TerminalCommand? {
-            if case .command(let command) = self { command } else { nil }
+            if case .command(let command, _, _) = self { command } else { nil }
         }
     }
 
-    var query = ""
-    var selectedCommand: TerminalCommand?
+    /// Rebuilds `rows`, once per change rather than once per read: the view,
+    /// the selection check and the arrow keys all read them.
+    var query = "" {
+        didSet {
+            guard query != oldValue else { return }
+            // A new query starts at its best match, and an emptied one at
+            // the top — not wherever the last list's selection happens to
+            // recur further down.
+            selectedRowID = nil
+            rebuildRows()
+        }
+    }
+    /// What the list shows, kept in step with `query` and the recents.
+    private(set) var rows: [Row] = []
+    /// The selected row's `id`, not its command, for the reason `Row` gives.
+    private(set) var selectedRowID: String?
     var onRun: ((TerminalCommand) -> Void)?
     var onDismiss: (() -> Void)?
+
+    var selectedCommand: TerminalCommand? {
+        selectedRowID.flatMap { id in rows.first { $0.id == id } }?.command
+    }
 
     /// The commands run from the palette, most recent first, deduplicated.
     ///
@@ -63,38 +88,50 @@ final class CommandPaletteModel {
 
     private static let recentLimit = 5
 
-    /// Subsequence matching, which is what people mean by "fuzzy" here:
-    /// `spr` finds "Split Pane Right". Ranked so that a match on consecutive
-    /// characters, or one starting at a word boundary, beats a scattered one.
-    var rows: [Row] {
-        query.isEmpty ? browsingRows() : searchRows(matching: query.lowercased())
+    init() {
+        rebuildRows()
     }
 
     /// Re-opened with a clean query and the top row selected — a palette
-    /// remembered from last time it closed would show a stale filter.
+    /// remembered from last time it closed would show a stale filter. Also
+    /// where a rebind made since the last opening reaches the shortcuts.
     func reset() {
-        query = ""
-        selectFirstIfNeeded()
+        selectedRowID = nil
+        if query.isEmpty { rebuildRows() } else { query = "" }
     }
 
     /// If the current selection fell out of `rows` (the query changed
     /// underneath it), lands on the first command row instead of leaving the
     /// selection on nothing, or on a row that no longer exists.
     func selectFirstIfNeeded() {
-        if let selectedCommand, rows.contains(where: { $0.command == selectedCommand }) { return }
-        selectedCommand = rows.first { $0.command != nil }?.command
+        if let selectedRowID, rows.contains(where: { $0.id == selectedRowID }) { return }
+        selectedRowID = rows.first { $0.command != nil }?.id
+    }
+
+    /// Subsequence matching, which is what people mean by "fuzzy" here:
+    /// `spr` finds "Split Pane Right". Ranked so that a match on consecutive
+    /// characters, or one starting at a word boundary, beats a scattered one.
+    private func rebuildRows() {
+        let shortcuts = ConfigurationStore.shared.configuration.keybindings
+        func row(_ command: TerminalCommand, recent: Bool = false) -> Row {
+            .command(command, recent: recent, shortcut: shortcuts[command]?.displayText ?? "")
+        }
+        rows =
+            query.isEmpty
+            ? browsingRows(row: row) : searchRows(matching: query.lowercased(), row: row)
+        selectFirstIfNeeded()
     }
 
     /// With no query: what was used recently, then every command under its
     /// group heading. Recents first because the single most likely next
     /// command is one of the last few — and it is the only ordering that
     /// gets shorter with use rather than longer.
-    private func browsingRows() -> [Row] {
+    private func browsingRows(row: (TerminalCommand, Bool) -> Row) -> [Row] {
         var rows: [Row] = []
         let recents = recentCommands.prefix(Self.recentLimit)
         if !recents.isEmpty {
             rows.append(.header(L10n.text("commandPalette.category.recent")))
-            rows.append(contentsOf: recents.map { Row.command($0) })
+            rows.append(contentsOf: recents.map { row($0, true) })
         }
         for category in CommandCategory.allCases {
             let commands = TerminalCommand.allCases
@@ -102,7 +139,7 @@ final class CommandPaletteModel {
                 .sorted { $0.paletteRank < $1.paletteRank }
             guard !commands.isEmpty else { continue }
             rows.append(.header(category.title))
-            rows.append(contentsOf: commands.map { Row.command($0) })
+            rows.append(contentsOf: commands.map { row($0, false) })
         }
         return rows
     }
@@ -110,10 +147,25 @@ final class CommandPaletteModel {
     /// With a query: one flat ranked list, no headings. A search result is
     /// already ordered by how well it matched, and grouping would fight that
     /// ordering for the sake of a structure the user has stopped browsing.
-    private func searchRows(matching query: String) -> [Row] {
-        TerminalCommand.allCases
-            .compactMap { command -> (TerminalCommand, Int)? in
-                guard let score = Self.score(command.title.lowercased(), query: query)
+    ///
+    /// The title ranks first; the command's config name (`split-right`,
+    /// English whatever the interface language) and its group's name also
+    /// match, a step below, so "pane" finds every pane command and an
+    /// English abbreviation works in a localized interface.
+    private func searchRows(matching query: String, row: (TerminalCommand, Bool) -> Row) -> [Row] {
+        let categoryTitles = Dictionary(
+            uniqueKeysWithValues: CommandCategory.allCases.map { ($0, $0.title.lowercased()) })
+        return TerminalCommand.allCases
+            .compactMap { command -> (command: TerminalCommand, onTitle: Bool, score: Int)? in
+                let onTitle = Self.score(command.title.lowercased(), query: query)
+                // Only when the title missed: most keystrokes need none of it.
+                guard
+                    let score = onTitle
+                        ?? [
+                            command.rawValue,
+                            String(command.rawValue.map { $0 == "-" ? " " : $0 }),
+                            categoryTitles[command.category] ?? "",
+                        ].compactMap({ Self.score($0, query: query) }).max()
                 else { return nil }
                 // A recently used command wins a tie against one that has
                 // never been run, which is the same argument as the recents
@@ -121,10 +173,12 @@ final class CommandPaletteModel {
                 let recency =
                     recentCommands.firstIndex(of: command)
                     .map { Self.recentLimit - $0 } ?? 0
-                return (command, score + recency)
+                return (command, onTitle != nil, score + recency)
             }
-            .sorted { $0.1 > $1.1 }
-            .map { Row.command($0.0) }
+            // A title match leads whatever the scores: they grow with the
+            // query, so no fixed penalty could keep the two apart.
+            .sorted { ($0.onTitle ? 1 : 0, $0.score) > ($1.onTitle ? 1 : 0, $1.score) }
+            .map { row($0.command, false) }
     }
 
     /// Pure, and deliberately not `@MainActor`: the ranking is the part worth
@@ -156,28 +210,24 @@ final class CommandPaletteModel {
     /// selecting them — a heading is a label, and an arrow key that lands on
     /// one leaves Return with nothing to run.
     func moveSelection(by delta: Int) {
-        let allRows = rows
-        guard !allRows.isEmpty else { return }
-        var index =
-            selectedCommand.flatMap { command in allRows.firstIndex { $0.command == command } }
-            ?? -1
+        guard !rows.isEmpty else { return }
+        var index = selectedRowID.flatMap { id in rows.firstIndex { $0.id == id } } ?? -1
         var remaining = abs(delta)
         let step = delta > 0 ? 1 : -1
         while remaining > 0 {
             var next = index + step
-            while next >= 0, next < allRows.count, allRows[next].command == nil { next += step }
-            guard next >= 0, next < allRows.count else { break }
+            while next >= 0, next < rows.count, rows[next].command == nil { next += step }
+            guard next >= 0, next < rows.count else { break }
             index = next
             remaining -= 1
         }
-        guard index >= 0, index < allRows.count, let command = allRows[index].command else {
-            return
-        }
-        selectedCommand = command
+        guard index >= 0, index < rows.count, rows[index].command != nil else { return }
+        selectedRowID = rows[index].id
     }
 
-    func select(_ command: TerminalCommand) {
-        selectedCommand = command
+    func select(_ row: Row) {
+        guard row.command != nil else { return }
+        selectedRowID = row.id
     }
 
     func runSelected() {

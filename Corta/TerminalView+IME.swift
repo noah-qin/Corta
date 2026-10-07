@@ -63,7 +63,8 @@ extension TerminalView: NSTextInputClient {
         let overlay = markedTextOverlay
         // Re-read each time, so ⌘= / ⌘- mid-composition takes effect.
         if let font = preeditFontProvider?() { overlay.font = font }
-        overlay.show(attributed, at: cursorRectProvider?() ?? .zero)
+        overlay.show(
+            attributed, at: cursorRectProvider?() ?? .zero, caret: selectedRange.location)
         inputCompositionRect = overlay.frame
         onInputContextChange?()
     }
@@ -166,11 +167,24 @@ extension TerminalView: NSTextInputClient {
     }
 }
 
-/// Draws the preedit over the cursor cells, above the Metal layer, with no
-/// backdrop (as Terminal.app). Never takes events.
+/// Draws the preedit over the cursor cells, above the Metal layer, on the
+/// terminal's background, with a caret where the IME puts it. Never takes
+/// events.
+///
+/// The backdrop is what keeps the cells underneath out of the preedit: with
+/// none, the block cursor sat over its first letter (`我 █ou` for "you"),
+/// and a program that hides the cursor to draw its own — Claude Code — left
+/// that cell inverted under the text, as did any text right of the cursor.
+/// The pane stops drawing its cursor while a preedit is up, and this caret
+/// stands in for it, at the IME's selection rather than the preedit's start.
 final class MarkedTextOverlayView: NSView {
     /// The preedit with the IME's attributes; nil while hidden.
     private(set) var markedText: NSAttributedString?
+    /// The caret's offset into `markedText`, in UTF-16 units, clamped to it.
+    private(set) var caretLocation = 0
+
+    /// Wide enough to see at any size, thin enough to read as a caret.
+    static let caretWidth: CGFloat = 2
 
     /// Re-pointed at the current size on each `show`
     /// (`TerminalView.preeditFontProvider`).
@@ -205,19 +219,31 @@ final class MarkedTextOverlayView: NSView {
 
     /// Shows the preedit at `cell` (current size, from the provider), at
     /// least a cell wide and clamped to the pane: AppKit doesn't clip
-    /// subviews, so it would paint over a split's divider.
-    func show(_ attributed: NSAttributedString, at cell: CGRect) {
+    /// subviews, so it would paint over a split's divider. `caret` is the
+    /// IME's selection; `NSNotFound` or past the end puts it at the end.
+    func show(_ attributed: NSAttributedString, at cell: CGRect, caret: Int = NSNotFound) {
         let display = displayString(for: attributed)
         markedText = display
+        caretLocation = caret == NSNotFound ? display.length : min(max(0, caret), display.length)
         let textSize = display.size()
         let available = superview.map { max(0, $0.bounds.maxX - cell.minX) }
             ?? .greatestFiniteMagnitude
         frame = CGRect(
             x: cell.minX, y: cell.minY,
-            width: min(max(ceil(textSize.width), cell.width), max(cell.width, available)),
+            width: min(
+                max(ceil(textSize.width) + Self.caretWidth, cell.width),
+                max(cell.width, available)),
             height: max(cell.height, ceil(textSize.height)))
         isHidden = false
         needsDisplay = true
+    }
+
+    /// The caret's x in the overlay: the width of the preedit before it.
+    var caretX: CGFloat {
+        guard let markedText, caretLocation > 0 else { return 0 }
+        return ceil(
+            markedText.attributedSubstring(from: NSRange(location: 0, length: caretLocation))
+                .size().width)
     }
 
     func hide() {
@@ -244,8 +270,18 @@ final class MarkedTextOverlayView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         guard let markedText else { return }
+        func color(_ c: SIMD4<Float>) -> NSColor {
+            NSColor(srgbRed: CGFloat(c.x), green: CGFloat(c.y), blue: CGFloat(c.z), alpha: 1)
+        }
+        color(TerminalColorPalette.defaultBackground).setFill()
+        bounds.fill()
         // Centred in the cell; AppKit draws the underline.
         let y = max(0, (bounds.height - markedText.size().height) / 2)
         markedText.draw(at: NSPoint(x: 0, y: y))
+        color(TerminalColorPalette.cursorColor).setFill()
+        CGRect(
+            x: min(caretX, bounds.width - Self.caretWidth), y: 0,
+            width: Self.caretWidth, height: bounds.height
+        ).fill()
     }
 }

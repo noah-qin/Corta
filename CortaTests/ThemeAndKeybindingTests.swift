@@ -260,6 +260,74 @@ import Testing
         #expect(short > long)
     }
 
+    /// A command run from the palette is listed twice while browsing — under
+    /// Recent and in its group. Keyed by command, the two rows shared an id
+    /// and the arrow keys, stepping onto the second, jumped back to the
+    /// first, so nothing below it could be reached.
+    @Test("the arrow keys get past a command listed under Recent")
+    @MainActor func paletteArrowKeysPassARecentCommand() throws {
+        let model = CommandPaletteModel()
+        let recent = try #require(model.rows.compactMap(\.command).dropFirst(3).first)
+        model.select(try #require(model.rows.first { $0.command == recent }))
+        model.runSelected()
+        model.reset()
+
+        let ids = model.rows.map(\.id)
+        #expect(Set(ids).count == ids.count, "every row has its own id")
+        #expect(model.rows.filter { $0.command == recent }.count == 2)
+
+        let commandRows = model.rows.filter { $0.command != nil }
+        var visited = [try #require(model.selectedRowID)]
+        for _ in 1..<commandRows.count {
+            model.moveSelection(by: 1)
+            visited.append(try #require(model.selectedRowID))
+        }
+        #expect(visited == commandRows.map(\.id), "each step lands on the next command row")
+    }
+
+    @Test("a cleared query selects the top row, not a copy further down")
+    @MainActor func paletteClearedQuerySelectsTheTop() throws {
+        let model = CommandPaletteModel()
+        let command = try #require(model.rows.compactMap(\.command).dropFirst(3).first)
+        model.select(try #require(model.rows.first { $0.command == command }))
+        model.runSelected()
+        model.reset()
+        model.query = command.title
+        #expect(model.selectedCommand == command)
+        model.query = ""
+        #expect(model.selectedRowID == model.rows.first { $0.command != nil }?.id)
+        #expect(model.selectedRowID == "recent-" + command.rawValue)
+    }
+
+    @Test("a title match outranks a config-name match, however long the query")
+    @MainActor func paletteTitleMatchesLead() {
+        let model = CommandPaletteModel()
+        for command in TerminalCommand.allCases {
+            model.query = command.rawValue
+            let rows = model.rows.compactMap(\.command)
+            let titleMatches = rows.map {
+                CommandPaletteModel.score($0.title.lowercased(), query: command.rawValue) != nil
+            }
+            // Every title match comes before every other match.
+            #expect(titleMatches == titleMatches.sorted { $0 && !$1 }, "\(command.rawValue)")
+        }
+    }
+
+    @Test("a group name or config name finds its commands")
+    @MainActor func paletteMatchesGroupAndConfigNames() throws {
+        let model = CommandPaletteModel()
+        model.query = TerminalCommand.newTab.rawValue
+        #expect(model.rows.first?.command == .newTab)
+        model.query = CommandCategory.panes.title
+        let found = Set(model.rows.compactMap(\.command))
+        let panes = TerminalCommand.allCases.filter { $0.category == .panes }
+        #expect(!panes.isEmpty)
+        #expect(Set(panes).isSubset(of: found))
+        // The selection follows the query onto a row that exists.
+        let selected = try #require(model.selectedRowID)
+        #expect(model.rows.contains { $0.id == selected })
+    }
+
     // MARK: - New scalar settings
 
     /// `option-as-meta` must parse as well as serialise: a key without a

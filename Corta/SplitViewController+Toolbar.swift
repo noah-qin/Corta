@@ -19,6 +19,7 @@ import AppKit
 extension NSToolbarItem.Identifier {
     static let cortaConnect = Self("corta.connect")
     static let cortaFiles = Self("corta.files")
+    static let cortaNewTab = Self("corta.new-tab")
     static let cortaInputSource = Self("corta.input-source")
 }
 
@@ -32,12 +33,19 @@ extension SplitViewController: NSToolbarDelegate {
         toolbar.autosavesConfiguration = false
         window.toolbarStyle = .unifiedCompact
         window.toolbar = toolbar
+        // The Quick Terminal is one panel, never a tab group: there "+" could
+        // only open an unrelated window behind it.
+        if window is NSPanel,
+            let index = toolbar.items.firstIndex(where: { $0.itemIdentifier == .cortaNewTab })
+        {
+            toolbar.removeItem(at: index)
+        }
     }
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, .cortaConnect, .cortaFiles]
+        [.flexibleSpace, .cortaConnect, .cortaFiles, .cortaNewTab]
     }
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, .space, .cortaConnect, .cortaFiles, .cortaInputSource]
+        [.flexibleSpace, .space, .cortaConnect, .cortaFiles, .cortaNewTab, .cortaInputSource]
     }
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier,
                  willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
@@ -48,6 +56,19 @@ extension SplitViewController: NSToolbarDelegate {
             item.view = inputSourceToolbarHost
             item.isBordered = false
             item.visibilityPriority = .high
+            return item
+        }
+        if identifier == .cortaNewTab {
+            // Always there: the tab bar's own "+" goes with the bar, which a
+            // window of one tab does not show. The menu's command and title,
+            // joined to this window's group whichever window is key.
+            let item = NSToolbarItem(itemIdentifier: identifier)
+            item.label = TerminalCommand.newTab.title
+            item.paletteLabel = item.label
+            item.toolTip = item.label
+            item.image = NSImage(systemSymbolName: "plus", accessibilityDescription: item.label)
+            item.target = self
+            item.action = #selector(newTabInThisWindow(_:))
             return item
         }
         let key: String
@@ -113,6 +134,10 @@ extension SplitViewController: NSToolbarDelegate {
             badge.autoresizingMask = [.width, .height]
             inputSourceToolbarHost.addSubview(badge)
         }
+    }
+
+    @objc private func newTabInThisWindow(_ sender: Any?) {
+        (NSApp.delegate as? AppDelegate)?.newTab(beside: view.window, sender: sender)
     }
 
     @objc private func connectSSH(_ sender: Any?) { RemoteConnectController.shared.show(.ssh, sender: sender) }

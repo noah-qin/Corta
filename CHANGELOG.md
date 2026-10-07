@@ -10,6 +10,48 @@ what to edit.
 
 ## [Unreleased]
 
+### Added
+
+- A **+** button in the toolbar, beside the network and folder buttons,
+  opens a new tab. The tab bar's own **+** goes with the bar, which a window
+  of one tab does not show.
+
+### Fixed
+
+- The command palette's arrow keys get past a command you ran recently. It
+  is listed twice — under Recent and in its group — and stepping onto the
+  second copy jumped back to the first, so nothing below it could be
+  reached with the keyboard; both copies were also highlighted at once.
+- Clicking another window while the command palette is open leaves that
+  window in front. The palette used to bring back the window it opened
+  over.
+- Find highlights stay on their text while output arrives. Between sweeps
+  each highlight was drawn as many rows off as lines had arrived since.
+- The find bar's "No Results" and its button names are translated.
+- Chinese and Japanese composition shows where you are typing. The block
+  cursor sat over the first letter of the preedit (`我 █ou` for "you"), and
+  inside Claude Code its own cursor cell showed through the text. The
+  preedit now draws on the terminal background with a caret at the input
+  method's position, and the terminal cursor steps aside while it is up.
+- The input-source badge in the toolbar stays while a program runs. It
+  disappeared for the whole of a Claude Code session or an editor on the
+  alternate screen; only the prompt-placed badge, which sits over output,
+  still steps aside.
+
+### Changed
+
+- The Corta theme's light cursor is a slate grey instead of near-black.
+- The find bar is smaller: about 28pt tall instead of 36pt, and about
+  55pt narrower. Its buttons have tooltips.
+- The command palette finds a command by its group's name (`panes`) or its
+  configuration name (`new-tab`) as well as its title, and the list scrolls
+  only as far as the selection needs. Its rows and shortcuts are worked out
+  once per keystroke rather than on every redraw.
+- Find builds its highlights once per search rather than on every frame.
+- The input-source indicator's default mode is called **Automatically**
+  (was "While entering commands"): in the toolbar it now shows while
+  programs run too.
+
 ## [1.1.6] — 2026-10-07
 
 ### Fixed

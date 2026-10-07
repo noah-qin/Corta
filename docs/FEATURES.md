@@ -85,8 +85,9 @@ files, remote connections and child-process input.
   in an independent upper-right toolbar group. Automatic display follows enabled
   non-Latin keyboard layouts and IMEs; Latin-only setups hide it. Settings also
   offer prompt-right placement with long-command avoidance, custom colors and
-  always/off modes. Shell integration hides the default badge during execution;
-  private IME modes that macOS does not expose use neutral styling.
+  always/off modes. The toolbar badge stays while a program runs — Claude Code,
+  an editor on the alternate screen; shell integration hides only the
+  prompt-placed badge during execution. Private IME modes that macOS does not expose use neutral styling.
 - Sparkle updates through **Corta ▸ Check for Updates…**, plus an optional
   daily background check.
 

@@ -286,7 +286,9 @@ public nonisolated final class TerminalRenderer {
         if fullRebuild || !Self.selectionsEqual(cachedSelection, selection)
             || grid.cursor != cachedCursor || effectiveCursorStyle != cachedCursorStyle
             || cursorVisible != cachedCursorVisible
-            || (selection != nil && cachedScrollbackTotalPushed != grid.scrollback.totalPushed)
+            // Both are anchored to the scrollback, so output moves them.
+            || ((selection != nil || !searchMatches.isEmpty)
+                && cachedScrollbackTotalPushed != grid.scrollback.totalPushed)
             || cachedSearchMatches != searchMatches
             || cachedCurrentSearchMatchIndex != currentSearchMatchIndex
             || !Self.selectionsEqual(cachedHoveredLink, hoveredLink)

@@ -176,12 +176,17 @@ import Testing
         #expect(reads == 1)
         var terminal = Terminal(rows: 4, columns: 30)
         func update(integration: Bool = true, prompt: Int? = 0, focus: Bool = true, scroll: Int = 0,
-            mode: Configuration.InputSourceIndicatorMode = .auto) {
-            var config = Configuration(); config.inputSourceIndicator = mode
+            mode: Configuration.InputSourceIndicatorMode = .auto,
+            position: Configuration.InputSourceIndicatorPosition = .prompt) {
+            var config = Configuration()
+            config.inputSourceIndicator = mode
+            config.inputSourceIndicatorPosition = position
             indicator.update(grid: terminal.grid, hasIntegration: integration, promptRow: prompt,
                 focused: focus, scrollOffset: scroll, configuration: config,
                 cellSize: CGSize(width: 8, height: 16), topInset: 0, compositionRect: nil)
         }
+        // On the grid, the badge steps aside for a running command, history
+        // and the alternate screen.
         update(); #expect(!indicator.view.isHidden)
         update(prompt: nil); #expect(indicator.view.isHidden)
         update(integration: false, prompt: nil); #expect(!indicator.view.isHidden)
@@ -189,8 +194,15 @@ import Testing
         update(scroll: 1); #expect(indicator.view.isHidden)
         update(mode: .off); #expect(indicator.view.isHidden)
         update(prompt: nil, mode: .always); #expect(!indicator.view.isHidden)
+        // In the toolbar it covers nothing, so it stays while Claude Code or
+        // any command runs, scrolled back or not.
+        update(prompt: nil, position: .toolbar); #expect(!indicator.view.isHidden)
+        update(prompt: nil, scroll: 3, position: .toolbar); #expect(!indicator.view.isHidden)
+        update(focus: false, position: .toolbar); #expect(indicator.view.isHidden)
+        update(mode: .off, position: .toolbar); #expect(indicator.view.isHidden)
         terminal.feed(Array("\u{1b}[?1049h".utf8))
         update(mode: .always); #expect(indicator.view.isHidden)
+        update(prompt: nil, position: .toolbar); #expect(!indicator.view.isHidden)
         // Painting never polls the input source, even across repeated frames.
         #expect(reads == 1)
         NotificationCenter.default.post(name: NSTextInputContext.keyboardSelectionDidChangeNotification, object: nil)

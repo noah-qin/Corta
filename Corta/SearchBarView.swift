@@ -101,9 +101,9 @@ struct SearchBarView: View {
                     .foregroundStyle(.primary)
                     .padding(.trailing, 2)
                 SearchFieldRepresentable(field: field)
-                    // 200pt when the pane has room; a narrow pane squeezes
+                    // 160pt when the pane has room; a narrow pane squeezes
                     // the field first, so the bar never runs past its edge.
-                    .frame(minWidth: 64, idealWidth: 200, maxWidth: 200)
+                    .frame(minWidth: 64, idealWidth: 160, maxWidth: 160)
                     .layoutPriority(-1)
                 // Monospaced digits, so the buttons don't twitch as the count
                 // changes.
@@ -119,12 +119,14 @@ struct SearchBarView: View {
                 toggle("asterisk", L10n.text("search.regex"), isOn: model.regex,
                     action: model.onToggleRegex)
                     .padding(.trailing, 2)
-                button("chevron.up", "Previous Match", action: model.onPrevious)
+                button("chevron.up", L10n.text("search.previousMatch"), action: model.onPrevious)
                     .padding(.trailing, -4)
-                button("chevron.down", "Next Match", action: model.onNext)
-                button("xmark", "Close Find", action: model.onClose)
+                button("chevron.down", L10n.text("search.nextMatch"), action: model.onNext)
+                button("xmark", L10n.text("search.close"), action: model.onClose)
             }
-            .padding(EdgeInsets(top: 7, leading: 12, bottom: 7, trailing: 8))
+            // A compact pill: at 7pt and 22pt buttons it stood 36pt tall and
+            // 440pt wide over the output, more bar than the job needs.
+            .padding(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 6))
             // Untinted: a window-background tint matched the terminal's own
             // background and the pill vanished into it.
             .cortaGlass(in: Capsule(), opaque: reduceTransparency)
@@ -147,7 +149,9 @@ struct SearchBarView: View {
         return hosting
     }
 
-    private static let symbolFont = Font.system(size: 12, weight: .semibold).leading(.tight)
+    private static let symbolFont = Font.system(size: 11, weight: .semibold).leading(.tight)
+    /// Each button's square hit area.
+    private static let buttonSide: CGFloat = 20
 
     private var secondary: Color {
         increasedContrast ? Color(nsColor: .labelColor) : Color(nsColor: .secondaryLabelColor)
@@ -159,10 +163,12 @@ struct SearchBarView: View {
 
     private func button(_ symbol: String, _ label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: symbol).font(Self.symbolFont).frame(width: 22, height: 22)
+            Image(systemName: symbol).font(Self.symbolFont)
+                .frame(width: Self.buttonSide, height: Self.buttonSide)
         }
         .buttonStyle(.plain)
         .foregroundStyle(secondary)
+        .help(label)
         .accessibilityLabel(label)
     }
 
@@ -171,7 +177,8 @@ struct SearchBarView: View {
         _ symbol: String, _ label: String, isOn: Bool, action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            Image(systemName: symbol).font(Self.symbolFont).frame(width: 22, height: 22)
+            Image(systemName: symbol).font(Self.symbolFont)
+                .frame(width: Self.buttonSide, height: Self.buttonSide)
         }
         .buttonStyle(.plain)
         .foregroundStyle(isOn ? Color.accentColor : secondary)

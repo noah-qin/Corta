@@ -144,7 +144,9 @@ extension Theme {
         light: Variant(
             foreground: rgb(38, 42, 51),
             background: rgb(252, 252, 250),
-            cursor: rgb(38, 42, 51),
+            // A slate grey, not the foreground: a near-black block read as a
+            // hole in the page. Still 4.7:1 against the background.
+            cursor: rgb(108, 114, 126),
             ansi: [
                 rgb(0, 0, 0), rgb(170, 34, 20), rgb(24, 132, 24), rgb(140, 108, 20),
                 rgb(38, 62, 190), rgb(160, 42, 160), rgb(24, 130, 142), rgb(120, 122, 124),
