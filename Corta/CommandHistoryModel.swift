@@ -268,11 +268,22 @@ final class CommandHistoryModel {
     func run(id: Int) {
         guard let pane, let record = record(id: id), let text = pane.shell.commandLineText(for: record)
         else { return }
-        guard pane.shell.fillAndRunPrompt(with: text) else {
+        // The row shows one line, and a record is OSC 133 marks that any
+        // output can forge: lines below the first were never on show, so
+        // they are filled, read at the prompt, and run by the user's Return.
+        let written =
+            Self.runsAsShown(text)
+            ? pane.shell.fillAndRunPrompt(with: text) : pane.shell.fillPrompt(with: text)
+        guard written else {
             pane.terminalView?.showToast(L10n.text("toast.cannotFillPrompt"), kind: .warning)
             return
         }
         onDismiss?()
+    }
+
+    /// One line, so the row showed all of it but its width.
+    nonisolated static func runsAsShown(_ text: String) -> Bool {
+        !text.unicodeScalars.contains { $0.value == 0x0A || $0.value == 0x0D }
     }
 
     private func record(id: Int) -> CommandRecord? {

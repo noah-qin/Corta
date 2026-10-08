@@ -293,7 +293,9 @@ With it installed:
   in Command Output**, which opens the last `path:line` it printed.
 - **Command History.** **Search Command History…** lists every command
   with its time, exit status and directory; **Fill** puts one back at the
-  prompt and **Run** runs it again (`command-history-limit`).
+  prompt and **Run** runs it again (`command-history-limit`). A command of
+  more than one line is filled rather than run: the list shows only its first
+  line, so the rest is shown at the prompt and runs on your Return.
 - **Long-task notifications.** With `notify-on-long-task = true`, a command
   that ran longer than `notification-threshold` seconds (30) posts a
   notification when it finishes; click it to jump to the command.
