@@ -396,6 +396,22 @@ which records S01–S04 and S07 in full); the entries below are the ones
 whose write-up belongs with the design rather than with the release that
 made them.
 
+- **S18 — 2026-10-08: a local-data and hostile-remote audit.** The SFTP
+  channel spawned `ssh -s -- <host> sftp` with whatever forwarding the
+  user's configuration gave that host; a `Host *` with `ForwardAgent yes`
+  handed the agent to a host named by a remote shell's OSC 7 the moment the
+  user accepted the connection. It now passes what `sftp(1)` passes:
+  `ForwardAgent=no`, `ForwardX11=no`, `ClearAllForwardings=yes`,
+  `PermitLocalCommand=no`. A failed transfer kept its plan through Change
+  Host, and Retry ran it on the new connection — a local file queued for one
+  host was uploaded to another; a job now runs only on the host its row
+  names. Command-history Run wrote a multi-line record and Return although
+  the row shows one line, and records are OSC 133 marks any output can forge;
+  such a record is filled, not run. Found and not yet changed: an OSC 7 with
+  an empty or `localhost` host is accepted as the *local* working directory
+  from any stream, a remote one included (§7, S05/S09 assumed the remote
+  names its own host), and a managed remote-edit copy has no size cap and no
+  retention limit.
 - **S17 — 2026-10-07: the audit's application-layer findings.** Link
   tooltips show the URL that opens (§2.4). SFTP downloads are quarantined
   through LaunchServices — not `LSFileQuarantineEnabled`, which would mark

@@ -10,6 +10,21 @@ what to edit.
 
 ## [Unreleased]
 
+### Security
+
+- The SFTP browser and remote editing no longer forward your SSH agent, X11
+  or ports to the host, and never run a `LocalCommand`, whatever
+  `~/.ssh/config` says for it — as `sftp` itself does. A `ForwardAgent yes`
+  meant for interactive logins reached a host named by a remote shell's own
+  report.
+- Retrying a failed transfer after **Change Host** no longer sends it to the
+  new host. The row named the host it was queued for, and Retry ran on
+  whichever host the browser was connected to by then.
+- **Run** in the command history fills a command of more than one line
+  instead of running it. The list shows one line, and the records come from
+  shell-integration marks that any program's output can imitate, so a line
+  you never saw could run.
+
 ## [1.1.8] — 2026-10-07
 
 ### Fixed
