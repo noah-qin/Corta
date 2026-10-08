@@ -93,6 +93,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         else { return false }
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
+        // Activation is asynchronous. An inactive app otherwise leaves its
+        // previous window ahead of the requested one on macOS 27.
+        window.orderFrontRegardless()
         return true
     }
 
