@@ -418,10 +418,14 @@ made them.
   only its enclosures carry signatures, while Sparkle acts on release notes,
   links and flags too; `verify-appcast.swift` now refuses any item field the
   feed has never published. Sparkle 2.10.0 is past every published
-  advisory. Open, and recorded rather than changed: a glyph-atlas thrash
-  that could hold the main thread busy, PNG decoding in process, and
-  Sparkle's `SUVerifyUpdateBeforeExtraction` and `SURequireSignedFeed`,
-  both off.
+  advisory. In the follow-up: a frame shapes at most 1,024 non-ASCII
+  glyphs, so a screen of distinct clusters cannot re-shape itself on the
+  main thread every frame; Kitty PNGs are decoded by `corta-image-decoder`
+  under the `pure-computation` sandbox; the feed must be signed
+  (`SURequireSignedFeed`, no grace period) and archives are verified
+  before extraction (D20 amended); one read batch queues at most 64 KiB of
+  query replies; the Open Window intent checks its folder off the main
+  thread.
 - **S18 — 2026-10-08: a local-data and hostile-remote audit.** The SFTP
   channel spawned `ssh -s -- <host> sftp` with whatever forwarding the
   user's configuration gave that host; a `Host *` with `ForwardAgent yes`

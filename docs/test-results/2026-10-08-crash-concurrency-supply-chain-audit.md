@@ -117,6 +117,22 @@ None in the shipped app. Three gaps in the release chain were closed.
   enclosure's attributes — exactly what `generate_appcast` writes today. A3
   is the stronger, unmade fix.
 
+## Fixed in the follow-up
+
+At the maintainer's request A1–A5 were fixed on the same branch:
+
+| Item | Fix |
+| --- | --- |
+| A1 | `perf: bound the glyph shaping one frame can run` — at most 1,024 non-ASCII shapes a frame; the rest draw next frame, requested only when nothing was evicted |
+| A2 | `fix(app): decode kitty pngs in a sandboxed process of their own` — `corta-image-decoder` under `pure-computation`, spawned and reaped by `ImageDecoderProcess` |
+| A3 | `build: require a signed update feed and verify before extraction` — `SURequireSignedFeed`, `SUSignedFeedFailureExpirationInterval = 0`, `SUVerifyUpdateBeforeExtraction`; `verify-appcast.swift` checks the feed's signature block (D20 amended) |
+| A4 | `fix: cap the query replies one read batch can queue` — 64 KiB of whole replies per batch |
+| A5 | `fix(app): check a shortcut's folder off the main thread` — the intent's `stat` moved to a background queue. The SSH-config glob already ran in `Task.detached` (this record was wrong to list it), and `ApplicationsFolderMover` reads only `/Applications` on the boot volume |
+
+A6 (the helper lookup) is unchanged. A1 changes the render loop, so the
+Release frame-CPU baseline (D17) is owed; A2 and A3 need a Mac and a release
+dry run to be confirmed end to end.
+
 ## 2 · Attack chains that need verification
 
 ### A1 — Glyph-atlas thrash on the main thread (performance DoS)
