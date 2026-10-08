@@ -207,6 +207,8 @@ final class SFTPTransferQueue {
 
     private struct Job {
         var plan: Plan
+        /// The host the row names; the queue's `client` follows Change Host.
+        let host: String
         var resolution: Resolution?
         var task: Task<Void, Never>?
     }
@@ -245,7 +247,7 @@ final class SFTPTransferQueue {
                 id: id, isUpload: plan.isUpload, isDirectory: plan.isDirectory, name: name,
                 remotePath: plan.remotePath, localURL: plan.localURL,
                 host: host, state: .queued))
-        jobs[id] = Job(plan: plan)
+        jobs[id] = Job(plan: plan, host: host)
         Task { await preflight(id: id) }
     }
 
@@ -416,7 +418,20 @@ final class SFTPTransferQueue {
     }
 
     private func start(id: UUID, resolution: Resolution) {
-        guard let plan = jobs[id]?.plan, let client else { return }
+        guard let job = jobs[id], let client else { return }
+        // A failed row outlives Change Host, and its Retry ran on whichever
+        // machine the browser was on by then: a file queued for one host
+        // went to another. It runs only where the row says it goes.
+        guard job.host == host else {
+            jobs[id] = nil
+            setState(
+                id,
+                .failed(
+                    message: L10n.format("sftp.error.connectionLost", job.host),
+                    retryable: false))
+            return
+        }
+        let plan = job.plan
         jobs[id]?.resolution = resolution
         let task = Task { [weak self] in
             guard let self else { return }

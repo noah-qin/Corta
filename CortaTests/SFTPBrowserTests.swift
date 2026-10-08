@@ -850,6 +850,38 @@ struct SFTPBrowserModelTests {
 
 @MainActor
 struct SFTPTransferQueueLifecycleTests {
+    @Test("a Retry after Change Host never runs on the new host")
+    func retryStaysOnItsHost() async throws {
+        let directory = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = directory.appendingPathComponent("secrets.env")
+        try Data("TOKEN=fake".utf8).write(to: source)
+        let first = FakeSFTPClient()
+        first.onTransfer = { _, _ in throw SFTPError.transport(.connectionLost) }
+        let queue = SFTPTransferQueue()
+        queue.client = first
+        queue.host = "host-a"
+        queue.enqueue(.init(isUpload: true, remotePath: "/srv/secrets.env", localURL: source))
+        await waitUntil("failed") {
+            guard case .failed(_, true) = queue.transfers.first?.state else { return false }
+            return true
+        }
+        // Change Host: the failed row stays, the queue moves to another machine.
+        queue.disconnect()
+        let second = FakeSFTPClient()
+        queue.client = second
+        queue.host = "host-b"
+        let id = try #require(queue.transfers.first?.id)
+        queue.retryTransfer(id)
+        #expect(second.transferCalls.isEmpty, "nothing queued for host-a reaches host-b")
+        guard case .failed(_, let retryable) = queue.transfers.first?.state else {
+            Issue.record("expected the row to fail, not run")
+            return
+        }
+        #expect(!retryable)
+        #expect(queue.transfers.first?.host == "host-a")
+    }
+
     @Test func cancellingConflictRemovesPromptAndCannotStartLater() async throws {
         let directory = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
