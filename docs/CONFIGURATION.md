@@ -613,7 +613,9 @@ name prefilled and editable (correct it to the alias you would pass to
 `ssh`), and connects only when you press Connect; a ⌘-clicked file
 reference in a remote pane asks the same question once. The channel is the
 system's `ssh -s -- <host> sftp`, so authentication and `~/.ssh/config`
-belong to OpenSSH; there is nothing to configure here — but the channel has
+belong to OpenSSH; there is nothing to configure here. Like `sftp(1)`, the
+channel never forwards the agent, X11 or ports, and never runs a
+`LocalCommand`, whatever the configuration says for that host — but it has
 **no terminal**, so ssh cannot prompt on it: a password, a key passphrase
 the agent does not hold, or a host key not yet in `known_hosts` fails with
 a message saying so rather than asking. Use a key held by `ssh-agent` or
