@@ -39,6 +39,22 @@ import Testing
         #expect(atlas.generation == generation)
     }
 
+    @Test("a frame's shaping budget defers the rest rather than shaping them")
+    func shapingBudgetDefers() throws {
+        let device = try #require(Self.makeDevice())
+        let atlas = try GlyphAtlas(device: device, font: CTFontCreateWithName("Menlo" as CFString, 14, nil))
+        atlas.beginFrame(shapingBudget: 2)
+        #expect(atlas.glyph(shaping: 0x4E00, style: .regular) != nil)
+        #expect(atlas.glyph(forCluster: [0x61, 0x301], style: .regular) != nil)
+        #expect(atlas.glyph(shaping: 0x4E01, style: .regular) == nil)
+        #expect(atlas.deferredShaping)
+        #expect(atlas.glyph(shaping: 0x4E00, style: .regular) != nil, "a cached glyph costs no budget")
+        #expect(atlas.glyph(forASCII: 0x41, style: .regular) != nil, "ASCII is outside the budget")
+        atlas.beginFrame(shapingBudget: 2)
+        #expect(!atlas.deferredShaping)
+        #expect(atlas.glyph(shaping: 0x4E01, style: .regular) != nil, "a deferred glyph was not cached as missing")
+    }
+
     @Test("color-page eviction invalidates emoji keys and preserves shaped keys")
     func emojiCacheFollowsOwningPage() throws {
         let device = try #require(Self.makeDevice())
