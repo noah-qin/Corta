@@ -293,9 +293,10 @@ With it installed:
   in Command Output**, which opens the last `path:line` it printed.
 - **Command History.** **Search Command History…** lists every command
   with its time, exit status and directory; **Fill** puts one back at the
-  prompt and **Run** runs it again (`command-history-limit`). A command of
-  more than one line is filled rather than run: the list shows only its first
-  line, so the rest is shown at the prompt and runs on your Return.
+  prompt and **Run** runs it again (`command-history-limit`). A command the
+  list cannot show whole — more than one line, longer than 80 characters, or
+  holding a tab — is filled rather than run, so all of it is at the prompt
+  and runs on your Return.
 - **Long-task notifications.** With `notify-on-long-task = true`, a command
   that ran longer than `notification-threshold` seconds (30) posts a
   notification when it finishes; click it to jump to the command.
@@ -395,7 +396,14 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
 - **Editing a remote file.** **Edit** in the browser — or ⌘-clicking a
   `path:line` in a remote pane — downloads a copy and opens it in your
   editor. Uploading your changes is a separate, explicit step, and Corta
-  checks first whether the remote file changed meanwhile.
+  checks first whether the remote file changed meanwhile. Files over 64 MB
+  are not copied this way; download them from the browser, which shows
+  progress and can cancel. A copy nobody has opened or changed for 30 days is
+  removed the next time remote editing is used; one with changes you have not
+  uploaded or dismissed stays.
+- **Names.** A remote name holding control, right-to-left or zero-width
+  characters shows them as `�`, and a download saves them as `_`, so a name
+  cannot pass for another one.
 
 The browser's connection has no terminal, so it cannot ask for a password:
 use a key loaded in `ssh-agent`, and connect once in the terminal before
@@ -572,6 +580,7 @@ Remote-edit uploads check the remote content as well as size and modification
 time. Each upload sends the version approved in the prompt. If the local copy
 changes after that prompt, Corta asks for a new decision; further saves during
 an upload remain pending edits. Managed copies remain on disk with private
-file modes. Restored sessions retain arrangement and directory metadata,
+file modes for 30 days after their last use, unless they hold an undecided
+edit. Restored sessions retain arrangement and directory metadata,
 with `restore-windows = true` by default, and start fresh processes without
 restoring terminal text. See [data-at-rest policy](SECURITY.md#5-data-at-rest).

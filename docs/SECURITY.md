@@ -323,7 +323,8 @@ and deletes.
 **Terminal contents are not automatically persisted.** Scrollback routinely
 contains credentials. Copy/export commands are explicit exceptions: a user
 can save selected text, command output, or the whole terminal through a
-Save panel. The destination and any later sharing are the user's choice.
+Save panel. The file is written owner-only (`0600`); the destination and any
+later sharing are the user's choice.
 
 **Custom session restoration saves plaintext metadata, not terminal text.**
 `restore-windows` defaults to `true`. `state.json` can contain window geometry,
@@ -349,7 +350,9 @@ from the terminal stream is ever written into it.
 **Remote editing deliberately creates local files.** Managed copies and
 approval snapshots live under Application Support/RemoteEdit. Directories
 are restricted to mode 0700 and files to 0600; reused copies are tightened
-when opened. Downloads create partials with 0600 and refuse a partial-file
+when opened. A copy whose content still matches its approved digest and that
+nobody opened or changed for 30 days is removed when the store loads; an
+undecided edit is kept. A ⌘-click or Edit copies at most 64 MB. Downloads create partials with 0600 and refuse a partial-file
 symlink. Download files and managed directories/files have inherited ACLs
 cleared before use. This does not exclude administrators or backups; parent
 storage policy and intentionally shared export destinations still matter.
@@ -407,11 +410,19 @@ made them.
   host was uploaded to another; a job now runs only on the host its row
   names. Command-history Run wrote a multi-line record and Return although
   the row shows one line, and records are OSC 133 marks any output can forge;
-  such a record is filled, not run. Found and not yet changed: an OSC 7 with
-  an empty or `localhost` host is accepted as the *local* working directory
-  from any stream, a remote one included (§7, S05/S09 assumed the remote
-  names its own host), and a managed remote-edit copy has no size cap and no
-  retention limit.
+  such a record is filled, not run, as is one longer than the row shows.
+  S05/S09's isolation assumed a remote names its own host; an OSC 7 with an
+  empty or `localhost` host, from a remote shell or `cat` of a file, became
+  the local working directory that new tabs, splits, restore and directory
+  history use. `TerminalSession.workingDirectory` now returns a report only
+  where the kernel puts the shell or the foreground job
+  (`PTY.confirmedWorkingDirectory`, string comparison with `/private`
+  folded, no `stat` of a path output named), else the shell's kernel
+  directory. Remote-edit downloads stop at 64 MB, and any download refuses a
+  READ reply longer than asked. SFTP names show controls and
+  `ConcealingScalars` as U+FFFD and are saved with them as `_`. Remote-edit
+  copies untouched for 30 days and matching their approved digest are
+  removed. Exports are written `0600`.
 - **S17 — 2026-10-07: the audit's application-layer findings.** Link
   tooltips show the URL that opens (§2.4). SFTP downloads are quarantined
   through LaunchServices — not `LSFileQuarantineEnabled`, which would mark

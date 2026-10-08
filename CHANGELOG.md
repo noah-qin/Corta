@@ -20,10 +20,26 @@ what to edit.
 - Retrying a failed transfer after **Change Host** no longer sends it to the
   new host. The row named the host it was queued for, and Retry ran on
   whichever host the browser was connected to by then.
-- **Run** in the command history fills a command of more than one line
-  instead of running it. The list shows one line, and the records come from
-  shell-integration marks that any program's output can imitate, so a line
-  you never saw could run.
+- **Run** in the command history fills, rather than runs, a command the
+  list cannot show whole: more than one line, longer than 80 characters, or
+  holding a tab. The records come from shell-integration marks that any
+  program's output can imitate, so a part you never saw could run.
+- A working-directory report (OSC 7) is believed only where the kernel puts
+  the shell or the running program. Any output — a remote shell, or `cat` of
+  a file — could name a local folder by leaving out the host, and new tabs,
+  splits, restored windows and the directory history followed it.
+- Editing a remote file by ⌘-click or **Edit** copies at most 64 MB, and any
+  download stops if the server sends more than the size it stated, or more
+  than a READ asked for. A server that gave no size could fill the disk with
+  no progress row to cancel from.
+- The SFTP browser shows control, right-to-left and zero-width characters in
+  a remote name as `�`, and saves them as `_`, so `invoice\u{202E}fdp.sh` no
+  longer reads as `invoicehs.pdf`.
+- Remote-edit copies are removed 30 days after their last use (when remote
+  editing is next used), unless they hold an edit not yet uploaded or
+  dismissed. A file opened once stayed in
+  Application Support, and its backups, for good.
+- Exported output and selections are written readable by you only (`0600`).
 
 ## [1.1.8] — 2026-10-07
 

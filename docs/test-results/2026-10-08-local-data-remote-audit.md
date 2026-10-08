@@ -65,11 +65,14 @@ key, token, history or `~/.ssh`.
   could run `make test` and a second line.
 - **Fix:** Run fills a multi-line record instead of running it; the user
   sees all of it at the prompt (`CommandHistoryModel.runsAsShown`).
-- **Remaining:** a single long line still tail-truncates in the row; the
-  tooltip shows it whole. Displayed text is executed text, so this is
-  disclosure by width, not a hidden payload.
+- **Follow-up (same day):** a single long line tail-truncated in the row
+  too (`make test` padded with spaces to a payload). Run now also fills a
+  record longer than 80 characters or holding a tab.
 
-## Confirmed, not changed
+## Fixed in the follow-up
+
+Found above as confirmed issues and privacy notes, then fixed on the same
+branch at the maintainer's request.
 
 ### C1 — A remote stream can set the *local* working directory
 
@@ -92,10 +95,14 @@ root, and local `path:line` resolution.
   there — a known code-execution chain (`core.fsmonitor`); **not
   reproduced**.
 - **Also:** a container whose hostname is `localhost` is taken for local.
-- **Suggested fix:** in the app, ignore a local OSC 7 while
-  `PaneRemoteState` is not `.local`, or accept it only when it matches the
-  foreground process's kernel cwd (`pty.currentWorkingDirectory`). Either is
-  a design change to S05/S09, left for its own issue.
+- **Fix:** `TerminalSession.workingDirectory` returns a report only when
+  the kernel puts the shell (the PTY's child) or the foreground job there
+  (`PTY.confirmedWorkingDirectory`); otherwise the shell's kernel directory.
+  The comparison is on strings with macOS's `/private` folded — a `stat` or
+  `realpath` of a path output named could hang on a dead mount. A symlinked
+  directory reads as its real path. Gating on `PaneRemoteState` was not
+  chosen: it misses a report printed after `ssh` exits, and `cat` locally.
+  `WorkingDirectoryConfirmationTests` spawn real shells for both cases.
 
 ### C2 — Remote-edit download has no size cap
 
@@ -107,26 +114,42 @@ Cancel. `SFTPSession.read` also accepts a DATA reply longer than the READ
 asked for, so a file can end longer than its stated size (no escape: the
 offset is the client's).
 
+**Fix:** `SFTPTransferEngine.Configuration.maximumDownloadBytes` refuses a
+stated size over the limit before OPEN and ends a transfer whose bytes pass
+it; remote editing sets 64 MiB (`RemoteEditCoordinator.maximumCopyBytes`).
+Any READ reply longer than asked is a protocol violation.
+
 ### C3 — SFTP names are shown unsanitised
 
 `isPlainEntryName` rejects `/`, NUL, `.` and `..` only. Bidi overrides,
 newlines and zero-width characters reach the table, conflict sheets and
 Finder drags as-is (`invoice\u{202E}fdp.sh` reads as `invoicehs.pdf`).
 Downloads are quarantined, which is Gatekeeper's check for an app or
-installer; a script opens in its default handler. `ConcealingScalars`
-would make the display honest.
+installer; a script opens in its default handler.
+
+**Fix:** `SFTPBrowserModel.displayName` shows controls and
+`ConcealingScalars` as U+FFFD in the table, transfer rows, conflict sheets
+and remote-edit prompts; `localFileName` saves them as `_` for downloads,
+drags, the save panel's suggestion and managed copies. Names inside a folder
+download keep the server's spelling (the engine has no `ConcealingScalars`).
+
+### P1 — Remote-edit copies were kept indefinitely
+
+Under `Application Support/Corta/RemoteEdit` (`0700`/`0600`, ACLs cleared)
+with no retention limit; a `.env` opened once stayed, and Time Machine
+backed it up. **Fix:** `RemoteEditStore.pruneStaleCopies` removes a copy
+nobody opened or changed for 30 days whose content still matches its
+approved digest; an undecided edit and copies set aside stay.
+
+### P2 — Exports were written `0644`
+
+With the process umask; in a folder other `staff` users can traverse (a
+project under a home that is typically `0750`) another account could read a
+transcript. **Fix:** `PaneCommands.write` uses `PrivateFile.write` (`0600`,
+atomic, `O_EXCL|O_NOFOLLOW`).
 
 ## Privacy design, accepted behaviour
 
-- **Remote-edit copies are kept indefinitely** under
-  `Application Support/Corta/RemoteEdit` (`0700`/`0600`, ACLs cleared) with
-  no retention limit and no Clear in Settings; a `.env` opened once stays,
-  and Time Machine backs it up. Suggest a Clear beside recent hosts.
-- **Exports** (Save Output/Selection) are written with the process umask
-  (`0644`). In a folder other `staff` users can traverse, such as a
-  project directory under a home that is typically `0750`, another local
-  account can read a transcript. The Save panel location is the user's choice; noted, not
-  changed.
 - **App Intents** expose window titles to Shortcuts. Titles are the child's
   text; Shortcuts runs as the same user.
 - **Accessibility** exposes the grid to clients the user granted; the trace
@@ -143,13 +166,13 @@ would make the display honest.
 | --- | --- | --- | --- | --- |
 | Passwords, passphrases | Never handled by Corta; ssh in a pane reads the tty, the SFTP channel has none | — | SFTP ssh has no tty and fails rather than prompting | No path found |
 | SSH private keys, agent | `ssh` / `ssh-agent` only | Remote, if forwarded | F1 turns forwarding off for SFTP; interactive `ssh` stays the user's config | Fixed (F1) |
-| Tokens, API keys in output | Grid and scrollback in memory | AX clients the user granted; exports | Never persisted (§5); OSC 52 read absent; notifications carry no text | No leak found; exports `0644` (privacy note) |
+| Tokens, API keys in output | Grid and scrollback in memory | AX clients the user granted; exports | Never persisted (§5); OSC 52 read absent; notifications carry no text | No leak found; exports `0600` (P2) |
 | Command lines | `CommandRecord` in memory; text read from the grid | — | Not persisted; cleared with history | Run spoofing fixed (F3) |
 | Environment | Child env via `ChildEnvironment` | Child processes (by design) | `CORTA_*`, `TERM*` stripped; `SSH_AUTH_SOCK` passes to shells | Accepted |
 | Clipboard | `NSPasteboard` | Other apps | OSC 52 write off by default and sanitised; read never | No path found |
 | Host names, usernames | `recent-hosts.json`, `state.json` | Owner (`0600`, atomic `O_EXCL\|O_NOFOLLOW`) | Clear in Settings; OSC 7 hosts never recorded | OK |
-| Local paths | `state.json`, `directory-history.json` | Owner (`0600`) | Restore drops missing directories | Remote can inject paths (C1) |
-| Remote file contents | RemoteEdit copies, Approvals, drag staging, chosen download folders | Owner (`0700`/`0600`); backups; admins | Approvals cleared at launch; downloads quarantined, `O_EXCL\|O_NOFOLLOW`, ACL cleared | No retention limit (privacy) |
+| Local paths | `state.json`, `directory-history.json` | Owner (`0600`) | Restore drops missing directories | Remote paths refused unless the kernel agrees (C1, fixed) |
+| Remote file contents | RemoteEdit copies, Approvals, drag staging, chosen download folders | Owner (`0700`/`0600`); backups; admins | Approvals cleared at launch; downloads quarantined, `O_EXCL\|O_NOFOLLOW`, ACL cleared | 30-day retention, 64 MiB cap (P1, C2, fixed) |
 | Logs, signposts | Unified log | Admin, sysdiagnose | Only counts and the Debug `CORTA_SFTP_SSH` path are `.public` | No sensitive value logged |
 | Release secrets | `release` environment, step env, `RUNNER_TEMP` key (`umask 077`, trap rm) | Workflow steps on `main` | Not in test-step env; artifacts are archives and xcresults | No leak found in workflows read |
 | Repository | git | Public | `.gitignore` covers `.p12`, `.env`; no key material in the tree | Clean (`git grep`) |
@@ -160,18 +183,18 @@ would make the display honest.
 | --- | --- | --- | --- |
 | OSC 0/2 title | Window title, notification, App Intent title | Never read back (§2.2) | OK |
 | OSC 7, remote host | SFTP host suggestion, remote-edit target | Per-run consent; `SSHDestination` charset; `--` | OK |
-| OSC 7, empty/`localhost` host | Local spawn cwd, restore, directory history | None | **C1** |
+| OSC 7, empty/`localhost` host | Local spawn cwd, restore, directory history | Kernel cwd of the shell or foreground job | Fixed (C1) |
 | OSC 8 / URL text | `NSWorkspace.open` | http/https/mailto, user click, real target shown | OK |
 | `path:line` text, local | Editor via `open-file-command` | Absolute path, no shell, no LaunchServices default | OK |
-| `path:line` text, remote | SFTP download + editor | Consent; managed copy; no default handler | No size cap (C2) |
+| `path:line` text, remote | SFTP download + editor | Consent; managed copy; no default handler | 64 MiB cap (C2, fixed) |
 | OSC 52 | Pasteboard write | Off by default, sanitised; read absent | OK |
 | OSC 133 | Command history Fill/Run | User click; prompt-state gate; multi-line now filled | Fixed (F3) |
 | OSC 134 | Directory completion | Display-only labels, fixed key sequences | OK |
 | Kitty graphics | Memory | Direct transmission only (no `t=f`/`t=t`/`t=s`), budgets | OK |
 | DA/DSR/colour queries | Bytes to stdin | Numeric, fixed-format replies | OK |
-| SFTP names | Local paths | One component, UTF-8, symlink components refused, `O_EXCL`, rename-into-place | OK; display spoofing (C3) |
+| SFTP names | Local paths | One component, UTF-8, symlink components refused, `O_EXCL`, rename-into-place | OK; names shown and saved without concealing scalars (C3, fixed) |
 | SFTP types, links | Recursion | Links and specials skipped and reported; depth/entry/byte caps | OK |
-| SFTP sizes, mtimes | Conflict decisions, resume | Resume re-validated; digest check before remote-edit upload | Unbounded size (C2) |
+| SFTP sizes, mtimes | Conflict decisions, resume | Resume re-validated; digest check before remote-edit upload | Download cap, over-long READ refused (C2, fixed) |
 | SFTP contents | Local files | Quarantined; never handed to LaunchServices from remote edit | OK |
 | SFTP errors, ssh stderr | Messages | 64 KiB tail; shown as text | OK |
 | Upload target | Remote host | Bound to the row's host (F2), to the manifest's host for remote edit | Fixed (F2) |
@@ -180,7 +203,9 @@ would make the display honest.
 
 ## Not verified
 
-- No build, no test run, no launched app on this machine (Linux).
+- No build, no test run, no launched app on this machine (Linux); CI on
+  the pull request is the first compile and test run. CI's runner cannot
+  render, so the app suites that need a working pane skip there.
 - The fsmonitor chain in C1 and the disk-fill in C2 are reasoned, not
   reproduced.
 - OpenSSH's handling of the four options was taken from `ssh_config(5)`
