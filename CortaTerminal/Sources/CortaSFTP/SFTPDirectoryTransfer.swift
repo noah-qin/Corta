@@ -366,7 +366,7 @@ extension SFTPTransferEngine {
         // moved away while its upload was queued created an empty remote
         // directory and reported success.
         var rootInfo = Darwin.stat()
-        guard Darwin.stat(root.path, &rootInfo) == 0 else {
+        guard fstatat(AT_FDCWD, root.path, &rootInfo, 0) == 0 else {
             throw .localIOFailed(operation: "opendir", code: errno)
         }
         guard rootInfo.st_mode & S_IFMT == S_IFDIR else {

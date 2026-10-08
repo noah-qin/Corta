@@ -666,8 +666,8 @@ final class RemoteEditCoordinator {
     nonisolated static func copyReplacing(_ source: URL, at destination: URL) throws {
         var sourceInfo = Darwin.stat()
         var destinationInfo = Darwin.stat()
-        if Darwin.stat(source.path, &sourceInfo) == 0,
-            Darwin.stat(destination.path, &destinationInfo) == 0,
+        if fstatat(AT_FDCWD, source.path, &sourceInfo, 0) == 0,
+            fstatat(AT_FDCWD, destination.path, &destinationInfo, 0) == 0,
             sourceInfo.st_dev == destinationInfo.st_dev,
             sourceInfo.st_ino == destinationInfo.st_ino
         {

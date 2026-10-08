@@ -854,7 +854,7 @@ public final class SFTPTransferEngine: @unchecked Sendable {
             throw .localIOFailed(operation: "fstat", code: errno)
         }
         var named = Darwin.stat()
-        guard LocalSourceIdentity(now) == opened, Darwin.stat(path, &named) == 0,
+        guard LocalSourceIdentity(now) == opened, fstatat(AT_FDCWD, path, &named, 0) == 0,
             named.st_dev == opened.device, named.st_ino == opened.inode
         else { throw .sourceChanged(path: path) }
     }
