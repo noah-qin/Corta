@@ -11,6 +11,7 @@ repository root.
 | `../../AppIcon.icon`        | Production macOS Icon Composer bundle                            |
 | `corta-pangolin-mascot.png` | Transparent mascot master, 1254 × 1254                           |
 | `corta-pangolin-loop.gif`   | Looping README animation, 360 × 360                              |
+| `session-ended.png` | Ended session, retained public output and recovery buttons, from an isolated `/bin/sh` fixture |
 | `screenshot.png`            | The README screenshot — light theme, a clean demo shell          |
 | `input-source-indicator.png` | Independent Chinese input-source badge, separated from toolbar action buttons, from an isolated demo shell |
 | `input-source-long-command.png` | Right-edge badge moved below a long command, without changing the grid |
