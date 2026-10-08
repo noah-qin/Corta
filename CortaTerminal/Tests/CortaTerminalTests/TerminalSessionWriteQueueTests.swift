@@ -131,7 +131,8 @@ import Testing
         defer { session.stop() }
         session.start()
 
-        #expect(awaitRecording(recorded, count: 1), "expected the replies to be written")
+        let written = awaitRecording(recorded, count: 1)
+        #expect(written, "expected the replies to be written")
         let chunks = recorded.withLock { $0 }
         let total = chunks.reduce(0) { $0 + $1.count }
         let reply = Array("\u{1B}[?62;1;22c".utf8)
