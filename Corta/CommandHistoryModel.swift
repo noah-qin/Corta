@@ -268,12 +268,29 @@ final class CommandHistoryModel {
     func run(id: Int) {
         guard let pane, let record = record(id: id), let text = pane.shell.commandLineText(for: record)
         else { return }
-        guard pane.shell.fillAndRunPrompt(with: text) else {
+        // The row shows one line, truncated, and a record is OSC 133 marks
+        // that any output can forge: what was never on show is filled, read
+        // at the prompt, and run by the user's Return.
+        let written =
+            Self.runsAsShown(text)
+            ? pane.shell.fillAndRunPrompt(with: text) : pane.shell.fillPrompt(with: text)
+        guard written else {
             pane.terminalView?.showToast(L10n.text("toast.cannotFillPrompt"), kind: .warning)
             return
         }
         onDismiss?()
     }
+
+    /// One line short enough that the row showed all of it. Longer, the row's
+    /// tail truncation hid the end — `make test` padded out to a payload — so
+    /// it is filled instead. A tab is not shown as what it sends either.
+    nonisolated static func runsAsShown(_ text: String) -> Bool {
+        text.unicodeScalars.count <= maximumRunLength
+            && !text.unicodeScalars.contains { $0.value == 0x0A || $0.value == 0x0D || $0.value == 0x09 }
+    }
+
+    /// What the history window's command column shows at its default width.
+    nonisolated static let maximumRunLength = 80
 
     private func record(id: Int) -> CommandRecord? {
         pane?.session?.commandRecords.records.first { $0.id == id }

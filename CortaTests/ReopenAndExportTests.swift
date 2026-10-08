@@ -179,6 +179,15 @@ struct ExportWriteTests {
         #expect(try String(contentsOf: url, encoding: .utf8) == "has newline\n")
     }
 
+    @Test("an export is readable by its owner only")
+    func ownerOnly() throws {
+        let url = temporaryURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        try PaneCommands.write("TOKEN=fake\n", to: url)
+        let mode = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int
+        #expect(mode == 0o600)
+    }
+
     /// Atomic: a failed write leaves the previous file intact rather than a
     /// truncated one, which matters when the export is over a file the user
     /// already keeps.

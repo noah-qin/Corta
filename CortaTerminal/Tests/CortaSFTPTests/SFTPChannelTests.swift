@@ -24,16 +24,20 @@ import Testing
 /// subprocess is exercised only in the app, never in tests.
 @Suite("SFTP channel")
 struct SFTPChannelTests {
-    @Test("the ssh invocation is `ssh -s -- <host> sftp`")
+    @Test("the ssh invocation is `ssh <channel options> -s -- <host> sftp`")
     func invocationArguments() {
+        let options = [
+            "-oForwardAgent=no", "-oForwardX11=no", "-oClearAllForwardings=yes",
+            "-oPermitLocalCommand=no",
+        ]
         // `--` before the host: a hostile or mistyped host must never be
         // parsed as an ssh option.
         #expect(
             SFTPSubprocessChannel.arguments(host: "example.com")
-                == ["-s", "--", "example.com", "sftp"])
+                == options + ["-s", "--", "example.com", "sftp"])
         #expect(
             SFTPSubprocessChannel.arguments(host: "-oProxyCommand=evil")
-                == ["-s", "--", "-oProxyCommand=evil", "sftp"])
+                == options + ["-s", "--", "-oProxyCommand=evil", "sftp"])
     }
 
     @Test("exit 255 with a permission refusal is an authentication failure")

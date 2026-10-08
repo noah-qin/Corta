@@ -290,6 +290,59 @@ struct SFTPTransferTests {
         #expect(receipt.bytesTransferred == UInt64(contents.count))
     }
 
+    @Test("a stated size over the download limit is refused before OPEN")
+    func statedSizeOverLimit() async throws {
+        let rig = try await makeRig { $0.maximumDownloadBytes = 1000 }
+        defer { teardown(rig) }
+        rig.fileSystem.createFile("/big", data: [UInt8](repeating: 1, count: 2000))
+        let destination = rig.directory.appendingPathComponent("big")
+        await #expect(throws: SFTPError.localIOFailed(operation: "download size limit", code: EFBIG)) {
+            try await rig.engine.download(remotePath: "/big", to: destination)
+        }
+        #expect(!FileManager.default.fileExists(atPath: destination.path))
+        #expect(!rig.server.log.operations.contains { $0.hasPrefix("open ") })
+    }
+
+    /// A server that states no size answers READs for as long as it likes.
+    @Test("a download with no stated size stops at the limit")
+    func unstatedSizeStopsAtLimit() async throws {
+        let rig = try await makeRig { $0.maximumDownloadBytes = 1000 }
+        defer { teardown(rig) }
+        rig.fileSystem.createFile("/endless", data: [UInt8](repeating: 2, count: 4000))
+        rig.server.interceptor = { message in
+            if case .stat = message.payload {
+                return .reply(.attrs(SFTPAttributes(permissions: 0o100_644, modificationTime: 1_000)))
+            }
+            return .proceed
+        }
+        let destination = rig.directory.appendingPathComponent("endless")
+        await #expect(throws: SFTPError.localIOFailed(operation: "download size limit", code: EFBIG)) {
+            try await rig.engine.download(remotePath: "/endless", to: destination)
+        }
+        #expect(!FileManager.default.fileExists(atPath: destination.path))
+        #expect(
+            !FileManager.default.fileExists(
+                atPath: destination.path + SFTPTransferEngine.partialSuffix))
+    }
+
+    @Test("a READ reply longer than requested is a protocol violation")
+    func overlongReadReply() async throws {
+        let rig = try await makeRig()
+        defer { teardown(rig) }
+        rig.fileSystem.createFile("/remote.bin", data: [UInt8](repeating: 3, count: 600))
+        rig.server.interceptor = { message in
+            if case .read(_, _, let length) = message.payload {
+                return .reply(.data([UInt8](repeating: 4, count: Int(length) + 1)))
+            }
+            return .proceed
+        }
+        let destination = rig.directory.appendingPathComponent("out.bin")
+        await #expect(throws: SFTPError.protocolViolation("READ reply longer than requested")) {
+            try await rig.engine.download(remotePath: "/remote.bin", to: destination)
+        }
+        #expect(!FileManager.default.fileExists(atPath: destination.path))
+    }
+
     /// `.fail` was checked once, before the transfer, and the commit was a
     /// plain `rename(2)`, which replaced a file that appeared meanwhile.
     @Test("the fail policy does not replace a destination that appeared mid-transfer")

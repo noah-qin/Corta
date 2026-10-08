@@ -247,7 +247,7 @@ struct SFTPBrowserView: View {
                         .foregroundStyle(entry.kind == .directory ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
                         .frame(width: 18)
                         .accessibilityHidden(true)
-                    Text(entry.name)
+                    Text(entry.displayName)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -289,7 +289,7 @@ struct SFTPBrowserView: View {
                 } else if entry.kind == .file {
                     // Dragged to Finder, a file is downloaded where it lands.
                     TableRow(entry)
-                        .draggable(SFTPDragItem(name: entry.name) { [model] in
+                        .draggable(SFTPDragItem(name: SFTPBrowserModel.localFileName(entry.name)) { [model] in
                             try await model.exportForDrag(entry)
                         })
                 } else {

@@ -98,8 +98,18 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
 
     /// `--` keeps a hostile `host` from becoming an option; user, port, keys and
     /// jump hosts come from `~/.ssh/config`.
+    ///
+    /// What a file channel never needs is switched off, as `sftp(1)` itself
+    /// does: a `ForwardAgent yes` meant for interactive logins would hand the
+    /// agent to a host a pane's OSC 7 named, and `LocalForward`/`RemoteForward`
+    /// would open ports for every browser and remote-edit connection.
+    public static let channelOptions = [
+        "-oForwardAgent=no", "-oForwardX11=no", "-oClearAllForwardings=yes",
+        "-oPermitLocalCommand=no",
+    ]
+
     public static func arguments(host: String) -> [String] {
-        ["-s", "--", host, subsystemName]
+        channelOptions + ["-s", "--", host, subsystemName]
     }
 
     public let processIdentifier: pid_t

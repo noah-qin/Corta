@@ -510,10 +510,12 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     }
 
     /// The write, testable apart from the panel: UTF-8 with a trailing
-    /// newline, which grep, less and diff expect.
+    /// newline, which grep, less and diff expect. Owner-only, like every file
+    /// Corta writes from the terminal: scrollback holds tokens, and the umask's
+    /// `0644` let any account that can reach the folder read the transcript.
     nonisolated static func write(_ text: String, to url: URL) throws {
         let payload = text.hasSuffix("\n") ? text : text + "\n"
-        try Data(payload.utf8).write(to: url, options: .atomic)
+        try PrivateFile.write(Data(payload.utf8), to: url)
     }
 
     /// The selection or the whole document; pure, for tests.
