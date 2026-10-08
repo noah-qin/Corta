@@ -22,16 +22,23 @@ import XCTest
 /// was silently not the one the app loaded — it started with the user's
 /// prompt and an 80×24 grid, and the test failed on what it then saw.
 enum UIFixtures {
-    /// The prepared stage named `name`, or a skip that says how to prepare
+    /// The prepared stage named `name`, or a setup failure that says how to prepare
     /// it — never a test run against whatever the app finds instead.
     static func stage(_ name: String) throws -> URL {
         guard let root = ProcessInfo.processInfo.environment["CORTA_UI_FIXTURES"] else {
-            throw XCTSkip(
-                "Set TEST_RUNNER_CORTA_UI_FIXTURES using CortaUITests/stage-ui-fixtures.sh; the runner's sandbox cannot write a stage the app can read.")
+            throw NSError(
+                domain: "CortaUITests.Setup", code: 1, userInfo: [
+                    NSLocalizedDescriptionKey: "setup failure: set TEST_RUNNER_CORTA_UI_FIXTURES using CortaUITests/stage-ui-fixtures.sh; the runner's sandbox cannot write a stage the app can read.",
+                ])
         }
         let stage = URL(fileURLWithPath: root, isDirectory: true).appendingPathComponent(name)
         guard FileManager.default.fileExists(atPath: stage.appendingPathComponent("config").path)
-        else { throw XCTSkip("stage-ui-fixtures.sh made no stage named \(name)") }
+        else {
+            throw NSError(
+                domain: "CortaUITests.Setup", code: 2, userInfo: [
+                    NSLocalizedDescriptionKey: "setup failure: stage-ui-fixtures.sh made no stage named \(name)",
+                ])
+        }
         return stage
     }
 
@@ -44,6 +51,7 @@ enum UIFixtures {
             .deletingLastPathComponent().deletingLastPathComponent()
         let app = XCUIApplication(url: products.appendingPathComponent("CortaDev.app"))
         app.launchArguments = ["-AppleLanguages", "(en)"]
+        app.launchEnvironment["HOME"] = stage.path
         app.launchEnvironment["CORTA_STAGE_DIR"] = stage.path
         app.launchEnvironment["ZDOTDIR"] = stage.path
         app.launchEnvironment["SHELL"] = "/bin/zsh"
