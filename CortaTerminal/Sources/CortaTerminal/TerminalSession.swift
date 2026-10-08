@@ -156,6 +156,11 @@ public final class TerminalSession: @unchecked Sendable {
         /// A chunk is being written: set from pop to the write's return. A
         /// write that blocks, on a child not reading, keeps it set.
         var writing = false
+        /// The paste the chunk being written belongs to, if any. Popping a
+        /// paste's last chunk retires its `pastes` entry, but the child has
+        /// not taken those bytes until the write returns — a paste is
+        /// queued, in flight, or done, and this is the middle state.
+        var inFlightPaste: UInt64?
 
         mutating func push(_ chunk: [UInt8], paste: UInt64? = nil) {
             chunks.append(Chunk(bytes: chunk, paste: paste))
@@ -172,6 +177,7 @@ public final class TerminalSession: @unchecked Sendable {
                 paste.started = true
                 pastes[id] = paste.remaining > 0 ? paste : nil
             }
+            inFlightPaste = chunk.paste
             if head == chunks.count {
                 chunks = []
                 head = 0
@@ -639,6 +645,11 @@ public final class TerminalSession: @unchecked Sendable {
         pendingWrites.withLock { !$0.pastes.isEmpty }
     }
 
+    /// A paste's chunk is being written and has not returned.
+    var isPasteInFlight: Bool {
+        pendingWrites.withLock { $0.writing && $0.inFlightPaste != nil }
+    }
+
     /// What Ctrl-C did to a paste still queued ahead of it.
     public struct PasteInterrupt: Sendable, Equatable {
         /// Queued paste chunks were dropped.
@@ -653,16 +664,19 @@ public final class TerminalSession: @unchecked Sendable {
     /// still being written — blocked on a child that stopped reading — a `^C`
     /// queued behind it would wait for that write too; if the line discipline
     /// would turn `^C` into `SIGINT` (`ISIG`), the signal goes to the
-    /// foreground group now, as the terminal would deliver it.
+    /// foreground group now, as the terminal would deliver it. That holds
+    /// for a paste's last chunk too: popped, nothing of it is queued any
+    /// more, but until its write returns the child has not read it and a
+    /// `^C` behind it waits just the same.
     public func interruptPendingPaste() -> PasteInterrupt {
-        let (cancelled, writing) = pendingWrites.withLock { pending in
-            (pending.cancelPastes(), pending.writing)
+        let (cancelled, writing, pasteInFlight) = pendingWrites.withLock { pending in
+            (pending.cancelPastes(), pending.writing, pending.inFlightPaste != nil)
         }
-        guard cancelled else { return PasteInterrupt() }
+        guard cancelled || (writing && pasteInFlight) else { return PasteInterrupt() }
         guard writing, writerSink == nil, pty.interruptForegroundGroupIfSignalsEnabled() else {
-            return PasteInterrupt(cancelledPaste: true)
+            return PasteInterrupt(cancelledPaste: cancelled)
         }
-        return PasteInterrupt(cancelledPaste: true, signalled: true)
+        return PasteInterrupt(cancelledPaste: cancelled, signalled: true)
     }
 
     private enum WriteKind {
@@ -718,13 +732,19 @@ public final class TerminalSession: @unchecked Sendable {
                 guard let chunk = pending.pop() else {
                     pending.isDraining = false
                     pending.writing = false
+                    pending.inFlightPaste = nil
                     return nil
                 }
                 pending.writing = true
                 return chunk
             }
             guard let chunk else { return }
-            defer { pendingWrites.withLock { $0.writing = false } }
+            defer {
+                pendingWrites.withLock { pending in
+                    pending.writing = false
+                    pending.inFlightPaste = nil
+                }
+            }
             do {
                 if let writerSink {
                     try writerSink(chunk)
