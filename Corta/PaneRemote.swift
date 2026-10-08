@@ -199,7 +199,9 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
     /// managed copy.
     @discardableResult
     func open(_ reference: ResolvedReference) -> Bool {
-        Task { [weak self] in
+        let id = UUID()
+        openTasks[id] = Task { [weak self] in
+            defer { self?.openTasks[id] = nil }
             guard let self else { return }
             do {
                 let opened = try await RemoteEditCoordinator.shared.open(
@@ -218,6 +220,17 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
             }
         }
         return true
+    }
+
+    /// The opens still connecting or downloading. A pane that closes takes
+    /// its ⌘-clicks with it: the editor does not open later for a pane the
+    /// user has already dismissed, and a connection nobody else waits for
+    /// is given up (`RemoteEditCoordinator`).
+    private var openTasks: [UUID: Task<Void, Never>] = [:]
+
+    func cancelPendingOpens() {
+        for (_, task) in openTasks { task.cancel() }
+        openTasks = [:]
     }
 
     // MARK: - Browse Remote Files…
