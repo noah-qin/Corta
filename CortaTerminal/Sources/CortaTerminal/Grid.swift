@@ -1175,7 +1175,7 @@ public struct Grid: Sendable {
 /// The parked main screen, behind a reference (a value type cannot hold
 /// itself). Written once, read once, never mutated — so snapshots sharing it
 /// make `Sendable` honest.
-private final class SuspendedScreen: @unchecked Sendable {
+private final class SuspendedScreen: Sendable {
     let grid: Grid
 
     init(_ grid: Grid) {
