@@ -10,6 +10,12 @@ what to edit.
 
 ## [Unreleased]
 
+### Fixed
+
+- A screen overflowing the glyph atlas no longer makes every unrelated cell
+  change re-shape an entire frame of text; deferred first paints that fit
+  still fill in across frames.
+
 ### Security
 
 - Inline images (the Kitty graphics protocol) are decoded in a separate,
