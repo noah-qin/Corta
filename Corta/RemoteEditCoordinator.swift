@@ -660,7 +660,7 @@ extension RemoteEditCoordinator.RemoteEditPresenter {
                 let alert = NSAlert()
                 alert.messageText = L10n.text("remoteEdit.changed.title")
                 alert.informativeText = L10n.format(
-                    "remoteEdit.changed.message", pending.copy.remotePath, pending.copy.host)
+                    "remoteEdit.changed.message", SFTPBrowserModel.displayName(pending.copy.remotePath), pending.copy.host)
                 alert.addButton(withTitle: L10n.text("remoteEdit.upload"))
                 alert.addButton(withTitle: L10n.text("remoteEdit.dismiss"))
                 if alert.runModal() == .alertFirstButtonReturn {
@@ -676,11 +676,11 @@ extension RemoteEditCoordinator.RemoteEditPresenter {
                     conflict.remoteDeleted
                     ? L10n.format(
                         "remoteEdit.conflict.deletedMessage",
-                        conflict.copy.remotePath, conflict.copy.host,
+                        SFTPBrowserModel.displayName(conflict.copy.remotePath), conflict.copy.host,
                         conflict.atDownloadDescription)
                     : L10n.format(
                         "remoteEdit.conflict.message",
-                        conflict.copy.remotePath, conflict.copy.host,
+                        SFTPBrowserModel.displayName(conflict.copy.remotePath), conflict.copy.host,
                         conflict.atDownloadDescription, conflict.remoteDescription)
                 alert.addButton(withTitle: L10n.text("remoteEdit.conflict.uploadAnyway"))
                 let redownload = alert.addButton(
@@ -695,8 +695,8 @@ extension RemoteEditCoordinator.RemoteEditPresenter {
                     coordinator?.resolveConflict(conflict.id, choice: .redownload)
                 case .alertThirdButtonReturn:
                     let panel = NSSavePanel()
-                    panel.nameFieldStringValue =
-                        (conflict.copy.remotePath as NSString).lastPathComponent
+                    panel.nameFieldStringValue = SFTPBrowserModel.localFileName(
+                        (conflict.copy.remotePath as NSString).lastPathComponent)
                     guard panel.runModal() == .OK, let url = panel.url else {
                         coordinator?.resolveConflict(conflict.id, choice: .dismiss)
                         return
@@ -716,7 +716,7 @@ extension RemoteEditCoordinator.RemoteEditPresenter {
                 let alert = NSAlert()
                 alert.messageText = L10n.format("remoteEdit.connect.title", host)
                 alert.informativeText = L10n.format(
-                    "remoteEdit.connect.message", remotePath, host)
+                    "remoteEdit.connect.message", SFTPBrowserModel.displayName(remotePath), host)
                 alert.addButton(withTitle: L10n.text("sftp.host.connect"))
                 alert.addButton(withTitle: L10n.text("common.cancel"))
                 return alert.runModal() == .alertFirstButtonReturn

@@ -238,10 +238,10 @@ final class SFTPTransferQueue {
         }
         let id = UUID()
         if let onFinish { finishHandlers[id] = onFinish }
-        let name =
+        let name = SFTPBrowserModel.displayName(
             plan.isUpload
-            ? plan.localURL.lastPathComponent
-            : (plan.remotePath as NSString).lastPathComponent
+                ? plan.localURL.lastPathComponent
+                : (plan.remotePath as NSString).lastPathComponent)
         transfers.append(
             Transfer(
                 id: id, isUpload: plan.isUpload, isDirectory: plan.isDirectory, name: name,
@@ -277,7 +277,8 @@ final class SFTPTransferQueue {
             conflictPrompts.append(
                 ConflictPrompt(
                     id: UUID(), transferID: id,
-                    path: transfer.isUpload ? plan.remotePath : plan.localURL.path,
+                    path: SFTPBrowserModel.displayName(
+                        transfer.isUpload ? plan.remotePath : plan.localURL.path),
                     sourceDescription: L10n.text("sftp.conflict.directory"),
                     destinationDescription: L10n.text("sftp.conflict.directoryExists"),
                     canResume: true, partialOnly: false))
@@ -317,7 +318,8 @@ final class SFTPTransferQueue {
         conflictPrompts.append(
             ConflictPrompt(
                 id: UUID(), transferID: id,
-                path: transfer.isUpload ? plan.remotePath : plan.localURL.path,
+                path: SFTPBrowserModel.displayName(
+                    transfer.isUpload ? plan.remotePath : plan.localURL.path),
                 sourceDescription: SFTPBrowserModel.describe(
                     size: plan.sourceSize, modified: plan.sourceModified),
                 // In the partial-only case the middle line describes the

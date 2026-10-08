@@ -111,6 +111,16 @@ struct SFTPBrowserFormattingTests {
         #expect(SFTPBrowserModel.kind(ofPermissions: 0o060600) == .other)
     }
 
+    @Test("a server's name shows what could disguise it, and lands locally without it")
+    func concealedNames() {
+        let name = "invoice\u{202E}fdp.sh"
+        #expect(SFTPBrowserModel.displayName(name) == "invoice\u{FFFD}fdp.sh")
+        #expect(SFTPBrowserModel.localFileName(name) == "invoice_fdp.sh")
+        #expect(SFTPBrowserModel.localFileName("a\nb\u{200B}c\u{7F}") == "a_b_c_")
+        #expect(SFTPBrowserModel.displayName("项目说明.txt") == "项目说明.txt")
+        #expect(SFTPBrowserModel.localFileName("README.md") == "README.md")
+    }
+
     @Test("path helpers are absolute-path arithmetic only")
     func paths() {
         #expect(SFTPBrowserModel.joinPath("/", "a") == "/a")

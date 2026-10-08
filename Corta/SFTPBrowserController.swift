@@ -234,7 +234,7 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
             // `<chosen>/<name>`.
             let panel = NSSavePanel()
             panel.title = L10n.text("sftp.action.download")
-            panel.nameFieldStringValue = entry.name
+            panel.nameFieldStringValue = SFTPBrowserModel.localFileName(entry.name)
             let response = await panel.beginSheetModal(for: window)
             guard response == .OK, let url = panel.url else { return nil }
             return .file(url)

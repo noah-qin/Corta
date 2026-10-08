@@ -101,7 +101,9 @@ final class RemoteEditStore {
     /// the basename is for the human who opens the folder in Finder.
     nonisolated static func localRelativePath(host: String, remotePath: String) -> String {
         let digest = sha256Hex(Data((host + "\u{0}" + remotePath).utf8)).prefix(16)
-        var name = (remotePath as NSString).lastPathComponent
+        // Named as the browser names a download: the editor and Finder show
+        // this name, and the server chose it.
+        var name = SFTPBrowserModel.localFileName((remotePath as NSString).lastPathComponent)
         // A trailing "/.." or "/" makes the basename a path instruction or
         // empty; the copy must stay inside its digest directory.
         if name.isEmpty || name == "." || name == ".." { name = "file" }

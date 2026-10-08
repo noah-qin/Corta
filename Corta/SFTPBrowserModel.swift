@@ -72,6 +72,8 @@ final class SFTPBrowserModel {
         var sortModified: Date { modified ?? .distantPast }
         /// A dot file, hidden unless the browser is told to show them.
         var isHidden: Bool { name.hasPrefix(".") }
+        /// The name as the table shows it (`SFTPBrowserModel.displayName`).
+        var displayName: String { SFTPBrowserModel.displayName(name) }
     }
 
     /// The table's sort: a column and a direction. Folders stay above
@@ -537,6 +539,33 @@ final class SFTPBrowserModel {
         return .available(free: free.partialValue, total: total.partialValue)
     }
 
+    /// A remote name as the browser shows it. The server chose it, and a
+    /// right-to-left override makes `invoice\u{202E}fdp.sh` read as
+    /// `invoicehs.pdf`: controls and the scalars the grid also replaces
+    /// (`ConcealingScalars`) show as U+FFFD. The name sent back is unchanged.
+    nonisolated static func displayName(_ name: String) -> String {
+        replacingConcealedScalars(in: name, with: "\u{FFFD}")
+    }
+
+    /// A remote name as a local file is called: the same scalars become `_`,
+    /// so Finder never shows a reordered or hidden extension either.
+    nonisolated static func localFileName(_ name: String) -> String {
+        replacingConcealedScalars(in: name, with: "_")
+    }
+
+    private nonisolated static func replacingConcealedScalars(
+        in name: String, with replacement: Unicode.Scalar
+    ) -> String {
+        var scalars = String.UnicodeScalarView()
+        for scalar in name.unicodeScalars {
+            let value = scalar.value
+            let concealing =
+                value < 0x20 || (0x7F...0x9F).contains(value) || ConcealingScalars.contains(value)
+            scalars.append(concealing ? replacement : scalar)
+        }
+        return String(scalars)
+    }
+
     /// Whether a name the server listed is one plain path component — the
     /// only thing a `READDIR` entry is allowed to be. A hostile server can
     /// send `../../.zshrc`, and a multi-file download would have appended
@@ -773,7 +802,7 @@ final class SFTPBrowserModel {
                     // component; asserted again at the one place the name
                     // becomes a local path.
                     guard Self.isPlainEntryName(entry.name) else { continue }
-                    local = directory.appendingPathComponent(entry.name)
+                    local = directory.appendingPathComponent(Self.localFileName(entry.name))
                 }
                 transferQueue.enqueue(
                     SFTPTransferQueue.Plan(
@@ -802,7 +831,7 @@ final class SFTPBrowserModel {
         let staging = try Self.makeDragStagingDirectory()
         dragStagingDirectories.append(staging)
         let remotePath = Self.joinPath(currentPath, entry.name)
-        let local = staging.appendingPathComponent(entry.name)
+        let local = staging.appendingPathComponent(Self.localFileName(entry.name))
         return try await withCheckedThrowingContinuation { continuation in
             transferQueue.enqueue(
                 SFTPTransferQueue.Plan(
