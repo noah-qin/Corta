@@ -18,7 +18,8 @@ signatures, notarisation and archive/feed checks still gate delivery.
 2. It synchronizes every `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`
    in the Xcode project, `CortaVersion.string`, the README download/status
    block and CHANGELOG. Unreleased notes move under the new dated version;
-   commit subjects since the previous release are included automatically.
+   commit subjects since the previous release are included automatically only
+   when Unreleased has no notes.
    Historical installation instructions and older changelog entries stay intact.
 3. It opens a version PR, explicitly dispatches the ordinary CI (bot-token
    PR creation does not trigger CI), waits for the matching commit's run,

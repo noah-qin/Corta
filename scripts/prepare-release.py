@@ -102,12 +102,12 @@ def prepare(root, bump="patch", date=None):
     subjects = [subject for subject in subjects
                 if not subject.startswith(("chore: release ", "chore: publish "))]
     notes = unreleased
-    if subjects:
+    if not unreleased and subjects:
         notes += "\n\n### Commits\n\n" + "\n".join(f"- {subject}" for subject in subjects)
     notes = notes.strip() or "- Release maintenance."
     # Replace only Unreleased's body, leaving all historical notes intact.
     changelog = re.sub(r"(^## \[Unreleased\][^\n]*\n).*?(?=^## \[|^\[Unreleased\]:|\Z)",
-                       lambda m: m.group(1) + f"\n## [{version}] — {date}\n\n{notes}\n\n",
+                       lambda m: m.group(1) + f"\n## [{version}] - {date}\n\n{notes}\n\n",
                        changelog, count=1, flags=re.M | re.S)
     repository = "https://github.com/noah-qin/Corta"
     changelog, count = re.subn(r"^\[Unreleased\]:.*$",

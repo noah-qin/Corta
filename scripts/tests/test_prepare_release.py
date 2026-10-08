@@ -83,9 +83,10 @@ class PrepareReleaseTests(unittest.TestCase):
         self.assertEqual(project.count("CURRENT_PROJECT_VERSION = 10;"), 2)
         self.assertIn('string = "1.2.4"', (self.root / release.FILES[1]).read_text())
         changelog = (self.root / "CHANGELOG.md").read_text()
-        self.assertIn("## [Unreleased]\n\n## [1.2.4] — 2026-10-06", changelog)
+        self.assertIn("## [Unreleased]\n\n## [1.2.4] - 2026-10-06", changelog)
         self.assertIn("- Recovery.", release.section(changelog, "1.2.4"))
-        self.assertIn("fix: recover $HOME and `literal`", release.section(changelog, "1.2.4"))
+        self.assertNotIn("### Commits", release.section(changelog, "1.2.4"))
+        self.assertNotIn("fix: recover $HOME and `literal`", release.section(changelog, "1.2.4"))
         self.assertEqual(release.section(changelog, "1.2.3"), "- Old changes.")
         readme = (self.root / "README.md").read_text()
         self.assertIn("Corta-1.2.4.zip.sha256", readme)
@@ -117,7 +118,9 @@ class PrepareReleaseTests(unittest.TestCase):
         self.assertEqual(self.prepare()["version"], "1.2.5")
         changelog = (self.root / "CHANGELOG.md").read_text()
         self.assertEqual(changelog.count("## [1.2.4]"), 1)
+        self.assertIn("### Commits", release.section(changelog, "1.2.5"))
         self.assertIn("fix: resolve signing failure", release.section(changelog, "1.2.5"))
+        self.assertNotIn("### Commits", release.section(changelog, "1.2.4"))
 
     def test_empty_unreleased_still_collects_commits(self):
         path = self.root / "CHANGELOG.md"
@@ -125,8 +128,18 @@ class PrepareReleaseTests(unittest.TestCase):
         self.commit("chore: publish 1.2.3 to the update feed", empty=True)
         self.prepare()
         notes = release.section(path.read_text(), "1.2.4")
+        self.assertIn("### Commits", notes)
         self.assertIn("fix: recover", notes)
         self.assertNotIn("chore: publish", notes)
+
+    def test_notes_cli_reads_both_heading_styles(self):
+        self.prepare()
+        for version, expected in (("1.2.4", "- Recovery."), ("1.2.3", "- Old changes.")):
+            result = subprocess.run(["python3", str(SCRIPTS / "prepare-release.py"),
+                                     "--notes", version], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(expected, result.stdout)
+            self.assertNotIn("### Commits", result.stdout)
 
     def test_invalid_metadata_does_not_partially_update_files(self):
         path = self.root / "CHANGELOG.md"

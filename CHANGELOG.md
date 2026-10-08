@@ -4,9 +4,9 @@ All notable changes to Corta are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions
 follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-While the major version is `0`, a minor bump may contain a breaking change
-to the config file format; those are always listed under **Changed** with
-what to edit.
+Breaking changes to the config file format are always listed under
+**Changed**, with instructions for what to edit. Corta 1.x follows Semantic
+Versioning for compatibility changes.
 
 ## [Unreleased]
 
@@ -123,7 +123,7 @@ what to edit.
   now fails, instead of creating an empty remote folder and reporting
   success; an unreadable subfolder fails the upload too.
 
-## [1.1.8] — 2026-10-07
+## [1.1.8] - 2026-10-07
 
 ### Fixed
 
@@ -134,7 +134,7 @@ what to edit.
 
 - fix(ui): drop the tab bar's + in favour of the toolbar's (#273)
 
-## [1.1.7] — 2026-10-07
+## [1.1.7] - 2026-10-07
 
 ### Added
 
@@ -182,7 +182,7 @@ what to edit.
 
 - fix(app): show the IME caret, keep the badge, fix palette and find (#269)
 
-## [1.1.6] — 2026-10-07
+## [1.1.6] - 2026-10-07
 
 ### Fixed
 
@@ -198,7 +198,7 @@ what to edit.
 - fix(app): draw rounded box corners with the borders they join (#264)
 - ci: pass the release secrets to the feed step (#262)
 
-## [1.1.5] — 2026-10-07
+## [1.1.5] - 2026-10-07
 
 ### Responsiveness and resilience (reliability review, 2026-10-07)
 
