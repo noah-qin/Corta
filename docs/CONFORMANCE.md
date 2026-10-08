@@ -341,6 +341,21 @@ crash found by a long run is fixed by adding its input to
 `CortaTerminal/Tests/Fuzz/corpus` — from then on it is a regression
 test.
 
+**Targets beyond the feed (2026-10-08).** `--target` points the same
+driver at the other inputs a hostile peer controls, each with its own
+corpus under `CortaTerminal/Tests/Fuzz`: `osc` frames every input as one
+OSC sequence whose code the first byte picks from the ones Corta handles
+(titles, OSC 4/5/10–12 colours, 7, 8, 52, 104/105, 133, 134); `kitty`
+frames it as one APC graphics command, two thirds of them as an `o=z`
+transmission whose zlib stream is the input, so the inflate ceiling,
+header and Adler-32 checks are what it reaches; `sftp` decodes it as one
+frame body (`SFTPCodec.decodeFrame`, the statvfs reply and the length
+check) and requires every frame that decodes to decode to the same message
+after `encodeFrame`. The terminal caps above hold for `osc` and `kitty`.
+`SFTPFuzzCorpusTests` replays the SFTP corpus in the test suite. PNG
+decoding is not a target: it is ImageIO behind the app's signature and
+dimension checks, and the SwiftPM harness cannot reach the app layer.
+
 ### 4.4 App-layer verification requires a launched app
 
 Offscreen render tests assert pixel coverage: that a cell with a known

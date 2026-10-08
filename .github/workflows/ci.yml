@@ -91,18 +91,26 @@ jobs:
       - name: Real SSH and SFTP against an isolated sshd
         run: python3 -B script/verify_ssh_integration.py
 
+      # One corpus per target: the raw feed, OSC and Kitty payloads framed
+      # as their sequences, and SFTP frames from a hostile server.
       - name: Replay the fuzz corpus
         run: |
-          CortaTerminal/.build/release/corta-fuzz \
-            CortaTerminal/Tests/Fuzz/corpus/*
+          fuzz=CortaTerminal/.build/release/corta-fuzz
+          $fuzz CortaTerminal/Tests/Fuzz/corpus/*
+          for target in osc kitty sftp; do
+            $fuzz --target "$target" CortaTerminal/Tests/Fuzz/"$target"/*
+          done
 
       # Seed 1 on a PR, deliberately: a PR check has to be a regression
       # check, and a different seed every run means a failure a reviewer
       # cannot reproduce. Rotating seeds are the nightly lane's job.
       - name: Short mutation fuzz run
         run: |
-          CortaTerminal/.build/release/corta-fuzz --fuzz 200000 --seed 1 \
-            CortaTerminal/Tests/Fuzz/corpus
+          fuzz=CortaTerminal/.build/release/corta-fuzz
+          $fuzz --fuzz 200000 --seed 1 CortaTerminal/Tests/Fuzz/corpus
+          for target in osc kitty sftp; do
+            $fuzz --target "$target" --fuzz 100000 --seed 1 CortaTerminal/Tests/Fuzz/"$target"
+          done
 
       - name: Keep the crashing input when the fuzzer finds one
         if: failure()
@@ -110,7 +118,7 @@ jobs:
         with:
           name: fuzz-failure-core
           path: |
-            CortaTerminal/Tests/Fuzz/corpus
+            CortaTerminal/Tests/Fuzz
             /tmp/corta-fuzz-*
           if-no-files-found: ignore
           retention-days: 14

@@ -115,8 +115,12 @@ jobs:
           esac
           echo "seed=$seed" >> "$GITHUB_OUTPUT"
           echo "Fuzzing with seed $seed"
-          CortaTerminal/.build/release/corta-fuzz --fuzz 20000000 --seed "$seed" \
-            CortaTerminal/Tests/Fuzz/corpus
+          fuzz=CortaTerminal/.build/release/corta-fuzz
+          $fuzz --fuzz 20000000 --seed "$seed" CortaTerminal/Tests/Fuzz/corpus
+          for target in osc kitty sftp; do
+            $fuzz --target "$target" --fuzz 1000000 --seed "$seed" \
+              CortaTerminal/Tests/Fuzz/"$target"
+          done
 
       - name: Keep the corpus and the seed when the fuzzer finds something
         if: failure()
@@ -124,7 +128,7 @@ jobs:
         with:
           name: fuzz-failure-seed-${{ steps.fuzz.outputs.seed }}
           path: |
-            CortaTerminal/Tests/Fuzz/corpus
+            CortaTerminal/Tests/Fuzz
             /tmp/corta-fuzz-*
           if-no-files-found: ignore
           retention-days: 30

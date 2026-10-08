@@ -70,6 +70,13 @@ CortaTerminal/.build/release/corta-fuzz CortaTerminal/Tests/Fuzz/corpus/*
 CortaTerminal/.build/release/corta-fuzz --fuzz 200000 --seed 1 \
   CortaTerminal/Tests/Fuzz/corpus
 
+# The other targets: OSC and Kitty payloads framed as their sequences
+# (Kitty's o=z inflate included), and SFTP frames from a hostile server.
+for target in osc kitty sftp; do
+  CortaTerminal/.build/release/corta-fuzz --target "$target" --fuzz 100000 --seed 1 \
+    CortaTerminal/Tests/Fuzz/"$target"
+done
+
 CORTA_TEST_TIMEOUT_SCALE=10 swift test --package-path CortaTerminal --sanitize=thread
 CORTA_TEST_TIMEOUT_SCALE=10 swift test --package-path CortaTerminal --sanitize=address
 ```

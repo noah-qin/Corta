@@ -71,14 +71,16 @@ let package = Package(
             dependencies: ["CortaTerminal"],
             swiftSettings: [.defaultIsolation(nil)]
         ),
-        // Fuzz harness over the terminal feed path. Built with
-        // `-Xswiftc -sanitize=fuzzer` it is a fuzz target; built plainly it
-        // replays files named on the command line, so a crashing input can
-        // be reproduced and the checked-in corpus can run in CI without a
-        // fuzzer-enabled toolchain.
+        // Fuzz harness over the terminal feed path, the OSC and Kitty
+        // payload handlers and the SFTP frame decoder (`--target`). Built
+        // with `-Xswiftc -sanitize=fuzzer` it is a fuzz target; built
+        // plainly it replays files named on the command line, so a crashing
+        // input can be reproduced and the checked-in corpus can run in CI
+        // without a fuzzer-enabled toolchain. An executable may depend on
+        // both libraries; only the libraries must not depend on each other.
         .executableTarget(
             name: "corta-fuzz",
-            dependencies: ["CortaTerminal"],
+            dependencies: ["CortaTerminal", "CortaSFTP"],
             swiftSettings: [.defaultIsolation(nil)]
         ),
         // The license-header rules (`docs/LICENSING.md`) and the tool that
