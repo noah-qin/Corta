@@ -703,6 +703,21 @@ averages ~0.6 ms, and its p95 is the GPU's scheduling. A change to the
 CPU path is best read on that row; the averaged figure stays the D17
 baseline so the history below remains comparable.
 
+**Mac audit closeout (2026-10-08–09).** The [dated record](test-results/2026-10-09-mac-audit-closeout.md)
+rebuilds the exact 1.1.8 tree and the audit follow-up on the same Apple M5,
+macOS 27.0.1 (26A434), Xcode 27.0 (27A266a), AC power, Benchmark `-O`.
+Three initial runs averaged 0.630 ms on 1.1.8 and 0.627 ms after #277/#278.
+After the atlas-overflow correction, a further batch averaged 0.678 ms, with
+larger GPU-completion tails; CPU-only full rebuild p50 was 0.135 ms versus
+0.133 ms in the preceding batch. Three subsequent alternating runs average **0.831 ms on 1.1.8 / 0.823 ms
+on the final fix**; CPU-only p50 ranges overlap (0.145–0.154 /
+0.133–0.158 ms). The paired sample does not show a stable frame-time regression.
+The record includes the per-run numbers and A1 stress verification: the fixed
+first 600 frames average 0.78 ms CPU, subsequent batches 0.60–0.65 ms, with a
+4.7% main-thread sample versus 36.6% before the overflow correction. The overflow correction
+prevents deferred work from forcing a whole-screen rebuild after eviction;
+it retains follow-up frames for a static CJK screen that fits the atlas.
+
 **The bridge (2026-09-27).** Until 1.1.0 this figure was taken under the
 Debug test action (`-Onone`), which is the column §5.6 still shows for
 1.0.x. It was re-recorded both ways once, on the same commit, machine and

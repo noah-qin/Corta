@@ -608,4 +608,5 @@ off in the CHANGELOG. The record stays as written.
 | [2026-10-03 — 1.1.0 release checks](test-results/2026-10-03-1.1.0-checks.md) | §4.4 points 1–5 and 7 on the merged tree, the esctest re-run, what was not judged |
 | [2026-10-03 — 1.1.1 release checks](test-results/2026-10-03-1.1.1-checks.md) | Real-shell empty-Return regression tests, full core/Unit suites and user-confirmed launched-app check |
 | [2026-10-07 — 1.1.5 release checks](test-results/2026-10-07-1.1.5-checks.md) | Full core/Unit suites, fuzz, esctest re-run, core benchmark and Release frame CPU, and the user-confirmed resize check |
+| [2026-10-09 — Mac audit closeout](test-results/2026-10-09-mac-audit-closeout.md) | §4.4 points 1–5, native session lifecycle, Quick Terminal and paste checks; explicit UI, VoiceOver, Shortcuts and remote limits |
 | [2026-10-07 — 1.1.6 release checks](test-results/2026-10-07-1.1.6-checks.md) | Rounded box corners: render tests failing on 1.1.5, the launched app, and a Release frame-CPU A/B |

@@ -208,6 +208,18 @@ status settings are preserved; defaults apply when those keys are absent.
 
 These features arrived in 1.1.5. macOS 26+ and Apple silicon are required.
 
+## When a session ends
+
+A pane keeps its output after the shell exits and displays a **Session ended**
+bar with its exit code or terminating signal. The cursor disappears, but
+scrolling, selection, copying and ⌘F search still work. **New Session** asks
+for confirmation before replacing the retained output; **Close Pane** closes
+that pane. A directly connected SSH session offers **Reconnect** to start a
+new connection. Exiting Python or another program back to a live shell does
+not end the terminal session.
+
+![Ended session retaining its final output and recovery actions](brand/session-ended.png)
+
 ## Scrollback, search and selection
 
 - **Scrolling.** The trackpad or wheel, or ⇧PageUp / ⇧PageDown, ⇧Home /

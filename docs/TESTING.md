@@ -659,3 +659,16 @@ grid, and the tests failed on what they then saw. Each now checks that the
 fixture’s `demo ❯` prompt loaded and reports a setup failure when it did not,
 before any feature assertion. Toolbar and optional prompt placement are covered
 in [the input-source placement record](test-results/2026-10-04-input-source-toolbar.md).
+
+## Mac closeout evidence, October 2026
+
+The [dated Mac closeout](test-results/2026-10-09-mac-audit-closeout.md) records
+actual Metal 4 Unit and PNG-helper tests, TSan, Release measurements, signed
+release/feed rehearsals and native UI checks. It also records the UI plan's
+pre-test automation-mode timeout, exact Swift 6.2 unavailability and the
+remote/TCC/VoiceOver limits; none is counted as a pass. For temporary adhoc
+Benchmark/TSan hosts, `ENABLE_HARDENED_RUNTIME=NO` was passed only on the build
+command to avoid unsigned-team library validation against Sparkle. Production
+signing retains hardened runtime. Native launches used an explicit minimal
+child environment as well as scratch HOME/stage/ZDOTDIR, rather than inheriting
+unrelated test-runner or desktop-launch metadata.

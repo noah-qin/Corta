@@ -402,24 +402,30 @@ request was #153).
 
 ## Not verified, and why
 
-Need a Mac (deferred at the maintainer's request; none of it was run):
+The [Mac closeout of October 8–9](2026-10-09-mac-audit-closeout.md)
+supersedes the original Linux-only verification boundary. SwiftPM tests and
+fuzz-corpus replay, actual Metal 4 app Unit tests, TSan, Apple's signature
+inspection, the signed release dry run, real signed-feed rehearsal and
+isolated Sparkle rejection tests and forced-quit Secure Keyboard Entry release
+have now run. The A1 reproducer found an
+additional overflow-triggered full-rebuild bug, fixed with a Metal regression.
+The closeout records its frame-CPU comparison and native launched-app checks.
 
-- Building and running anything added here: `corta-fuzz --target`, the
-  corpora, `SFTPFuzzCorpusTests`, the new `ReleaseCheckTests`, the
-  `corta-release-check` and `verify-appcast.swift` changes. CI is their first
-  compile.
-- A `release.yml` **dry run** before merging V2's rules: the first real
-  gathering of `codesign -d --entitlements - --xml` and `otool -l` output
-  across the bundle.
-- `codesign -d --entitlements :- --verbose=4` and `otool -L/-l` with Apple's
-  tools, to confirm table C's parse.
-- `-strict-memory-safety` (Swift 6.2): compile the core and the app with it
-  and classify each diagnostic against table B.
-- The app unit tests under the thread sanitizer
-  (`TESTING.md` "The application under the thread sanitizer"); only the
-  SwiftPM core has run under TSan/ASan so far.
-- A1's reproducer and frame-time measurement; A2's decoder fuzzing.
-- TCC behaviour: `osascript`, a camera tool and `ls ~/Documents` in a pane of
-  a clean user account; Secure Keyboard Entry after a forced quit.
-- The launched-app check (D14) — no app-layer behaviour changed, so it is
-  owed only for the privacy manifest's inclusion in the bundle.
+Still not verified in the requested environment:
+
+- Exact Swift 6.2 strict-memory-safety compilation and exhaustive table-B
+  classification: this Mac has only Swift 6.4. Supplemental 6.4 builds and
+  a diagnostic inventory are recorded; four unnecessary unchecked
+  declarations were removed and checked by the compiler.
+- The complete UI test plan: Xcode timed out enabling automation mode
+  before running a case. No machine setting was changed to work around it.
+- Clean-user TCC attribution (Finder, camera and Documents): no disposable
+  test account was available, and this pass did not create one or grant
+  permissions. Actual VoiceOver speech and the Shortcuts application's
+  unreachable-directory flow remain unverified.
+- Real-host SFTP retry/resume, remote editor cancellation and an SSH
+  session's Reconnect button: no authorized disposable host was supplied.
+- Sustained font-zoom memory reclamation beyond the measured short sample.
+
+These are verification limits, not passes. PNG type/corpus and subprocess
+limits were exercised; a broad ImageIO decoder fuzz campaign was not run.

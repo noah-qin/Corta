@@ -84,6 +84,7 @@ Dated, and not edited except to fix a link.
 - [Local data and hostile-remote audit, 2026-10-08](test-results/2026-10-08-local-data-remote-audit.md) — leak and remote-to-local paths by attacker, the fixes, and the data and entry-point tables.
 - [Crash, concurrency, signing and supply-chain audit, 2026-10-08](test-results/2026-10-08-crash-concurrency-supply-chain-audit.md) — remote crash and hang points, `@unchecked` and unsafe sites, the 1.1.8 signatures, the update and CI chains, TCC, and the unimplemented sequences.
 - [esctest results](esctest/) — result files per release.
+- [Mac audit closeout, 2026-10-08–09](test-results/2026-10-09-mac-audit-closeout.md) — Metal 4 tests, signed release/feed rehearsal, native session checks, rendering and focus fixes, and the remaining verification limits.
 - [Interactive test records](test-results/) — dated passes by a person; findings are worked off in the changelog.
 
 The completed v1 implementation plan is recorded in the
