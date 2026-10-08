@@ -110,6 +110,14 @@ PR, tag, release or feed change:
 gh workflow run release.yml --ref main -f dry_run=true
 ```
 
+The rehearsal also runs the pinned `generate_appcast` against the final
+stapled archive, using the release environment key through stdin. It
+verifies the feed's own signature and the archive's signature with
+`verify-appcast.swift`, and keeps `rehearsal-appcast-v<version>` for seven
+days. It does not push that feed or publish the archive; the publication
+job stays skipped. This exercises `SURequireSignedFeed` before a release
+can offer a build that requires it.
+
 ## The signing secrets
 
 `release.yml` signs with the Developer ID Application certificate and
