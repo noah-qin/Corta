@@ -94,4 +94,76 @@ struct ReleaseCheckTests {
         #expect(!ReleaseCheck.requiresArm64(""))
         #expect(!ReleaseCheck.requiresArm64("arm64e"))
     }
+
+    @Test("a denied entitlement is found unless it is false, and nothing is no entitlements")
+    func deniedEntitlements() {
+        let plist = Data("""
+            <?xml version="1.0" encoding="UTF-8"?>
+            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+            <plist version="1.0"><dict>
+            <key>com.apple.security.get-task-allow</key><true/>
+            <key>com.apple.security.cs.allow-jit</key><false/>
+            <key>com.apple.security.network.client</key><true/>
+            </dict></plist>
+            """.utf8)
+        #expect(ReleaseCheck.forbiddenEntitlements(inPlist: plist) == ["com.apple.security.get-task-allow"])
+        #expect(ReleaseCheck.forbiddenEntitlements(inPlist: Data()) == [])
+        #expect(ReleaseCheck.forbiddenEntitlements(inPlist: Data(" \n".utf8)) == [])
+        #expect(ReleaseCheck.forbiddenEntitlements(inPlist: Data("<plist".utf8)) == nil)
+    }
+
+    @Test("the hardened runtime is read off the CodeDirectory flags, alone or among others")
+    func hardenedRuntime() {
+        let release = """
+            Executable=/Applications/Corta.app/Contents/MacOS/Corta
+            CodeDirectory v=20500 size=1234 flags=0x10000(runtime) hashes=27+7 location=embedded
+            TeamIdentifier=646VSJ9K5F
+            """
+        #expect(ReleaseCheck.hasHardenedRuntime(codesignDescription: release))
+        #expect(ReleaseCheck.hasHardenedRuntime(
+            codesignDescription: "CodeDirectory v=20500 size=1 flags=0x10002(adhoc,runtime) hashes=1+0"))
+        #expect(!ReleaseCheck.hasHardenedRuntime(
+            codesignDescription: "CodeDirectory v=20400 size=1 flags=0x2(adhoc) hashes=1+0"))
+        #expect(!ReleaseCheck.hasHardenedRuntime(codesignDescription: "flags=0x10000(runtime)"))
+        #expect(ReleaseCheck.teamIdentifier(codesignDescription: release) == "646VSJ9K5F")
+        #expect(ReleaseCheck.teamIdentifier(codesignDescription: "TeamIdentifier=not set") == nil)
+        #expect(ReleaseCheck.teamIdentifier(codesignDescription: "") == nil)
+    }
+
+    @Test("load paths outside the bundle and the system are reported")
+    func loadPaths() {
+        let otool = """
+            Load command 12
+                      cmd LC_RPATH
+                  cmdsize 48
+                     path @executable_path/../Frameworks (offset 12)
+            Load command 13
+                      cmd LC_RPATH
+                  cmdsize 32
+                     path /usr/lib/swift (offset 12)
+            Load command 14
+                      cmd LC_RPATH
+                  cmdsize 48
+                     path /Users/me/lib (offset 12)
+            Load command 15
+                      cmd LC_LOAD_DYLIB
+                  cmdsize 88
+                     name @rpath/Sparkle.framework/Versions/B/Sparkle (offset 24)
+            Load command 16
+                      cmd LC_LOAD_WEAK_DYLIB
+                  cmdsize 56
+                     name /opt/homebrew/lib/libx.dylib (offset 24)
+            Load command 17
+                      cmd LC_LOAD_DYLIB
+                  cmdsize 56
+                     name /System/Library/Frameworks/AppKit.framework/Versions/C/AppKit (offset 24)
+            """
+        let paths = ReleaseCheck.loadPaths(otoolLoadCommands: otool)
+        #expect(paths.count == 6)
+        #expect(paths.first == ReleaseCheck.LoadPath(command: "LC_RPATH", path: "@executable_path/../Frameworks"))
+        #expect(ReleaseCheck.unsafeLoadPaths(paths) == [
+            .init(command: "LC_RPATH", path: "/Users/me/lib"),
+            .init(command: "LC_LOAD_WEAK_DYLIB", path: "/opt/homebrew/lib/libx.dylib"),
+        ])
+    }
 }

@@ -539,7 +539,12 @@ swift run --package-path CortaTerminal -c release corta-release-check \
 `corta-release-check` is the one implementation of the release rules
 (`RELEASING.md`): versions and build number against `project.pbxproj`,
 license headers, the CHANGELOG and README naming the version, arm64-only
-executables (D21), the code signature, and — with the flags — the archive
+executables (D21), the code signature, every Mach-O in the bundle (the app,
+`corta-exec`, Sparkle and its helpers) signed with the hardened runtime, under
+one team identifier, carrying none of the entitlements that undo it
+(`ReleaseCheck.deniedEntitlements`: `get-task-allow`, library-validation,
+`DYLD_*`, JIT and unsigned-memory exceptions) and searching only the bundle
+and the system for libraries (`LC_RPATH` and dylib paths), and — with the flags — the archive
 and its sidecar, the feed item, Developer ID, the staple and Gatekeeper.
 Every rule prints `ok` or `FAIL`; the exit status is the number that
 failed. The judgements over text live in the `ReleaseCheck` library and
