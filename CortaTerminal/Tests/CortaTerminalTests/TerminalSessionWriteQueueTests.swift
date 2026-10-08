@@ -99,6 +99,48 @@ import Testing
         #expect(chunks[2] == userAfter)
     }
 
+    /// A batch of queries cannot queue replies without bound: 1 MiB of DA1
+    /// queries asks for ~3.8 MB of answers in one read batch, and every one
+    /// was admitted at once. Replies stop at the per-batch budget, and the
+    /// ones that go out are whole — an answer cut in half would reach the
+    /// child as input it never asked for.
+    @Test func aBatchOfQueriesQueuesAtMostTheReplyBudget() throws {
+        var seams = TerminalSession.Seams()
+        let recorded = Mutex<[[UInt8]]>([])
+        seams.writerSink = { chunk in recorded.withLock { $0.append(chunk) } }
+
+        let query: [UInt8] = [0x1B, 0x5B, 0x63]
+        let payload = Array(
+            Array(repeating: query, count: (1024 * 1024) / query.count).joined())
+        let offset = Mutex(0)
+        seams.readerSource = ReaderSource(
+            read: { buffer in
+                offset.withLock { position -> Int in
+                    let count = min(buffer.count, payload.count - position)
+                    guard count > 0 else { return 0 }
+                    payload[position..<(position + count)].withUnsafeBytes {
+                        buffer.copyMemory(from: $0)
+                    }
+                    position += count
+                    return count
+                }
+            },
+            isReadable: { offset.withLock { $0 < payload.count } }
+        )
+        let session = try TerminalSession(executable: "/bin/cat", seams: seams)
+        defer { session.stop() }
+        session.start()
+
+        #expect(awaitRecording(recorded, count: 1), "expected the replies to be written")
+        let chunks = recorded.withLock { $0 }
+        let total = chunks.reduce(0) { $0 + $1.count }
+        let reply = Array("\u{1B}[?62;1;22c".utf8)
+        #expect(total > 0)
+        #expect(total <= TerminalSession.maxResponseBytesPerBatch, "queued \(total) bytes of replies")
+        #expect(total % reply.count == 0, "a reply was cut: \(total) bytes")
+        #expect(chunks.allSatisfy { $0.starts(with: reply) })
+    }
+
     /// `write` must not block behind a write that is itself stuck (a child
     /// that has stopped reading). The sink's gate parks the drain on the
     /// first chunk; the test thread then calling `write` again *returning at
