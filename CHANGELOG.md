@@ -12,6 +12,10 @@ what to edit.
 
 ### Security
 
+- Updates are checked harder: Corta refuses an update feed that is not
+  signed with its update key, with no grace period, and checks a
+  downloaded update's signature before unpacking it rather than after. The
+  feed's notes, links and flags were not covered by any signature before.
 - The update feed's own check now refuses an entry that carries release
   notes, a link or an update flag, which Sparkle would act on and the
   update's signature does not cover; the feed has never published any. The

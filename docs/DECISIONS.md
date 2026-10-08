@@ -396,6 +396,24 @@ one-click releases; restoring a required reviewer (or removing the
 ruleset bypass) is how to buy the second step back, and either reopens
 this amendment.
 
+**Amended 2026-10-08 — the feed is signed as well as its archives.**
+`Sparkle-Info.plist` sets `SURequireSignedFeed`, so a Corta built from now
+on refuses a feed whose trailing `sparkle-signatures` block does not verify
+under `SUPublicEDKey`; `SUSignedFeedFailureExpirationInterval = 0` removes
+Sparkle's fallback that accepts an unverifiable feed after twenty days of
+failures (the fallback exists for key rotation, which D20 already rules
+out); and `SUVerifyUpdateBeforeExtraction` checks an archive's EdDSA
+signature before anything unzips it. `generate_appcast` signs the whole
+feed by itself once the archive it adds carries the key, with the same key
+through the same stdin, so `appcast.yml` is unchanged. Before this an edit
+to `appcast.xml` on `main` could put release notes, links or flags in front
+of every user unsigned; copies older than the first build with the key
+(build 11) still read the feed that way, which is what
+`verify-appcast.swift`'s field allowlist is for. The cost: a feed edited by
+hand after signing, or a signing step that fails, stops updates for every
+new copy until the feed is re-signed — `verify-appcast.swift` fails such a
+feed on every CI run, so it cannot merge.
+
 ## D21 — Corta builds for Apple silicon only
 
 **Decision.** From 1.1.0 the application and `corta-exec` are `arm64`

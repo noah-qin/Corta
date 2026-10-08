@@ -506,7 +506,9 @@ swift scripts/verify-appcast.swift --download            # every item, against t
   since Sparkle offers whichever item has the highest one; and nothing in
   an item beyond those fields — no release notes, link, critical or
   informational flag, channel or rollout tag, which Sparkle acts on and
-  the enclosure's signature does not cover (the feed itself is unsigned).
+  the enclosure's signature does not cover. A `sparkle-signatures` block,
+  once the feed carries one (D20, amended 2026-10-08), must verify over
+  every byte before it; from build 11 on the feed must carry one.
 - The **archive** layer is what `corta-release-check check --archive`
   adds, offline, against the archive it already holds, with or without
   `--appcast` — `appcast.yml` runs it once the feed is signed. `corta-release-check
