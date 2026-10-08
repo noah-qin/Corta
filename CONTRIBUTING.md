@@ -35,7 +35,9 @@ first so contributors do not duplicate effort.
 | `CortaTests/`, `CortaUITests/`, `CortaPerformanceTests/` | App-hosted tests, interactive UI tests, and the Release measurements |
 | `docs/` | User guides, architecture and verification evidence |
 | `TestPlans/` | `Unit` (the default), `UI` (interactive sessions only) and `Release` (the Release measurements) |
-| `scripts/`, `script/`, `.github/` | The two Swift scripts CI runs (Metal 4 probe, update-feed check), the release workflow's `prepare-release` helpers and their tests; local helpers and the isolated-sshd fixture (`script/`); and the CI, release and update-feed workflows |
+| `scripts/` | Metal capability and update-feed checks, release preparation helpers and tests, and `report-ci-statuses.sh` for automation PR checks |
+| `script/` | Local build helpers and the isolated-sshd fixture |
+| `.github/` | Issue and discussion forms, community files, and five workflows: `ci.yml`, `nightly.yml`, `render.yml`, `release.yml`, `appcast.yml` |
 
 ## Tests and documentation
 
@@ -257,17 +259,18 @@ the reviewer and scope in the PR, and record any human-only gaps.
 
 ## Reporting problems
 
-- **Bugs and feature requests** — open an issue. The forms ask for the
-  byte sequence that reproduces the problem; that is the part that makes a
-  VT bug fixable.
-- **Could not install or start Corta** — the *Installation blocker* form.
-  Check `docs/TROUBLESHOOTING.md` first, and say so if its entry was wrong.
-- **Tried Corta and went back** — the *Went back to my old terminal* form.
-  No reproduction needed; the reason is the report.
-- **Questions and ideas** — Discussions, not issues.
-- **Security vulnerabilities** — never in public. `SECURITY.md` has the
-  private reporting channel.
-- **Conduct** — `CODE_OF_CONDUCT.md`.
+- **Usage questions** — [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a).
+- **Early ideas and preferences** — [Discussions → Ideas](https://github.com/noah-qin/Corta/discussions/categories/ideas).
+- **Concrete feature requests** — the [feature request form](https://github.com/noah-qin/Corta/issues/new?template=feature_request.yml).
+- **Bugs** — the [bug report form](https://github.com/noah-qin/Corta/issues/new?template=bug_report.yml). Include a reproducer when possible.
+- **Installation blockers** — the [Installation blocker form](https://github.com/noah-qin/Corta/issues/new?template=install_blocker.yml). Check [Troubleshooting](docs/TROUBLESHOOTING.md) first.
+- **Tried Corta and went back** — the [Went back form](https://github.com/noah-qin/Corta/issues/new?template=went_back.yml). No reproduction needed.
+- **Security vulnerabilities** — report privately through [SECURITY.md](SECURITY.md).
+- **Conduct** — [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+
+One problem per issue.
+An accepted idea becomes an issue in the outcome/scope/acceptance/dependencies
+shape, written by the maintainer.
 
 ## Releases
 

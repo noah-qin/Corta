@@ -10,6 +10,11 @@ what to edit.
 
 ## [Unreleased]
 
+### Added
+
+- Discussions now have forms for questions and early ideas; bug reports ask
+  for diagnostic information when Corta freezes or crashes.
+
 ### Fixed
 
 - Cancelled SFTP uploads keep only their confirmed contiguous prefix before

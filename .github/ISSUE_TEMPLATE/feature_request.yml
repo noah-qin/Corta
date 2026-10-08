@@ -16,53 +16,49 @@
 
 name: Feature request
 description: Propose something Corta should do.
-labels: ["enhancement"]
+labels:
+- enhancement
 body:
-  - type: markdown
-    attributes:
-      value: |
-        Corta is deliberately small. `docs/DESIGN.md` §6 lists what has already
-        been considered and rejected — a built-in multiplexer, cross-platform
-        support, tmux control mode, AI features, RTL text and terminal title
-        query responses. Please read the design rationale first. If new evidence changes a
-        trade-off, describe it along with the workflow you want to improve.
+- type: markdown
+  attributes:
+    value: |
+      Corta is deliberately small. `docs/DESIGN.md` §6 lists what has already
+      been considered and rejected — a built-in multiplexer, cross-platform
+      support, tmux control mode, AI features, RTL text and terminal title
+      query responses. Please read the design rationale first. If new evidence changes a
+      trade-off, describe it along with the workflow you want to improve.
 
-  - type: checkboxes
-    id: read-non-goals
-    attributes:
-      label: Prerequisite
-      options:
-        - label: I have read the non-goals in `docs/DESIGN.md` §6 and explained any proposed change to them.
-          required: true
-
-  - type: textarea
-    id: problem
-    attributes:
-      label: The problem
-      description: What are you unable to do today? Describe the situation, not the solution.
-    validations:
+      One request per issue. For a list of separate thoughts or preferences you are unsure about, start in [Ideas](https://github.com/noah-qin/Corta/discussions/categories/ideas).
+- type: checkboxes
+  id: read-non-goals
+  attributes:
+    label: Prerequisite
+    options:
+    - label: I have read the non-goals in `docs/DESIGN.md` §6 and the settled decisions in `docs/DECISIONS.md`,
+        and explained any proposed change to them.
       required: true
-
-  - type: textarea
-    id: proposal
-    attributes:
-      label: What you would like Corta to do
-    validations:
-      required: true
-
-  - type: textarea
-    id: prior-art
-    attributes:
-      label: Prior art
-      description: >
-        Which terminals implement this, and how? If there is a specification or
-        an escape sequence for it, link it.
-
-  - type: textarea
-    id: cost
-    attributes:
-      label: What it would cost
-      description: >
-        Optional, and genuinely valued. Does this need a new per-cell field
-        (the cell is 16 bytes and full), a change to the hot path, or a new
-        state in the parser?
+- type: textarea
+  id: problem
+  attributes:
+    label: The problem
+    description: What are you unable to do today? Describe the situation, not the solution.
+  validations:
+    required: true
+- type: textarea
+  id: proposal
+  attributes:
+    label: What you would like Corta to do
+  validations:
+    required: true
+- type: textarea
+  id: prior-art
+  attributes:
+    label: Prior art
+    description: |
+      Which terminals implement this, and how? If there is a specification or an escape sequence for it, link it.
+- type: textarea
+  id: cost
+  attributes:
+    label: What it would cost
+    description: |
+      Optional, and genuinely valued. Does this need a new per-cell field (the cell is 16 bytes and full), a change to the hot path, or a new state in the parser?

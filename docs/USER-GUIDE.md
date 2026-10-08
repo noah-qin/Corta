@@ -578,6 +578,7 @@ fails and how to fix it — a download macOS will not open, a font that is
 refused, a shortcut that does nothing. [Features and limitations](FEATURES.md)
 lists what Corta does not do yet. Report anything else on
 [GitHub Issues](https://github.com/noah-qin/Corta/issues/new/choose).
+For usage questions, go to [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a).
 
 ### Development preview
 

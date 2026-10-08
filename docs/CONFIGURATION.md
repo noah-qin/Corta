@@ -673,8 +673,9 @@ search away.
 - **Title and colour *queries*.** Corta answers what it is; it does not
   report back things a program could use to read the screen or the
   clipboard.
-- **Transparency, ligatures, and per-profile settings.** Not shipped —
-  see `DESIGN.md` §6 for what is out of scope and why.
+- **Transparency, ligatures, and per-profile settings.** Not shipped; each needs a
+  decision in [DECISIONS.md](DECISIONS.md) before it is a feature — propose
+  one in [Discussions → Ideas](https://github.com/noah-qin/Corta/discussions/categories/ideas).
 
 ## 7. Where the values are applied
 
