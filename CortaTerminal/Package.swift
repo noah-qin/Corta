@@ -31,6 +31,7 @@ let package = Package(
         .executable(name: "corta-dump", targets: ["corta-dump"]),
         .executable(name: "corta-bench", targets: ["corta-bench"]),
         .executable(name: "corta-exec", targets: ["corta-exec"]),
+        .executable(name: "corta-image-decoder", targets: ["corta-image-decoder"]),
         .executable(name: "corta-fuzz", targets: ["corta-fuzz"]),
         .executable(name: "corta-license", targets: ["corta-license"]),
         .executable(name: "corta-release-check", targets: ["corta-release-check"]),
@@ -55,6 +56,14 @@ let package = Package(
         // must become its own Mach-O image so `posix_spawn` can launch it.
         .executableTarget(
             name: "corta-exec",
+            swiftSettings: [.defaultIsolation(nil)]
+        ),
+        // The PNG decoder the app spawns for Kitty images: ImageIO in a
+        // process of its own under the `pure-computation` sandbox, so a
+        // decoder bug cannot reach Corta's TCC grants. Embedded beside
+        // `corta-exec`; see its doc comment.
+        .executableTarget(
+            name: "corta-image-decoder",
             swiftSettings: [.defaultIsolation(nil)]
         ),
         // Feeds stdin to a terminal and prints the grid, so the core can be

@@ -12,6 +12,10 @@ what to edit.
 
 ### Security
 
+- Inline images (the Kitty graphics protocol) are decoded in a separate,
+  sandboxed process with no access to files or the network, so a flaw in
+  the system's PNG decoder can no longer reach anything Corta has been
+  allowed to read.
 - Updates are checked harder: Corta refuses an update feed that is not
   signed with its update key, with no grace period, and checks a
   downloaded update's signature before unpacking it rather than after. The

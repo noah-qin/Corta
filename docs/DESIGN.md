@@ -201,6 +201,7 @@ four reasons and what it would have bought.
 | `Scrollback`        | `CortaTerminal`                      | nonisolated | Ring buffer of variable-length lines                 |
 | `TerminalSession`   | `CortaTerminal`                      | nonisolated | Owns PTY + Parser + Grid; the unit a split renders   |
 | `PTY`, `corta-exec` | `CortaTerminal`                      | nonisolated | Spawn, read/write, winsize, child lifecycle          |
+| `corta-image-decoder` | `CortaTerminal/Sources/corta-image-decoder/` | own process | Decodes a Kitty PNG under the `pure-computation` sandbox; spawned by `ImageDecoderProcess` |
 | `CortaSFTP`         | `CortaTerminal/Sources/CortaSFTP/`   | nonisolated | The SFTP protocol over the system `ssh`, no SSH library (§7.9); a sibling library, not part of the core |
 | Renderer            | `Corta/Renderer/`                    | nonisolated | `TerminalRenderer`, `Metal4Backend` (the only GPU backend: one render pass per frame, D21), `QuadPipelineCache`, `GlyphAtlas`, `KittyImageRenderer`; draws a session into a rect, driven from the display link |
 | Font stack          | `Corta/Renderer/`                    | nonisolated | `TerminalFont`, `MonospacedFontCatalog`, `CellMetrics`: Core Text shaping, fallback, verification, the ASCII fast path |

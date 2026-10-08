@@ -291,14 +291,14 @@ if readme.contains("macOS \(bundleTarget)") {
 // Apple silicon only (D21). Xcode does not apply the project's ARCHS to
 // Swift package products, so a build that did not pass `ARCHS=arm64` on the
 // command line ships a universal corta-exec beside an arm64 app. Sparkle's
-// own binaries are not ours to thin; the rule covers the two executables
-// this project compiles.
+// own binaries are not ours to thin; the rule covers the executables
+// this project compiles (the app, corta-exec, corta-image-decoder).
 func architectures(_ path: String) -> String {
     trimmed(run("/usr/bin/lipo", ["-archs", path])?.stdout ?? "")
 }
 let bundleExecutable = plistValue("CFBundleExecutable")
 let appArchitectures = architectures("\(app)/Contents/MacOS/\(bundleExecutable)")
-for executable in [bundleExecutable, "corta-exec"] {
+for executable in [bundleExecutable, "corta-exec", "corta-image-decoder"] {
     let path = "\(app)/Contents/MacOS/\(executable)"
     guard !executable.isEmpty, fileManager.fileExists(atPath: path) else {
         fail("no executable at Contents/MacOS/\(executable.isEmpty ? "<CFBundleExecutable missing>" : executable)")
