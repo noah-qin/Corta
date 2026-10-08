@@ -277,26 +277,22 @@ public enum Search {
         return bytes.isEmpty ? nil : bytes
     }
 
-    /// Right to left, like the `String` path, so a capped sweep keeps the
-    /// newest matches within a line too.
-    private static func lastIndex(
-        of needle: [UInt8], in haystack: ContiguousArray<UInt8>, before end: Int,
-        fold: [UInt8]
-    ) -> Int? {
-        let count = needle.count
-        guard count > 0, end >= count else { return nil }
-        var start = end - count
-        while true {
-            var offset = 0
-            while offset < count {
-                if fold[Int(haystack[start + offset])] != needle[offset] { break }
-                offset += 1
-            }
-            if offset == count { return start }
-            if start == 0 { return nil }
-            start -= 1
+    /// The Knuth–Morris–Pratt failure function: for each prefix of
+    /// `pattern`, the length of its longest proper prefix that is also a
+    /// suffix. It is what lets a mismatch resume without re-reading text.
+    private static func failureTable(_ pattern: [UInt8]) -> [Int] {
+        var table = [Int](repeating: 0, count: pattern.count)
+        var matched = 0
+        for index in 1..<max(1, pattern.count) {
+            while matched > 0, pattern[index] != pattern[matched] { matched = table[matched - 1] }
+            if pattern[index] == pattern[matched] { matched += 1 }
+            table[index] = matched
         }
+        return table
     }
+
+    /// Bytes scanned between `shouldStop` polls inside one logical line.
+    static let stopPollInterval = 64 * 1024
 
     /// Oldest first; empty for an empty query. A capped result is the newest
     /// `maxMatches`. `shouldStop` is polled per line and per match.
@@ -317,6 +313,12 @@ public enum Search {
         // on its own.
         let needle = asciiNeedle(query, caseSensitive: caseSensitive)
         let fold = caseSensitive ? asciiIdentity : asciiFold
+        // Matched right to left as KMP over the reversed needle: each byte
+        // is read once, however much of the needle a near miss repeats.
+        // Comparing from every start position cost the line's length times
+        // the needle's — `a`×4095 then `b` against a long line of `a`.
+        let reversedNeedle = needle.map { Array($0.reversed()) } ?? []
+        let failure = needle == nil ? [] : failureTable(reversedNeedle)
         var haystack = ContiguousArray<UInt8>()
         var haystackRows = ContiguousArray<Int32>()
         var haystackColumns = ContiguousArray<Int32>()
@@ -348,22 +350,40 @@ public enum Search {
             {
                 guard !haystack.isEmpty else { continue }
                 if shouldStop() { break }
-                var searchEnd = haystack.count
-                while searchEnd >= needle.count,
-                    let start = lastIndex(
-                        of: needle, in: haystack, before: searchEnd, fold: fold)
-                {
-                    let last = start + needle.count - 1
-                    results.append(
-                        SelectionRange(
-                            start: SelectionPoint(
-                                row: Int(haystackRows[start]),
-                                column: Int(haystackColumns[start])),
-                            end: SelectionPoint(
-                                row: Int(haystackRows[last]),
-                                column: Int(haystackColumns[last]))))
-                    searchEnd = start
-                    if results.count >= maxMatches || shouldStop() { break lineLoop }
+                // The rightmost match first, then only what lies wholly to
+                // its left: a self-overlapping query ("aa" in "aaa") reports
+                // the later occurrence, as before.
+                let count = needle.count
+                var matched = 0
+                var index = haystack.count - 1
+                var sincePoll = 0
+                while index >= 0 {
+                    let byte = fold[Int(haystack[index])]
+                    while matched > 0, byte != reversedNeedle[matched] {
+                        matched = failure[matched - 1]
+                    }
+                    if byte == reversedNeedle[matched] { matched += 1 }
+                    if matched == count {
+                        let last = index + count - 1
+                        results.append(
+                            SelectionRange(
+                                start: SelectionPoint(
+                                    row: Int(haystackRows[index]),
+                                    column: Int(haystackColumns[index])),
+                                end: SelectionPoint(
+                                    row: Int(haystackRows[last]),
+                                    column: Int(haystackColumns[last]))))
+                        matched = 0
+                        if results.count >= maxMatches || shouldStop() { break lineLoop }
+                    }
+                    index -= 1
+                    // A cancelled sweep stops inside a long line too, not
+                    // only between lines and at matches.
+                    sincePoll += 1
+                    if sincePoll == stopPollInterval {
+                        sincePoll = 0
+                        if shouldStop() { break lineLoop }
+                    }
                 }
                 continue
             }
