@@ -221,6 +221,44 @@ if Set(shortVersions).count != shortVersions.count {
     fail("versions repeat in the feed: \(shortVersions)")
 }
 
+// MARK: - What else an item may say
+
+// Sparkle acts on more of an item than its enclosure: release notes it
+// renders, a link it opens, a critical or informational flag it obeys, a
+// phased-rollout or channel tag. None of it is covered by the enclosure's
+// EdDSA signature, and the feed itself is unsigned (`SURequireSignedFeed`
+// is off), so one edit to this file on `main` would reach every installed
+// Corta. The feed publishes none of them; a change that wants one adds it
+// here, deliberately, in the same pull request.
+let channelChildren: Set<String> = ["title", "link", "description", "language", "item"]
+let itemChildren: Set<String> = [
+    "title", "pubDate", "sparkle:version", "sparkle:shortVersionString",
+    "sparkle:minimumSystemVersion", "sparkle:hardwareRequirements", "enclosure",
+]
+let enclosureAttributes: Set<String> = ["url", "length", "type", "sparkle:edSignature"]
+func names(_ nodes: [XMLNode]?) -> [String] { (nodes ?? []).compactMap(\.name) }
+var unexpected: [String] = []
+for channel in (try? document.nodes(forXPath: "/rss/channel")) as? [XMLElement] ?? [] {
+    let extra = names(channel.children?.filter { $0.kind == .element }).filter { !channelChildren.contains($0) }
+    unexpected += extra.map { "channel: <\($0)>" }
+}
+for element in itemElements {
+    let short = sparkleText(element, "shortVersionString") ?? "?"
+    let extra = names(element.children?.filter { $0.kind == .element }).filter { !itemChildren.contains($0) }
+    unexpected += extra.map { "item \(short): <\($0)>" }
+    for enclosure in element.elements(forName: "enclosure") {
+        unexpected += names(enclosure.attributes).filter { !enclosureAttributes.contains($0) }
+            .map { "item \(short): enclosure attribute \($0)" }
+    }
+}
+if unexpected.isEmpty {
+    pass("no item carries release notes, links or flags the signature does not cover")
+} else {
+    for entry in unexpected {
+        fail("\(entry) is not something this feed publishes unsigned")
+    }
+}
+
 // MARK: - Signatures
 
 func verify(_ item: Item, bytes: Data, source: String) {

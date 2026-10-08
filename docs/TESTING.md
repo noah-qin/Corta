@@ -503,7 +503,10 @@ swift scripts/verify-appcast.swift --download            # every item, against t
   carrying a version, an integer build, an enclosure, a length and a
   base64 64-byte signature; each enclosure URL being exactly the GitHub
   release URL for its own version; build numbers unique and newest-first,
-  since Sparkle offers whichever item has the highest one.
+  since Sparkle offers whichever item has the highest one; and nothing in
+  an item beyond those fields — no release notes, link, critical or
+  informational flag, channel or rollout tag, which Sparkle acts on and
+  the enclosure's signature does not cover (the feed itself is unsigned).
 - The **archive** layer is what `corta-release-check check --archive`
   adds, offline, against the archive it already holds, with or without
   `--appcast` — `appcast.yml` runs it once the feed is signed. `corta-release-check
