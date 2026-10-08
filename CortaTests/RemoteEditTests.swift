@@ -351,7 +351,9 @@ struct RemoteEditCoordinatorTests {
             },
             opener: { _, _, _ in true },
             presenter: .init(promptUpload: { _ in }, promptConflict: { _ in }, showError: { _ in }),
-            connectTimeout: .milliseconds(400))
+            // Long enough that the cancels below land first on a loaded
+            // runner; the last waiter still meets it.
+            connectTimeout: .seconds(3) * testTimeoutScale)
 
         @MainActor final class Outcomes {
             var aDone = false
@@ -835,7 +837,9 @@ struct RemoteEditCoordinatorTests {
         #expect(conflict.remoteDescription == L10n.text("remoteEdit.conflict.deleted"))
     }
 
-    @Test("a failed upload keeps the decision open and says the remote is untouched")
+    /// A lost connection may have cut the upload off anywhere, so the
+    /// wording says the remote's state is not known rather than untouched.
+    @Test("a failed upload keeps the decision open and says what is known of the remote")
     func uploadFailureWording() async throws {
         let fixture = try makeFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
@@ -855,7 +859,7 @@ struct RemoteEditCoordinatorTests {
         #expect(
             message
                 == L10n.format(
-                    "remoteEdit.uploadFailed", "/srv/app/main.rs", "build-box",
+                    "remoteEdit.uploadUncertain", "/srv/app/main.rs", "build-box",
                     SFTPBrowserModel.errorMessage(
                         .transport(.connectionLost), host: "build-box")))
         #expect(
