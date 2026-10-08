@@ -715,7 +715,12 @@ public final class SFTPTransferEngine: @unchecked Sendable {
     /// record is what lets the retry — or the user's next attempt, until
     /// relaunch — recognise its own partial. Across a relaunch the stamp
     /// the cleanup restores is the evidence instead.
-    private static let uploadResumeRecords = Mutex<[String: LocalSourceIdentity]>([:])
+    private struct UploadResumeRecord: Sendable {
+        let source: LocalSourceIdentity
+        let confirmedOffset: UInt64
+    }
+
+    private static let uploadResumeRecords = Mutex<[String: UploadResumeRecord]>([:])
 
     private func uploadOnce(
         sourcePath: String,
@@ -763,7 +768,9 @@ public final class SFTPTransferEngine: @unchecked Sendable {
             // own when the interrupted upload was cleaned up (see below), or
             // this process remembers writing it from this very source.
             let recorded = Self.uploadResumeRecords.withLock { $0[recordKey] }
-            if partial.modificationTime == sourceMTime || recorded == source {
+            if let recorded, recorded.source == source {
+                offset = min(partialSize, recorded.confirmedOffset)
+            } else if partial.modificationTime == sourceMTime {
                 offset = partialSize
             }
         }
@@ -793,18 +800,28 @@ public final class SFTPTransferEngine: @unchecked Sendable {
             }
             throw failure
         }
-        Self.uploadResumeRecords.withLock { $0[recordKey] = source }
+        Self.uploadResumeRecords.withLock {
+            $0[recordKey] = UploadResumeRecord(source: source, confirmedOffset: offset)
+        }
         try? await session.fsetStat(
             handle: handle, attributes: SFTPAttributes(modificationTime: sourceMTime))
 
         let abort = AbortFlag()
+        let confirmedOffset = Mutex(offset)
         var handleOpen = true
         do {
             let moved = try await withTaskCancellationHandler {
                 try await self.pipeUpload(
                     session: session, handle: handle, descriptor: descriptor,
                     sourcePath: sourcePath, offset: offset, total: sourceSize,
-                    progress: progress, abort: abort)
+                    progress: { update in
+                        confirmedOffset.withLock { $0 = update.completedBytes }
+                        Self.uploadResumeRecords.withLock {
+                            $0[recordKey] = UploadResumeRecord(
+                                source: source, confirmedOffset: update.completedBytes)
+                        }
+                        progress?(update)
+                    }, abort: abort)
             } onCancel: {
                 abort.set()
             }
@@ -825,13 +842,32 @@ public final class SFTPTransferEngine: @unchecked Sendable {
                 Self.uploadResumeRecords.withLock { $0[recordKey] = nil }
                 throw failure
             }
-            if handleOpen { await cleanUpRemote { try? await session.close(handle) } }
-            if Self.keepsPartial(partialDisposition, keepForResume: resolution == .resume) {
-                // Every WRITE moved the partial's mtime; put the source's
-                // back so the partial validates itself after a relaunch.
+            let handleClosed = Mutex(!handleOpen)
+            if handleOpen {
                 await cleanUpRemote {
-                    try? await session.setStat(
-                        path: partialPath, attributes: SFTPAttributes(modificationTime: sourceMTime))
+                    do {
+                        try await session.close(handle)
+                        handleClosed.withLock { $0 = true }
+                    } catch {}
+                }
+            }
+            if Self.keepsPartial(partialDisposition, keepForResume: resolution == .resume) {
+                // Concurrent WRITE tasks can reach the server out of offset
+                // order. File size may include holes beyond the acknowledged
+                // contiguous prefix. CLOSE is a barrier against late writes;
+                // only then truncate and stamp a safe resume point.
+                if handleClosed.withLock({ $0 }) {
+                    let prefix = confirmedOffset.withLock { $0 }
+                    await cleanUpRemote {
+                        do {
+                            try await session.setStat(
+                                path: partialPath,
+                                attributes: SFTPAttributes(size: prefix, modificationTime: sourceMTime))
+                            Self.uploadResumeRecords.withLock {
+                                $0[recordKey] = UploadResumeRecord(source: source, confirmedOffset: prefix)
+                            }
+                        } catch {}
+                    }
                 }
             } else {
                 Self.uploadResumeRecords.withLock { $0[recordKey] = nil }

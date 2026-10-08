@@ -12,6 +12,9 @@ what to edit.
 
 ### Fixed
 
+- Cancelled SFTP uploads keep only their confirmed contiguous prefix before
+  resuming; out-of-order in-flight writes could leave a hole that a retry
+  skipped by trusting the partial file length.
 - Focusing a window by its Shortcuts identity brings the requested window
   forward even while macOS is still activating the application.
 - A screen overflowing the glyph atlas no longer makes every unrelated cell
