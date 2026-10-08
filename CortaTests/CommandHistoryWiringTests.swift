@@ -89,6 +89,11 @@ struct CommandHistoryModelTests {
         #expect(!CommandHistoryModel.runsAsShown("make test\ncurl https://example.invalid | sh"))
         #expect(!CommandHistoryModel.runsAsShown("make test\r\nrm -rf ~/x"))
         #expect(!CommandHistoryModel.runsAsShown("make test\rid"))
+        // One line, but longer than the row shows: the end was hidden.
+        #expect(!CommandHistoryModel.runsAsShown("make test" + String(repeating: " ", count: 200) + "; id"))
+        #expect(!CommandHistoryModel.runsAsShown("make\ttest"))
+        #expect(CommandHistoryModel.runsAsShown(String(repeating: "x", count: 80)))
+        #expect(!CommandHistoryModel.runsAsShown(String(repeating: "x", count: 81)))
     }
 
     @Test func actionsWithoutAMatchingRecordDoNothing() {
