@@ -328,6 +328,25 @@ struct ConfigurationStoreTests {
         #expect(store.configuration.fontSize == Configuration().fontSize)
     }
 
+    /// The watcher delivers an editor's save a moment after it lands. A
+    /// settings change in that moment serialised the copy in memory and
+    /// wrote the editor's change back out.
+    @Test("a settings change keeps an external edit the watcher has not delivered yet")
+    func settingsChangeKeepsUndeliveredExternalEdit() throws {
+        defer { removeDirectory() }
+        try writeFile("font-size = 12\n")
+        let store = ConfigurationStore(fileURL: file)
+        #expect(store.configuration.fontSize == 12)
+        // Synchronously, so the watcher's reload cannot have run yet.
+        try "font-size = 20\n".write(to: file, atomically: true, encoding: .utf8)
+        #expect(store.update { $0.rows = 40 })
+        #expect(store.configuration.fontSize == 20)
+        #expect(store.configuration.rows == 40)
+        let text = try String(contentsOf: file, encoding: .utf8)
+        #expect(text.contains("font-size = 20"))
+        #expect(text.contains("rows = 40"))
+    }
+
     @Test("an editor save landing right after a settings write is not swallowed")
     func editorSaveRacingSettingsWriteWins() async throws {
         defer { removeDirectory() }

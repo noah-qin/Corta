@@ -723,7 +723,7 @@ struct SFTPTransferTests {
         #expect(!rig.server.log.operations.contains("extended \(SFTPCodec.posixRenameExtensionName)"))
     }
 
-    @Test("without posix-rename, overwriting falls back to remove then rename")
+    @Test("without posix-rename, overwriting renames the old file aside until the new one is in place")
     func uploadOverwriteFallback() async throws {
         let rig = try await makeRig()
         defer { teardown(rig) }
@@ -733,12 +733,315 @@ struct SFTPTransferTests {
         try await rig.engine.upload(from: source, to: "/dest/up.bin", policy: .overwrite)
         #expect(rig.fileSystem.file("/dest/up.bin")?.data == [1, 2, 3, 4])
         let log = rig.server.log.operations
-        let removeIndex = log.firstIndex(of: "remove /dest/up.bin")
-        // The first rename attempt fails (destination exists) and is what
-        // the fallback reacts to; the successful one is the last.
-        let renameIndex = log.lastIndex(
-            of: "rename /dest/up.bin\(rig.partialName) -> /dest/up.bin")
-        #expect(removeIndex != nil && renameIndex != nil && removeIndex! < renameIndex!)
+        // The old file is never removed before the new one has its name:
+        // aside first, the partial into place, then the old copy removed.
+        let aside = try #require(
+            log.first { $0.hasPrefix("rename /dest/up.bin -> /dest/up.bin.corta-old-") })
+        let asidePath = String(aside.dropFirst("rename /dest/up.bin -> ".count))
+        let asideIndex = try #require(log.firstIndex(of: aside))
+        let commitIndex = try #require(
+            log.lastIndex(of: "rename /dest/up.bin\(rig.partialName) -> /dest/up.bin"))
+        let removeIndex = try #require(log.firstIndex(of: "remove \(asidePath)"))
+        #expect(asideIndex < commitIndex && commitIndex < removeIndex)
+        #expect(!log.contains("remove /dest/up.bin"))
+        #expect(!rig.fileSystem.exists(asidePath))
+    }
+
+    /// The fallback used to REMOVE the destination and then RENAME; when the
+    /// second step failed, the failure cleanup removed the partial too, and
+    /// neither the old file nor the new one was left anywhere.
+    @Test("a failed fallback commit puts the old file back")
+    func failedFallbackCommitRestoresDestination() async throws {
+        let rig = try await makeRig()
+        defer { teardown(rig) }
+        rig.fileSystem.createFile("/remote", data: Array("ORIGINAL".utf8))
+        let source = try localFile(rig, "new", contents: Array("NEW".utf8))
+        let partialPath = "/remote" + rig.partialName
+        rig.server.interceptor = { message in
+            if case .rename(let old, _) = message.payload,
+                String(decoding: old, as: UTF8.self) == partialPath
+            {
+                return .reply(.status(SFTPStatus(
+                    code: .failure, message: Array("refused".utf8), languageTag: Array("en".utf8))))
+            }
+            return .proceed
+        }
+        await #expect(throws: SFTPError.self) {
+            try await rig.engine.upload(
+                from: source, to: "/remote", policy: .overwrite, partialDisposition: .remove)
+        }
+        #expect(rig.fileSystem.file("/remote")?.data == Array("ORIGINAL".utf8))
+        #expect(rig.fileSystem.children(of: "/") == ["remote"])
+    }
+
+    @Test("a fallback commit that cannot be undone says where both copies are")
+    func unrecoverableFallbackCommitKeepsBothCopies() async throws {
+        let rig = try await makeRig()
+        defer { teardown(rig) }
+        rig.fileSystem.createFile("/remote", data: Array("ORIGINAL".utf8))
+        let source = try localFile(rig, "new", contents: Array("NEW".utf8))
+        let partialPath = "/remote" + rig.partialName
+        rig.server.interceptor = { message in
+            if case .rename(let old, _) = message.payload {
+                let name = String(decoding: old, as: UTF8.self)
+                if name == partialPath || name.hasPrefix("/remote.corta-old-") {
+                    return .reply(.status(SFTPStatus(
+                        code: .failure, message: Array("refused".utf8),
+                        languageTag: Array("en".utf8))))
+                }
+            }
+            return .proceed
+        }
+        // Bound outside the catch: see `firstConnectRefusalIsClassified`.
+        var caught: SFTPError?
+        do {
+            _ = try await rig.engine.upload(
+                from: source, to: "/remote", policy: .overwrite, partialDisposition: .remove)
+        } catch {
+            caught = error
+        }
+        guard case .replaceIncomplete(let destination, let previous, let new)? = caught else {
+            Issue.record("expected replaceIncomplete, got \(String(describing: caught))")
+            return
+        }
+        #expect(destination == "/remote")
+        #expect(new == partialPath)
+        #expect(rig.fileSystem.file(previous)?.data == Array("ORIGINAL".utf8))
+        #expect(rig.fileSystem.file(new)?.data == Array("NEW".utf8))
+    }
+
+    /// Two overwrites of one path shared its partial: the second truncated
+    /// and committed it while the first still wrote through its own handle,
+    /// so a destination reported done went on changing.
+    @Test("transfers to one destination take turns, across engines of one scope")
+    func sameDestinationTransfersAreSerialised() async throws {
+        let scope = "box-\(UUID().uuidString)"
+        let rig = try await makeRig(configureEngine: {
+            $0.destinationScope = scope
+            $0.pipelineDepth = 1
+        })
+        defer { teardown(rig) }
+        var configuration = rig.engine.configuration
+        configuration.destinationScope = scope
+        let other = SFTPTransferEngine(session: rig.session, configuration: configuration)
+        let first = try localFile(rig, "a", contents: [UInt8](repeating: 0x41, count: 2048))
+        let second = try localFile(rig, "b", contents: [UInt8](repeating: 0x42, count: 512))
+
+        let firstPaused = Mutex(false)
+        let releaseFirst = DispatchSemaphore(value: 0)
+        let firstTask = Task {
+            try await rig.engine.upload(from: first, to: "/target", policy: .overwrite) { _ in
+                if !firstPaused.withLock({ $0 }) {
+                    firstPaused.withLock { $0 = true }
+                    _ = releaseFirst.wait(timeout: .now() + 5)
+                }
+            }
+        }
+        #expect(try await waitForFlag(firstPaused))
+        let secondFinished = Mutex(false)
+        let secondTask = Task {
+            defer { secondFinished.withLock { $0 = true } }
+            return try await other.upload(from: second, to: "/target", policy: .overwrite)
+        }
+        try await Task.sleep(for: .milliseconds(200))
+        // The second waits for the path; it has not opened anything.
+        #expect(!secondFinished.withLock { $0 })
+        #expect(!rig.fileSystem.exists("/target"))
+        releaseFirst.signal()
+        _ = try await firstTask.value
+        _ = try await secondTask.value
+        // Last writer wins, whole: the destination is the second file, not
+        // the first's tail written over it.
+        #expect(rig.fileSystem.file("/target")?.data == [UInt8](repeating: 0x42, count: 512))
+        #expect(!SFTPDestinationLocks.shared.isHeld(rig.engine.remoteClaim("/target")))
+        // One path, however it is spelled.
+        #expect(rig.engine.remoteClaim("//target") == rig.engine.remoteClaim("/target"))
+        #expect(SFTPDestinationLocks.normalizedRemotePath("/a//b/./c/../d") == "/a/b/d")
+        #expect(SFTPDestinationLocks.normalizedRemotePath("rel/./x") == "rel/x")
+    }
+
+    @Test("a download whose source shrinks mid-transfer fails and keeps the destination")
+    func shrunkDownloadSourceFails() async throws {
+        let rig = try await makeRig()
+        defer { teardown(rig) }
+        rig.fileSystem.createFile("/remote", data: [UInt8](repeating: 7, count: 2048))
+        let destination = try localFile(rig, "out", contents: Array("ORIGINAL".utf8))
+        let fileSystem = rig.fileSystem
+        let shrunk = Mutex(false)
+        rig.server.interceptor = { message in
+            if case .read = message.payload, !shrunk.withLock({ $0 }) {
+                shrunk.withLock { $0 = true }
+                fileSystem.createFile("/remote", data: [UInt8](repeating: 7, count: 100))
+            }
+            return .proceed
+        }
+        await #expect(throws: SFTPError.sourceChanged(path: "/remote")) {
+            try await rig.engine.download(remotePath: "/remote", to: destination, policy: .overwrite)
+        }
+        #expect(localContents(destination) == Array("ORIGINAL".utf8))
+    }
+
+    @Test("a download whose source is rewritten mid-transfer fails")
+    func rewrittenDownloadSourceFails() async throws {
+        let rig = try await makeRig()
+        defer { teardown(rig) }
+        rig.fileSystem.createFile("/remote", data: [UInt8](repeating: 7, count: 2048))
+        let destination = rig.directory.appendingPathComponent("out")
+        let fileSystem = rig.fileSystem
+        rig.server.interceptor = { message in
+            if case .read = message.payload, fileSystem.file("/remote")?.modificationTime == 1_000 {
+                fileSystem.createFile(
+                    "/remote", data: [UInt8](repeating: 8, count: 2048), modificationTime: 2_000)
+            }
+            return .proceed
+        }
+        await #expect(throws: SFTPError.sourceChanged(path: "/remote")) {
+            try await rig.engine.download(remotePath: "/remote", to: destination, policy: .overwrite)
+        }
+        #expect(!FileManager.default.fileExists(atPath: destination.path))
+    }
+
+    @Test("an upload whose source shrinks or grows mid-transfer fails and keeps the destination",
+        arguments: [100, 4096])
+    func changedUploadSourceFails(newSize: Int) async throws {
+        let rig = try await makeRig()
+        defer { teardown(rig) }
+        rig.fileSystem.createFile("/remote", data: Array("ORIGINAL".utf8))
+        let source = try localFile(rig, "up", contents: [UInt8](repeating: 3, count: 2048))
+        let changed = Mutex(false)
+        rig.server.interceptor = { message in
+            if case .open = message.payload, !changed.withLock({ $0 }) {
+                changed.withLock { $0 = true }
+                try? Data(repeating: 4, count: newSize).write(to: source)
+            }
+            return .proceed
+        }
+        await #expect(throws: SFTPError.self) {
+            try await rig.engine.upload(from: source, to: "/remote", policy: .overwrite)
+        }
+        #expect(rig.fileSystem.file("/remote")?.data == Array("ORIGINAL".utf8))
+        #expect(!rig.fileSystem.exists("/remote" + rig.partialName))
+    }
+
+    /// A real server moves the partial's mtime on every WRITE, so the stamp
+    /// set at OPEN was gone by the time a cancel kept the partial, and the
+    /// retry restarted from zero.
+    @Test("a cancelled upload's partial resumes on a server whose WRITE moves the mtime")
+    func cancelledUploadResumesDespiteWriteStamps() async throws {
+        let rig = try await makeRig(configureEngine: { $0.pipelineDepth = 1 })
+        defer { teardown(rig) }
+        let contents = (0..<2048).map { UInt8($0 % 229) }
+        let source = try localFile(rig, "up", contents: contents, mtime: 7777)
+        let partialPath = "/remote" + rig.partialName
+        let fileSystem = rig.fileSystem
+        rig.server.interceptor = { message in
+            if case .write = message.payload, var file = fileSystem.file(partialPath) {
+                file.modificationTime = 99_999
+                fileSystem.createFile(partialPath, data: file.data, modificationTime: 99_999)
+            }
+            return .proceed
+        }
+        let wrote = Mutex(false)
+        let release = DispatchSemaphore(value: 0)
+        let transfer = Task {
+            try await rig.engine.upload(
+                from: source, to: "/remote", policy: .resume, partialDisposition: .keepForResume
+            ) { _ in
+                wrote.withLock { $0 = true }
+                _ = release.wait(timeout: .now() + 5)
+            }
+        }
+        #expect(try await waitForFlag(wrote))
+        transfer.cancel()
+        release.signal()
+        await #expect(throws: SFTPError.cancelled) { try await transfer.value }
+        // The cleanup put the source's mtime back on what it kept.
+        #expect(rig.fileSystem.file(partialPath)?.modificationTime == 7777)
+        #expect((rig.fileSystem.file(partialPath)?.data.count ?? 0) > 0)
+
+        // A different engine — no memory of the first — trusts the stamp.
+        let fresh = SFTPTransferEngine(session: rig.session, configuration: rig.engine.configuration)
+        rig.server.interceptor = nil
+        let receipt = try await fresh.upload(from: source, to: "/remote", policy: .resume)
+        #expect(receipt.resumedFromOffset > 0)
+        #expect(rig.fileSystem.file("/remote")?.data == contents)
+    }
+
+    @Test("an upload retried after a lost connection resumes its own partial")
+    func uploadResumesAfterTransportFailure() async throws {
+        let fileSystem = FakeRemoteFileSystem()
+        let contents = (0..<4096).map { UInt8($0 % 227) }
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("corta-sftp-tests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = directory.appendingPathComponent("up")
+        try Data(contents).write(to: source)
+        let partialPath = "/remote" + SFTPTransferEngine.partialSuffix
+
+        let firstConnection = SFTPLoopbackConnection()
+        let firstServer = FakeSFTPServer(connection: firstConnection, fileSystem: fileSystem)
+        let writes = Mutex(0)
+        firstServer.interceptor = { message in
+            if case .write = message.payload {
+                // Every WRITE moves the mtime, as a real server's does.
+                if let file = fileSystem.file(partialPath) {
+                    fileSystem.createFile(partialPath, data: file.data, modificationTime: 99_999)
+                }
+                let count = writes.withLock { count -> Int in
+                    count += 1
+                    return count
+                }
+                if count == 3 { return .dropConnection }
+            }
+            return .proceed
+        }
+        firstServer.start()
+        let reconnect: SFTPTransferEngine.ReconnectHandler = {
+            let connection = SFTPLoopbackConnection()
+            let server = FakeSFTPServer(connection: connection, fileSystem: fileSystem)
+            server.start()
+            let session = SFTPSession(transport: connection.clientTransport())
+            _ = try await session.connect()
+            return session
+        }
+        let firstSession = SFTPSession(transport: firstConnection.clientTransport())
+        _ = try await firstSession.connect()
+        var configuration = SFTPTransferEngine.Configuration()
+        configuration.blockSize = 512
+        configuration.pipelineDepth = 1
+        configuration.initialBackoff = .milliseconds(10)
+        let engine = SFTPTransferEngine(
+            session: firstSession, reconnect: reconnect, configuration: configuration)
+        defer {
+            engine.session.close()
+            firstConnection.close()
+        }
+        let receipt = try await engine.upload(from: source, to: "/remote", policy: .resume)
+        #expect(receipt.attempts == 2)
+        #expect(receipt.resumedFromOffset == 1024)
+        #expect(fileSystem.file("/remote")?.data == contents)
+    }
+
+    @Test("a folder that is gone when its upload starts fails instead of uploading nothing")
+    func missingUploadDirectoryFails() async throws {
+        let rig = try await makeRig()
+        defer { teardown(rig) }
+        let missing = rig.directory.appendingPathComponent("MISSING")
+        await #expect(throws: SFTPError.localIOFailed(operation: "opendir", code: ENOENT)) {
+            try await rig.engine.uploadDirectory(from: missing, to: "/backup", policy: .overwrite)
+        }
+        #expect(!rig.fileSystem.exists("/backup"))
+        let file = try localFile(rig, "plain", contents: [1])
+        await #expect(throws: SFTPError.localIOFailed(operation: "opendir", code: ENOTDIR)) {
+            try await rig.engine.uploadDirectory(from: file, to: "/backup", policy: .overwrite)
+        }
+        // A folder that is really empty still uploads as one.
+        let empty = rig.directory.appendingPathComponent("empty")
+        try FileManager.default.createDirectory(at: empty, withIntermediateDirectories: false)
+        let receipt = try await rig.engine.uploadDirectory(from: empty, to: "/backup", policy: .overwrite)
+        #expect(receipt.filesTransferred == 0)
+        #expect(rig.fileSystem.isDirectory("/backup"))
     }
 
     @Test("an upload resumes at the remote partial's size")

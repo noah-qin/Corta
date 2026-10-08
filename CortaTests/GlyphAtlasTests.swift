@@ -119,6 +119,76 @@ import Testing
         try? report.write(toFile: outputPath, atomically: true, encoding: .utf8)
         #expect(initMs >= 0)  // always true; the measurement is the point
     }
+    /// A committed frame recorded UVs into the atlas's textures, and a font
+    /// change rewrote them before the GPU read them: the old frame drew the
+    /// new font's glyphs. While frames are in flight the atlas moves to
+    /// fresh textures and leaves the old ones as they were.
+    @Test("a reset while frames are in flight leaves the queued frames' texture untouched")
+    func resetInFlightKeepsOldTexture() throws {
+        let device = try #require(Self.makeDevice())
+        let atlas = try GlyphAtlas(
+            device: device, font: CTFontCreateWithName("Menlo" as CFString, 14, nil),
+            atlasPixelSize: 256)
+        var retired: [ObjectIdentifier] = []
+        atlas.onTextureRetired = { retired.append(ObjectIdentifier($0)) }
+        _ = atlas.glyph(forASCII: 0x41, style: .regular)
+        let before = atlas.texture
+        let snapshot = Self.bytes(of: before)
+
+        atlas.texturesInUse = { true }
+        atlas.reset(font: CTFontCreateWithName("Menlo" as CFString, 30, nil))
+        _ = atlas.glyph(forASCII: 0x4D, style: .regular)
+        #expect(atlas.texture !== before)
+        #expect(Self.bytes(of: before) == snapshot)
+        #expect(retired.contains(ObjectIdentifier(before)))
+
+        // With nothing in flight it rewrites in place, as it always did.
+        atlas.texturesInUse = { false }
+        let current = atlas.texture
+        atlas.reset(font: CTFontCreateWithName("Menlo" as CFString, 14, nil))
+        #expect(atlas.texture === current)
+    }
+
+    @Test("an eviction while frames are in flight copies the surviving page and spares the old texture")
+    func evictionInFlightKeepsOldTexture() throws {
+        let device = try #require(Self.makeDevice())
+        let atlas = try GlyphAtlas(
+            device: device, font: CTFontCreateWithName("Menlo" as CFString, 14, nil),
+            atlasPixelSize: 64)
+        _ = atlas.glyph(forASCII: 0x41, style: .regular)
+        let before = atlas.texture
+        var atRetirement: [UInt8]?
+        atlas.onTextureRetired = { atRetirement = Self.bytes(of: $0) }
+        atlas.texturesInUse = { true }
+        let evictions = atlas.evictionCount
+        var scalar: UInt32 = 0x4E00
+        while atlas.evictionCount == evictions, scalar < 0x4F00 {
+            _ = atlas.glyph(shaping: scalar, style: .regular)
+            scalar += 1
+        }
+        #expect(atlas.evictionCount > evictions)
+        #expect(atlas.texture !== before)
+        // Glyphs shaped after the eviction land in the new texture only.
+        for extra in scalar..<(scalar + 3) { _ = atlas.glyph(shaping: extra, style: .regular) }
+        let snapshot = try #require(atRetirement)
+        #expect(Self.bytes(of: before) == snapshot)
+        // The ASCII page, the top half, came along to the new texture.
+        let half = before.width * (before.height / 2)
+        #expect(Array(Self.bytes(of: atlas.texture).prefix(half)) == Array(snapshot.prefix(half)))
+    }
+
+    private static func bytes(of texture: MTLTexture) -> [UInt8] {
+        let bytesPerRow = texture.width * (texture.pixelFormat == .bgra8Unorm ? 4 : 1)
+        var bytes = [UInt8](repeating: 0, count: bytesPerRow * texture.height)
+        bytes.withUnsafeMutableBytes { raw in
+            guard let base = raw.baseAddress else { return }
+            texture.getBytes(
+                base, bytesPerRow: bytesPerRow,
+                from: MTLRegionMake2D(0, 0, texture.width, texture.height), mipmapLevel: 0)
+        }
+        return bytes
+    }
+
     private static func makeDevice() -> MTLDevice? { MTLCreateSystemDefaultDevice() }
 
     private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (

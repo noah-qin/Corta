@@ -12452,65 +12452,6 @@
         }
       }
     },
-    "toast.connectionEnded": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The connection ended. Shell ▸ Reconnect to Host starts a new one."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "连接已结束。在 Shell 菜单中选择“重新连接到主机”可建立新连接。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "連線已結束。在 Shell 選單中選擇「重新連線到主機」可建立新連線。"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "接続が終了しました。Shell メニューの「ホストに再接続」で新しい接続を開始できます。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "연결이 종료되었습니다. Shell 메뉴에서 “호스트에 다시 연결”을 선택하면 새 연결이 시작됩니다."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Die Verbindung wurde beendet. Über Shell ▸ Erneut mit Host verbinden wird eine neue aufgebaut."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "La connexion a pris fin. Shell ▸ Se reconnecter à l’hôte en ouvre une nouvelle."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "La conexión ha terminado. Shell ▸ Reconectar al host inicia una nueva."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "A conexão foi encerrada. Shell ▸ Reconectar ao host inicia uma nova."
-          }
-        }
-      }
-    },
     "toast.reconnected": {
       "extractionState": "manual",
       "localizations": {
@@ -35990,6 +35931,773 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Fechar busca"
+          }
+        }
+      }
+    },
+    "sftp.error.sourceChanged": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%1$@” changed while it was being transferred, so nothing was replaced. Try again once it has stopped changing."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%1$@”在传输过程中发生了变化，因此没有替换任何文件。请在它停止变化后重试。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「%1$@」在傳輸過程中發生了變化，因此沒有取代任何檔案。請在它停止變化後重試。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「%1$@」が転送中に変更されたため、何も置き換えられませんでした。変更が止まってから再試行してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%1$@”이(가) 전송 중에 변경되어 아무것도 바꾸지 않았습니다. 변경이 멈춘 뒤 다시 시도하세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "„%1$@“ hat sich während der Übertragung geändert, daher wurde nichts ersetzt. Versuche es erneut, sobald sich die Datei nicht mehr ändert."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "« %1$@ » a changé pendant le transfert ; rien n’a été remplacé. Réessayez une fois qu’il ne change plus."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "«%1$@» cambió durante la transferencia, así que no se reemplazó nada. Vuelve a intentarlo cuando deje de cambiar."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%1$@” mudou durante a transferência, então nada foi substituído. Tente novamente quando ele parar de mudar."
+          }
+        }
+      }
+    },
+    "sftp.error.replaceIncomplete": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Replacing %1$@ did not finish. The previous file is at %2$@ and the new one at %3$@."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "替换 %1$@ 未能完成。原文件位于 %2$@，新文件位于 %3$@。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "取代 %1$@ 未能完成。原檔案位於 %2$@，新檔案位於 %3$@。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ の置き換えが完了しませんでした。以前のファイルは %2$@、新しいファイルは %3$@ にあります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ 바꾸기를 완료하지 못했습니다. 이전 파일은 %2$@에, 새 파일은 %3$@에 있습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Das Ersetzen von %1$@ wurde nicht abgeschlossen. Die vorherige Datei liegt unter %2$@, die neue unter %3$@."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Le remplacement de %1$@ ne s’est pas terminé. L’ancien fichier se trouve à %2$@ et le nouveau à %3$@."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se terminó de reemplazar %1$@. El archivo anterior está en %2$@ y el nuevo en %3$@."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "A substituição de %1$@ não terminou. O arquivo anterior está em %2$@ e o novo em %3$@."
+          }
+        }
+      }
+    },
+    "remoteEdit.uploadIncomplete": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uploading “%1$@” to %2$@ did not finish: %3$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上传“%1$@”到 %2$@ 未能完成：%3$@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "上傳「%1$@」到 %2$@ 未能完成：%3$@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「%1$@」の %2$@ へのアップロードが完了しませんでした: %3$@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%1$@”을(를) %2$@(으)로 업로드하는 작업을 완료하지 못했습니다: %3$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Das Hochladen von „%1$@“ zu %2$@ wurde nicht abgeschlossen: %3$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "L’envoi de « %1$@ » vers %2$@ ne s’est pas terminé : %3$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se terminó de subir «%1$@» a %2$@: %3$@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O envio de “%1$@” para %2$@ não terminou: %3$@"
+          }
+        }
+      }
+    },
+    "remoteEdit.uploadUncertain": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uploading “%1$@” to %2$@ failed: %3$@\n\nThe connection ended before the result was known. Check the remote file before uploading again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上传“%1$@”到 %2$@ 失败：%3$@\n\n连接在结果确认之前就已中断。再次上传前请先检查远程文件。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "上傳「%1$@」到 %2$@ 失敗：%3$@\n\n連線在結果確認之前就已中斷。再次上傳前請先檢查遠端檔案。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「%1$@」の %2$@ へのアップロードに失敗しました: %3$@\n\n結果がわかる前に接続が切れました。再度アップロードする前にリモートファイルを確認してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%1$@”을(를) %2$@(으)로 업로드하지 못했습니다: %3$@\n\n결과를 확인하기 전에 연결이 끊겼습니다. 다시 업로드하기 전에 원격 파일을 확인하세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "„%1$@“ konnte nicht zu %2$@ hochgeladen werden: %3$@\n\nDie Verbindung wurde beendet, bevor das Ergebnis feststand. Prüfe die entfernte Datei, bevor du erneut hochlädst."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "L’envoi de « %1$@ » vers %2$@ a échoué : %3$@\n\nLa connexion s’est terminée avant que le résultat soit connu. Vérifiez le fichier distant avant de l’envoyer à nouveau."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se pudo subir «%1$@» a %2$@: %3$@\n\nLa conexión terminó antes de conocerse el resultado. Revisa el archivo remoto antes de volver a subirlo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Falha ao enviar “%1$@” para %2$@: %3$@\n\nA conexão terminou antes de o resultado ser conhecido. Verifique o arquivo remoto antes de enviar novamente."
+          }
+        }
+      }
+    },
+    "session.ended.exited": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session ended · exit code %1$ld"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会话已结束 · 退出码 %1$ld"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "工作階段已結束 · 結束代碼 %1$ld"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "セッションは終了しました · 終了コード %1$ld"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "세션이 종료됨 · 종료 코드 %1$ld"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Sitzung beendet · Exit-Code %1$ld"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Session terminée · code de sortie %1$ld"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Sesión finalizada · código de salida %1$ld"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Sessão encerrada · código de saída %1$ld"
+          }
+        }
+      }
+    },
+    "session.ended.signalled": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session ended by %1$@ (signal %2$ld)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会话已被 %1$@ 终止（信号 %2$ld）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "工作階段已被 %1$@ 終止（訊號 %2$ld）"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "セッションは %1$@ により終了しました（シグナル %2$ld）"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "세션이 %1$@에 의해 종료됨 (시그널 %2$ld)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Sitzung durch %1$@ beendet (Signal %2$ld)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Session terminée par %1$@ (signal %2$ld)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Sesión finalizada por %1$@ (señal %2$ld)"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Sessão encerrada por %1$@ (sinal %2$ld)"
+          }
+        }
+      }
+    },
+    "session.ended.connection.exited": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection ended · exit code %1$ld"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接已结束 · 退出码 %1$ld"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "連線已結束 · 結束代碼 %1$ld"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "接続は終了しました · 終了コード %1$ld"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "연결이 종료됨 · 종료 코드 %1$ld"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Verbindung beendet · Exit-Code %1$ld"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Connexion terminée · code de sortie %1$ld"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conexión finalizada · código de salida %1$ld"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conexão encerrada · código de saída %1$ld"
+          }
+        }
+      }
+    },
+    "session.ended.connection.signalled": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection ended by %1$@ (signal %2$ld)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接已被 %1$@ 终止（信号 %2$ld）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "連線已被 %1$@ 終止（訊號 %2$ld）"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "接続は %1$@ により終了しました（シグナル %2$ld）"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "연결이 %1$@에 의해 종료됨 (시그널 %2$ld)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Verbindung durch %1$@ beendet (Signal %2$ld)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Connexion terminée par %1$@ (signal %2$ld)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conexión finalizada por %1$@ (señal %2$ld)"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conexão encerrada por %1$@ (sinal %2$ld)"
+          }
+        }
+      }
+    },
+    "session.ended.newSession": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Session"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新建会话"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "新增工作階段"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "新規セッション"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "새 세션"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Neue Sitzung"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Nouvelle session"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Nueva sesión"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Nova sessão"
+          }
+        }
+      }
+    },
+    "session.ended.confirm.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start a new session in this pane?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要在此窗格中启动新会话吗？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "要在此窗格中啟動新的工作階段嗎？"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "このペインで新しいセッションを開始しますか？"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "이 패널에서 새 세션을 시작할까요?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Eine neue Sitzung in diesem Bereich starten?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Démarrer une nouvelle session dans ce panneau ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "¿Iniciar una nueva sesión en este panel?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Iniciar uma nova sessão neste painel?"
+          }
+        }
+      }
+    },
+    "session.ended.confirm.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A new shell starts here. The output above is cleared, and what was running before does not come back."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这里会启动一个新的 shell。上方的输出将被清除，之前运行的内容不会恢复。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "這裡會啟動一個新的 shell。上方的輸出將被清除，先前執行的內容不會恢復。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ここで新しいシェルが起動します。上の出力は消去され、以前に実行していたものは戻りません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "여기에서 새 셸이 시작됩니다. 위의 출력은 지워지며 이전에 실행 중이던 것은 돌아오지 않습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Hier startet eine neue Shell. Die Ausgabe oben wird gelöscht, und was vorher lief, kommt nicht zurück."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Un nouveau shell démarre ici. La sortie ci-dessus est effacée et ce qui s’exécutait auparavant ne revient pas."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Aquí se inicia una nueva shell. La salida de arriba se borra y lo que se ejecutaba antes no vuelve."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Um novo shell é iniciado aqui. A saída acima é apagada, e o que estava em execução antes não volta."
+          }
+        }
+      }
+    },
+    "session.ended.confirm.remoteMessage": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The command runs again as a new connection. The output above is cleared, and the previous session does not come back."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该命令将作为新连接再次运行。上方的输出将被清除，之前的会话不会恢复。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "該指令將以新連線再次執行。上方的輸出將被清除，先前的工作階段不會恢復。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "コマンドは新しい接続として再実行されます。上の出力は消去され、以前のセッションは戻りません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "명령이 새 연결로 다시 실행됩니다. 위의 출력은 지워지며 이전 세션은 돌아오지 않습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Der Befehl läuft erneut als neue Verbindung. Die Ausgabe oben wird gelöscht, und die vorherige Sitzung kommt nicht zurück."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "La commande s’exécute à nouveau dans une nouvelle connexion. La sortie ci-dessus est effacée et la session précédente ne revient pas."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "El comando se ejecuta de nuevo como una conexión nueva. La salida de arriba se borra y la sesión anterior no vuelve."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O comando é executado novamente como uma nova conexão. A saída acima é apagada, e a sessão anterior não volta."
+          }
+        }
+      }
+    },
+    "session.ended.confirm.start": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "启动"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "啟動"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "開始"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "시작"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Starten"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Démarrer"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Iniciar"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Iniciar"
           }
         }
       }

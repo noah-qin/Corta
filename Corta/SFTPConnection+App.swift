@@ -34,6 +34,10 @@ extension SFTPConnection {
         var engine = SFTPTransferEngine.Configuration()
         engine.quarantinesDownloads = true
         engine.maximumDownloadBytes = maximumDownloadBytes
+        // Every connection to one host claims its remote paths under the
+        // same scope, so a browser upload and a remote-edit save to one file
+        // take turns instead of sharing its partial.
+        engine.destinationScope = host
         if let override = DiagnosticsEnvironment.sftpSSHExecutable() {
             return SFTPConnection(
                 host: host, sshExecutable: override, environment: environment,

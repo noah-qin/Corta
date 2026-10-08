@@ -158,6 +158,61 @@ struct SearchTests {
         #expect(matches.last?.end == SelectionPoint(row: 49, column: 39))
     }
 
+    /// A near miss repeated along a long line: comparing from every start
+    /// position read the line's length times the query's, and polled for
+    /// cancellation only between lines.
+    @Test("a near-miss query on a long line is linear and stops when asked")
+    func nearMissOnALongLineStopsWhenAsked() {
+        var terminal = Terminal(rows: 50, columns: 80, scrollbackLimit: 4096)
+        terminal.feed([UInt8](repeating: UInt8(ascii: "a"), count: 131_072))
+        let query = String(repeating: "a", count: 4095) + "b"
+        let started = ContinuousClock.now
+        #expect(Search.find(query, in: terminal.grid).isEmpty)
+        // Linear: well under the quarter-second the quadratic scan took.
+        #expect(started.duration(to: .now) < .seconds(2))
+
+        var polls = 0
+        _ = Search.find(query, in: terminal.grid, shouldStop: {
+            polls += 1
+            return polls > 1
+        })
+        // The first poll is before the line; the second, inside it, stops it.
+        #expect(polls == 2)
+    }
+
+    /// The KMP scan reports what comparing at every position reported.
+    @Test("the linear scan finds what a scan from every position finds")
+    func linearScanMatchesTheNaiveOne() {
+        var generator = SystemRandomNumberGenerator()
+        for _ in 0..<200 {
+            let length = Int.random(in: 1...60, using: &generator)
+            let line = String((0..<length).map { _ in "abA".randomElement(using: &generator)! })
+            let query = String(
+                (0..<Int.random(in: 1...4, using: &generator)).map { _ in
+                    "ab".randomElement(using: &generator)!
+                })
+            var terminal = Terminal(rows: 3, columns: 80)
+            terminal.feed(Array(line.utf8))
+            let found = Search.find(query, in: terminal.grid).map(\.start.column)
+            // Rightmost first, then wholly to its left; case-insensitive.
+            var expected: [Int] = []
+            let haystack = Array(line.lowercased().utf8)
+            let needle = Array(query.utf8)
+            var end = haystack.count
+            var start = end - needle.count
+            while start >= 0 {
+                if Array(haystack[start..<(start + needle.count)]) == needle {
+                    expected.append(start)
+                    end = start
+                    start = end - needle.count
+                } else {
+                    start -= 1
+                }
+            }
+            #expect(found == expected.reversed(), "\(query) in \(line)")
+        }
+    }
+
     @Test("reversed logical-line iteration visits the same lines, backwards")
     func reversedIteration() {
         var terminal = Terminal(rows: 5, columns: 8, scrollbackLimit: 10)

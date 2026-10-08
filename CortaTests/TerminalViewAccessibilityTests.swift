@@ -149,11 +149,41 @@ struct TerminalViewAccessibilityTests {
         var terminal = self.terminal(rows: 4, columns: 20)
         terminal.feed(Array("hello world".utf8))
         let selection = SelectionRange(
-            anchor: SelectionPoint(row: 0, column: 0), head: SelectionPoint(row: 0, column: 5))
+            anchor: SelectionPoint(row: 0, column: 0), head: SelectionPoint(row: 0, column: 4))
         let snapshot = TerminalAccessibilitySnapshot(grid: terminal.grid, selection: selection)
         let view = view(snapshot: snapshot)
         #expect(view.accessibilitySelectedTextRange() == snapshot.selectedRange)
         #expect(view.accessibilitySelectedText() == "hello")
+    }
+
+    /// Both ends of a selection are included; the range ended *at* the last
+    /// cell, so VoiceOver read "AB" of a selected "ABC" and a single
+    /// selected cell as no selection at all.
+    @Test func selectedTextIncludesTheLastCellAndMatchesCopy() {
+        var terminal = self.terminal(rows: 4, columns: 20)
+        terminal.feed(Array("ABC\r\n中文\r\ne\u{301}x".utf8))
+        func selected(_ from: (Int, Int), _ to: (Int, Int)) -> (ax: String?, copy: String) {
+            let selection = SelectionRange(
+                anchor: SelectionPoint(row: from.0, column: from.1),
+                head: SelectionPoint(row: to.0, column: to.1))
+            let snapshot = TerminalAccessibilitySnapshot(grid: terminal.grid, selection: selection)
+            return (
+                view(snapshot: snapshot).accessibilitySelectedText(),
+                Selection.text(of: selection, in: terminal.grid))
+        }
+        #expect(selected((0, 0), (0, 2)).ax == "ABC")
+        #expect(selected((0, 0), (0, 2)).copy == "ABC")
+        #expect(selected((0, 1), (0, 1)).ax == "B")
+        // Backwards is the same selection.
+        #expect(selected((0, 2), (0, 0)).ax == "ABC")
+        // Wide characters: the last cell may be either half of one.
+        #expect(selected((1, 0), (1, 3)).ax == "中文")
+        #expect(selected((1, 0), (1, 2)).ax == "中文")
+        #expect(selected((1, 0), (1, 1)).ax == "中")
+        // A combining sequence is one cell and one grapheme.
+        #expect(selected((2, 0), (2, 0)).ax == "e\u{301}")
+        // Across rows, and the AX text is what Copy gives.
+        #expect(selected((0, 0), (1, 3)).ax == selected((0, 0), (1, 3)).copy)
     }
 
     @Test func noSelectionMeansNoSelectedText() {

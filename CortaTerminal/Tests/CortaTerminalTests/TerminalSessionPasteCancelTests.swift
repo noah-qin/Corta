@@ -152,6 +152,51 @@ import Testing
         #expect(waitForGrid(session) { $0.contains("got-int") })
     }
 
+    /// The last chunk of a paste is popped before it is written, so nothing
+    /// of the paste was queued any more while that write still blocked on a
+    /// child not reading — and Ctrl-C, finding no paste to cancel, queued a
+    /// `^C` behind the blocked write instead of sending the signal.
+    @Test func aBlockedLastPasteChunkStillLetsCtrlCInterrupt() throws {
+        let session = try TerminalSession(
+            executable: "/bin/sh",
+            arguments: [
+                "-c",
+                "stty -icanon -echo isig; trap 'echo got-int; exit 0' INT; echo ready; while :; do sleep 0.05; done",
+            ])
+        defer { session.stop() }
+        session.start()
+        #expect(waitForGrid(session) { $0.contains("ready") })
+        // One 64 KiB chunk: far more than the line discipline holds for a
+        // child that never reads.
+        #expect(session.write(paste: [[UInt8](repeating: 0x61, count: 64 * 1024)], closing: nil) == .accepted)
+        #expect(wait { !session.hasPendingPaste && session.isPasteInFlight })
+        Thread.sleep(forTimeInterval: 0.1)
+        #expect(session.isPasteInFlight, "the write should still be blocked")
+
+        let interrupt = session.interruptPendingPaste()
+        #expect(interrupt.signalled)
+        #expect(!interrupt.cancelledPaste, "nothing was left queued to cancel")
+        #expect(waitForGrid(session) { $0.contains("got-int") })
+    }
+
+    @Test func aPastesLastChunkIsInFlightUntilItsWriteReturns() throws {
+        let sink = GatedSink()
+        let session = try makeSession(sink)
+        defer { session.stop() }
+        #expect(session.write(paste: [[0x61]], closing: nil) == .accepted)
+        #expect(wait { sink.chunks.count == 1 })
+        #expect(!session.hasPendingPaste)
+        #expect(session.isPasteInFlight)
+        // A sink is not a pty: nothing to signal, and nothing was queued.
+        #expect(session.interruptPendingPaste() == TerminalSession.PasteInterrupt())
+        sink.released.withLock { $0 = true }
+        #expect(wait { !session.isPasteInFlight })
+        // Ordinary input is never mistaken for a paste in flight.
+        #expect(session.write([0x62]) == .accepted)
+        #expect(wait { sink.chunks.count == 2 })
+        #expect(!session.isPasteInFlight)
+    }
+
     /// With `ISIG` off `^C` is input to a raw-mode program; no signal is sent.
     @Test func noSignalIsSentToARawModeProgram() throws {
         let session = try TerminalSession(

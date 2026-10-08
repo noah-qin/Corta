@@ -361,14 +361,40 @@ extension SFTPTransferEngine {
     /// order.
     static func enumerateLocal(root: URL) throws(SFTPError) -> TreePlan {
         var plan = TreePlan()
+        // The enumerator yields nothing for a root that is missing or
+        // unreadable, which looked exactly like an empty folder: a folder
+        // moved away while its upload was queued created an empty remote
+        // directory and reported success.
+        var rootInfo = Darwin.stat()
+        guard fstatat(AT_FDCWD, root.path, &rootInfo, 0) == 0 else {
+            throw .localIOFailed(operation: "opendir", code: errno)
+        }
+        guard rootInfo.st_mode & S_IFMT == S_IFDIR else {
+            throw .localIOFailed(operation: "opendir", code: ENOTDIR)
+        }
+        guard Darwin.access(root.path, R_OK | X_OK) == 0 else {
+            throw .localIOFailed(operation: "opendir", code: errno)
+        }
         let keys: Set<URLResourceKey> = [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]
+        // A subdirectory that cannot be read is a tree that cannot be
+        // uploaded whole: the walk stops and says so, rather than reporting
+        // a partial tree as the folder.
+        let enumerationError = EnumerationError()
         guard
             let enumerator = FileManager.default.enumerator(
                 at: root, includingPropertiesForKeys: Array(keys),
-                options: [.producesRelativePathURLs])
+                options: [.producesRelativePathURLs],
+                errorHandler: { _, error in
+                    let underlying = (error as NSError).userInfo[NSUnderlyingErrorKey] as? NSError
+                    if enumerationError.code == nil {
+                        enumerationError.code = Int32(clamping: underlying?.code ?? Int(EIO))
+                    }
+                    return false
+                })
         else { throw .localIOFailed(operation: "opendir", code: ENOENT) }
         let rootPath = root.standardizedFileURL.path
         for case let url as URL in enumerator {
+            if Task.isCancelled { throw .cancelled }
             let values = try? url.resourceValues(forKeys: keys)
             let absolute = url.standardizedFileURL.path
             let relative =
@@ -384,6 +410,9 @@ extension SFTPTransferEngine {
             } else {
                 plan.skipped.append(.init(relativePath: relative, reason: .notARegularFile))
             }
+        }
+        if let code = enumerationError.code {
+            throw .localIOFailed(operation: "readdir", code: code)
         }
         // The enumerator yields in traversal order, so parents precede
         // their children already; sorting by depth keeps that true for
@@ -425,4 +454,11 @@ extension SFTPTransferEngine {
     static func join(_ directory: String, _ relative: String) -> String {
         directory == "/" ? "/\(relative)" : "\(directory)/\(relative)"
     }
+}
+
+/// The first error the local walk's enumerator reported. The walk calls its
+/// error handler synchronously on the walking thread, so a plain reference
+/// is enough; `@unchecked` only because the handler's type may be `@Sendable`.
+private final class EnumerationError: @unchecked Sendable {
+    var code: Int32?
 }

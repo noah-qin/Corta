@@ -118,11 +118,25 @@ final class RemoteEditCoordinator {
     private var presenter: RemoteEditPresenter
 
     private var clients: [String: any SFTPClient] = [:]
-    private struct ConnectionAttempt {
+    /// One connection being made to a host, shared by every operation that
+    /// needs that host meanwhile. Each of them waits on a continuation of
+    /// its own, so one that is cancelled stops waiting at once; the attempt
+    /// itself is abandoned when its last waiter leaves, or at the deadline.
+    private final class ConnectionAttempt {
         let id = UUID()
-        let task: Task<any SFTPClient, any Error>
+        let client: any SFTPClient
+        var task: Task<Void, Never>?
+        var deadline: Task<Void, Never>?
+        var waiters: [UUID: CheckedContinuation<any SFTPClient, any Error>] = [:]
+
+        init(client: any SFTPClient) { self.client = client }
     }
     private var connections: [String: ConnectionAttempt] = [:]
+    /// How long a connection may take to answer before it is given up:
+    /// ssh's own connect, authentication, and SFTP's INIT/VERSION. A server
+    /// whose subsystem never answers would otherwise hold every operation
+    /// on that host until the app quit.
+    private let connectTimeout: Duration
 
     private(set) var pendingUploads: [PendingUpload] = []
     private(set) var pendingConflicts: [UploadConflict] = []
@@ -145,9 +159,11 @@ final class RemoteEditCoordinator {
         store: RemoteEditStore = RemoteEditStore.shared,
         makeClient: ((String) -> any SFTPClient)? = nil,
         opener: (@MainActor (URL, Int, Int?) -> Bool)? = nil,
-        presenter: RemoteEditPresenter? = nil
+        presenter: RemoteEditPresenter? = nil,
+        connectTimeout: Duration = .seconds(30)
     ) {
         self.store = store
+        self.connectTimeout = connectTimeout
         self.makeClient = makeClient ?? {
             SFTPConnection.forApp(host: $0, maximumDownloadBytes: RemoteEditCoordinator.maximumCopyBytes)
         }
@@ -164,7 +180,12 @@ final class RemoteEditCoordinator {
     isolated deinit {
         for (_, watch) in watches { watch.source.cancel() }
         for (_, check) in pendingChecks { check.cancel() }
-        for (_, connection) in connections { connection.task.cancel() }
+        for (_, connection) in connections {
+            connection.task?.cancel()
+            connection.deadline?.cancel()
+            connection.client.close()
+            for (_, waiter) in connection.waiters { waiter.resume(throwing: SFTPError.cancelled) }
+        }
         for (_, client) in clients { client.close() }
         for (_, url) in approvedSnapshots { try? FileManager.default.removeItem(at: url) }
     }
@@ -269,34 +290,91 @@ final class RemoteEditCoordinator {
 
     private func client(for host: String) async throws(SFTPError) -> any SFTPClient {
         if let client = clients[host] { return client }
-        let connection: ConnectionAttempt
-        if let pending = connections[host] {
-            connection = pending
-        } else {
-            let client = makeClient(host)
-            connection = ConnectionAttempt(task: Task {
-                do {
-                    try await client.connect()
-                    try Task.checkCancellation()
-                    return client
-                } catch {
-                    client.close()
-                    throw error
-                }
-            })
-            connections[host] = connection
-        }
+        let attempt = connections[host] ?? startConnection(to: host)
+        let waiter = UUID()
         do {
-            let client = try await connection.task.value
-            if connections[host]?.id == connection.id {
-                clients[host] = client
-                connections[host] = nil
+            return try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { continuation in
+                    guard !Task.isCancelled else {
+                        continuation.resume(throwing: SFTPError.cancelled)
+                        return
+                    }
+                    attempt.waiters[waiter] = continuation
+                }
+            } onCancel: { [attemptID = attempt.id] in
+                Task { @MainActor [weak self] in
+                    self?.stopWaiting(waiter, onAttempt: attemptID, host: host)
+                }
             }
-            return client
         } catch {
-            if connections[host]?.id == connection.id { connections[host] = nil }
             throw Self.sftpError(error)
         }
+    }
+
+    private func startConnection(to host: String) -> ConnectionAttempt {
+        let attempt = ConnectionAttempt(client: makeClient(host))
+        connections[host] = attempt
+        let client = attempt.client
+        attempt.task = Task { [weak self] in
+            var failure: SFTPError?
+            do {
+                _ = try await client.connect()
+            } catch {
+                failure = Self.sftpError(error)
+            }
+            self?.finish(attempt, host: host, failure: failure)
+        }
+        let timeout = connectTimeout
+        attempt.deadline = Task { [weak self] in
+            do { try await Task.sleep(for: timeout) } catch { return }
+            self?.abandon(
+                attempt, host: host,
+                error: .transport(.hostUnreachable(
+                    diagnostics: "no SFTP answer within \(timeout.components.seconds) seconds")))
+        }
+        return attempt
+    }
+
+    private func finish(_ attempt: ConnectionAttempt, host: String, failure: SFTPError?) {
+        attempt.deadline?.cancel()
+        guard connections[host] === attempt else {
+            // Abandoned meanwhile: a late success is nobody's connection.
+            attempt.client.close()
+            return
+        }
+        connections[host] = nil
+        let waiters = attempt.waiters
+        attempt.waiters = [:]
+        if let failure {
+            attempt.client.close()
+            for (_, waiter) in waiters { waiter.resume(throwing: failure) }
+        } else {
+            clients[host] = attempt.client
+            for (_, waiter) in waiters { waiter.resume(returning: attempt.client) }
+        }
+    }
+
+    /// A cancelled operation stops waiting now. The attempt goes on for the
+    /// others, and is abandoned when it was the last one waiting.
+    private func stopWaiting(_ waiter: UUID, onAttempt attemptID: UUID, host: String) {
+        // An attempt that already finished resumed this waiter itself.
+        guard let attempt = connections[host], attempt.id == attemptID else { return }
+        attempt.waiters.removeValue(forKey: waiter)?.resume(throwing: SFTPError.cancelled)
+        if attempt.waiters.isEmpty { abandon(attempt, host: host, error: .cancelled) }
+    }
+
+    /// Gives an attempt up: its client is closed, which ends the connect,
+    /// and whoever still waits hears `error`. The next operation on the
+    /// host starts a fresh attempt.
+    private func abandon(_ attempt: ConnectionAttempt, host: String, error: SFTPError) {
+        guard connections[host] === attempt else { return }
+        connections[host] = nil
+        attempt.deadline?.cancel()
+        attempt.task?.cancel()
+        attempt.client.close()
+        let waiters = attempt.waiters
+        attempt.waiters = [:]
+        for (_, waiter) in waiters { waiter.resume(throwing: error) }
     }
 
     /// A failed conversation is retired, not replayed. The next explicit
@@ -453,12 +531,11 @@ final class RemoteEditCoordinator {
             let matchesContent: Bool
             let metadataMatches =
                 current.size == copy.remoteSize && current.modificationTime == copy.remoteMTime
-            if metadataMatches, copy.remoteDigest == nil {
-                // A copy downloaded before digests were recorded (1.0.x) has
-                // no content baseline; size and time are all there is, as
-                // they were then. The upload records a digest for next time.
-                matchesContent = true
-            } else if metadataMatches, let baseline = copy.remoteDigest {
+            // A copy downloaded before digests were recorded (1.0.x) has no
+            // content baseline, and size and time alone miss a same-size
+            // rewrite within the second: it takes the conflict decision
+            // (docs/SECURITY.md), once — Upload Anyway records a digest.
+            if metadataMatches, let baseline = copy.remoteDigest {
                 let probe = store.approvalsURL.appendingPathComponent(UUID().uuidString)
                 try store.secureCopy(at: probe)
                 defer { try? FileManager.default.removeItem(at: probe) }
@@ -551,17 +628,19 @@ final class RemoteEditCoordinator {
         case .saveCopyElsewhere(let destination):
             do {
                 // The save panel already asked about replacing an existing
-                // file; `copyItem` alone refuses one.
-                if FileManager.default.fileExists(atPath: destination.path) {
-                    try FileManager.default.removeItem(at: destination)
-                }
-                try FileManager.default.copyItem(at: store.localURL(for: copy), to: destination)
+                // file — consent to replace it with the copy, not to lose it
+                // when the copy fails.
+                try Self.copyReplacing(store.localURL(for: copy), at: destination)
             } catch {
                 // Said, and the decision asked again: dropped, it told the user
                 // nothing; kept silently, it blocked every later upload prompt.
-                let code = ((error as NSError).userInfo[NSUnderlyingErrorKey] as? NSError)?.code
+                let nsError = error as NSError
+                let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError
+                let code =
+                    underlying?.code
+                    ?? (nsError.domain == NSPOSIXErrorDomain ? nsError.code : Int(EIO))
                 presenter.showError(SFTPBrowserModel.errorMessage(
-                    .localIOFailed(operation: "save copy", code: Int32(code ?? Int(EIO))),
+                    .localIOFailed(operation: "save copy", code: Int32(clamping: code)),
                     host: copy.host))
                 presenter.promptConflict(conflict)
                 return
@@ -575,6 +654,35 @@ final class RemoteEditCoordinator {
             pendingConflicts.removeAll { $0.id == conflictID }
             pendingUploads.removeAll { $0.id == conflictID }
             store.recordApproved(copy, digest: digests[copy.id])
+        }
+    }
+
+    /// Copies `source` to `destination`, replacing a file already there
+    /// only once the copy is complete: the copy is made beside the
+    /// destination under a name of its own and `rename(2)`d over it, so a
+    /// failure — a missing source, a full disk, no permission — leaves the
+    /// existing file exactly as it was. The destination being the source
+    /// itself is already the requested state.
+    nonisolated static func copyReplacing(_ source: URL, at destination: URL) throws {
+        var sourceInfo = Darwin.stat()
+        var destinationInfo = Darwin.stat()
+        if fstatat(AT_FDCWD, source.path, &sourceInfo, 0) == 0,
+            fstatat(AT_FDCWD, destination.path, &destinationInfo, 0) == 0,
+            sourceInfo.st_dev == destinationInfo.st_dev,
+            sourceInfo.st_ino == destinationInfo.st_ino
+        {
+            return
+        }
+        let temporary = destination.deletingLastPathComponent().appendingPathComponent(
+            ".\(destination.lastPathComponent).corta-save-\(UUID().uuidString)")
+        do {
+            try FileManager.default.copyItem(at: source, to: temporary)
+            guard Darwin.rename(temporary.path, destination.path) == 0 else {
+                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: temporary)
+            throw error
         }
     }
 
@@ -611,12 +719,21 @@ final class RemoteEditCoordinator {
             uploadsInFlight.remove(copy.id)
             noteLocalWrite(copyID: copy.id)
         } catch {
-            // The pending entry stays: the decision is still owed, and the
-            // wording is honest about the remote being untouched.
+            // The pending entry stays: the decision is still owed. The
+            // wording says what is known about the remote: untouched after
+            // a refusal, unknown after a lost connection, and split in two
+            // when a replacement could not be finished or undone.
+            let error = Self.sftpError(error)
+            let key: String
+            switch error {
+            case .replaceIncomplete: key = "remoteEdit.uploadIncomplete"
+            case .transport: key = "remoteEdit.uploadUncertain"
+            default: key = "remoteEdit.uploadFailed"
+            }
             presenter.showError(
                 L10n.format(
-                    "remoteEdit.uploadFailed", copy.remotePath, copy.host,
-                    SFTPBrowserModel.errorMessage(Self.sftpError(error), host: copy.host)))
+                    key, copy.remotePath, copy.host,
+                    SFTPBrowserModel.errorMessage(error, host: copy.host)))
             askAgain(copy)
         }
     }

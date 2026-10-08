@@ -1093,6 +1093,10 @@ final class SFTPBrowserModel {
             return L10n.format("sftp.error.conflict", path)
         case .localIOFailed(let operation, let code):
             return L10n.format("sftp.error.localIO", operation, code)
+        case .sourceChanged(let path):
+            return L10n.format("sftp.error.sourceChanged", path)
+        case .replaceIncomplete(let destination, let previousCopy, let newCopy):
+            return L10n.format("sftp.error.replaceIncomplete", destination, previousCopy, newCopy)
         }
     }
 

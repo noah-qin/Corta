@@ -43,6 +43,15 @@ public enum SFTPError: Error, Equatable {
     case destinationConflict(path: String)
     /// A local filesystem operation failed while staging a transfer.
     case localIOFailed(operation: String, code: Int32)
+    /// The source changed while it was being read — it shrank, grew, was
+    /// rewritten or replaced — so what arrived is none of its versions.
+    /// Nothing was committed; the destination is as it was.
+    case sourceChanged(path: String)
+    /// Replacing the destination on a server without `posix-rename` failed
+    /// half-way, and putting the old file back failed too. Nothing is lost,
+    /// but the copies are apart: the old content is at `previousCopy`, the
+    /// new at `newCopy`, and `destination` may hold neither.
+    case replaceIncomplete(destination: String, previousCopy: String, newCopy: String)
 
     /// Whether a retry against a fresh channel could plausibly succeed.
     /// Transport failures only — a server STATUS is a considered answer,
@@ -50,6 +59,20 @@ public enum SFTPError: Error, Equatable {
     /// protocol at all.
     public var isRetryableTransportFailure: Bool {
         if case .transport = self { return true }
+        return false
+    }
+
+    /// Whether this is `.replaceIncomplete`: the one failure after which
+    /// the partial must stay, because it may hold the only new copy.
+    var isIncompleteReplacement: Bool {
+        if case .replaceIncomplete = self { return true }
+        return false
+    }
+
+    /// A STATUS of plain `SSH_FX_FAILURE` — what OpenSSH answers for an
+    /// exclusive create of a name that exists.
+    var isPlainServerFailure: Bool {
+        if case .server(let status) = self { return status.code == .failure }
         return false
     }
 }
@@ -65,6 +88,9 @@ extension SFTPError: CustomStringConvertible {
         case .destinationConflict(let path): "the destination already exists: \(path)"
         case .localIOFailed(let operation, let code):
             "local \(operation) failed: errno \(code)"
+        case .sourceChanged(let path): "the source changed during the transfer: \(path)"
+        case .replaceIncomplete(let destination, let previousCopy, let newCopy):
+            "replacing \(destination) did not finish: the old file is at \(previousCopy), the new one at \(newCopy)"
         }
     }
 }

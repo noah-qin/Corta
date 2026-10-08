@@ -54,6 +54,63 @@ what to edit.
   dismissed. A file opened once stayed in
   Application Support, and its backups, for good.
 - Exported output and selections are written readable by you only (`0600`).
+- A remote-edit copy from 1.0.x, which recorded no content digest, now asks
+  the conflict question before its first upload, as the security notes
+  always said; size and time alone miss a same-size change within the
+  second. **Upload Anyway** records the digest for next time.
+
+### Added
+
+- A pane whose session has ended says so until you act: a bar names the
+  exit code or the signal, and offers **New Session** (or **Reconnect** for
+  an `ssh`-style command) and **Close Pane**. The last output stays readable
+  and selectable, and no caret is drawn. A program that exits back to the
+  shell's prompt is not the session ending, and shows nothing.
+
+### Fixed
+
+- Two uploads to the same remote file no longer share one partial file. The
+  second could finish and report success while the first, still writing
+  through its own handle, changed the file it had committed. Transfers to
+  one destination now take turns, from any browser window, folder transfer
+  or remote-edit save, and a transfer from zero writes a partial of its own.
+- On a server without `posix-rename`, a failed overwrite can no longer lose
+  both files. The old file is renamed aside rather than removed, put back if
+  the new one cannot take its name, and removed only once it has; if even
+  putting it back fails, the error says where both copies are.
+- **Save Local Copy Elsewhere** no longer deletes the file you agreed to
+  replace when the copy then fails. The copy is made beside it first and
+  only then renamed over it.
+- A transfer whose source shrinks, grows, is rewritten or replaced while it
+  is read now fails, and leaves the destination as it was. It used to
+  commit what it had read — a truncated or mixed file — and report success.
+- Ctrl-C reaches a program that stopped reading in the middle of a paste's
+  last chunk. With nothing of the paste still queued, Ctrl-C waited behind
+  the blocked write instead of interrupting the program.
+- Opening a remote file no longer waits forever on a server whose SFTP
+  service never answers: the connection is given up after 30 seconds, a
+  cancelled open stops waiting at once, closing the pane cancels its opens,
+  and the next open connects afresh.
+- The Quick Terminal no longer disappears just after it was summoned, when
+  the summon came while an earlier hide was still sliding out.
+- A setting changed in Settings no longer writes over an edit to the config
+  file made a moment earlier, before Corta had read it.
+- Changing the font size while a frame was still being drawn could show
+  glyphs from the new size in that frame. The glyph atlas now leaves the
+  textures a queued frame uses alone.
+- Plain-text search stays fast on long lines with a near-miss query, and
+  stops promptly when the query changes, instead of finishing a scan that
+  could take hundreds of milliseconds.
+- Clicking a long-task notification lands on the pane that posted it, not
+  the first pane of its window with a command of the same number.
+- VoiceOver's selected text includes the last selected character, and a
+  single selected character is reported as a selection.
+- A cancelled upload resumes from where it stopped on OpenSSH servers,
+  instead of starting over: every write moved the partial's timestamp, so
+  it no longer looked like the same file.
+- Uploading a folder that was moved or deleted while it waited in the queue
+  now fails, instead of creating an empty remote folder and reporting
+  success; an unreadable subfolder fails the upload too.
 
 ## [1.1.8] — 2026-10-07
 

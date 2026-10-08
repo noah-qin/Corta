@@ -76,7 +76,16 @@ final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
 
     @Guarded var capabilities: SFTPServerCapabilities? = nil
 
+    /// A server that never answers INIT: `connect` waits until `close`.
+    @Guarded var connectHangs = false
+
     func connect() async throws(SFTPError) -> SFTPServerCapabilities {
+        if connectHangs {
+            while !closed {
+                do { try await Task.sleep(for: .milliseconds(5)) } catch { break }
+            }
+            throw .transport(.closed)
+        }
         if let connectError { throw connectError }
         let capabilities = SFTPServerCapabilities(
             version: 3, extensions: [:],

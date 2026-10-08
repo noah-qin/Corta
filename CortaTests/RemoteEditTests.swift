@@ -324,6 +324,82 @@ struct RemoteEditCoordinatorTests {
         #expect(made == 2 && !replacement.closed)
     }
 
+    /// A server whose SFTP subsystem never answered held every open of its
+    /// host: cancelling one did not stop it waiting, and the next joined
+    /// the same attempt. Each waiter now leaves on its own, the attempt
+    /// ends with its last waiter or its deadline, and the next open
+    /// connects afresh.
+    @Test("a silent connection can be cancelled, times out, and the next open reconnects")
+    func silentConnectionIsCancellableAndTimesOut() async throws {
+        let root = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = "/srv/main.rs"
+        let firstSilent = FakeSFTPClient()
+        let secondSilent = FakeSFTPClient()
+        let working = FakeSFTPClient()
+        for client in [firstSilent, secondSilent] { client.connectHangs = true }
+        working.lstatResults[path] = SFTPAttributes(size: 2)
+        working.onTransfer = { call, _ in
+            try "ok".write(toFile: call.localPath, atomically: true, encoding: .utf8)
+        }
+        var made = 0
+        let coordinator = RemoteEditCoordinator(
+            store: RemoteEditStore(rootURL: root),
+            makeClient: { _ in
+                made += 1
+                return [firstSilent, secondSilent, working][min(made, 3) - 1]
+            },
+            opener: { _, _, _ in true },
+            presenter: .init(promptUpload: { _ in }, promptConflict: { _ in }, showError: { _ in }),
+            // Long enough that the cancels below land first on a loaded
+            // runner; the last waiter still meets it.
+            connectTimeout: .seconds(3) * testTimeoutScale)
+
+        @MainActor final class Outcomes {
+            var aDone = false
+            var bDone = false
+            var c: SFTPError?
+        }
+        let outcomes = Outcomes()
+
+        // The only waiter cancels: it returns at once, and the attempt goes.
+        let a = Task {
+            defer { outcomes.aDone = true }
+            _ = try await coordinator.materialize(host: "build-box", remotePath: path)
+        }
+        await waitUntil("first attempt started") { made == 1 }
+        a.cancel()
+        await waitUntil("cancelled open returned") { outcomes.aDone }
+        #expect(firstSilent.closed)
+
+        // Two waiters share the next attempt; one cancelling leaves it to
+        // the other, which the deadline then releases.
+        let b = Task {
+            defer { outcomes.bDone = true }
+            _ = try await coordinator.materialize(host: "build-box", remotePath: path)
+        }
+        let c = Task {
+            do {
+                _ = try await coordinator.materialize(host: "build-box", remotePath: path)
+            } catch {
+                outcomes.c = error as? SFTPError
+            }
+        }
+        await waitUntil("second attempt started") { made == 2 }
+        b.cancel()
+        await waitUntil("cancelled waiter returned") { outcomes.bDone }
+        #expect(!secondSilent.closed, "the other waiter still wants this connection")
+        await c.value
+        if case .transport(.hostUnreachable)? = outcomes.c {} else {
+            Issue.record("expected the connect deadline, got \(String(describing: outcomes.c))")
+        }
+        #expect(secondSilent.closed)
+
+        // A fresh attempt, not the abandoned one.
+        _ = try await coordinator.materialize(host: "build-box", remotePath: path)
+        #expect(made == 3)
+    }
+
     @Test("server errors preserve a connection; failed downloads retire it")
     func failedDownloadReconnectsButMissingFileDoesNot() async throws {
         let root = try makeTempDirectory()
@@ -761,7 +837,9 @@ struct RemoteEditCoordinatorTests {
         #expect(conflict.remoteDescription == L10n.text("remoteEdit.conflict.deleted"))
     }
 
-    @Test("a failed upload keeps the decision open and says the remote is untouched")
+    /// A lost connection may have cut the upload off anywhere, so the
+    /// wording says the remote's state is not known rather than untouched.
+    @Test("a failed upload keeps the decision open and says what is known of the remote")
     func uploadFailureWording() async throws {
         let fixture = try makeFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
@@ -781,7 +859,7 @@ struct RemoteEditCoordinatorTests {
         #expect(
             message
                 == L10n.format(
-                    "remoteEdit.uploadFailed", "/srv/app/main.rs", "build-box",
+                    "remoteEdit.uploadUncertain", "/srv/app/main.rs", "build-box",
                     SFTPBrowserModel.errorMessage(
                         .transport(.connectionLost), host: "build-box")))
         #expect(
@@ -805,10 +883,11 @@ struct RemoteEditCoordinatorTests {
     }
 
     /// Remote editing shipped in 1.0.0, before digests were recorded: such a
-    /// copy has only size and time to compare, as it did then, and the
-    /// upload records a digest for the next one.
-    @Test("a copy from before content digests uploads when size and time still match")
-    func legacyCopyWithoutDigestUploads() async throws {
+    /// copy has only size and time, which miss a same-size rewrite within
+    /// the second, so it takes the conflict decision docs/SECURITY.md
+    /// promises instead of uploading over the remote unasked.
+    @Test("a copy from before content digests asks for a conflict decision")
+    func legacyCopyWithoutDigestAsksFirst() async throws {
         let fixture = try makeFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         _ = try await fixture.coordinator.open(host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
@@ -819,8 +898,38 @@ struct RemoteEditCoordinatorTests {
         fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
         let pending = try #require(fixture.coordinator.pendingUploads.first)
         fixture.coordinator.upload(pending)
-        await waitUntil("uploaded") { fixture.fake.transferCalls.contains { $0.isUpload } }
-        #expect(fixture.coordinator.pendingConflicts.isEmpty)
+        await waitUntil("conflict") { !fixture.coordinator.pendingConflicts.isEmpty }
+        #expect(!fixture.fake.transferCalls.contains { $0.isUpload })
+        #expect(fixture.coordinator.pendingConflicts.first?.remoteDeleted == false)
+    }
+
+    /// The save panel's Replace is consent to replace the file with the
+    /// copy. Removing it first and copying second lost it whenever the copy
+    /// failed — here, a managed copy deleted while the conflict was shown.
+    @Test("saving a copy elsewhere never removes the file it fails to replace")
+    func saveElsewhereFailureKeepsExistingFile() throws {
+        let root = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let existing = root.appendingPathComponent("backup.rs")
+        try "USER-BACKUP".write(to: existing, atomically: true, encoding: .utf8)
+
+        #expect(throws: (any Error).self) {
+            try RemoteEditCoordinator.copyReplacing(
+                root.appendingPathComponent("deleted.rs"), at: existing)
+        }
+        #expect((try? String(contentsOf: existing, encoding: .utf8)) == "USER-BACKUP")
+        #expect((try? FileManager.default.contentsOfDirectory(atPath: root.path)) == ["backup.rs"])
+
+        let edit = root.appendingPathComponent("edit.rs")
+        try "EDIT".write(to: edit, atomically: true, encoding: .utf8)
+        try RemoteEditCoordinator.copyReplacing(edit, at: existing)
+        #expect((try? String(contentsOf: existing, encoding: .utf8)) == "EDIT")
+        // The same file as its own destination is already saved.
+        try RemoteEditCoordinator.copyReplacing(existing, at: existing)
+        #expect((try? String(contentsOf: existing, encoding: .utf8)) == "EDIT")
+        #expect(
+            (try? FileManager.default.contentsOfDirectory(atPath: root.path).sorted())
+                == ["backup.rs", "edit.rs"])
     }
 
     @Test("approval snapshots a quit left behind are removed when the store opens")

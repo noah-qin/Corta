@@ -255,6 +255,55 @@ struct SFTPRealServerTests {
         #expect(!FileManager.default.fileExists(atPath: target.appendingPathComponent("hosts").path))
     }
 
+    /// OpenSSH's server moves a file's mtime on every WRITE, so the stamp
+    /// an upload set on its partial at OPEN was gone when a cancel kept
+    /// the partial, and the retry silently started again from zero. The
+    /// fake server never moved it, so only the real one shows this.
+    @Test("a cancelled upload resumes against the real server")
+    func cancelledUploadResumes() async throws {
+        let root = try Self.makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let payload = Data((0..<(2 * 1024 * 1024)).map { UInt8($0 % 241) })
+        let local = root.appendingPathComponent("big.bin")
+        try payload.write(to: local)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date(timeIntervalSince1970: 1000)], ofItemAtPath: local.path)
+        let remote = root.appendingPathComponent("srv/app/big.bin").path
+
+        let first = try await Self.connect(root: root)
+        let moved = Mutex(false)
+        let transfer = Task {
+            try await first.upload(
+                from: local, to: remote, policy: .resume, partialDisposition: .keepForResume
+            ) { progress in
+                if progress.completedBytes > 0 { moved.withLock { $0 = true } }
+            }
+        }
+        let deadline = ContinuousClock.now + .seconds(10)
+        while !moved.withLock({ $0 }), ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        transfer.cancel()
+        _ = try? await transfer.value
+        first.close()
+        let partial = remote + SFTPTransferEngine.partialSuffix
+        let kept = (try? FileManager.default.attributesOfItem(atPath: partial)[.size] as? NSNumber)?
+            .uint64Value ?? 0
+        guard kept > 0, kept < UInt64(payload.count) else {
+            // The whole file went up before the cancel landed: nothing to resume.
+            return
+        }
+
+        // A new connection — no memory of the first — trusts the stamp.
+        let second = try await Self.connect(root: root)
+        defer { second.close() }
+        let receipt = try await second.upload(
+            from: local, to: remote, policy: .resume, partialDisposition: .keepForResume,
+            progress: nil)
+        #expect(receipt.resumedFromOffset == kept)
+        #expect(try Data(contentsOf: URL(fileURLWithPath: remote)) == payload)
+    }
+
     @Test("a missing executable fails the spawn, not the connection")
     func missingExecutableFails() async {
         let client = SFTPConnection(

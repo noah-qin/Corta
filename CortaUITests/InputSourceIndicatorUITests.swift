@@ -23,14 +23,14 @@ final class InputSourceIndicatorUITests: XCTestCase {
         continueAfterFailure = false
         let previous = LatinInputSource.select()
         defer { LatinInputSource.restore(previous) }
-        let stage = try stage(appearance: "light")
-        defer { try? FileManager.default.removeItem(at: stage) }
-        let app = application(stage: stage)
+        let stage = try UIFixtures.stage("input-source-toolbar")
+        let app = UIFixtures.app(stage: stage, runner: Self.self)
         app.launch()
         app.activate()
         defer { app.terminate() }
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 10))
+        UIFixtures.requireFixturePrompt(in: app)
         let badge = app.staticTexts["input-source-indicator"]
         XCTAssertTrue(badge.waitForExistence(timeout: 5), app.debugDescription)
         // The launched grid agrees with the child, and a full screen of
@@ -108,17 +108,14 @@ final class InputSourceIndicatorUITests: XCTestCase {
     }
 
     @MainActor func testDarkAppearanceAndFallbackWithoutIntegration() throws {
-        let stage = try stage(appearance: "dark")
-        defer { try? FileManager.default.removeItem(at: stage) }
-        let app = application(stage: stage)
-        let shell = stage.appendingPathComponent("plain-shell")
-        try "#!/bin/sh\nexec /bin/sh --noprofile --norc -i\n".write(to: shell, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: shell.path)
-        app.launchEnvironment["SHELL"] = shell.path
+        let stage = try UIFixtures.stage("input-source-dark")
+        let app = UIFixtures.app(stage: stage, runner: Self.self)
+        app.launchEnvironment["SHELL"] = stage.appendingPathComponent("plain-shell").path
         app.launchEnvironment["PS1"] = "demo ❯ "
         app.launch()
         defer { app.terminate() }
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
+        UIFixtures.requireFixturePrompt(in: app)
         XCTAssertTrue(app.staticTexts["input-source-indicator"].waitForExistence(timeout: 5))
         attach(app.windows.firstMatch, name: "input-source-dark-fallback")
     }
@@ -138,12 +135,12 @@ final class InputSourceIndicatorUITests: XCTestCase {
                 sources.first { property($0, kTISPropertyInputSourceID)?.hasPrefix(prefix) == true }
             }
         guard !chosen.isEmpty else { throw XCTSkip("No enabled built-in CJK source; no sources installed for testing") }
-        let stage = try stage(appearance: "light")
-        defer { try? FileManager.default.removeItem(at: stage) }
-        let app = application(stage: stage)
+        let stage = try UIFixtures.stage("input-source-cjk")
+        let app = UIFixtures.app(stage: stage, runner: Self.self)
         app.launch()
         defer { app.terminate() }
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
+        UIFixtures.requireFixturePrompt(in: app)
         for (index, source) in chosen.enumerated() {
             XCTAssertEqual(TISSelectInputSource(source), noErr)
             let name = try XCTUnwrap(property(source, kTISPropertyLocalizedName))
@@ -157,14 +154,11 @@ final class InputSourceIndicatorUITests: XCTestCase {
     @MainActor func testOptionalPromptPositionAvoidsLongCommands() throws {
         let previous = LatinInputSource.select()
         defer { LatinInputSource.restore(previous) }
-        let stage = try stage(appearance: "light")
-        defer { try? FileManager.default.removeItem(at: stage) }
-        let configURL = stage.appendingPathComponent("config")
-        let config = try String(contentsOf: configURL, encoding: .utf8)
-        try (config + "input-source-indicator-position = prompt\n").write(to: configURL, atomically: true, encoding: .utf8)
-        let app = application(stage: stage)
+        let stage = try UIFixtures.stage("input-source-prompt")
+        let app = UIFixtures.app(stage: stage, runner: Self.self)
         app.launch(); app.activate()
         defer { app.terminate() }
+        UIFixtures.requireFixturePrompt(in: app)
         let badge = app.staticTexts["input-source-indicator"]
         XCTAssertTrue(badge.waitForExistence(timeout: 5))
         let initial = badge.frame
@@ -182,20 +176,5 @@ final class InputSourceIndicatorUITests: XCTestCase {
     @MainActor private func attach(_ window: XCUIElement, name: String) {
         let attachment = XCTAttachment(screenshot: window.screenshot())
         attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
-    }
-    private func stage(appearance: String) throws -> URL {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("corta-input-ui-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        try "appearance = \(appearance)\ncolumns = 60\nrows = 18\nrestore-windows = false\nfont-size = 14\n".write(to: directory.appendingPathComponent("config"), atomically: true, encoding: .utf8)
-        try "PROMPT='demo ❯ '\nRPROMPT=''\n".write(to: directory.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
-        return directory
-    }
-    @MainActor private func application(stage: URL) -> XCUIApplication {
-        let app = XCUIApplication()
-        app.launchArguments = ["-AppleLanguages", "(en)"]
-        app.launchEnvironment["CORTA_STAGE_DIR"] = stage.path
-        app.launchEnvironment["ZDOTDIR"] = stage.path
-        app.launchEnvironment["SHELL"] = "/bin/zsh"
-        return app
     }
 }

@@ -44,13 +44,58 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
             let window = NSApp.window(withWindowNumber: windowNumber)
         else { return }
         window.makeKeyAndOrderFront(nil)
-        guard let split = window.contentViewController as? SplitViewController,
-            let commandID = userInfo["commandID"] as? Int
+        guard let split = window.contentViewController as? SplitViewController else { return }
+        let panes = split.panes
+        guard
+            let target = Self.notificationTarget(
+                paneID: userInfo["paneID"] as? String,
+                sessionGeneration: userInfo["sessionGeneration"] as? Int,
+                commandID: userInfo["commandID"] as? Int,
+                panes: panes.map { pane in
+                    NotificationCandidate(
+                        paneID: pane.taskNotifier.paneID.uuidString,
+                        sessionGeneration: pane.taskNotifier.sessionGeneration,
+                        commandIDs: Set(pane.session?.commandRecords.records.map(\.id) ?? []))
+                })
         else { return }
-        guard let pane = split.panes.first(where: { pane in
-            pane.session?.commandRecords.records.contains { $0.id == commandID } == true
-        }) else { return }
+        let pane = panes[target.paneIndex]
         window.makeFirstResponder(pane.terminalView)
-        pane.shell.focusCommand(id: commandID)
+        if let commandID = target.commandID { pane.shell.focusCommand(id: commandID) }
+    }
+
+    /// A pane a notification can land on, as the click sees it.
+    nonisolated struct NotificationCandidate {
+        var paneID: String
+        var sessionGeneration: Int
+        var commandIDs: Set<Int>
+    }
+
+    nonisolated struct NotificationTarget: Equatable {
+        var paneIndex: Int
+        /// The command to land on; nil when only the pane is still there.
+        var commandID: Int?
+    }
+
+    /// Where a click lands: the pane that posted, by its identity, and its
+    /// command only while the session that ran it is still the pane's —
+    /// a restarted pane numbers commands from zero again. A notification
+    /// from before panes were named carries no pane, and falls back to the
+    /// first pane holding the id.
+    nonisolated static func notificationTarget(
+        paneID: String?, sessionGeneration: Int?, commandID: Int?,
+        panes: [NotificationCandidate]
+    ) -> NotificationTarget? {
+        if let paneID {
+            guard let index = panes.firstIndex(where: { $0.paneID == paneID }) else { return nil }
+            let pane = panes[index]
+            guard let commandID, sessionGeneration == pane.sessionGeneration,
+                pane.commandIDs.contains(commandID)
+            else { return NotificationTarget(paneIndex: index, commandID: nil) }
+            return NotificationTarget(paneIndex: index, commandID: commandID)
+        }
+        guard let commandID,
+            let index = panes.firstIndex(where: { $0.commandIDs.contains(commandID) })
+        else { return nil }
+        return NotificationTarget(paneIndex: index, commandID: commandID)
     }
 }

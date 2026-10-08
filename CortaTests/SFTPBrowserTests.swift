@@ -180,6 +180,11 @@ struct SFTPBrowserFormattingTests {
                 .localIOFailed(operation: "open", code: 13),
                 L10n.format("sftp.error.localIO", "open", 13)
             ),
+            (.sourceChanged(path: "/s"), L10n.format("sftp.error.sourceChanged", "/s")),
+            (
+                .replaceIncomplete(destination: "/d", previousCopy: "/d.old", newCopy: "/d.new"),
+                L10n.format("sftp.error.replaceIncomplete", "/d", "/d.old", "/d.new")
+            ),
         ]
         for (error, expected) in cases {
             #expect(SFTPBrowserModel.errorMessage(error, host: host) == expected, "\(error)")

@@ -214,6 +214,16 @@ public nonisolated final class TerminalRenderer {
         self.pointMetrics = CellMetrics(font: font, scale: scale)
         self.metrics = self.pointMetrics.scaled(by: scale)
         self.scale = scale
+        // A reset or eviction while a frame is queued moves the atlas to
+        // fresh textures; the old ones go when those frames complete.
+        glyphAtlas.texturesInUse = { [weak self] in
+            guard let self else { return false }
+            return self.backend.hasFramesInFlight
+                || self.retiredBackends.contains { $0.hasFramesInFlight }
+        }
+        glyphAtlas.onTextureRetired = { [weak self] texture in
+            self?.backend.retireTexture(texture)
+        }
     }
 
     /// Reuses pipelines and texture; a new renderer per keystroke stuttered
