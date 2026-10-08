@@ -15,8 +15,9 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# Prepare the stages CursorAndWindowUITests and SystemStatusAndThemeEditorUITests
-# launch the app against. The UI-test runner is sandboxed: it can read
+# Prepare the stages CursorAndWindowUITests, SystemStatusAndThemeEditorUITests,
+# InputSourceIndicatorUITests and DirectoryCompletionUITests launch the app
+# against. The UI-test runner is sandboxed: it can read
 # anywhere but write only its own container, which the app cannot read, so
 # a test cannot write its own config. Each test finds a directory named
 # after it under the printed root, with its config and a neutral zshrc.
@@ -43,4 +44,25 @@ done
 for language in en zh-Hans zh-Hant ja ko de fr es pt-BR; do
   stage "system-language-$language" 'appearance = light\nstatus-bar = true\nrestore-windows = false\ninput-source-indicator = off\n'
 done
+# The input-source indicator: a 60×18 grid each test checks with `stty size`
+# before it trusts anything else it sees.
+input_source='columns = 60\nrows = 18\nrestore-windows = false\nfont-size = 14\n'
+stage input-source-toolbar "appearance = light\n$input_source"
+stage input-source-cjk "appearance = light\n$input_source"
+stage input-source-dark "appearance = dark\n$input_source"
+stage input-source-prompt "appearance = light\n${input_source}input-source-indicator-position = prompt\n"
+for name in input-source-toolbar input-source-cjk input-source-dark input-source-prompt; do
+  printf "PROMPT='demo ❯ '\nRPROMPT=''\n" > "$root/$name/.zshrc"
+done
+# A shell without integration, for the fallback placement.
+printf '#!/bin/sh\nexec /bin/sh --noprofile --norc -i\n' > "$root/input-source-dark/plain-shell"
+chmod 700 "$root/input-source-dark/plain-shell"
+
+# Directory completion: the folders it offers, one of them hidden, one of
+# them a name with a space and CJK in it.
+stage directory-completion 'restore-windows = false\n'
+for name in Alpha Another '空格 中文' .hidden; do
+  mkdir -p "$root/directory-completion/Demo/$name"
+done
+
 printf '%s\n' "$root"

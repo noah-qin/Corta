@@ -21,20 +21,15 @@ final class DirectoryCompletionUITests: XCTestCase {
         continueAfterFailure = false
         let previousInputSource = LatinInputSource.select()
         defer { LatinInputSource.restore(previousInputSource) }
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("corta-cd-ui-\(UUID().uuidString)/Demo")
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: folder) }
-        for name in ["Alpha", "Another", "空格 中文", ".hidden"] {
-            try FileManager.default.createDirectory(at: folder.appendingPathComponent(name), withIntermediateDirectories: true)
-        }
-        try "PROMPT='demo ❯ '\n".write(to: folder.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
-        let app = XCUIApplication()
-        app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
-        app.launchEnvironment["SHELL"] = "/bin/zsh"
-        app.launchEnvironment["ZDOTDIR"] = folder.path
-        app.launchEnvironment["CORTA_STAGE_DIR"] = folder.appendingPathComponent("stage").path
+        // Prepared by stage-ui-fixtures.sh: the runner cannot write folders
+        // the app's shell can see.
+        let stage = try UIFixtures.stage("directory-completion")
+        let folder = stage.appendingPathComponent("Demo")
+        let app = UIFixtures.app(stage: stage, runner: Self.self)
         app.launch()
+        defer { app.terminate() }
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
+        UIFixtures.requireFixturePrompt(in: app)
         app.typeText("cd '\(folder.path)'\nclear\ntrue\nfalse\nsleep 10\n")
         app.typeKey("c", modifierFlags: .control)
         app.typeText("cd ")

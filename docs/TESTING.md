@@ -646,8 +646,12 @@ read/write exception for this directory when signing the runner; then run
 shipping entitlements. An inaccessible fixture is a setup failure, not evidence
 that settings or translations work.
 
-The input-source indicator UI fixtures use the runner’s
-`FileManager.default.temporaryDirectory` and pass that isolated stage to the
-app. They do not require the temporary `/private/tmp/corta-ui-stages/` signing
-exception described above. Toolbar and optional prompt placement are covered
+The input-source indicator and directory-completion UI fixtures come from
+`CortaUITests/stage-ui-fixtures.sh` too, through `TEST_RUNNER_CORTA_UI_FIXTURES`,
+like the system-status ones. They once wrote their stages into the runner’s own
+`FileManager.default.temporaryDirectory`, which the sandboxed runner can write
+and the app cannot read: the app started with the user’s prompt and an 80×24
+grid, and the tests failed on what they then saw. Each now checks that the
+fixture’s `demo ❯` prompt loaded and reports a setup failure when it did not,
+before any feature assertion. Toolbar and optional prompt placement are covered
 in [the input-source placement record](test-results/2026-10-04-input-source-toolbar.md).
