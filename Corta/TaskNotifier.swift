@@ -51,6 +51,13 @@ final class TaskNotifier {
     private var lastCommandID: Int?
     /// Checked for key status, and the source of the title.
     private weak var window: NSWindow?
+    /// Which pane posted, for the click. A command id alone named no pane:
+    /// every session numbers its commands from zero, so two panes of one
+    /// window had the same ids and the click landed on the first.
+    let paneID = UUID()
+    /// Which of the pane's sessions the command ran in; a pane that
+    /// restarted numbers its commands from zero again. Set by the pane.
+    var sessionGeneration = 0
     private static var didRequestAuthorization = false
 
     /// Whether macOS will deliver anything, so the settings page can explain
@@ -211,6 +218,8 @@ final class TaskNotifier {
         // A window number and command id: enough to find it, no text.
         var userInfo: [String: Any] = [:]
         if let windowNumber = window?.windowNumber { userInfo["windowNumber"] = windowNumber }
+        userInfo["paneID"] = paneID.uuidString
+        userInfo["sessionGeneration"] = sessionGeneration
         if let lastCommandID { userInfo["commandID"] = lastCommandID }
         content.userInfo = userInfo
         lastCommandID = nil

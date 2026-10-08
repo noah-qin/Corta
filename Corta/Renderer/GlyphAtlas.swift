@@ -200,6 +200,19 @@ nonisolated final class GlyphAtlas {
     /// Bumped on any page's eviction; earlier UVs may be stale.
     private(set) var generation = 0
 
+    /// Whether a committed frame may still sample the current textures. A
+    /// reset or eviction then moves to fresh textures instead of rewriting
+    /// these: a frame already queued drew glyphs from the new font, or
+    /// another glyph, at the UVs it had recorded for the old one. Set by
+    /// the renderer; `false` rewrites in place, as nothing reads them.
+    var texturesInUse: () -> Bool = { false }
+    /// A texture the atlas stopped using while frames still read it; the
+    /// renderer lets it go once they complete.
+    var onTextureRetired: (MTLTexture) -> Void = { _ in }
+    /// Textures moved away from, for tests.
+    private(set) var textureReplacementCount = 0
+    private let allocateTexture: (MTLTextureDescriptor) -> MTLTexture?
+
     /// Shapes `glyph(shaping:)` and `glyph(forCluster:)` may still run before
     /// `beginFrame` is called again; unlimited outside a frame. A screen of
     /// more distinct clusters than a page holds evicted and re-shaped all of
@@ -246,6 +259,7 @@ nonisolated final class GlyphAtlas {
         self.colorBox = Self.colorBox(for: base)
 
         let allocate = makeTexture ?? { device.makeTexture(descriptor: $0) }
+        self.allocateTexture = allocate
         // Halve and retry down to `minimumAtlasPixelSize`, then give up — as a
         // thrown error the pane shows as a renderer failure, where a trap took
         // every window down with it.
@@ -313,6 +327,11 @@ nonisolated final class GlyphAtlas {
         (asciiPage, shapedPage, colorPage) = Self.makePages(atlasPixelSize: atlasPixelSize)
         evictionCount += 1
         generation += 1
+        if texturesInUse() {
+            // Nothing of the old font is kept: fresh, empty textures.
+            replaceTexture(.grayscale, copying: false)
+            replaceTexture(.color, copying: false)
+        }
         var white: UInt8 = 255
         texture.replace(
             region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: &white, bytesPerRow: 1)
@@ -653,5 +672,45 @@ nonisolated final class GlyphAtlas {
         page.evict(reservedFirstRow: page === asciiPage)
         evictionCount += 1
         generation += 1
+        if texturesInUse() {
+            // The page's texels are about to be overwritten. The other
+            // grayscale page shares the texture, so its texels come along.
+            replaceTexture(page === colorPage ? .color : .grayscale, copying: true)
+        }
+    }
+
+    private enum TextureKind { case grayscale, color }
+
+    /// Moves one texture to a fresh one of the same shape, with the old
+    /// one's texels when `copying` (managed storage: the CPU copy is the
+    /// whole truth, as only the CPU writes an atlas). The old texture is
+    /// left exactly as queued frames recorded it. Without memory for a
+    /// second texture the old one is rewritten, as it always was.
+    private func replaceTexture(_ kind: TextureKind, copying: Bool) {
+        let old = kind == .color ? colorTexture : texture
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: old.pixelFormat, width: old.width, height: old.height, mipmapped: false)
+        descriptor.usage = [.shaderRead]
+        descriptor.storageMode = .managed
+        guard let fresh = allocateTexture(descriptor) else { return }
+        if copying {
+            let bytesPerRow = old.width * (old.pixelFormat == .bgra8Unorm ? 4 : 1)
+            let region = MTLRegionMake2D(0, 0, old.width, old.height)
+            var bytes = [UInt8](repeating: 0, count: bytesPerRow * old.height)
+            bytes.withUnsafeMutableBytes { raw in
+                guard let base = raw.baseAddress else { return }
+                old.getBytes(base, bytesPerRow: bytesPerRow, from: region, mipmapLevel: 0)
+            }
+            bytes.withUnsafeBytes { raw in
+                guard let base = raw.baseAddress else { return }
+                fresh.replace(region: region, mipmapLevel: 0, withBytes: base, bytesPerRow: bytesPerRow)
+            }
+        }
+        switch kind {
+        case .grayscale: texture = fresh
+        case .color: colorTexture = fresh
+        }
+        textureReplacementCount += 1
+        onTextureRetired(old)
     }
 }

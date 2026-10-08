@@ -97,7 +97,15 @@ struct SessionLifecycleTests {
         #expect(failure.primaryAction?.keyEquivalent == "")
     }
 
-    @Test func childExitOnItsOwnShowsAToast() async throws {
+    /// A toast said "exited" for two seconds; after that a dead pane looked
+    /// like a live one not answering. The bar stays until a new session
+    /// starts, and says how the session ended.
+    @Test(arguments: [
+        ("exit 0", ChildExit.exited(code: 0)),
+        ("exit 3", ChildExit.exited(code: 3)),
+        ("kill -TERM $$", ChildExit.signalled(signal: SIGTERM)),
+    ])
+    func childExitOnItsOwnShowsTheEndedBar(script: String, expected: ChildExit) async throws {
         // A shell that exits the moment it starts, rather than the default
         // login shell plus a typed `exit\n`: real dotfiles can fork
         // long-lived children that keep the pty's slave side open well past
@@ -105,21 +113,29 @@ struct SessionLifecycleTests {
         // this machine's shell configuration instead of of `onChildExit`.
         var preset = Preset(name: "immediate-exit")
         preset.shell = "/bin/sh"
-        preset.arguments = ["-c", "exit 0"]
+        preset.arguments = ["-c", script]
         let pane = makePane(preset: preset)
+        defer { pane.teardown() }
         let session = try #require(pane.session)
 
         #expect(
             await waitUntilTrue(timeout: .seconds(10)) {
                 session.pty.waitForExit(timeout: .seconds(0)) != nil
             },
-            "the shell should exit on its own after `exit`")
+            "the shell should exit on its own")
         #expect(
-            await waitUntilTrue(timeout: .seconds(10)) { self.toastText(in: pane) != nil },
-            "expected a toast once the reader loop observes the exit")
-        #expect(toastText(in: pane) == L10n.text("toast.shellExited"))
-
-        pane.teardown()
+            await waitUntilTrue(timeout: .seconds(10)) { pane.sessionEndedBar != nil },
+            "expected the bar once the reader loop observes the exit")
+        let bar = try #require(pane.sessionEndedBar)
+        #expect(bar.message == SessionEndedBar.message(for: expected, isConnection: false))
+        #expect(bar.accessibilityLabel() == bar.message)
+        // Still there later: it is not a toast.
+        try await Task.sleep(for: .seconds(3))
+        #expect(pane.sessionEndedBar === bar && bar.superview != nil)
+        // A new session takes it away.
+        pane.rebuildPane(strictRespawn: false)
+        #expect(pane.sessionEndedBar == nil && bar.superview == nil)
+        #expect(pane.session !== session)
     }
 
     @Test func childExitDuringTeardownShowsNoToast() async throws {
@@ -138,6 +154,7 @@ struct SessionLifecycleTests {
         // landed on a pane the user already closed.
         try await Task.sleep(for: .milliseconds(200))
         #expect(toastText(in: pane) == nil, "teardown must not surface a toast for its own pane")
+        #expect(pane.sessionEndedBar == nil, "nor the ended bar")
     }
 
     /// `await Task.sleep` between checks, not `Thread.sleep`: the suite is

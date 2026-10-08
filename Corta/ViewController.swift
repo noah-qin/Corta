@@ -87,6 +87,9 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     var selection: TerminalSelection?
     /// Non-nil exactly when `isOperable` is false.
     var failureView: PaneFailureView?
+    /// Shown from the moment this pane's session ends until a new one
+    /// starts or the pane closes (`SessionEndedBar`).
+    private(set) var sessionEndedBar: SessionEndedBar?
     /// A fallback shell or directory, reported once the toast can be seen.
     private var pendingSessionNotice: String?
     /// The window is sized (`SplitViewController.prepareWindow`); until then a
@@ -353,6 +356,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         focus.observeWindows()
         appearance.observe()
         let generation = frameLoop.attach(session: session, renderer: terminalRenderer)
+        taskNotifier.sessionGeneration = generation
         let wake = frameLoop.outputWake
         taskNotifier.lastOutputUptimeNanoseconds = { wake.lastOutputUptimeNanoseconds }
         session.onChildExit = { [weak self] childExit in
@@ -479,6 +483,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         search.close()
         commands.stop()
         taskNotifier.cancel()
+        remote.cancelPendingOpens()
         appearance.stop()
         frameLoop.suspendRendering()
         terminalView?.stopRendering()
@@ -607,7 +612,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             // `?25l`: a program drawing its own screen hid the cursor. A
             // preedit draws its own caret (`MarkedTextOverlayView`).
             cursorVisible: scrollOffset == 0 && isFocusedPane && grid.isCursorVisible
-                && focus.cursorBlinkVisible && !terminalView.hasMarkedText(),
+                && focus.cursorBlinkVisible && !terminalView.hasMarkedText()
+                && sessionEndedBar == nil,
             selection: selection,
             searchMatches: search.highlights,
             currentSearchMatchIndex: search.currentMatchIndex, hoveredLink: pointer.hoveredLink,
@@ -629,19 +635,64 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// stopping the session, and must not toast; a generation check alone
     /// would miss it.
     @MainActor
-    private func noteChildExit(_: ChildExit, generation: Int) {
+    private func noteChildExit(_ exit: ChildExit, generation: Int) {
         guard !didTeardown, frameLoop.isCurrent(generation) else { return }
         // A dead child produces no output to rebuild the title; the `⟂ host`
         // badge would outlive its connection.
         windowTitle.invalidateProcessFacts()
         windowTitle.apply()
         // A remote launcher: the connection ended, and the way back is a new one.
-        if let launchedCommand,
-            PaneRemoteState.isRemoteLauncher(executable: launchedCommand.executable)
-        {
-            terminalView?.showToast(L10n.text("toast.connectionEnded"), kind: .warning)
-        } else {
-            terminalView?.showToast(L10n.text("toast.shellExited"), kind: .warning)
+        let isConnection =
+            launchedCommand.map { PaneRemoteState.isRemoteLauncher(executable: $0.executable) }
+            ?? false
+        presentSessionEnded(exit, isConnection: isConnection)
+    }
+
+    /// Says, until something changes it, that this pane's session is over.
+    /// Only the session's own child ending gets here — a program inside the
+    /// shell exiting back to its prompt is not the session ending.
+    private func presentSessionEnded(_ exit: ChildExit, isConnection: Bool) {
+        sessionEndedBar?.removeFromSuperview()
+        let bar = SessionEndedBar(exit: exit, isConnection: isConnection)
+        bar.onNewSession = { [weak self] in self?.confirmNewSession(isConnection: isConnection) }
+        bar.onClosePane = { [weak self] in
+            guard let self else { return }
+            // The last pane is its window, as ⌘W treats it; the session is
+            // over, so nothing here needs the close confirmation.
+            if let split = self.splitController, split.hasMultiplePanes {
+                split.closePane(self)
+            } else {
+                self.view.window?.performClose(nil)
+            }
+        }
+        // On the edge away from the last output: the cursor's half of the
+        // screen is where the program left off.
+        let cursorInLowerHalf = session.map { session in
+            let grid = session.snapshot()
+            return grid.cursor.row >= grid.rows / 2
+        } ?? true
+        bar.present(
+            in: view, atTop: cursorInLowerHalf,
+            inset: cursorInLowerHalf ? topInset : TerminalLayout.insets.bottom)
+        sessionEndedBar = bar
+        // No caret: nothing typed here goes anywhere.
+        invalidateDisplay()
+    }
+
+    /// A new session replaces this pane's output; asked first, because the
+    /// output above is gone afterwards and the old program does not return.
+    private func confirmNewSession(isConnection: Bool) {
+        let alert = NSAlert()
+        alert.messageText = L10n.text("session.ended.confirm.title")
+        alert.informativeText = L10n.text(
+            isConnection ? "session.ended.confirm.remoteMessage" : "session.ended.confirm.message")
+        alert.addButton(withTitle: L10n.text("session.ended.confirm.start"))
+        alert.addButton(withTitle: L10n.text("common.cancel"))
+        alert.present(for: view.window) { [weak self] response in
+            guard response == .alertFirstButtonReturn, let self, !self.didTeardown,
+                self.sessionEndedBar != nil
+            else { return }
+            self.rebuildPane(strictRespawn: isConnection)
         }
     }
 
@@ -823,6 +874,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         terminalRenderer = nil
         failureView?.removeFromSuperview()
         failureView = nil
+        sessionEndedBar?.removeFromSuperview()
+        sessionEndedBar = nil
         terminalView?.removeFromSuperview()
         terminalView = nil
         // A new session: nothing of the old one's viewport, selection or

@@ -52,6 +52,10 @@ final class ConfigurationStore {
     /// external edit by content; a time window swallowed editor saves.
     private var lastWrittenText: String?
     private var pendingReload: DispatchWorkItem?
+    /// The file's text as this store last read or wrote it; nil when it was
+    /// absent. A write compares the file with it first, so an edit the
+    /// watcher has not delivered yet is read in, not written over.
+    private var syncedText: String?
 
     /// Injected so tests use a temporary directory.
     let fileURL: URL
@@ -83,6 +87,7 @@ final class ConfigurationStore {
         switch UserFile.readText(at: fileURL) {
         case .missing:
             setReadError(nil)
+            syncedText = nil
             unknownKeys = []
             let defaults = Configuration()
             guard configuration != defaults else { return }
@@ -95,6 +100,7 @@ final class ConfigurationStore {
         case .text(let contents):
             setReadError(nil)
             text = contents
+            syncedText = contents
         }
         let (parsed, unknown) = Configuration.parse(text)
         unknownKeys = unknown
@@ -127,15 +133,23 @@ final class ConfigurationStore {
     /// directly. A failed write is rolled back rather than kept in memory,
     /// where it wouldn't survive a relaunch; it posts `writeStatusDidChange`,
     /// not `didChange`. Returns whether it persisted.
+    ///
+    /// The change is applied to the file as it is now. A watcher event is
+    /// delivered a moment after the save it reports, and a change made in
+    /// that moment used to serialise the stale copy in memory — writing an
+    /// external edit back out. The mutation touches only the settings it
+    /// changes, so an external edit to any other setting survives; on the
+    /// same setting the later one, this change, wins. Two processes writing
+    /// at the same instant are not serialised: the file has no lock.
     @discardableResult
     func update(_ mutate: (inout Configuration) -> Void) -> Bool {
-        if readError != nil { reload() }
+        if readError != nil || fileChangedSinceSync() { reload() }
         var updated = configuration
         mutate(&updated)
         guard updated != configuration else { return true }
         let previous = configuration
         configuration = updated
-        guard write() else {
+        guard persist() else {
             configuration = previous
             return false
         }
@@ -148,8 +162,23 @@ final class ConfigurationStore {
     @discardableResult
     func write() -> Bool {
         // Read again first: a fix that leaves no write event — a `chmod` —
-        // would otherwise keep writes refused until the next launch.
-        if readError != nil { reload() }
+        // would otherwise keep writes refused until the next launch, and an
+        // edit not yet delivered would be written over.
+        if readError != nil || fileChangedSinceSync() { reload() }
+        return persist()
+    }
+
+    /// Whether the file differs from what this store last read or wrote.
+    private func fileChangedSinceSync() -> Bool {
+        switch UserFile.readText(at: fileURL) {
+        case .missing: return syncedText != nil
+        case .unreadable: return true
+        case .text(let contents): return contents != syncedText
+        }
+    }
+
+    /// Serialises the configuration in memory over the file.
+    private func persist() -> Bool {
         guard readError == nil else {
             noteWriteResult(UnreadableFileError(path: fileURL.path))
             return false
@@ -164,6 +193,7 @@ final class ConfigurationStore {
             return false
         }
         lastWrittenText = text
+        syncedText = text
         noteWriteResult(nil)
         // The atomic write replaced the inode; re-watch.
         startWatching()

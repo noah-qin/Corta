@@ -547,6 +547,15 @@ public nonisolated final class Metal4Backend {
         encoder.popDebugGroup()
     }
 
+    /// A texture nothing will bind again — an atlas texture replaced while
+    /// frames still sampled it — leaves residency, and is released, once the
+    /// last frame that bound it completes, without the grace period.
+    func retireTexture(_ texture: MTLTexture) {
+        let id = ObjectIdentifier(texture)
+        guard let entry = boundTextures[id] else { return }
+        boundTextures[id] = (texture: entry.texture, lastFrame: entry.lastFrame, retentionFrames: 0)
+    }
+
     /// See `boundTextures`.
     private func makeResident(_ texture: MTLTexture, transient: Bool) {
         let id = ObjectIdentifier(texture)

@@ -56,8 +56,12 @@ final class QuickTerminalController {
     /// A slide is in flight. Display changes wait for it: `show()` animates to
     /// a frame captured before the change, and `hide()` undoes a fixed
     /// offset, so a reposition mid-slide would be overwritten.
-    private var isAnimating = false
+    private var isAnimating: Bool { runningAnimations > 0 }
+    private var runningAnimations = 0
     private var repositionWhenIdle = false
+    /// Which show or hide is the latest; an older hide's completion must
+    /// not order out a panel a later show brought back.
+    private var visibility = Visibility()
 
     /// The app to return to on dismissal.
     private var previousApplication: NSRunningApplication?
@@ -122,7 +126,8 @@ final class QuickTerminalController {
     var isVisible: Bool { controller?.window?.isVisible == true }
 
     func toggle() {
-        if let window = controller?.window, window.isVisible {
+        // A panel sliding out is going away: the hotkey brings it back.
+        if let window = controller?.window, window.isVisible, !visibility.isHiding {
             if window.isKeyWindow || !NSApp.isActive {
                 hide(returningFocus: true)
             } else {
@@ -135,6 +140,7 @@ final class QuickTerminalController {
     }
 
     func show() {
+        visibility.beginShow()
         let frontmost = NSWorkspace.shared.frontmostApplication
         if frontmost?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
             previousApplication = frontmost
@@ -192,7 +198,9 @@ final class QuickTerminalController {
     /// `returningFocus` re-activates the summoning app; false when Corta
     /// already lost activation.
     func hide(returningFocus: Bool) {
-        guard let window = controller?.window, window.isVisible else { return }
+        guard let window = controller?.window, window.isVisible,
+            let generation = visibility.beginHide()
+        else { return }
         let position = ConfigurationStore.shared.configuration.quickTerminalPosition
         let offset = Self.slideOffset(for: position)
         let target = window.frame.offsetBy(dx: offset.width, dy: offset.height)
@@ -201,7 +209,10 @@ final class QuickTerminalController {
         animate {
             window.animator().alphaValue = 0
             window.animator().setFrame(target, display: true)
-        } completion: {
+        } completion: { [weak self] in
+            // A show since this hide began owns the panel now: its frame,
+            // its alpha and whether it is on screen.
+            guard let self, self.visibility.completeHide(generation) else { return }
             window.orderOut(nil)
             window.setFrame(window.frame.offsetBy(dx: -offset.width, dy: -offset.height), display: false)
             window.alphaValue = 1
@@ -268,7 +279,7 @@ final class QuickTerminalController {
     }
 
     private func animate(_ changes: @escaping () -> Void, completion: (@MainActor @Sendable () -> Void)? = nil) {
-        isAnimating = true
+        runningAnimations += 1
         NSAnimationContext.runAnimationGroup { context in
             context.duration =
                 NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : Self.animationDuration
@@ -278,13 +289,47 @@ final class QuickTerminalController {
             MainActor.assumeIsolated {
                 completion?()
                 guard let self else { return }
-                self.isAnimating = false
+                self.runningAnimations -= 1
+                guard !self.isAnimating else { return }
                 // Apply a display change deferred during the slide.
                 if self.repositionWhenIdle {
                     self.repositionWhenIdle = false
                     self.screenParametersDidChange()
                 }
             }
+        }
+    }
+
+    // MARK: - Visibility
+
+    /// The latest request wins. Hides and shows can overlap — a second
+    /// hotkey press mid-slide, or the app resigning active while a hide is
+    /// already running — and each animation's completion arrives in its own
+    /// time, so completions are matched to the request that started them.
+    nonisolated struct Visibility: Equatable {
+        private(set) var generation: UInt64 = 0
+        /// A hide is running and nothing has superseded it.
+        private(set) var isHiding = false
+
+        mutating func beginShow() {
+            generation &+= 1
+            isHiding = false
+        }
+
+        /// The new hide's generation, or nil when one is already running —
+        /// hiding twice is hiding once.
+        mutating func beginHide() -> UInt64? {
+            guard !isHiding else { return nil }
+            generation &+= 1
+            isHiding = true
+            return generation
+        }
+
+        /// Whether the hide of `generation` may still order the panel out.
+        mutating func completeHide(_ generation: UInt64) -> Bool {
+            guard isHiding, generation == self.generation else { return false }
+            isHiding = false
+            return true
         }
     }
 

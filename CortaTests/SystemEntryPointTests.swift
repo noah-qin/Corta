@@ -18,6 +18,7 @@ import AppKit
 import Carbon.HIToolbox
 import Testing
 import Synchronization
+import CortaTerminal
 
 @testable import Corta
 
@@ -122,6 +123,35 @@ struct QuickTerminalGeometryTests {
         controller.observeClose(of: window)
         #expect(controller.observerCount == 1)
         #expect(center.removals == 5)
+    }
+
+    /// hide, hide, show: the first hide's completion, arriving after the
+    /// show, ordered the panel the user had just summoned back out.
+    @Test("a hide's completion after a later show leaves the panel shown")
+    func staleHideCompletionIsIgnored() throws {
+        var visibility = QuickTerminalController.Visibility()
+        let firstHide = visibility.beginHide()
+        let first = try #require(firstHide)
+        let again = visibility.beginHide()
+        #expect(again == nil, "a second hide is the same hide")
+        visibility.beginShow()
+        let staleFirst = visibility.completeHide(first)
+        #expect(!staleFirst)
+        #expect(!visibility.isHiding)
+
+        // show, hide, show: the hide in between is superseded too.
+        let secondHide = visibility.beginHide()
+        let second = try #require(secondHide)
+        visibility.beginShow()
+        let staleSecond = visibility.completeHide(second)
+        #expect(!staleSecond)
+
+        // An uninterrupted hide completes, once.
+        let thirdHide = visibility.beginHide()
+        let third = try #require(thirdHide)
+        let completed = visibility.completeHide(third)
+        let completedTwice = visibility.completeHide(third)
+        #expect(completed && !completedTwice)
     }
 
     let visible = NSRect(x: 100, y: 50, width: 1000, height: 800)
@@ -582,5 +612,78 @@ struct RestoredTabOrderTests {
         let tabs = try #require(a.window?.tabbedWindows)
         #expect(tabs.map(\.title) == ["a", "b", "c"])
         #expect(a.window?.tabGroup?.selectedWindow === c.window)
+    }
+}
+
+/// A task notification's click lands on the pane that posted it.
+struct NotificationRoutingTests {
+    private typealias Candidate = AppDelegate.NotificationCandidate
+
+    /// Every session numbers its commands from zero, so two panes of one
+    /// window both had a command 0, and the click landed on the first.
+    @Test("two panes with the same command id: the click lands on the one that posted")
+    func sameCommandIDInTwoPanes() {
+        let panes = [
+            Candidate(paneID: "left", sessionGeneration: 1, commandIDs: [0]),
+            Candidate(paneID: "right", sessionGeneration: 1, commandIDs: [0]),
+        ]
+        let target = AppDelegate.notificationTarget(
+            paneID: "right", sessionGeneration: 1, commandID: 0, panes: panes)
+        #expect(target == AppDelegate.NotificationTarget(paneIndex: 1, commandID: 0))
+    }
+
+    @Test("a restarted pane is focused, but not on another session's command of the same id")
+    func restartedPaneDoesNotReuseCommandIDs() {
+        let panes = [Candidate(paneID: "pane", sessionGeneration: 2, commandIDs: [0])]
+        let target = AppDelegate.notificationTarget(
+            paneID: "pane", sessionGeneration: 1, commandID: 0, panes: panes)
+        #expect(target == AppDelegate.NotificationTarget(paneIndex: 0, commandID: nil))
+    }
+
+    @Test("a closed pane is not replaced by another one")
+    func closedPaneLandsNowhere() {
+        let panes = [Candidate(paneID: "other", sessionGeneration: 1, commandIDs: [0])]
+        #expect(
+            AppDelegate.notificationTarget(
+                paneID: "gone", sessionGeneration: 1, commandID: 0, panes: panes) == nil)
+    }
+
+    @Test("a notification from before panes were named still finds its command")
+    func legacyNotificationFallsBack() {
+        let panes = [
+            Candidate(paneID: "a", sessionGeneration: 1, commandIDs: [3]),
+            Candidate(paneID: "b", sessionGeneration: 1, commandIDs: [4]),
+        ]
+        #expect(
+            AppDelegate.notificationTarget(
+                paneID: nil, sessionGeneration: nil, commandID: 4, panes: panes)
+                == AppDelegate.NotificationTarget(paneIndex: 1, commandID: 4))
+    }
+}
+
+/// What the ended-session bar says. The bar itself needs a pane, which needs
+/// Metal 4 (`SessionLifecycleTests`); the wording does not.
+struct SessionEndedWordingTests {
+    @Test("an exit says its code, a signal its name, and a connection says connection")
+    func wordingFollowsTheExit() {
+        #expect(
+            SessionEndedBar.message(for: .exited(code: 0), isConnection: false)
+                == L10n.format("session.ended.exited", 0))
+        #expect(
+            SessionEndedBar.message(for: .exited(code: 1), isConnection: true)
+                == L10n.format("session.ended.connection.exited", 1))
+        #expect(
+            SessionEndedBar.message(for: .signalled(signal: SIGKILL), isConnection: false)
+                == L10n.format("session.ended.signalled", "SIGKILL", 9))
+        #expect(SessionEndedBar.signalName(SIGTERM) == "SIGTERM")
+        #expect(SessionEndedBar.signalName(77) == "signal 77")
+        // Every case reads differently.
+        let all = Set([
+            SessionEndedBar.message(for: .exited(code: 0), isConnection: false),
+            SessionEndedBar.message(for: .exited(code: 0), isConnection: true),
+            SessionEndedBar.message(for: .signalled(signal: 15), isConnection: false),
+            SessionEndedBar.message(for: .signalled(signal: 15), isConnection: true),
+        ])
+        #expect(all.count == 4)
     }
 }

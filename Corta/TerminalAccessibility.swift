@@ -98,8 +98,17 @@ struct TerminalAccessibilitySnapshot {
 
         self.cursorOffset = offset(documentRow: grid.cursor.row, column: grid.cursor.column)
         if let selection {
-            let start = offset(documentRow: selection.start.row, column: selection.start.column)
-            let end = offset(documentRow: selection.end.row, column: selection.end.column)
+            // Both ends of a selection are cells it includes; an NSRange
+            // ends after its last unit. The end is therefore the boundary
+            // after the character in the last selected cell — a whole
+            // grapheme, however many UTF-16 units or columns it takes.
+            let lower = min(selection.start, selection.end)
+            let upper = max(selection.start, selection.end)
+            let start = offset(documentRow: lower.row, column: lower.column)
+            let end = Self.offset(
+                after: upper.column, documentRow: upper.row, lineStarts: lineStarts,
+                rowBoundaries: rowBoundaries, rowLengths: rowLengths,
+                textLength: text.utf16.count, scrollOffset: scrollOffset)
             self.selectedRange = NSRange(location: min(start, end), length: abs(end - start))
         } else {
             self.selectedRange = NSRange(location: cursorOffset, length: 0)
@@ -121,6 +130,27 @@ struct TerminalAccessibilitySnapshot {
             return start + (exact.column == column ? exact.offset : rowLengths[row])
         }
         return start + min(rowLengths[row], max(0, column))
+    }
+
+    /// The offset just past the character in `column`: the next
+    /// character's start, or the row's end when it is the last. A column
+    /// past the trimmed tail ends at the row's end; rows off the viewport
+    /// clamp to its ends.
+    private static func offset(
+        after column: Int, documentRow: Int, lineStarts: [Int],
+        rowBoundaries: [[(offset: Int, column: Int)]], rowLengths: [Int],
+        textLength: Int, scrollOffset: Int
+    ) -> Int {
+        let row = documentRow + scrollOffset
+        guard row >= 0 else { return 0 }
+        guard row < lineStarts.count else { return textLength }
+        let start = lineStarts[row]
+        let boundaries = rowBoundaries[row]
+        guard let index = boundaries.lastIndex(where: { $0.column <= column }) else {
+            return start + min(rowLengths[row], max(0, column + 1))
+        }
+        let next = index + 1 < boundaries.count ? boundaries[index + 1].offset : rowLengths[row]
+        return start + next
     }
 
     // MARK: - The two conversions
