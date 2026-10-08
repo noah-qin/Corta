@@ -34,6 +34,46 @@ import Testing
     }
 
 
+    @Test("a static Retina CJK screen fills across budgeted frames")
+    func deferredCJKCompletes() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let renderer = try TerminalRenderer(
+            device: device, font: CTFontCreateWithName("Menlo" as CFString, 14, nil), scale: 2)
+        var terminal = Terminal(rows: 40, columns: 120)
+        for row in 0..<40 {
+            let text = (0..<60).map { String(Unicode.Scalar(0x4E00 + row * 60 + $0)!) }.joined()
+            terminal.feed(Array("\u{1B}[\(row + 1);1H\(text)".utf8))
+        }
+        var requests = 0
+        renderer.onGlyphsDeferred = { requests += 1 }
+        for _ in 0..<4 {
+            _ = renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
+        }
+        #expect(requests > 0)
+        #expect(!renderer.glyphAtlas.deferredShaping)
+        #expect(renderer.glyphAtlas.evictionCount == 0)
+        #expect(renderer.cachedInstances[1].count == 2400)
+    }
+
+    @Test("overflow does not force every row to reshape on unrelated damage")
+    func overflowingScreenDoesNotKeepRebuilding() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let renderer = try TerminalRenderer(
+            device: device, font: CTFontCreateWithName("Menlo" as CFString, 30, nil), scale: 2)
+        var terminal = Terminal(rows: 40, columns: 120)
+        for row in 0..<40 {
+            let text = (0..<60).map { String(Unicode.Scalar(0x4E00 + row * 60 + $0)!) }.joined()
+            terminal.feed(Array("\u{1B}[\(row + 1);1H\(text)".utf8))
+        }
+        _ = renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
+        #expect(renderer.glyphAtlas.evictionCount > 0)
+        let hits = renderer.glyphAtlas.shapingHits
+        terminal.feed(Array("\u{1B}[1;1Hx".utf8))
+        _ = renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
+        #expect(renderer.lastRebuiltRowCount == 1)
+        #expect(renderer.glyphAtlas.shapingHits - hits < TerminalRenderer.shapingBudgetPerFrame)
+    }
+
     @Test func cursorBlockRendersAtTheCursorCell() throws {
         guard let device = MTLCreateSystemDefaultDevice() else {
             Issue.record("No Metal device available in this environment")

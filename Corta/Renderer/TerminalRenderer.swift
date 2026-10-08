@@ -352,8 +352,8 @@ public nonisolated final class TerminalRenderer {
         // only while nothing was evicted: past that the content overflows the
         // atlas, and re-asking would shape a budget's worth every frame for as
         // long as it stays on screen.
-        needsFullRebuild = glyphAtlas.deferredShaping
-        if glyphAtlas.deferredShaping, glyphAtlas.generation == atlasGeneration {
+        needsFullRebuild = glyphAtlas.deferredShaping && glyphAtlas.generation == atlasGeneration
+        if needsFullRebuild {
             onGlyphsDeferred?()
         }
         // Not on a cursor blink or a selection drag: only the rows carry marks.

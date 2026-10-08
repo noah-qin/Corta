@@ -967,6 +967,46 @@ struct SFTPTransferTests {
         #expect(rig.fileSystem.file("/remote")?.data == contents)
     }
 
+    @Test("a cancelled upload retains only its acknowledged contiguous prefix")
+    func cancelledUploadDiscardsSparseTail() async throws {
+        let rig = try await makeRig(configureEngine: { $0.pipelineDepth = 1 })
+        defer { teardown(rig) }
+        let contents = (0..<2048).map { UInt8($0 % 229) }
+        let source = try localFile(rig, "up", contents: contents, mtime: 7777)
+        let partialPath = "/remote" + rig.partialName
+        let wrote = Mutex(false)
+        let prefix = Mutex(UInt64(0))
+        let release = DispatchSemaphore(value: 0)
+        let fileSystem = rig.fileSystem
+        let transfer = Task {
+            try await rig.engine.upload(
+                from: source, to: "/remote", policy: .resume, partialDisposition: .keepForResume
+            ) { update in
+                prefix.withLock { $0 = update.completedBytes }
+                // Model a later in-flight WRITE extending the file past a
+                // missing block, without acknowledging that prefix.
+                if let file = fileSystem.file(partialPath) {
+                    fileSystem.createFile(
+                        partialPath, data: file.data + Array(repeating: 0, count: 512),
+                        modificationTime: 99_999)
+                }
+                wrote.withLock { $0 = true }
+                _ = release.wait(timeout: .now() + 5)
+            }
+        }
+        #expect(try await waitForFlag(wrote))
+        transfer.cancel()
+        release.signal()
+        await #expect(throws: SFTPError.cancelled) { try await transfer.value }
+        let kept = try #require(fileSystem.file(partialPath))
+        let confirmed = prefix.withLock { $0 }
+        #expect(kept.data == Array(contents.prefix(Int(confirmed))))
+        let fresh = SFTPTransferEngine(session: rig.session, configuration: rig.engine.configuration)
+        let receipt = try await fresh.upload(from: source, to: "/remote", policy: .resume)
+        #expect(receipt.resumedFromOffset == confirmed)
+        #expect(fileSystem.file("/remote")?.data == contents)
+    }
+
     @Test("an upload retried after a lost connection resumes its own partial")
     func uploadResumesAfterTransportFailure() async throws {
         let fileSystem = FakeRemoteFileSystem()

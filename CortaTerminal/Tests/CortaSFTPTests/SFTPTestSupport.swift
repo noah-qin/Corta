@@ -583,6 +583,11 @@ final class FakeSFTPServer: @unchecked Sendable {
         case .setstat(let path, let attributes):
             let name = String(decoding: path, as: UTF8.self)
             if var file = fileSystem.file(name) {
+                if let size = attributes.size {
+                    let count = Int(size)
+                    if count < file.data.count { file.data.removeLast(file.data.count - count) }
+                    else { file.data.append(contentsOf: repeatElement(0, count: count - file.data.count)) }
+                }
                 if let mtime = attributes.modificationTime { file.modificationTime = mtime }
                 fileSystem.createFile(name, data: file.data, modificationTime: file.modificationTime)
                 fail(.ok, "")
