@@ -74,6 +74,39 @@ struct RemoteEditStoreTests {
         #expect(loaded.localFile == copy.localFile)
     }
 
+    @Test("a copy left alone past retention goes; an undecided edit and a recent copy stay")
+    func retention() async throws {
+        let root = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = RemoteEditStore(rootURL: root)
+        let content = Data("SECRET=fake\n".utf8)
+        let digest = RemoteEditStore.sha256Hex(content)
+        let longAgo = Date(timeIntervalSinceNow: -RemoteEditStore.retention - 86_400)
+        func stage(_ path: String, edited: Bool, modified: Date) throws -> RemoteEditStore.RemoteCopy {
+            let copy = store.recordDownload(
+                host: "build-box", remotePath: path, remoteSize: 12, remoteMTime: 1,
+                remoteDigest: digest)
+            let url = store.localURL(for: copy)
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try (edited ? Data("SECRET=edited\n".utf8) : content).write(to: url)
+            try FileManager.default.setAttributes(
+                [.modificationDate: modified], ofItemAtPath: url.path)
+            return copy
+        }
+        let stale = try stage("/srv/app/.env", edited: false, modified: longAgo)
+        let undecided = try stage("/srv/app/config.yml", edited: true, modified: longAgo)
+        let recent = try stage("/srv/app/notes.txt", edited: false, modified: Date())
+        store.pruneStaleCopies()
+        #expect(store.copies[stale.id] == nil)
+        #expect(!FileManager.default.fileExists(atPath: store.localURL(for: stale).path))
+        #expect(store.copies[undecided.id] != nil)
+        #expect(FileManager.default.fileExists(atPath: store.localURL(for: undecided).path))
+        #expect(store.copies[recent.id] != nil)
+        // The manifest on disk agrees.
+        #expect(RemoteEditStore(rootURL: root).copies[stale.id] == nil)
+    }
+
     @Test("a corrupt or future-version manifest degrades to empty, not to a guess")
     func manifestValidation() async throws {
         let root = try makeTempDirectory()

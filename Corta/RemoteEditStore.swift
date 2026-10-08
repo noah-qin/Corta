@@ -90,8 +90,42 @@ final class RemoteEditStore {
         // so whatever a quit left behind is only a stale copy of a file.
         try? FileManager.default.removeItem(at: approvalsURL)
         load()
+        pruneStaleCopies()
         try? secureCopy(at: manifestURL)
         for copy in copies.values { try? secureCopy(at: localURL(for: copy)) }
+    }
+
+    // MARK: - Retention
+
+    /// How long a copy nobody opens or edits is kept.
+    static let retention: TimeInterval = 30 * 24 * 60 * 60
+
+    /// Removes copies left alone for `retention`: a remote `.env` opened once
+    /// was otherwise kept for good, and backed up with Application Support.
+    /// Only a copy whose content is what was last decided on — downloaded,
+    /// uploaded or dismissed — so an edit never uploaded waits for its
+    /// decision however old it is. Copies set aside beside it stay too.
+    func pruneStaleCopies(now: Date = Date()) {
+        guard !preservesNewerManifest else { return }
+        var pruned = false
+        for (id, copy) in copies {
+            let url = localURL(for: copy)
+            guard
+                let modified = (try? FileManager.default.attributesOfItem(atPath: url.path))?[
+                    .modificationDate] as? Date,
+                now.timeIntervalSince(max(copy.lastOpenedAt, modified)) > Self.retention,
+                let baseline = copy.approvedDigest ?? copy.remoteDigest,
+                Self.sha256Hex(ofFile: url) == baseline
+            else { continue }
+            guard (try? FileManager.default.removeItem(at: url)) != nil else { continue }
+            let folder = url.deletingLastPathComponent()
+            if (try? FileManager.default.contentsOfDirectory(atPath: folder.path))?.isEmpty == true {
+                try? FileManager.default.removeItem(at: folder)
+            }
+            copies[id] = nil
+            pruned = true
+        }
+        if pruned { save() }
     }
 
     // MARK: - Naming (pure)
