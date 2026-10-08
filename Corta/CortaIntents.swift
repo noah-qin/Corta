@@ -108,7 +108,7 @@ struct OpenTerminalWindowIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<TerminalWindowEntity> {
-        let path = try Self.validatedDirectory(directory)
+        let path = try await Self.validatedDirectoryOffMain(directory)
         guard let delegate = NSApp.delegate as? AppDelegate,
             let controller = delegate.openWindow(workingDirectory: path)
         else { throw CortaIntentError.windowNotCreated }
@@ -126,6 +126,19 @@ struct OpenTerminalWindowIntent: AppIntent {
             isDirectory.boolValue
         else { throw CortaIntentError.directoryNotFound(url.path) }
         return path
+    }
+
+    /// `validatedDirectory` on a background queue. The `stat` behind it blocks
+    /// until the kernel gives up on a mount that stopped answering, and
+    /// `perform` runs on the main actor every window shares — a Shortcut
+    /// naming a folder on a dead server froze them all.
+    nonisolated static func validatedDirectoryOffMain(_ url: URL?) async throws -> String? {
+        guard url != nil else { return nil }
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                continuation.resume(with: Result { try validatedDirectory(url) })
+            }
+        }
     }
 }
 

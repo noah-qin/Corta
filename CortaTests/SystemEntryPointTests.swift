@@ -419,6 +419,19 @@ struct AppIntentTests {
         }
     }
 
+    @Test("the intent checks its folder off the main thread, with the same answers")
+    func directoryValidationOffMain() async throws {
+        #expect(try await OpenTerminalWindowIntent.validatedDirectoryOffMain(nil) == nil)
+        let tmp = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        #expect(
+            try await OpenTerminalWindowIntent.validatedDirectoryOffMain(tmp)
+                == tmp.standardizedFileURL.path)
+        await #expect(throws: CortaIntentError.self) {
+            _ = try await OpenTerminalWindowIntent.validatedDirectoryOffMain(
+                URL(string: "https://example.com")!)
+        }
+    }
+
     @Test("focusing an id no window carries fails rather than picking another window")
     func unknownIdIsRefused() throws {
         #expect(try delegate.focusWindow(id: "no-such-window") == false)

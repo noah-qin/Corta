@@ -291,14 +291,14 @@ if readme.contains("macOS \(bundleTarget)") {
 // Apple silicon only (D21). Xcode does not apply the project's ARCHS to
 // Swift package products, so a build that did not pass `ARCHS=arm64` on the
 // command line ships a universal corta-exec beside an arm64 app. Sparkle's
-// own binaries are not ours to thin; the rule covers the two executables
-// this project compiles.
+// own binaries are not ours to thin; the rule covers the executables
+// this project compiles (the app, corta-exec, corta-image-decoder).
 func architectures(_ path: String) -> String {
     trimmed(run("/usr/bin/lipo", ["-archs", path])?.stdout ?? "")
 }
 let bundleExecutable = plistValue("CFBundleExecutable")
 let appArchitectures = architectures("\(app)/Contents/MacOS/\(bundleExecutable)")
-for executable in [bundleExecutable, "corta-exec"] {
+for executable in [bundleExecutable, "corta-exec", "corta-image-decoder"] {
     let path = "\(app)/Contents/MacOS/\(executable)"
     guard !executable.isEmpty, fileManager.fileExists(atPath: path) else {
         fail("no executable at Contents/MacOS/\(executable.isEmpty ? "<CFBundleExecutable missing>" : executable)")
@@ -339,6 +339,92 @@ if requireNotarized {
     } else {
         fail("spctl --assess rejects the app")
     }
+}
+
+// --- Hardened runtime, entitlements, load paths
+
+/// Every Mach-O file in the bundle — the app, corta-exec, Sparkle and its
+/// helpers (Autoupdate, Updater.app, the XPC services) — found by magic
+/// number rather than listed, so a component a Sparkle update adds is held
+/// to the same rules. Symlinks into a framework's versions count once.
+@MainActor func machOFiles(in bundle: String) -> [String] {
+    let magics: Set<UInt32> = [0xFEED_FACF, 0xCFFA_EDFE, 0xCAFE_BABE, 0xBEBA_FECA, 0xFEED_FACE, 0xCEFA_EDFE]
+    var seen = Set<String>()
+    var found: [String] = []
+    guard let walker = fileManager.enumerator(atPath: bundle) else { return [] }
+    while let relative = walker.nextObject() as? String {
+        let path = ("\(bundle)/\(relative)" as NSString).resolvingSymlinksInPath
+        var isDirectory: ObjCBool = false
+        guard !seen.contains(path), fileManager.fileExists(atPath: path, isDirectory: &isDirectory),
+            !isDirectory.boolValue, let handle = FileHandle(forReadingAtPath: path)
+        else { continue }
+        let head = handle.readData(ofLength: 4)
+        handle.closeFile()
+        let magic = head.reduce(UInt32(0), { $0 << 8 | UInt32($1) })
+        guard head.count == 4, magics.contains(magic) else { continue }
+        seen.insert(path)
+        found.append(path)
+    }
+    return found.sorted()
+}
+
+// A component that can be debugged, load another team's libraries, honour
+// DYLD_* or map writable executable memory inherits every TCC grant the app
+// was given; so does one that searches a directory outside the bundle and
+// the system for its libraries (SECURITY.md §4.2).
+let resolvedApp = (app as NSString).resolvingSymlinksInPath
+let components = machOFiles(in: app)
+var entitlementProblems: [String] = []
+var runtimeMissing: [String] = []
+var componentsByTeam: [String: [String]] = [:]
+var loadPathProblems: [String] = []
+for path in components {
+    let name = path.hasPrefix(resolvedApp + "/") ? String(path.dropFirst(resolvedApp.count + 1)) : path
+    let entitlements = run("/usr/bin/codesign", ["-d", "--entitlements", "-", "--xml", path])?.stdout ?? ""
+    if let denied = ReleaseCheck.forbiddenEntitlements(inPlist: Data(entitlements.utf8)) {
+        entitlementProblems += denied.map { "\(name): \($0)" }
+    } else {
+        entitlementProblems.append("\(name): entitlements unreadable")
+    }
+    let description = run("/usr/bin/codesign", ["-dvv", path])?.stderr ?? ""
+    if !ReleaseCheck.hasHardenedRuntime(codesignDescription: description) {
+        runtimeMissing.append(name)
+    }
+    componentsByTeam[ReleaseCheck.teamIdentifier(codesignDescription: description) ?? "none", default: []]
+        .append(name)
+    let loads = ReleaseCheck.loadPaths(otoolLoadCommands: run("/usr/bin/otool", ["-l", path])?.stdout ?? "")
+    loadPathProblems += ReleaseCheck.unsafeLoadPaths(loads).map { "\(name): \($0.command) \($0.path)" }
+}
+if components.isEmpty {
+    fail("no Mach-O code found in \(app)")
+}
+if entitlementProblems.isEmpty {
+    pass("no component carries a denied entitlement (\(components.count) checked)")
+} else {
+    fail("denied or unreadable entitlements:")
+    for problem in entitlementProblems { print("      \(problem)") }
+}
+if runtimeMissing.isEmpty {
+    pass("every component is signed with the hardened runtime")
+} else {
+    fail("signed without the hardened runtime: \(runtimeMissing.joined(separator: ", "))")
+}
+// Ad hoc builds carry no team at all, which is consistent; a release must
+// carry exactly one, the Developer ID's.
+let teams = componentsByTeam.keys.sorted()
+if teams.count > 1 {
+    fail("components disagree on the team identifier:")
+    for team in teams { print("      \(team): \((componentsByTeam[team] ?? []).joined(separator: ", "))") }
+} else if requireNotarized, teams.first == "none" {
+    fail("no component carries a team identifier")
+} else if let team = teams.first {
+    pass("every component carries team identifier \(team)")
+}
+if loadPathProblems.isEmpty {
+    pass("no component searches outside the bundle and the system for libraries")
+} else {
+    fail("load paths outside the bundle and the system:")
+    for problem in loadPathProblems { print("      \(problem)") }
 }
 
 // --- Archive

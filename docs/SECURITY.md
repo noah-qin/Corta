@@ -181,6 +181,7 @@ allocating without bound. These caps are asserted in the fuzz harness
 | OSC / DCS string length    | Hard limit; discard the sequence on overflow and resynchronise |
 | APC (Kitty graphics) chunk | 132 KiB — one `kitten icat` chunk plus its header; discard the sequence on overflow and resynchronise. A whole image is capped separately, as is a pane's image memory |
 | Kitty image memory         | 64 MB per image; 320 MB per pane across *both* screens (the alternate screen gets what the parked main screen left) with an unfinished transmission charged at its decoded size; 1 GB across every pane (`ImageMemoryBudget`, each session charged after every feed slice — exceeded by at most one image per session storing at the same instant) |
+| Kitty PNG decoding         | `corta-image-decoder`, a process of its own under the `pure-computation` sandbox (no files, no network), 10 s and 64 MB of output; the app re-checks the header's dimensions and the pixel count |
 | Compressed Kitty image (`o=z`) | Inflates to exactly its declared pixels (RGB, RGBA) or at most the 64 MB image cap (PNG); the stream stops at the ceiling and the image is refused, so the expansion is never allocated. The zlib header and Adler-32 must check out; any other `o=` value is refused |
 | CSI parameter count        | 16 (xterm's limit); ignore the remainder               |
 | CSI parameter value        | Clamp to a sane maximum before use                     |
@@ -399,6 +400,32 @@ which records S01–S04 and S07 in full); the entries below are the ones
 whose write-up belongs with the design rather than with the release that
 made them.
 
+- **S19 — 2026-10-08: a crash, concurrency, signing and supply-chain
+  audit** ([record](test-results/2026-10-08-crash-concurrency-supply-chain-audit.md)).
+  No byte sequence was found that stably crashes or hangs a pane; the fuzz
+  harness now reaches what a mutation of raw output rarely did —
+  `corta-fuzz --target osc|kitty|sftp` frames each input as one OSC
+  sequence, one Kitty command (mostly an `o=z` transmission, so the inflate
+  ceiling) or one SFTP frame, which must fail as a typed error or decode to
+  a message that survives re-encoding. `ci.yml` and `nightly.yml` named
+  their actions by tag and left the job token in `.git/config`; they pin by
+  commit, as the release workflows do, and keep no token. The release check
+  verified that the app was signed but not what the signature allows: it
+  now fails any Mach-O in the bundle that carries `get-task-allow` or
+  another entitlement that undoes the hardened runtime, lacks the runtime
+  flag, disagrees on the team, or searches outside the bundle and the
+  system for libraries (1.1.8 passes every rule). The feed is unsigned and
+  only its enclosures carry signatures, while Sparkle acts on release notes,
+  links and flags too; `verify-appcast.swift` now refuses any item field the
+  feed has never published. Sparkle 2.10.0 is past every published
+  advisory. In the follow-up: a frame shapes at most 1,024 non-ASCII
+  glyphs, so a screen of distinct clusters cannot re-shape itself on the
+  main thread every frame; Kitty PNGs are decoded by `corta-image-decoder`
+  under the `pure-computation` sandbox; the feed must be signed
+  (`SURequireSignedFeed`, no grace period) and archives are verified
+  before extraction (D20 amended); one read batch queues at most 64 KiB of
+  query replies; the Open Window intent checks its folder off the main
+  thread.
 - **S18 — 2026-10-08: a local-data and hostile-remote audit.** The SFTP
   channel spawned `ssh -s -- <host> sftp` with whatever forwarding the
   user's configuration gave that host; a `Host *` with `ForwardAgent yes`

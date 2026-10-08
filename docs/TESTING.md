@@ -70,6 +70,13 @@ CortaTerminal/.build/release/corta-fuzz CortaTerminal/Tests/Fuzz/corpus/*
 CortaTerminal/.build/release/corta-fuzz --fuzz 200000 --seed 1 \
   CortaTerminal/Tests/Fuzz/corpus
 
+# The other targets: OSC and Kitty payloads framed as their sequences
+# (Kitty's o=z inflate included), and SFTP frames from a hostile server.
+for target in osc kitty sftp; do
+  CortaTerminal/.build/release/corta-fuzz --target "$target" --fuzz 100000 --seed 1 \
+    CortaTerminal/Tests/Fuzz/"$target"
+done
+
 CORTA_TEST_TIMEOUT_SCALE=10 swift test --package-path CortaTerminal --sanitize=thread
 CORTA_TEST_TIMEOUT_SCALE=10 swift test --package-path CortaTerminal --sanitize=address
 ```
@@ -496,7 +503,12 @@ swift scripts/verify-appcast.swift --download            # every item, against t
   carrying a version, an integer build, an enclosure, a length and a
   base64 64-byte signature; each enclosure URL being exactly the GitHub
   release URL for its own version; build numbers unique and newest-first,
-  since Sparkle offers whichever item has the highest one.
+  since Sparkle offers whichever item has the highest one; and nothing in
+  an item beyond those fields — no release notes, link, critical or
+  informational flag, channel or rollout tag, which Sparkle acts on and
+  the enclosure's signature does not cover. A `sparkle-signatures` block,
+  once the feed carries one (D20, amended 2026-10-08), must verify over
+  every byte before it; from build 11 on the feed must carry one.
 - The **archive** layer is what `corta-release-check check --archive`
   adds, offline, against the archive it already holds, with or without
   `--appcast` — `appcast.yml` runs it once the feed is signed. `corta-release-check
@@ -532,7 +544,12 @@ swift run --package-path CortaTerminal -c release corta-release-check \
 `corta-release-check` is the one implementation of the release rules
 (`RELEASING.md`): versions and build number against `project.pbxproj`,
 license headers, the CHANGELOG and README naming the version, arm64-only
-executables (D21), the code signature, and — with the flags — the archive
+executables (D21), the code signature, every Mach-O in the bundle (the app,
+`corta-exec`, Sparkle and its helpers) signed with the hardened runtime, under
+one team identifier, carrying none of the entitlements that undo it
+(`ReleaseCheck.deniedEntitlements`: `get-task-allow`, library-validation,
+`DYLD_*`, JIT and unsigned-memory exceptions) and searching only the bundle
+and the system for libraries (`LC_RPATH` and dylib paths), and — with the flags — the archive
 and its sidecar, the feed item, Developer ID, the staple and Gatekeeper.
 Every rule prints `ok` or `FAIL`; the exit status is the number that
 failed. The judgements over text live in the `ReleaseCheck` library and

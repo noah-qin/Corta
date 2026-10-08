@@ -103,4 +103,120 @@ public enum ReleaseCheck {
         requirements.split(separator: ",")
             .contains { $0.trimmingCharacters(in: .whitespaces) == "arm64" }
     }
+
+    // MARK: - Code signatures and load paths
+
+    /// Entitlements no shipped component may carry. Each switches off part of
+    /// the hardened runtime — a debugger attaching, libraries not signed by
+    /// the team, `DYLD_*` variables, writable executable memory — in an app
+    /// whose TCC grants every child inherits (`SECURITY.md` §4.2).
+    public static let deniedEntitlements = [
+        "com.apple.security.get-task-allow",
+        "com.apple.security.cs.disable-library-validation",
+        "com.apple.security.cs.allow-dyld-environment-variables",
+        "com.apple.security.cs.allow-unsigned-executable-memory",
+        "com.apple.security.cs.allow-jit",
+        "com.apple.security.cs.disable-executable-page-protection",
+        "com.apple.security.cs.debugger",
+    ]
+
+    /// The denied entitlements a `codesign -d --entitlements - --xml`
+    /// plist grants, any value but `false` counting. An empty output is no
+    /// entitlements; `nil` is output that is not a dictionary plist.
+    public static func forbiddenEntitlements(inPlist data: Data) -> [String]? {
+        let text = String(decoding: data, as: UTF8.self)
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
+        guard
+            let object = try? PropertyListSerialization.propertyList(from: data, format: nil),
+            let entitlements = object as? [String: Any]
+        else { return nil }
+        return deniedEntitlements.filter { key in
+            guard let value = entitlements[key] else { return false }
+            return (value as? Bool) != false
+        }
+    }
+
+    /// Whether a `codesign -dvv` description's CodeDirectory carries the
+    /// hardened runtime flag (`flags=0x10000(runtime)`, or among others).
+    public static func hasHardenedRuntime(codesignDescription text: String) -> Bool {
+        text.split(separator: "\n").contains { line in
+            guard line.hasPrefix("CodeDirectory "), let flags = line.range(of: "flags=") else {
+                return false
+            }
+            let field = line[flags.upperBound...].prefix { $0 != " " }
+            guard let open = field.firstIndex(of: "("), let close = field.lastIndex(of: ")"),
+                open < close
+            else { return false }
+            return field[field.index(after: open)..<close].split(separator: ",").contains("runtime")
+        }
+    }
+
+    /// The `TeamIdentifier=` of a `codesign -dvv` description; `nil` for an
+    /// ad hoc signature (`not set`) or none.
+    public static func teamIdentifier(codesignDescription text: String) -> String? {
+        for line in text.split(separator: "\n") where line.hasPrefix("TeamIdentifier=") {
+            let value = line.dropFirst("TeamIdentifier=".count)
+            return value.isEmpty || value == "not set" ? nil : String(value)
+        }
+        return nil
+    }
+
+    /// One search path or library a Mach-O load command names.
+    public struct LoadPath: Equatable, Sendable {
+        public var command: String
+        public var path: String
+
+        public init(command: String, path: String) {
+            self.command = command
+            self.path = path
+        }
+    }
+
+    /// The `path` and `name` fields of `otool -l`'s load commands, each with
+    /// the command it belongs to.
+    public static func loadPaths(otoolLoadCommands text: String) -> [LoadPath] {
+        var paths: [LoadPath] = []
+        var command: String?
+        for raw in text.split(separator: "\n") {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("cmd ") {
+                command = String(line.dropFirst(4))
+                continue
+            }
+            guard let current = command, line.hasPrefix("path ") || line.hasPrefix("name ") else {
+                continue
+            }
+            var value = line.dropFirst(5)
+            if let offset = value.range(of: " (offset ", options: .backwards) {
+                value = value[..<offset.lowerBound]
+            }
+            paths.append(LoadPath(command: current, path: String(value)))
+            command = nil
+        }
+        return paths
+    }
+
+    /// Load paths that could resolve outside the bundle and the system's
+    /// SIP-protected libraries — an `LC_RPATH` or library in a directory the
+    /// user (or anyone who can write there) controls is a library the
+    /// component would load in place of its own.
+    public static func unsafeLoadPaths(_ paths: [LoadPath]) -> [LoadPath] {
+        let system = ["/System/", "/usr/lib/"]
+        let relative = ["@executable_path/", "@loader_path/"]
+        func isSystem(_ path: String) -> Bool { system.contains { path.hasPrefix($0) } }
+        func isRelative(_ path: String) -> Bool {
+            path == "@executable_path" || path == "@loader_path" || relative.contains { path.hasPrefix($0) }
+        }
+        return paths.filter { item in
+            switch item.command {
+            case "LC_RPATH":
+                return !(isRelative(item.path) || isSystem(item.path))
+            case "LC_LOAD_DYLIB", "LC_LOAD_WEAK_DYLIB", "LC_REEXPORT_DYLIB", "LC_LOAD_UPWARD_DYLIB",
+                "LC_LAZY_LOAD_DYLIB":
+                return !(item.path.hasPrefix("@rpath/") || isRelative(item.path) || isSystem(item.path))
+            default:
+                return false
+            }
+        }
+    }
 }

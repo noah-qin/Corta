@@ -15,6 +15,8 @@
 		C07A000230465E2000E8DD20 /* CortaTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000630465E2000E8DD20 /* CortaTerminal */; };
 		C07A001030465E2000E8DD20 /* CortaSFTP in Frameworks */ = {isa = PBXBuildFile; productRef = C07A000A30465E2000E8DD20 /* CortaSFTP */; };
 		C07A000830465E2000E8DD20 /* corta-exec in Embed corta-exec */ = {isa = PBXBuildFile; productRef = C07A000730465E2000E8DD20 /* corta-exec */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		C07A001130465E2000E8DD20 /* corta-image-decoder in Frameworks */ = {isa = PBXBuildFile; productRef = C07A001330465E2000E8DD20 /* corta-image-decoder */; };
+		C07A001230465E2000E8DD20 /* corta-image-decoder in Embed corta-exec */ = {isa = PBXBuildFile; productRef = C07A001330465E2000E8DD20 /* corta-image-decoder */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		5B0E0C1D30465E2000E8DD20 /* CortaTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = 5B0E0C1C30465E2000E8DD20 /* CortaTerminal */; };
 /* End PBXBuildFile section */
 
@@ -50,6 +52,7 @@
 			dstSubfolderSpec = 6;
 			files = (
 				C07A000830465E2000E8DD20 /* corta-exec in Embed corta-exec */,
+				C07A001230465E2000E8DD20 /* corta-image-decoder in Embed corta-exec */,
 			);
 			name = "Embed corta-exec";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -96,6 +99,7 @@
 			files = (
 				4F9658043049C77E005C56CD /* Sparkle in Frameworks */,
 				4F2E2B293047183A0037705B /* corta-exec in Frameworks */,
+				C07A001130465E2000E8DD20 /* corta-image-decoder in Frameworks */,
 				C07A000130465E2000E8DD20 /* CortaTerminal in Frameworks */,
 				C07A001030465E2000E8DD20 /* CortaSFTP in Frameworks */,
 			);
@@ -176,6 +180,7 @@
 				C07A000530465E2000E8DD20 /* CortaTerminal */,
 				C07A000A30465E2000E8DD20 /* CortaSFTP */,
 				C07A000730465E2000E8DD20 /* corta-exec */,
+				C07A001330465E2000E8DD20 /* corta-image-decoder */,
 				4F9658033049C77E005C56CD /* Sparkle */,
 			);
 			productName = Corta;
@@ -1002,6 +1007,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C07A000430465E2000E8DD20 /* XCLocalSwiftPackageReference "CortaTerminal" */;
 			productName = "corta-exec";
+		};
+		C07A001330465E2000E8DD20 /* corta-image-decoder */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C07A000430465E2000E8DD20 /* XCLocalSwiftPackageReference "CortaTerminal" */;
+			productName = "corta-image-decoder";
 		};
 		5B0E0C1C30465E2000E8DD20 /* CortaTerminal */ = {
 			isa = XCSwiftPackageProductDependency;

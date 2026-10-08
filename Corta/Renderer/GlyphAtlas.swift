@@ -200,6 +200,34 @@ nonisolated final class GlyphAtlas {
     /// Bumped on any page's eviction; earlier UVs may be stale.
     private(set) var generation = 0
 
+    /// Shapes `glyph(shaping:)` and `glyph(forCluster:)` may still run before
+    /// `beginFrame` is called again; unlimited outside a frame. A screen of
+    /// more distinct clusters than a page holds evicted and re-shaped all of
+    /// them on every frame that touched a row — on the main thread every
+    /// window shares — so a frame shapes at most this many and leaves the
+    /// rest for the next (`deferredShaping`).
+    private var shapingAllowance = Int.max
+    /// A lookup this frame missed the cache with no allowance left and drew
+    /// nothing; the caller decides whether another frame is worth asking for.
+    private(set) var deferredShaping = false
+
+    /// Starts a frame's shaping budget.
+    func beginFrame(shapingBudget: Int) {
+        shapingAllowance = max(0, shapingBudget)
+        deferredShaping = false
+    }
+
+    /// One shape from the frame's budget, or `false` (and a deferral) once
+    /// it is spent.
+    private func takeShapingAllowance() -> Bool {
+        guard shapingAllowance > 0 else {
+            deferredShaping = true
+            return false
+        }
+        shapingAllowance -= 1
+        return true
+    }
+
     /// An opaque texel at the origin, so cursor and selection quads share the
     /// glyph pipeline. Reserved in `asciiPage`, never evicted.
     static let solidWhiteUV = SIMD4<Float>(0, 0, 0, 0)
@@ -345,7 +373,7 @@ nonisolated final class GlyphAtlas {
     func glyph(shaping scalar: UInt32, style: Style) -> GlyphInfo? {
         let key = GlyphKey(scalar: scalar, style: style)
         if let cached = shapedPage.cache[key] ?? colorPage.cache[key] { return cached }
-        guard let scalarValue = Unicode.Scalar(scalar) else { return nil }
+        guard let scalarValue = Unicode.Scalar(scalar), takeShapingAllowance() else { return nil }
         shapingHits += 1
         let shaped = shape(String(Character(scalarValue)), style: style)
         let page = cachePage(for: shaped.runs)
@@ -367,7 +395,7 @@ nonisolated final class GlyphAtlas {
             guard let value = Unicode.Scalar(scalar) else { return nil }
             view.append(value)
         }
-        guard !view.isEmpty else { return nil }
+        guard !view.isEmpty, takeShapingAllowance() else { return nil }
         shapingHits += 1
         let shaped = shape(String(view), style: style)
         let page = cachePage(for: shaped.runs)

@@ -788,6 +788,10 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         renderer.kittyImageRenderer.onImagesReady = { [weak self] in
             DispatchQueue.main.async { self?.invalidateDisplay() }
         }
+        // Glyphs a frame's shaping budget left for later.
+        renderer.onGlyphsDeferred = { [weak self] in
+            DispatchQueue.main.async { self?.invalidateDisplay() }
+        }
         return renderer
     }
 

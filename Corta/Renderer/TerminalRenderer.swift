@@ -101,6 +101,18 @@ public nonisolated final class TerminalRenderer {
     private var cachedHoveredLink: TerminalSelection?
     private var needsFullRebuild = true
 
+    /// Non-ASCII shapes one frame may run (`GlyphAtlas.beginFrame`): about
+    /// 20 ms of Core Text at the slowest measured rate, so a hostile screen of
+    /// distinct clusters cannot hold the main thread for a whole screen's
+    /// worth each frame. A first paint of more fills in over a few frames.
+    static let shapingBudgetPerFrame = 1024
+
+    /// Called when a frame left glyphs unshaped for want of budget and the
+    /// atlas still has room for them: draw again soon, or they wait for the
+    /// next output. Not called when the frame evicted, since content that
+    /// overflows the atlas would then ask for frames forever.
+    var onGlyphsDeferred: (() -> Void)?
+
     /// Where the rows draw a block cursor: a screen row and column, live
     /// screen only. It lives in the row instances, so a row is stale when
     /// the cursor enters or leaves it, or when a scroll shift carries a
@@ -270,6 +282,7 @@ public nonisolated final class TerminalRenderer {
         // An eviction mid-build stales every UV: rebuild once. Content that alone
         // overflows the atlas draws blank.
         let atlasGeneration = glyphAtlas.generation
+        glyphAtlas.beginFrame(shapingBudget: Self.shapingBudgetPerFrame)
         if fullRebuild {
             rebuildAllRows(grid: grid, offset: offset)
         } else {
@@ -325,7 +338,14 @@ public nonisolated final class TerminalRenderer {
         cachedSearchMatches = searchMatches
         cachedCurrentSearchMatchIndex = currentSearchMatchIndex
         cachedHoveredLink = hoveredLink
-        needsFullRebuild = false
+        // Rows that drew without some glyph are rebuilt next frame. Asked for
+        // only while nothing was evicted: past that the content overflows the
+        // atlas, and re-asking would shape a budget's worth every frame for as
+        // long as it stays on screen.
+        needsFullRebuild = glyphAtlas.deferredShaping
+        if glyphAtlas.deferredShaping, glyphAtlas.generation == atlasGeneration {
+            onGlyphsDeferred?()
+        }
         // Not on a cursor blink or a selection drag: only the rows carry marks.
         if rowsChanged || marksAreStale {
             changed = changed || marksAreStale

@@ -221,6 +221,94 @@ if Set(shortVersions).count != shortVersions.count {
     fail("versions repeat in the feed: \(shortVersions)")
 }
 
+// MARK: - What else an item may say
+
+// Sparkle acts on more of an item than its enclosure: release notes it
+// renders, a link it opens, a critical or informational flag it obeys, a
+// phased-rollout or channel tag. None of it is covered by the enclosure's
+// EdDSA signature, and copies of Corta built before `SURequireSignedFeed`
+// do not check the feed's own signature, so one edit to this file on
+// `main` would reach them. The feed publishes none of these; a change that
+// wants one adds it here, deliberately, in the same pull request.
+let channelChildren: Set<String> = ["title", "link", "description", "language", "item"]
+let itemChildren: Set<String> = [
+    "title", "pubDate", "sparkle:version", "sparkle:shortVersionString",
+    "sparkle:minimumSystemVersion", "sparkle:hardwareRequirements", "enclosure",
+]
+let enclosureAttributes: Set<String> = ["url", "length", "type", "sparkle:edSignature"]
+func names(_ nodes: [XMLNode]?) -> [String] { (nodes ?? []).compactMap(\.name) }
+var unexpected: [String] = []
+for channel in (try? document.nodes(forXPath: "/rss/channel")) as? [XMLElement] ?? [] {
+    let extra = names(channel.children?.filter { $0.kind == .element }).filter { !channelChildren.contains($0) }
+    unexpected += extra.map { "channel: <\($0)>" }
+}
+for element in itemElements {
+    let short = sparkleText(element, "shortVersionString") ?? "?"
+    let extra = names(element.children?.filter { $0.kind == .element }).filter { !itemChildren.contains($0) }
+    unexpected += extra.map { "item \(short): <\($0)>" }
+    for enclosure in element.elements(forName: "enclosure") {
+        unexpected += names(enclosure.attributes).filter { !enclosureAttributes.contains($0) }
+            .map { "item \(short): enclosure attribute \($0)" }
+    }
+}
+if unexpected.isEmpty {
+    pass("no item carries release notes, links or flags the signature does not cover")
+} else {
+    for entry in unexpected {
+        fail("\(entry) is not something this feed publishes unsigned")
+    }
+}
+
+// MARK: - The feed's own signature
+
+// `SURequireSignedFeed` in `Sparkle-Info.plist` makes every Corta built with
+// it refuse a feed whose trailing `<!-- sparkle-signatures:` block does not
+// verify under `SUPublicEDKey`, and `SUSignedFeedFailureExpirationInterval =
+// 0` takes away the fallback that would accept one anyway after twenty days
+// of failures. `generate_appcast` writes the block as soon as the archive it
+// signs carries the key. What is signed is every byte before the block, and
+// its length — `SPUExtractAppcastContent`, mirrored here.
+//
+// The first build with the key is 11 (1.1.8 is 10). Until the feed offers it,
+// the feed may still be unsigned; from then on an unsigned feed is a feed no
+// new copy of Corta accepts, and a broken block equally so.
+let firstBuildRequiringSignedFeed = 11
+let requiresSignedFeed = (plist["SURequireSignedFeed"] as? Bool) == true
+let feedBytes = FileManager.default.contents(atPath: appcastPath) ?? Data()
+if let prefix = feedBytes.range(of: Data("<!-- sparkle-signatures:\n".utf8), options: .backwards) {
+    let content = feedBytes.subdata(in: feedBytes.startIndex..<prefix.lowerBound)
+    let afterPrefix = feedBytes.subdata(in: prefix.upperBound..<feedBytes.endIndex)
+    var signatureText: String?
+    var lengthText: String?
+    if let suffix = afterPrefix.range(of: Data("-->".utf8)) {
+        let block = String(
+            decoding: afterPrefix.subdata(in: afterPrefix.startIndex..<suffix.lowerBound), as: UTF8.self)
+        for line in block.split(whereSeparator: \.isNewline) {
+            if line.hasPrefix("edSignature:") {
+                signatureText = line.dropFirst("edSignature:".count).trimmingCharacters(in: .whitespaces)
+            } else if line.hasPrefix("length:") {
+                lengthText = line.dropFirst("length:".count).trimmingCharacters(in: .whitespaces)
+            }
+        }
+    }
+    if let signatureText, let signature = Data(base64Encoded: signatureText),
+        let lengthText, Int(lengthText) == content.count,
+        publicKey.isValidSignature(signature, for: content)
+    {
+        pass("the feed's own signature verifies under SUPublicEDKey (\(content.count) bytes)")
+    } else {
+        fail(
+            "the feed's sparkle-signatures block does not verify over the \(content.count) bytes "
+                + "before it — every Corta built with SURequireSignedFeed would refuse this feed")
+    }
+} else if requiresSignedFeed, items.contains(where: { $0.build >= firstBuildRequiringSignedFeed }) {
+    fail(
+        "the feed offers build \(firstBuildRequiringSignedFeed) or later, which requires a signed "
+            + "feed, and carries no sparkle-signatures block")
+} else {
+    pass("the feed is unsigned, and offers no build that requires it signed yet")
+}
+
 // MARK: - Signatures
 
 func verify(_ item: Item, bytes: Data, source: String) {

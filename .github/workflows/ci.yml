@@ -50,7 +50,9 @@ jobs:
     # A hung test otherwise holds a runner for the six-hour default.
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Check automatic release preparation
         run: python3 -B -m unittest discover -s scripts/tests -v
@@ -91,26 +93,34 @@ jobs:
       - name: Real SSH and SFTP against an isolated sshd
         run: python3 -B script/verify_ssh_integration.py
 
+      # One corpus per target: the raw feed, OSC and Kitty payloads framed
+      # as their sequences, and SFTP frames from a hostile server.
       - name: Replay the fuzz corpus
         run: |
-          CortaTerminal/.build/release/corta-fuzz \
-            CortaTerminal/Tests/Fuzz/corpus/*
+          fuzz=CortaTerminal/.build/release/corta-fuzz
+          $fuzz CortaTerminal/Tests/Fuzz/corpus/*
+          for target in osc kitty sftp; do
+            $fuzz --target "$target" CortaTerminal/Tests/Fuzz/"$target"/*
+          done
 
       # Seed 1 on a PR, deliberately: a PR check has to be a regression
       # check, and a different seed every run means a failure a reviewer
       # cannot reproduce. Rotating seeds are the nightly lane's job.
       - name: Short mutation fuzz run
         run: |
-          CortaTerminal/.build/release/corta-fuzz --fuzz 200000 --seed 1 \
-            CortaTerminal/Tests/Fuzz/corpus
+          fuzz=CortaTerminal/.build/release/corta-fuzz
+          $fuzz --fuzz 200000 --seed 1 CortaTerminal/Tests/Fuzz/corpus
+          for target in osc kitty sftp; do
+            $fuzz --target "$target" --fuzz 100000 --seed 1 CortaTerminal/Tests/Fuzz/"$target"
+          done
 
       - name: Keep the crashing input when the fuzzer finds one
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: fuzz-failure-core
           path: |
-            CortaTerminal/Tests/Fuzz/corpus
+            CortaTerminal/Tests/Fuzz
             /tmp/corta-fuzz-*
           if-no-files-found: ignore
           retention-days: 14
@@ -128,7 +138,9 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Select the pinned Xcode
         run: |
@@ -213,7 +225,7 @@ jobs:
       # the failing test, its message and its attachments come back.
       - name: Keep the test results when something fails
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: xcresult-app
           path: TestResults.xcresult

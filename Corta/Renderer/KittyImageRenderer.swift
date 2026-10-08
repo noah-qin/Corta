@@ -29,10 +29,11 @@ import simd
 /// no new pipeline.
 ///
 /// **Decoding.** RGB/RGBA are reordered to premultiplied bgra by hand; PNG
-/// goes through `CGImageSource` into a bgra `CGContext`. PNG dimensions
-/// are read off the header and checked against
-/// `KittyGraphics.maximumImageDimension`/`maximumImagePixels` before
-/// decoding: a few header bytes can claim a 40 GB decode.
+/// is decoded by `corta-image-decoder`, sandboxed, out of process
+/// (`ImageDecoderProcess`), which reads the dimensions off the header and
+/// checks them against `KittyGraphics.maximumImageDimension`/
+/// `maximumImagePixels` before decoding: a few header bytes can claim a
+/// 40 GB decode.
 ///
 /// **Off the frame path.** `update(table:...)` (from
 /// `TerminalRenderer.updateInstances`) only schedules decodes, which run on
@@ -551,42 +552,13 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     /// `f=100` is PNG and nothing else. `CGImageSource` sniffs content, so
     /// unchecked any output could reach every ImageIO parser — TIFF, PSD,
     /// HEIC and the rest — under the name of a PNG: the signature is checked
-    /// before ImageIO sees a byte, and the type ImageIO settles on after.
+    /// here, and the decoder process pins the type and the header's
+    /// dimensions before it decodes. ImageIO itself runs only in that
+    /// process, sandboxed (`ImageDecoderProcess`).
     static func decodePNG(_ bytes: [UInt8]) -> DecodedImage? {
-        guard bytes.starts(with: pngSignature) else { return nil }
-        let options = [kCGImageSourceTypeIdentifierHint: "public.png"] as CFDictionary
-        guard let source = CGImageSourceCreateWithData(Data(bytes) as CFData, options),
-            CGImageSourceGetType(source) as String? == "public.png"
+        guard bytes.starts(with: pngSignature), let decoded = ImageDecoderProcess.decodePNG(bytes)
         else { return nil }
-        // Dimensions come off the header before anything decodes, so the caps
-        // stop a hostile declaration before the work starts.
-        guard let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
-            let width = properties[kCGImagePropertyPixelWidth] as? Int,
-            let height = properties[kCGImagePropertyPixelHeight] as? Int,
-            width > 0, height > 0,
-            width <= KittyGraphics.maximumImageDimension, height <= KittyGraphics.maximumImageDimension,
-            width <= KittyGraphics.maximumImagePixels / height,
-            let image = CGImageSourceCreateImageAtIndex(source, 0, nil),
-            image.width == width, image.height == height
-        else { return nil }
-        var bgra = [UInt8](repeating: 0, count: width * height * 4)
-        // The context draws into the buffer after its initializer returns, so
-        // the pointer must outlive both calls: `&bgra` is valid for the
-        // initializer alone.
-        let drawn = bgra.withUnsafeMutableBytes { buffer -> Bool in
-            guard
-                let context = CGContext(
-                    data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
-                    bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
-                    bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
-                        | CGBitmapInfo.byteOrder32Little.rawValue)
-            else { return false }
-            // No CTM flip, as in `GlyphAtlas.rasterizeColor`.
-            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-            return true
-        }
-        guard drawn else { return nil }
-        return DecodedImage(width: width, height: height, bgra: bgra)
+        return DecodedImage(width: decoded.width, height: decoded.height, bgra: decoded.bgra)
     }
 
     private func makeTexture(from decoded: DecodedImage) -> MTLTexture? {

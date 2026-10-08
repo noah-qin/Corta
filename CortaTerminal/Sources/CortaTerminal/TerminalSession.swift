@@ -228,6 +228,14 @@ public final class TerminalSession: @unchecked Sendable {
     /// Per lock acquisition; ≈ 4 ms at the worst measured feed rate.
     private static let feedLockSliceSize = 16 * 1024
 
+    /// Query replies one read batch may queue. A reply can be several times
+    /// its query (`ESC]4;0;?` is answered with an `rgb:` triple), so a 1 MB
+    /// batch of queries queued about 7 MB at once — admitted whole, since the
+    /// back-pressure cap is checked before a chunk, not inside it. Past this,
+    /// a slice's replies are dropped whole, never cut mid-sequence: a flood of
+    /// queries is not a program waiting for every answer.
+    static let maxResponseBytesPerBatch = 64 * 1024
+
     private let writerSink: (@Sendable ([UInt8]) throws -> Void)?
 
     /// Shared with the app's other sessions; charged after every slice and
@@ -439,7 +447,9 @@ public final class TerminalSession: @unchecked Sendable {
                         current.synchronizedOutputEpisode = episodeAfter
                         return (sliceResponses, episodeAfter)
                     }
-                    responses.append(contentsOf: applied.responses)
+                    if responses.count + applied.responses.count <= Self.maxResponseBytesPerBatch {
+                        responses.append(contentsOf: applied.responses)
+                    }
                     if let newEpisode = applied.episode { episode = newEpisode }
                     offset = end
                     // After the last slice too: the next batch's first slice is

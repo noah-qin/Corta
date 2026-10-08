@@ -31,6 +31,7 @@ let package = Package(
         .executable(name: "corta-dump", targets: ["corta-dump"]),
         .executable(name: "corta-bench", targets: ["corta-bench"]),
         .executable(name: "corta-exec", targets: ["corta-exec"]),
+        .executable(name: "corta-image-decoder", targets: ["corta-image-decoder"]),
         .executable(name: "corta-fuzz", targets: ["corta-fuzz"]),
         .executable(name: "corta-license", targets: ["corta-license"]),
         .executable(name: "corta-release-check", targets: ["corta-release-check"]),
@@ -57,6 +58,14 @@ let package = Package(
             name: "corta-exec",
             swiftSettings: [.defaultIsolation(nil)]
         ),
+        // The PNG decoder the app spawns for Kitty images: ImageIO in a
+        // process of its own under the `pure-computation` sandbox, so a
+        // decoder bug cannot reach Corta's TCC grants. Embedded beside
+        // `corta-exec`; see its doc comment.
+        .executableTarget(
+            name: "corta-image-decoder",
+            swiftSettings: [.defaultIsolation(nil)]
+        ),
         // Feeds stdin to a terminal and prints the grid, so the core can be
         // checked by hand against a real program's output without a window.
         .executableTarget(
@@ -71,14 +80,16 @@ let package = Package(
             dependencies: ["CortaTerminal"],
             swiftSettings: [.defaultIsolation(nil)]
         ),
-        // Fuzz harness over the terminal feed path. Built with
-        // `-Xswiftc -sanitize=fuzzer` it is a fuzz target; built plainly it
-        // replays files named on the command line, so a crashing input can
-        // be reproduced and the checked-in corpus can run in CI without a
-        // fuzzer-enabled toolchain.
+        // Fuzz harness over the terminal feed path, the OSC and Kitty
+        // payload handlers and the SFTP frame decoder (`--target`). Built
+        // with `-Xswiftc -sanitize=fuzzer` it is a fuzz target; built
+        // plainly it replays files named on the command line, so a crashing
+        // input can be reproduced and the checked-in corpus can run in CI
+        // without a fuzzer-enabled toolchain. An executable may depend on
+        // both libraries; only the libraries must not depend on each other.
         .executableTarget(
             name: "corta-fuzz",
-            dependencies: ["CortaTerminal"],
+            dependencies: ["CortaTerminal", "CortaSFTP"],
             swiftSettings: [.defaultIsolation(nil)]
         ),
         // The license-header rules (`docs/LICENSING.md`) and the tool that
