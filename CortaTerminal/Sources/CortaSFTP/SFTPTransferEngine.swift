@@ -1186,7 +1186,7 @@ public final class SFTPTransferEngine: @unchecked Sendable {
 /// cancellation handler. (`Task.isCancelled` alone cannot be observed by
 /// the transfer loop while it sits inside `await task.value` on a server
 /// that never answers — the flag plus child-task cancellation covers both.)
-final class AbortFlag: @unchecked Sendable {
+final class AbortFlag: Sendable {
     private let flag = Mutex(false)
 
     func set() { flag.withLock { $0 = true } }

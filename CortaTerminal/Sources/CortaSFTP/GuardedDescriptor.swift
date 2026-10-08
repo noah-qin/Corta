@@ -35,7 +35,7 @@ import Synchronization
 /// This file exists twice, byte for byte: in `CortaTerminal` and in
 /// `CortaSFTP`, which shares no code with the core. `CortaSFTPTests` holds
 /// the two equal; change both or neither.
-final class GuardedDescriptor: @unchecked Sendable {
+final class GuardedDescriptor: Sendable {
     let number: Int32
 
     private struct State {

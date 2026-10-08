@@ -150,7 +150,7 @@ The UI runner is sandboxed: it reads anywhere but writes only its own
 container, which the app cannot read, so a UI test cannot write the
 config it launches the app with. `CursorAndWindowUITests` and
 `SystemStatusAndThemeEditorUITests` read theirs from a root prepared
-outside the sandbox, and skip with this instruction without it:
+outside the sandbox. Prepare them with:
 
 ```sh
 UI_FIXTURES=$(CortaUITests/stage-ui-fixtures.sh)
@@ -161,6 +161,10 @@ TEST_RUNNER_CORTA_FEEDBACK_STAGE="$FEEDBACK_STAGE" xcodebuild test \
 ```
 
 Remove both printed directories once the development app has exited.
+`InputSourceIndicatorUITests` and `DirectoryCompletionUITests` report a
+setup failure when the root or their config is missing, or the fixture
+prompt did not load. Their shared launcher also isolates `HOME` and
+`ZDOTDIR`; a missing fixture must never be counted as feature coverage.
 
 ### Terminal feedback regression (#213)
 

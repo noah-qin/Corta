@@ -48,6 +48,10 @@ env:
   XCODE_PIN: "26.6.0"
   # The team the Developer ID certificate belongs to.
   TEAM_ID: 646VSJ9K5F
+  # Same pinned signing tool as appcast.yml; a rehearsal signs the feed
+  # against its own archive without publishing either one.
+  SPARKLE_VERSION: "2.10.0"
+  SPARKLE_TARBALL_SHA256: "c2bf58aa8387266ac179357b1415d6f2635f044da8be41042af32425dae6da0c"
 
 jobs:
   prepare:
@@ -378,6 +382,40 @@ jobs:
           swift run --package-path CortaTerminal -c release corta-release-check \
             package build/Build/Products/Release/Corta.app \
             "${{ steps.version.outputs.version }}" . --require-notarized $REHEARSAL
+
+      - name: Rehearse the signed update feed
+        if: ${{ steps.published.outputs.exists != 'true' && inputs.dry_run }}
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          ARCHIVE: ${{ steps.package.outputs.zip }}
+        run: |
+          set -euo pipefail
+          tools="$RUNNER_TEMP/rehearsal-sparkle"
+          feed="$RUNNER_TEMP/rehearsal-feed"
+          mkdir -p "$tools" "$feed"
+          curl -sSL --fail -o "$tools/sparkle.tar.xz" \
+            "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz"
+          echo "${SPARKLE_TARBALL_SHA256}  $tools/sparkle.tar.xz" | shasum -a 256 -c -
+          tar -xJf "$tools/sparkle.tar.xz" -C "$tools" ./bin/generate_appcast
+          cp "$ARCHIVE" "$feed/"
+          cp appcast.xml "$feed/appcast.xml"
+          printf '%s\n' "$SPARKLE_PRIVATE_KEY" | "$tools/bin/generate_appcast" \
+            --ed-key-file - \
+            --download-url-prefix "https://github.com/noah-qin/Corta/releases/download/$TAG/" \
+            "$feed"
+          swift scripts/verify-appcast.swift "$feed/appcast.xml" Sparkle-Info.plist \
+            --archive "$ARCHIVE" --version "$VERSION"
+
+      - name: Keep the rehearsal's signed feed
+        if: ${{ steps.published.outputs.exists != 'true' && inputs.dry_run }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rehearsal-appcast-${{ steps.version.outputs.tag }}
+          path: ${{ runner.temp }}/rehearsal-feed/appcast.xml
+          if-no-files-found: error
+          retention-days: 7
 
       # The minimum OS is read from the app, not typed here: a note that
       # said "26.5" while the app said 26.0 is exactly the drift T11 found.
