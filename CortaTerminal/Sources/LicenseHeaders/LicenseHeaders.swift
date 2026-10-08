@@ -69,6 +69,7 @@ public enum LicenseHeaders {
         ("docs/esctest/**", .reuse),
         ("docs/brand/*.png", .reuse),
         ("docs/brand/*.gif", .reuse),
+        ("docs/test-results/issue-228-*.png", .reuse),
         ("AppIcon.icon/**", .reuse),
         ("AppIconDev.icon/**", .reuse),
         ("Corta/Acknowledgements/**", .reuse),
