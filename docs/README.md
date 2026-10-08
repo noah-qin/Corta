@@ -82,6 +82,7 @@ Dated, and not edited except to fix a link.
 - [1.1.5 release checks, 2026-10-07](test-results/2026-10-07-1.1.5-checks.md) — suites, fuzz, the esctest re-run and the resize fixes' evidence.
 - [1.1.6 release checks, 2026-10-07](test-results/2026-10-07-1.1.6-checks.md) — the rounded-corner patch: render tests, the launched app and a frame-CPU A/B.
 - [Local data and hostile-remote audit, 2026-10-08](test-results/2026-10-08-local-data-remote-audit.md) — leak and remote-to-local paths by attacker, the fixes, and the data and entry-point tables.
+- [Crash, concurrency, signing and supply-chain audit, 2026-10-08](test-results/2026-10-08-crash-concurrency-supply-chain-audit.md) — remote crash and hang points, `@unchecked` and unsafe sites, the 1.1.8 signatures, the update and CI chains, TCC, and the unimplemented sequences.
 - [esctest results](esctest/) — result files per release.
 - [Interactive test records](test-results/) — dated passes by a person; findings are worked off in the changelog.
 
