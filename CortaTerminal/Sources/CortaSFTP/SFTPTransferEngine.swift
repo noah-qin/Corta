@@ -97,6 +97,12 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         /// every shell the app spawns would inherit.
         public var quarantinesDownloads = false
 
+        /// The most one download may write; `nil` for no limit. A server
+        /// states a file's size, or leaves it out and answers READs for as
+        /// long as it likes — a stated size over the limit is refused before
+        /// OPEN, and bytes past it end the transfer, whatever was stated.
+        public var maximumDownloadBytes: UInt64?
+
         public init() {}
     }
 
@@ -423,6 +429,11 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         ownedPartial: borrowing Mutex<LocalPartialIdentity?>
     ) async throws(SFTPError) -> SFTPTransferReceipt {
         let sourceAttributes = try await session.stat(path: remotePath)
+        if let limit = configuration.maximumDownloadBytes, let size = sourceAttributes.size,
+            size > limit
+        {
+            throw .localIOFailed(operation: "download size limit", code: EFBIG)
+        }
         let partialPath = Self.partialPath(for: destinationPath)
         let destinationExists = FileManager.default.fileExists(atPath: destinationPath)
         let partialInfo = localFileInfo(partialPath)
@@ -582,6 +593,16 @@ public final class SFTPTransferEngine: @unchecked Sendable {
                 endOfFile = true
                 for item in pending { item.task.cancel() }
                 break
+            }
+            // More than was asked is no reply to the READ: written, it ran
+            // past the stated size and under the next block.
+            guard data.count <= first.length else {
+                throw SFTPError.protocolViolation("READ reply longer than requested")
+            }
+            if let limit = configuration.maximumDownloadBytes,
+                first.offset + UInt64(data.count) > limit
+            {
+                throw SFTPError.localIOFailed(operation: "download size limit", code: EFBIG)
             }
             try writeAll(descriptor: descriptor, bytes: data, at: first.offset)
             // The partial's mtime is the resume-validation record, but

@@ -104,6 +104,10 @@ final class RemoteEditCoordinator {
         }
     }
 
+    /// The largest remote file a ⌘-click copies for editing. Larger files
+    /// are the file browser's, which shows progress and can cancel.
+    nonisolated static let maximumCopyBytes: UInt64 = 64 * 1024 * 1024
+
     let store: RemoteEditStore
     private let makeClient: (String) -> any SFTPClient
     /// Opens the editor on a local path at a line/column — the same
@@ -144,7 +148,9 @@ final class RemoteEditCoordinator {
         presenter: RemoteEditPresenter? = nil
     ) {
         self.store = store
-        self.makeClient = makeClient ?? { SFTPConnection.forApp(host: $0) }
+        self.makeClient = makeClient ?? {
+            SFTPConnection.forApp(host: $0, maximumDownloadBytes: RemoteEditCoordinator.maximumCopyBytes)
+        }
         self.opener = opener ?? PanePointer.openRemoteFileAt(url:line:column:)
         self.presenter = presenter ?? RemoteEditPresenter(
             promptUpload: { _ in }, promptConflict: { _ in }, showError: { _ in })

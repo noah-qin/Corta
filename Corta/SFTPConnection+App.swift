@@ -25,11 +25,15 @@ import Foundation
 /// (`DiagnosticsEnvironment.sftpSSHExecutable`). Either way the child gets
 /// the same sanitised environment as a shell (`ChildEnvironment`).
 extension SFTPConnection {
-    static func forApp(host: String) -> SFTPConnection {
+    /// `maximumDownloadBytes` bounds each download: remote editing passes
+    /// one, since a server choosing what a ⌘-click fetches could otherwise
+    /// fill the disk with no progress row to cancel from.
+    static func forApp(host: String, maximumDownloadBytes: UInt64? = nil) -> SFTPConnection {
         let environment = ChildEnvironment.default()
         // Remote bytes landing on this Mac get Gatekeeper's first-open check.
         var engine = SFTPTransferEngine.Configuration()
         engine.quarantinesDownloads = true
+        engine.maximumDownloadBytes = maximumDownloadBytes
         if let override = DiagnosticsEnvironment.sftpSSHExecutable() {
             return SFTPConnection(
                 host: host, sshExecutable: override, environment: environment,
