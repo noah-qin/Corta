@@ -828,9 +828,13 @@ public final class TerminalSession: @unchecked Sendable {
         registerStateWaiter { state.withLock { $0.terminal.windowTitle } }
     }
 
-    /// Always local, safe to spawn or restore from.
+    /// Always local, safe to spawn or restore from: the shell's OSC 7 report,
+    /// once the kernel agrees a local process is there
+    /// (`PTY.confirmedWorkingDirectory`); `nil` until a local report arrives.
     public var workingDirectory: String? {
-        registerStateWaiter { state.withLock { $0.terminal.workingDirectory } }
+        guard let reported = registerStateWaiter({ state.withLock { $0.terminal.workingDirectory } })
+        else { return nil }
+        return pty.confirmedWorkingDirectory(reported)
     }
 
     /// Informational only; never for spawning.
@@ -850,7 +854,7 @@ public final class TerminalSession: @unchecked Sendable {
     /// OSC 7 first (the shell's own answer); else the kernel's for the
     /// foreground group, since stock macOS zsh sends OSC 7 only to Terminal.app.
     public var currentDirectory: String? {
-        registerStateWaiter { state.withLock { $0.terminal.workingDirectory } } ?? pty.currentWorkingDirectory
+        workingDirectory ?? pty.currentWorkingDirectory
     }
 
     public var isCommandRunning: Bool {

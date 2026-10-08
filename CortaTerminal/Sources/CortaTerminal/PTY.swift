@@ -314,9 +314,45 @@ public final class PTY: @unchecked Sendable {
     /// caller decides how often the syscall is worth it.
     public var currentWorkingDirectory: String? {
         guard let group = foregroundProcessGroup else { return nil }
+        return Self.workingDirectory(of: group)
+    }
+
+    /// `reported` — an OSC 7 path — when the kernel puts the shell or the
+    /// foreground job there; otherwise the shell's own directory. The report
+    /// is program output: `cat` of a file, or a remote shell that names no
+    /// host, sent one for a directory nobody is in, and new tabs, restore and
+    /// directory history took it for where the shell stood. `nil` once the
+    /// child has exited, since its id may belong to another process by then.
+    ///
+    /// Strings only: a `stat` or `realpath` of a path the output named can
+    /// block on a mount that stopped answering. A symlinked directory reads
+    /// as its real path, which is the same directory.
+    public func confirmedWorkingDirectory(_ reported: String) -> String? {
+        guard exitStatus == nil else { return nil }
+        let shell = Self.workingDirectory(of: processIdentifier)
+        var places = [shell]
+        if let group = foregroundProcessGroup, group != processIdentifier {
+            places.append(Self.workingDirectory(of: group))
+        }
+        if places.contains(where: { $0.map { Self.isSamePlace(reported, kernel: $0) } == true }) {
+            return reported
+        }
+        return shell
+    }
+
+    /// Whether a reported path is the kernel's, as macOS spells it: `/tmp`,
+    /// `/var` and `/etc` are links into `/private`, and the kernel names the
+    /// real place while a shell's `$PWD` keeps the link.
+    static func isSamePlace(_ reported: String, kernel: String) -> Bool {
+        var path = reported
+        while path.count > 1, path.hasSuffix("/") { path.removeLast() }
+        return kernel == path || kernel == "/private" + path
+    }
+
+    private static func workingDirectory(of pid: pid_t) -> String? {
         var info = proc_vnodepathinfo()
         let size = Int32(MemoryLayout<proc_vnodepathinfo>.size)
-        guard proc_pidinfo(group, PROC_PIDVNODEPATHINFO, 0, &info, size) == size else {
+        guard proc_pidinfo(pid, PROC_PIDVNODEPATHINFO, 0, &info, size) == size else {
             return nil
         }
         let path = withUnsafeBytes(of: &info.pvi_cdir.vip_path) { raw -> String? in
