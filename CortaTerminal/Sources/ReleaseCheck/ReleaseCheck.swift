@@ -52,7 +52,11 @@ public enum ReleaseCheck {
 
     /// The archive's file name for a version; the feed, the README and the
     /// release all name it this way.
-    public static func archiveName(version: String) -> String { "Corta-\(version).zip" }
+    public static func archiveName(version: String) -> String { "Corta-\(version).dmg" }
+
+    public static func isDiskImageDownloadURL(_ url: String, version: String) -> Bool {
+        url == diskImageDownloadURL(version: version)
+    }
 
     /// A SHA-256 sidecar in `shasum -a 256` form, naming the archive by its
     /// file name so `shasum -c` works from the directory it is downloaded to.
@@ -72,11 +76,13 @@ public enum ReleaseCheck {
         public var build: String
         public var length: String
         public var hardwareRequirements: String
+        public var url: String
 
-        public init(build: String, length: String, hardwareRequirements: String) {
+        public init(build: String, length: String, hardwareRequirements: String, url: String = "") {
             self.build = build
             self.length = length
             self.hardwareRequirements = hardwareRequirements
+            self.url = url
         }
     }
 
@@ -92,7 +98,8 @@ public enum ReleaseCheck {
             guard text("shortVersionString") == version else { continue }
             let length = item.elements(forName: "enclosure").first?.attribute(forName: "length")?.stringValue
             return AppcastItem(build: text("version"), length: length ?? "",
-                               hardwareRequirements: text("hardwareRequirements"))
+                               hardwareRequirements: text("hardwareRequirements"),
+                               url: item.elements(forName: "enclosure").first?.attribute(forName: "url")?.stringValue ?? "")
         }
         return nil
     }

@@ -98,10 +98,10 @@ jobs:
             --jq 'if (.isDraft or .isPrerelease) then error("The feed requires a published stable release") else "Published stable release" end'
           mkdir -p feed
           gh release download "${{ steps.version.outputs.tag }}" \
-            --pattern "Corta-${{ steps.version.outputs.version }}.zip*" \
+            --pattern "Corta-${{ steps.version.outputs.version }}.dmg*" \
             --dir feed
           cd feed
-          shasum -a 256 -c "Corta-${{ steps.version.outputs.version }}.zip.sha256"
+          shasum -a 256 -c "Corta-${{ steps.version.outputs.version }}.dmg.sha256"
 
       - name: Fetch Sparkle's signing tools
         run: |
@@ -156,12 +156,16 @@ jobs:
       # stapled and accepted by Gatekeeper.
       - name: Check the app, the archive and the feed agree
         run: |
-          mkdir -p unpacked
-          ditto -x -k "feed/Corta-${{ steps.version.outputs.version }}.zip" unpacked
+          set -euo pipefail
+          image="feed/Corta-${{ steps.version.outputs.version }}.dmg"
+          mount="$RUNNER_TEMP/corta-feed-mount"
+          mkdir -p "$mount"
+          trap 'hdiutil detach "$mount" || hdiutil detach -force "$mount"' EXIT
+          hdiutil attach "$image" -readonly -nobrowse -noautoopen -mountpoint "$mount"
           swift run --package-path CortaTerminal -c release corta-release-check \
-            check unpacked/Corta.app \
+            check "$mount/Corta.app" \
             --version "${{ steps.version.outputs.version }}" \
-            --archive "feed/Corta-${{ steps.version.outputs.version }}.zip" \
+            --archive "$image" \
             --appcast --require-notarized
 
       - name: Hand the signed feed to the publish job

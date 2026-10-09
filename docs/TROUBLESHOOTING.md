@@ -18,31 +18,35 @@ If an entry here is wrong or missing, open an issue with the
 
 ### "Corta can't be opened because Apple cannot check it for malicious software"
 
-You have a build that is not notarised: one you built yourself, or a
-release the workflow produced without signing secrets (its release notes
-carry a warning box saying so). Check the signing notes for the exact asset you downloaded on
-[GitHub Releases](https://github.com/noah-qin/Corta/releases).
-
-If you trust the build, clear the quarantine flag once:
-
-```sh
-xattr -dr com.apple.quarantine /Applications/Corta.app
-```
+Official releases are Developer ID signed and notarised. A source build
+may not be. For a downloaded release, verify its checksum and the image
+and app checks below, then report the exact message with the version.
 
 ### "Corta is damaged and can't be opened"
 
-The archive may be incomplete, altered or rejected by macOS signature
+The disk image may be incomplete, altered or rejected by macOS signature
 validation. First check it against the
 `.sha256` file published beside it:
 
 ```sh
-shasum -a 256 -c Corta-<version>.zip.sha256
+shasum -a 256 -c Corta-<version>.dmg.sha256
 ```
 
-A mismatch means download again. Every release archive is checked against
+A mismatch means download again. Every release package is checked against
 its sidecar before it is published (`corta-release-check`), so a
 mismatch is a reason to stop and download again. If the checksum matches,
-include the release version and macOS error in your report.
+check the image and copied app:
+
+```sh
+spctl -a -t open --context context:primary-signature -v Corta-<version>.dmg
+xcrun stapler validate Corta-<version>.dmg
+spctl --assess --type exec /Applications/Corta.app
+xcrun stapler validate /Applications/Corta.app
+```
+
+Include the release version, macOS error and these results in your report.
+Do not bypass Gatekeeper to test a release. Versions through 1.1.8 retain
+their original ZIP checksums; use the filename from that release.
 
 ### Corta offers to move itself to /Applications
 
@@ -51,7 +55,7 @@ anywhere; `/Applications` is where Sparkle updates and Spotlight expect it.
 Say no and it stops asking — or set `suggest-applications-folder = false`
 in `~/.config/corta/config`.
 
-Opened straight from the unzipped download, macOS runs Corta from a
+Opened straight from the disk image, macOS runs Corta from a
 temporary read-only location, so it cannot move itself; it asks you to drag
 it into Applications instead. If a newer Corta is already there, it offers
 to open that one rather than replace it with the older copy.

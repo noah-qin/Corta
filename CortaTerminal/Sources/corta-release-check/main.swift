@@ -24,7 +24,7 @@ import ReleaseCheck
 /// and a CI package are rejected for the same reasons, and a rule added
 /// here reaches every route at once.
 ///
-///     corta-release-check check APP [--version V] [--archive ZIP]
+///     corta-release-check check APP [--version V] [--archive DMG]
 ///                                   [--appcast] [--require-notarized]
 ///     corta-release-check package APP VERSION [OUTPUT_DIRECTORY]
 ///                                   [--require-notarized] [--rehearsal]
@@ -37,8 +37,8 @@ import ReleaseCheck
 /// corta-exec are arm64 only (D21); the code signature verifies.
 ///
 ///     --version V          V (a tag with its `v` stripped) must be the version.
-///     --archive ZIP        ZIP is named Corta-V.zip, holds Corta.app, its
-///                          ZIP.sha256 sidecar matches it, and the feed and
+///     --archive DMG        DMG is named Corta-V.dmg, holds Corta.app and Applications, its
+///                          DMG.sha256 sidecar matches it, and the feed and
 ///                          V's signature verify (scripts/verify-appcast.swift).
 ///     --appcast            appcast.xml has an item for this version and build
 ///                          whose enclosure length, with --archive, is the
@@ -48,14 +48,11 @@ import ReleaseCheck
 ///                          notarization ticket is stapled, and Gatekeeper
 ///                          accepts the app.
 ///
-/// `package` zips the app with `ditto` into OUTPUT_DIRECTORY (default
-/// `dist`) as Corta-VERSION.zip, writes the SHA-256 sidecar beside it, and
-/// runs the same checks on it — so an archive that would be rejected on CI
-/// is rejected here first, for the same reason. One exception: the feed is
-/// signed only after a release is published (D20), so a package has no
-/// signature to verify yet. It checks the feed alone instead, and that the
-/// feed does not already publish VERSION, whose signed bytes a rebuild would
-/// never match.
+/// `package` checks the finished, signed and notarised Corta-VERSION.dmg in
+/// OUTPUT_DIRECTORY (default `dist`) and writes its SHA-256 sidecar. It never
+/// rebuilds the image or invalidates its signature/ticket. The mounted app
+/// passes all the same checks. The feed is checked offline, but VERSION must
+/// not already be published unless this is a rehearsal.
 ///
 ///     --rehearsal          skip only that last rule, for release.yml's dry
 ///                          run, which rebuilds the version the project
@@ -65,7 +62,7 @@ import ReleaseCheck
 /// of failed checks, and every failure is printed; 2 is a usage error.
 
 let usage = """
-    usage: corta-release-check check APP [--version V] [--archive ZIP] [--appcast]
+    usage: corta-release-check check APP [--version V] [--archive DMG] [--appcast]
                                          [--require-notarized] [--root DIR]
            corta-release-check package APP VERSION [OUTPUT_DIRECTORY]
                                          [--require-notarized] [--rehearsal] [--root DIR]
@@ -170,16 +167,10 @@ if command == "package" {
     try fileManager.createDirectory(atPath: outputDirectory, withIntermediateDirectories: true)
     let name = ReleaseCheck.archiveName(version: version)
     let archive = "\(outputDirectory)/\(name)"
-    try? fileManager.removeItem(atPath: archive)
-    guard let ditto = run("/usr/bin/ditto", ["-c", "-k", "--keepParent", "--sequesterRsrc", app, archive]),
-          ditto.status == 0 else {
-        FileHandle.standardError.write(Data("ditto could not archive \(app)\n".utf8))
+    guard fileManager.fileExists(atPath: archive) else {
+        FileHandle.standardError.write(Data("finished disk image not found: \(archive)\n".utf8))
         exit(1)
     }
-    let digest = SHA256.hash(data: try Data(contentsOf: URL(fileURLWithPath: archive), options: .mappedIfSafe))
-        .map { String(format: "%02x", $0) }.joined()
-    try ReleaseCheck.sidecar(digest: digest, archiveName: name)
-        .write(toFile: archive + ".sha256", atomically: true, encoding: .utf8)
     positional = [app]
     expectedVersion = version
     archivePath = archive
@@ -189,18 +180,36 @@ guard positional.count == 1 else { usageError() }
 
 // MARK: - check
 
-let app = absolute(positional[0])
+var app = absolute(positional[0])
+var diskImageMount: ReleaseCheck.DiskImageMount?
 var failures = 0
 @MainActor func fail(_ message: String) { print("FAIL  \(message)"); failures += 1 }
 @MainActor func pass(_ message: String) { print("ok    \(message)") }
 @MainActor func finish() -> Never {
+    if let diskImageMount, !diskImageMount.close() {
+        fail("could not detach disk image at \(diskImageMount.root.path)")
+    }
     exit(Int32(min(failures, 125)))
+}
+
+// The app actually inside the signed image is authoritative, not a different
+// build directory supplied by the caller. Release checks below are unchanged.
+if let archivePath {
+    do {
+        let mount = try ReleaseCheck.inspectDiskImage(URL(fileURLWithPath: absolute(archivePath)))
+        diskImageMount = mount
+        app = mount.root.appendingPathComponent("Corta.app").path
+        pass("Developer ID disk image is notarised, accepted, has no license agreement and contains only Corta.app and Applications")
+    } catch {
+        fail(error.localizedDescription)
+        finish()
+    }
 }
 
 let plistURL = URL(fileURLWithPath: "\(app)/Contents/Info.plist")
 guard let plist = NSDictionary(contentsOf: plistURL) as? [String: Any] else {
     fail("no application bundle at \(app)")
-    exit(1)
+    finish()
 }
 @MainActor func plistValue(_ key: String) -> String { (plist[key] as? String) ?? "" }
 
@@ -427,6 +436,10 @@ if loadPathProblems.isEmpty {
     for problem in loadPathProblems { print("      \(problem)") }
 }
 
+if let diskImageMount, !ReleaseCheck.diskImageTeamMatches(diskImageMount.team, appTeams: teams) {
+    fail("disk image and app disagree on the Developer ID team")
+}
+
 // --- Archive
 
 var archiveLength: String?
@@ -438,13 +451,9 @@ if let archivePath {
     } else {
         fail("archive is named \(name), not \(archiveName)")
     }
-    let listing = run("/usr/bin/zipinfo", ["-1", archive])?.stdout ?? ""
-    if listing.split(separator: "\n").contains("Corta.app/Contents/Info.plist") {
-        pass("archive contains Corta.app")
-    } else {
-        fail("archive \(archive) is missing or does not contain Corta.app at its root")
-    }
-    if let sidecar = try? String(contentsOfFile: archive + ".sha256", encoding: .utf8),
+    if command == "package" {
+        // The sidecar is written only after all package checks pass below.
+    } else if let sidecar = try? String(contentsOfFile: archive + ".sha256", encoding: .utf8),
        let recorded = ReleaseCheck.recordedDigest(inSidecar: sidecar) {
         let data = (try? Data(contentsOf: URL(fileURLWithPath: archive), options: .mappedIfSafe)) ?? Data()
         let actual = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
@@ -520,6 +529,11 @@ if checkAppcast {
     case .success(nil):
         fail("appcast.xml has no item for version \(bundleVersion)")
     case .success(let item?):
+        if ReleaseCheck.isDiskImageDownloadURL(item.url, version: bundleVersion) {
+            pass("appcast names the version's disk image")
+        } else {
+            fail("new appcast item must name Corta-\(bundleVersion).dmg")
+        }
         if item.build == bundleBuild {
             pass("appcast item carries build \(bundleBuild)")
         } else {
@@ -545,6 +559,19 @@ if checkAppcast {
             }
         }
     }
+}
+
+if command == "package", failures == 0, let archivePath {
+    do {
+        let digest = SHA256.hash(data: try Data(contentsOf: URL(fileURLWithPath: archivePath), options: .mappedIfSafe))
+            .map { String(format: "%02x", $0) }.joined()
+        try ReleaseCheck.sidecar(digest: digest, archiveName: archiveName)
+            .write(toFile: archivePath + ".sha256", atomically: true, encoding: .utf8)
+        pass("wrote the finished disk image's SHA-256 sidecar")
+    } catch { fail("could not write checksum: \(error.localizedDescription)") }
+}
+if let diskImageMount, !diskImageMount.close() {
+    fail("could not detach disk image at \(diskImageMount.root.path)")
 }
 
 if failures == 0 {

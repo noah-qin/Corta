@@ -51,7 +51,7 @@ class PrepareReleaseTests(unittest.TestCase):
             "[1.2.3]: https://github.com/noah-qin/Corta/releases/tag/v1.2.3\n")
         (self.root / "README.md").write_text(
             "## Install\n\nRequires macOS 26.0; Intel last supported in [1.0.1](old).\n"
-            "shasum -a 256 -c Corta-1.2.3.zip.sha256\nunzip Corta-1.2.3.zip\n\n"
+            "shasum -a 256 -c Corta-1.2.3.dmg.sha256\nopen Corta-1.2.3.dmg\n\n"
             "> **Release status:** [1.2.3](tag),\n> published yesterday.\n\n"
             "For updates, install 1.1.1 shell integration.\n")
         (self.root / "appcast.xml").write_text(
@@ -89,9 +89,16 @@ class PrepareReleaseTests(unittest.TestCase):
         self.assertNotIn("fix: recover $HOME and `literal`", release.section(changelog, "1.2.4"))
         self.assertEqual(release.section(changelog, "1.2.3"), "- Old changes.")
         readme = (self.root / "README.md").read_text()
-        self.assertIn("Corta-1.2.4.zip.sha256", readme)
+        self.assertIn("Corta-1.2.4.dmg.sha256", readme)
         self.assertIn("[1.0.1](old)", readme)
         self.assertIn("1.1.1 shell integration", readme)
+
+    def test_readme_dmg_placeholder_is_synchronized(self):
+        path = self.root / "README.md"
+        path.write_text(path.read_text().replace("Corta-1.2.3.dmg", "Corta-<version>.dmg"))
+        self.prepare()
+        self.assertIn("Corta-1.2.4.dmg.sha256", path.read_text())
+        self.assertNotIn("Corta-<version>.dmg", path.read_text())
 
     def test_explicit_minor(self):
         self.assertEqual(self.prepare("minor")["version"], "1.3.0")

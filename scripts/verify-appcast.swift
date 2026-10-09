@@ -181,8 +181,17 @@ for element in itemElements {
         fail("item \(short) has no base64 64-byte sparkle:edSignature")
         continue
     }
+    // D26: immutable historical ZIPs remain valid; every later release is DMG.
+    let parts = short.split(separator: ".", omittingEmptySubsequences: false)
+    guard parts.count == 3, parts.allSatisfy({ !$0.isEmpty && $0.allSatisfy { $0.isASCII && $0.isNumber } }),
+          let major = Int(parts[0]), let minor = Int(parts[1]), let patch = Int(parts[2]) else {
+        fail("item \(short) has no stable semantic version")
+        continue
+    }
+    let version = [major, minor, patch], lastZIP = [1, 1, 8]
+    let suffix = version == lastZIP || version.lexicographicallyPrecedes(lastZIP) ? "zip" : "dmg"
     let expectedURL =
-        "https://github.com/noah-qin/Corta/releases/download/v\(short)/Corta-\(short).zip"
+        "https://github.com/noah-qin/Corta/releases/download/v\(short)/Corta-\(short).\(suffix)"
     if url != expectedURL {
         fail("item \(short) enclosure url is \(url), expected \(expectedURL)")
     }

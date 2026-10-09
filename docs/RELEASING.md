@@ -31,10 +31,10 @@ signatures, notarisation and archive/feed checks still gate delivery.
    same. Without it the 1.1.5 version PR sat blocked behind green checks.
 4. It checks out that exact merge commit, reruns core/app tests, archives
    with the pinned Xcode and Developer ID, exports, packages, notarises,
-   staples and checks the app with `corta-release-check --require-notarized`.
+   staples and checks the app and image with `corta-release-check --require-notarized`.
    Missing signing or Sparkle configuration fails the run; automatic
    releases never fall back to ad-hoc signing.
-5. Only after those checks does it create the version tag, upload the ZIP
+5. Only after those checks does it create the version tag, upload the DMG
    and SHA-256 sidecar to a temporary draft, and publish it automatically.
    A draft is only an upload staging area, never an approval step.
 6. The same pipeline calls `Update feed` as a reusable workflow. It checks
@@ -56,6 +56,35 @@ Run workflow form. The default is `patch`.
 A manually chosen higher, not-yet-prepared project version is respected by
 the default patch route. Performance measurements and conformance records
 are added when measured; the automation does not invent evidence.
+
+## Disk-image packaging (D26)
+
+Release notarises the Developer ID signed app using a temporary ZIP sent
+only to Apple, deletes that ZIP and staples the app. It then copies the
+app and an Applications symlink into an isolated staging folder, creates
+an UDZO read-only image named Corta, signs it with a Developer ID timestamp,
+notarises it and staples the image. `corta-release-check package
+--require-notarized` checks the finished image and its mounted app and writes
+the SHA-256 sidecar. No ZIP is uploaded. Rehearsal package artifacts contain
+only `Corta-<version>.dmg` and its `.sha256` sidecar; the source patch and
+signed-feed evidence remain separate artifacts.
+
+The feed workflow checks the checksum, mounts read-only with cleanup on
+success or failure, and generates/signs from the same DMG with the key on
+stdin. `verify-appcast.swift` accepts historical ZIP URLs through 1.1.8
+and requires DMG afterwards; nightly verifies the bytes of both formats.
+Sparkle 2.9.6 and pinned 2.10.0 support DMG with pre-extraction verification
+and a signed feed with zero grace period; neither security setting changes.
+
+After a packaging change merges on main, run the signed/notarised dry run
+before requesting a real release. Validate both image and app, checksum,
+drag-install and offline first launch on Apple silicon without changing
+machine-wide settings. After the first DMG release, test Check for Updates
+from the latest ZIP install (1.1.8 at the transition) and a successful
+restart. If that transition fails, revert the DMG batch on main and ship a
+new ZIP patch; never replace published assets. Enable release immutability
+only after these checks pass. Uploads and retries may alter drafts only;
+published releases have no asset-mutation path.
 
 ## Recovery
 

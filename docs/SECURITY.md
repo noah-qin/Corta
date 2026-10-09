@@ -319,6 +319,11 @@ with sit in the same environment; the
 certificate reaches the runner only inside a keychain the job creates
 and deletes.
 
+Future updates use a Developer ID signed, notarised disk image, with the
+app also notarised and stapled (D26). The feed retains historical ZIP
+entries; both formats keep EdDSA verification. Signed-feed enforcement,
+zero grace period and verification before mounting/extraction are unchanged.
+
 ## 5. Data at Rest
 
 **Terminal contents are not automatically persisted.** Scrollback routinely

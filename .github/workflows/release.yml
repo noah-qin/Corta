@@ -333,55 +333,47 @@ jobs:
             -exportOptionsPlist "$options" \
             -quiet
 
-      # The same command a maintainer runs locally (`corta-release-check
-      # package`): the archive, its SHA-256 sidecar, then the release check —
-      # versions, build number, deployment target, CHANGELOG/README
-      # agreement, architecture, signature, archive and sidecar. One
-      # implementation of the rules, so the two routes reject the same
-      # artifact (B15).
-      #
-      # A dry run transfers the prepared metadata as a patch, without a PR,
-      # tag or publication. The rehearsal flag also permits existing versions.
-      - name: Package and check
-        if: steps.published.outputs.exists != 'true'
+      # Notarise the app first; this ZIP is an Apple submission only and
+      # is deleted on every path. Then sign/notarise/staple the final DMG.
+      - name: Notarise the app and disk image
+        if: ${{ steps.published.outputs.exists != 'true' && steps.signing.outputs.available == 'true' }}
         id: package
-        env:
-          REHEARSAL: ${{ inputs.dry_run && '--rehearsal' || '' }}
-        run: |
-          app=build/Build/Products/Release/Corta.app
-          test -d "$app" || { echo "no app at $app"; exit 1; }
-          zip="Corta-${{ steps.version.outputs.version }}.zip"
-          swift run --package-path CortaTerminal -c release corta-release-check \
-            package "$app" "${{ steps.version.outputs.version }}" . $REHEARSAL
-          echo "zip=$zip" >> "$GITHUB_OUTPUT"
-
-      - name: Notarise and staple
-        if: ${{ steps.published.outputs.exists != 'true' && (steps.signing.outputs.available == 'true') }}
         env:
           REHEARSAL: ${{ inputs.dry_run && '--rehearsal' || '' }}
           ASC_KEY: ${{ secrets.ASC_KEY }}
           ASC_KEY_ID: ${{ vars.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ vars.ASC_ISSUER_ID }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
+          set -euo pipefail
+          app=build/Build/Products/Release/Corta.app
           key="$RUNNER_TEMP/asc-key.p8"
-          trap 'rm -f "$key"' EXIT
+          temporary_zip="$RUNNER_TEMP/corta-app-notary.zip"
+          stage="$RUNNER_TEMP/corta-dmg-stage"
+          trap 'rm -f "$key" "$temporary_zip"; rm -rf "$stage"' EXIT
           (umask 077 && printf '%s\n' "$ASC_KEY" > "$key")
-          xcrun notarytool submit "${{ steps.package.outputs.zip }}" \
-            --key "$key" \
-            --key-id "$ASC_KEY_ID" \
-            --issuer "$ASC_ISSUER_ID" \
-            --wait
-          xcrun stapler staple build/Build/Products/Release/Corta.app
-          xcrun stapler validate build/Build/Products/Release/Corta.app
-          codesign --verify --deep --strict --verbose=2 \
-            build/Build/Products/Release/Corta.app
-          rm -f "${{ steps.package.outputs.zip }}"
-          # Re-packaged with the ticket stapled, and re-checked — this time
-          # requiring the Developer ID signature, the staple and
-          # Gatekeeper's acceptance.
+          ditto -c -k --keepParent --sequesterRsrc "$app" "$temporary_zip"
+          xcrun notarytool submit "$temporary_zip" \
+            --key "$key" --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" --wait
+          rm -f "$temporary_zip"
+          xcrun stapler staple "$app"
+          xcrun stapler validate "$app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+
+          mkdir -p "$stage"
+          ditto "$app" "$stage/Corta.app"
+          ln -s /Applications "$stage/Applications"
+          dmg="Corta-$VERSION.dmg"
+          # UDZO is a compressed read-only image understood by hdiutil and
+          # Sparkle, with no Finder customization or license resources.
+          hdiutil create -volname Corta -srcfolder "$stage" -format UDZO "$dmg"
+          codesign --force --sign "Developer ID Application" --timestamp "$dmg"
+          xcrun notarytool submit "$dmg" \
+            --key "$key" --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" --wait
+          xcrun stapler staple "$dmg"
           swift run --package-path CortaTerminal -c release corta-release-check \
-            package build/Build/Products/Release/Corta.app \
-            "${{ steps.version.outputs.version }}" . --require-notarized $REHEARSAL
+            package "$app" "$VERSION" . --require-notarized $REHEARSAL
+          echo "dmg=$dmg" >> "$GITHUB_OUTPUT"
 
       - name: Rehearse the signed update feed
         if: ${{ steps.published.outputs.exists != 'true' && inputs.dry_run }}
@@ -389,7 +381,7 @@ jobs:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
           TAG: ${{ steps.version.outputs.tag }}
           VERSION: ${{ steps.version.outputs.version }}
-          ARCHIVE: ${{ steps.package.outputs.zip }}
+          ARCHIVE: ${{ steps.package.outputs.dmg }}
         run: |
           set -euo pipefail
           tools="$RUNNER_TEMP/rehearsal-sparkle"
@@ -422,7 +414,7 @@ jobs:
       - name: Write the release notes
         if: steps.published.outputs.exists != 'true'
         run: |
-          sha=$(shasum -a 256 "${{ steps.package.outputs.zip }}" | cut -d' ' -f1)
+          sha=$(shasum -a 256 "${{ steps.package.outputs.dmg }}" | cut -d' ' -f1)
           minimum=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' \
             build/Build/Products/Release/Corta.app/Contents/Info.plist)
           {
@@ -432,7 +424,22 @@ jobs:
             echo
             echo "See [CHANGELOG.md](https://github.com/noah-qin/Corta/blob/${{ steps.version.outputs.tag }}/CHANGELOG.md) for the full history."
             echo
-            echo "Requires macOS $minimum or later."
+            executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' \
+              build/Build/Products/Release/Corta.app/Contents/Info.plist)
+            architectures=$(lipo -archs "build/Build/Products/Release/Corta.app/Contents/MacOS/$executable")
+            case "$architectures" in
+              arm64) hardware="a Mac with Apple silicon" ;;
+              *) hardware="a Mac supporting $architectures" ;;
+            esac
+            echo "Requires macOS $minimum or later on $hardware."
+            echo
+            echo "## Install"
+            echo
+            echo "Download \`Corta-${{ steps.version.outputs.version }}.dmg\` and its \`.sha256\` file."
+            echo '```sh'
+            echo "shasum -a 256 -c Corta-${{ steps.version.outputs.version }}.dmg.sha256"
+            echo '```'
+            echo "Open the disk image, drag Corta into Applications, then eject the disk image."
             echo
             echo "\`\`\`"
             echo "SHA-256  $sha"
@@ -452,11 +459,10 @@ jobs:
         if: ${{ steps.published.outputs.exists != 'true' && (inputs.dry_run) }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: rehearsal-${{ steps.package.outputs.zip }}
+          name: rehearsal-${{ steps.package.outputs.dmg }}
           path: |
-            ${{ steps.package.outputs.zip }}
-            ${{ steps.package.outputs.zip }}.sha256
-            release-notes.md
+            ${{ steps.package.outputs.dmg }}
+            ${{ steps.package.outputs.dmg }}.sha256
           retention-days: 7
 
       # Create the tag only after the exact commit's archive passed checks.
@@ -486,7 +492,7 @@ jobs:
               --title "Corta $TAG" --notes-file release-notes.md
           fi
           gh release upload "$TAG" \
-            "${{ steps.package.outputs.zip }}" "${{ steps.package.outputs.zip }}.sha256" --clobber
+            "${{ steps.package.outputs.dmg }}" "${{ steps.package.outputs.dmg }}.sha256" --clobber
           gh release edit "$TAG" --draft=false --latest
 
       # Always, including when an earlier step failed: a signing keychain
