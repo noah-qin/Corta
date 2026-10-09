@@ -110,16 +110,18 @@ Ghostty is the better choice today; those are
 Requires **macOS 26.0 or later** on a Mac with **Apple silicon** (M1 or
 later) from 1.1.0 on. Intel Macs are not supported after
 [1.0.1](https://github.com/noah-qin/Corta/releases/tag/v1.0.1), which stays
-available for them. Download the archive and matching SHA-256
-file from [GitHub Releases](https://github.com/noah-qin/Corta/releases/latest).
-Follow the signing and installation notes attached to that release, verify the
-checksum, unzip the archive and move `Corta.app` to `/Applications`.
+available for them. Releases after 1.1.8 use disk images. Download
+`Corta-<version>.dmg` and `Corta-<version>.dmg.sha256` from
+[GitHub Releases](https://github.com/noah-qin/Corta/releases/latest).
+Version 1.1.8 and earlier retain their original ZIP downloads.
 
 ```sh
-# Run in the directory containing both downloaded files.
-shasum -a 256 -c Corta-1.1.8.zip.sha256
-unzip Corta-1.1.8.zip
+# Replace <version> with the chosen DMG release; keep both files together.
+shasum -a 256 -c Corta-<version>.dmg.sha256
 ```
+
+Open the disk image, drag **Corta** into **Applications**, then eject the
+image. For later updates, use **Corta ▸ Check for Updates…**.
 
 > [!NOTE]
 > **Release status:** [1.1.8](https://github.com/noah-qin/Corta/releases/tag/v1.1.8),

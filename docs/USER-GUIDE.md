@@ -28,14 +28,16 @@ and Find Previous can be changed ([Keyboard shortcuts](#keyboard-shortcuts)).
 ## Install and update
 
 Corta needs **macOS 26.0 or later** on a Mac with **Apple silicon**.
-Download the `.zip` and its `.sha256` file from
+For releases after 1.1.8, download the `.dmg` and its `.sha256` file from
 [GitHub Releases](https://github.com/noah-qin/Corta/releases/latest), check
-the archive, and move `Corta.app` to `/Applications`:
+the checksum, then open the image and drag Corta into Applications:
 
 ```sh
-shasum -a 256 -c Corta-x.y.z.zip.sha256
-unzip Corta-x.y.z.zip
+shasum -a 256 -c Corta-x.y.z.dmg.sha256
+open Corta-x.y.z.dmg
 ```
+
+Eject the image after copying. Versions through 1.1.8 keep their original ZIPs.
 
 Every release is signed with a Developer ID and notarised, so it opens
 without a Gatekeeper warning. Launched from anywhere else, Corta offers to

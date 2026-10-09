@@ -87,8 +87,8 @@ The daily driver is the installed, signed and notarised **Release**
 build — never a build from `main` HEAD. A bug written today should not
 be able to eat tomorrow's work, and secure input, the hardened runtime
 and Gatekeeper only behave as they do for a user when the build is the
-one a user would have. Keep the previous release's `.zip` so a bad daily
-driver is one `ditto` away from being rolled back.
+one a user would have. Keep the previous release's installation package so a bad daily driver
+can be rolled back by reinstalling that version.
 
 Turn *automatic* update installation off on the daily driver. An
 automatic update relaunches the application, which takes the session

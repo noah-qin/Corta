@@ -499,7 +499,7 @@ carries.**
 
 ```sh
 swift scripts/verify-appcast.swift                       # offline: structure, URLs, builds, key
-swift scripts/verify-appcast.swift --archive dist/Corta-1.0.1.zip --version 1.0.1
+swift scripts/verify-appcast.swift --archive dist/Corta-<version>.dmg --version <version>
 swift scripts/verify-appcast.swift --download            # every item, against the published archives
 ```
 
@@ -539,11 +539,19 @@ Exit status is the number of failed checks, as `corta-release-check` reports.
 
 ```sh
 swift run --package-path CortaTerminal -c release corta-release-check \
-  package path/to/Corta.app 1.1.1 dist          # archive, sidecar, then the check
+  package path/to/Corta.app <version> dist --require-notarized  # finished image, sidecar, checks
 swift run --package-path CortaTerminal -c release corta-release-check \
-  check path/to/Corta.app --version 1.1.1 --archive dist/Corta-1.1.1.zip \
+  check path/to/Corta.app --version <version> --archive dist/Corta-<version>.dmg \
   --appcast --require-notarized
 ```
+
+Create, sign, notarise and staple the DMG through Release before using
+`package`; it validates the finished image and writes its checksum, and
+never rebuilds notarised bytes. It mounts read-only and checks the app
+inside the image. The root is only Corta.app and an Applications symlink;
+the image has no license agreement and passes Developer ID, stapler and
+Gatekeeper checks. The feed verifier accepts immutable ZIP entries through
+1.1.8 and requires DMG for later versions; nightly verifies both formats.
 
 `corta-release-check` is the one implementation of the release rules
 (`RELEASING.md`): versions and build number against `project.pbxproj`,

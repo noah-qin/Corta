@@ -124,7 +124,7 @@ def prepare(root, bump="patch", date=None):
     start = readme.index("## Install")
     end = readme.index("For updates,", start)
     install = readme[start:end]
-    install = re.sub(r"Corta-[0-9]+\.[0-9]+\.[0-9]+\.zip", f"Corta-{version}.zip", install)
+    install = re.sub(r"Corta-(?:[0-9]+\.[0-9]+\.[0-9]+|<version>)\.dmg", f"Corta-{version}.dmg", install)
     install, count = re.subn(r"> \*\*Release status:\*\*.*?(?=\n\n|\Z)",
                             f"> **Release status:** [{version}]({repository}/releases/tag/v{version}),\n"
                             f"> prepared on {date}. Manually running Release on `main` starts tests,\n"

@@ -79,6 +79,8 @@ line each:
 - **D24** The canvas stays below an opaque titlebar; no background
   extension. **D25** Metal frames present on their own, not with the
   Core Animation transaction.
+- **D26** Future releases and Sparkle updates use a signed, notarised DMG;
+  published ZIPs remain unchanged.
 
 ## Working Rules
 
@@ -182,8 +184,10 @@ Connect key that notarises, and the Sparkle key are secrets of the
 repository secrets. An API key cannot sign with a cloud-managed Developer
 ID certificate — the export fails with *Cloud signing permission error*
 whatever the key's role — so do not propose key-only signing. A signing
-change is proven with `release.yml`'s `dry_run` before it merges, and a
-dry run that did not sign is a failure, not a pass: `release.yml` refuses
+change is proven with `release.yml`'s `dry_run`. Since the workflow admits
+only `main`, merge its change after CI, then require a signed, notarised
+rehearsal before any official release (D26). A dry run that did not sign
+is a failure, not a pass: `release.yml` refuses
 to fall back to ad hoc when only some of the secrets are set. Storing the
 `.p12`: `base64` of a file the terminal cannot read (a TCC-protected
 `~/Documents`) prints nothing, and `gh secret set` stores that nothing.

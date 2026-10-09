@@ -10,6 +10,11 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Changed
+
+- Future releases use a signed, notarised disk image (`.dmg`) for installation
+  and automatic updates. Earlier releases keep their original ZIP files.
+
 ### Added
 
 - Discussions now have forms for questions and early ideas; bug reports ask

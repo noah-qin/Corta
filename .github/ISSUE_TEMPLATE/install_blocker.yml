@@ -34,8 +34,9 @@ body:
   attributes:
     label: Where it stopped
     options:
-    - Downloading the release archive
+    - Downloading the disk image
     - Verifying the checksum
+    - Opening the disk image
     - Opening Corta.app (Gatekeeper, "damaged", "cannot check for malicious software")
     - Corta starts but shows no window, or a blank window
     - Corta starts but the shell does not
@@ -69,9 +70,10 @@ body:
 - type: textarea
   id: checks
   attributes:
-    label: What the archive check says, if you got that far
-    description: The output of `shasum -a 256 -c Corta-<version>.zip.sha256`, and of `spctl --assess
-      --type exec /Applications/Corta.app` if the app is on disk.
+    label: What the disk image check says, if you got that far
+    description: Paste the output of `shasum -a 256 -c Corta-<version>.dmg.sha256`, `spctl -a -t
+      open --context context:primary-signature -v Corta-<version>.dmg`, and `spctl --assess --type
+      exec /Applications/Corta.app` if the app is copied.
     render: shell
 - type: textarea
   id: shell

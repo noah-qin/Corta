@@ -226,10 +226,9 @@ none).
 `suggest-applications-folder` turns itself off the first time the prompt
 is answered either way — accepting moves the app and there is nothing
 left to ask about, and "Don't Ask Again" writes `false` directly
-(`ApplicationsFolderMover.swift`). Direct-download distribution (M6.16)
-ships a plain `.zip` with no drag-to-install step, so without this, a
-Corta run from wherever it was unzipped never gets asked to relocate —
-and Sparkle's update path and Spotlight/Launchpad both assume
+(`ApplicationsFolderMover.swift`). New direct downloads use a disk image with an Applications link (D26).
+The prompt still helps when an app is launched from the image or another
+folder without being copied first; Sparkle and Spotlight/Launchpad expect
 `/Applications`.
 
 ---

@@ -403,7 +403,7 @@ under `SUPublicEDKey`; `SUSignedFeedFailureExpirationInterval = 0` removes
 Sparkle's fallback that accepts an unverifiable feed after twenty days of
 failures (the fallback exists for key rotation, which D20 already rules
 out); and `SUVerifyUpdateBeforeExtraction` checks an archive's EdDSA
-signature before anything unzips it. `generate_appcast` signs the whole
+signature before anything mounts or extracts it. `generate_appcast` signs the whole
 feed by itself once the archive it adds carries the key, with the same key
 through the same stdin, so `appcast.yml` is unchanged. Before this an edit
 to `appcast.xml` on `main` could put release notes, links or flags in front
@@ -576,3 +576,39 @@ later, which presenting inside the transaction does not change for a
 **Consequence.** An overlay that must stay locked to the text is drawn in
 the Metal pass (#238), not synchronised by presentation. Reopen this only
 with a measurement in which the property closes the gap.
+
+
+## D26 — Releases ship as a disk image
+
+**Decision.** Starting with the next release after 1.1.8, publish only
+`Corta-<version>.dmg` and `Corta-<version>.dmg.sha256`. Sparkle installs
+from the same disk image. Already published ZIPs, including Intel's 1.0.1,
+remain unchanged. The image contains only `Corta.app` and an `Applications`
+symlink to `/Applications`, with no license agreement.
+
+**Why.** The maintainer chose this on 2026-10-08. A disk image is familiar
+on macOS: open it, drag the app into Applications, then eject it. UDZO
+provides a compressed read-only image supported by macOS and Sparkle.
+
+**What it costs.** Every release notarises twice: the app first (using a
+throwaway ZIP submitted only to Apple), then the Developer ID signed DMG.
+Sparkle mounts the image before installing the app. The first ZIP-to-DMG
+update is a transition risk and must be tested from the latest ZIP install.
+The feed keeps historical ZIP entries alongside new DMG entries; it cannot
+rewrite those signed bytes. Both the signed-feed requirement with zero
+grace period and pre-extraction verification stay enabled.
+
+**Consequence.** All new image rules live in `ReleaseCheck`; the mounted
+app must pass the existing app rules, and the DMG must have a Developer ID
+signature, a stapled ticket and Gatekeeper acceptance. `package` validates
+the finished image and writes the checksum without rebuilding it.
+Publication uploads to a draft and never alters assets once published.
+Since Release admits only main, workflow changes merge after CI and must
+then pass a signed, notarised main-branch dry run before any official
+release. This makes explicit the main-only rehearsal order in RELEASING,
+rather than claiming the changed workflow can run before it is on main.
+An Apple silicon drag-install and offline first launch, followed by the
+first official DMG update from 1.1.8, remain required human acceptance.
+On transition failure, revert this batch on main and ship a new ZIP patch;
+never replace a published asset. Enable release immutability only after
+those checks pass.
