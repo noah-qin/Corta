@@ -2,7 +2,7 @@
 
 Baseline `b0917ddf2fd05f8f36159987a565a1f0c9ed5205`; machine and raw numbers
 are in [PERFORMANCE §5.14](../PERFORMANCE.md#514-scrolling-without-per-line-screen-allocation-281-283)
-and [the raw record](2026-10-09-scrolling-raw.txt). No desktop input, application
+and [the raw record](2026-10-09-scrolling-raw.md). No desktop input, application
 window, System Settings change or UI automation was used. Builds used two
 jobs. The dedicated compile-time `CORTA_HEADLESS_TESTS` host suppresses normal
 AppDelegate startup and sets prohibited activation. It was applied to both

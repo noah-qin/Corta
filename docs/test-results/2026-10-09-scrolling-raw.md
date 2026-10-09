@@ -1,3 +1,4 @@
+```text
 Baseline: b0917ddf2fd05f8f36159987a565a1f0c9ed5205
 Apple M5, Mac17,3, 32 GB, macOS 27.0.1, Xcode 27.0, Swift 6.4, AC, Low Power Mode off.
 No builds or fuzzing ran during the recorded alternating measurement sets.
@@ -146,3 +147,4 @@ region scroll by 1        : p50 0.028 ms, p95 0.030 ms, p99 0.050 ms, max 0.050 
 history scroll by 1       : p50 0.023 ms, p95 0.024 ms, p99 0.026 ms, max 0.026 ms (n=60)
 history scroll by third   : p50 0.047 ms, p95 0.053 ms, p99 0.053 ms, max 0.053 ms (n=60)
 flood while scrolled back : p50 0.010 ms, p95 0.010 ms, p99 0.011 ms, max 0.011 ms (n=60)
+```

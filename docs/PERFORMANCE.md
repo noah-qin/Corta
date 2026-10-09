@@ -1195,7 +1195,7 @@ No full-rebuild regression was observed in this run. These measurements do
 not establish displayed flood GPU tails, compositor latency or idle energy.
 The anchored-history regression test asserts 0 rebuilt rows after new output.
 
-[Raw measurements](test-results/2026-10-09-scrolling-raw.txt) preserve all
+[Raw measurements](test-results/2026-10-09-scrolling-raw.md) preserve all
 rounds. [Verification and outstanding gates](test-results/2026-10-09-scrolling.md)
 record the tests, mutation checks and interactive limits. An Allocations CLI
 recording failed system authorization (`-60006`) and attach, so no valid
