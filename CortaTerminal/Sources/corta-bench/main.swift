@@ -287,6 +287,10 @@ func benchmarkKeypressLatency() {
             + "(write -> PTY echo -> parse -> grid write; excludes vsync + display)")
 }
 
+if CommandLine.arguments.contains("--memory-only") {
+    benchmarkScrollbackMemory()
+    exit(0)
+}
 if !focusedHistoryBenchmarks { benchmarkParseThroughput() }
 if !focusedHistoryBenchmarks { benchmarkScrollbackMemory() }
 if !focusedHistoryBenchmarks { benchmarkKeypressLatency() }

@@ -158,10 +158,22 @@ public struct Line: Equatable, Sendable {
         wrapped = false
     }
 
-    /// Before a row enters scrollback, where it is never edited again.
-    public mutating func trimTrailingBlanks() {
+    /// Empty a vacated screen slot without releasing its cell allocation.
+    mutating func recycle() {
+        clear()
+        mark = .none
+    }
+
+    /// The arena copies this prefix without triggering copy-on-write.
+    var trimmedCount: Int {
         var end = cells.count
         while end > 0, cells[end - 1].isBlank { end -= 1 }
+        return end
+    }
+
+    /// Before a row enters scrollback, where it is never edited again.
+    public mutating func trimTrailingBlanks() {
+        let end = trimmedCount
         if end < cells.count { cells.removeSubrange(end...) }
     }
 
@@ -201,8 +213,8 @@ public struct Line: Equatable, Sendable {
 
     @inline(__always)
     private mutating func grow(to length: Int) {
-        while cells.count < length {
-            cells.append(.blank)
-        }
+        let missing = length - cells.count
+        guard missing > 0 else { return }
+        cells.append(contentsOf: repeatElement(Cell.blank, count: missing))
     }
 }
