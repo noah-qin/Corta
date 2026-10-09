@@ -10,6 +10,12 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- With View ▸ Show Tab Bar on, a new window opens at the configured `rows`
+  instead of two or three rows short: the tab bar is now counted in the
+  window's height before the window appears.
+
 ## [1.1.9] - 2026-10-09
 
 ### Changed
