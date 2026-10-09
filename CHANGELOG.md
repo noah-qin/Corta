@@ -10,6 +10,8 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+## [1.1.9] - 2026-10-09
+
 ### Changed
 
 - Future releases use a signed, notarised disk image (`.dmg`) for installation
@@ -1707,7 +1709,8 @@ M1–M10.
   same-conditions end-to-end re-measurement against the 45.5 ms baseline
   is still open.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.1.8...main
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.1.9...main
+[1.1.9]: https://github.com/noah-qin/Corta/releases/tag/v1.1.9
 [1.1.8]: https://github.com/noah-qin/Corta/releases/tag/v1.1.8
 [1.1.7]: https://github.com/noah-qin/Corta/releases/tag/v1.1.7
 [1.1.6]: https://github.com/noah-qin/Corta/releases/tag/v1.1.6
