@@ -147,7 +147,7 @@ known issues from degenerate render-target parameter cases. The previous
 valid; subsequent core-source changes only add the profiling CLI harness.
 The typing-grace test now executes captured cancellation/expiry work directly,
 avoiding the CI wall-clock flake without weakening its assertions. The final
-current-source license checker passes 655 files; the initially reused binary
+current-source license checker passes 657 tracked files; the initially reused binary
 contained stale image rules and was rebuilt rather than changing classifications.
 
 Final D17 three rounds, Release 120×40 full rebuild: mean **0.740 / 0.715 /
