@@ -34,7 +34,7 @@ These features arrived in 1.1.5; its changelog section lists them.
 | [Conformance](CONFORMANCE.md) | Feature priorities (P0/P1/P2), the daily-driver checklist, the test strategy — esctest, the fuzz harness, and the five-point manual check every app-layer change gets. |
 | [Performance](PERFORMANCE.md) | Targets, the hot-path rules, how each number is measured, and the numbers. |
 | [Security](SECURITY.md) | The threat model, escape-sequence injection, resource caps, process safety, the three trust boundaries, and a change log of every security-relevant change. |
-| [Releasing](RELEASING.md) | The maintainer's release checklist: versions, tag, draft, publish, and the signed update feed. |
+| [Releasing](RELEASING.md) | The maintainer's one-click release pipeline: one manual run on main versions, tests, signs, notarises, publishes and updates the signed feed. |
 | [Licensing](LICENSING.md) | The license header every source file carries, which files are covered by `REUSE.toml` instead, and the tool that checks and adds headers. |
 
 The public core API is documented in place:
