@@ -209,9 +209,14 @@ final class PaneFrameLoop {
         RenderMetrics.noteOutputForKeystroke()
         guard wake.noteOutput() else { return }
         // Measured apart: a busy main thread lengthens this stage.
+        let wakeStart = RenderMetrics.isEnabled ? DispatchTime.now().uptimeNanoseconds : nil
         let interval = InputLatencySignposts.begin(.wake)
         // On the keypress-to-pixel chain; the default priority has no claim.
         Task(priority: .userInitiated) { @MainActor [weak self] in
+            if let wakeStart {
+                RenderMetrics.record(.wakeHop, milliseconds:
+                    Double(DispatchTime.now().uptimeNanoseconds - wakeStart) / 1_000_000)
+            }
             InputLatencySignposts.end(.wake, interval)
             guard let self, self.generation == generation else { return }
             self.onNeedsDisplay?()

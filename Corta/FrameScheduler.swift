@@ -41,6 +41,8 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
 
     private let metalLayer: CAMetalLayer
     private var link: CAMetalDisplayLink?
+    private var resumedAt: CFTimeInterval?
+    private var previousPresentationTimestamp: CFTimeInterval?
     /// Survives `attach(to:)` recreating the link, or a tab moving windows
     /// would lose `RenderPolicy`'s rate.
     private var desiredFrameRateRange = CAFrameRateRange.default
@@ -53,6 +55,8 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
     /// Recreates the link for `window`; nil tears it down.
     func attach(to window: NSWindow?) {
         link?.invalidate()
+        resumedAt = nil
+        previousPresentationTimestamp = nil
         guard window != nil else {
             link = nil
             return
@@ -74,6 +78,10 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
 
     /// Wakes the scheduler for the next vsync. Idempotent, main thread.
     func resume() {
+        if RenderMetrics.isEnabled, link?.isPaused == true {
+            resumedAt = CACurrentMediaTime()
+            previousPresentationTimestamp = nil
+        }
         link?.isPaused = false
     }
 
@@ -82,7 +90,13 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
 
     var isPaused: Bool {
         get { link?.isPaused ?? true }
-        set { link?.isPaused = newValue }
+        set {
+            if newValue {
+                resumedAt = nil
+                previousPresentationTimestamp = nil
+                link?.isPaused = true
+            } else { resume() }
+        }
     }
 
     /// The rate ceiling, adapted by `RenderPolicy` (focus, Low Power Mode,
@@ -113,6 +127,22 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         // With no acquire to time, lateness past the target timestamp is the
         // stall signal (`PERFORMANCE.md` §5.3/§5.4).
         if RenderMetrics.isEnabled {
+            RenderMetrics.noteConditions(minimum: desiredFrameRateRange.minimum,
+                maximum: desiredFrameRateRange.maximum, preferred: desiredFrameRateRange.preferred,
+                lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled)
+            let now = CACurrentMediaTime()
+            let leadMS = (update.targetPresentationTimestamp - now) * 1000
+            RenderMetrics.record(.callbackLead, milliseconds: leadMS)
+            if let resumedAt {
+                RenderMetrics.record(.firstAfterResume, milliseconds: leadMS)
+                RenderMetrics.record(.resumeToCallback, milliseconds: (now - resumedAt) * 1000)
+                self.resumedAt = nil
+            }
+            if let previousPresentationTimestamp {
+                RenderMetrics.record(.frameInterval, milliseconds:
+                    (update.targetPresentationTimestamp - previousPresentationTimestamp) * 1000)
+            }
+            previousPresentationTimestamp = update.targetPresentationTimestamp
             let latenessMS = (CACurrentMediaTime() - update.targetTimestamp) * 1000
             RenderMetrics.record(.drawableWait, milliseconds: max(0, latenessMS))
         }
@@ -120,6 +150,7 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         let drawn = onRenderFrame?(metalLayer.drawableSize, update.drawable) ?? true
         if Self.mayPause(stillPending: stillPending, drawn: drawn) {
             link.isPaused = true
+            previousPresentationTimestamp = nil
         }
     }
 

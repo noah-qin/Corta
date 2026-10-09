@@ -43,7 +43,7 @@ rather than filled in with a guess.
 | -------------- | ---------------------------------------------------- | -------------------- |
 | Input          | Keypress → glass feels immediate; §1's latency target | `RenderMetrics.keypressToPresent` via `MeasurementUITests.testKeypressToGlass` (§5.7), `corta-bench`'s `benchmarkKeypressLatency` |
 | Sustained output | A flood (`yes`, a build log, a training run) does not fall behind or drop frames below §1's frame budget | `corta-bench`'s parse-throughput and write-backpressure benchmarks; `MeasurementUITests`' 1-, 2- and 4-pane floods |
-| Scrolling      | Scrolling a long buffer tracks the pointer/trackpad with no visible stutter | `CORTA_RENDER_METRICS` ring buffer, by hand (`TESTING.md`, *Measuring the app*); no dedicated automated scroll benchmark exists yet — a real gap, not an oversight |
+| Scrolling      | Scrolling a long buffer tracks the pointer/trackpad with no visible stutter | `CORTA_RENDER_METRICS` ring buffer, by hand (`TESTING.md`, *Measuring the app*); `InstanceUploadBenchmarkTests` region/history/flood-while-scrolled cases, plus `MeasurementUITests.testRegionAndHistoryScrolling` (interactive) |
 | Startup        | A warm launch reaches an interactive window fast enough that switching to Corta does not feel like waiting for an app to open | `MeasurementUITests.testLaunchToFirstWindow` (`XCTApplicationLaunchMetric`, 5 warm launches) |
 | Memory         | §1's scrollback figure holds, and closing panes/windows returns memory rather than leaking it | `corta-bench`'s scrollback-footprint and peak-RSS benchmarks; `MeasurementUITests.testOpenAndCloseWindowReturnsMemory` |
 | Energy         | An idle pane draws no more power than idle CPU (§1) implies; a flooding pane does not keep the GPU busier than the frames it is actually producing require | An *Activity Monitor* `xctrace` recording (per-process CPU, idle wakeups, App Nap) across `MeasurementUITests`' idle, occluded and flood scenarios; machine-wide watts need `sudo powermetrics`, a person's call (`TESTING.md`, *Measuring the app*) — §5.6 has the figures. Thermal pressure is not forced and stays *not judged* |
@@ -148,21 +148,23 @@ numbers a moment-ago screen's cache could coincidentally already hold,
 instance — is checked alongside `lineRevision` so that coincidence can
 never be mistaken for "unchanged" (`Grid.linesGeneration`).
 
-**On scrolling specifically:** a whole-screen scroll used to look like
-every row changed — the ring-buffer rotation `ScreenLines.rotateUp`
-uses to make scrolling O(1) also (correctly) gives every surviving row
-a new *position*, and the old value-based diff had no way to tell "this
-row's content moved" from "this row's content changed". `Grid.
-linesRotated` (`ScreenLines.totalRotated`, bumped in `rotateUp`) lets
-`TerminalRenderer.applyScrollShift` tell the difference: retained rows'
-instances are shifted by a Y-coordinate offset — a bulk arithmetic pass —
-instead of rebuilt through `appendRowInstances`' per-cell Core Text/atlas
-lookups, and only the newly exposed rows at the bottom get a real
-rebuild. A scroll larger than the screen (nothing survives to shift) and
-scrolling within a partial scroll region (an application's own scroll
-region, e.g. a status line — outside `Grid.scrollUp`'s history-saving
-path, so `totalRotated` does not move for it) both fall back to the
-ordinary per-row check, unoptimised but correct.
+**On scrolling specifically:** `ScreenLines` rotates storage and revisions
+together. A 64-event journal records full-screen and margin-region rotations
+in order; `TerminalRenderer.applyShift` moves retained instances in Y and
+invalidates only exposed rows. If the journal overflows, the ordinary revision
+check rebuilds changed rows instead. A generation change still rebuilds all
+rows. The randomized instance/count oracle covers mixed region/full/history
+scrolls, edits, cursor movement and journal overflow, including deliberate
+mutations that omit Y adjustment or journal replay.
+
+History caches track `scrollback.totalPushed - offset`, the top document row.
+A viewport movement shifts retained rows in either direction; output with an
+unchanged document top rebuilds no history rows. Value comparisons still catch
+live rows at the bottom of a partly scrolled viewport. Retained history rows
+check only their mutable mark, without copying cells out of the arena. Eviction of the cached top forces a full rebuild. Kitty placements
+entirely inside a scroll region move and permanently clip their source pixels
+at its margins; placements straddling a margin stay fixed, following the
+[Kitty page-area rule](https://sw.kovidgoyal.net/kitty/graphics-protocol/#interaction-with-other-terminal-actions).
 
 **Considered and not done:** shifting the CPU-side cache is the win here,
 not shrinking what gets copied into the GPU instance buffer afterward.
@@ -253,6 +255,11 @@ samples is the second-largest value in the set, which is one scheduling
 hiccup away from being noise; `corta-bench` takes 2,000.
 
 ### 5.2 The fixed benchmark environment
+
+Every new latency record must state power source, Low Power Mode state and
+physical panel refresh rate, alongside the effective requested frame-rate
+range and measured `frameInterval`. The range alone does not prove delivered
+120 Hz. These details were missing from some historical battery runs.
 
 Numbers recorded in this document or in `docs/history/ROADMAP-0.1.md` are only comparable
 against numbers taken the same way. Any run that is quoted must state:
@@ -591,6 +598,48 @@ ms at 1.1.0, is the comparison, and it did not move. Every scripted core
 figure is inside the 1.0.0–1.1.1 range or better than it.
 
 ### 5.7 Keypress → glass, measured from inside the app
+
+**October 9 follow-up (#280, #282).** Diagnostic sampling now records
+`wakeHop` (reader-to-main Task), `callbackLead` (callback-to-target-presentation),
+`firstAfterResume` (that lead only on a resumed tick), `resumeToCallback`, and
+`frameInterval` (successive target presentation timestamps without a pause).
+Latency-stage rings use `CORTA_RENDER_METRICS_KEYSTROKES` so a 200-key session
+can emit them; frame/GPU rings remain 600 samples. Summary lines retain their
+existing prefix and append the requested minimum/maximum/preferred range and
+Low Power Mode state. `default` is a system-selected preferred rate, not a
+measured refresh rate. No timing or condition collection runs when metrics
+are disabled.
+
+| Decomposition stage | October 9 evidence |
+| :--- | :--- |
+| Keypress → echo | Existing signpost/core measurement; no new glass session |
+| Echo → main hop | `wakeHop`; interactive measurement pending |
+| Hop → first callback | `resumeToCallback`; interactive measurement pending |
+| First callback presentation lead | `firstAfterResume`; interactive measurement pending |
+| Steady callback presentation lead | `callbackLead`; interactive measurement pending |
+| Callback → actual presentation | Target lead + GPU/compositor; interactive measurement pending |
+
+The desktop was reserved for the user's work. No keypress-to-glass or manual
+session was run, and no one-frame improvement is claimed. #279 remains open:
+external calibration is also pending. #280's hold-awake and on-demand decision
+gates therefore remain unresolved; no hold, driver switch, or new frame-driver
+default was added. Keeping the current driver is not evidence that the
+structural experiment is unnecessary.
+
+Typing, committed IME text, selector commands, accepted paste and reported
+mouse input now request an interactive rate for a re-armed one-second grace.
+The pure policy overrides serious thermal pressure, Low Power Mode and window
+inactivity during interaction. Critical pressure still caps at 20 Hz, including
+scroll gestures (a change from their former precedence). Above 60 Hz the
+interactive range explicitly prefers the screen maximum; non-interactive
+output prefers 60 Hz with the screen maximum as its ceiling. Screen-change
+notifications reapply the policy. The scheduler still parks at idle; the grace
+does not wake it or re-present unchanged frames.
+
+Low Power Mode latency, delivered 60/120 Hz intervals, flood energy and the
+one-second grace's energy cost require the interactive alternating runs. No
+120 Hz panel result or energy equivalence is inferred from policy tests.
+
 
 A third-party screen-capture tool — one that grabs the window in a loop
 until the pixels change — can measure keypress to glass, but Corta
@@ -1088,3 +1137,68 @@ overlapping ranges; the CPU-only ranges overlap. These offscreen measurements
 exclude the AppKit completion tracker and failure UI. See the
 [repair verification record](test-results/2026-10-06-issue-228-fix.md) for all
 three performance workloads, interactive recovery checks and scope limits.
+
+### 5.14 Scrolling without per-line screen allocation (#281, #283)
+
+October 9, 2026: Apple M5 MacBook Air (Mac17,3), 32 GB; macOS 27.0.1
+(26A434), Xcode 27.0 (27A266a), Swift 6.4 (`swiftlang-6.4.0.34.1`), AC,
+Low Power Mode off. Baseline `b0917dd`; same toolchain, Release optimization,
+three alternating before/after launches with no concurrent builds or fuzzing.
+The original `corta-bench` corpus, slices and snapshotter modes were retained.
+Each feed-throughput launch already alternates its three snapshot modes three
+times; the table reports the median of the three launch medians.
+
+| Core path | Before | After |
+| :--- | ---: | ---: |
+| Parser + grid, MiB/s | 158.0 | 355.9 |
+| Core feed, MiB/s | 137.2 | 317.3 |
+| `yes`, no snapshotter, MiB/s | 50.1 | 85.4 |
+| `yes`, 60 Hz released snapshot, MiB/s | 49.4 | 83.9 |
+| `yes`, 60 Hz held snapshot, MiB/s | 49.3 | 83.7 |
+| 200-column rows, no snapshotter, MiB/s | 203.8 | 491.8 |
+| 200-column rows, released snapshot, MiB/s | 195.3 | 452.9 |
+| 200-column rows, held snapshot, MiB/s | 194.8 | 446.4 |
+| Warm-run memory increment, 100k × 120 rows, MB | 185.0 | 185.9 |
+| Standalone memory increment, same rows, MB | 192.4 | 192.4 |
+
+The warm-run resident increment depends on allocations left by the earlier
+parse phase: resident memory after filling was 326.6 MB before and 326.5 MB
+after (medians), while the starting resident value differed. To isolate that
+confound, `corta-bench --memory-only` runs only the existing memory workload
+in a fresh process. Standalone before range 192.4–192.9 MB, after 192.4 MB;
+this shows no footprint increase and retains the approximately 200 MB target.
+The harness's MB unit divides bytes by 1,048,576, as earlier records did.
+The isolated figure must not replace the historical 185.0 MB without naming
+the changed measurement sequence.
+
+The render table uses `InstanceUploadBenchmarkTests`, Menlo 14 @1x,
+120 × 40, Release `-O`. Region scroll retains a 39-row region and status
+line and writes a full-width replacement row each frame. History is filled
+with SGR-varied full-width rows and alternates by one or 13 rows; flood output
+reanchors a history viewport. Each run has 5 warmups and 60 samples and waits
+for GPU completion outside the CPU timing window. The same new harness was
+compiled against the baseline core/renderer and the changed core/renderer.
+Medians of three p50 and p95 readings:
+
+| CPU-only scene | Before p50 / p95, ms | After p50 / p95, ms |
+| :--- | ---: | ---: |
+| Region scroll by 1, with replacement text | 0.130 / 0.146 | 0.026 / 0.030 |
+| History scroll by 1 | 0.103 / 0.111 | 0.024 / 0.026 |
+| History scroll by 13 | 0.098 / 0.104 | 0.047 / 0.048 |
+| Flood while anchored in history | 0.096 / 0.103 | 0.010 / 0.010 |
+| Full rebuild, same harness | 0.153 / 0.168 | 0.132 / 0.159 |
+
+D17's separate full-rebuild CPU benchmark averaged **0.769 ms before**
+(0.806 / 0.786 / 0.716), **0.753 ms after** (0.779 / 0.755 / 0.726).
+Its p95 ranges overlap: 1.121–3.220 ms before, 1.329–2.929 ms after.
+No full-rebuild regression was observed in this run. These measurements do
+not establish displayed flood GPU tails, compositor latency or idle energy.
+The anchored-history regression test asserts 0 rebuilt rows after new output.
+
+[Raw measurements](test-results/2026-10-09-scrolling-raw.txt) preserve all
+rounds. [Verification and outstanding gates](test-results/2026-10-09-scrolling.md)
+record the tests, mutation checks and interactive limits. An Allocations CLI
+recording failed system authorization (`-60006`) and attach, so no valid
+call-tree numbers were obtained. Buffer-address reuse is tested, but the
+requested Instruments proof of no steady-state per-line malloc/free remains
+unverified; it must not be inferred solely from the throughput gain.

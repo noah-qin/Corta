@@ -728,3 +728,43 @@ command to avoid unsigned-team library validation against Sparkle. Production
 signing retains hardened runtime. Native launches used an explicit minimal
 child environment as well as scratch HOME/stage/ZDOTDIR, rather than inheriting
 unrelated test-runner or desktop-launch metadata.
+
+## Background verification for #280–#283
+
+For selected pure-policy and offscreen Metal suites, build a dedicated test
+host with `SWIFT_ACTIVE_COMPILATION_CONDITIONS='DEBUG CORTA_HEADLESS_TESTS'`
+(or just `CORTA_HEADLESS_TESTS` under Benchmark). This compile-time flag prevents
+AppDelegate from starting a window, shell, menus, hotkeys or secure-input
+monitoring and gives the host a prohibited activation policy. It is not an
+environment/config switch and is never set for shipping builds. It does not
+make window/focus/UI tests safe to run unattended; select only the suites below.
+It also does not satisfy D14.
+
+```sh
+xcodebuild build-for-testing -project Corta.xcodeproj -scheme Corta \
+  -testPlan Unit -destination 'platform=macOS' -derivedDataPath /tmp/corta-headless \
+  SWIFT_ACTIVE_COMPILATION_CONDITIONS='DEBUG CORTA_HEADLESS_TESTS'
+xcodebuild test-without-building -project Corta.xcodeproj -scheme Corta \
+  -testPlan Unit -destination 'platform=macOS' -derivedDataPath /tmp/corta-headless \
+  -only-testing:CortaTests/DamageTrackingTests \
+  -only-testing:CortaTests/RenderPolicyTests \
+  -only-testing:CortaTests/CanvasPresentTests \
+  -only-testing:CortaTests/DiagnosticsEnvironmentTests \
+  -only-testing:CortaTests/ImagePlacementScrollTests \
+  -only-testing:CortaTests/DocumentationDriftTests
+```
+
+Use the existing local signing overrides from the contributor guide as needed.
+The Release plan's FrameCPUBaselineTests and InstanceUploadBenchmarkTests can
+also run with this host: they render to textures, without a display link or
+window. Their figures cannot establish glass latency, idle energy, 120 Hz
+cadence or compositor behavior. `testRegionAndHistoryScrolling` drives the
+frontmost window and is reserved for an interactive session.
+
+`CORTA_RENDER_METRICS` additionally emits wakeHop, callbackLead,
+firstAfterResume, resumeToCallback and frameInterval. The first-after-resume
+metric is presentation lead, while resumeToCallback measures the wait since
+resume; do not add firstAfterResume and callbackLead as independent stages.
+Only uninterrupted ticks contribute frameInterval. Summary suffixes include
+requested rate bounds/preference and Low Power Mode, and keep the existing
+metric-name prefix for test readers.

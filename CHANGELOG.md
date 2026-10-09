@@ -10,8 +10,21 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Changed
+
+- Scrolling output reuses screen row buffers and avoids a trim-induced copy
+  when pushing rows into history. Region and history scrolling reuse retained
+  render instances; output while anchored in history no longer rebuilds the
+  entire visible screen.
+- Typing, committed IME text, paste and mouse reports temporarily lift frame
+  throttles and request the panel's maximum refresh rate. Critical thermal
+  pressure still limits both typing and scrolling; actual 120 Hz cadence and
+  energy impact remain to be measured.
+
 ### Fixed
 
+- Kitty images contained in scroll regions move with the text and retain only
+  their visible source pixels when clipped by a margin.
 - With View ▸ Show Tab Bar on, a new window opens at the configured `rows`
   instead of two or three rows short: the tab bar is now counted in the
   window's height before the window appears.

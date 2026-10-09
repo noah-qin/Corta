@@ -31,6 +31,12 @@ import Synchronization
 /// sandboxed runner that cannot read the unified log — gets the numbers.
 nonisolated enum RenderMetrics {
     enum Metric: String, CaseIterable {
+        case wakeHop
+        case callbackLead
+        /// Presentation lead on the first tick after a paused link resumes.
+        case firstAfterResume
+        case resumeToCallback
+        case frameInterval
         case drawableWait
         case cpuFrame
         case gpu
@@ -56,6 +62,18 @@ nonisolated enum RenderMetrics {
     private struct State {
         var samples: [Metric: [Double]] = [:]
         var pending: PendingKeystroke?
+        var conditions: Conditions?
+    }
+
+    private struct Conditions: Sendable {
+        var minimum: Float
+        var maximum: Float
+        var preferred: Float?
+        var lowPower: Bool
+
+        var description: String {
+            "rate=\(minimum)/\(maximum)/\(preferred.map { String($0) } ?? "default")Hz lowPower=\(lowPower)"
+        }
     }
 
     private static let state = Mutex(State())
@@ -71,7 +89,13 @@ nonisolated enum RenderMetrics {
             // In place: a copy out of the dictionary would copy the ring per
             // sample.
             state.samples[metric, default: []].append(milliseconds)
-            let limit = metric == .keypressToPresent ? keystrokeCapacity : capacity
+            let limit: Int
+            switch metric {
+            case .keypressToPresent, .wakeHop, .callbackLead, .firstAfterResume, .resumeToCallback, .frameInterval:
+                limit = keystrokeCapacity
+            case .drawableWait, .cpuFrame, .gpu:
+                limit = capacity
+            }
             guard let values = state.samples[metric], values.count >= limit else { return nil }
             state.samples[metric] = []
             return values
@@ -90,6 +114,13 @@ nonisolated enum RenderMetrics {
         return result
     }
 
+    static func noteConditions(minimum: Float, maximum: Float, preferred: Float?, lowPower: Bool) {
+        guard isEnabled else { return }
+        state.withLock {
+            $0.conditions = Conditions(minimum: minimum, maximum: maximum, preferred: preferred, lowPower: lowPower)
+        }
+    }
+
     private static func dump(metric: Metric, values: [Double]) {
         let sorted = values.sorted()
         let count = sorted.count
@@ -98,13 +129,14 @@ nonisolated enum RenderMetrics {
         let p95 = sorted[min(count - 1, Int(Double(count) * 0.95))]
         let p99 = sorted[min(count - 1, Int(Double(count) * 0.99))]
         let max = sorted[count - 1]
+        let conditions = state.withLock { $0.conditions }?.description ?? "conditions=unavailable"
         os_log(
-            "%{public}@: n=%{public}d avg=%{public}.2fms p50=%{public}.2fms p95=%{public}.2fms p99=%{public}.2fms max=%{public}.2fms",
-            log: log, type: .default, metric.rawValue, count, avg, p50, p95, p99, max)
+            "%{public}@: n=%{public}d avg=%{public}.2fms p50=%{public}.2fms p95=%{public}.2fms p99=%{public}.2fms max=%{public}.2fms %{public}@",
+            log: log, type: .default, metric.rawValue, count, avg, p50, p95, p99, max, conditions)
         if let outputFile {
             let line = String(
-                format: "%@: n=%d avg=%.2fms p50=%.2fms p95=%.2fms p99=%.2fms max=%.2fms\n",
-                metric.rawValue, count, avg, p50, p95, p99, max)
+                format: "%@: n=%d avg=%.2fms p50=%.2fms p95=%.2fms p99=%.2fms max=%.2fms %@\n",
+                metric.rawValue, count, avg, p50, p95, p99, max, conditions)
             append(line, to: outputFile)
         }
     }
