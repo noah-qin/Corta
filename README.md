@@ -111,21 +111,21 @@ Requires **macOS 26.0 or later** on a Mac with **Apple silicon** (M1 or
 later) from 1.1.0 on. Intel Macs are not supported after
 [1.0.1](https://github.com/noah-qin/Corta/releases/tag/v1.0.1), which stays
 available for them. Releases after 1.1.8 use disk images. Download
-`Corta-<version>.dmg` and `Corta-<version>.dmg.sha256` from
+`Corta-1.1.9.dmg` and `Corta-1.1.9.dmg.sha256` from
 [GitHub Releases](https://github.com/noah-qin/Corta/releases/latest).
 Version 1.1.8 and earlier retain their original ZIP downloads.
 
 ```sh
 # Replace <version> with the chosen DMG release; keep both files together.
-shasum -a 256 -c Corta-<version>.dmg.sha256
+shasum -a 256 -c Corta-1.1.9.dmg.sha256
 ```
 
 Open the disk image, drag **Corta** into **Applications**, then eject the
 image. For later updates, use **Corta ▸ Check for Updates…**.
 
 > [!NOTE]
-> **Release status:** [1.1.8](https://github.com/noah-qin/Corta/releases/tag/v1.1.8),
-> prepared on 2026-10-07. Manually running Release on `main` starts tests,
+> **Release status:** [1.1.9](https://github.com/noah-qin/Corta/releases/tag/v1.1.9),
+> prepared on 2026-10-09. Manually running Release on `main` starts tests,
 > build, sign and notarise the app, publish a release, and update
 > the signed update feed. See [GitHub Releases](https://github.com/noah-qin/Corta/releases/latest)
 > for the latest successfully published build.
