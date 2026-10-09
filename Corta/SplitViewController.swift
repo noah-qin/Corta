@@ -137,6 +137,14 @@ final class SplitViewController: NSViewController {
             // screen and kept inside its visible frame, so AppKit never
             // shrinks it after the child has its size. The opener may
             // cascade it from there (`AppDelegate.cascade`).
+            //
+            // A tab bar the user keeps shown (View ▸ Show Tab Bar) is chrome
+            // too, but AppKit attaches it when the window's tab group is
+            // created, which is otherwise when the window first shows: the
+            // frame came out a tab bar short and the child lost two or three
+            // rows (#305). Creating the group here puts the bar in the chrome
+            // measured below.
+            _ = window.tabGroup
             var size = pane.initialWindowContentSize
             size.height += statusBarHeight
             let screen = NSScreen.main ?? NSScreen.screens.first
