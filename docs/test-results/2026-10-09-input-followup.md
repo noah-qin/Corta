@@ -142,9 +142,10 @@ traces: `/tmp/corta-alloc-signed-after.trace` and
 in the raw Markdown rather than committing gigabyte traces.
 
 Final full Unit plan: **961 tests in 147 suites passed**, with four intentional
-known issues from degenerate render-target parameter cases. The previous
-902 core/package tests, unchanged goldens and 500k seeded fuzz result remain
-valid; subsequent core-source changes only add the profiling CLI harness.
+known issues from degenerate render-target parameter cases. The original
+902 core/package tests preceded the added no-history regression. The final
+903-test package rerun, unchanged goldens and rebuilt 500k seeded fuzz pass
+are recorded below.
 The typing-grace test now executes captured cancellation/expiry work directly,
 avoiding the CI wall-clock flake without weakening its assertions. The final
 current-source license checker passes 657 tracked files; the initially reused binary
