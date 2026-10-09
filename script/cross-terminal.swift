@@ -255,17 +255,12 @@ func prepare(_ arguments: [String]) throws {
     try write(
         "#!/bin/sh\nprintf '\\033[?25l'\nexec cat > /dev/null\n", to: latencyShell, executable: true)
 
-    // A new Corta window opens short of `rows` (#305) by a fixed height —
-    // three rows at 12 pt, two at 18 pt; ask for that many more so the
-    // child still gets the held grid. `check` reads the winsize back, so
-    // the day #305 lands this shows up as a warning.
-    let cortaRowShortfall = 2
     try write(
         """
         # Written by script/cross-terminal.swift; scratch stage, deleted by cleanup.
         font-size = \(fontSize)
         columns = \(columns)
-        rows = \(rows + cortaRowShortfall)
+        rows = \(rows)
         cursor-blink = false
         update-auto-check = false
         suggest-applications-folder = false
