@@ -607,3 +607,265 @@ frameToGlass: n=200 avg=22.27ms p50=22.59ms p95=30.51ms p99=43.95ms max=44.61ms 
 keypressToPresent: n=200 avg=25.62ms p50=25.66ms p95=33.50ms p99=47.53ms max=51.16ms rate=0.0/0.0/defaultHz lowPower=false
 
 ```
+
+## Three alternating flood repetitions and native GPU diagnostics
+
+### before, round 1
+
+```text
+measurement: 4-pane flood cpuFrame: n=600 avg=0.12ms p50=0.11ms p95=0.20ms p99=0.27ms max=0.53ms
+measurement: 4-pane flood gpu: n=600 avg=0.39ms p50=0.38ms p95=0.49ms p99=1.51ms max=2.01ms
+measurement: 1-pane flood cpuFrame: n=600 avg=0.07ms p50=0.07ms p95=0.09ms p99=0.10ms max=0.21ms
+measurement: 1-pane flood gpu: n=600 avg=0.61ms p50=0.61ms p95=0.62ms p99=0.63ms max=0.63ms
+measurement: 2-pane flood cpuFrame: n=600 avg=0.10ms p50=0.09ms p95=0.15ms p99=0.18ms max=0.34ms
+measurement: 2-pane flood gpu: n=600 avg=0.67ms p50=0.68ms p95=0.74ms p99=0.78ms max=1.71ms
+```
+
+### displaylink, round 1
+
+```text
+measurement: 4-pane flood cpuFrame: n=600 avg=0.12ms p50=0.11ms p95=0.19ms p99=0.28ms max=0.42ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 4-pane flood gpu: n=600 avg=0.41ms p50=0.39ms p95=0.54ms p99=1.45ms max=4.07ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 1-pane flood cpuFrame: n=600 avg=0.07ms p50=0.07ms p95=0.09ms p99=0.13ms max=0.36ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 1-pane flood gpu: n=600 avg=0.61ms p50=0.61ms p95=0.63ms p99=0.64ms max=0.65ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 2-pane flood cpuFrame: n=600 avg=0.09ms p50=0.08ms p95=0.13ms p99=0.17ms max=0.44ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 2-pane flood gpu: n=600 avg=0.69ms p50=0.70ms p95=0.74ms p99=0.77ms max=0.77ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### ondemand, round 1
+
+```text
+measurement: 4-pane flood cpuFrame: n=600 avg=0.13ms p50=0.12ms p95=0.25ms p99=0.40ms max=0.60ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 4-pane flood gpu: n=600 avg=0.40ms p50=0.40ms p95=0.60ms p99=1.32ms max=2.06ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 1-pane flood cpuFrame: n=600 avg=0.68ms p50=0.69ms p95=0.78ms p99=0.81ms max=0.84ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 1-pane flood gpu: n=600 avg=0.61ms p50=0.61ms p95=0.62ms p99=0.65ms max=0.71ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 2-pane flood cpuFrame: n=600 avg=0.42ms p50=0.36ms p95=0.97ms p99=1.09ms max=1.22ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 2-pane flood gpu: n=600 avg=0.69ms p50=0.69ms p95=0.75ms p99=0.78ms max=0.83ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### before, round 2
+
+```text
+measurement: 4-pane flood cpuFrame: n=600 avg=0.13ms p50=0.12ms p95=0.23ms p99=0.43ms max=0.66ms
+measurement: 4-pane flood gpu: n=600 avg=0.39ms p50=0.40ms p95=0.49ms p99=1.47ms max=1.94ms
+measurement: 1-pane flood cpuFrame: n=600 avg=0.07ms p50=0.07ms p95=0.09ms p99=0.10ms max=0.21ms
+measurement: 1-pane flood gpu: n=600 avg=0.61ms p50=0.62ms p95=0.62ms p99=0.63ms max=0.66ms
+measurement: 2-pane flood cpuFrame: n=600 avg=0.09ms p50=0.08ms p95=0.14ms p99=0.16ms max=0.38ms
+measurement: 2-pane flood gpu: n=600 avg=0.70ms p50=0.71ms p95=0.75ms p99=0.78ms max=0.83ms
+```
+
+### displaylink, round 2
+
+```text
+measurement: 4-pane flood cpuFrame: n=600 avg=0.12ms p50=0.10ms p95=0.20ms p99=0.28ms max=0.60ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 4-pane flood gpu: n=600 avg=0.41ms p50=0.39ms p95=0.50ms p99=1.73ms max=3.18ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 1-pane flood cpuFrame: n=600 avg=0.07ms p50=0.07ms p95=0.09ms p99=0.11ms max=0.37ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 1-pane flood gpu: n=600 avg=0.61ms p50=0.61ms p95=0.62ms p99=0.64ms max=0.75ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 2-pane flood cpuFrame: n=600 avg=0.09ms p50=0.08ms p95=0.13ms p99=0.18ms max=0.46ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 2-pane flood gpu: n=600 avg=0.71ms p50=0.71ms p95=0.73ms p99=0.77ms max=2.65ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### ondemand, round 2
+
+```text
+measurement: 4-pane flood cpuFrame: n=600 avg=0.12ms p50=0.11ms p95=0.23ms p99=0.44ms max=0.55ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 4-pane flood gpu: n=600 avg=0.54ms p50=0.41ms p95=1.36ms p99=4.40ms max=9.78ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 1-pane flood cpuFrame: n=600 avg=0.08ms p50=0.07ms p95=0.12ms p99=0.22ms max=0.27ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 1-pane flood gpu: n=600 avg=0.61ms p50=0.62ms p95=0.63ms p99=0.69ms max=0.79ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 2-pane flood cpuFrame: n=600 avg=0.09ms p50=0.08ms p95=0.13ms p99=0.16ms max=0.23ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 2-pane flood gpu: n=600 avg=0.71ms p50=0.71ms p95=0.73ms p99=0.76ms max=0.81ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### before, round 3
+
+```text
+measurement: 4-pane flood cpuFrame: n=600 avg=0.14ms p50=0.12ms p95=0.24ms p99=0.34ms max=0.64ms
+measurement: 4-pane flood gpu: n=600 avg=0.39ms p50=0.39ms p95=0.49ms p99=2.08ms max=4.87ms
+measurement: 1-pane flood cpuFrame: n=600 avg=0.08ms p50=0.07ms p95=0.11ms p99=0.18ms max=0.25ms
+measurement: 1-pane flood gpu: n=600 avg=0.61ms p50=0.62ms p95=0.63ms p99=0.66ms max=0.86ms
+measurement: 2-pane flood cpuFrame: n=600 avg=0.09ms p50=0.08ms p95=0.14ms p99=0.17ms max=0.33ms
+measurement: 2-pane flood gpu: n=600 avg=0.70ms p50=0.71ms p95=0.73ms p99=0.78ms max=0.83ms
+```
+
+### displaylink, round 3
+
+```text
+measurement: 4-pane flood cpuFrame: n=600 avg=0.13ms p50=0.12ms p95=0.22ms p99=0.31ms max=0.36ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 4-pane flood gpu: n=600 avg=0.46ms p50=0.39ms p95=1.13ms p99=3.42ms max=4.44ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 1-pane flood cpuFrame: n=600 avg=0.07ms p50=0.07ms p95=0.08ms p99=0.13ms max=0.36ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 1-pane flood gpu: n=600 avg=0.61ms p50=0.61ms p95=0.62ms p99=0.63ms max=0.66ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 2-pane flood cpuFrame: n=600 avg=0.09ms p50=0.08ms p95=0.12ms p99=0.17ms max=0.47ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 2-pane flood gpu: n=600 avg=0.69ms p50=0.70ms p95=0.72ms p99=0.76ms max=0.77ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### ondemand, round 3
+
+```text
+measurement: 4-pane flood cpuFrame: n=600 avg=0.17ms p50=0.13ms p95=0.25ms p99=0.49ms max=17.07ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 4-pane flood gpu: n=600 avg=0.52ms p50=0.40ms p95=1.77ms p99=4.04ms max=4.69ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 1-pane flood cpuFrame: n=600 avg=0.08ms p50=0.07ms p95=0.11ms p99=0.19ms max=0.30ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 1-pane flood gpu: n=600 avg=0.62ms p50=0.62ms p95=0.63ms p99=0.68ms max=0.73ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 2-pane flood cpuFrame: n=600 avg=0.09ms p50=0.08ms p95=0.13ms p99=0.16ms max=0.32ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 2-pane flood gpu: n=600 avg=0.70ms p50=0.71ms p95=0.73ms p99=0.76ms max=0.85ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+XCTest process CPU seconds per four-second flood window (five windows per run; run averages):
+
+```json
+{
+  "before": {
+    "1": [
+      3.957,
+      3.956,
+      3.951
+    ],
+    "2": [
+      7.912,
+      7.91,
+      7.908
+    ],
+    "4": [
+      15.797,
+      15.805,
+      15.81
+    ]
+  },
+  "displaylink": {
+    "1": [
+      3.958,
+      3.953,
+      3.955
+    ],
+    "2": [
+      7.913,
+      7.91,
+      7.906
+    ],
+    "4": [
+      15.796,
+      15.807,
+      15.819
+    ]
+  },
+  "ondemand": {
+    "1": [
+      3.957,
+      3.954,
+      3.954
+    ],
+    "2": [
+      7.914,
+      7.906,
+      7.905
+    ],
+    "4": [
+      15.748,
+      15.784,
+      15.812
+    ]
+  }
+}
+```
+
+### Native GPU probe: before, one four-pane run
+
+```text
+measurement: 4-pane flood cpuFrame: n=600 avg=0.13ms p50=0.12ms p95=0.25ms p99=0.38ms max=0.53ms
+measurement: 4-pane flood gpu: n=600 avg=0.42ms p50=0.39ms p95=0.60ms p99=1.79ms max=5.35ms
+```
+
+### Native GPU probe: displaylink, one four-pane run
+
+```text
+measurement: 4-pane flood cpuFrame: n=600 avg=0.12ms p50=0.11ms p95=0.20ms p99=0.31ms max=0.59ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 4-pane flood gpu: n=600 avg=0.37ms p50=0.37ms p95=0.49ms p99=0.79ms max=2.05ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### Native GPU probe: ondemand, one four-pane run
+
+```text
+measurement: 4-pane flood cpuFrame: n=600 avg=0.36ms p50=0.13ms p95=0.48ms p99=16.45ms max=17.23ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 4-pane flood gpu: n=600 avg=0.47ms p50=0.39ms p95=0.83ms p99=3.49ms max=4.66ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+## Input then idle, accepted trace
+
+Only target CortaDev PID 82354 and dev.noahqin.Corta/input-latency signposts were selected. Trace duration 40.650491 s.
+
+```json
+{
+  "last_keydown_seconds": 9.303557625,
+  "window_seconds": [
+    11.303557625,
+    31.303557625
+  ],
+  "commits_in_window": 0,
+  "counts": {
+    "keyDown": 12,
+    "commit": 12,
+    "gpu": 12,
+    "wake": 12
+  }
+}
+```
+
+The following timer coordinates are local to the orchestrator; only their difference is used. CPU counter units were not calibrated and are not interpreted as nanoseconds.
+
+```json
+{
+  "pid": "82354",
+  "driver": "ondemand",
+  "typing_end_uptime": 14.245961458,
+  "idle_start_uptime": 16.807216166,
+  "idle_end_uptime": 36.818064458,
+  "before": {
+    "interrupt_wakeups": 250,
+    "package_idle_wakeups": 75,
+    "footprint": 72516640,
+    "user_raw": 6539844,
+    "system_raw": 3219142
+  },
+  "after": {
+    "interrupt_wakeups": 346,
+    "package_idle_wakeups": 127,
+    "footprint": 69354528,
+    "user_raw": 6570136,
+    "system_raw": 3307403
+  },
+  "elapsed_s": 20.010848292000002
+}
+```
+
+## Native GPU probe final metric rings
+
+These are the last summaries from each exported metrics attachment, including execution and feedback diagnostics. Earlier rings remain in the local xcresult attachments.
+
+### before
+
+```text
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.13ms p50=0.12ms p95=0.25ms p99=0.38ms max=0.53ms
+gpu: n=600 avg=0.42ms p50=0.39ms p95=0.60ms p99=1.79ms max=5.35ms
+gpuExecution: n=600 avg=0.13ms p50=0.08ms p95=0.20ms p99=1.28ms max=4.18ms
+gpuFeedbackDelay: n=600 avg=0.08ms p50=0.07ms p95=0.11ms p99=0.54ms max=1.30ms
+```
+
+### displaylink
+
+```text
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.12ms p50=0.11ms p95=0.20ms p99=0.31ms max=0.59ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.37ms p50=0.37ms p95=0.49ms p99=0.79ms max=2.05ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.16ms p99=0.19ms max=1.61ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.08ms p50=0.07ms p95=0.11ms p99=0.21ms max=0.98ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### ondemand
+
+```text
+cpuFrame: n=600 avg=0.36ms p50=0.13ms p95=0.48ms p99=16.45ms max=17.23ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.23ms p50=0.01ms p95=0.35ms p99=16.29ms max=17.03ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.47ms p50=0.39ms p95=0.83ms p99=3.49ms max=4.66ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.15ms p50=0.08ms p95=0.44ms p99=2.02ms max=2.26ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.11ms p99=0.27ms max=0.47ms rate=0.0/0.0/defaultHz lowPower=false
+```

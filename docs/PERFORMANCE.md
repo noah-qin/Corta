@@ -619,8 +619,8 @@ first-tick penalty was observed, so no hold-awake was added. The mixed
 CAMetalDisplayLink/nextDrawable prototype trapped twice and was removed; the
 opt-in experiment uses separate CADisplayLink pacing and only bypasses pacing
 for paused-link echoes within 50 ms of input, rate-limited to one refresh.
-**DisplayLink stays the default:** higher experimental flood tails need
-repeated comparison, and manual/Low Power Mode/tearing acceptance is pending.
+**DisplayLink stays the default:** three alternating flood rounds show higher experimental tails, so the promotion
+gate fails. Manual/Low Power Mode/tearing acceptance is still pending.
 
 [Full environment, decomposition, raw rounds and acceptance limits](test-results/2026-10-09-input-followup.md)
 also record final full Unit, D17, idle/occluded Activity Monitor counters and

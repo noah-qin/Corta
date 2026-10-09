@@ -80,7 +80,7 @@ fullscreen tearing acceptance was performed; it remains diagnostic only. `presen
 
 **The default remains `displaylink`.** Scripted latency alone does not satisfy
 the promotion gate: human rounds, Low Power Mode and visual tearing checks
-remain, and the flood tails below need repeated comparison.
+remain, and the repeated flood tails below fail the experimental promotion gate.
 
 ## Floods and energy
 
@@ -191,10 +191,71 @@ run with foreground-PID protection completed 1400 wheel events over about
 0.50/0.85 and 0.50/0.93 ms; GPU rings were 1.27/1.75 and 1.27/1.41 ms.
 It measures the full live prepare/render path, not the CPU-only shift benchmark.
 
+## Automatic follow-up before human input
+
+Three alternating rounds ran baseline → changed DisplayLink → on-demand for
+one, two and four panes. Every original ring remains in the raw record.
+
+| Panes | Baseline CPU/GPU p99, median of runs ms | Changed DisplayLink | On-demand |
+| :--- | :--- | :--- | :--- |
+| 1 | 0.10 / 0.63 | 0.13 / 0.64 | 0.22 / 0.68 |
+| 2 | 0.17 / 0.78 | 0.17 / 0.77 | 0.16 / 0.76 |
+| 4 | 0.34 / 1.51 | 0.28 / 1.73 | 0.44 / 4.04 |
+
+All changed-default medians fall within the respective baseline three-run
+ranges. This does **not** establish that every tail is within spread: changed
+DisplayLink four-pane GPU p99 was 1.45 / 1.73 / **3.42 ms**, versus baseline
+1.51 / 1.47 / 2.08. The outlier is retained. Experimental four-pane GPU p99 was **1.32 / 4.40 / 4.04 ms**, while CPU p99 was
+0.40 / 0.44 / 0.49 ms. On-demand fails the flood promotion gate.
+XCTest CPU time per four-second window stays close to one saturated reader
+core per pane across the rounds. It is a CPU proxy, not a watts measurement
+or an Activity Monitor wakeup trace.
+
+The existing `gpu` metric spans submission to completion feedback, rather than
+only GPU execution. Two diagnostic-only metrics now record Metal 4's native
+`gpuStartTime`/`gpuEndTime` difference and elapsed time from GPU end to the
+observation after the completion callback. Disabled metrics do not sample
+these timestamps. They do not redefine or replace the original gate metric.
+Identical diagnostic additions were made to the scratch baseline only.
+Native GPU probe and power-pair executable SHA-256 values are
+`3124a34d95fa751cce072dad129d210d8383b8670a6e57ad50d5b3a444b5d1ef`
+(baseline plus diagnostic seam) and
+`27af7b0fe38ba237fd0cbb16aa38d146d084ec082daf2ad73bbdea7d6d91fbad`
+(changed source including GPU diagnostics).
+A single four-pane probe measured baseline / DisplayLink / on-demand GPU
+execution p99 **1.28 / 0.19 / 2.02 ms**, and original `gpu` p99
+**1.79 / 0.79 / 3.49 ms**. On-demand drawable-wait p99 **16.29 ms** explains
+most of its CPU p99 **16.45 ms** in this probe. This single diagnostic run does
+not override the three original rounds. Full Unit after the diagnostic change:
+**961 tests in 147 suites passed**, four known degenerate-target cases.
+
+An accepted 40.650491-second signpost trace contains twelve target `keyDown`,
+`wake`, `commit` and `gpu` intervals. From two seconds after the last keyDown
+(trace time 11.303557625) through 31.303557625, **zero render commits** occur.
+A separate 20.010848-second process-counter window records **96 interrupt
+wakeups (4.7974/s)** and 52 package idle wakeups. Raw CPU counter units were
+not calibrated and are not used as nanoseconds. The earlier no-input trace is
+discarded. Render quiescence is established; zero process wakeups is not.
+`TerminalSession.stopCheckMilliseconds` is 250 and its live reader waits with
+that timeout. This is source evidence of polling, not a sampled attribution
+of all 96 kernel wakeups. No hold-awake was introduced.
+
+A corrected live `less -R` fixture injects a checkerboard after startup at
+row 10 with cursor restoration. Native paging moves the text while the normal
+Kitty placement stays fixed. This matches the [official Kitty implementation](https://github.com/kovidgoyal/kitty/blob/master/kitty/screen.c):
+insert/delete-line actions deliberately do not move normal image references;
+index scrolling does. A separate explicit index sequence in the live less
+window moved the image up four rows, then seven more rows clipped it to two
+rows at the upper margin, preserving its source crop without stretching or
+duplicates. Native screenshots were inspected locally. The attempted raw less
+capture was empty after termination and is not accepted as sequence evidence.
+This validates the explicit index fixture, not document-aware less placement
+or unsupported Unicode-placeholder behavior.
+
 ## Outstanding acceptance
 
 Human three-round typing is explicitly deferred. Normal/Low Power Mode paired
-latency, 120 Hz if a panel becomes available, repeated flood tail/energy
-comparisons, zero-wakeup attribution, and the complete
+latency, 120 Hz if a panel becomes available, flood-tail outliers and Activity Monitor energy
+comparisons, zero-process-wakeup attribution, and the complete
 D14 real-program/IME/windowed/fullscreen visual checklist remain gates. These
 are not replaced by policy-table tests, offscreen equivalence or static images.

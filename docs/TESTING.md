@@ -769,6 +769,10 @@ resume; do not add firstAfterResume and callbackLead as independent stages.
 Only uninterrupted ticks contribute frameInterval. Summary suffixes include
 requested rate bounds/preference and Low Power Mode, and keep the existing
 metric-name prefix for test readers.
+`gpuExecution` uses Metal 4 native start/end timestamps; `gpuFeedbackDelay`
+measures GPU end to observation after the completion callback. The existing
+`gpu` submission-to-feedback metric stays the acceptance metric; the native
+diagnostics must not be substituted for its recorded tails.
 
 ### Steady scrolling allocation profile
 

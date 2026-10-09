@@ -47,6 +47,9 @@ nonisolated enum RenderMetrics {
         case drawableWait
         case cpuFrame
         case gpu
+        /// Metal's execution timestamps, independent of callback scheduling.
+        case gpuExecution
+        case gpuFeedbackDelay
         /// HID timestamp → the first frame with the echo on the glass
         /// (`MTLDrawable.presentedTime`); see `noteKeystroke`.
         case keypressToPresent
@@ -100,7 +103,7 @@ nonisolated enum RenderMetrics {
             switch metric {
             case .keypressToPresent, .keyDelivery, .keypressToOutput, .presentationSlip, .echoToMain, .mainToFrame, .frameToGlass, .wakeHop, .callbackLead, .firstAfterResume, .resumeToCallback, .frameInterval:
                 limit = keystrokeCapacity
-            case .drawableWait, .cpuFrame, .gpu:
+            case .drawableWait, .cpuFrame, .gpu, .gpuExecution, .gpuFeedbackDelay:
                 limit = capacity
             }
             guard let values = state.samples[metric], values.count >= limit else { return nil }
