@@ -130,6 +130,32 @@ final class MeasurementUITests: XCTestCase {
         app.terminate()
     }
 
+    /// Interactive only: kept out of background runs like the other UI
+    /// measurements. A region flood and a sustained history gesture each
+    /// fill their own frame/GPU rings.
+    @MainActor
+    func testRegionAndHistoryScrolling() throws {
+        var app = try launchSettled()
+        app.typeText("printf '\\033[1;39r'; while :; do printf 'region line\\r\\n'; done\n")
+        pause(22)
+        app.typeKey("c", modifierFlags: .control)
+        report(try waitForMetrics(["cpuFrame", "gpu"], timeout: 10).map { "region scroll \($0)" })
+        app.typeText("printf '\\033[r'\n")
+        removeMetricsFile(through: app)
+        app.terminate()
+
+        app = try launchSettled()
+        app.typeText("i=0; while [ $i -lt 10000 ]; do printf 'history %s\\r\\n' \"$i\"; i=$((i+1)); done\n")
+        pause(3)
+        for _ in 0..<800 {
+            app.windows.firstMatch.scroll(byDeltaX: 0, deltaY: 20)
+            pause(0.03)
+        }
+        report(try waitForMetrics(["cpuFrame", "gpu"], timeout: 10).map { "history scroll \($0)" })
+        removeMetricsFile(through: app)
+        app.terminate()
+    }
+
     // MARK: - Recovery: closing a window returns its memory
 
     /// Opens and closes a window per iteration after a short flood has

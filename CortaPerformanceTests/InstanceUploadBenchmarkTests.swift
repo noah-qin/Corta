@@ -86,10 +86,10 @@ extension PerformanceSuites {
             /// (`Metal4Backend`), so without the wait the fourth frame would
             /// time the GPU instead of the CPU.
             let completed = DispatchSemaphore(value: 0)
-            func drawFrame(grid: Grid) -> Double {
+            func drawFrame(grid: Grid, offset: Int = 0) -> Double {
                 let start = DispatchTime.now()
                 renderer.render(
-                    grid: grid, rect: rect, drawableSize: drawableSize, cursorVisible: true,
+                    grid: grid, scrollOffset: offset, rect: rect, drawableSize: drawableSize, cursorVisible: true,
                     selection: nil, target: texture, clearColor: MTLClearColorMake(0, 0, 0, 1)
                 ) { _ in completed.signal() }
                 let elapsedMs =
@@ -158,6 +158,34 @@ extension PerformanceSuites {
                 renderer.invalidate()
             }
 
+            let regionScroll = runScenario { terminal in
+                terminal.feed(Array("\u{1B}[1;39r\u{1B}[39;1H\r\n\u{1B}[32m\(String(repeating: "x", count: columns - 1))\u{1B}[0m".utf8))
+            }
+            func historyScenario(step: Int, flood: Bool) -> [Double] {
+                var terminal = makeTerminal()
+                for i in 0..<800 {
+                    terminal.feed(Array("\u{1B}[\(31 + i % 7)m\(String(repeating: "x", count: columns - 1))\u{1B}[0m\r\n".utf8))
+                }
+                var offset = 400
+                _ = drawFrame(grid: terminal.grid, offset: offset)
+                var values: [Double] = []
+                for i in 0..<(iterations + 5) {
+                    if flood {
+                        let before = terminal.grid.scrollback.totalPushed
+                        terminal.feed(Array("\r\nflood".utf8))
+                        offset += terminal.grid.scrollback.totalPushed - before
+                    } else {
+                        offset += i.isMultiple(of: 2) ? step : -step
+                    }
+                    let duration = drawFrame(grid: terminal.grid, offset: offset)
+                    if i >= 5 { values.append(duration) }
+                }
+                return values
+            }
+            let historyOne = historyScenario(step: 1, flood: false)
+            let historyThird = historyScenario(step: rows / 3, flood: false)
+            let anchoredFlood = historyScenario(step: 0, flood: true)
+
             func summarise(_ name: String, _ durations: [Double]) -> String {
                 let sorted = durations.sorted()
                 let count = sorted.count
@@ -177,6 +205,10 @@ extension PerformanceSuites {
                 \(summarise("full rebuild              ", fullRebuild))
                 \(summarise("every row redrawn         ", redraw))
                 \(summarise("full rebuild, blocks      ", blockRebuild))
+                \(summarise("region scroll by 1        ", regionScroll))
+                \(summarise("history scroll by 1       ", historyOne))
+                \(summarise("history scroll by third   ", historyThird))
+                \(summarise("flood while scrolled back ", anchoredFlood))
 
                 """
             let outputPath =

@@ -428,9 +428,13 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
             let instance = QuadInstance(
                 origin: .init(Float(placement.column) * cellWidth, Float(viewportRow) * cellHeight),
                 size: .init(Float(columns) * cellWidth, Float(placementRows) * cellHeight),
-                color: .one, uvRect: .init(0, 0, 1, 1))
+                color: .one, uvRect: Self.sourceUVRect(for: placement))
             body(instance, texture)
         }
+    }
+
+    static func sourceUVRect(for placement: KittyGraphics.Placement) -> SIMD4<Float> {
+        .init(0, placement.sourceTop, 1, placement.sourceBottom - placement.sourceTop)
     }
 
     /// The cached texture, or nil: no decode, allocation or scheduling.

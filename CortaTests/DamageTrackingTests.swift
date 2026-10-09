@@ -226,7 +226,7 @@ import Testing
         #expect(cellHasInk(row: 1, column: 0))  // 'b' survived the splice
     }
 
-    @Test func scrollOffsetChangeIsAFullRebuild() throws {
+    @Test func scrollOffsetChangeRebuildsOnlyExposedRows() throws {
         let renderer = try #require(Self.makeRenderer())
         var terminal = Terminal(rows: 4, columns: 10, scrollbackLimit: 100)
         for i in 0..<10 { terminal.feed(Array("row\(i)\r\n".utf8)) }
@@ -235,7 +235,7 @@ import Testing
 
         renderer.updateInstances(grid: grid, scrollOffset: 0, cursorVisible: false, selection: nil)
         #expect(renderer.updateInstances(grid: grid, scrollOffset: 1, cursorVisible: false, selection: nil))
-        #expect(renderer.lastRebuiltRowCount == 4)
+        #expect(renderer.lastRebuiltRowCount == 1)
     }
 
     // MARK: - Scroll shift
@@ -331,4 +331,94 @@ import Testing
         #expect(renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil))
         #expect(renderer.lastRebuiltRowCount == 4)
     }
+    @Test func regionAndHistoryScrollsMatchFullRebuild() throws {
+        let renderer = try #require(Self.makeRenderer())
+        var terminal = Terminal(rows: 12, columns: 40, scrollbackLimit: 100)
+        for i in 0..<80 { terminal.feed(Array("\u{1B}[\(31 + i % 7)mrow\(i)████\u{1B}[0m\r\n".utf8)) }
+        var offset = 0
+        var seed: UInt64 = 283
+        func random(_ limit: Int) -> Int {
+            seed = seed &* 6364136223846793005 &+ 1
+            return Int((seed >> 32) % UInt64(limit))
+        }
+        func flattened(_ arrays: [[QuadInstance]]) -> [[Float]] {
+            arrays.map { $0.flatMap { q in
+                [q.origin.x, q.origin.y, q.size.x, q.size.y,
+                 q.color.x, q.color.y, q.color.z, q.color.w,
+                 q.uvRect.x, q.uvRect.y, q.uvRect.z, q.uvRect.w]
+            } }
+        }
+        renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
+        terminal.feed(Array("\u{1B}[2;11r\u{1B}[S".utf8))
+        renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
+        #expect(renderer.lastRebuiltRowCount == 1, "oracle prelude must consume the region journal")
+        for step in 0..<400 {
+            switch random(8) {
+            case 0, 1:
+                let top = random(6) + 1, bottom = 8 + random(4)
+                terminal.feed(Array("\u{1B}[\(top);\(bottom)r\u{1B}[\(random(3) + 1)\(random(2) == 0 ? "S" : "T")".utf8))
+            case 2:
+                let before = terminal.grid.scrollback.totalPushed
+                terminal.feed(Array("\u{1B}[r\u{1B}[12;1H\r\nline\(step)".utf8))
+                if offset > 0 { offset += terminal.grid.scrollback.totalPushed - before }
+            case 3: offset = min(terminal.grid.scrollback.count, max(0, offset + random(9) - 4))
+            case 4: offset = random(2) == 0 ? 0 : min(20, terminal.grid.scrollback.count)
+            case 5: terminal.feed(Array("\u{1B}[\(random(12) + 1);\(random(30) + 1)H\u{1B}[41mx\u{1B}[0m".utf8))
+            case 6: terminal.feed(Array("\u{1B}[\(random(12) + 1);1H".utf8))
+            default:
+                // Overflow plus interleaved opposite rotations, in one frame.
+                terminal.feed(Array("\u{1B}[2;11r".utf8))
+                for _ in 0..<70 { terminal.feed(Array((random(2) == 0 ? "\u{1B}[S" : "\u{1B}[T").utf8)) }
+            }
+            let selection = step % 3 == 0 ? TerminalSelection(
+                start: .init(row: -4, column: 0), end: .init(row: 2, column: 8),
+                baseScrollbackTotal: terminal.grid.scrollback.totalPushed) : nil
+            renderer.updateInstances(grid: terminal.grid, scrollOffset: offset,
+                cursorVisible: true, selection: selection)
+            let instances = flattened(renderer.cachedInstances)
+            let counts = renderer.cachedInstanceCounts
+            renderer.invalidate()
+            renderer.updateInstances(grid: terminal.grid, scrollOffset: offset,
+                cursorVisible: true, selection: selection)
+            #expect(flattened(renderer.cachedInstances) == instances, "step \(step), offset \(offset)")
+            #expect(renderer.cachedInstanceCounts == counts, "counts at step \(step)")
+        }
+    }
+
+    @Test func regionScrollAndAnchoredFloodRebuildOnlyExposedRows() throws {
+        let renderer = try #require(Self.makeRenderer())
+        var terminal = Terminal(rows: 12, columns: 40, scrollbackLimit: 100)
+        for i in 0..<60 { terminal.feed(Array("row\(i)\r\n".utf8)) }
+        renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
+        terminal.feed(Array("\u{1B}[2;11r\u{1B}[S".utf8))
+        renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
+        #expect(renderer.lastRebuiltRowCount == 1)
+        renderer.updateInstances(grid: terminal.grid, scrollOffset: 20, cursorVisible: false, selection: nil)
+        let total = terminal.grid.scrollback.totalPushed
+        terminal.feed(Array("\u{1B}[r\u{1B}[12;1H\r\nflood".utf8))
+        renderer.updateInstances(grid: terminal.grid,
+            scrollOffset: 20 + terminal.grid.scrollback.totalPushed - total,
+            cursorVisible: false, selection: nil)
+        #expect(renderer.lastRebuiltRowCount == 0)
+    }
+
+    @Test func historyMarkUpdatesAndLiveToHistoryEditsAreNotSkipped() throws {
+        let renderer = try #require(Self.makeRenderer())
+        var terminal = Terminal(rows: 4, columns: 10, scrollbackLimit: 100)
+        for i in 0..<20 { terminal.feed(Array("row\(i)\r\n".utf8)) }
+        renderer.updateInstances(grid: terminal.grid, scrollOffset: 6, cursorVisible: false, selection: nil)
+        terminal.grid.scrollback.setMark(.promptFailed, at: terminal.grid.scrollback.count - 6)
+        renderer.updateInstances(grid: terminal.grid, scrollOffset: 6, cursorVisible: false, selection: nil)
+        #expect(renderer.lastRebuiltRowCount == 1)
+        renderer.updateInstances(grid: terminal.grid, scrollOffset: 1, cursorVisible: false, selection: nil)
+        let total = terminal.grid.scrollback.totalPushed
+        terminal.feed(Array("\u{1B}[1;1HZZZZ\u{1B}[4;1H\r\n".utf8))
+        let offset = 1 + terminal.grid.scrollback.totalPushed - total
+        renderer.updateInstances(grid: terminal.grid, scrollOffset: offset, cursorVisible: false, selection: nil)
+        let instances = renderer.cachedInstances.map { $0.map { [$0.origin.x, $0.origin.y, $0.uvRect.x, $0.uvRect.y] } }
+        renderer.invalidate()
+        renderer.updateInstances(grid: terminal.grid, scrollOffset: offset, cursorVisible: false, selection: nil)
+        #expect(renderer.cachedInstances.map { $0.map { [$0.origin.x, $0.origin.y, $0.uvRect.x, $0.uvRect.y] } } == instances)
+    }
+
 }
