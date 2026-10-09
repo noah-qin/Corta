@@ -16,68 +16,91 @@
 
 name: Bug report
 description: Something renders wrong, crashes, hangs or behaves differently from another terminal.
-labels: ["bug"]
+labels:
+- bug
 body:
-  - type: markdown
-    attributes:
-      value: |
-        Thanks for the report. The single most useful thing you can give us is
-        **the byte sequence that reproduces it** — a `printf` line beats a
-        paragraph of description and a screenshot.
+- type: markdown
+  attributes:
+    value: |
+      Thanks for the report. The single most useful thing you can give us is
+      **the byte sequence that reproduces it** — a `printf` line beats a
+      paragraph of description and a screenshot.
 
-        If this is a security problem, stop here and
-        [report it privately](https://github.com/noah-qin/Corta/security/advisories/new).
-
-  - type: textarea
-    id: what
-    attributes:
-      label: What happened
-      description: What you saw, and what you expected instead.
-    validations:
-      required: true
-
-  - type: textarea
-    id: repro
-    attributes:
-      label: How to reproduce
-      description: >
-        Ideally a single command. If it involves an escape sequence, give it as
-        a `printf` line or a hex dump — `xxd` output of the offending bytes is
-        perfect.
-      placeholder: |
-        printf '\033[?1049h\033[2J'
-        # then: ...
-      render: shell
-    validations:
-      required: true
-
-  - type: input
-    id: version
-    attributes:
-      label: Corta version or commit
-      description: "Use Corta ▸ About Corta, or `git rev-parse --short HEAD` for a source build."
-    validations:
-      required: true
-
-  - type: input
-    id: macos
-    attributes:
-      label: macOS version and hardware
-      placeholder: macOS 26.5, M2 Pro
-    validations:
-      required: true
-
-  - type: input
-    id: other-terminals
-    attributes:
-      label: Does another terminal do it right?
-      description: >
-        Compare against Terminal.app, iTerm2, Ghostty or xterm. Knowing which
-        terminals agree with you narrows a VT bug down enormously.
-      placeholder: "Correct in iTerm2 and xterm; wrong in Corta"
-
-  - type: textarea
-    id: extra
-    attributes:
-      label: Anything else
-      description: Relevant screenshots, configuration, shell and program versions. Remove tokens, hostnames and other private data before attaching logs or config.
+      If this is a security problem, stop here and
+      [report it privately](https://github.com/noah-qin/Corta/security/advisories/new).
+- type: dropdown
+  id: kind
+  attributes:
+    label: What kind of problem
+    options:
+    - Wrong output or rendering
+    - Crash
+    - Freezes or stops responding
+    - Keyboard, IME or input method
+    - Tabs, windows or splits
+    - SSH or SFTP
+    - Settings or the config file
+    - Updates
+    - Something else
+  validations:
+    required: true
+- type: textarea
+  id: what
+  attributes:
+    label: What happened
+    description: What you saw, and what you expected instead.
+  validations:
+    required: true
+- type: textarea
+  id: repro
+  attributes:
+    label: How to reproduce
+    description: |-
+      Ideally a single command. If it involves an escape sequence, give it as a `printf` line or a hex dump — `xxd` output of the offending bytes is perfect.
+       If you cannot reproduce it, say what you were doing.
+    placeholder: |
+      printf '\033[?1049h\033[2J'
+      # then: ...
+    render: shell
+  validations:
+    required: true
+- type: input
+  id: version
+  attributes:
+    label: Corta version or commit
+    description: Use Corta ▸ About Corta, or `git rev-parse --short HEAD` for a source build.
+    placeholder: 1.1.8
+  validations:
+    required: true
+- type: input
+  id: macos
+  attributes:
+    label: macOS version and hardware
+    placeholder: macOS 26.5, M2 Pro
+  validations:
+    required: true
+- type: input
+  id: other-terminals
+  attributes:
+    label: Does another terminal do it right?
+    description: |
+      Compare against Terminal.app, iTerm2, Ghostty or xterm. Knowing which terminals agree with you narrows a VT bug down enormously.
+    placeholder: Correct in iTerm2 and xterm; wrong in Corta
+- type: input
+  id: environment
+  attributes:
+    label: Shell, input method and the program involved
+    placeholder: zsh 5.9, Pinyin, Claude Code in tmux over ssh
+- type: textarea
+  id: diagnostics
+  attributes:
+    label: If it froze or crashed
+    description: For a freeze, run `sample Corta 5 -file ~/Desktop/corta-sample.txt`. Crash reports
+      are in `~/Library/Logs/DiagnosticReports/Corta-*.ips`. Say whether this followed sleep/wake
+      and whether you were using SSH. Remove private information before submitting.
+- type: textarea
+  id: extra
+  attributes:
+    label: Anything else
+    description: Relevant screenshots, configuration, shell and program versions. Remove tokens,
+      hostnames and other private data before attaching logs or config.

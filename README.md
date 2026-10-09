@@ -224,6 +224,7 @@ graphics. Accessibility and input reports still need follow-up. The
 | Configure Corta | [Configuration](docs/CONFIGURATION.md) |
 | Understand a feature or limitation | [Features](docs/FEATURES.md) |
 | Diagnose a problem | [Troubleshooting](docs/TROUBLESHOOTING.md) |
+| See what is planned, or suggest something | [Milestones](https://github.com/noah-qin/Corta/milestones) · [Discussions → Ideas](https://github.com/noah-qin/Corta/discussions/categories/ideas) |
 | Make a first contribution | [Contributing](CONTRIBUTING.md) |
 | Run or add tests | [Testing](docs/TESTING.md) |
 | Understand the code | [Architecture](docs/DESIGN.md) · [Core API](CortaTerminal/Sources/CortaTerminal/CortaTerminal.docc/CortaTerminal.md) |
@@ -237,6 +238,7 @@ code contributions are welcome. Pick a focused change and read
 Community participation follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 Report vulnerabilities through the [private security channel](SECURITY.md).
+For usage questions, go to [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a).
 For other problems, [open an issue](https://github.com/noah-qin/Corta/issues/new/choose).
 If you would like to support maintenance, [sponsor the project](https://github.com/sponsors/noah-qin).
 
