@@ -620,7 +620,7 @@ CAMetalDisplayLink/nextDrawable prototype trapped twice and was removed; the
 opt-in experiment uses separate CADisplayLink pacing and only bypasses pacing
 for paused-link echoes within 50 ms of input, rate-limited to one refresh.
 **DisplayLink stays the default:** three alternating flood rounds show higher experimental tails, so the promotion
-gate fails. Manual/Low Power Mode/tearing acceptance is still pending.
+gate fails. Manual/tearing acceptance is still pending; scripted power-mode pairs are recorded below.
 
 [Full environment, decomposition, raw rounds and acceptance limits](test-results/2026-10-09-input-followup.md)
 also record final full Unit, D17, idle/occluded Activity Monitor counters and
@@ -637,9 +637,12 @@ output prefers 60 Hz with the screen maximum as its ceiling. Screen-change
 notifications reapply the policy. The scheduler still parks at idle; the grace
 does not wake it or re-present unchanged frames.
 
-Low Power Mode latency, delivered 60/120 Hz intervals, flood energy and the
-one-second grace's energy cost require the interactive alternating runs. No
-120 Hz panel result or energy equivalence is inferred from policy tests.
+Three scripted power-mode pairs (October 9–10, shipping DisplayLink driver)
+measure low-power p50 medians **186.64 → 64.08 ms** and normal-mode medians
+**108.48 → 107.23 ms**. Low-power target-interval p50/p99 is 16.67/16.67 ms.
+XCTest input cadence differs by power mode; human input and energy limits
+remain in the linked record. No 120 Hz result or energy equivalence is inferred
+from policy tests.
 
 
 A third-party screen-capture tool — one that grabs the window in a loop

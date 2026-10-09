@@ -1004,7 +1004,9 @@ public struct Grid: Sendable {
     public mutating func scrollUp(_ count: Int) {
         let count = min(max(0, count), marginBottom - marginTop + 1)
         guard count > 0 else { return }
-        let saveToHistory = marginTop == 0 && marginBottom == rows - 1
+        // With no history (including the alternate screen), totalPushed
+        // cannot advance the image anchors. Move and clip them explicitly.
+        let saveToHistory = marginTop == 0 && marginBottom == rows - 1 && scrollback.limit > 0
         if saveToHistory {
             for row in 0..<count { scrollback.push(lines[row]) }
             lines.rotateUp(count)

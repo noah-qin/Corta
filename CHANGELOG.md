@@ -24,7 +24,8 @@ Versioning for compatibility changes.
 ### Fixed
 
 - Kitty images contained in scroll regions move with the text and retain only
-  their visible source pixels when clipped by a margin.
+  their visible source pixels when clipped by a margin. This also applies to
+  full-screen scrolling in the alternate screen or with scrollback disabled.
 - With View ▸ Show Tab Bar on, a new window opens at the configured `rows`
   instead of two or three rows short: the tab bar is now counted in the
   window's height before the window appears.

@@ -11,8 +11,8 @@ retain the results. The issues remain open and PR #309 remains a draft.
 Apple M5 Mac17,3, 32 GB, macOS 27.0.1 (26A434), Xcode 27.0 (27A266a), Swift
 6.4; AC power, Low Power Mode off. The only detected screen was the built-in
 Retina display, maximum 60 Hz, scale 2. No 120 Hz panel was available.
-Configurations, HOME and ZDOTDIR were isolated under `/private/tmp`; system
-power settings and production signing were unchanged.
+Configurations, HOME and ZDOTDIR were isolated under `/private/tmp`; production signing was unchanged. Power settings were temporarily changed only
+for the later power-mode pairs and restored to their original values.
 
 The in-app sessions used Menlo 14, 120×40, cursor blink off, `cat`-like shell
 echo, and XCTest digits. Each round typed 320 keys with requested 150 ms pauses;
@@ -79,7 +79,7 @@ paired three-round result against the earlier synchronized rings, and no
 fullscreen tearing acceptance was performed; it remains diagnostic only. `presentsWithTransaction` stays unchanged (D25).
 
 **The default remains `displaylink`.** Scripted latency alone does not satisfy
-the promotion gate: human rounds, Low Power Mode and visual tearing checks
+the promotion gate: human rounds and visual tearing checks
 remain, and the repeated flood tails below fail the experimental promotion gate.
 
 ## Floods and energy
@@ -240,22 +240,103 @@ discarded. Render quiescence is established; zero process wakeups is not.
 that timeout. This is source evidence of polling, not a sampled attribution
 of all 96 kernel wakeups. No hold-awake was introduced.
 
-A corrected live `less -R` fixture injects a checkerboard after startup at
-row 10 with cursor restoration. Native paging moves the text while the normal
-Kitty placement stays fixed. This matches the [official Kitty implementation](https://github.com/kovidgoyal/kitty/blob/master/kitty/screen.c):
-insert/delete-line actions deliberately do not move normal image references;
-index scrolling does. A separate explicit index sequence in the live less
-window moved the image up four rows, then seven more rows clipped it to two
-rows at the upper margin, preserving its source crop without stretching or
-duplicates. Native screenshots were inspected locally. The attempted raw less
-capture was empty after termination and is not accepted as sequence evidence.
-This validates the explicit index fixture, not document-aware less placement
-or unsupported Unicode-placeholder behavior.
+A live `less -R` fixture injects a checkerboard at row 10 with cursor
+restoration. A valid transcript saved after quitting less contains ordinary
+line feeds, with no IL/DL sequences. It exposed an existing full-screen
+no-history bug: `Scrollback(limit: 0)` never increments `totalPushed`, so image
+anchors stayed fixed while alternate-screen text scrolled. Full-screen scrolls
+now use the explicit image movement/crop path when the history limit is zero,
+including alternate screens. Normal history scrolling keeps its document
+anchors. Ordinary image references deliberately stay fixed for IL/DL in the
+[official Kitty implementation](https://github.com/kovidgoyal/kitty/blob/master/kitty/screen.c);
+those actions were not changed.
+
+The two parameter cases (alternate screen and zero-history main screen) fail
+before the fix and pass afterward, asserting movement, fractional source
+crop and complete removal. Rebuilt-app native less paging now moves the image
+up four rows, reaches a two-row source crop after eleven row steps, and removes
+it after thirteen; screenshots show no stretching or duplicates. The earlier
+empty transcript and fixture-path failure are discarded. This validates
+ordinary live image references, not unsupported Unicode placeholders.
+After this final core fix, **743 terminal tests, 125 SFTP, 22 release-check and
+13 license tests pass**, unchanged goldens and **500k seeded mutation inputs
+pass again**. Final full Unit: **961 tests in 147 suites pass**, four known
+issues; the 400-step renderer oracle is included.
+
+Native nvim `j` and Control-F move the view while preserving its status line.
+View ▸ Bigger reaches the pane: child dimensions change **40×120 → 37×113**;
+Command-minus restores **40×120**, with upright text at both sizes.
+The final Pinyin candidate fixture initially remained plain Latin after a
+TIS-only switch. Activating the input context with [Control-Space](https://support.apple.com/guide/chinese-input-method/switch-to-a-chinese-or-cantonese-input-source-cim119a8d473/mac)
+and sending HID keycodes without Unicode produces underlined `ni hao`, with
+the candidate bar directly below the composing cell, then space commits
+`你好`. Compositor-region capture includes the actual candidate bar, unlike
+an app-window-only image. The failed Latin-only attempts are not accepted as
+IME evidence. Original Pinyin input source is restored; no IME setting or
+permission was changed.
+
+Final native/D17 executable SHA-256:
+`95a8cec1fcb2eb460dd8ab82ff88dc66659cde0daafc284b240725912b8052b5`.
+Final-source D17 three Release 120×40 rounds: average **0.759 / 0.723 /
+0.806 ms**, p95 **3.881 / 2.877 / 3.468 ms**. Across-round mean **0.763 ms**
+versus baseline **0.769 ms**, overlapping mean ranges; the larger individual
+p95 values are retained. Earlier input, power, allocation and flood rings
+precede only this isolated no-history image-path correction and are not
+relabelled as measurements of the final executable.
+
+## Scripted power-mode pairs, October 9–10
+
+Same diagnostic executables as the native GPU probe; DisplayLink driver in
+both builds, isolated Menlo 14 120×40 fixture, 320 requested 150 ms key events,
+200 successful presentations per reported ring. Three rounds alternate
+normal baseline → normal changed → Low Power baseline → Low Power changed.
+This tests the shipping policy, separately from the older same-binary
+DisplayLink/on-demand experiment. Normal rings in this session must not be
+substituted into that earlier table.
+
+The original Battery setting was Never (`lowpowermode=0` for Battery and AC).
+The temporary UI setting Only on Power Adapter enabled AC mode alone. Changed
+app summaries independently report the actual `lowPower` flag. Settings are
+restored in `finally` and read back after the final pair. No password or global
+permission change was needed.
+
+An initial Xcode process trapped before launching the changed low-power app.
+Its report identifies libmalloc free-block corruption in DVT/Touch Bar
+notification handling. No app result is accepted from that launch. The whole
+first low-power pair was rerun; its first valid baseline-only trial remains a
+separate diagnostic (p50/p95/p99 187.39/414.87/431.83 ms), outside the paired
+table. Normal pair 1 stayed valid and was not repeated.
+
+Requested input pauses are identical, but XCTest overhead differs by power
+mode (mean key-to-key 0.330–0.333 s normal, 0.409–0.412 s low-power). This
+can affect timing phase and prevents claiming identical input cadence or a
+human result. The changed low-power p50 is lower than the normal range, not
+statistically equal to it. The policy change removes the large before/after
+low-power penalty in these scripted sessions. Physical human input remains
+required. Continuous target intervals are reported separately from actual
+keypress-to-present distributions; a 16.67 ms target interval is not proof
+that every frame reaches the glass at 60 Hz.
+
+| Round | Normal baseline p50/p95/p99 ms | Normal changed | Low Power baseline | Low Power changed |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 | 108.49 / 133.11 / 149.38 | 107.34 / 133.68 / 149.70 | 185.50 / 419.17 / 435.03 | 64.08 / 132.59 / 136.90 |
+| 2 | 108.44 / 132.08 / 149.85 | 106.99 / 133.60 / 150.03 | 186.64 / 413.46 / 433.58 | 66.80 / 133.63 / 136.83 |
+| 3 | 108.48 / 132.45 / 149.62 | 107.23 / 131.88 / 148.78 | 188.54 / 416.34 / 420.99 | 64.02 / 126.43 / 136.79 |
+
+All three changed low-power continuous target-interval rings had p50/p99
+**16.67 / 16.67 ms**, mean 16.92 ms and maximum 66.66 ms. The occasional
+larger target gap is retained; these timestamps do not establish actual
+presentation cadence. Normal p50 medians are baseline **108.48 ms**, changed
+**107.23 ms**. Normal tail ranges overlap, but changed median p95 is 1.15 ms
+higher and median p99 0.08 ms higher; no assertion of identical distributions
+is made. Low-power p50 medians are baseline **186.64 ms**, changed **64.08 ms**.
+Both Battery and AC `lowpowermode` were read back as zero after restoration.
+
 
 ## Outstanding acceptance
 
-Human three-round typing is explicitly deferred. Normal/Low Power Mode paired
-latency, 120 Hz if a panel becomes available, flood-tail outliers and Activity Monitor energy
+Human three-round typing is explicitly deferred. Scripted Normal/Low Power pairs are complete; human power-mode pairs,
+120 Hz if a panel becomes available, flood-tail outliers and Activity Monitor energy
 comparisons, zero-process-wakeup attribution, and the complete
 D14 real-program/IME/windowed/fullscreen visual checklist remain gates. These
 are not replaced by policy-table tests, offscreen equivalence or static images.
