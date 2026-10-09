@@ -82,4 +82,47 @@ struct RenderPolicyTests {
         policy.scrollingStateChanged(true)
         #expect(scheduler.preferredFrameRateRange.maximum == 10)
     }
+    @Test func decisionTable() {
+        for fps in [60, 120] {
+            for thermal in [ProcessInfo.ThermalState.nominal, .fair, .serious, .critical] {
+                for lowPower in [false, true] {
+                    for active in [false, true] {
+                        for typing in [false, true] {
+                            for scrolling in [false, true] {
+                                let range = RenderPolicy.range(for: .init(
+                                    isScrolling: scrolling, isTyping: typing, thermalState: thermal,
+                                    isLowPowerModeEnabled: lowPower, isWindowActive: active,
+                                    maximumFramesPerSecond: fps))
+                                if thermal == .critical || (thermal == .serious && !typing && !scrolling) {
+                                    #expect(range.maximum == 20 && range.preferred == 10)
+                                } else if typing || scrolling {
+                                    if fps == 120 {
+                                        #expect(range.minimum == 60 && range.maximum == 120 && range.preferred == 120)
+                                    } else { #expect(range == .default) }
+                                } else if lowPower || !active {
+                                    #expect(range.maximum == 30 && range.preferred == 15)
+                                } else if fps == 120 {
+                                    #expect(range.maximum == 120 && range.preferred == 60)
+                                } else { #expect(range == .default) }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test func typingGraceIsRearmedAndEventuallyExpires() async throws {
+        let scheduler = Self.makeScheduler()
+        let policy = RenderPolicy(scheduler: scheduler, window: nil)
+        policy.noteInput()
+        #expect(policy.isTyping)
+        try await Task.sleep(for: .milliseconds(600))
+        policy.noteInput()
+        try await Task.sleep(for: .milliseconds(600))
+        #expect(policy.isTyping)
+        try await Task.sleep(for: .milliseconds(600))
+        #expect(!policy.isTyping)
+    }
+
 }

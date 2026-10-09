@@ -362,6 +362,11 @@ final class TerminalView: NSView, CALayerDelegate {
         frameScheduler.resume()
     }
 
+    /// Shared input hook, independent of diagnostic sampling.
+    func noteUserInput() {
+        renderPolicy?.noteInput()
+    }
+
     /// Starts a keypress-to-glass sample (`RenderMetrics`); a frame that
     /// never reached the glass wakes this pane for another.
     func noteKeystrokeForMetrics(at timestamp: TimeInterval) {

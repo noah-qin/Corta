@@ -39,17 +39,63 @@ final class RenderPolicy {
     private var resignObserver: NSObjectProtocol?
     private var isWindowActive: Bool
     private var isScrolling = false
+    private(set) var isTyping = false
+    private weak var window: NSWindow?
+    private var screenObservers: [NSObjectProtocol] = []
+    private var typingExpiry: DispatchWorkItem?
+    static let typingGrace: TimeInterval = 1
+
+    nonisolated struct Inputs: Equatable {
+        var isScrolling: Bool
+        var isTyping: Bool
+        var thermalState: ProcessInfo.ThermalState
+        var isLowPowerModeEnabled: Bool
+        var isWindowActive: Bool
+        var maximumFramesPerSecond: Int
+    }
+
+    nonisolated static func range(for inputs: Inputs) -> CAFrameRateRange {
+        // Critical pressure protects the machine even during interaction.
+        if inputs.thermalState == .critical { return thermalPressure }
+        let maxFPS = Float(max(60, inputs.maximumFramesPerSecond))
+        if inputs.isScrolling || inputs.isTyping {
+            return maxFPS > 60
+                ? CAFrameRateRange(minimum: 60, maximum: maxFPS, preferred: maxFPS)
+                : .default
+        }
+        if inputs.thermalState == .serious { return thermalPressure }
+        if inputs.isLowPowerModeEnabled { return lowPower }
+        if !inputs.isWindowActive { return inactiveWindow }
+        return maxFPS > 60
+            ? CAFrameRateRange(minimum: 60, maximum: maxFPS, preferred: 60)
+            : .default
+    }
+
+    func noteInput() {
+        typingExpiry?.cancel()
+        isTyping = true
+        apply()
+        let expiry = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                self?.isTyping = false
+                self?.typingExpiry = nil
+                self?.apply()
+            }
+        }
+        typingExpiry = expiry
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.typingGrace, execute: expiry)
+    }
 
     /// Ceilings, increasingly restrictive; never zero, since a restricted
     /// window still redraws on change. Modest, and due the same measurement.
-    private static let unrestricted = CAFrameRateRange.default
-    private static let inactiveWindow = CAFrameRateRange(minimum: 1, maximum: 30, preferred: 15)
-    private static let lowPower = CAFrameRateRange(minimum: 1, maximum: 30, preferred: 15)
-    private static let thermalPressure = CAFrameRateRange(minimum: 1, maximum: 20, preferred: 10)
+    nonisolated private static let inactiveWindow = CAFrameRateRange(minimum: 1, maximum: 30, preferred: 15)
+    nonisolated private static let lowPower = CAFrameRateRange(minimum: 1, maximum: 30, preferred: 15)
+    nonisolated private static let thermalPressure = CAFrameRateRange(minimum: 1, maximum: 20, preferred: 10)
 
     /// - Parameter window: observed for key/resign to track focus.
     init(scheduler: FrameScheduler, window: NSWindow?) {
         self.scheduler = scheduler
+        self.window = window
         self.isWindowActive = window?.isKeyWindow ?? true
 
         let center = NotificationCenter.default
@@ -75,11 +121,20 @@ final class RenderPolicy {
                 MainActor.assumeIsolated { self?.windowActiveStateChanged(false) }
             }
         }
+        for name in [NSWindow.didChangeScreenNotification, NSApplication.didChangeScreenParametersNotification] {
+            screenObservers.append(center.addObserver(
+                forName: name, object: name == NSWindow.didChangeScreenNotification ? window : nil, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.apply() }
+            })
+        }
         apply()
     }
 
     isolated deinit {
+        typingExpiry?.cancel()
         let center = NotificationCenter.default
+        for observer in screenObservers { center.removeObserver(observer) }
         if let thermalObserver { center.removeObserver(thermalObserver) }
         if let powerStateObserver { center.removeObserver(powerStateObserver) }
         if let keyObserver { center.removeObserver(keyObserver) }
@@ -101,21 +156,10 @@ final class RenderPolicy {
 
     private func apply() {
         guard let scheduler else { return }
-        // Scrolling first: full rate for the seconds a gesture lasts, even when
-        // throttled.
-        if isScrolling {
-            scheduler.preferredFrameRateRange = Self.unrestricted
-            return
-        }
         let info = ProcessInfo.processInfo
-        if info.thermalState == .serious || info.thermalState == .critical {
-            scheduler.preferredFrameRateRange = Self.thermalPressure
-        } else if info.isLowPowerModeEnabled {
-            scheduler.preferredFrameRateRange = Self.lowPower
-        } else if !isWindowActive {
-            scheduler.preferredFrameRateRange = Self.inactiveWindow
-        } else {
-            scheduler.preferredFrameRateRange = Self.unrestricted
-        }
+        scheduler.preferredFrameRateRange = Self.range(for: Inputs(
+            isScrolling: isScrolling, isTyping: isTyping, thermalState: info.thermalState,
+            isLowPowerModeEnabled: info.isLowPowerModeEnabled, isWindowActive: isWindowActive,
+            maximumFramesPerSecond: window?.screen?.maximumFramesPerSecond ?? 60))
     }
 }
