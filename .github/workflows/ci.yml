@@ -26,6 +26,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, edited, synchronize, reopened]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -44,6 +45,22 @@ env:
 
 
 jobs:
+  pr-title:
+    name: Pull request title
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check the squash-merge subject
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: python3 -B scripts/check-pr-title.py
+
   core:
     name: Terminal core (SwiftPM)
     runs-on: macos-26
