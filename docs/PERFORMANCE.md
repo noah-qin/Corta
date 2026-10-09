@@ -494,33 +494,47 @@ anything either. **Conclusion: leave the default (3).** Forcing 2 has no
 measured benefit and is not worth the added blocking risk on a slower
 frame or a busier machine.
 
-(These two runs' Avg/SD are higher across the board than §5.5's earlier
-single-run numbers for Corta — 70 ms vs. 45 ms — despite identical
+(These two runs' Avg/SD are higher across the board than the pre-1.0
+cross-terminal run's single-run numbers for Corta (its table is in
+`history/2026-10-09-CROSS-TERMINAL-RUN.md`) — 70 ms vs. 45 ms — despite identical
 capture settings; §5.2's environment table was not fully controlled for
 this pair either, e.g. other background load on the machine varied
 between sessions. The A vs. B *comparison* is still valid, since both
 runs shared whatever that day's uncontrolled conditions were — only the
-absolute numbers should not be cross-cited against §5.5's.)
+absolute numbers should not be cross-cited against that table.)
 
 ### 5.5 Cross-terminal comparison
 
-Taken before 1.0.0 with an external screen-capture latency tool — the only
-kind of measure that can be pointed at another terminal, which is why
-this table is not refreshed by §5.7's in-app measure. 200 characters /
-150 ms delay / 50 ms period / 1000 ms length, synchronous mode, same
-machine, same font (system monospaced, 12 pt), power connected, target
-app frontmost with nothing else running:
+Corta, Ghostty and iTerm2, current releases, one machine, one day
+(2026-10-09, #279): keypress → glass from Typometer, the external
+screen-capture tool, and throughput from `vtebench` and a 100 MiB `cat`.
+The environment, every run, the calibration and what was not measured are
+in [`history/2026-10-09-CROSS-TERMINAL-RUN.md`](history/2026-10-09-CROSS-TERMINAL-RUN.md),
+which also keeps the pre-1.0 table this replaces. `TESTING.md` →
+*Against other terminals* repeats it.
 
-| Terminal | Min, ms | Max, ms | Avg, ms | SD, ms |
-| -------- | ------- | ------- | ------- | ------ |
-| Corta    | 32.8    | 64.1    | 45.4    | 8.1    |
-| iTerm2   | 28.1    | 63.0    | 42.7    | 7.7    |
-| Ghostty  | 17.8    | 45.2    | 31.9    | 5.9    |
+Keypress → glass, MacBook Air M5, 60 Hz, 3 × 200 samples each, ms:
 
-Corta is slower on average than iTerm2 and noticeably slower than
-Ghostty on this machine. (Terminal.app is missing — the tool would not
-measure it; figures above are min/max/avg/SD, not the §5.1 percentile
-distribution.)
+| Terminal | p50 | p95 | p99 | max |
+| -------- | --- | --- | --- | --- |
+| Corta 1.1.9 | 60.4 | 79.6 | 81.2 | 82.3 |
+| iTerm2 3.6.11 | 38.5 | 56.7 | 60.8 | 69.3 |
+| Ghostty 1.3.1 | 34.5 | 39.7 | 43.7 | 50.1 |
+
+Corta trails Ghostty by 26 ms at p50, about one and a half frames; before
+1.0 the gap was about one. In-app `keypressToPresent` (§5.7) reads about
+14 ms above this external figure at p50.
+
+Throughput (vtebench ms per 1 MiB sample, lower is faster; `cat` in MiB/s):
+
+| Case | Corta | Ghostty | iTerm2 |
+| ---- | ----- | ------- | ------ |
+| `scrolling` | 30 | 17 | 21 |
+| `scrolling_top_region` | 79 | 22 | 2,040 |
+| `scrolling_fullscreen` | 23 | 25 | 36 |
+| `dense_cells` | 10 | 7 | 80 |
+| `unicode` | 36 | 9 | 50 |
+| `cat` 100 MiB, MiB/s | 88 | 76 | 17 |
 
 ---
 

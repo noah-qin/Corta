@@ -258,6 +258,54 @@ Machine-wide power in watts needs `powermetrics`, which needs root: `sudo
 powermetrics --samplers cpu_power,gpu_power -i 1000` beside command 1, when
 the person running it chooses to. Nothing here asks for it.
 
+### Against other terminals
+
+`PERFORMANCE.md` §5.5 compares Corta with Ghostty and iTerm2 on one
+machine. `script/cross-terminal.swift` holds the configuration and
+launches each terminal with it. It changes none of the three's own
+settings: Corta gets a scratch `CORTA_STAGE_DIR`, Ghostty a config file
+for that launch only, and iTerm2 a `corta-bench` dynamic profile that
+`cleanup` removes (D13). Everything else lives in `.build/cross-terminal/`.
+
+```sh
+swift script/cross-terminal.swift prepare   # configs, test program, environment record
+swift script/cross-terminal.swift check     # conditions, and each open pane's grid
+swift script/cross-terminal.swift launch corta|ghostty|iterm2 [--throughput|--metrics]
+swift script/cross-terminal.swift report results.csv     # Typometer export → p50/p95/p99
+swift script/cross-terminal.swift throughput-report      # vtebench and cat
+swift script/cross-terminal.swift cleanup
+```
+
+**Latency** uses Typometer, which needs Java and the person's go-ahead:
+Accessibility and Screen Recording for the app that launches it. Launch
+it from Terminal.app, so those grants go to Terminal. Typometer types
+`.`, so select the ABC layout first; Pinyin turns it into `。`.
+
+Settings: 200 characters, 150 ms delay, synchronous, no pauses. Run
+three rounds, alternating the order. Name each run with the terminal and
+the round number, so `report` can pool them.
+
+Typometer depends on rendering details:
+
+- The test program hides the cursor.
+- Corta and iTerm2 run at 18 pt and Ghostty at 12 pt. At other sizes,
+  Typometer's watched pixel misses the dot and the run waits about 80 s
+  before it times out.
+- If `check` stops seeing captures, a stuck capture has wedged macOS's
+  screen-capture service. Kill the stuck process; if captures still time
+  out, log out and back in.
+
+`launch corta --metrics` writes `keypressToPresent` beside the run, for
+the in-app-to-external offset.
+
+**Throughput** needs `alacritty/vtebench` built into
+`.build/cross-terminal/vtebench-src` (a Rust toolchain; the record names
+the commit). With `--throughput`, each terminal runs the default vtebench
+set and three `cat`s of a generated 100 MiB file, then closes. Keep the
+window frontmost and the machine untouched: a background window is
+throttled. iTerm2 needs Profiles ▸ `corta-bench-throughput` chosen by
+hand for each run.
+
 ### Which environments can run the render tests
 
 Measured 2026-09-25 (issue #107). `scripts/metal-capability.swift` is the
