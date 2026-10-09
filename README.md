@@ -129,8 +129,8 @@ unzip Corta-1.1.8.zip
 > for the latest successfully published build.
 
 For updates, use **Corta ▸ Check for Updates…** or download a newer release.
-After updating to 1.1.1, use **Settings ▸ Terminal ▸ Shell Integration ▸ Update**
-and open a new shell to apply the empty-Return fix to an existing integration.
+If Settings reports that the shell integration is outdated, choose Update
+and open a new shell.
 Installation help and uninstall instructions are in
 [Troubleshooting](docs/TROUBLESHOOTING.md).
 
