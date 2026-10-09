@@ -112,16 +112,21 @@ struct RenderPolicyTests {
         }
     }
 
-    @Test func typingGraceIsRearmedAndEventuallyExpires() async throws {
+    @Test func typingGraceIsRearmedAndEventuallyExpires() {
         let scheduler = Self.makeScheduler()
-        let policy = RenderPolicy(scheduler: scheduler, window: nil)
+        var scheduled: [(TimeInterval, DispatchWorkItem)] = []
+        let policy = RenderPolicy(scheduler: scheduler, window: nil,
+            scheduleTypingExpiry: { scheduled.append(($0, $1)) })
         policy.noteInput()
         #expect(policy.isTyping)
-        try await Task.sleep(for: .milliseconds(600))
         policy.noteInput()
-        try await Task.sleep(for: .milliseconds(600))
+        #expect(scheduled.count == 2)
+        #expect(scheduled.allSatisfy { $0.0 == RenderPolicy.typingGrace })
+        #expect(scheduled[0].1.isCancelled)
+        // Executing a cancelled item must not expire the rearmed grace.
+        scheduled[0].1.perform()
         #expect(policy.isTyping)
-        try await Task.sleep(for: .milliseconds(600))
+        scheduled[1].1.perform()
         #expect(!policy.isTyping)
     }
 

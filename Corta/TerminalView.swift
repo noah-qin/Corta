@@ -362,8 +362,11 @@ final class TerminalView: NSView, CALayerDelegate {
         frameScheduler.resume()
     }
 
+    func renderEchoOnDemand() -> Bool { frameScheduler.renderEchoOnDemand() }
+
     /// Shared input hook, independent of diagnostic sampling.
     func noteUserInput() {
+        frameScheduler.noteInput()
         renderPolicy?.noteInput()
     }
 

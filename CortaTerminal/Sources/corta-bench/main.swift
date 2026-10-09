@@ -287,6 +287,28 @@ func benchmarkKeypressLatency() {
             + "(write -> PTY echo -> parse -> grid write; excludes vsync + display)")
 }
 
+/// A profiler target: warm the history ring, then repeat the yes corpus
+/// without retaining snapshots. The marker separates initial capacity growth
+/// from steady-state recycling in an Allocations call tree.
+func profileSteadyScrolling() {
+    var terminal = Terminal(rows: 40, columns: 120, scrollbackLimit: 100_000)
+    let bytes = Array([UInt8]("y\r\n".utf8).repeated(toCount: 1_048_576))
+    terminal.feed(bytes)
+    print("scroll allocations: STEADY begins (history warmed, no snapshotter)")
+    fflush(stdout)
+    let deadline = DispatchTime.now().uptimeNanoseconds + 30_000_000_000
+    var batches = 0
+    while DispatchTime.now().uptimeNanoseconds < deadline {
+        terminal.feed(bytes)
+        batches += 1
+    }
+    print("scroll allocations: STEADY ends (\(batches) MiB batches)")
+}
+
+if CommandLine.arguments.contains("--scroll-allocations") {
+    profileSteadyScrolling()
+    exit(0)
+}
 if CommandLine.arguments.contains("--memory-only") {
     benchmarkScrollbackMemory()
     exit(0)

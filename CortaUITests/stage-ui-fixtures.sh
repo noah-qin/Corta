@@ -35,6 +35,7 @@ stage() {
   printf "PROMPT='demo ❯ '\n" > "$root/$1/.zshrc"
 }
 
+stage measurement 'columns = 120\nrows = 40\nfont-size = 14\nrestore-windows = false\ncursor-blink = false\nstatus-bar = false\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
 stage terminal-recovery 'restore-windows = false\ncursor-blink = false\nstatus-bar = false\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\ncolumns = 90\nrows = 24\n'
 stage cursor-oversized 'columns = 500\nrows = 300\nrestore-windows = true\ncursor-shape = bar\ncursor-blink = true\n'
 stage cursor-blink 'appearance = light\ncolumns = 90\nrows = 24\nrestore-windows = false\ncursor-shape = bar\ncursor-blink = true\n'

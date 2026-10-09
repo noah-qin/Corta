@@ -43,6 +43,7 @@ final class RenderPolicy {
     private weak var window: NSWindow?
     private var screenObservers: [NSObjectProtocol] = []
     private var typingExpiry: DispatchWorkItem?
+    private let scheduleTypingExpiry: (TimeInterval, DispatchWorkItem) -> Void
     static let typingGrace: TimeInterval = 1
 
     nonisolated struct Inputs: Equatable {
@@ -83,7 +84,7 @@ final class RenderPolicy {
             }
         }
         typingExpiry = expiry
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.typingGrace, execute: expiry)
+        scheduleTypingExpiry(Self.typingGrace, expiry)
     }
 
     /// Ceilings, increasingly restrictive; never zero, since a restricted
@@ -93,7 +94,11 @@ final class RenderPolicy {
     nonisolated private static let thermalPressure = CAFrameRateRange(minimum: 1, maximum: 20, preferred: 10)
 
     /// - Parameter window: observed for key/resign to track focus.
-    init(scheduler: FrameScheduler, window: NSWindow?) {
+    init(scheduler: FrameScheduler, window: NSWindow?,
+        scheduleTypingExpiry: @escaping (TimeInterval, DispatchWorkItem) -> Void = { delay, work in
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+        }) {
+        self.scheduleTypingExpiry = scheduleTypingExpiry
         self.scheduler = scheduler
         self.window = window
         self.isWindowActive = window?.isKeyWindow ?? true

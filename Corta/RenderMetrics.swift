@@ -17,6 +17,7 @@
 import Foundation
 import Metal
 import OSLog
+import QuartzCore
 import Synchronization
 
 /// Per-frame render timing in fixed-size buffers, summarised as
@@ -31,6 +32,12 @@ import Synchronization
 /// sandboxed runner that cannot read the unified log — gets the numbers.
 nonisolated enum RenderMetrics {
     enum Metric: String, CaseIterable {
+        case keyDelivery
+        case keypressToOutput
+        case presentationSlip
+        case echoToMain
+        case mainToFrame
+        case frameToGlass
         case wakeHop
         case callbackLead
         /// Presentation lead on the first tick after a paused link resumes.
@@ -91,7 +98,7 @@ nonisolated enum RenderMetrics {
             state.samples[metric, default: []].append(milliseconds)
             let limit: Int
             switch metric {
-            case .keypressToPresent, .wakeHop, .callbackLead, .firstAfterResume, .resumeToCallback, .frameInterval:
+            case .keypressToPresent, .keyDelivery, .keypressToOutput, .presentationSlip, .echoToMain, .mainToFrame, .frameToGlass, .wakeHop, .callbackLead, .firstAfterResume, .resumeToCallback, .frameInterval:
                 limit = keystrokeCapacity
             case .drawableWait, .cpuFrame, .gpu:
                 limit = capacity
@@ -164,6 +171,8 @@ nonisolated enum RenderMetrics {
     private struct PendingKeystroke: Sendable {
         var timestamp: TimeInterval
         var outputLanded = false
+        var outputAt: TimeInterval?
+        var mainAt: TimeInterval?
         /// Asks the pane for another frame (`TerminalView.setNeedsRedraw`).
         var requestFrame: @Sendable () -> Void
     }
@@ -175,6 +184,7 @@ nonisolated enum RenderMetrics {
     /// the glass (see `notePresent`).
     static func noteKeystroke(at timestamp: TimeInterval, requestFrame: @escaping @Sendable () -> Void) {
         guard isEnabled else { return }
+        record(.keyDelivery, milliseconds: (CACurrentMediaTime() - timestamp) * 1000)
         state.withLock { $0.pending = PendingKeystroke(timestamp: timestamp, requestFrame: requestFrame) }
     }
 
@@ -182,7 +192,31 @@ nonisolated enum RenderMetrics {
     /// taken as its echo.
     static func noteOutputForKeystroke() {
         guard isEnabled else { return }
-        state.withLock { $0.pending?.outputLanded = true }
+        let elapsed: Double? = state.withLock { state in
+            guard let pending = state.pending, !pending.outputLanded else { return nil }
+            let now = CACurrentMediaTime()
+            state.pending?.outputLanded = true
+            state.pending?.outputAt = now
+            return (now - pending.timestamp) * 1000
+        }
+        if let elapsed { record(.keypressToOutput, milliseconds: elapsed) }
+    }
+
+    static func noteMainHopForKeystroke() {
+        guard isEnabled else { return }
+        state.withLock { state in
+            guard state.pending?.outputLanded == true, state.pending?.mainAt == nil else { return }
+            state.pending?.mainAt = CACurrentMediaTime()
+        }
+    }
+
+    /// A target is a scheduling timestamp, not the compositor's actual time.
+    static func notePresentationTarget(of drawable: MTLDrawable, at target: TimeInterval) {
+        guard isEnabled else { return }
+        drawable.addPresentedHandler { drawable in
+            guard drawable.presentedTime > 0 else { return }
+            record(.presentationSlip, milliseconds: (drawable.presentedTime - target) * 1000)
+        }
     }
 
     /// Before presenting: if an echo is on the grid, this drawable's presented
@@ -195,6 +229,7 @@ nonisolated enum RenderMetrics {
             return keystroke
         }
         guard let keystroke = landed else { return }
+        let frameAt = CACurrentMediaTime()
         drawable.addPresentedHandler { presented in
             // Zero when the compositor replaced this drawable (about half a burst's
             // frames); re-pend rather than drop, which would flatter the number.
@@ -212,6 +247,11 @@ nonisolated enum RenderMetrics {
             }
             let seconds = presented.presentedTime - keystroke.timestamp
             guard seconds >= 0, seconds < 2 else { return }
+            if let outputAt = keystroke.outputAt, let mainAt = keystroke.mainAt {
+                record(.echoToMain, milliseconds: (mainAt - outputAt) * 1000)
+                record(.mainToFrame, milliseconds: (frameAt - mainAt) * 1000)
+                record(.frameToGlass, milliseconds: (presented.presentedTime - frameAt) * 1000)
+            }
             record(.keypressToPresent, milliseconds: seconds * 1000)
         }
     }

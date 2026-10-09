@@ -521,6 +521,7 @@ single reader to the code.
 
 | Variable | Values | Builds | Effect |
 | --- | --- | --- | --- |
+| `CORTA_FRAME_DRIVER` | `displaylink` (default), `ondemand`, `ondemand-nosync` | all | Experimental echo presentation with separate CADisplayLink pacing; immediate acquisition only while paused; no-sync is a separate opt-in experiment |
 | `CORTA_FRAME_LATENCY` | number ≥ 1 | all | The display link's `preferredFrameLatency` (default 2; `PERFORMANCE.md` §5.7) |
 | `CORTA_MAX_DRAWABLES` | `2` or `3` | all | The Metal layer's drawable count (default 3), for a double-buffering A/B |
 | `CORTA_RENDER_METRICS` | any; an absolute path also writes there | all | Frame-timing percentiles to the `render-metrics` log category, and to the file |
@@ -768,3 +769,14 @@ resume; do not add firstAfterResume and callbackLead as independent stages.
 Only uninterrupted ticks contribute frameInterval. Summary suffixes include
 requested rate bounds/preference and Low Power Mode, and keep the existing
 metric-name prefix for test readers.
+
+### Steady scrolling allocation profile
+
+Build `corta-bench` in Release, then record Allocations while launching it with
+`--scroll-allocations`. This uses the existing `yes` corpus, warms 100k×120
+history and runs the steady phase for 30 seconds without a snapshotter. Select
+a range after the printed STEADY-begins marker, include All Allocations and
+inspect the complete call tree. The reserved history arena and row-index arrays
+allocate per 256-row batch; a missing per-line Line path is the criterion, not
+zero total allocations. The [October 9 follow-up](test-results/2026-10-09-input-followup.md)
+records the successful profile and temporary signing method.

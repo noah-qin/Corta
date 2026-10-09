@@ -40,6 +40,14 @@ struct DiagnosticsEnvironmentTests {
         #expect(Switch.allCases.filter { !$0.isHonouredInRelease } == [.sftpSSH])
     }
 
+    @Test func frameDriverDefaultsAndDocumentedValues() {
+        #expect(DiagnosticsEnvironment.frameDriver(in: [:]) == .displaylink)
+        #expect(DiagnosticsEnvironment.frameDriver(in: ["CORTA_FRAME_DRIVER": "invalid"]) == .displaylink)
+        for driver in DiagnosticsEnvironment.FrameDriver.allCases {
+            #expect(DiagnosticsEnvironment.frameDriver(in: ["CORTA_FRAME_DRIVER": driver.rawValue]) == driver)
+        }
+    }
+
     @Test func measurementSwitchesParseOnlyTheirDocumentedValues() {
         #expect(DiagnosticsEnvironment.frameLatency(in: [:]) == nil)
         #expect(DiagnosticsEnvironment.frameLatency(in: ["CORTA_FRAME_LATENCY": "1"]) == 1)

@@ -58,7 +58,10 @@ by sustained full-width text before recording the final render table.
   capacity regression also passed, distinguishing retained storage from a
   coincidental allocator address reuse.
 
-## Outstanding acceptance
+## Outstanding acceptance at the end of the background phase
+
+The later [authorized desktop follow-up](2026-10-09-input-followup.md) supersedes
+this snapshot for Allocations, full Unit, latency and energy results.
 
 | Issue | Remaining gate |
 | :--- | :--- |

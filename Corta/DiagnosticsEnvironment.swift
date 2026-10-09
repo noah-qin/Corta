@@ -29,6 +29,7 @@ import OSLog
 nonisolated enum DiagnosticsEnvironment {
     /// The variable names, for documentation and the stripping test.
     enum Switch: String, CaseIterable {
+        case frameDriver = "CORTA_FRAME_DRIVER"
         case frameLatency = "CORTA_FRAME_LATENCY"
         case maxDrawables = "CORTA_MAX_DRAWABLES"
         case renderMetrics = "CORTA_RENDER_METRICS"
@@ -46,6 +47,16 @@ nonisolated enum DiagnosticsEnvironment {
 
     private static func value(_ name: Switch, in environment: Environment) -> String? {
         environment[name.rawValue]
+    }
+
+    enum FrameDriver: String, CaseIterable {
+        case displaylink
+        case ondemand
+        case ondemandNoSync = "ondemand-nosync"
+    }
+
+    static func frameDriver(in environment: Environment = ProcessInfo.processInfo.environment) -> FrameDriver {
+        value(.frameDriver, in: environment).flatMap(FrameDriver.init(rawValue:)) ?? .displaylink
     }
 
     /// `CORTA_FRAME_LATENCY=<n>`, n ≥ 1: the display link's

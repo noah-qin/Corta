@@ -599,32 +599,33 @@ figure is inside the 1.0.0–1.1.1 range or better than it.
 
 ### 5.7 Keypress → glass, measured from inside the app
 
-**October 9 follow-up (#280, #282).** Diagnostic sampling now records
-`wakeHop` (reader-to-main Task), `callbackLead` (callback-to-target-presentation),
-`firstAfterResume` (that lead only on a resumed tick), `resumeToCallback`, and
-`frameInterval` (successive target presentation timestamps without a pause).
-Latency-stage rings use `CORTA_RENDER_METRICS_KEYSTROKES` so a 200-key session
-can emit them; frame/GPU rings remain 600 samples. Summary lines retain their
-existing prefix and append the requested minimum/maximum/preferred range and
-Low Power Mode state. `default` is a system-selected preferred rate, not a
-measured refresh rate. No timing or condition collection runs when metrics
-are disabled.
+**October 9 follow-up (#280, #282).** Correlated diagnostics now record
+keypress→output, echo→main, main→frame and frame→actual glass, alongside
+`wakeHop`, callback target lead, first-after-resume lead, resume→callback,
+actual-target presentation slip and delivered `frameInterval`. Timing is
+conditional on metrics being enabled. Requested ranges are recorded as
+requests, not evidence of delivered refresh.
 
-| Decomposition stage | October 9 evidence |
-| :--- | :--- |
-| Keypress → echo | Existing signpost/core measurement; no new glass session |
-| Echo → main hop | `wakeHop`; interactive measurement pending |
-| Hop → first callback | `resumeToCallback`; interactive measurement pending |
-| First callback presentation lead | `firstAfterResume`; interactive measurement pending |
-| Steady callback presentation lead | `callbackLead`; interactive measurement pending |
-| Callback → actual presentation | Target lead + GPU/compositor; interactive measurement pending |
+Three alternating same-binary rounds on the built-in 60 Hz panel, AC and Low
+Power Mode off, give DisplayLink p50 **83.75–84.12 ms** and opt-in on-demand
+p50 **33.94–34.21 ms**, with lower p95/p99. Three Typometer rounds confirm the
+direction: **54.81–56.37 ms → 22.26–24.12 ms**. Internal and external gains
+differ by about one frame; the old calibration offset is not reused. Human
+rounds were deferred by the user. #279's external baseline is now closed.
 
-The desktop was reserved for the user's work. No keypress-to-glass or manual
-session was run, and no one-frame improvement is claimed. #279 remains open:
-external calibration is also pending. #280's hold-awake and on-demand decision
-gates therefore remain unresolved; no hold, driver switch, or new frame-driver
-default was added. Keeping the current driver is not evidence that the
-structural experiment is unnecessary.
+The first resumed callback has approximately the same 49.9 ms target lead as
+steady callbacks; resume→callback is approximately 16.4 ms. No additional
+first-tick penalty was observed, so no hold-awake was added. The mixed
+CAMetalDisplayLink/nextDrawable prototype trapped twice and was removed; the
+opt-in experiment uses separate CADisplayLink pacing and only bypasses pacing
+for paused-link echoes within 50 ms of input, rate-limited to one refresh.
+**DisplayLink stays the default:** higher experimental flood tails need
+repeated comparison, and manual/Low Power Mode/tearing acceptance is pending.
+
+[Full environment, decomposition, raw rounds and acceptance limits](test-results/2026-10-09-input-followup.md)
+also record final full Unit, D17, idle/occluded Activity Monitor counters and
+valid Allocations evidence. No 120 Hz panel was available. Idle process CPU
+was approximately 0.03%, but process wakeups were approximately 4–5/s, not zero.
 
 Typing, committed IME text, selector commands, accepted paste and reported
 mouse input now request an interactive rate for a re-armed one-second grace.
@@ -1197,8 +1198,8 @@ The anchored-history regression test asserts 0 rebuilt rows after new output.
 
 [Raw measurements](test-results/2026-10-09-scrolling-raw.md) preserve all
 rounds. [Verification and outstanding gates](test-results/2026-10-09-scrolling.md)
-record the tests, mutation checks and interactive limits. An Allocations CLI
-recording failed system authorization (`-60006`) and attach, so no valid
-call-tree numbers were obtained. Buffer-address reuse is tested, but the
-requested Instruments proof of no steady-state per-line malloc/free remains
-unverified; it must not be inferred solely from the throughput gain.
+record the original background tests and limits. The subsequent
+[authorized desktop follow-up](test-results/2026-10-09-input-followup.md)
+includes a valid steady-state Allocations call tree: no per-line Line allocation,
+with the two reserved history arrays still allocated once per 256-row batch.
+It also records final full Unit and D17, live flood tails and outstanding gates.
