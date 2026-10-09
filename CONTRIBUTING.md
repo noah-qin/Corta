@@ -12,7 +12,8 @@ or add a regression test. For substantial work, discuss the scope on an issue
 first so contributors do not duplicate effort.
 
 1. Fork and clone the repository, then create a branch for your change.
-2. Install a released Xcode with Swift 6.2 or later on macOS 26.0 or later.
+2. Use an Apple silicon Mac running macOS 26.0 or later, and install a
+   released Xcode with Swift 6.2 or later (D21).
    Only stable Xcode toolchains are supported. The project's
    `SWIFT_VERSION = 6.0` is the *language mode* (Swift 6), not the
    toolchain: a 6.2 compiler builds in Swift 6 mode, so the two numbers do
@@ -35,7 +36,9 @@ first so contributors do not duplicate effort.
 | `CortaTests/`, `CortaUITests/`, `CortaPerformanceTests/` | App-hosted tests, interactive UI tests, and the Release measurements |
 | `docs/` | User guides, architecture and verification evidence |
 | `TestPlans/` | `Unit` (the default), `UI` (interactive sessions only) and `Release` (the Release measurements) |
-| `scripts/`, `script/`, `.github/` | The two Swift scripts CI runs (Metal 4 probe, update-feed check), the release workflow's `prepare-release` helpers and their tests; local helpers and the isolated-sshd fixture (`script/`); and the CI, release and update-feed workflows |
+| `scripts/` | Metal capability and update-feed checks, release preparation helpers and tests, and `report-ci-statuses.sh` for automation PR checks |
+| `script/` | Local build helpers and the isolated-sshd fixture |
+| `.github/` | Issue and discussion forms, community files, and five workflows: `ci.yml`, `nightly.yml`, `render.yml`, `release.yml`, `appcast.yml` |
 
 ## Tests and documentation
 
@@ -156,7 +159,7 @@ Example: `fix(ui): keep the window title in sync after a document rename`
    - Explains *why* the change was made, and any consequence a reviewer
      would not infer from the diff. Bullet lists with `-` are fine.
 3. **Footers** (optional)
-   - `Refs: #123`, `Closes: #123`, `Co-authored-by: Name <email>`.
+   - `Refs: #123`, `Closes: #123`.
    - Breaking changes: append `!` after the type/scope **and** add a
      `BREAKING CHANGE: <explanation>` footer.
 4. **One logical change per commit.** Do not mix a refactor with a
@@ -203,8 +206,7 @@ Before writing a commit, work through this checklist:
 - [ ] Body explains *why*, wrapped at 72 chars, if the change is not
       self-evident.
 - [ ] The commit contains one logical change; split it otherwise.
-- [ ] Do not add advertising footers, emoji, or co-author trailers unless
-      the maintainer asked for them.
+- [ ] Do not add advertising footers or emoji.
 - [ ] No tool or session identifiers anywhere in the message (rule 6).
 - [ ] Never rewrite published history without explicit instruction.
 
@@ -257,28 +259,32 @@ the reviewer and scope in the PR, and record any human-only gaps.
 
 ## Reporting problems
 
-- **Bugs and feature requests** — open an issue. The forms ask for the
-  byte sequence that reproduces the problem; that is the part that makes a
-  VT bug fixable.
-- **Could not install or start Corta** — the *Installation blocker* form.
-  Check `docs/TROUBLESHOOTING.md` first, and say so if its entry was wrong.
-- **Tried Corta and went back** — the *Went back to my old terminal* form.
-  No reproduction needed; the reason is the report.
-- **Questions and ideas** — Discussions, not issues.
-- **Security vulnerabilities** — never in public. `SECURITY.md` has the
-  private reporting channel.
-- **Conduct** — `CODE_OF_CONDUCT.md`.
+- **Usage questions** — [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a).
+- **Early ideas and preferences** — [Discussions → Ideas](https://github.com/noah-qin/Corta/discussions/categories/ideas).
+- **Concrete feature requests** — the [feature request form](https://github.com/noah-qin/Corta/issues/new?template=feature_request.yml).
+- **Bugs** — the [bug report form](https://github.com/noah-qin/Corta/issues/new?template=bug_report.yml). Include a reproducer when possible.
+- **Installation blockers** — the [Installation blocker form](https://github.com/noah-qin/Corta/issues/new?template=install_blocker.yml). Check [Troubleshooting](docs/TROUBLESHOOTING.md) first.
+- **Tried Corta and went back** — the [Went back form](https://github.com/noah-qin/Corta/issues/new?template=went_back.yml). No reproduction needed.
+- **Security vulnerabilities** — report privately through [SECURITY.md](SECURITY.md).
+- **Conduct** — [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+
+One problem per issue.
+An accepted idea becomes an issue in the outcome/scope/acceptance/dependencies
+shape, written by the maintainer.
 
 ## Releases
 
-Releases are cut by the maintainer, following
-[Releasing](docs/RELEASING.md); a contributor never needs a certificate or
-a key. The Developer ID certificate, the notarisation key and the Sparkle
-update key are secrets of the reviewed `release` environment: only a
-`v*` tag can reach them, and every run waits for the maintainer's
-approval. A fork that pushes a tag gets an ad-hoc signed build, and its
-release notes say so. A change to how releases are signed is rehearsed
-with the release workflow's dry run before it merges.
+The maintainer opens **Actions → Release → Run workflow** on **main**.
+That one request prepares the version and CHANGELOG, runs tests, builds,
+signs and notarises the app, creates the tag, publishes the release and
+updates the signed Sparkle feed. Merging to main runs CI without publishing.
+[Releasing](docs/RELEASING.md) describes the pipeline and recovery steps.
+
+Contributors never need certificates or keys. Signing and update keys are
+secrets of the `release` environment, which admits only `main` and has no
+required reviewer; the manual workflow request is the approval (D20,
+amended 2026-10-06). Before changing signing, rehearse on `main` with the
+Release workflow's `dry_run`. A rehearsal that did not sign is a failure.
 
 ## License headers
 

@@ -186,6 +186,7 @@ class PrepareReleaseTests(unittest.TestCase):
         scripts = self.root / "scripts"
         scripts.mkdir()
         shutil.copy(SCRIPTS / "prepare-release.py", scripts)
+        shutil.copy(SCRIPTS / "check-pr-title.py", scripts)
         binaries = self.root / "bin"
         binaries.mkdir()
         gh = binaries / "gh"
@@ -214,6 +215,12 @@ elif args[:2] == ['run', 'watch']:
 elif args[:2] == ['run', 'view']:
     for name in ('Terminal core (SwiftPM)', 'App, tests and the update feed'):
         print(f"{name}\t{state.get('conclusion', 'success')}\thttps://example.invalid/job")
+    if state.get('title_job'):
+        print("Pull request title\\tskipped\\thttps://example.invalid/title-job")
+elif args[:1] == ['api'] and args[1].endswith('/pulls'):
+    if state.get('title_api_error'):
+        sys.exit(1)
+    print(state.get('title', 'chore: release 1.2.4'))
 elif args[:3] == ['api', '--method', 'POST']:
     fields = dict(arg.split('=', 1) for arg in args[4:] if '=' in arg)
     state.setdefault('statuses', []).append([args[3], fields['context'], fields['state']])
@@ -272,6 +279,31 @@ path.write_text(json.dumps(state))
         self.assertEqual(result.returncode, 0, result.stderr)
         state = json.loads((self.root / "github-state.json").read_text())
         self.assertEqual([status[2] for status in state["statuses"]], ["failure", "failure"])
+
+    def test_dispatched_title_status_checks_the_actual_bot_title(self):
+        environment = self.automatic_fixture()
+        for title, expected in (("chore: release 1.2.4", "success"),
+                                ("chore: publish 1.2.4 to the update feed", "success"),
+                                ("Fix releases", "failure"),
+                                ("fix: preserve $(false) and `literal`", "success")):
+            with self.subTest(title=title):
+                state_path = self.root / "github-state.json"
+                state_path.write_text(json.dumps({"head": "abc", "title_job": True, "title": title}))
+                result = subprocess.run(["bash", str(SCRIPTS / "report-ci-statuses.sh"), "11", "abc"],
+                                        env=environment, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                statuses = json.loads(state_path.read_text())["statuses"]
+                self.assertEqual(statuses[-1][1:3], ["Pull request title", expected])
+
+    def test_title_lookup_failure_is_not_reported_as_a_pass(self):
+        environment = self.automatic_fixture()
+        state_path = self.root / "github-state.json"
+        state_path.write_text(json.dumps({"head": "abc", "title_job": True, "title_api_error": True}))
+        result = subprocess.run(["bash", str(SCRIPTS / "report-ci-statuses.sh"), "11", "abc"],
+                                env=environment, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        statuses = json.loads(state_path.read_text())["statuses"]
+        self.assertEqual(statuses[-1][1:3], ["Pull request title", "failure"])
 
     def test_retry_of_published_release_only_hands_off_to_feed(self):
         environment = self.automatic_fixture()

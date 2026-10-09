@@ -16,18 +16,24 @@
 
 blank_issues_enabled: false
 contact_links:
-  - name: Troubleshooting
-    url: https://github.com/noah-qin/Corta/blob/main/docs/TROUBLESHOOTING.md
-    about: Installing, starting, behaviour that differs from other terminals, and uninstalling cleanly — check here before filing an install blocker.
-  - name: v1 roadmap
-    url: https://github.com/noah-qin/Corta/milestone/1
-    about: The ordered B01-B16 implementation batches, all landed; new work is opened as issues in the same shape.
-  - name: Question, idea or general discussion
-    url: https://github.com/noah-qin/Corta/discussions
-    about: Anything that is not a reproducible bug or a concrete feature request belongs in Discussions.
-  - name: Security vulnerability
-    url: https://github.com/noah-qin/Corta/security/advisories/new
-    about: Report privately. Never open a public issue for a security problem.
-  - name: Things Corta deliberately does not do
-    url: https://github.com/noah-qin/Corta/blob/main/docs/DECISIONS.md
-    about: Multiplexing, cross-platform, tmux control mode, AI features, automation that runs commands and RTL text were each considered and rejected. Read the decision before requesting one.
+- name: Troubleshooting
+  url: https://github.com/noah-qin/Corta/blob/main/docs/TROUBLESHOOTING.md
+  about: Installing, starting, behaviour that differs from other terminals, and uninstalling cleanly
+    — check here before filing an install blocker.
+- name: What is planned
+  url: https://github.com/noah-qin/Corta/milestones
+  about: Planned work for upcoming versions.
+- name: Question about using Corta
+  url: https://github.com/noah-qin/Corta/discussions/categories/q-a
+  about: Ask for help using Corta.
+- name: An idea that is not yet a concrete request
+  url: https://github.com/noah-qin/Corta/discussions/categories/ideas
+  about: Discuss early ideas and preferences about appearance or layout.
+- name: Security vulnerability
+  url: https://github.com/noah-qin/Corta/security/advisories/new
+  about: Report privately. Never open a public issue for a security problem.
+- name: Things Corta deliberately does not do
+  url: https://github.com/noah-qin/Corta/blob/main/docs/DESIGN.md#6-non-goals
+  about: Built-in multiplexing, cross-platform support, tmux control mode, AI features, command blocks,
+    cloud sync, command-running automation, implementing SSH or git, RTL text and terminal title
+    queries. Read the reasons before requesting one.

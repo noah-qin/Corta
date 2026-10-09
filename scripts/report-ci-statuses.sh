@@ -33,6 +33,18 @@ jobs=$(gh run view "$run_id" --json jobs \
 test -n "$jobs" || { echo "::error::CI run $run_id has no jobs to report."; exit 1; }
 
 while IFS=$'\t' read -r name conclusion url; do
+  # Bot-created PRs receive workflow_dispatch checks instead of PR events.
+  # The PR-only title job is skipped there; validate the actual matching
+  # PR title with the same checker before reporting its required status.
+  if [ "$name" = "Pull request title" ] && [ "$conclusion" = skipped ]; then
+    if title=$(gh api "repos/$GITHUB_REPOSITORY/commits/$commit/pulls" \
+      --jq "map(select(.state == \"open\" and .head.sha == \"$commit\")) | if length == 1 then .[0].title else error(\"Expected one open PR for CI head\") end") &&
+       PR_TITLE="$title" python3 -B scripts/check-pr-title.py; then
+      conclusion=success
+    else
+      conclusion=failure
+    fi
+  fi
   state=failure
   [ "$conclusion" != success ] || state=success
   gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$commit" \
