@@ -536,3 +536,5 @@ explicitly allows. The later [authorized foreground retry](2026-10-10-foreground
 fixes a real ghost/IME overlap and records new scheduling and flood evidence.
 Flood GPU tails still fail; the user did not watch the continuous animation,
 so temporal tearing cannot be certified.
+
+October 11 merge follow-up: the [final validation](2026-10-11-merge-validation.md) corrects flood sampling before teardown, records three passing sustained default-driver pairs and a final-source check, matches scripted input cadence across power modes, withdraws no-sync, and attributes the three-second idle timer to Apple AGX deferred GPU setup. Historical negative results above are retained with their method limits; absolute zero process wakeups and an unperformed human panel observation are not claimed.

@@ -43,6 +43,8 @@ struct DiagnosticsEnvironmentTests {
     @Test func frameDriverDefaultsAndDocumentedValues() {
         #expect(DiagnosticsEnvironment.frameDriver(in: [:]) == .displaylink)
         #expect(DiagnosticsEnvironment.frameDriver(in: ["CORTA_FRAME_DRIVER": "invalid"]) == .displaylink)
+        // The unaccepted no-sync experiment must not disable vsync in a shipped build.
+        #expect(DiagnosticsEnvironment.frameDriver(in: ["CORTA_FRAME_DRIVER": "ondemand-nosync"]) == .displaylink)
         for driver in DiagnosticsEnvironment.FrameDriver.allCases {
             #expect(DiagnosticsEnvironment.frameDriver(in: ["CORTA_FRAME_DRIVER": driver.rawValue]) == driver)
         }

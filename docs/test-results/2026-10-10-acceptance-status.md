@@ -1,5 +1,7 @@
 # Issue-by-issue acceptance audit, October 10, 2026
 
+**Historical audit:** the [October 11 validation](2026-10-11-merge-validation.md) supersedes the remaining-gate column below. Sustained default flood and matched-cadence power checks now pass; the three-second timer is identified in Apple AGX setup, and unaccepted no-sync was removed. Absolute zero process counters are a documented platform limit, not a claimed pass.
+
 This audits the original requirements of #280–#283 against the
 [full measurement record](2026-10-09-input-followup.md) and
 [raw evidence](2026-10-09-input-followup-raw.md). It supersedes a combined
@@ -69,3 +71,5 @@ The combined PR remains draft: passing CI does not fill the outstanding
 #280/#282 runtime gates. No issue is closed or experimental driver promoted.
 
 Latest foreground retry: the directory ghost/IME overlap was fixed and full Unit now passes 962 tests. Three additional default four-pane pairs still fail GPU tails; CPU/wakeup proxy results and the confirmed blocked reader are in the later record. No completion/merge is inferred.
+
+October 11 merge follow-up: the [final validation](2026-10-11-merge-validation.md) corrects flood sampling before teardown, records three passing sustained default-driver pairs and a final-source check, matches scripted input cadence across power modes, withdraws no-sync, and attributes the three-second idle timer to Apple AGX deferred GPU setup. Historical negative results above are retained with their method limits; absolute zero process wakeups and an unperformed human panel observation are not claimed.

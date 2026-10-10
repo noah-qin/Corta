@@ -80,7 +80,7 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         owesDraw = false
         lastInput = nil
         lastPresent = nil
-        metalLayer.displaySyncEnabled = driver != .ondemandNoSync
+        metalLayer.displaySyncEnabled = true
         link?.invalidate()
         pacingLink?.invalidate()
         link = nil

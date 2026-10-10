@@ -19,7 +19,8 @@ Versioning for compatibility changes.
 - Typing, committed IME text, paste and mouse reports temporarily lift frame
   throttles and request the panel's maximum refresh rate. Critical thermal
   pressure still limits both typing and scrolling; actual 120 Hz cadence and
-  energy impact remain to be measured.
+  energy impact require a panel unavailable in this validation. The 60 Hz
+  power-mode measurements and idle/flood CPU checks are recorded.
 
 ### Fixed
 

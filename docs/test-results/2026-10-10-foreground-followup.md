@@ -158,3 +158,5 @@ GPU flood tails, scripted low-power/normal spread equivalence, and physical
 continuous-screen tearing are not all established. The user did not observe
 the animation, so that human confirmation is unavailable. PR #309 remains
 draft, DisplayLink remains default, no issue is closed and no merge occurs.
+
+October 11 merge follow-up: the [final validation](2026-10-11-merge-validation.md) corrects flood sampling before teardown, records three passing sustained default-driver pairs and a final-source check, matches scripted input cadence across power modes, withdraws no-sync, and attributes the three-second idle timer to Apple AGX deferred GPU setup. Historical negative results above are retained with their method limits; absolute zero process wakeups and an unperformed human panel observation are not claimed.

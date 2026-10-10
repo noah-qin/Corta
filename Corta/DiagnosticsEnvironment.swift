@@ -52,7 +52,6 @@ nonisolated enum DiagnosticsEnvironment {
     enum FrameDriver: String, CaseIterable {
         case displaylink
         case ondemand
-        case ondemandNoSync = "ondemand-nosync"
     }
 
     static func frameDriver(in environment: Environment = ProcessInfo.processInfo.environment) -> FrameDriver {

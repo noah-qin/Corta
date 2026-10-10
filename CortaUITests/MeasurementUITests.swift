@@ -123,12 +123,15 @@ final class MeasurementUITests: XCTestCase {
                 options: Self.fourSecondSamples) {
             pause(4)
         }
+        // Read the latest full rings while every producer is still running.
+        // Stopping panes one by one can fill another ring with a changing
+        // workload, so its tail is not an N-pane steady-state measurement.
+        let lines = try waitForMetrics(["cpuFrame", "gpu"], timeout: 10)
+        report(lines.map { "\(panes)-pane flood \($0)" })
         for centre in centres {
             app.windows.firstMatch.coordinate(withNormalizedOffset: centre).click()
             app.typeKey("c", modifierFlags: .control)
         }
-        let lines = try waitForMetrics(["cpuFrame", "gpu"], timeout: 10)
-        report(lines.map { "\(panes)-pane flood \($0)" })
         removeMetricsFile(through: app)
         app.terminate()
     }

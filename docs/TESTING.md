@@ -521,7 +521,7 @@ single reader to the code.
 
 | Variable | Values | Builds | Effect |
 | --- | --- | --- | --- |
-| `CORTA_FRAME_DRIVER` | `displaylink` (default), `ondemand`, `ondemand-nosync` | all | Experimental echo presentation with separate CADisplayLink pacing; immediate acquisition only while paused; no-sync is a separate opt-in experiment |
+| `CORTA_FRAME_DRIVER` | `displaylink` (default), `ondemand` | all | Experimental echo presentation with separate CADisplayLink pacing; immediate acquisition only while paused; the unaccepted no-sync experiment was removed, so both retained drivers use display synchronization |
 | `CORTA_FRAME_LATENCY` | number ≥ 1 | all | The display link's `preferredFrameLatency` (default 2; `PERFORMANCE.md` §5.7) |
 | `CORTA_MAX_DRAWABLES` | `2` or `3` | all | The Metal layer's drawable count (default 3), for a double-buffering A/B |
 | `CORTA_RENDER_METRICS` | any; an absolute path also writes there | all | Frame-timing percentiles to the `render-metrics` log category, and to the file |

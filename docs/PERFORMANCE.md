@@ -1224,3 +1224,5 @@ record the original background tests and limits. The subsequent
 includes a valid steady-state Allocations call tree: no per-line Line allocation,
 with the two reserved history arrays still allocated once per 256-row batch.
 It also records final full Unit and D17, live flood tails and outstanding gates.
+
+October 11 merge follow-up: the [final validation](test-results/2026-10-11-merge-validation.md) corrects flood sampling before teardown, records three passing sustained default-driver pairs and a final-source check, matches scripted input cadence across power modes, withdraws no-sync, and attributes the three-second idle timer to Apple AGX deferred GPU setup. Historical negative results above are retained with their method limits; absolute zero process wakeups and an unperformed human panel observation are not claimed.
