@@ -532,5 +532,7 @@ energy equivalence, literal scripted normal/low-power spread, strict
 zero-process-wakeup attribution and complete temporal/overlay D14 checks
 remain unresolved. Normal p99 outliers remain evidence, but are not a new
 independent #282-only criterion. A 120 Hz panel is unavailable, as the issue
-explicitly allows. The user now disallows desktop-disrupting automation;
-background verification cannot certify foreground temporal tearing.
+explicitly allows. The later [authorized foreground retry](2026-10-10-foreground-followup.md)
+fixes a real ghost/IME overlap and records new scheduling and flood evidence.
+Flood GPU tails still fail; the user did not watch the continuous animation,
+so temporal tearing cannot be certified.

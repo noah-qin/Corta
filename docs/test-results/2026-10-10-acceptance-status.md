@@ -4,9 +4,10 @@ This audits the original requirements of #280–#283 against the
 [full measurement record](2026-10-09-input-followup.md) and
 [raw evidence](2026-10-09-input-followup-raw.md). It supersedes a combined
 remaining-gates list that made completed core/renderer work appear unfinished.
-The user now prohibits desktop-disrupting automated tests. No foreground
-launch, input simulation, window manipulation or power-setting change is
-authorized for this phase. Only background review and headless tests are used.
+This audit records the background-only phase, when desktop-disrupting tests
+were prohibited. The user subsequently explicitly authorized foreground
+testing; the [later foreground follow-up](2026-10-10-foreground-followup.md)
+supersedes its runtime/overlay status and records a new verified collision fix.
 
 | Issue | Implementation and evidence | Remaining acceptance |
 | :--- | :--- | :--- |
@@ -66,3 +67,5 @@ that the absence of idle intervals is not an empty-export artifact.
 Latest code and measurement CI at `dfee89c` passed all three jobs.
 The combined PR remains draft: passing CI does not fill the outstanding
 #280/#282 runtime gates. No issue is closed or experimental driver promoted.
+
+Latest foreground retry: the directory ghost/IME overlap was fixed and full Unit now passes 962 tests. Three additional default four-pane pairs still fail GPU tails; CPU/wakeup proxy results and the confirmed blocked reader are in the later record. No completion/merge is inferred.

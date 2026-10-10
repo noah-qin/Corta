@@ -23,6 +23,8 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- Directory completion hints are hidden while an input method composes text,
+  so they no longer overlap the preedit text or candidate panel.
 - Idle PTY readers wait for data or an explicit close signal instead of waking
   every 250 ms. Closing still interrupts a silent reader without releasing a
   descriptor while it is in use.

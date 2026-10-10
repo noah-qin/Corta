@@ -653,6 +653,16 @@ and the full raw distributions remain in the linked record. No 120 Hz result or 
 from policy tests.
 
 
+The [later authorized foreground retry](test-results/2026-10-10-foreground-followup.md)
+fixes directory-preview overlap with real Pinyin preedit. Three further
+default-driver four-pane pairs still fail GPU tails: old p99 0.80/0.50/1.42
+ms versus current 1.05/2.80/1.73 ms. CPU/wakeup energy proxies do not
+increase in the recorded stable windows, but are not watts. System Trace
+confirms a 27.127-second blocked reader; process wakeups remain about
+0.45/s, and disabling diagnostics still gives about 0.60/s. The user did
+not observe the continuous animation, so physical temporal tearing remains
+unconfirmed. No experimental default or acceptance completion is claimed.
+
 A third-party screen-capture tool — one that grabs the window in a loop
 until the pixels change — can measure keypress to glass, but Corta
 measures the same interval from the inside, with nothing installed and no

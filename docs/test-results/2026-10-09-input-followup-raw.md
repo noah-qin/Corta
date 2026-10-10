@@ -2180,3 +2180,986 @@ keypressToOutput: n=200 avg=7.06ms p50=4.91ms p95=17.68ms p99=18.65ms max=27.31m
 wakeHop: n=200 avg=1.23ms p50=0.16ms p95=5.84ms p99=9.46ms max=21.97ms rate=0.0/0.0/defaultHz lowPower=false
 keypressToPresent: n=200 avg=40.52ms p50=39.39ms p95=59.59ms p99=66.87ms max=69.54ms rate=0.0/0.0/defaultHz lowPower=false
 ```
+
+## October 10 foreground retry and overlay fix
+
+Method and limits: [foreground record](2026-10-10-foreground-followup.md).
+
+```json
+[
+  {
+    "pid": "8290",
+    "variant": "before",
+    "lifetime_s": 45.716788917,
+    "stable_window": [
+      12.909632125,
+      50.301814041
+    ],
+    "samples": 37,
+    "cpu_percent": 322.10764979045734,
+    "idle_wakeups_per_second": 233.07011127561077,
+    "footprint_min": 162694152.0,
+    "footprint_max": 189105184.0,
+    "appNap_values": [
+      "No"
+    ]
+  },
+  {
+    "pid": "8389",
+    "variant": "after",
+    "lifetime_s": 45.602587541,
+    "stable_window": [
+      62.778740833,
+      100.036832583
+    ],
+    "samples": 37,
+    "cpu_percent": 321.6582950950513,
+    "idle_wakeups_per_second": 228.7825167535586,
+    "footprint_min": 121095200.0,
+    "footprint_max": 189072464.0,
+    "appNap_values": [
+      "No"
+    ]
+  },
+  {
+    "pid": "8477",
+    "variant": "before",
+    "lifetime_s": 45.261604791999986,
+    "stable_window": [
+      112.510411541,
+      149.440563875
+    ],
+    "samples": 37,
+    "cpu_percent": 323.4478603328903,
+    "idle_wakeups_per_second": 230.1913060936251,
+    "footprint_min": 132908088.0,
+    "footprint_max": 189350968.0,
+    "appNap_values": [
+      "No"
+    ]
+  },
+  {
+    "pid": "8577",
+    "variant": "after",
+    "lifetime_s": 46.602711,
+    "stable_window": [
+      161.762539458,
+      200.097112875
+    ],
+    "samples": 38,
+    "cpu_percent": 315.8016016432668,
+    "idle_wakeups_per_second": 225.33184094776854,
+    "footprint_min": 133186568.0,
+    "footprint_max": 189432864.0,
+    "appNap_values": [
+      "No"
+    ]
+  },
+  {
+    "pid": "8658",
+    "variant": "before",
+    "lifetime_s": 45.584066500000006,
+    "stable_window": [
+      212.513498041,
+      249.843559625
+    ],
+    "samples": 37,
+    "cpu_percent": 323.54930729010056,
+    "idle_wakeups_per_second": 233.43117129318892,
+    "footprint_min": 163382280.0,
+    "footprint_max": 189334560.0,
+    "appNap_values": [
+      "No"
+    ]
+  },
+  {
+    "pid": "8759",
+    "variant": "after",
+    "lifetime_s": 46.51773779199999,
+    "stable_window": [
+      262.210630208,
+      300.451776416
+    ],
+    "samples": 38,
+    "cpu_percent": 317.90385480278246,
+    "idle_wakeups_per_second": 226.30074822886976,
+    "footprint_min": 121127968.0,
+    "footprint_max": 188843088.0,
+    "appNap_values": [
+      "No"
+    ]
+  }
+]
+```
+
+### New four-pane before, pair 1
+
+```text
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.15ms p50=0.12ms p95=0.34ms p99=0.66ms max=2.57ms
+gpu: n=600 avg=0.45ms p50=0.40ms p95=0.78ms p99=2.23ms max=6.86ms
+gpuExecution: n=600 avg=0.11ms p50=0.08ms p95=0.16ms p99=0.79ms max=1.81ms
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.18ms max=0.96ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.16ms p50=0.13ms p95=0.35ms p99=0.58ms max=0.86ms
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.48ms p99=0.58ms max=0.62ms
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.15ms p99=0.17ms max=0.19ms
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.09ms p99=0.11ms max=0.16ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.16ms p50=0.14ms p95=0.34ms p99=0.57ms max=1.29ms
+gpu: n=600 avg=0.34ms p50=0.33ms p95=0.48ms p99=0.59ms max=0.63ms
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.14ms p99=0.17ms max=0.18ms
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.11ms max=0.16ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.16ms p50=0.14ms p95=0.34ms p99=0.56ms max=1.16ms
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.48ms p99=0.58ms max=0.60ms
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.15ms p99=0.17ms max=0.18ms
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.09ms p99=0.10ms max=0.19ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.16ms p50=0.14ms p95=0.33ms p99=0.65ms max=1.17ms
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.47ms p99=0.59ms max=0.64ms
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.14ms p99=0.17ms max=0.17ms
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.09ms p99=0.10ms max=0.20ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.16ms p50=0.14ms p95=0.34ms p99=0.63ms max=0.74ms
+gpu: n=600 avg=0.34ms p50=0.32ms p95=0.47ms p99=0.57ms max=0.62ms
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.14ms p99=0.17ms max=0.19ms
+gpuFeedbackDelay: n=600 avg=0.06ms p50=0.06ms p95=0.09ms p99=0.10ms max=0.20ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.16ms p50=0.14ms p95=0.34ms p99=0.55ms max=0.71ms
+gpu: n=600 avg=0.34ms p50=0.33ms p95=0.47ms p99=0.56ms max=0.64ms
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.14ms p99=0.17ms max=0.18ms
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.09ms p99=0.11ms max=0.20ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.16ms p50=0.14ms p95=0.35ms p99=0.69ms max=0.93ms
+gpu: n=600 avg=0.33ms p50=0.32ms p95=0.47ms p99=0.51ms max=0.62ms
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.14ms p99=0.17ms max=0.17ms
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.09ms p99=0.10ms max=0.20ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.18ms p50=0.15ms p95=0.42ms p99=0.64ms max=0.76ms
+gpu: n=600 avg=0.33ms p50=0.33ms p95=0.48ms p99=0.60ms max=0.62ms
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.14ms p99=0.17ms max=0.18ms
+gpuFeedbackDelay: n=600 avg=0.06ms p50=0.06ms p95=0.09ms p99=0.10ms max=0.21ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.16ms p50=0.14ms p95=0.36ms p99=0.51ms max=0.69ms
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.47ms p99=0.53ms max=3.49ms
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.14ms p99=0.17ms max=0.18ms
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.09ms p99=0.11ms max=3.15ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.18ms p50=0.15ms p95=0.41ms p99=0.64ms max=0.74ms
+gpu: n=600 avg=0.34ms p50=0.33ms p95=0.48ms p99=0.56ms max=0.60ms
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.14ms p99=0.17ms max=0.18ms
+gpuFeedbackDelay: n=600 avg=0.06ms p50=0.06ms p95=0.09ms p99=0.10ms max=0.21ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.15ms p50=0.13ms p95=0.32ms p99=0.51ms max=0.72ms
+gpu: n=600 avg=0.40ms p50=0.38ms p95=0.50ms p99=0.80ms max=3.61ms
+gpuExecution: n=600 avg=0.11ms p50=0.08ms p95=0.16ms p99=0.49ms max=2.38ms
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.09ms p99=0.19ms max=0.70ms
+```
+
+### New four-pane after, pair 1
+
+```text
+callbackLead: n=200 avg=49.27ms p50=49.93ms p95=49.97ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=17.11ms p50=16.67ms p95=16.67ms p99=40.42ms max=40.42ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.71ms p50=0.03ms p95=3.20ms p99=7.08ms max=68.97ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=-0.80ms p50=0.03ms p95=0.07ms p99=0.07ms max=0.08ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.73ms p50=49.83ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.75ms p50=16.67ms p95=16.67ms p99=16.67ms max=33.33ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.15ms p50=0.06ms p95=0.32ms p99=3.51ms max=4.13ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=-0.11ms p50=0.06ms p95=0.11ms p99=0.11ms max=0.11ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.72ms p50=49.74ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.16ms p50=0.12ms p95=0.41ms p99=0.77ms max=1.83ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.45ms p50=0.40ms p95=0.69ms p99=2.54ms max=4.95ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.11ms p50=0.08ms p95=0.16ms p99=0.79ms max=2.30ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.09ms p99=0.14ms max=0.86ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.12ms p50=0.07ms p95=0.40ms p99=0.63ms max=0.63ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.73ms p50=49.78ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.11ms p50=0.06ms p95=0.33ms p99=0.50ms max=0.59ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.74ms p50=49.79ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.10ms p50=0.06ms p95=0.31ms p99=0.91ms max=0.92ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.79ms p50=49.81ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.15ms p50=0.13ms p95=0.33ms p99=0.54ms max=0.96ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.35ms p50=0.35ms p95=0.48ms p99=0.51ms max=0.55ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.17ms p99=0.18ms max=0.20ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.12ms max=0.23ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.06ms p50=0.04ms p95=0.21ms p99=0.57ms max=0.60ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.76ms p50=49.80ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.08ms p50=0.05ms p95=0.27ms p99=0.73ms max=0.77ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.72ms p50=49.78ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.11ms p50=0.06ms p95=0.34ms p99=0.58ms max=0.67ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.69ms p50=49.78ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.17ms p50=0.13ms p95=0.46ms p99=0.63ms max=1.19ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.48ms p99=0.52ms max=1.04ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.15ms p99=0.17ms max=0.19ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.09ms p99=0.10ms max=0.48ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.11ms p50=0.06ms p95=0.49ms p99=0.58ms max=0.96ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.12ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.74ms p50=49.79ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.08ms p50=0.05ms p95=0.41ms p99=0.56ms max=0.57ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.12ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.76ms p50=49.81ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.08ms p50=0.05ms p95=0.38ms p99=0.54ms max=0.63ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.79ms p50=49.82ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.15ms p50=0.12ms p95=0.34ms p99=0.67ms max=0.79ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.47ms p99=0.50ms max=0.53ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.09ms p95=0.17ms p99=0.18ms max=0.19ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.11ms max=0.18ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.08ms p50=0.05ms p95=0.25ms p99=0.55ms max=0.71ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.73ms p50=49.78ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.11ms p50=0.06ms p95=0.36ms p99=0.56ms max=0.63ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.72ms p50=49.77ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.09ms p50=0.05ms p95=0.30ms p99=0.53ms max=0.54ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.75ms p50=49.77ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.16ms p50=0.13ms p95=0.36ms p99=0.63ms max=0.73ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.47ms p99=0.49ms max=0.59ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.17ms p99=0.17ms max=0.18ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.10ms max=0.20ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.09ms p50=0.05ms p95=0.29ms p99=0.55ms max=0.55ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.79ms p50=49.82ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.08ms p50=0.05ms p95=0.29ms p99=0.53ms max=0.60ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.73ms p50=49.78ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.08ms p50=0.05ms p95=0.29ms p99=0.51ms max=0.56ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.72ms p50=49.77ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.16ms p50=0.13ms p95=0.40ms p99=0.60ms max=0.69ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.48ms p99=0.50ms max=0.77ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.16ms p99=0.18ms max=0.18ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.11ms max=0.11ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.10ms p50=0.05ms p95=0.34ms p99=0.55ms max=0.58ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.65ms p50=49.69ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.11ms p50=0.06ms p95=0.44ms p99=0.79ms max=0.83ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.78ms p50=49.80ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.09ms p50=0.05ms p95=0.33ms p99=0.99ms max=1.01ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.78ms p50=49.80ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.16ms p50=0.13ms p95=0.38ms p99=0.61ms max=1.04ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.35ms p50=0.34ms p95=0.48ms p99=0.58ms max=0.69ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.16ms p99=0.18ms max=0.20ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.12ms max=0.23ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.08ms p50=0.05ms p95=0.30ms p99=0.44ms max=0.45ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.73ms p50=49.77ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.08ms p50=0.05ms p95=0.28ms p99=0.37ms max=0.49ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.12ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.71ms p50=49.75ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.09ms p50=0.06ms p95=0.30ms p99=0.53ms max=0.69ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.74ms p50=49.79ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.17ms p50=0.14ms p95=0.37ms p99=0.59ms max=1.13ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.35ms p50=0.35ms p95=0.48ms p99=0.50ms max=0.59ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.17ms p99=0.18ms max=0.19ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.10ms max=0.22ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.11ms p50=0.06ms p95=0.39ms p99=0.65ms max=0.96ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.78ms p50=49.79ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.10ms p50=0.05ms p95=0.32ms p99=0.71ms max=0.73ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.79ms p50=49.81ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.09ms p50=0.05ms p95=0.28ms p99=0.53ms max=0.81ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.73ms p50=49.77ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.16ms p50=0.13ms p95=0.37ms p99=0.52ms max=0.86ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.47ms p99=0.48ms max=0.54ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.16ms p99=0.17ms max=0.18ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.09ms p99=0.11ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.08ms p50=0.05ms p95=0.30ms p99=0.50ms max=0.55ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.72ms p50=49.76ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.10ms p50=0.06ms p95=0.29ms p99=0.56ms max=0.72ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.75ms p50=49.78ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.11ms p50=0.06ms p95=0.34ms p99=0.61ms max=1.05ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.77ms p50=49.80ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.16ms p50=0.13ms p95=0.39ms p99=0.59ms max=1.21ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.47ms p99=0.49ms max=0.50ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.16ms p99=0.17ms max=0.18ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.11ms max=0.21ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.09ms p50=0.05ms p95=0.30ms p99=0.45ms max=0.52ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.76ms p50=49.80ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.09ms p50=0.05ms p95=0.30ms p99=0.42ms max=0.49ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.12ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.73ms p50=49.77ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.09ms p50=0.05ms p95=0.31ms p99=0.56ms max=0.57ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.12ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.71ms p50=49.77ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.16ms p50=0.13ms p95=0.41ms p99=0.61ms max=0.74ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.48ms p99=0.50ms max=0.52ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.17ms p99=0.18ms max=0.19ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.11ms max=0.20ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.11ms p50=0.06ms p95=0.38ms p99=0.54ms max=0.66ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.72ms p50=49.76ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.11ms p50=0.06ms p95=0.31ms p99=0.46ms max=0.52ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.75ms p50=49.82ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=17.17ms p50=16.67ms p95=16.67ms p99=33.33ms max=33.33ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.13ms p50=0.06ms p95=0.29ms p99=3.44ms max=3.48ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.08ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.91ms p50=49.96ms p95=49.97ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.14ms p50=0.12ms p95=0.31ms p99=0.45ms max=0.54ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.39ms p50=0.39ms p95=0.50ms p99=1.05ms max=1.70ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.11ms p50=0.08ms p95=0.16ms p99=0.48ms max=1.24ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.06ms p50=0.06ms p95=0.08ms p99=0.17ms max=0.37ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### New four-pane before, pair 2
+
+```text
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.16ms p50=0.13ms p95=0.36ms p99=0.72ms max=1.79ms
+gpu: n=600 avg=0.44ms p50=0.40ms p95=0.74ms p99=2.09ms max=4.38ms
+gpuExecution: n=600 avg=0.11ms p50=0.08ms p95=0.16ms p99=0.49ms max=1.81ms
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.09ms p99=0.17ms max=0.73ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.16ms p50=0.14ms p95=0.37ms p99=0.66ms max=0.74ms
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.48ms p99=0.50ms max=0.63ms
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.14ms p99=0.17ms max=0.20ms
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.11ms max=0.23ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.19ms p50=0.15ms p95=0.46ms p99=0.61ms max=0.75ms
+gpu: n=600 avg=0.33ms p50=0.34ms p95=0.47ms p99=0.49ms max=0.60ms
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.14ms p99=0.16ms max=0.19ms
+gpuFeedbackDelay: n=600 avg=0.06ms p50=0.06ms p95=0.09ms p99=0.10ms max=0.18ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.17ms p50=0.14ms p95=0.39ms p99=0.64ms max=1.05ms
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.48ms p99=0.51ms max=0.53ms
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.14ms p99=0.17ms max=0.17ms
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.09ms p99=0.10ms max=0.35ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.18ms p50=0.15ms p95=0.45ms p99=0.72ms max=1.33ms
+gpu: n=600 avg=0.33ms p50=0.33ms p95=0.47ms p99=0.50ms max=0.52ms
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.14ms p99=0.17ms max=0.18ms
+gpuFeedbackDelay: n=600 avg=0.06ms p50=0.06ms p95=0.09ms p99=0.10ms max=0.24ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.18ms p50=0.15ms p95=0.44ms p99=0.61ms max=0.78ms
+gpu: n=600 avg=0.34ms p50=0.33ms p95=0.47ms p99=0.50ms max=0.54ms
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.14ms p99=0.17ms max=0.18ms
+gpuFeedbackDelay: n=600 avg=0.06ms p50=0.06ms p95=0.09ms p99=0.10ms max=0.18ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.18ms p50=0.15ms p95=0.42ms p99=0.62ms max=0.86ms
+gpu: n=600 avg=0.34ms p50=0.33ms p95=0.48ms p99=0.51ms max=0.54ms
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.14ms p99=0.17ms max=0.18ms
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.09ms p99=0.11ms max=0.23ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.19ms p50=0.15ms p95=0.49ms p99=0.66ms max=0.75ms
+gpu: n=600 avg=0.33ms p50=0.33ms p95=0.48ms p99=0.51ms max=0.66ms
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.14ms p99=0.16ms max=0.18ms
+gpuFeedbackDelay: n=600 avg=0.06ms p50=0.06ms p95=0.09ms p99=0.10ms max=0.21ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.18ms p50=0.15ms p95=0.44ms p99=0.59ms max=1.06ms
+gpu: n=600 avg=0.33ms p50=0.32ms p95=0.46ms p99=0.48ms max=0.51ms
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.14ms p99=0.16ms max=0.17ms
+gpuFeedbackDelay: n=600 avg=0.06ms p50=0.06ms p95=0.08ms p99=0.09ms max=0.20ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.19ms p50=0.15ms p95=0.49ms p99=0.70ms max=1.41ms
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.48ms p99=0.56ms max=0.63ms
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.15ms p99=0.20ms max=0.20ms
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.09ms p99=0.11ms max=0.21ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.18ms p50=0.15ms p95=0.44ms p99=0.69ms max=1.21ms
+gpu: n=600 avg=0.33ms p50=0.32ms p95=0.47ms p99=0.50ms max=0.53ms
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.14ms p99=0.16ms max=0.17ms
+gpuFeedbackDelay: n=600 avg=0.06ms p50=0.06ms p95=0.09ms p99=0.10ms max=0.18ms
+```
+
+### New four-pane after, pair 2
+
+```text
+callbackLead: n=200 avg=50.78ms p50=49.95ms p95=49.97ms p99=147.41ms max=149.43ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=17.80ms p50=16.67ms p95=16.67ms p99=66.66ms max=89.98ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.73ms p50=0.03ms p95=3.95ms p99=6.20ms max=65.57ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=-1.22ms p50=0.03ms p95=0.07ms p99=0.08ms max=0.08ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.81ms p50=49.84ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.92ms p50=16.67ms p95=16.67ms p99=33.33ms max=33.33ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.19ms p50=0.06ms p95=0.45ms p99=3.82ms max=3.94ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=2.39ms p50=0.07ms p95=16.76ms p99=16.77ms max=16.77ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.78ms p50=49.82ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.15ms p50=0.12ms p95=0.34ms p99=0.69ms max=1.85ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.47ms p50=0.41ms p95=0.85ms p99=2.51ms max=4.11ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.12ms p50=0.08ms p95=0.17ms p99=1.08ms max=2.54ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.20ms max=0.78ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.10ms p50=0.05ms p95=0.34ms p99=1.49ms max=1.50ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.06ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.74ms p50=49.79ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.08ms p50=0.05ms p95=0.28ms p99=0.33ms max=0.37ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.06ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.72ms p50=49.76ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.10ms p50=0.06ms p95=0.32ms p99=0.53ms max=0.54ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.66ms p50=49.77ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.17ms p50=0.13ms p95=0.45ms p99=0.71ms max=1.11ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.35ms p50=0.34ms p95=0.49ms p99=0.60ms max=0.61ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.16ms p99=0.17ms max=0.18ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.11ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.11ms p50=0.05ms p95=0.52ms p99=0.78ms max=0.91ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.12ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.78ms p50=49.80ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.09ms p50=0.05ms p95=0.31ms p99=0.52ms max=0.57ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.78ms p50=49.81ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.09ms p50=0.05ms p95=0.31ms p99=0.49ms max=0.51ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.06ms p50=0.06ms p95=0.12ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.73ms p50=49.76ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.16ms p50=0.13ms p95=0.34ms p99=0.55ms max=0.64ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.35ms p50=0.34ms p95=0.50ms p99=0.61ms max=0.65ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.16ms p99=0.17ms max=0.19ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.09ms p99=0.11ms max=0.14ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.09ms p50=0.06ms p95=0.29ms p99=0.53ms max=0.59ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.06ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.70ms p50=49.74ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.11ms p50=0.06ms p95=0.32ms p99=0.66ms max=0.91ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.72ms p50=49.77ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.09ms p50=0.06ms p95=0.31ms p99=0.55ms max=1.25ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.76ms p50=49.80ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.17ms p50=0.13ms p95=0.40ms p99=0.59ms max=1.42ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.36ms p50=0.36ms p95=0.51ms p99=0.61ms max=0.65ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.17ms p99=0.18ms max=0.19ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.11ms max=0.17ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.11ms p50=0.06ms p95=0.36ms p99=0.51ms max=0.55ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.06ms p50=0.06ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.76ms p50=49.80ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.09ms p50=0.05ms p95=0.30ms p99=0.39ms max=0.51ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.06ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.72ms p50=49.77ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.08ms p50=0.05ms p95=0.27ms p99=0.50ms max=0.55ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.72ms p50=49.76ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.16ms p50=0.14ms p95=0.39ms p99=0.60ms max=0.76ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.35ms p50=0.35ms p95=0.49ms p99=0.61ms max=0.64ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.16ms p99=0.17ms max=0.19ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.11ms max=0.16ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.09ms p50=0.05ms p95=0.31ms p99=0.53ms max=0.55ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.12ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.77ms p50=49.79ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.09ms p50=0.06ms p95=0.32ms p99=0.51ms max=0.54ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.78ms p50=49.80ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.08ms p50=0.06ms p95=0.29ms p99=0.31ms max=0.33ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.06ms p50=0.06ms p95=0.12ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.74ms p50=49.78ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.15ms p50=0.13ms p95=0.34ms p99=0.56ms max=0.75ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.35ms p50=0.35ms p95=0.49ms p99=0.62ms max=0.64ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.16ms p99=0.17ms max=0.18ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.09ms p99=0.10ms max=0.24ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.10ms p50=0.05ms p95=0.32ms p99=0.61ms max=0.74ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.06ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.76ms p50=49.81ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.08ms p50=0.05ms p95=0.31ms p99=0.50ms max=0.54ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.68ms p50=49.73ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.08ms p50=0.05ms p95=0.32ms p99=0.54ms max=0.54ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.76ms p50=49.78ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.17ms p50=0.13ms p95=0.42ms p99=0.64ms max=0.74ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.36ms p50=0.36ms p95=0.53ms p99=0.61ms max=0.68ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.11ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.16ms p99=0.17ms max=0.18ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.11ms p50=0.06ms p95=0.39ms p99=0.52ms max=0.62ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.06ms p50=0.06ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.73ms p50=49.77ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.10ms p50=0.06ms p95=0.32ms p99=0.53ms max=0.54ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.06ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.74ms p50=49.79ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.11ms p50=0.06ms p95=0.33ms p99=0.56ms max=0.63ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.73ms p50=49.77ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.17ms p50=0.14ms p95=0.42ms p99=0.61ms max=0.87ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.48ms p99=0.59ms max=0.61ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.16ms p99=0.18ms max=0.19ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.09ms p99=0.10ms max=0.19ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.08ms p50=0.05ms p95=0.29ms p99=0.53ms max=0.57ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.12ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.70ms p50=49.75ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.10ms p50=0.06ms p95=0.31ms p99=0.99ms max=0.99ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.74ms p50=49.77ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.10ms p50=0.06ms p95=0.33ms p99=0.52ms max=0.53ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.06ms p50=0.06ms p95=0.12ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.70ms p50=49.75ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.18ms p50=0.14ms p95=0.41ms p99=0.62ms max=1.04ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.36ms p50=0.36ms p95=0.51ms p99=0.60ms max=0.65ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.15ms p99=0.17ms max=0.18ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.11ms max=0.21ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.12ms p50=0.06ms p95=0.32ms p99=0.48ms max=0.60ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.06ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.77ms p50=49.79ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.08ms p50=0.05ms p95=0.25ms p99=0.54ms max=0.56ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.73ms p50=49.79ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.08ms p50=0.05ms p95=0.28ms p99=0.53ms max=0.55ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.76ms p50=49.78ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.15ms p50=0.12ms p95=0.32ms p99=0.68ms max=0.85ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.35ms p50=0.35ms p95=0.48ms p99=0.58ms max=0.64ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.16ms p99=0.17ms max=0.18ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.11ms max=0.15ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.08ms p50=0.06ms p95=0.30ms p99=0.53ms max=0.53ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.06ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.72ms p50=49.76ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.11ms p50=0.06ms p95=0.31ms p99=0.51ms max=0.54ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.06ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.72ms p50=49.78ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.12ms p50=0.08ms p95=0.32ms p99=0.56ms max=0.63ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.12ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.73ms p50=49.78ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.17ms p50=0.14ms p95=0.39ms p99=0.63ms max=1.24ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.35ms p50=0.34ms p95=0.49ms p99=0.60ms max=0.63ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.16ms p99=0.17ms max=0.18ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.11ms max=0.16ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.10ms p50=0.05ms p95=0.35ms p99=0.62ms max=1.02ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.12ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.67ms p50=49.74ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.10ms p50=0.06ms p95=0.40ms p99=0.58ms max=0.62ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.69ms p50=49.76ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=17.00ms p50=16.67ms p95=16.67ms p99=33.33ms max=33.33ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.12ms p50=0.06ms p95=0.43ms p99=1.34ms max=4.04ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.08ms p50=0.08ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.79ms p50=49.85ms p95=49.97ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.16ms p50=0.13ms p95=0.36ms p99=0.58ms max=0.76ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.44ms p50=0.39ms p95=0.56ms p99=2.80ms max=5.17ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.14ms p50=0.08ms p95=0.16ms p99=2.30ms max=2.55ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.08ms p50=0.06ms p95=0.10ms p99=0.80ms max=1.86ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.92ms p50=16.67ms p95=16.67ms p99=33.33ms max=33.33ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.04ms p50=0.01ms p95=0.14ms p99=0.25ms max=0.25ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.10ms p50=0.10ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### New four-pane before, pair 3
+
+```text
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.17ms p50=0.14ms p95=0.38ms p99=0.66ms max=2.45ms
+gpu: n=600 avg=0.50ms p50=0.41ms p95=1.04ms p99=2.51ms max=8.27ms
+gpuExecution: n=600 avg=0.14ms p50=0.08ms p95=0.31ms p99=1.97ms max=4.46ms
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.26ms max=0.41ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.18ms p50=0.14ms p95=0.41ms p99=0.62ms max=0.71ms
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.48ms p99=0.56ms max=0.62ms
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.14ms p99=0.17ms max=0.17ms
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.09ms p99=0.11ms max=0.20ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.18ms p50=0.15ms p95=0.42ms p99=0.58ms max=0.71ms
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.48ms p99=0.60ms max=0.62ms
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.12ms p99=0.16ms max=0.17ms
+gpuFeedbackDelay: n=600 avg=0.06ms p50=0.06ms p95=0.09ms p99=0.10ms max=0.35ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.19ms p50=0.16ms p95=0.44ms p99=0.72ms max=1.24ms
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.48ms p99=0.61ms max=0.64ms
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.14ms p99=0.17ms max=0.18ms
+gpuFeedbackDelay: n=600 avg=0.06ms p50=0.06ms p95=0.09ms p99=0.10ms max=0.21ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.18ms p50=0.15ms p95=0.43ms p99=0.62ms max=0.79ms
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.48ms p99=0.58ms max=0.62ms
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.14ms p99=0.17ms max=0.18ms
+gpuFeedbackDelay: n=600 avg=0.06ms p50=0.06ms p95=0.09ms p99=0.10ms max=0.17ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.19ms p50=0.16ms p95=0.43ms p99=0.64ms max=0.72ms
+gpu: n=600 avg=0.34ms p50=0.33ms p95=0.48ms p99=0.56ms max=0.66ms
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.13ms p99=0.16ms max=0.17ms
+gpuFeedbackDelay: n=600 avg=0.06ms p50=0.06ms p95=0.09ms p99=0.10ms max=0.21ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.19ms p50=0.16ms p95=0.41ms p99=0.69ms max=1.21ms
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.48ms p99=0.60ms max=0.62ms
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.14ms p99=0.16ms max=0.17ms
+gpuFeedbackDelay: n=600 avg=0.06ms p50=0.06ms p95=0.09ms p99=0.10ms max=0.21ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.19ms p50=0.16ms p95=0.43ms p99=0.69ms max=0.78ms
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.47ms p99=0.54ms max=0.62ms
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.12ms p99=0.16ms max=0.18ms
+gpuFeedbackDelay: n=600 avg=0.06ms p50=0.06ms p95=0.08ms p99=0.10ms max=0.21ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.19ms p50=0.16ms p95=0.45ms p99=0.68ms max=1.32ms
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.48ms p99=0.57ms max=0.63ms
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.14ms p99=0.17ms max=0.18ms
+gpuFeedbackDelay: n=600 avg=0.06ms p50=0.06ms p95=0.08ms p99=0.10ms max=0.17ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.18ms p50=0.15ms p95=0.42ms p99=0.77ms max=1.26ms
+gpu: n=600 avg=0.34ms p50=0.33ms p95=0.47ms p99=0.52ms max=0.66ms
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.14ms p99=0.16ms max=0.18ms
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.09ms p99=0.11ms max=0.18ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.20ms p50=0.16ms p95=0.48ms p99=0.74ms max=1.40ms
+gpu: n=600 avg=0.34ms p50=0.33ms p95=0.47ms p99=0.51ms max=0.54ms
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.12ms p99=0.16ms max=0.17ms
+gpuFeedbackDelay: n=600 avg=0.06ms p50=0.06ms p95=0.08ms p99=0.10ms max=0.22ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.17ms p50=0.15ms p95=0.38ms p99=0.61ms max=0.74ms
+gpu: n=600 avg=0.39ms p50=0.38ms p95=0.51ms p99=1.42ms max=2.08ms
+gpuExecution: n=600 avg=0.11ms p50=0.08ms p95=0.16ms p99=0.93ms max=1.75ms
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.20ms max=0.31ms
+```
+
+### New four-pane after, pair 3
+
+```text
+callbackLead: n=200 avg=49.45ms p50=49.95ms p95=49.97ms p99=49.97ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=17.01ms p50=16.67ms p95=16.67ms p99=39.42ms max=39.42ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.80ms p50=0.03ms p95=3.61ms p99=15.66ms max=65.84ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=-0.63ms p50=0.03ms p95=0.07ms p99=0.08ms max=0.08ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.84ms p50=49.86ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.14ms p50=0.06ms p95=0.38ms p99=3.62ms max=3.62ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=-0.11ms p50=0.06ms p95=0.11ms p99=0.11ms max=0.12ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.74ms p50=49.78ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.15ms p50=0.12ms p95=0.38ms p99=0.66ms max=2.30ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.47ms p50=0.41ms p95=0.91ms p99=1.88ms max=7.02ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.13ms p50=0.08ms p95=0.16ms p99=1.20ms max=4.22ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.21ms max=0.24ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.13ms p50=0.07ms p95=0.42ms p99=1.37ms max=3.83ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.06ms p50=0.06ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.72ms p50=49.78ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.11ms p50=0.07ms p95=0.30ms p99=0.58ms max=0.60ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.06ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.69ms p50=49.74ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.11ms p50=0.06ms p95=0.32ms p99=0.56ms max=0.62ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.78ms p50=49.80ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.16ms p50=0.13ms p95=0.37ms p99=0.57ms max=0.72ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.49ms p99=0.52ms max=0.54ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.17ms p99=0.18ms max=0.19ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.11ms max=0.21ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.07ms p50=0.05ms p95=0.20ms p99=0.55ms max=0.56ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.12ms p99=0.12ms max=0.12ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.75ms p50=49.78ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.08ms p50=0.05ms p95=0.26ms p99=0.34ms max=0.36ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.08ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.75ms p50=49.78ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.08ms p50=0.05ms p95=0.28ms p99=0.51ms max=0.54ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.06ms p50=0.06ms p95=0.12ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.72ms p50=49.77ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.16ms p50=0.14ms p95=0.34ms p99=0.57ms max=0.66ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.48ms p99=0.50ms max=0.57ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.16ms p99=0.17ms max=0.18ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.11ms max=0.17ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.09ms p50=0.06ms p95=0.30ms p99=0.53ms max=0.53ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.06ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.71ms p50=49.77ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.10ms p50=0.06ms p95=0.32ms p99=0.57ms max=1.13ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.74ms p50=49.77ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.09ms p50=0.05ms p95=0.31ms p99=0.55ms max=0.57ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.08ms p50=0.08ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.77ms p50=49.82ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.16ms p50=0.13ms p95=0.39ms p99=0.65ms max=0.76ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.48ms p99=0.50ms max=0.54ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.17ms p99=0.18ms max=0.18ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.11ms max=0.18ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.09ms p50=0.06ms p95=0.33ms p99=0.56ms max=0.60ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.06ms p50=0.06ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.74ms p50=49.79ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.10ms p50=0.06ms p95=0.32ms p99=0.56ms max=0.63ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.06ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.69ms p50=49.77ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.12ms p50=0.06ms p95=0.42ms p99=0.56ms max=0.63ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.69ms p50=49.75ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.17ms p50=0.14ms p95=0.46ms p99=0.65ms max=0.95ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.48ms p99=0.50ms max=0.53ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.16ms p99=0.17ms max=0.18ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.11ms max=0.12ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.09ms p50=0.06ms p95=0.30ms p99=0.57ms max=0.90ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.12ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.77ms p50=49.79ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.08ms p50=0.05ms p95=0.30ms p99=0.52ms max=0.53ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.08ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.78ms p50=49.82ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.08ms p50=0.05ms p95=0.29ms p99=0.34ms max=0.47ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.06ms p50=0.06ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.72ms p50=49.75ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.16ms p50=0.13ms p95=0.35ms p99=0.48ms max=0.65ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.34ms p50=0.35ms p95=0.48ms p99=0.49ms max=0.52ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.15ms p99=0.17ms max=0.18ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.11ms max=0.22ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.10ms p50=0.06ms p95=0.31ms p99=0.40ms max=0.41ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.06ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.68ms p50=49.77ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.12ms p50=0.06ms p95=0.52ms p99=0.63ms max=1.18ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.72ms p50=49.76ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.09ms p50=0.06ms p95=0.30ms p99=0.53ms max=0.55ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.08ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.77ms p50=49.80ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.17ms p50=0.13ms p95=0.43ms p99=0.69ms max=1.13ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.35ms p50=0.35ms p95=0.48ms p99=0.50ms max=0.54ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.16ms p99=0.18ms max=0.18ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.11ms max=0.17ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.80ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.13ms p50=0.06ms p95=0.53ms p99=0.64ms max=0.77ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.72ms p50=49.79ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.11ms p50=0.07ms p95=0.33ms p99=0.53ms max=0.63ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.12ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.69ms p50=49.75ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.09ms p50=0.06ms p95=0.31ms p99=0.53ms max=0.53ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.06ms p50=0.06ms p95=0.12ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.67ms p50=49.74ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.18ms p50=0.15ms p95=0.47ms p99=0.69ms max=0.82ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.35ms p50=0.34ms p95=0.48ms p99=0.50ms max=0.58ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.14ms p99=0.17ms max=0.18ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.09ms p99=0.11ms max=0.18ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.12ms p50=0.07ms p95=0.47ms p99=0.55ms max=0.63ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.66ms p50=49.72ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.10ms p50=0.06ms p95=0.32ms p99=0.55ms max=0.56ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.08ms p50=0.08ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.78ms p50=49.81ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.10ms p50=0.06ms p95=0.31ms p99=0.58ms max=0.59ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.06ms p50=0.06ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.75ms p50=49.80ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.17ms p50=0.13ms p95=0.41ms p99=0.70ms max=0.76ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.35ms p50=0.34ms p95=0.48ms p99=0.51ms max=0.52ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.11ms max=0.18ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.16ms p99=0.17ms max=0.18ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.11ms p50=0.05ms p95=0.51ms p99=0.65ms max=0.93ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.06ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.69ms p50=49.76ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.12ms p50=0.07ms p95=0.43ms p99=0.56ms max=0.64ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.69ms p50=49.74ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.09ms p50=0.05ms p95=0.30ms p99=0.50ms max=0.84ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.12ms p99=0.12ms max=0.12ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.71ms p50=49.76ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.18ms p50=0.14ms p95=0.43ms p99=0.66ms max=1.06ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.34ms p50=0.33ms p95=0.48ms p99=0.50ms max=0.55ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.09ms p50=0.08ms p95=0.15ms p99=0.17ms max=0.20ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.09ms p99=0.11ms max=0.20ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.11ms p50=0.06ms p95=0.37ms p99=0.54ms max=0.54ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.08ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.73ms p50=49.81ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.12ms p50=0.06ms p95=0.45ms p99=0.57ms max=0.64ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.06ms p50=0.06ms p95=0.12ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.75ms p50=49.81ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.10ms p50=0.05ms p95=0.36ms p99=0.54ms max=0.62ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.06ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.74ms p50=49.78ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.17ms p50=0.13ms p95=0.42ms p99=0.63ms max=1.21ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.34ms p50=0.34ms p95=0.48ms p99=0.50ms max=0.60ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.11ms max=0.15ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.10ms p50=0.08ms p95=0.16ms p99=0.18ms max=0.18ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.11ms p50=0.06ms p95=0.35ms p99=0.82ms max=0.83ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.07ms p50=0.07ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.65ms p50=49.70ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.17ms p50=0.06ms p95=0.41ms p99=3.69ms max=3.82ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.08ms p50=0.08ms p95=0.13ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.66ms p50=49.78ms p95=49.98ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=17.00ms p50=16.67ms p95=16.67ms p99=33.33ms max=33.33ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.15ms p50=0.06ms p95=0.54ms p99=3.50ms max=4.20ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.06ms p50=0.07ms p95=0.12ms p99=0.13ms max=0.13ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.75ms p50=49.87ms p95=49.97ms p99=49.98ms max=49.98ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.17ms p50=0.13ms p95=0.37ms p99=0.73ms max=1.46ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.39ms p50=0.37ms p95=0.51ms p99=1.73ms max=3.19ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.11ms p50=0.08ms p95=0.16ms p99=1.30ms max=2.56ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.07ms p50=0.06ms p95=0.10ms p99=0.18ms max=0.51ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.83ms p50=16.67ms p95=16.67ms p99=33.33ms max=33.33ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.10ms p50=0.03ms p95=0.27ms p99=3.32ms max=4.14ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.08ms p50=0.08ms p95=0.12ms p99=0.12ms max=0.12ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### corta-foreground-final-idle-system-summary.json
+
+```json
+{
+  "pid": "6825",
+  "driver": "displaylink",
+  "elapsed_seconds": 20.018284792,
+  "interrupt_wakeups": 9,
+  "package_idle_wakeups": 5,
+  "before": {
+    "interrupt_wakeups": 193,
+    "package_idle_wakeups": 96,
+    "footprint": 97305632,
+    "user_raw": 6533758,
+    "system_raw": 4637233
+  },
+  "after": {
+    "interrupt_wakeups": 202,
+    "package_idle_wakeups": 101,
+    "footprint": 94061600,
+    "user_raw": 6546377,
+    "system_raw": 4656322
+  },
+  "power": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t93%; charging; 1:13 remaining present: true\n",
+  "interrupt_wakeups_per_second": 0.44958896796176623,
+  "traceExit": 0
+}
+```
+
+### corta-foreground-final-idle-metrics-off-summary.json
+
+```json
+[
+  {
+    "driver": "displaylink",
+    "pid": "7615",
+    "elapsed_seconds": 20.00364475,
+    "before": {
+      "interrupt_wakeups": 193,
+      "package_idle_wakeups": 85,
+      "footprint": 97207328,
+      "user_raw": 6279166,
+      "system_raw": 3589931
+    },
+    "after": {
+      "interrupt_wakeups": 205,
+      "package_idle_wakeups": 88,
+      "footprint": 93963296,
+      "user_raw": 6338233,
+      "system_raw": 3613903
+    },
+    "interrupt_wakeups": 12,
+    "package_idle_wakeups": 3,
+    "interrupt_wakeups_per_second": 0.5998906774226732
+  }
+]
+```

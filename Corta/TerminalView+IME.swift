@@ -62,6 +62,7 @@ extension TerminalView: NSTextInputClient {
             return
         }
         let overlay = markedTextOverlay
+        shellOverlay.isInputComposing = true
         // Re-read each time, so ⌘= / ⌘- mid-composition takes effect.
         if let font = preeditFontProvider?() { overlay.font = font }
         overlay.show(
@@ -87,6 +88,7 @@ extension TerminalView: NSTextInputClient {
         guard existingMarkedTextOverlay?.markedText != nil || inputCompositionRect != nil else { return }
         existingMarkedTextOverlay?.hide()
         inputCompositionRect = nil
+        shellOverlay.isInputComposing = false
         onInputContextChange?()
     }
 
