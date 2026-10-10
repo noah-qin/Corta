@@ -110,12 +110,13 @@ reported in those windows.
 | Idle | 0.0256 / 4.644 | 0.0311 / 4.450 | 0.0360 / 4.609 |
 | Occluded | 0.0457 / 5.181 | 0.0389 / 4.644 | 0.0325 / 4.633 |
 
-CPU remains near zero. **Process wakeups are not zero.** The existing reader's
+In this earlier build, CPU remains near zero. **Process wakeups are not zero.** The reader's
 250 ms poll stop-check is consistent with this order of wakeups, but this is
 an inference, not an attributed stack trace. No claim is made that the typing
 burst reaches zero process wakeups. Flood CPU/wakeups are in the raw record;
 the windows include setup and teardown margins and do not replace a repeated
-energy comparison. Thermal and battery-mode acceptance remains unmeasured.
+energy comparison. Thermal acceptance remains unmeasured; subsequent scripted
+power-mode pairs and the final reader-wakeup measurements are recorded below.
 
 ## Allocations and regressions
 
@@ -259,7 +260,7 @@ up four rows, reaches a two-row source crop after eleven row steps, and removes
 it after thirteen; screenshots show no stretching or duplicates. The earlier
 empty transcript and fixture-path failure are discarded. This validates
 ordinary live image references, not unsupported Unicode placeholders.
-After this final core fix, **743 terminal tests, 125 SFTP, 22 release-check and
+After the no-history core fix, **743 terminal tests, 125 SFTP, 22 release-check and
 13 license tests pass**, unchanged goldens and **500k seeded mutation inputs
 pass again**. Final full Unit: **961 tests in 147 suites pass**, four known
 issues; the 400-step renderer oracle is included.
@@ -276,9 +277,9 @@ an app-window-only image. The failed Latin-only attempts are not accepted as
 IME evidence. Original Pinyin input source is restored; no IME setting or
 permission was changed.
 
-Final native/D17 executable SHA-256:
+No-history correction native/D17 executable SHA-256:
 `95a8cec1fcb2eb460dd8ab82ff88dc66659cde0daafc284b240725912b8052b5`.
-Final-source D17 three Release 120×40 rounds: average **0.759 / 0.723 /
+D17 after the no-history correction, three Release 120×40 rounds: average **0.759 / 0.723 /
 0.806 ms**, p95 **3.881 / 2.877 / 3.468 ms**. Across-round mean **0.763 ms**
 versus baseline **0.769 ms**, overlapping mean ranges; the larger individual
 p95 values are retained. Earlier input, power, allocation and flood rings
@@ -333,6 +334,63 @@ higher and median p99 0.08 ms higher; no assertion of identical distributions
 is made. Low-power p50 medians are baseline **186.64 ms**, changed **64.08 ms**.
 Both Battery and AC `lowpowermode` were read back as zero after restoration.
 
+
+## Explicit PTY close wakeup, October 10
+
+The four-per-second reader timeout was replaced with an indefinite readiness
+wait and a lazy, parent-only close-notification pipe. Closing signals one
+nonblocking byte, with concurrent/repeated signals guarded. Both pipe ends
+use the existing descriptor leases: an in-flight wait owns its number until
+it observes close, preventing descriptor reuse races. CLOEXEC plus the spawn
+close-by-default policy prevent child inheritance. Creation failures close
+both new handles and report the existing I/O failure. There is no new timer.
+
+The deterministic kernel test closes concurrently after the poll lease is
+held, verifies readiness and that the number stays valid inside the lease.
+The existing 25-cycle descriptor-leak test now creates the wakeup handles in
+each cycle. Full package: **744 terminal + 125 SFTP + 22 release-check + 13
+license = 904 tests passed**; the rebuilt **500k seed-1 fuzz** passes. Full
+Unit: **961 tests in 147 suites passed**, four known degenerate-target cases.
+The duplicated descriptor documentation stays byte-identical; SFTP runtime
+behavior is unchanged.
+
+| Driver | Profiled 20 s interrupt wakeups / second | Without profiler | Render commits after two-second grace |
+| :--- | :--- | :--- | :--- |
+| Default DisplayLink | 10 / 0.500 | 8 / 0.400 | 0 |
+| On-demand | 11 / 0.550 | 11 / 0.550 | 0 |
+
+Both traces contain twelve target keyDown/wake intervals. Default records
+27 frame/commit/GPU intervals during the burst; on-demand records twelve
+commits/GPU intervals. Each following 20-second window has **zero commits and
+zero frame callbacks**. The first export used a nonexistent schema and was
+empty; it was discarded, then exported using the actual `OSSignpostIntervals`
+schema from the TOC. Zero counts are calculated from traces that contain the
+input burst, not from an empty export.
+
+Original process wakeups were 96 over 20.010848 s (4.7974/s). They are now
+approximately **0.4–0.55/s**, including unprofiled controls, a substantial
+reduction. They are **not strictly zero**. Residual kernel wakeups are not
+causally attributed and are not relabelled as render wakes. Raw CPU counter
+units remain uncalibrated; no nanosecond-based CPU percentage is inferred.
+
+Three final functional-build normal-mode pairs alternate baseline → changed
+DisplayLink, 320 scripted keys and 200 successful presentations per ring,
+AC power and Low Power Mode off. Executable SHA-256:
+`42e7fa41bd1fc243d0aa9105d9a9007b077a90ba553dab4f26ccfb47551a6cf7`.
+
+| Round | Baseline p50/p95/p99 ms | Changed default |
+| :--- | :--- | :--- |
+| 1 | 103.08 / 118.64 / 119.55 | 105.32 / 118.92 / 149.06 |
+| 2 | 104.19 / 118.57 / 131.51 | 105.75 / 118.32 / 119.24 |
+| 3 | 104.88 / 118.88 / 119.53 | 104.77 / 119.07 / 119.56 |
+
+Median p50 **104.19 → 105.32 ms**, a 1.13 ms increase versus a 1.80 ms
+baseline run range; p99 medians **119.55 → 119.56 ms**. The first changed p99
+**149.06 ms** exceeds every paired baseline p99 and is retained, despite the
+near-equal medians. No assertion that every tail is within spread is made.
+The earlier three power-mode pairs and the same-binary driver experiment
+precede this idle-reader optimization; they remain explicitly earlier-build
+measurements. Renderer code and the offscreen D17 path are unchanged by it.
 
 ## Outstanding acceptance
 

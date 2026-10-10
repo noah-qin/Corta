@@ -61,11 +61,6 @@ public final class TerminalSession: @unchecked Sendable {
     /// Per `read`; internal so lifecycle tests can feed exact boundaries.
     static let readChunkSize = 64 * 1024
     private static let batchByteCap = 1024 * 1024
-    /// How long an idle reader waits before looking again at whether the
-    /// session stopped: `PTY.close()` defers its close to an in-flight call,
-    /// and a child that ignores `SIGHUP` would otherwise never let one return.
-    private static let stopCheckMilliseconds: Int32 = 250
-
     public let pty: PTY
 
     private struct State {
@@ -519,11 +514,10 @@ public final class TerminalSession: @unchecked Sendable {
     private var liveReaderSource: ReaderSource {
         ReaderSource(
             read: { [pty] buffer in
-                // Bounded, not a bare blocking read: after `stop()` the timed
-                // wait throws `.closed`, and the descriptor is released even if
-                // the child never speaks or hangs up.
+                // close() explicitly wakes this wait, even for a silent child
+                // that ignores hangup. No timer wakes an idle reader.
                 while true {
-                    if try pty.waitUntilReadable(timeoutMilliseconds: Self.stopCheckMilliseconds) {
+                    if try pty.waitUntilReadable(timeoutMilliseconds: -1) {
                         return try pty.read(into: buffer)
                     }
                 }

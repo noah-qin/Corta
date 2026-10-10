@@ -29,6 +29,8 @@ public final class PTY: @unchecked Sendable {
     /// Every system call on the primary goes through this, so a `close()` on
     /// another thread can never hand an in-flight call a recycled number.
     private let descriptor: GuardedDescriptor
+    /// Created on the first readiness wait; close wakes an indefinite poll.
+    private let closeWakeup = Mutex<PTYCloseWakeup?>(nil)
 
     /// Also the group and session id (`POSIX_SPAWN_SETSID`).
     public let processIdentifier: pid_t
@@ -192,13 +194,33 @@ public final class PTY: @unchecked Sendable {
     /// `timeoutMilliseconds` (`-1`: no limit). End of file and errors count as
     /// readable — the read reports them. `.closed` after `close()`.
     public func waitUntilReadable(timeoutMilliseconds: Int32) throws(PTYError) -> Bool {
-        let result = descriptor.withNumber { fd -> Bool in
-            while true {
-                var request = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
-                let ready = poll(&request, 1, timeoutMilliseconds)
-                if ready >= 0 { return request.revents != 0 }
-                if errno != EINTR { return true }
+        let wakeup = try closeWakeup.withLock { wakeup throws(PTYError) -> PTYCloseWakeup in
+            guard !descriptor.isClosed else { throw .closed }
+            if let wakeup { return wakeup }
+            let created = try PTYCloseWakeup()
+            wakeup = created
+            return created
+        }
+        let result = try descriptor.withNumber { fd throws(PTYError) -> Bool in
+            let ready = try wakeup.readEnd.withNumber { wakeFD throws(PTYError) -> Bool in
+                while true {
+                    var requests = (
+                        pollfd(fd: fd, events: Int16(POLLIN), revents: 0),
+                        pollfd(fd: wakeFD, events: Int16(POLLIN), revents: 0))
+                    let count = withUnsafeMutablePointer(to: &requests) {
+                        $0.withMemoryRebound(to: pollfd.self, capacity: 2) {
+                            poll($0, 2, timeoutMilliseconds)
+                        }
+                    }
+                    if count >= 0 {
+                        if requests.1.revents != 0 { throw .closed }
+                        return requests.0.revents != 0
+                    }
+                    if errno != EINTR { return true }
+                }
             }
+            guard let ready else { throw .closed }
+            return ready
         }
         guard let result else { throw .closed }
         return result
@@ -439,6 +461,49 @@ public final class PTY: @unchecked Sendable {
     /// descriptor until it returns — so it can never reach a recycled number —
     /// and the last one out closes it.
     public func close() {
-        descriptor.close()
+        guard descriptor.close() else { return }
+        closeWakeup.withLock { $0?.signalAndClose() }
+    }
+}
+
+/// Both pipe ends use the same lease rules as the PTY: an in-flight poll
+/// keeps its read number owned until the close byte wakes it. One byte,
+/// never periodic polling; CLOEXEC keeps these parent-only handles private.
+final class PTYCloseWakeup: Sendable {
+    let readEnd: GuardedDescriptor
+    private let writeEnd: GuardedDescriptor
+    private let isSignalled = Mutex(false)
+
+    init() throws(PTYError) {
+        var numbers = (Int32(-1), Int32(-1))
+        let result = withUnsafeMutablePointer(to: &numbers) {
+            $0.withMemoryRebound(to: Int32.self, capacity: 2) { pipe($0) }
+        }
+        guard result == 0 else { throw .ioFailed(code: errno) }
+        guard fcntl(numbers.0, F_SETFD, FD_CLOEXEC) >= 0,
+            fcntl(numbers.1, F_SETFD, FD_CLOEXEC) >= 0,
+            fcntl(numbers.1, F_SETFL, O_NONBLOCK) >= 0 else {
+            let code = errno
+            Darwin.close(numbers.0)
+            Darwin.close(numbers.1)
+            throw .ioFailed(code: code)
+        }
+        readEnd = GuardedDescriptor(numbers.0)
+        writeEnd = GuardedDescriptor(numbers.1)
+    }
+
+    func signalAndClose() {
+        let first = isSignalled.withLock { signalled in
+            guard !signalled else { return false }
+            signalled = true
+            return true
+        }
+        guard first else { return }
+        _ = writeEnd.withNumber { fd in
+            var byte: UInt8 = 1
+            while Darwin.write(fd, &byte, 1) < 0, errno == EINTR {}
+        }
+        readEnd.close()
+        writeEnd.close()
     }
 }

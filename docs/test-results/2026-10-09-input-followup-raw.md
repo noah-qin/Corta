@@ -1104,3 +1104,248 @@ frame CPU time (120x40, full screen, Release, -O): avg 0.806 ms, p95 3.468 ms, o
 ```
 
 Live less output is preserved locally in `/tmp/corta-less-control-accepted.raw`; normal image placement followed real line-feed scrolling and clipped to two rows at the top, then disappeared. Native captures are under `/tmp/corta-final-d14/kitty-less-accepted-page{4,11,13}.png`. Input-source context retry captures are `pinyin-context-{candidate,committed}.png`; font-menu PTY sizes are 40 120 → 37 113 → 40 120.
+
+## Explicit close wakeup: final package, Unit and idle controls
+
+744 terminal, 125 SFTP, 22 release-check and 13 license tests pass; full Unit 961/147 passes with four known issues. Rebuilt fuzzer: 500000 terminal inputs, seed 1, no crash/hang/cap violation.
+
+### Profiled counters
+
+```json
+[
+  {
+    "driver": "displaylink",
+    "pid": "87202",
+    "elapsed_seconds": 20.013068916,
+    "before": {
+      "interrupt_wakeups": 197,
+      "package_idle_wakeups": 33,
+      "footprint": 97076280,
+      "user_raw": 6593585,
+      "system_raw": 3321667
+    },
+    "after": {
+      "interrupt_wakeups": 207,
+      "package_idle_wakeups": 38,
+      "footprint": 93799480,
+      "user_raw": 6615519,
+      "system_raw": 3336174
+    },
+    "interrupt_wakeups": 10,
+    "package_idle_wakeups": 5,
+    "interrupt_wakeups_per_second": 0.49967349045628995
+  },
+  {
+    "driver": "ondemand",
+    "pid": "87239",
+    "elapsed_seconds": 20.014394333999995,
+    "before": {
+      "interrupt_wakeups": 139,
+      "package_idle_wakeups": 67,
+      "footprint": 72090656,
+      "user_raw": 6046662,
+      "system_raw": 2677107
+    },
+    "after": {
+      "interrupt_wakeups": 150,
+      "package_idle_wakeups": 73,
+      "footprint": 68879392,
+      "user_raw": 6096839,
+      "system_raw": 2699307
+    },
+    "interrupt_wakeups": 11,
+    "package_idle_wakeups": 6,
+    "interrupt_wakeups_per_second": 0.549604440505774
+  }
+]
+```
+
+### Unprofiled counters
+
+```json
+[
+  {
+    "driver": "displaylink",
+    "pid": "87363",
+    "elapsed_seconds": 20.01076625,
+    "before": {
+      "interrupt_wakeups": 197,
+      "package_idle_wakeups": 91,
+      "footprint": 96912416,
+      "user_raw": 6340270,
+      "system_raw": 2975701
+    },
+    "after": {
+      "interrupt_wakeups": 205,
+      "package_idle_wakeups": 95,
+      "footprint": 93619232,
+      "user_raw": 6350974,
+      "system_raw": 2987243
+    },
+    "interrupt_wakeups": 8,
+    "package_idle_wakeups": 4,
+    "interrupt_wakeups_per_second": 0.3997847908497757
+  },
+  {
+    "driver": "ondemand",
+    "pid": "87394",
+    "elapsed_seconds": 20.006373208,
+    "before": {
+      "interrupt_wakeups": 143,
+      "package_idle_wakeups": 69,
+      "footprint": 72057888,
+      "user_raw": 6093951,
+      "system_raw": 2652789
+    },
+    "after": {
+      "interrupt_wakeups": 154,
+      "package_idle_wakeups": 77,
+      "footprint": 68797472,
+      "user_raw": 6158438,
+      "system_raw": 2676979
+    },
+    "interrupt_wakeups": 11,
+    "package_idle_wakeups": 8,
+    "interrupt_wakeups_per_second": 0.5498247926116565
+  }
+]
+```
+
+### Target signposts
+
+```json
+[
+  {
+    "driver": "displaylink",
+    "pid": "87202",
+    "counts": {
+      "keyDown": 12,
+      "wake": 12,
+      "frame": 27,
+      "gpu": 27,
+      "commit": 27
+    },
+    "window_trace_seconds": [
+      5.757199375,
+      25.757199375
+    ],
+    "commits_in_window": 0,
+    "frames_in_window": 0
+  },
+  {
+    "driver": "ondemand",
+    "pid": "87239",
+    "counts": {
+      "keyDown": 12,
+      "wake": 12,
+      "gpu": 12,
+      "commit": 12
+    },
+    "window_trace_seconds": [
+      5.973904625,
+      25.973904625
+    ],
+    "commits_in_window": 0,
+    "frames_in_window": 0
+  }
+]
+```
+
+### Final normal pair 1, before
+
+```text
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.28ms p50=0.24ms p95=0.50ms p99=0.64ms max=0.69ms
+gpu: n=600 avg=0.96ms p50=0.85ms p95=1.53ms p99=3.09ms max=3.81ms
+gpuExecution: n=600 avg=0.31ms p50=0.25ms p95=0.61ms p99=2.47ms max=3.09ms
+gpuFeedbackDelay: n=600 avg=0.11ms p50=0.09ms p95=0.15ms p99=0.82ms max=1.88ms
+keypressToPresent: n=200 avg=96.30ms p50=103.08ms p95=118.64ms p99=119.55ms max=124.34ms
+```
+
+### Final normal pair 1, displaylink
+
+```text
+callbackLead: n=200 avg=49.84ms p50=49.89ms p95=49.94ms p99=49.95ms max=49.95ms rate=0.0/0.0/defaultHz lowPower=false
+firstAfterResume: n=200 avg=49.83ms p50=49.90ms p95=49.95ms p99=49.96ms max=49.96ms rate=0.0/0.0/defaultHz lowPower=false
+resumeToCallback: n=200 avg=17.36ms p50=16.40ms p95=33.50ms p99=33.56ms max=33.58ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=-5.66ms p50=0.00ms p95=0.01ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.28ms p50=0.24ms p95=0.50ms p99=0.63ms max=0.91ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.95ms p50=0.85ms p95=1.33ms p99=3.12ms max=3.90ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.31ms p50=0.25ms p95=0.25ms p99=2.36ms max=2.89ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.11ms p50=0.09ms p95=0.14ms p99=0.56ms max=1.89ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=1.69ms p50=1.44ms p95=1.99ms p99=4.17ms max=76.99ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+keyDelivery: n=200 avg=1.95ms p50=1.69ms p95=3.23ms p99=4.56ms max=6.10ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=2.04ms p50=1.78ms p95=3.30ms p99=4.65ms max=6.19ms rate=0.0/0.0/defaultHz lowPower=false
+echoToMain: n=200 avg=1.31ms p50=1.44ms p95=1.97ms p99=2.92ms max=4.17ms rate=0.0/0.0/defaultHz lowPower=false
+mainToFrame: n=200 avg=53.84ms p50=52.80ms p95=64.67ms p99=97.55ms max=113.41ms rate=0.0/0.0/defaultHz lowPower=false
+frameToGlass: n=200 avg=42.49ms p50=49.54ms p95=49.80ms p99=66.26ms max=66.38ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=99.68ms p50=105.32ms p95=118.92ms p99=149.06ms max=169.52ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### Final normal pair 2, before
+
+```text
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.28ms p50=0.24ms p95=0.50ms p99=0.59ms max=0.75ms
+gpu: n=600 avg=1.00ms p50=0.84ms p95=2.40ms p99=3.53ms max=4.23ms
+gpuExecution: n=600 avg=0.37ms p50=0.25ms p95=1.26ms p99=2.82ms max=3.43ms
+gpuFeedbackDelay: n=600 avg=0.11ms p50=0.09ms p95=0.18ms p99=0.55ms max=1.50ms
+keypressToPresent: n=200 avg=99.57ms p50=104.19ms p95=118.57ms p99=131.51ms max=134.77ms
+```
+
+### Final normal pair 2, displaylink
+
+```text
+callbackLead: n=200 avg=49.88ms p50=49.90ms p95=49.95ms p99=49.95ms max=49.96ms rate=0.0/0.0/defaultHz lowPower=false
+firstAfterResume: n=200 avg=49.87ms p50=49.90ms p95=49.95ms p99=49.95ms max=49.96ms rate=0.0/0.0/defaultHz lowPower=false
+resumeToCallback: n=200 avg=15.15ms p50=16.38ms p95=33.12ms p99=33.52ms max=33.56ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.28ms p50=0.25ms p95=0.50ms p99=0.56ms max=0.77ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=1.00ms p50=0.85ms p95=2.27ms p99=3.80ms max=5.39ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.37ms p50=0.25ms p95=1.26ms p99=2.96ms max=4.21ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.11ms p50=0.09ms p95=0.16ms p99=0.51ms max=1.89ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=-4.25ms p50=0.00ms p95=0.01ms p99=0.01ms max=0.01ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=1.61ms p50=1.40ms p95=1.96ms p99=2.24ms max=68.46ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+keyDelivery: n=200 avg=1.86ms p50=1.68ms p95=3.02ms p99=3.56ms max=4.06ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=1.95ms p50=1.76ms p95=3.10ms p99=3.64ms max=4.14ms rate=0.0/0.0/defaultHz lowPower=false
+echoToMain: n=200 avg=1.28ms p50=1.40ms p95=1.96ms p99=2.16ms max=2.24ms rate=0.0/0.0/defaultHz lowPower=false
+mainToFrame: n=200 avg=54.40ms p50=53.41ms p95=64.54ms p99=65.32ms max=75.59ms rate=0.0/0.0/defaultHz lowPower=false
+frameToGlass: n=200 avg=44.16ms p50=49.61ms p95=49.79ms p99=49.81ms max=49.84ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=101.80ms p50=105.75ms p95=118.32ms p99=119.24ms max=127.23ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### Final normal pair 3, before
+
+```text
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.28ms p50=0.24ms p95=0.49ms p99=0.51ms max=0.54ms
+gpu: n=600 avg=0.96ms p50=0.84ms p95=1.63ms p99=3.51ms max=3.89ms
+gpuExecution: n=600 avg=0.34ms p50=0.25ms p95=1.04ms p99=2.78ms max=3.19ms
+gpuFeedbackDelay: n=600 avg=0.10ms p50=0.09ms p95=0.14ms p99=0.44ms max=1.48ms
+keypressToPresent: n=200 avg=99.04ms p50=104.88ms p95=118.88ms p99=119.53ms max=169.39ms
+```
+
+### Final normal pair 3, displaylink
+
+```text
+callbackLead: n=200 avg=49.87ms p50=49.90ms p95=49.95ms p99=49.95ms max=49.96ms rate=0.0/0.0/defaultHz lowPower=false
+firstAfterResume: n=200 avg=49.85ms p50=49.90ms p95=49.94ms p99=49.96ms max=49.96ms rate=0.0/0.0/defaultHz lowPower=false
+resumeToCallback: n=200 avg=17.02ms p50=16.38ms p95=33.51ms p99=33.58ms max=33.61ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=-5.33ms p50=0.00ms p95=0.01ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.29ms p50=0.24ms p95=0.51ms p99=0.63ms max=0.77ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=0.99ms p50=0.85ms p95=1.73ms p99=4.09ms max=4.64ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.36ms p50=0.25ms p95=1.11ms p99=3.20ms max=3.70ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.10ms p50=0.09ms p95=0.17ms p99=0.42ms max=1.22ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=1.69ms p50=1.47ms p95=1.88ms p99=5.00ms max=81.89ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+keyDelivery: n=200 avg=2.01ms p50=1.71ms p95=3.40ms p99=4.22ms max=4.62ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=2.09ms p50=1.80ms p95=3.47ms p99=4.31ms max=4.72ms rate=0.0/0.0/defaultHz lowPower=false
+echoToMain: n=200 avg=1.30ms p50=1.47ms p95=1.87ms p99=3.22ms max=5.00ms rate=0.0/0.0/defaultHz lowPower=false
+mainToFrame: n=200 avg=53.51ms p50=52.35ms p95=65.03ms p99=66.54ms max=66.63ms rate=0.0/0.0/defaultHz lowPower=false
+frameToGlass: n=200 avg=41.50ms p50=49.50ms p95=49.79ms p99=49.82ms max=49.82ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=98.40ms p50=104.77ms p95=119.07ms p99=119.56ms max=119.61ms rate=0.0/0.0/defaultHz lowPower=false
+```

@@ -625,7 +625,10 @@ gate fails. Manual/tearing acceptance is still pending; scripted power-mode pair
 [Full environment, decomposition, raw rounds and acceptance limits](test-results/2026-10-09-input-followup.md)
 also record final full Unit, D17, idle/occluded Activity Monitor counters and
 valid Allocations evidence. No 120 Hz panel was available. Idle process CPU
-was approximately 0.03%, but process wakeups were approximately 4–5/s, not zero.
+was approximately 0.03%. A later explicit PTY close wakeup removes the 250 ms
+reader poll: input-then-idle interrupt wakeups fall from 4.7974/s to about
+0.4–0.55/s, with zero render commits/frame callbacks over 20 seconds. Total
+process wakeups are still not strictly zero; raw controls are linked above.
 
 Typing, committed IME text, selector commands, accepted paste and reported
 mouse input now request an interactive rate for a re-armed one-second grace.
