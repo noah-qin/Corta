@@ -127,4 +127,27 @@ struct CanvasPresentTests {
         #expect(FrameScheduler.mayPause(stillPending: false, drawn: true))
         #expect(!FrameScheduler.mayPause(stillPending: true, drawn: true))
     }
+    @Test func echoGateRespectsWindowPauseAndRefreshInterval() {
+        #expect(FrameScheduler.mayPresentEcho(now: 10, lastInput: 9.96, lastPresent: nil, maximumFPS: 60, isPaused: true))
+        #expect(!FrameScheduler.mayPresentEcho(now: 10, lastInput: 9.94, lastPresent: nil, maximumFPS: 60, isPaused: true))
+        #expect(!FrameScheduler.mayPresentEcho(now: 10, lastInput: 10.01, lastPresent: nil, maximumFPS: 60, isPaused: true))
+        #expect(!FrameScheduler.mayPresentEcho(now: 10, lastInput: nil, lastPresent: nil, maximumFPS: 60, isPaused: true))
+        #expect(!FrameScheduler.mayPresentEcho(now: 10, lastInput: 9.99, lastPresent: 9.99, maximumFPS: 60, isPaused: true))
+        #expect(FrameScheduler.mayPresentEcho(now: 10, lastInput: 9.99, lastPresent: 9.99, maximumFPS: 120, isPaused: true))
+        #expect(!FrameScheduler.mayPresentEcho(now: 10, lastInput: 9.99, lastPresent: 9.96, maximumFPS: 20, isPaused: true))
+        #expect(!FrameScheduler.mayPresentEcho(now: 10, lastInput: 9.99, lastPresent: nil, maximumFPS: 60, isPaused: false))
+    }
+
+    @Test func onDemandPacingDoesNotRetainTheScheduler() {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
+            styleMask: .borderless, backing: .buffered, defer: false)
+        window.contentView = NSView(frame: window.contentLayoutRect)
+        var scheduler: FrameScheduler? = FrameScheduler(metalLayer: CAMetalLayer(), driver: .ondemand)
+        weak var released = scheduler
+        scheduler?.attach(to: window)
+        #expect(scheduler?.isAttached == true)
+        scheduler = nil
+        #expect(released == nil, "CADisplayLink must not retain its scheduler through its target")
+    }
+
 }

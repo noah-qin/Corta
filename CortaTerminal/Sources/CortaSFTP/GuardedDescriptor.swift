@@ -29,8 +29,8 @@ import Synchronization
 /// Deferred, not done in place: Darwin's `close(2)` (and `dup2` over the
 /// number) sleeps until an in-flight call on the file returns — measured: a
 /// `close` of a pty primary with a reader parked in `read` waited out the
-/// child's 30-second `sleep`. Callers keep their calls bounded (a timed
-/// `poll` before a read) so the deferred close follows promptly.
+/// child's 30-second `sleep`. Callers arrange a bounded wait or an explicit
+/// close wakeup so the deferred close follows promptly.
 ///
 /// This file exists twice, byte for byte: in `CortaTerminal` and in
 /// `CortaSFTP`, which shares no code with the core. `CortaSFTPTests` holds

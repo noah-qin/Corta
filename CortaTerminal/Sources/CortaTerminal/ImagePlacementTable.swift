@@ -281,6 +281,40 @@ public struct ImagePlacementTable: Sendable {
         revision &+= 1
     }
 
+    /// Kitty's page-area rule: only fully contained images scroll; ones
+    /// straddling a margin remain fixed. Clip source pixels at either margin.
+    /// https://sw.kovidgoyal.net/kitty/graphics-protocol/#interaction-with-other-terminal-actions
+    mutating func scrollRegion(top: Int, bottom: Int, delta: Int,
+        scrollbackTotal: Int, cellPixelHeight: Int) {
+        guard !placements.isEmpty else { return }
+        var changed = false
+        for key in placementOrder {
+            guard var placement = placements[key],
+                let height = rowCount(of: placement, cellPixelHeight: cellPixelHeight) else { continue }
+            let row = ScrollbackCoordinates.reanchoredRow(
+                placement.row, from: placement.baseScrollbackTotal, to: scrollbackTotal)
+            guard row >= top, row + height <= bottom + 1 else { continue }
+            let moved = row - delta
+            let clippedTop = max(0, top - moved)
+            let clippedBottom = max(0, moved + height - bottom - 1)
+            let remaining = height - clippedTop - clippedBottom
+            changed = true
+            guard remaining > 0 else { placements[key] = nil; continue }
+            let sourceHeight = placement.sourceBottom - placement.sourceTop
+            let sourceTop = placement.sourceTop
+            placement.sourceTop = sourceTop + sourceHeight * Float(clippedTop) / Float(height)
+            placement.sourceBottom -= sourceHeight * Float(clippedBottom) / Float(height)
+            placement.row = max(top, moved)
+            placement.baseScrollbackTotal = scrollbackTotal
+            if clippedTop > 0 || clippedBottom > 0 { placement.rows = remaining }
+            placements[key] = placement
+        }
+        if changed {
+            placementOrder.removeAll { placements[$0] == nil }
+            revision &+= 1
+        }
+    }
+
     private func rowCount(of placement: KittyGraphics.Placement, cellPixelHeight: Int) -> Int? {
         if let rows = placement.rows { return rows }
         guard cellPixelHeight > 0, let height = images[placement.imageID]?.pixelHeight else {

@@ -208,6 +208,13 @@ public struct Grid: Sendable {
     public var linesGeneration: UInt64 { lines.generation }
 
     public var linesRotated: UInt64 { lines.totalRotated }
+    public var scrollEventsTotal: UInt64 { lines.scrollEventsTotal }
+    public func scrollEvent(at sequence: UInt64) -> ScrollEvent? { lines.scrollEvent(at: sequence) }
+
+    /// Test-only access without retaining a `Line` and sharing its buffer.
+    func rowBufferAddress(_ row: Int) -> UInt? {
+        lines[row].cells.withUnsafeBufferPointer { $0.baseAddress.map { UInt(bitPattern: $0) } }
+    }
 
     // MARK: - Writing
 
@@ -997,33 +1004,26 @@ public struct Grid: Sendable {
     public mutating func scrollUp(_ count: Int) {
         let count = min(max(0, count), marginBottom - marginTop + 1)
         guard count > 0 else { return }
-        let saveToHistory = marginTop == 0 && marginBottom == rows - 1
+        // With no history (including the alternate screen), totalPushed
+        // cannot advance the image anchors. Move and clip them explicitly.
+        let saveToHistory = marginTop == 0 && marginBottom == rows - 1 && scrollback.limit > 0
         if saveToHistory {
             for row in 0..<count { scrollback.push(lines[row]) }
             lines.rotateUp(count)
             return
         }
-        for row in marginTop..<(marginBottom - count + 1) {
-            lines[row] = lines[row + count]
-        }
-        for row in (marginBottom - count + 1)...marginBottom {
-            lines[row] = Line()
-        }
+        imagePlacements.scrollRegion(top: marginTop, bottom: marginBottom, delta: count,
+            scrollbackTotal: scrollback.totalPushed, cellPixelHeight: cellPixelHeight)
+        lines.rotate(top: marginTop, bottom: marginBottom, by: count)
     }
 
     /// SD: nothing enters scrollback — scrolling down creates no history.
     public mutating func scrollDown(_ count: Int) {
         let count = min(max(0, count), marginBottom - marginTop + 1)
         guard count > 0 else { return }
-        var row = marginBottom
-        while row >= marginTop + count {
-            lines[row] = lines[row - count]
-            row -= 1
-        }
-        while row >= marginTop {
-            lines[row] = Line()
-            row -= 1
-        }
+        imagePlacements.scrollRegion(top: marginTop, bottom: marginBottom, delta: -count,
+            scrollbackTotal: scrollback.totalPushed, cellPixelHeight: cellPixelHeight)
+        lines.rotate(top: marginTop, bottom: marginBottom, by: -count)
     }
 
     // MARK: - Editing

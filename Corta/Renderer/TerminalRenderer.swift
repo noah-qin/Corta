@@ -89,9 +89,11 @@ public nonisolated final class TerminalRenderer {
     /// other check.
     private var cachedIndexedOverridesGeneration: UInt64 = 0
     private var indexedOverrides: IndexedColorOverrides = [:]
-    /// The delta is how far a whole-screen scroll shifted: shift the cache
-    /// instead of rebuilding (`applyScrollShift`).
-    private var cachedLinesRotated: UInt64 = 0
+    /// Journal sequence within cachedLinesGeneration, replayed in order.
+    private var cachedScrollEventsTotal: UInt64 = 0
+    private var cachedDocumentTop = 0
+    /// Newly exposed history rows must rebuild even when their value is blank.
+    private var invalidRows: [Bool] = []
     private var cachedCursor: Cursor?
     private var cachedCursorStyle: CursorStyle?
     private var cachedCursorVisible = false
@@ -184,6 +186,9 @@ public nonisolated final class TerminalRenderer {
     /// Rows in the cached frame: the grid height `draw` lays out.
     var cachedRowCount: Int { cachedLines.count }
 
+    /// Per-row counts as well as instance order belong to the cache contract.
+    var cachedInstanceCounts: [[Int]] { [backgroundCounts, glyphCounts, colorGlyphCounts] }
+
     /// The cached instances — background, glyphs, colour glyphs — so an
     /// incremental build can be compared with a full one.
     var cachedInstances: [[QuadInstance]] {
@@ -258,8 +263,8 @@ public nonisolated final class TerminalRenderer {
         return true
     }
 
-    /// `false`: the cache still matches and the frame can be skipped. A
-    /// changed offset or size is a full rebuild.
+    /// `false`: the cache still matches and the frame can be skipped. Size
+    /// changes rebuild; scrolling shifts the retained document rows.
     @discardableResult
     func updateInstances(
         grid: Grid, scrollOffset: Int, cursorVisible: Bool, selection: TerminalSelection?,
@@ -277,9 +282,8 @@ public nonisolated final class TerminalRenderer {
             needsFullRebuild
             || cachedLines.count != grid.rows
             || cachedColumns != grid.columns
-            || cachedOffset != offset
-            || (offset > 0 && cachedScrollbackTotalPushed != grid.scrollback.totalPushed)
-            || (offset == 0 && cachedLinesGeneration != grid.linesGeneration)
+            || cachedLinesGeneration != grid.linesGeneration
+            || (cachedOffset > 0 && cachedDocumentTop < grid.scrollback.totalPushed - grid.scrollback.count)
             || cachedIndexedOverridesGeneration != indexedOverridesGeneration
 
         var changed = fullRebuild
@@ -306,7 +310,7 @@ public nonisolated final class TerminalRenderer {
             rowsChanged = true
         }
 
-        if fullRebuild || !Self.selectionsEqual(cachedSelection, selection)
+        if fullRebuild || cachedOffset != offset || !Self.selectionsEqual(cachedSelection, selection)
             || grid.cursor != cachedCursor || effectiveCursorStyle != cachedCursorStyle
             || cursorVisible != cachedCursorVisible
             // Both are anchored to the scrollback, so output moves them.
@@ -327,10 +331,9 @@ public nonisolated final class TerminalRenderer {
         cachedOffset = offset
         cachedScrollbackTotalPushed = grid.scrollback.totalPushed
         cachedIndexedOverridesGeneration = indexedOverridesGeneration
-        if offset == 0 {
-            cachedLinesGeneration = grid.linesGeneration
-            cachedLinesRotated = grid.linesRotated
-        }
+        cachedLinesGeneration = grid.linesGeneration
+        cachedScrollEventsTotal = grid.scrollEventsTotal
+        cachedDocumentTop = grid.scrollback.totalPushed - offset
         // Decodes are scheduled here, never in `draw`; an image delete changes
         // no cell, so it registers as damage here or not at all.
         if cachedImagePlacements.revision != grid.imagePlacements.revision {
@@ -460,6 +463,8 @@ public nonisolated final class TerminalRenderer {
             cachedRevisions.append(liveScreen ? grid.lineRevision(row) : 0)
         }
         overlayCount = 0
+        invalidRows.removeAll(keepingCapacity: true)
+        invalidRows.append(contentsOf: repeatElement(false, count: grid.rows))
         lastRebuiltRowCount = grid.rows
     }
 
@@ -472,9 +477,9 @@ public nonisolated final class TerminalRenderer {
     /// a single `UInt64` compare, instead of a full `Line` comparison —
     /// see the type's doc comment and
     /// `ScreenLines.swift`. Scrolled into history, rows are immutable
-    /// scrollback storage with no revision to compare, so that path is
-    /// unchanged: `visibleLine` is fetched and compared by value every row,
-    /// every call, same as the whole cache always did.
+    /// scrollback storage with no revision to compare. Retained history rows
+    /// compare only their mutable mark; live/history transitions and the live
+    /// portion of a partly scrolled viewport still compare cells by value.
     private func rebuildDamagedRows(
         grid: Grid, offset: Int, previousBlockCursor: BlockCursor?
     ) -> Bool {
@@ -482,26 +487,40 @@ public nonisolated final class TerminalRenderer {
         var glyphStart = 0
         var colorGlyphStart = 0
         let liveScreen = offset == 0
-        var shifted = 0
-        if liveScreen {
-            let rotated = grid.linesRotated - cachedLinesRotated
-            // `< grid.rows`: at or past a full screen's worth, nothing
-            // survived to shift — every row differs anyway, and the normal
-            // per-row loop below rebuilds them all just as a full rebuild
-            // would, only row by row instead of in one pass.
-            if rotated > 0, rotated < UInt64(grid.rows) {
-                shifted = Int(rotated)
-                applyScrollShift(shifted, cellHeight: Float(metrics.cellHeight))
+        var shifted = false
+        var retainedHistoryRows = min(grid.rows, max(0, cachedOffset))
+        var oldCursorRow = previousBlockCursor?.row ?? -1
+        func shift(top: Int, bottom: Int, delta: Int) {
+            applyShift(top: top, bottom: bottom, delta: delta, cellHeight: Float(metrics.cellHeight))
+            shifted = true
+            if oldCursorRow >= top && oldCursorRow <= bottom {
+                oldCursorRow -= delta
+                if oldCursorRow < top || oldCursorRow > bottom { oldCursorRow = -1 }
             }
         }
-        // The block cursor is baked into its row: rebuild the row it left —
-        // where a shift carried it — and the row it is on, which may hold
-        // content shifted in from below without it.
+        if liveScreen && cachedOffset == 0 {
+            if grid.scrollEventsTotal >= cachedScrollEventsTotal,
+                grid.scrollEventsTotal - cachedScrollEventsTotal <= 64 {
+                for sequence in cachedScrollEventsTotal..<grid.scrollEventsTotal {
+                    if let event = grid.scrollEvent(at: sequence) {
+                        shift(top: Int(event.top), bottom: Int(event.bottom), delta: Int(event.delta))
+                    }
+                }
+            }
+            // Overflow: ordinary revision comparison remains correct; old cached
+            // rows have not moved, so the old cursor also remains in its old row.
+        } else {
+            let delta = grid.scrollback.totalPushed - offset - cachedDocumentTop
+            if delta != 0 {
+                shift(top: 0, bottom: grid.rows - 1, delta: delta)
+                retainedHistoryRows = max(0, min(grid.rows, retainedHistoryRows - delta))
+            }
+        }
         forcedRowA = -1
         forcedRowB = -1
-        if previousBlockCursor != blockCursor || shifted > 0 {
-            if let previousBlockCursor { forcedRowA = previousBlockCursor.row - shifted }
-            if let blockCursor { forcedRowB = blockCursor.row }
+        if previousBlockCursor != blockCursor || shifted {
+            forcedRowA = oldCursorRow
+            forcedRowB = blockCursor?.row ?? -1
         }
         rowBackground.removeAll(keepingCapacity: true)
         rowGlyphs.removeAll(keepingCapacity: true)
@@ -510,12 +529,17 @@ public nonisolated final class TerminalRenderer {
         for row in 0..<grid.rows {
             let revision = liveScreen ? grid.lineRevision(row) : 0
             let forced = row == forcedRowA || row == forcedRowB
-            // `!liveScreen` always re-checks by value below: history rows
-            // carry no revision to compare.
-            let possiblyChanged = forced || !liveScreen || revision != cachedRevisions[row]
+            // Retained history cells never change; only marks can be edited.
+            // A formerly live row may have changed before entering history,
+            // so compare that transition by value rather than assuming it froze.
+            let unchangedHistory = !liveScreen && row < offset && row < retainedHistoryRows
+                && !invalidRows[row]
+                && grid.scrollback.mark(at: grid.scrollback.count - offset + row) == cachedLines[row].mark
+            let possiblyChanged = forced || invalidRows[row]
+                || (liveScreen ? revision != cachedRevisions[row] : !unchangedHistory)
             if possiblyChanged {
                 let line = Self.visibleLine(grid: grid, row: row, offset: offset)
-                if liveScreen || forced || line != cachedLines[row] {
+                if liveScreen || forced || invalidRows[row] || line != cachedLines[row] {
                     let rebuilt = RebuiltRow(
                         row: row, background: rowBackground.count..<rowBackground.count,
                         glyphs: rowGlyphs.count..<rowGlyphs.count,
@@ -533,6 +557,7 @@ public nonisolated final class TerminalRenderer {
                     rebuiltRows.append(finished)
                     cachedLines[row] = line
                     cachedRevisions[row] = revision
+                    invalidRows[row] = false
                 }
             }
             backgroundStart += backgroundCounts[row]
@@ -540,7 +565,7 @@ public nonisolated final class TerminalRenderer {
             colorGlyphStart += colorGlyphCounts[row]
         }
         lastRebuiltRowCount = rebuiltRows.count
-        guard !rebuiltRows.isEmpty else { return false }
+        guard !rebuiltRows.isEmpty else { return shifted }
         place(
             into: &cachedBackground, counts: &backgroundCounts, from: rowBackground,
             ranges: \.background, starts: \.cachedBackgroundStart)
@@ -601,50 +626,55 @@ public nonisolated final class TerminalRenderer {
         swap(&cached, &spliceBuffer)
     }
 
-    /// Reflects a whole-screen scroll of `count` rows (`Grid.scrollUp`'s
-    /// history-saving path, `ScreenLines.rotateUp`) onto the cache without
-    /// rebuilding every retained row's instances from scratch: their
-    /// content did not change, only which screen row shows it, so shifting
-    /// each surviving instance's Y coordinate by `count` cells is a bulk
-    /// arithmetic pass rather than a Core Text/atlas lookup per cell.
-    ///
-    /// Only the `count` rows this exposes at the bottom need a real
-    /// rebuild — their cached revision is set to a sentinel no real row can
-    /// ever have, so the per-row loop that runs immediately after this
-    /// unconditionally treats them as changed, exactly like any other
-    /// damaged row. A row among the *retained* ones that also happens to
-    /// have changed in the same batch (a scroll followed by an edit
-    /// somewhere further up) is caught the same way: its shifted-over
-    /// cached revision no longer matches `grid.lineRevision` at its new
-    /// position, so the per-row loop rebuilds it too, on top of the shift.
-    private func applyScrollShift(_ count: Int, cellHeight: Float) {
-        let droppedBackground = backgroundCounts[0..<count].reduce(0, +)
-        let droppedGlyphs = glyphCounts[0..<count].reduce(0, +)
-        let droppedColorGlyphs = colorGlyphCounts[0..<count].reduce(0, +)
-        cachedBackground.removeFirst(droppedBackground)
-        cachedGlyphs.removeFirst(droppedGlyphs)
-        cachedColorGlyphs.removeFirst(droppedColorGlyphs)
-        backgroundCounts.removeFirst(count)
-        glyphCounts.removeFirst(count)
-        colorGlyphCounts.removeFirst(count)
-        cachedLines.removeFirst(count)
-        cachedRevisions.removeFirst(count)
-
-        // The overlay (the tail) does not shift: row positions are fixed, only
-        // their content scrolls, and the overlay rebuilds on its own changes.
-        let shift = Float(count) * cellHeight
-        let rowInstanceCount = cachedBackground.count - overlayCount
-        for i in 0..<rowInstanceCount { cachedBackground[i].origin.y -= shift }
-        for i in cachedGlyphs.indices { cachedGlyphs[i].origin.y -= shift }
-        for i in cachedColorGlyphs.indices { cachedColorGlyphs[i].origin.y -= shift }
-
-        for _ in 0..<count {
-            backgroundCounts.append(0)
-            glyphCounts.append(0)
-            colorGlyphCounts.append(0)
-            cachedLines.append(Line())
-            // Real revisions never reach `.max`, so these rows always rebuild.
-            cachedRevisions.append(.max)
+    /// Retained instances keep their atlas coordinates and move only in Y.
+    /// Exposed rows are invalidated; overlays outside the region stay fixed.
+    private func applyShift(top: Int, bottom: Int, delta: Int, cellHeight: Float) {
+        guard delta != 0 else { return }
+        let height = bottom - top + 1
+        let count = min(abs(delta), height)
+        let retained = delta > 0 ? (top + count)..<(bottom + 1) : top..<(bottom - count + 1)
+        let shiftY = Float(delta) * cellHeight
+        func moveInstances(_ instances: inout [QuadInstance], counts: inout [Int]) {
+            let regionStart = counts[..<top].reduce(0, +)
+            let regionEnd = regionStart + counts[top...bottom].reduce(0, +)
+            let keptStart = counts[..<retained.lowerBound].reduce(0, +)
+            let keptEnd = keptStart + counts[retained].reduce(0, +)
+            // Delete the discarded ends in place. The overlay tail is outside
+            // regionEnd and never moves in Y, even when its array index changes.
+            instances.removeSubrange(keptEnd..<regionEnd)
+            instances.removeSubrange(regionStart..<keptStart)
+            for i in regionStart..<(regionStart + keptEnd - keptStart) {
+                instances[i].origin.y -= shiftY
+            }
+            if delta > 0 {
+                for row in top..<(bottom - count + 1) { counts[row] = counts[row + count] }
+                for row in (bottom - count + 1)...bottom { counts[row] = 0 }
+            } else {
+                for row in stride(from: bottom, through: top + count, by: -1) { counts[row] = counts[row - count] }
+                for row in top..<(top + count) { counts[row] = 0 }
+            }
+        }
+        moveInstances(&cachedBackground, counts: &backgroundCounts)
+        moveInstances(&cachedGlyphs, counts: &glyphCounts)
+        moveInstances(&cachedColorGlyphs, counts: &colorGlyphCounts)
+        if delta > 0 {
+            for row in top..<(bottom - count + 1) {
+                cachedLines[row] = cachedLines[row + count]
+                cachedRevisions[row] = cachedRevisions[row + count]
+                invalidRows[row] = invalidRows[row + count]
+            }
+        } else {
+            for row in stride(from: bottom, through: top + count, by: -1) {
+                cachedLines[row] = cachedLines[row - count]
+                cachedRevisions[row] = cachedRevisions[row - count]
+                invalidRows[row] = invalidRows[row - count]
+            }
+        }
+        let exposed = delta > 0 ? (bottom - count + 1)...bottom : top...(top + count - 1)
+        for row in exposed {
+            cachedLines[row] = Line()
+            cachedRevisions[row] = .max
+            invalidRows[row] = true
         }
     }
 

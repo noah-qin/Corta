@@ -87,6 +87,7 @@ extension TerminalView {
         }
         keyCodesDelivered.insert(event.keyCode)
         // Starts the keypress-to-pixel trace (`InputLatencySignposts`).
+        noteUserInput()
         noteKeystrokeForMetrics(at: event.timestamp)
         InputLatencySignposts.measure(.keyDown) { onKeyBytes?(bytes) }
     }

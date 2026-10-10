@@ -245,5 +245,36 @@ struct KittyGraphicsClearTests {
         terminal.feed(Array("\u{1B}[3J".utf8))
         #expect(Self.placementIDs(terminal).isEmpty)
     }
+    @Test func regionScrollMovesAndPermanentlyClipsContainedImages() throws {
+        var terminal = Terminal(rows: 8, columns: 20)
+        terminal.feed(Array("\u{1B}[3;1H".utf8))
+        terminal.feed(Self.place(id: 1, rows: 2))
+        // A second placement straddles the top margin and must stay fixed.
+        terminal.feed(Array("\u{1B}[1;1H".utf8))
+        terminal.feed(Self.place(id: 2, rows: 3))
+        terminal.feed(Array("\u{1B}[2;7r\u{1B}[2S".utf8))
+        var placements = terminal.grid.imagePlacements.orderedPlacements()
+        var image = try #require(placements.first { $0.imageID.rawValue == 1 })
+        #expect(image.row == 1 && image.rows == 1)
+        #expect(image.sourceTop == 0.5 && image.sourceBottom == 1)
+        #expect(placements.first { $0.imageID.rawValue == 2 }?.row == 0)
+        terminal.feed(Array("\u{1B}[T".utf8))
+        placements = terminal.grid.imagePlacements.orderedPlacements()
+        image = try #require(placements.first { $0.imageID.rawValue == 1 })
+        #expect(image.row == 2 && image.rows == 1 && image.sourceTop == 0.5)
+        terminal.feed(Array("\u{1B}[6S".utf8))
+        #expect(!terminal.grid.imagePlacements.orderedPlacements().contains { $0.imageID.rawValue == 1 })
+    }
+
+    @Test func regionScrollClipsTheBottomSourceInterval() throws {
+        var terminal = Terminal(rows: 8, columns: 20)
+        terminal.feed(Array("\u{1B}[5;1H".utf8))
+        terminal.feed(Self.place(id: 1, rows: 2))
+        terminal.feed(Array("\u{1B}[2;7r\u{1B}[2T".utf8))
+        let image = try #require(terminal.grid.imagePlacements.orderedPlacements().first)
+        #expect(image.row == 6 && image.rows == 1)
+        #expect(image.sourceTop == 0 && image.sourceBottom == 0.5)
+    }
+
 }
 

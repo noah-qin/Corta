@@ -101,7 +101,8 @@ final class PanePointer: NSObject {
             self?.session?.sgrMouseTrackingMode ?? .off
         }
         view.mouseOverrideModifier = ConfigurationStore.shared.configuration.mouseOverrideModifier
-        view.onMouseBytes = { [weak self] bytes in
+        view.onMouseBytes = { [weak self, weak view] bytes in
+            view?.noteUserInput()
             self?.session?.write(bytes)
         }
         view.cursorRectProvider = { [weak self] in

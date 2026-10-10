@@ -251,7 +251,9 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
         let chunks = Paste.chunks(
             for: Paste.sanitized(text), bracketedPasteEnabled: bracketed, trailer: run ? [0x0D] : [])
         switch session.write(paste: chunks, closing: Paste.closing(bracketedPasteEnabled: bracketed)) {
-        case .accepted: return true
+        case .accepted:
+            host?.terminalView?.noteUserInput()
+            return true
         case .backpressured, .stopped, .failed: return false
         }
     }

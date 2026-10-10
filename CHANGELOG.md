@@ -10,8 +10,28 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Changed
+
+- Scrolling output reuses screen row buffers and avoids a trim-induced copy
+  when pushing rows into history. Region and history scrolling reuse retained
+  render instances; output while anchored in history no longer rebuilds the
+  entire visible screen.
+- Typing, committed IME text, paste and mouse reports temporarily lift frame
+  throttles and request the panel's maximum refresh rate. Critical thermal
+  pressure still limits both typing and scrolling; actual 120 Hz cadence and
+  energy impact require a panel unavailable in this validation. The 60 Hz
+  power-mode measurements and idle/flood CPU checks are recorded.
+
 ### Fixed
 
+- Directory completion hints are hidden while an input method composes text,
+  so they no longer overlap the preedit text or candidate panel.
+- Idle PTY readers wait for data or an explicit close signal instead of waking
+  every 250 ms. Closing still interrupts a silent reader without releasing a
+  descriptor while it is in use.
+- Kitty images contained in scroll regions move with the text and retain only
+  their visible source pixels when clipped by a margin. This also applies to
+  full-screen scrolling in the alternate screen or with scrollback disabled.
 - With View ▸ Show Tab Bar on, a new window opens at the configured `rows`
   instead of two or three rows short: the tab bar is now counted in the
   window's height before the window appears.

@@ -17,6 +17,7 @@
 import Foundation
 import Metal
 import OSLog
+import QuartzCore
 import Synchronization
 
 /// Per-frame render timing in fixed-size buffers, summarised as
@@ -31,9 +32,24 @@ import Synchronization
 /// sandboxed runner that cannot read the unified log — gets the numbers.
 nonisolated enum RenderMetrics {
     enum Metric: String, CaseIterable {
+        case keyDelivery
+        case keypressToOutput
+        case presentationSlip
+        case echoToMain
+        case mainToFrame
+        case frameToGlass
+        case wakeHop
+        case callbackLead
+        /// Presentation lead on the first tick after a paused link resumes.
+        case firstAfterResume
+        case resumeToCallback
+        case frameInterval
         case drawableWait
         case cpuFrame
         case gpu
+        /// Metal's execution timestamps, independent of callback scheduling.
+        case gpuExecution
+        case gpuFeedbackDelay
         /// HID timestamp → the first frame with the echo on the glass
         /// (`MTLDrawable.presentedTime`); see `noteKeystroke`.
         case keypressToPresent
@@ -56,6 +72,18 @@ nonisolated enum RenderMetrics {
     private struct State {
         var samples: [Metric: [Double]] = [:]
         var pending: PendingKeystroke?
+        var conditions: Conditions?
+    }
+
+    private struct Conditions: Sendable {
+        var minimum: Float
+        var maximum: Float
+        var preferred: Float?
+        var lowPower: Bool
+
+        var description: String {
+            "rate=\(minimum)/\(maximum)/\(preferred.map { String($0) } ?? "default")Hz lowPower=\(lowPower)"
+        }
     }
 
     private static let state = Mutex(State())
@@ -71,7 +99,13 @@ nonisolated enum RenderMetrics {
             // In place: a copy out of the dictionary would copy the ring per
             // sample.
             state.samples[metric, default: []].append(milliseconds)
-            let limit = metric == .keypressToPresent ? keystrokeCapacity : capacity
+            let limit: Int
+            switch metric {
+            case .keypressToPresent, .keyDelivery, .keypressToOutput, .presentationSlip, .echoToMain, .mainToFrame, .frameToGlass, .wakeHop, .callbackLead, .firstAfterResume, .resumeToCallback, .frameInterval:
+                limit = keystrokeCapacity
+            case .drawableWait, .cpuFrame, .gpu, .gpuExecution, .gpuFeedbackDelay:
+                limit = capacity
+            }
             guard let values = state.samples[metric], values.count >= limit else { return nil }
             state.samples[metric] = []
             return values
@@ -90,6 +124,13 @@ nonisolated enum RenderMetrics {
         return result
     }
 
+    static func noteConditions(minimum: Float, maximum: Float, preferred: Float?, lowPower: Bool) {
+        guard isEnabled else { return }
+        state.withLock {
+            $0.conditions = Conditions(minimum: minimum, maximum: maximum, preferred: preferred, lowPower: lowPower)
+        }
+    }
+
     private static func dump(metric: Metric, values: [Double]) {
         let sorted = values.sorted()
         let count = sorted.count
@@ -98,13 +139,14 @@ nonisolated enum RenderMetrics {
         let p95 = sorted[min(count - 1, Int(Double(count) * 0.95))]
         let p99 = sorted[min(count - 1, Int(Double(count) * 0.99))]
         let max = sorted[count - 1]
+        let conditions = state.withLock { $0.conditions }?.description ?? "conditions=unavailable"
         os_log(
-            "%{public}@: n=%{public}d avg=%{public}.2fms p50=%{public}.2fms p95=%{public}.2fms p99=%{public}.2fms max=%{public}.2fms",
-            log: log, type: .default, metric.rawValue, count, avg, p50, p95, p99, max)
+            "%{public}@: n=%{public}d avg=%{public}.2fms p50=%{public}.2fms p95=%{public}.2fms p99=%{public}.2fms max=%{public}.2fms %{public}@",
+            log: log, type: .default, metric.rawValue, count, avg, p50, p95, p99, max, conditions)
         if let outputFile {
             let line = String(
-                format: "%@: n=%d avg=%.2fms p50=%.2fms p95=%.2fms p99=%.2fms max=%.2fms\n",
-                metric.rawValue, count, avg, p50, p95, p99, max)
+                format: "%@: n=%d avg=%.2fms p50=%.2fms p95=%.2fms p99=%.2fms max=%.2fms %@\n",
+                metric.rawValue, count, avg, p50, p95, p99, max, conditions)
             append(line, to: outputFile)
         }
     }
@@ -132,6 +174,8 @@ nonisolated enum RenderMetrics {
     private struct PendingKeystroke: Sendable {
         var timestamp: TimeInterval
         var outputLanded = false
+        var outputAt: TimeInterval?
+        var mainAt: TimeInterval?
         /// Asks the pane for another frame (`TerminalView.setNeedsRedraw`).
         var requestFrame: @Sendable () -> Void
     }
@@ -143,6 +187,7 @@ nonisolated enum RenderMetrics {
     /// the glass (see `notePresent`).
     static func noteKeystroke(at timestamp: TimeInterval, requestFrame: @escaping @Sendable () -> Void) {
         guard isEnabled else { return }
+        record(.keyDelivery, milliseconds: (CACurrentMediaTime() - timestamp) * 1000)
         state.withLock { $0.pending = PendingKeystroke(timestamp: timestamp, requestFrame: requestFrame) }
     }
 
@@ -150,7 +195,31 @@ nonisolated enum RenderMetrics {
     /// taken as its echo.
     static func noteOutputForKeystroke() {
         guard isEnabled else { return }
-        state.withLock { $0.pending?.outputLanded = true }
+        let elapsed: Double? = state.withLock { state in
+            guard let pending = state.pending, !pending.outputLanded else { return nil }
+            let now = CACurrentMediaTime()
+            state.pending?.outputLanded = true
+            state.pending?.outputAt = now
+            return (now - pending.timestamp) * 1000
+        }
+        if let elapsed { record(.keypressToOutput, milliseconds: elapsed) }
+    }
+
+    static func noteMainHopForKeystroke() {
+        guard isEnabled else { return }
+        state.withLock { state in
+            guard state.pending?.outputLanded == true, state.pending?.mainAt == nil else { return }
+            state.pending?.mainAt = CACurrentMediaTime()
+        }
+    }
+
+    /// A target is a scheduling timestamp, not the compositor's actual time.
+    static func notePresentationTarget(of drawable: MTLDrawable, at target: TimeInterval) {
+        guard isEnabled else { return }
+        drawable.addPresentedHandler { drawable in
+            guard drawable.presentedTime > 0 else { return }
+            record(.presentationSlip, milliseconds: (drawable.presentedTime - target) * 1000)
+        }
     }
 
     /// Before presenting: if an echo is on the grid, this drawable's presented
@@ -163,6 +232,7 @@ nonisolated enum RenderMetrics {
             return keystroke
         }
         guard let keystroke = landed else { return }
+        let frameAt = CACurrentMediaTime()
         drawable.addPresentedHandler { presented in
             // Zero when the compositor replaced this drawable (about half a burst's
             // frames); re-pend rather than drop, which would flatter the number.
@@ -180,6 +250,11 @@ nonisolated enum RenderMetrics {
             }
             let seconds = presented.presentedTime - keystroke.timestamp
             guard seconds >= 0, seconds < 2 else { return }
+            if let outputAt = keystroke.outputAt, let mainAt = keystroke.mainAt {
+                record(.echoToMain, milliseconds: (mainAt - outputAt) * 1000)
+                record(.mainToFrame, milliseconds: (frameAt - mainAt) * 1000)
+                record(.frameToGlass, milliseconds: (presented.presentedTime - frameAt) * 1000)
+            }
             record(.keypressToPresent, milliseconds: seconds * 1000)
         }
     }

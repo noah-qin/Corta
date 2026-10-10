@@ -85,6 +85,16 @@ public struct Scrollback: Sendable {
         return batches[batchIndex].rows[rowIndex].wrapped
     }
 
+    /// History cells are immutable, but command status may update a mark.
+    /// The renderer checks this metadata without copying an arena row out.
+    public func mark(at index: Int) -> LineMark {
+        guard index >= 0, index < count else { return .none }
+        let global = index + headSkip
+        let batchIndex = global / batchSize, rowIndex = global % batchSize
+        guard batchIndex < batches.count, rowIndex < batches[batchIndex].rows.count else { return .none }
+        return batches[batchIndex].rows[rowIndex].mark
+    }
+
     /// Oldest first: index 0 is the line furthest back in history.
     public subscript(index: Int) -> Line {
         guard index >= 0, index < count else { return Line() }
@@ -117,18 +127,20 @@ public struct Scrollback: Sendable {
 
     public mutating func push(_ line: Line) {
         guard limit > 0 else { return }
-        var line = line
-        line.trimTrailingBlanks()
+        let length = line.trimmedCount
 
         if batches.isEmpty || batches[batches.count - 1].rows.count >= batchSize {
-            batches.append(Batch())
+            var batch = Batch()
+            batch.arena.reserveCapacity(batches.last?.arena.count ?? 0)
+            batch.rows.reserveCapacity(batchSize)
+            batches.append(batch)
         }
         let tailIndex = batches.count - 1
         let start = Int32(batches[tailIndex].arena.count)
-        batches[tailIndex].arena.append(contentsOf: line.cells)
+        batches[tailIndex].arena.append(contentsOf: line.cells[..<length])
         batches[tailIndex].rows.append(
             RowSpan(
-                start: start, length: Int32(line.count), wrapped: line.wrapped, mark: line.mark))
+                start: start, length: Int32(length), wrapped: line.wrapped, mark: line.mark))
 
         totalPushed += 1
         if count < limit {

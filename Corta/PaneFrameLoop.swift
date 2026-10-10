@@ -72,6 +72,7 @@ final class PaneFrameLoop {
     var content: ((_ hasOutput: Bool) -> Content?)?
     /// Asks the view for a vsync (`TerminalView.setNeedsRedraw`).
     var onNeedsDisplay: (() -> Void)?
+    private var renderEchoOnDemand: (() -> Bool)?
     var onRenderingFailure: ((any Error) -> Void)?
     private var renderingStopped = false
     private var feedback = GPUFrameFeedback()
@@ -105,6 +106,7 @@ final class PaneFrameLoop {
 
     /// Makes `view`'s display link drive this loop.
     func install(on view: TerminalView) {
+        renderEchoOnDemand = { [weak view] in view?.renderEchoOnDemand() ?? false }
         view.onRenderFrame = { [weak self] drawableSize, drawable in
             guard let self else {
                 // Never hold a drawable: an unpresented one is never recycled.
@@ -209,12 +211,18 @@ final class PaneFrameLoop {
         RenderMetrics.noteOutputForKeystroke()
         guard wake.noteOutput() else { return }
         // Measured apart: a busy main thread lengthens this stage.
+        let wakeStart = RenderMetrics.isEnabled ? DispatchTime.now().uptimeNanoseconds : nil
         let interval = InputLatencySignposts.begin(.wake)
         // On the keypress-to-pixel chain; the default priority has no claim.
         Task(priority: .userInitiated) { @MainActor [weak self] in
+            if let wakeStart {
+                RenderMetrics.record(.wakeHop, milliseconds:
+                    Double(DispatchTime.now().uptimeNanoseconds - wakeStart) / 1_000_000)
+            }
+            RenderMetrics.noteMainHopForKeystroke()
             InputLatencySignposts.end(.wake, interval)
             guard let self, self.generation == generation else { return }
-            self.onNeedsDisplay?()
+            if self.renderEchoOnDemand?() != true { self.onNeedsDisplay?() }
         }
     }
 

@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import AppKit
 import Carbon.HIToolbox
 import Darwin
 import XCTest
@@ -46,10 +47,12 @@ final class MeasurementUITests: XCTestCase {
     /// read — so the app creates the file and removes it on request.
     private var metricsFile: URL!
     private var previousInputSource: TISInputSource?
+    private var measurementStage: URL!
 
     override func setUpWithError() throws {
         continueAfterFailure = false
-        metricsFile = URL(fileURLWithPath: "/private/tmp/corta-measure-\(UUID().uuidString).log")
+        measurementStage = try UIFixtures.stage("measurement")
+        metricsFile = measurementStage.appendingPathComponent("metrics-\(UUID().uuidString).log")
         // Commands are typed; a CJK input method would compose them.
         previousInputSource = LatinInputSource.select()
         report(Self.environmentHeader())
@@ -120,12 +123,41 @@ final class MeasurementUITests: XCTestCase {
                 options: Self.fourSecondSamples) {
             pause(4)
         }
+        // Read the latest full rings while every producer is still running.
+        // Stopping panes one by one can fill another ring with a changing
+        // workload, so its tail is not an N-pane steady-state measurement.
+        let lines = try waitForMetrics(["cpuFrame", "gpu"], timeout: 10)
+        report(lines.map { "\(panes)-pane flood \($0)" })
         for centre in centres {
             app.windows.firstMatch.coordinate(withNormalizedOffset: centre).click()
             app.typeKey("c", modifierFlags: .control)
         }
-        let lines = try waitForMetrics(["cpuFrame", "gpu"], timeout: 10)
-        report(lines.map { "\(panes)-pane flood \($0)" })
+        removeMetricsFile(through: app)
+        app.terminate()
+    }
+
+    /// Interactive only: kept out of background runs like the other UI
+    /// measurements. A region flood and a sustained history gesture each
+    /// fill their own frame/GPU rings.
+    @MainActor
+    func testRegionAndHistoryScrolling() throws {
+        var app = try launchSettled()
+        app.typeText("printf '\\033[1;39r'; while :; do printf 'region line\\r\\n'; done\n")
+        pause(22)
+        app.typeKey("c", modifierFlags: .control)
+        report(try waitForMetrics(["cpuFrame", "gpu"], timeout: 10).map { "region scroll \($0)" })
+        app.typeText("printf '\\033[r'\n")
+        removeMetricsFile(through: app)
+        app.terminate()
+
+        app = try launchSettled()
+        app.typeText("i=0; while [ $i -lt 10000 ]; do printf 'history %s\\r\\n' \"$i\"; i=$((i+1)); done\n")
+        pause(3)
+        for _ in 0..<800 {
+            app.windows.firstMatch.scroll(byDeltaX: 0, deltaY: 20)
+            pause(0.03)
+        }
+        report(try waitForMetrics(["cpuFrame", "gpu"], timeout: 10).map { "history scroll \($0)" })
         removeMetricsFile(through: app)
         app.terminate()
     }
@@ -185,6 +217,26 @@ final class MeasurementUITests: XCTestCase {
         app.terminate()
     }
 
+    /// Launched-app checks for the input/render path, kept out of CI.
+    @MainActor
+    func testMenuPaste() throws {
+        let app = try launchSettled(renderMetrics: false)
+        defer { app.terminate() }
+        let clipboard = NSPasteboard.general
+        let saved = (clipboard.pasteboardItems ?? []).map { item -> NSPasteboardItem in
+            let copy = NSPasteboardItem()
+            for type in item.types { if let data = item.data(forType: type) { copy.setData(data, forType: type) } }
+            return copy
+        }
+        addTeardownBlock { clipboard.clearContents(); clipboard.writeObjects(saved) }
+        clipboard.clearContents()
+        clipboard.setString("paste-check-280", forType: .string)
+        app.typeKey("v", modifierFlags: .command)
+        pause(0.5)
+        XCTAssertTrue((app.textViews.firstMatch.value as? String)?.contains("paste-check-280") == true)
+        app.typeKey("c", modifierFlags: .control)
+    }
+
     // MARK: - Harness
 
     private static var fourSecondSamples: XCTMeasureOptions {
@@ -195,7 +247,7 @@ final class MeasurementUITests: XCTestCase {
 
     @MainActor
     private func makeApp(renderMetrics: Bool = true) -> XCUIApplication {
-        let app = XCUIApplication()
+        let app = UIFixtures.app(stage: measurementStage, runner: Self.self)
         // Session restore would carry the previous test's windows in.
         app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
         // No rc files: the prompt is up at once and nothing redraws around
@@ -203,7 +255,7 @@ final class MeasurementUITests: XCTestCase {
         app.launchEnvironment["SHELL"] = "/bin/sh"
         if renderMetrics { app.launchEnvironment["CORTA_RENDER_METRICS"] = metricsFile.path }
         let runner = ProcessInfo.processInfo.environment
-        for key in ["CORTA_MAX_DRAWABLES", "CORTA_FRAME_LATENCY"] {
+        for key in ["CORTA_MAX_DRAWABLES", "CORTA_FRAME_LATENCY", "CORTA_RENDER_METRICS_KEYSTROKES", "CORTA_FRAME_DRIVER"] {
             if let value = runner[key] { app.launchEnvironment[key] = value }
         }
         return app
@@ -213,11 +265,14 @@ final class MeasurementUITests: XCTestCase {
     @MainActor
     private func launchSettled(renderMetrics: Bool = true) throws -> XCUIApplication {
         let app = makeApp(renderMetrics: renderMetrics)
+        addTeardownBlock { app.terminate() }
         app.launch()
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 10), "no window within ten seconds")
         pause(2)
         window.click()
+        _ = LatinInputSource.select()
+        pause(0.5)
         return app
     }
 

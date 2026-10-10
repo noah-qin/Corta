@@ -20,6 +20,37 @@ import Testing
 @testable import Corta
 
 @MainActor struct ShellOverlayTests {
+    @Test func compositionSuppressesCompletionIncludingFrameRefreshes() throws {
+        let view = TerminalView(frame: CGRect(x: 0, y: 0, width: 400, height: 200))
+        let overlay = view.shellOverlay
+        overlay.frame = view.bounds
+        let completion = try #require(DirectoryCompletion(payload: "1;0;p=Doc;Documentation;Documents"))
+        let anchor = CGRect(x: 80, y: 40, width: 8, height: 17)
+        overlay.showCompletion(completion, anchor: anchor)
+        #expect(overlay.completion != nil && !overlay.occupiedRects.isEmpty)
+
+        view.setMarkedText("nihao", selectedRange: NSRange(location: 5, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(view.hasMarkedText())
+        #expect(overlay.completion == nil && overlay.occupiedRects.isEmpty)
+        // A renderer refresh with the shell's previous hint must not put it
+        // back under the IME before the shell receives committed text.
+        overlay.showCompletion(completion, anchor: anchor)
+        #expect(overlay.completion == nil && overlay.occupiedRects.isEmpty)
+
+        view.unmarkText()
+        overlay.showCompletion(completion, anchor: anchor)
+        #expect(overlay.completion != nil)
+        var delivered: [UInt8] = []
+        view.onKeyBytes = { delivered += $0 }
+        view.setMarkedText("nihao", selectedRange: NSRange(location: 5, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0))
+        view.insertText("你好", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(!view.hasMarkedText() && delivered == Array("你好".utf8))
+        overlay.showCompletion(completion, anchor: anchor)
+        #expect(overlay.completion != nil)
+    }
+
     @Test func statusGutterHasTextOutsideTerminalCells() {
         let overlay = ShellOverlayView()
         let rect = CGRect(x: 7, y: 60, width: 2, height: 20)

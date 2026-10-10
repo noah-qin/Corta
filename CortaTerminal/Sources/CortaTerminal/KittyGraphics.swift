@@ -111,6 +111,10 @@ public enum KittyGraphics {
         public var rows: Int?
         public var baseScrollbackTotal: Int
         public var zIndex: Int
+        /// Source UV interval retained after scrolling against a page margin.
+        /// Clipping is permanent: a later reverse scroll cannot restore pixels.
+        public internal(set) var sourceTop: Float = 0
+        public internal(set) var sourceBottom: Float = 1
     }
 
     enum Command {

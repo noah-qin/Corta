@@ -715,7 +715,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
             closing: Paste.closing(bracketedPasteEnabled: bracketed))
         {
         case .accepted:
-            break
+            host?.terminalView?.noteUserInput()
         case .backpressured:
             // The child stopped reading; nothing was sent. Say why.
             host?.terminalView?.showToast(L10n.text("toast.pasteStopped"), kind: .warning)

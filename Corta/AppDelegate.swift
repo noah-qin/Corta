@@ -255,6 +255,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// Runs before the first window exists, so it opens with the right theme
     /// rather than re-theming a frame later.
     func applicationWillFinishLaunching(_ notification: Notification) {
+        #if CORTA_HEADLESS_TESTS
+        // Command-line CPU/Metal tests must not activate a window, start a
+        // shell, register a hotkey or alter secure input on the user's desktop.
+        NSApp.setActivationPolicy(.prohibited)
+        return
+        #endif
         AppPaths.pruneStaleTestStages()
         _ = ConfigurationStore.shared
         _ = UpdateController.shared
@@ -269,6 +275,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+        #if CORTA_HEADLESS_TESTS
+        return
+        #endif
         // Off the main thread: a listing of the temporary directory.
         DispatchQueue.global(qos: .utility).async { ZshBootstrap.removeStaleFolders() }
         // The saved arrangement, or one window; restored windows are born in

@@ -18,6 +18,7 @@ import CoreGraphics
 import Foundation
 import Metal
 import OSLog
+import QuartzCore
 import Synchronization
 
 enum Metal4BackendError: Error {
@@ -446,6 +447,15 @@ public nonisolated final class Metal4Backend {
             completion.note(frame)
             slotReleased.signal()
             onCompleted?(feedback.error)
+            // Keep the existing submission-to-callback metric intact. Native
+            // timestamps distinguish execution from a delayed feedback thread.
+            if RenderMetrics.isEnabled, feedback.gpuStartTime > 0,
+                feedback.gpuEndTime >= feedback.gpuStartTime {
+                RenderMetrics.record(.gpuExecution, milliseconds:
+                    (feedback.gpuEndTime - feedback.gpuStartTime) * 1000)
+                RenderMetrics.record(.gpuFeedbackDelay, milliseconds:
+                    max(0, CACurrentMediaTime() - feedback.gpuEndTime) * 1000)
+            }
         }
         queue.commit([commandBuffer], options: options)
         if let drawable {

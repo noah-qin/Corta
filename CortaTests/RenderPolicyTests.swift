@@ -82,4 +82,52 @@ struct RenderPolicyTests {
         policy.scrollingStateChanged(true)
         #expect(scheduler.preferredFrameRateRange.maximum == 10)
     }
+    @Test func decisionTable() {
+        for fps in [60, 120] {
+            for thermal in [ProcessInfo.ThermalState.nominal, .fair, .serious, .critical] {
+                for lowPower in [false, true] {
+                    for active in [false, true] {
+                        for typing in [false, true] {
+                            for scrolling in [false, true] {
+                                let range = RenderPolicy.range(for: .init(
+                                    isScrolling: scrolling, isTyping: typing, thermalState: thermal,
+                                    isLowPowerModeEnabled: lowPower, isWindowActive: active,
+                                    maximumFramesPerSecond: fps))
+                                if thermal == .critical || (thermal == .serious && !typing && !scrolling) {
+                                    #expect(range.maximum == 20 && range.preferred == 10)
+                                } else if typing || scrolling {
+                                    if fps == 120 {
+                                        #expect(range.minimum == 60 && range.maximum == 120 && range.preferred == 120)
+                                    } else { #expect(range == .default) }
+                                } else if lowPower || !active {
+                                    #expect(range.maximum == 30 && range.preferred == 15)
+                                } else if fps == 120 {
+                                    #expect(range.maximum == 120 && range.preferred == 60)
+                                } else { #expect(range == .default) }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test func typingGraceIsRearmedAndEventuallyExpires() {
+        let scheduler = Self.makeScheduler()
+        var scheduled: [(TimeInterval, DispatchWorkItem)] = []
+        let policy = RenderPolicy(scheduler: scheduler, window: nil,
+            scheduleTypingExpiry: { scheduled.append(($0, $1)) })
+        policy.noteInput()
+        #expect(policy.isTyping)
+        policy.noteInput()
+        #expect(scheduled.count == 2)
+        #expect(scheduled.allSatisfy { $0.0 == RenderPolicy.typingGrace })
+        #expect(scheduled[0].1.isCancelled)
+        // Executing a cancelled item must not expire the rearmed grace.
+        scheduled[0].1.perform()
+        #expect(policy.isTyping)
+        scheduled[1].1.perform()
+        #expect(!policy.isTyping)
+    }
+
 }

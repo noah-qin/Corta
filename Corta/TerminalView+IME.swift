@@ -44,6 +44,7 @@ extension TerminalView: NSTextInputClient {
         clearMarkedText()
         let text = (string as? NSAttributedString)?.string ?? (string as? String) ?? ""
         guard !text.isEmpty else { return }
+        noteUserInput()
         if let event = NSApp.currentEvent { noteKeystrokeForMetrics(at: event.timestamp) }
         InputLatencySignposts.measure(.keyDown) { onKeyBytes?(Array(text.utf8)) }
     }
@@ -61,6 +62,7 @@ extension TerminalView: NSTextInputClient {
             return
         }
         let overlay = markedTextOverlay
+        shellOverlay.isInputComposing = true
         // Re-read each time, so ⌘= / ⌘- mid-composition takes effect.
         if let font = preeditFontProvider?() { overlay.font = font }
         overlay.show(
@@ -86,6 +88,7 @@ extension TerminalView: NSTextInputClient {
         guard existingMarkedTextOverlay?.markedText != nil || inputCompositionRect != nil else { return }
         existingMarkedTextOverlay?.hide()
         inputCompositionRect = nil
+        shellOverlay.isInputComposing = false
         onInputContextChange?()
     }
 
@@ -162,6 +165,7 @@ extension TerminalView: NSTextInputClient {
         default: bytes = nil
         }
         guard let bytes else { return }
+        noteUserInput()
         if let event = NSApp.currentEvent { noteKeystrokeForMetrics(at: event.timestamp) }
         InputLatencySignposts.measure(.keyDown) { onKeyBytes?(bytes) }
     }

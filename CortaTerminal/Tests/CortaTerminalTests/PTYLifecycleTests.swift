@@ -17,6 +17,7 @@
 import Darwin
 import Dispatch
 import Foundation
+import Synchronization
 import Testing
 
 @testable import CortaTerminal
@@ -35,6 +36,33 @@ import Testing
 /// `.serialized` note on `TerminalSessionTests`.
 @Suite("PTY lifecycle", .serialized)
 struct PTYLifecycleTests {
+    @Test("close wakes an indefinite poll without releasing its borrowed number")
+    func closeWakeupRetainsPollDescriptor() throws {
+        let wakeup = try PTYCloseWakeup()
+        let entered = DispatchSemaphore(value: 0)
+        let finished = DispatchSemaphore(value: 0)
+        let observed = Mutex((count: Int32(-1), events: Int16(0), heldOpen: false))
+        DispatchQueue.global().async {
+            _ = wakeup.readEnd.withNumber { fd in
+                entered.signal()
+                var request = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+                let count = poll(&request, 1, -1)
+                observed.withLock {
+                    $0 = (count, request.revents, fcntl(fd, F_GETFD) >= 0)
+                }
+            }
+            finished.signal()
+        }
+        #expect(entered.wait(timeout: .now() + .seconds(10 * testTimeoutScale)) == .success)
+        DispatchQueue.concurrentPerform(iterations: 4) { _ in wakeup.signalAndClose() }
+        #expect(finished.wait(timeout: .now() + .seconds(10 * testTimeoutScale)) == .success)
+        let result = observed.withLock { $0 }
+        #expect(result.count == 1)
+        #expect(result.events & Int16(POLLIN) != 0)
+        #expect(result.heldOpen)
+        wakeup.signalAndClose()  // a repeated close must touch neither number
+    }
+
     // MARK: Descriptor reuse after close
 
     @Test("a write after close cannot leak into a recycled descriptor")
@@ -128,6 +156,7 @@ struct PTYLifecycleTests {
     func repeatedSpawnAndCloseLeaksNoDescriptors() throws {
         for _ in 0..<3 {
             let warmup = try PTY.spawn(executable: "/usr/bin/true")
+            _ = try warmup.waitUntilReadable(timeoutMilliseconds: 0)
             _ = warmup.waitForExit()
             warmup.close()
         }
@@ -136,6 +165,7 @@ struct PTYLifecycleTests {
 
         for _ in 0..<25 {
             let pty = try PTY.spawn(executable: "/usr/bin/true")
+            _ = try pty.waitUntilReadable(timeoutMilliseconds: 0)
             _ = pty.waitForExit()
             pty.close()
         }

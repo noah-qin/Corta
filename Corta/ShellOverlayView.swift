@@ -28,6 +28,11 @@ final class ShellOverlayView: NSView {
     }
     var statuses: [Status] = []
     var completion: DirectoryCompletion?
+    /// Preedit and directory hints share the caret. Keep shell refreshes
+    /// from recreating a hint underneath the input method's native overlay.
+    var isInputComposing = false {
+        didSet { if isInputComposing { hideCompletion() } }
+    }
     private var preview: DirectoryGhostView?
     private var candidateRow: DirectoryCandidateRowView?
     /// Native completion previews occupy space outside the terminal grid.
@@ -49,7 +54,7 @@ final class ShellOverlayView: NSView {
 
     func showCompletion(_ state: DirectoryCompletion?, anchor: CGRect,
         font: NSFont = .monospacedSystemFont(ofSize: 14, weight: .regular), baseline: CGFloat = 12) {
-        guard let state, let suffix = state.previewSuffix, !suffix.isEmpty else {
+        guard !isInputComposing, let state, let suffix = state.previewSuffix, !suffix.isEmpty else {
             completion = nil
             preview?.removeFromSuperview()
             preview = nil
