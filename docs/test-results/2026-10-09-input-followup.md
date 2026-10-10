@@ -481,9 +481,50 @@ All three low-power p95/p99 improve relative to their old counterparts.
 This supports removal of the low-power typing penalty on this 60 Hz panel;
 no 120 Hz, energy, tearing or strict tail/zero-wakeup pass is inferred.
 
+
+## Human driver comparison on verified mains, October 10
+
+Six further physical-input launches completed three DisplayLink → on-demand
+pairs on the same functional PTY-wakeup binary (SHA-256
+`42e7fa41bd1fc243d0aa9105d9a9007b077a90ba553dab4f26ccfb47551a6cf7`,
+functional source `69fd44c`). Built-in 60 Hz, Menlo 14, 120×40, blink off,
+isolated configs and shell echo. Launch, focus and completion snapshots of
+every session report AC Power; AC lowpowermode=0 at launch/completion,
+and all latency rings report lowPower=false. Power is sampled at those
+boundaries, not continuously monitored.
+
+All six windows were prelaunched at the user's request. Each was focused in
+order after the previous process exited, with an automatic close after the
+first complete 200-presentation ring. Other test processes were inactive
+with blink disabled; process count therefore declines across the queue.
+The same launch/close pattern applies in every pair, but does not eliminate
+process-count effects. No scripted key events were sent; the user was
+instructed to type individual digits naturally. Exact physical key count,
+content and cadence were not recorded, so this is physical ordinary-key
+input evidence rather than independently verified digits-only input.
+
+| Pair | DisplayLink p50 / p95 / p99 ms | On-demand p50 / p95 / p99 ms |
+| :--- | :--- | :--- |
+| 1 | 66.38 / 107.69 / 122.48 | 36.78 / 53.06 / 59.88 |
+| 2 | 68.85 / 89.78 / 174.21 | 39.45 / 60.89 / 65.17 |
+| 3 | 69.21 / 84.26 / 168.50 | 39.39 / 59.59 / 66.87 |
+
+Median p50 is **68.85 → 39.39 ms**, an improvement of **29.46 ms**
+(about 1.77 frames at 60 Hz). Every paired p95 and p99 is lower; median
+p95 is **89.78 → 59.59 ms**, p99 **168.50 → 65.17 ms**. This supplies
+the previously missing mains human driver comparison. The earlier unplugged
+series remains separately labelled supplemental. The internal improvement
+agrees in direction and approximate size with the earlier external Typometer
+result; it does not replace its separate build/environment limits.
+All six test processes and watchers exited; the original Pinyin input source
+was verified afterward. DisplayLink remains default because experimental
+flood tails fail their promotion gate. Complete visual/tearing acceptance,
+strict normal-policy tail non-regression, energy and zero-wakeup attribution
+remain unresolved; this positive latency comparison does not pass those.
+
 ## Outstanding acceptance
 
-Human driver typing has completed with the mixed-key limitation above. Scripted and human Normal/Low Power pairs are recorded with the limits above; verified-mains driver comparison, strict normal tails,
+Human driver typing has completed with the mixed-key limitation above. Scripted and human Normal/Low Power pairs are recorded with the limits above; mains driver pairs are also complete; strict normal tails,
 120 Hz if a panel becomes available, flood-tail outliers and Activity Monitor energy
 comparisons, zero-process-wakeup attribution, and the complete
 D14 real-program/IME/windowed/fullscreen visual checklist remain gates. These

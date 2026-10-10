@@ -1942,3 +1942,241 @@ echoToMain: n=200 avg=1.08ms p50=0.18ms p95=4.35ms p99=5.81ms max=6.71ms rate=0.
 mainToFrame: n=200 avg=14.13ms p50=12.44ms p95=16.23ms p99=98.61ms max=98.72ms rate=0.0/0.0/defaultHz lowPower=true
 frameToGlass: n=200 avg=50.67ms p50=49.30ms p95=65.84ms p99=66.22ms max=66.27ms rate=0.0/0.0/defaultHz lowPower=true
 ```
+
+## Human verified-mains driver pairs, October 10
+
+
+## Human driver comparison on verified mains, October 10
+
+Six further physical-input launches completed three DisplayLink → on-demand
+pairs on the same functional PTY-wakeup binary (SHA-256
+`42e7fa41bd1fc243d0aa9105d9a9007b077a90ba553dab4f26ccfb47551a6cf7`,
+functional source `69fd44c`). Built-in 60 Hz, Menlo 14, 120×40, blink off,
+isolated configs and shell echo. Launch, focus and completion snapshots of
+every session report AC Power; AC lowpowermode=0 at launch/completion,
+and all latency rings report lowPower=false. Power is sampled at those
+boundaries, not continuously monitored.
+
+All six windows were prelaunched at the user's request. Each was focused in
+order after the previous process exited, with an automatic close after the
+first complete 200-presentation ring. Other test processes were inactive
+with blink disabled; process count therefore declines across the queue.
+The same launch/close pattern applies in every pair, but does not eliminate
+process-count effects. No scripted key events were sent; the user was
+instructed to type individual digits naturally. Exact physical key count,
+content and cadence were not recorded, so this is physical ordinary-key
+input evidence rather than independently verified digits-only input.
+
+| Pair | DisplayLink p50 / p95 / p99 ms | On-demand p50 / p95 / p99 ms |
+| :--- | :--- | :--- |
+| 1 | 66.38 / 107.69 / 122.48 | 36.78 / 53.06 / 59.88 |
+| 2 | 68.85 / 89.78 / 174.21 | 39.45 / 60.89 / 65.17 |
+| 3 | 69.21 / 84.26 / 168.50 | 39.39 / 59.59 / 66.87 |
+
+Median p50 is **68.85 → 39.39 ms**, an improvement of **29.46 ms**
+(about 1.77 frames at 60 Hz). Every paired p95 and p99 is lower; median
+p95 is **89.78 → 59.59 ms**, p99 **168.50 → 65.17 ms**. This supplies
+the previously missing mains human driver comparison. The earlier unplugged
+series remains separately labelled supplemental. The internal improvement
+agrees in direction and approximate size with the earlier external Typometer
+result; it does not replace its separate build/environment limits.
+All six test processes and watchers exited; the original Pinyin input source
+was verified afterward. DisplayLink remains default because experimental
+flood tails fail their promotion gate. Complete visual/tearing acceptance,
+strict normal-policy tail non-regression, energy and zero-wakeup attribution
+remain unresolved; this positive latency comparison does not pass those.
+
+### driver-ac-01-displaylink
+
+```json
+{
+  "kind": "human",
+  "completedUTC": "2026-10-10T07:56:32.942212+00:00",
+  "stage": "driver-ac-01-displaylink",
+  "pid": 3979,
+  "automaticClosure": "first complete 200-presentation ring",
+  "summaries": [
+    "keypressToPresent: n=200 avg=69.24ms p50=66.38ms p95=107.69ms p99=122.48ms max=135.37ms rate=0.0/0.0/defaultHz lowPower=false"
+  ],
+  "executableSHA256": "42e7fa41bd1fc243d0aa9105d9a9007b077a90ba553dab4f26ccfb47551a6cf7",
+  "powerAtLaunch": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t99%; finishing charge; (no estimate) present: true\n",
+  "powerAtEnd": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t99%; finishing charge; (no estimate) present: true\n",
+  "continuousPowerMonitoring": false,
+  "powerAtFocus": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t99%; finishing charge; (no estimate) present: true\n",
+  "powerSettingsAtLaunch": "Battery Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 0\n networkoversleep     0\n sleep                1\n lessbright           1\n tcpkeepalive         1\n disksleep            10\nAC Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 1\n networkoversleep     0\n sleep                0\n tcpkeepalive         1\n disksleep            10\n",
+  "powerSettingsAtEnd": "Battery Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 0\n networkoversleep     0\n sleep                1\n lessbright           1\n tcpkeepalive         1\n disksleep            10\nAC Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 1\n networkoversleep     0\n sleep                0\n tcpkeepalive         1\n disksleep            10\n"
+}
+```
+
+```text
+callbackLead: n=200 avg=51.78ms p50=49.89ms p95=49.93ms p99=149.89ms max=149.93ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=-0.16ms p50=0.01ms p95=16.68ms p99=16.70ms max=16.70ms rate=0.0/0.0/defaultHz lowPower=false
+firstAfterResume: n=200 avg=50.80ms p50=49.89ms p95=49.91ms p99=143.53ms max=149.93ms rate=0.0/0.0/defaultHz lowPower=false
+resumeToCallback: n=200 avg=10.93ms p50=10.64ms p95=16.42ms p99=29.21ms max=68.89ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.89ms p50=49.90ms p95=49.92ms p99=49.94ms max=49.94ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=17.17ms p50=16.67ms p95=16.67ms p99=66.66ms max=66.66ms rate=0.0/0.0/defaultHz lowPower=false
+keyDelivery: n=200 avg=4.92ms p50=3.69ms p95=11.08ms p99=18.76ms max=19.46ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=5.06ms p50=3.80ms p95=11.18ms p99=18.87ms max=19.54ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.74ms p50=0.15ms p95=4.35ms p99=5.44ms max=5.99ms rate=0.0/0.0/defaultHz lowPower=false
+echoToMain: n=200 avg=0.74ms p50=0.15ms p95=4.36ms p99=5.44ms max=5.99ms rate=0.0/0.0/defaultHz lowPower=false
+mainToFrame: n=200 avg=15.10ms p50=10.56ms p95=54.71ms p99=66.30ms max=74.07ms rate=0.0/0.0/defaultHz lowPower=false
+frameToGlass: n=200 avg=48.42ms p50=49.14ms p95=65.71ms p99=65.80ms max=65.87ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=69.24ms p50=66.38ms p95=107.69ms p99=122.48ms max=135.37ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### driver-ac-01-ondemand
+
+```json
+{
+  "kind": "human",
+  "completedUTC": "2026-10-10T07:56:48.989667+00:00",
+  "stage": "driver-ac-01-ondemand",
+  "pid": 3994,
+  "automaticClosure": "first complete 200-presentation ring",
+  "summaries": [
+    "keypressToPresent: n=200 avg=37.13ms p50=36.78ms p95=53.06ms p99=59.88ms max=66.39ms rate=0.0/0.0/defaultHz lowPower=false"
+  ],
+  "executableSHA256": "42e7fa41bd1fc243d0aa9105d9a9007b077a90ba553dab4f26ccfb47551a6cf7",
+  "powerAtLaunch": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t99%; finishing charge; (no estimate) present: true\n",
+  "powerAtEnd": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t99%; finishing charge; (no estimate) present: true\n",
+  "continuousPowerMonitoring": false,
+  "powerAtFocus": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t99%; finishing charge; (no estimate) present: true\n",
+  "powerSettingsAtLaunch": "Battery Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 0\n networkoversleep     0\n sleep                1\n lessbright           1\n tcpkeepalive         1\n disksleep            10\nAC Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 1\n networkoversleep     0\n sleep                0\n tcpkeepalive         1\n disksleep            10\n",
+  "powerSettingsAtEnd": "Battery Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 0\n networkoversleep     0\n sleep                1\n lessbright           1\n tcpkeepalive         1\n disksleep            10\nAC Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 1\n networkoversleep     0\n sleep                0\n tcpkeepalive         1\n disksleep            10\n"
+}
+```
+
+```text
+keyDelivery: n=200 avg=5.87ms p50=3.64ms p95=15.38ms p99=19.92ms max=25.94ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=6.01ms p50=3.78ms p95=15.43ms p99=20.07ms max=26.01ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=1.09ms p50=0.16ms p95=5.44ms p99=11.22ms max=20.54ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=37.13ms p50=36.78ms p95=53.06ms p99=59.88ms max=66.39ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### driver-ac-02-displaylink
+
+```json
+{
+  "kind": "human",
+  "completedUTC": "2026-10-10T07:57:02.046269+00:00",
+  "stage": "driver-ac-02-displaylink",
+  "pid": 4007,
+  "automaticClosure": "first complete 200-presentation ring",
+  "summaries": [
+    "keypressToPresent: n=200 avg=70.90ms p50=68.85ms p95=89.78ms p99=174.21ms max=179.65ms rate=0.0/0.0/defaultHz lowPower=false"
+  ],
+  "executableSHA256": "42e7fa41bd1fc243d0aa9105d9a9007b077a90ba553dab4f26ccfb47551a6cf7",
+  "powerAtLaunch": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t99%; finishing charge; (no estimate) present: true\n",
+  "powerAtEnd": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t99%; finishing charge; (no estimate) present: true\n",
+  "continuousPowerMonitoring": false,
+  "powerAtFocus": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t99%; finishing charge; (no estimate) present: true\n",
+  "powerSettingsAtLaunch": "Battery Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 0\n networkoversleep     0\n sleep                1\n lessbright           1\n tcpkeepalive         1\n disksleep            10\nAC Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 1\n networkoversleep     0\n sleep                0\n tcpkeepalive         1\n disksleep            10\n",
+  "powerSettingsAtEnd": "Battery Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 0\n networkoversleep     0\n sleep                1\n lessbright           1\n tcpkeepalive         1\n disksleep            10\nAC Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 1\n networkoversleep     0\n sleep                0\n tcpkeepalive         1\n disksleep            10\n"
+}
+```
+
+```text
+callbackLead: n=200 avg=51.76ms p50=49.90ms p95=49.94ms p99=149.92ms max=149.93ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=1.43ms p50=0.01ms p95=16.68ms p99=16.69ms max=33.34ms rate=0.0/0.0/defaultHz lowPower=false
+keyDelivery: n=200 avg=6.11ms p50=3.75ms p95=16.18ms p99=19.61ms max=20.39ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=6.22ms p50=3.87ms p95=16.33ms p99=19.76ms max=20.54ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=17.17ms p50=16.67ms p95=16.67ms p99=66.66ms max=66.66ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=1.09ms p50=0.16ms p95=4.85ms p99=6.39ms max=6.83ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=70.90ms p50=68.85ms p95=89.78ms p99=174.21ms max=179.65ms rate=0.0/0.0/defaultHz lowPower=false
+echoToMain: n=200 avg=1.02ms p50=0.16ms p95=4.60ms p99=6.06ms max=6.84ms rate=0.0/0.0/defaultHz lowPower=false
+mainToFrame: n=200 avg=13.02ms p50=12.13ms p95=16.13ms p99=98.50ms max=98.79ms rate=0.0/0.0/defaultHz lowPower=false
+frameToGlass: n=200 avg=50.89ms p50=49.28ms p95=65.81ms p99=66.22ms max=66.24ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### driver-ac-02-ondemand
+
+```json
+{
+  "kind": "human",
+  "completedUTC": "2026-10-10T07:57:13.095903+00:00",
+  "stage": "driver-ac-02-ondemand",
+  "pid": 4022,
+  "automaticClosure": "first complete 200-presentation ring",
+  "summaries": [
+    "keypressToPresent: n=200 avg=40.14ms p50=39.45ms p95=60.89ms p99=65.17ms max=67.89ms rate=0.0/0.0/defaultHz lowPower=false"
+  ],
+  "executableSHA256": "42e7fa41bd1fc243d0aa9105d9a9007b077a90ba553dab4f26ccfb47551a6cf7",
+  "powerAtLaunch": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t99%; finishing charge; (no estimate) present: true\n",
+  "powerAtEnd": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t99%; finishing charge; 0:09 remaining present: true\n",
+  "continuousPowerMonitoring": false,
+  "powerAtFocus": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t99%; finishing charge; (no estimate) present: true\n",
+  "powerSettingsAtLaunch": "Battery Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 0\n networkoversleep     0\n sleep                1\n lessbright           1\n tcpkeepalive         1\n disksleep            10\nAC Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 1\n networkoversleep     0\n sleep                0\n tcpkeepalive         1\n disksleep            10\n",
+  "powerSettingsAtEnd": "Battery Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 0\n networkoversleep     0\n sleep                1\n lessbright           1\n tcpkeepalive         1\n disksleep            10\nAC Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 1\n networkoversleep     0\n sleep                0\n tcpkeepalive         1\n disksleep            10\n"
+}
+```
+
+```text
+keyDelivery: n=200 avg=8.07ms p50=6.48ms p95=18.38ms p99=21.11ms max=22.82ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=8.19ms p50=6.59ms p95=18.50ms p99=21.20ms max=22.88ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=1.36ms p50=0.17ms p95=5.81ms p99=9.49ms max=10.26ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=40.14ms p50=39.45ms p95=60.89ms p99=65.17ms max=67.89ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### driver-ac-03-displaylink
+
+```json
+{
+  "kind": "human",
+  "completedUTC": "2026-10-10T07:57:26.133030+00:00",
+  "stage": "driver-ac-03-displaylink",
+  "pid": 4035,
+  "automaticClosure": "first complete 200-presentation ring",
+  "summaries": [
+    "keypressToPresent: n=200 avg=70.55ms p50=69.21ms p95=84.26ms p99=168.50ms max=178.69ms rate=0.0/0.0/defaultHz lowPower=false"
+  ],
+  "executableSHA256": "42e7fa41bd1fc243d0aa9105d9a9007b077a90ba553dab4f26ccfb47551a6cf7",
+  "powerAtLaunch": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t99%; finishing charge; (no estimate) present: true\n",
+  "powerAtEnd": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t99%; finishing charge; 0:09 remaining present: true\n",
+  "continuousPowerMonitoring": false,
+  "powerAtFocus": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t99%; finishing charge; 0:09 remaining present: true\n",
+  "powerSettingsAtLaunch": "Battery Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 0\n networkoversleep     0\n sleep                1\n lessbright           1\n tcpkeepalive         1\n disksleep            10\nAC Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 1\n networkoversleep     0\n sleep                0\n tcpkeepalive         1\n disksleep            10\n",
+  "powerSettingsAtEnd": "Battery Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 0\n networkoversleep     0\n sleep                1\n lessbright           1\n tcpkeepalive         1\n disksleep            10\nAC Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 1\n networkoversleep     0\n sleep                0\n tcpkeepalive         1\n disksleep            10\n"
+}
+```
+
+```text
+callbackLead: n=200 avg=50.73ms p50=49.90ms p95=49.93ms p99=146.39ms max=149.86ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.59ms p50=0.01ms p95=0.04ms p99=16.70ms max=16.70ms rate=0.0/0.0/defaultHz lowPower=false
+keyDelivery: n=200 avg=6.39ms p50=4.53ms p95=15.93ms p99=20.21ms max=24.06ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=6.50ms p50=4.61ms p95=15.98ms p99=20.38ms max=24.10ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=17.03ms p50=16.67ms p95=16.67ms p99=39.84ms max=66.66ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=1.30ms p50=0.18ms p95=4.98ms p99=8.61ms max=22.16ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=70.55ms p50=69.21ms p95=84.26ms p99=168.50ms max=178.69ms rate=0.0/0.0/defaultHz lowPower=false
+echoToMain: n=200 avg=1.22ms p50=0.18ms p95=4.98ms p99=8.61ms max=22.16ms rate=0.0/0.0/defaultHz lowPower=false
+mainToFrame: n=200 avg=13.10ms p50=11.69ms p95=16.02ms p99=98.15ms max=98.37ms rate=0.0/0.0/defaultHz lowPower=false
+frameToGlass: n=200 avg=50.28ms p50=49.28ms p95=65.65ms p99=66.19ms max=66.21ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### driver-ac-03-ondemand
+
+```json
+{
+  "kind": "human",
+  "completedUTC": "2026-10-10T07:57:39.209903+00:00",
+  "stage": "driver-ac-03-ondemand",
+  "pid": 4050,
+  "automaticClosure": "first complete 200-presentation ring",
+  "summaries": [
+    "keypressToPresent: n=200 avg=40.52ms p50=39.39ms p95=59.59ms p99=66.87ms max=69.54ms rate=0.0/0.0/defaultHz lowPower=false"
+  ],
+  "executableSHA256": "42e7fa41bd1fc243d0aa9105d9a9007b077a90ba553dab4f26ccfb47551a6cf7",
+  "powerAtLaunch": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t99%; finishing charge; (no estimate) present: true\n",
+  "powerAtEnd": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t99%; finishing charge; 0:09 remaining present: true\n",
+  "continuousPowerMonitoring": false,
+  "powerAtFocus": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t99%; finishing charge; 0:09 remaining present: true\n",
+  "powerSettingsAtLaunch": "Battery Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 0\n networkoversleep     0\n sleep                1\n lessbright           1\n tcpkeepalive         1\n disksleep            10\nAC Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 1\n networkoversleep     0\n sleep                0\n tcpkeepalive         1\n disksleep            10\n",
+  "powerSettingsAtEnd": "Battery Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 0\n networkoversleep     0\n sleep                1\n lessbright           1\n tcpkeepalive         1\n disksleep            10\nAC Power:\n Sleep On Power Button 1\n lowpowermode         0\n standby              1\n ttyskeepawake        1\n hibernatemode        3\n powernap             1\n hibernatefile        /var/vm/sleepimage\n displaysleep         0\n womp                 1\n networkoversleep     0\n sleep                0\n tcpkeepalive         1\n disksleep            10\n"
+}
+```
+
+```text
+keyDelivery: n=200 avg=6.93ms p50=4.65ms p95=17.58ms p99=18.50ms max=27.23ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=7.06ms p50=4.91ms p95=17.68ms p99=18.65ms max=27.31ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=1.23ms p50=0.16ms p95=5.84ms p99=9.46ms max=21.97ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=40.52ms p50=39.39ms p95=59.59ms p99=66.87ms max=69.54ms rate=0.0/0.0/defaultHz lowPower=false
+```

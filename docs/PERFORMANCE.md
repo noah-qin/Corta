@@ -620,7 +620,8 @@ CAMetalDisplayLink/nextDrawable prototype trapped twice and was removed; the
 opt-in experiment uses separate CADisplayLink pacing and only bypasses pacing
 for paused-link echoes within 50 ms of input, rate-limited to one refresh.
 **DisplayLink stays the default:** three alternating flood rounds show higher experimental tails, so the promotion
-gate fails. Verified-mains driver/tearing acceptance is still pending; scripted power-mode pairs are recorded below.
+gate fails. Verified-mains human driver pairs later give median p50 **68.85 → 39.39 ms**
+with every paired p95/p99 lower; full visual/tearing acceptance is still pending; scripted power-mode pairs are recorded below.
 
 [Full environment, decomposition, raw rounds and acceptance limits](test-results/2026-10-09-input-followup.md)
 also record final full Unit, D17, idle/occluded Activity Monitor counters and
