@@ -1349,3 +1349,596 @@ mainToFrame: n=200 avg=53.51ms p50=52.35ms p95=65.03ms p99=66.54ms max=66.63ms r
 frameToGlass: n=200 avg=41.50ms p50=49.50ms p95=49.79ms p99=49.82ms max=49.82ms rate=0.0/0.0/defaultHz lowPower=false
 keypressToPresent: n=200 avg=98.40ms p50=104.77ms p95=119.07ms p99=119.56ms max=119.61ms rate=0.0/0.0/defaultHz lowPower=false
 ```
+
+## Human driver rounds, October 10
+
+First full ring per launch is used for comparison; all full metric rings are retained. No typed text is included.
+
+### normal-01-displaylink
+
+```text
+callbackLead: n=200 avg=49.78ms p50=49.90ms p95=49.93ms p99=49.94ms max=49.94ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=-1.35ms p50=0.01ms p95=0.02ms p99=16.68ms max=16.68ms rate=0.0/0.0/defaultHz lowPower=false
+firstAfterResume: n=200 avg=49.78ms p50=49.89ms p95=49.92ms p99=49.93ms max=49.94ms rate=0.0/0.0/defaultHz lowPower=false
+resumeToCallback: n=200 avg=11.13ms p50=11.14ms p95=16.40ms p99=46.73ms max=56.57ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.90ms p50=49.90ms p95=49.92ms p99=49.93ms max=49.94ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.95ms p50=16.67ms p95=16.67ms p99=33.44ms max=46.21ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.50ms p50=0.16ms p95=2.99ms p99=4.58ms max=20.14ms rate=0.0/0.0/defaultHz lowPower=false
+keyDelivery: n=200 avg=4.95ms p50=3.50ms p95=11.62ms p99=18.30ms max=117.88ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=5.09ms p50=3.64ms p95=11.72ms p99=18.39ms max=118.33ms rate=0.0/0.0/defaultHz lowPower=false
+echoToMain: n=200 avg=0.52ms p50=0.16ms p95=3.00ms p99=4.59ms max=20.15ms rate=0.0/0.0/defaultHz lowPower=false
+mainToFrame: n=200 avg=14.20ms p50=11.42ms p95=44.83ms p99=85.72ms max=92.31ms rate=0.0/0.0/defaultHz lowPower=false
+frameToGlass: n=200 avg=46.04ms p50=49.11ms p95=49.58ms p99=65.76ms max=66.01ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=65.93ms p50=63.11ms p95=82.81ms p99=145.49ms max=273.81ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=-1.32ms p50=0.01ms p95=16.68ms p99=16.69ms max=16.69ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.91ms p50=49.92ms p95=49.93ms p99=49.94ms max=49.94ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.53ms p50=0.36ms p95=0.92ms p99=1.25ms max=5.17ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=1.21ms p50=1.09ms p95=1.68ms p99=2.21ms max=6.43ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.26ms p50=0.25ms p95=0.26ms p99=0.26ms max=2.98ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.14ms p50=0.13ms p95=0.19ms p99=0.20ms max=0.67ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.51ms p50=0.01ms p95=16.67ms p99=16.69ms max=16.69ms rate=0.0/0.0/defaultHz lowPower=false
+firstAfterResume: n=200 avg=49.91ms p50=49.91ms p95=49.94ms p99=49.94ms max=49.94ms rate=0.0/0.0/defaultHz lowPower=false
+resumeToCallback: n=200 avg=10.64ms p50=11.97ms p95=16.36ms p99=16.43ms max=16.66ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.91ms p50=49.92ms p95=49.94ms p99=49.94ms max=49.94ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=1.00ms p50=0.17ms p95=3.38ms p99=4.71ms max=4.81ms rate=0.0/0.0/defaultHz lowPower=false
+keyDelivery: n=200 avg=5.23ms p50=3.76ms p95=13.53ms p99=17.72ms max=19.58ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=5.37ms p50=3.90ms p95=13.68ms p99=17.87ms max=19.72ms rate=0.0/0.0/defaultHz lowPower=false
+echoToMain: n=200 avg=1.02ms p50=0.17ms p95=3.39ms p99=4.81ms max=5.04ms rate=0.0/0.0/defaultHz lowPower=false
+mainToFrame: n=200 avg=12.60ms p50=12.08ms p95=39.59ms p99=65.37ms max=65.82ms rate=0.0/0.0/defaultHz lowPower=false
+frameToGlass: n=200 avg=49.29ms p50=49.21ms p95=65.81ms p99=65.87ms max=65.93ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=68.21ms p50=67.61ms p95=84.74ms p99=119.47ms max=119.54ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.93ms p50=0.01ms p95=16.68ms p99=16.69ms max=16.69ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.92ms p50=49.92ms p95=49.94ms p99=49.95ms max=49.95ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=1.10ms p50=0.01ms p95=16.68ms p99=16.69ms max=16.69ms rate=0.0/0.0/defaultHz lowPower=false
+firstAfterResume: n=200 avg=49.92ms p50=49.92ms p95=49.95ms p99=49.95ms max=49.95ms rate=0.0/0.0/defaultHz lowPower=false
+resumeToCallback: n=200 avg=10.04ms p50=11.33ms p95=16.31ms p99=16.64ms max=16.64ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.92ms p50=49.92ms p95=49.95ms p99=49.95ms max=49.96ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.51ms p50=0.39ms p95=0.90ms p99=1.13ms max=1.88ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=1.14ms p50=1.07ms p95=1.50ms p99=1.98ms max=2.15ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.26ms p50=0.25ms p95=0.26ms p99=0.27ms max=0.27ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.13ms p50=0.13ms p95=0.18ms p99=0.19ms max=0.88ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=1.11ms p50=0.18ms p95=3.68ms p99=4.99ms max=5.03ms rate=0.0/0.0/defaultHz lowPower=false
+keyDelivery: n=200 avg=6.01ms p50=4.28ms p95=13.82ms p99=17.83ms max=18.71ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=6.15ms p50=4.42ms p95=13.96ms p99=17.93ms max=18.86ms rate=0.0/0.0/defaultHz lowPower=false
+echoToMain: n=200 avg=1.14ms p50=0.19ms p95=4.15ms p99=4.99ms max=5.03ms rate=0.0/0.0/defaultHz lowPower=false
+mainToFrame: n=200 avg=10.87ms p50=11.49ms p95=15.87ms p99=48.50ms max=60.63ms rate=0.0/0.0/defaultHz lowPower=false
+frameToGlass: n=200 avg=50.30ms p50=49.26ms p95=65.81ms p99=65.89ms max=65.91ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=68.50ms p50=68.24ms p95=87.09ms p99=94.60ms max=113.46ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=1.51ms p50=0.01ms p95=16.68ms p99=16.69ms max=16.69ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.92ms p50=49.92ms p95=49.95ms p99=49.96ms max=49.96ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### normal-01-ondemand
+
+```text
+keyDelivery: n=200 avg=6.87ms p50=4.31ms p95=17.80ms p99=19.96ms max=20.29ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=7.00ms p50=4.45ms p95=17.92ms p99=20.06ms max=20.40ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.94ms p50=0.16ms p95=4.94ms p99=5.57ms max=6.05ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=39.81ms p50=38.02ms p95=60.31ms p99=66.58ms max=67.37ms rate=0.0/0.0/defaultHz lowPower=false
+echoToMain: n=200 avg=0.74ms p50=0.17ms p95=4.65ms p99=5.33ms max=5.38ms rate=0.0/0.0/defaultHz lowPower=false
+mainToFrame: n=200 avg=1.64ms p50=0.82ms p95=11.83ms p99=16.68ms max=17.68ms rate=0.0/0.0/defaultHz lowPower=false
+frameToGlass: n=200 avg=30.54ms p50=30.52ms p95=47.21ms p99=48.93ms max=49.86ms rate=0.0/0.0/defaultHz lowPower=false
+keyDelivery: n=200 avg=6.61ms p50=3.72ms p95=15.60ms p99=19.32ms max=19.80ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=6.73ms p50=3.85ms p95=15.71ms p99=19.46ms max=19.87ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.95ms p50=0.16ms p95=4.93ms p99=5.30ms max=5.34ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=37.60ms p50=36.25ms p95=55.11ms p99=64.34ms max=67.17ms rate=0.0/0.0/defaultHz lowPower=false
+echoToMain: n=200 avg=0.75ms p50=0.15ms p95=4.66ms p99=5.30ms max=5.84ms rate=0.0/0.0/defaultHz lowPower=false
+mainToFrame: n=200 avg=1.41ms p50=0.82ms p95=9.36ms p99=12.79ms max=13.34ms rate=0.0/0.0/defaultHz lowPower=false
+frameToGlass: n=200 avg=28.88ms p50=29.29ms p95=43.71ms p99=50.06ms max=50.34ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.72ms p50=0.80ms p95=0.95ms p99=1.26ms max=5.07ms rate=0.0/0.0/defaultHz lowPower=false
+keyDelivery: n=200 avg=7.31ms p50=4.50ms p95=18.09ms p99=19.48ms max=20.30ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=7.44ms p50=4.65ms p95=18.24ms p99=19.63ms max=20.44ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### normal-02-displaylink
+
+```text
+callbackLead: n=200 avg=49.82ms p50=49.92ms p95=49.94ms p99=49.95ms max=49.96ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=1.51ms p50=0.01ms p95=16.68ms p99=16.69ms max=16.69ms rate=0.0/0.0/defaultHz lowPower=false
+keyDelivery: n=200 avg=5.48ms p50=3.79ms p95=13.83ms p99=17.80ms max=17.81ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=5.60ms p50=3.95ms p95=13.96ms p99=17.92ms max=17.92ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.75ms p50=16.67ms p95=16.67ms p99=16.67ms max=34.00ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.73ms p50=0.15ms p95=3.59ms p99=4.88ms max=5.28ms rate=0.0/0.0/defaultHz lowPower=false
+echoToMain: n=200 avg=0.68ms p50=0.16ms p95=3.50ms p99=4.88ms max=5.29ms rate=0.0/0.0/defaultHz lowPower=false
+mainToFrame: n=200 avg=13.38ms p50=12.10ms p95=15.97ms p99=98.39ms max=98.47ms rate=0.0/0.0/defaultHz lowPower=false
+frameToGlass: n=200 avg=51.47ms p50=49.30ms p95=65.84ms p99=66.27ms max=66.30ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=71.16ms p50=68.27ms p95=86.17ms p99=176.71ms max=179.17ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.90ms p50=49.91ms p95=49.94ms p99=49.95ms max=49.95ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=2.43ms p50=0.01ms p95=16.68ms p99=16.68ms max=16.69ms rate=0.0/0.0/defaultHz lowPower=false
+firstAfterResume: n=200 avg=49.81ms p50=49.91ms p95=49.94ms p99=49.95ms max=49.95ms rate=0.0/0.0/defaultHz lowPower=false
+resumeToCallback: n=200 avg=10.31ms p50=11.45ms p95=16.30ms p99=17.60ms max=45.84ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.91ms p50=49.91ms p95=49.94ms p99=49.94ms max=49.95ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.54ms p50=0.53ms p95=0.91ms p99=1.08ms max=5.19ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=1.16ms p50=1.09ms p95=1.46ms p99=1.68ms max=7.30ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.25ms p50=0.25ms p95=0.25ms p99=0.26ms max=2.77ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.13ms p50=0.13ms p95=0.18ms p99=0.19ms max=0.57ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=1.59ms p50=0.01ms p95=16.68ms p99=16.69ms max=16.69ms rate=0.0/0.0/defaultHz lowPower=false
+keyDelivery: n=200 avg=5.87ms p50=3.90ms p95=14.82ms p99=17.92ms max=18.24ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=6.00ms p50=4.06ms p95=14.94ms p99=18.02ms max=18.34ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.72ms p50=0.17ms p95=4.15ms p99=4.56ms max=4.79ms rate=0.0/0.0/defaultHz lowPower=false
+echoToMain: n=200 avg=0.68ms p50=0.17ms p95=4.14ms p99=4.57ms max=4.79ms rate=0.0/0.0/defaultHz lowPower=false
+mainToFrame: n=200 avg=12.04ms p50=11.53ms p95=15.92ms p99=98.23ms max=98.75ms rate=0.0/0.0/defaultHz lowPower=false
+frameToGlass: n=200 avg=50.86ms p50=49.25ms p95=65.77ms p99=66.22ms max=66.26ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=69.22ms p50=67.39ms p95=86.19ms p99=171.27ms max=179.23ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.91ms p50=49.91ms p95=49.94ms p99=49.95ms max=49.95ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=1.26ms p50=0.01ms p95=16.68ms p99=16.68ms max=16.68ms rate=0.0/0.0/defaultHz lowPower=false
+firstAfterResume: n=200 avg=49.90ms p50=49.90ms p95=49.94ms p99=49.95ms max=49.95ms rate=0.0/0.0/defaultHz lowPower=false
+resumeToCallback: n=200 avg=9.44ms p50=10.15ms p95=16.35ms p99=16.39ms max=16.42ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### normal-02-ondemand
+
+```text
+keyDelivery: n=200 avg=6.55ms p50=3.83ms p95=16.59ms p99=18.67ms max=19.58ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=6.69ms p50=3.97ms p95=16.96ms p99=18.81ms max=19.72ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=1.03ms p50=0.16ms p95=5.53ms p99=6.70ms max=7.14ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=39.07ms p50=38.25ms p95=57.89ms p99=66.73ms max=67.72ms rate=0.0/0.0/defaultHz lowPower=false
+echoToMain: n=200 avg=0.79ms p50=0.16ms p95=5.15ms p99=5.93ms max=6.62ms rate=0.0/0.0/defaultHz lowPower=false
+mainToFrame: n=200 avg=1.85ms p50=0.84ms p95=11.61ms p99=16.46ms max=18.62ms rate=0.0/0.0/defaultHz lowPower=false
+frameToGlass: n=200 avg=29.88ms p50=30.28ms p95=45.96ms p99=47.98ms max=50.89ms rate=0.0/0.0/defaultHz lowPower=false
+keyDelivery: n=200 avg=6.11ms p50=3.62ms p95=17.05ms p99=21.89ms max=22.96ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=6.24ms p50=3.75ms p95=17.18ms p99=21.98ms max=23.08ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.74ms p50=0.16ms p95=4.83ms p99=5.74ms max=5.82ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=37.62ms p50=36.16ms p95=57.62ms p99=67.29ms max=68.11ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### normal-03-displaylink
+
+```text
+callbackLead: n=200 avg=49.84ms p50=49.90ms p95=49.93ms p99=49.94ms max=49.94ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=1.51ms p50=0.01ms p95=16.68ms p99=16.69ms max=16.69ms rate=0.0/0.0/defaultHz lowPower=false
+keyDelivery: n=200 avg=6.23ms p50=4.23ms p95=16.93ms p99=19.83ms max=20.62ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=6.35ms p50=4.37ms p95=17.08ms p99=19.95ms max=20.74ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.93ms p50=0.16ms p95=4.00ms p99=6.15ms max=6.83ms rate=0.0/0.0/defaultHz lowPower=false
+echoToMain: n=200 avg=0.87ms p50=0.17ms p95=3.93ms p99=5.65ms max=6.83ms rate=0.0/0.0/defaultHz lowPower=false
+mainToFrame: n=200 avg=12.53ms p50=11.70ms p95=15.84ms p99=98.01ms max=98.48ms rate=0.0/0.0/defaultHz lowPower=false
+frameToGlass: n=200 avg=50.48ms p50=49.26ms p95=65.78ms p99=66.21ms max=66.25ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=70.02ms p50=68.61ms p95=84.44ms p99=171.45ms max=173.20ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.91ms p50=49.91ms p95=49.93ms p99=49.94ms max=49.94ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.67ms p50=0.01ms p95=16.68ms p99=16.68ms max=16.68ms rate=0.0/0.0/defaultHz lowPower=false
+firstAfterResume: n=200 avg=49.86ms p50=49.90ms p95=49.93ms p99=49.94ms max=49.94ms rate=0.0/0.0/defaultHz lowPower=false
+resumeToCallback: n=200 avg=9.90ms p50=10.48ms p95=16.26ms p99=18.58ms max=69.97ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.90ms p50=49.91ms p95=49.93ms p99=49.93ms max=49.94ms rate=0.0/0.0/defaultHz lowPower=false
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms rate=0.0/0.0/defaultHz lowPower=false
+cpuFrame: n=600 avg=0.55ms p50=0.55ms p95=0.92ms p99=1.08ms max=5.37ms rate=0.0/0.0/defaultHz lowPower=false
+gpu: n=600 avg=1.18ms p50=1.10ms p95=1.47ms p99=2.55ms max=6.35ms rate=0.0/0.0/defaultHz lowPower=false
+gpuExecution: n=600 avg=0.25ms p50=0.25ms p95=0.25ms p99=0.26ms max=2.17ms rate=0.0/0.0/defaultHz lowPower=false
+gpuFeedbackDelay: n=600 avg=0.13ms p50=0.13ms p95=0.18ms p99=0.19ms max=0.57ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.51ms p50=0.01ms p95=0.02ms p99=16.68ms max=16.68ms rate=0.0/0.0/defaultHz lowPower=false
+keyDelivery: n=200 avg=5.52ms p50=3.76ms p95=14.77ms p99=18.53ms max=19.82ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=5.65ms p50=3.92ms p95=14.90ms p99=18.62ms max=19.97ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.67ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=0.61ms p50=0.17ms p95=3.22ms p99=4.54ms max=5.40ms rate=0.0/0.0/defaultHz lowPower=false
+echoToMain: n=200 avg=0.61ms p50=0.18ms p95=3.22ms p99=4.55ms max=5.40ms rate=0.0/0.0/defaultHz lowPower=false
+mainToFrame: n=200 avg=11.96ms p50=11.75ms p95=16.10ms p99=88.15ms max=98.59ms rate=0.0/0.0/defaultHz lowPower=false
+frameToGlass: n=200 avg=49.99ms p50=49.13ms p95=65.77ms p99=65.98ms max=66.18ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=68.20ms p50=66.53ms p95=85.02ms p99=142.09ms max=183.28ms rate=0.0/0.0/defaultHz lowPower=false
+callbackLead: n=200 avg=49.89ms p50=49.91ms p95=49.93ms p99=49.94ms max=49.94ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=1.34ms p50=0.01ms p95=16.68ms p99=16.68ms max=16.68ms rate=0.0/0.0/defaultHz lowPower=false
+firstAfterResume: n=200 avg=49.89ms p50=49.90ms p95=49.93ms p99=49.94ms max=49.94ms rate=0.0/0.0/defaultHz lowPower=false
+resumeToCallback: n=200 avg=9.70ms p50=9.92ms p95=15.33ms p99=16.56ms max=16.65ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### normal-03-ondemand
+
+```text
+keyDelivery: n=200 avg=6.69ms p50=4.13ms p95=18.30ms p99=20.39ms max=67.40ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=6.84ms p50=4.29ms p95=18.38ms p99=20.53ms max=68.44ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=1.21ms p50=0.19ms p95=5.95ms p99=7.30ms max=8.96ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=37.77ms p50=36.40ms p95=57.59ms p99=67.36ms max=110.73ms rate=0.0/0.0/defaultHz lowPower=false
+echoToMain: n=200 avg=1.10ms p50=0.19ms p95=5.70ms p99=7.31ms max=8.97ms rate=0.0/0.0/defaultHz lowPower=false
+mainToFrame: n=200 avg=1.94ms p50=0.85ms p95=11.55ms p99=13.67ms max=16.68ms rate=0.0/0.0/defaultHz lowPower=false
+frameToGlass: n=200 avg=28.17ms p50=28.39ms p95=40.53ms p99=47.19ms max=47.25ms rate=0.0/0.0/defaultHz lowPower=false
+keyDelivery: n=200 avg=5.52ms p50=3.40ms p95=15.78ms p99=18.36ms max=19.37ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=5.65ms p50=3.56ms p95=15.88ms p99=18.51ms max=19.46ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### Human power-state correction
+
+The user clarified that the entire preceding human batch was unplugged. The six driver launches are reported battery-powered, not verified mains acceptance; lowPower=false remains as recorded. The first old-version power baseline is supplemental and will be repeated on mains. No continuous power-state capture was made. Completion snapshot:
+
+```text
+Now drawing from 'Battery Power'
+ -InternalBattery-0 (id=36110435)	95%; discharging; 9:28 remaining present: true
+```
+
+#### Unplugged old-version first power baseline (supplemental)
+
+```text
+keypressToPresent: n=200 avg=74.18ms p50=71.11ms p95=93.61ms p99=170.39ms max=173.31ms
+drawableWait: n=600 avg=0.00ms p50=0.00ms p95=0.00ms p99=0.00ms max=0.00ms
+cpuFrame: n=600 avg=0.54ms p50=0.53ms p95=0.91ms p99=1.18ms max=3.74ms
+gpu: n=600 avg=1.17ms p50=1.11ms p95=1.45ms p99=2.11ms max=8.13ms
+gpuExecution: n=600 avg=0.25ms p50=0.25ms p95=0.25ms p99=0.26ms max=2.84ms
+gpuFeedbackDelay: n=600 avg=0.13ms p50=0.13ms p95=0.17ms p99=0.19ms max=0.87ms
+keypressToPresent: n=200 avg=69.04ms p50=66.67ms p95=86.73ms p99=162.96ms max=180.15ms
+```
+
+## Human mains/power pairs, October 10
+
+
+## Human mains and Low Power policy pairs, October 10
+
+Twelve human launches completed three old/new pairs under normal mains power,
+then three old/new pairs under Low Power Mode on mains. The user personally
+changed Battery settings to Only on Power Adapter before the low-power series.
+Each launch used DisplayLink, Menlo 14, 120×40, blink off, isolated config,
+and shell echo; the first complete 200-presentation ring triggered automatic
+save/close. No synthetic keystrokes were sent. Both launch/end snapshots of
+all twelve sessions report AC Power. Power was not continuously monitored.
+Low-mode setting snapshots show AC lowpowermode=1, Battery=0; changed-app
+rings report lowPower=true (normal rings false). Original Never setting and
+Pinyin input source were restored after the series.
+
+Old binary SHA-256: `3124a34d95fa751cce072dad129d210d8383b8670a6e57ad50d5b3a444b5d1ef`
+(baseline `b0917dd`). Current functional binary:
+`42e7fa41bd1fc243d0aa9105d9a9007b077a90ba553dab4f26ccfb47551a6cf7`
+(source `69fd44c`). Normal first pair was launched individually; remaining
+three normal windows and all six low-power windows were prelaunched with
+blink disabled, then focused sequentially after the previous process exited.
+Consequently later runs have additional inactive test processes; this is
+not an identical process-count experiment. The tiny watchers check metric
+files once per second. The user was instructed to type individual digits,
+but short Latin text was seen during some launch verifications, including
+normal-after-1 and low-before-1; exact key count/content/cadence was not
+recorded. Results are mixed ordinary physical-key sessions, not digits-only
+proof. Typed content is not committed.
+
+| Mode / pair | Old p50 / p95 / p99 ms | Current p50 / p95 / p99 ms |
+| :--- | :--- | :--- |
+| normal / 1 | 68.32 / 84.55 / 169.47 | 68.74 / 84.16 / 175.47 |
+| normal / 2 | 66.40 / 83.83 / 163.80 | 69.30 / 85.25 / 173.80 |
+| normal / 3 | 68.91 / 85.45 / 168.18 | 69.02 / 83.47 / 142.45 |
+| low / 1 | 184.76 / 220.41 / 232.61 | 68.17 / 82.46 / 91.35 |
+| low / 2 | 183.25 / 227.51 / 243.00 | 68.33 / 84.01 / 166.93 |
+| low / 3 | 184.54 / 221.09 / 234.39 | 70.28 / 86.85 / 174.71 |
+
+Normal p50 medians are **68.32 → 69.02 ms**, a +0.70 ms difference within
+the 2.51 ms old-run range. Normal old/new median p99 is **168.18 →
+173.80 ms**; current first-pair p99 **175.47 ms** exceeds the old maximum
+**169.47 ms**, so strict tail non-regression is not passed. Do not omit it.
+Low-power p50 medians are **184.54 → 68.33 ms**; current low-power median
+is within the normal old-run range (66.40–68.91 ms), and within 0.69 ms of
+current normal median 69.02 ms. Current low-power range 68.17–70.28 overlaps
+current normal 68.74–69.30; not every low-power round lies within that range.
+All three low-power p95/p99 improve relative to their old counterparts.
+This supports removal of the low-power typing penalty on this 60 Hz panel;
+no 120 Hz, energy, tearing or strict tail/zero-wakeup pass is inferred.
+
+
+### power-normal-01-before-ac2
+
+```json
+{
+  "kind": "human",
+  "completedUTC": "2026-10-10T06:15:38.496110+00:00",
+  "stage": "power-normal-01-before-ac2",
+  "pid": 2375,
+  "automaticClosure": "first complete 200-presentation ring",
+  "summaries": [
+    "keypressToPresent: n=200 avg=69.74ms p50=68.32ms p95=84.55ms p99=169.47ms max=178.98ms"
+  ],
+  "executableSHA256": "3124a34d95fa751cce072dad129d210d8383b8670a6e57ad50d5b3a444b5d1ef",
+  "powerAtLaunch": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t94%; charging; 0:27 remaining present: true\n",
+  "powerAtEnd": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t94%; charging; 0:27 remaining present: true\n",
+  "continuousPowerMonitoring": false
+}
+```
+
+```text
+keypressToPresent: n=200 avg=69.74ms p50=68.32ms p95=84.55ms p99=169.47ms max=178.98ms
+```
+
+### power-normal-01-after
+
+```json
+{
+  "kind": "human",
+  "completedUTC": "2026-10-10T06:16:25.924457+00:00",
+  "stage": "power-normal-01-after",
+  "pid": 2514,
+  "automaticClosure": "first complete 200-presentation ring",
+  "summaries": [
+    "keypressToPresent: n=200 avg=70.90ms p50=68.74ms p95=84.16ms p99=175.47ms max=211.41ms rate=0.0/0.0/defaultHz lowPower=false"
+  ],
+  "executableSHA256": "42e7fa41bd1fc243d0aa9105d9a9007b077a90ba553dab4f26ccfb47551a6cf7",
+  "powerAtLaunch": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t94%; charging; 0:26 remaining present: true\n",
+  "powerAtEnd": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t94%; charging; 0:26 remaining present: true\n",
+  "continuousPowerMonitoring": false
+}
+```
+
+```text
+callbackLead: n=200 avg=49.76ms p50=49.91ms p95=49.94ms p99=49.95ms max=49.95ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=1.01ms p50=0.01ms p95=16.67ms p99=16.68ms max=16.68ms rate=0.0/0.0/defaultHz lowPower=false
+keyDelivery: n=200 avg=7.29ms p50=4.46ms p95=17.52ms p99=18.89ms max=118.16ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=7.41ms p50=4.59ms p95=17.64ms p99=19.01ms max=118.83ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=16.67ms p50=16.67ms p95=16.67ms p99=16.67ms max=16.74ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=1.56ms p50=0.26ms p95=5.21ms p99=6.53ms max=14.94ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=70.90ms p50=68.74ms p95=84.16ms p99=175.47ms max=211.41ms rate=0.0/0.0/defaultHz lowPower=false
+echoToMain: n=200 avg=1.47ms p50=0.20ms p95=5.01ms p99=6.53ms max=14.95ms rate=0.0/0.0/defaultHz lowPower=false
+mainToFrame: n=200 avg=12.02ms p50=11.44ms p95=15.73ms p99=98.17ms max=98.64ms rate=0.0/0.0/defaultHz lowPower=false
+frameToGlass: n=200 avg=50.23ms p50=49.29ms p95=65.69ms p99=66.27ms max=66.42ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### power-normal-02-before
+
+```json
+{
+  "kind": "human",
+  "completedUTC": "2026-10-10T06:17:16.340866+00:00",
+  "stage": "power-normal-02-before",
+  "pid": 2641,
+  "automaticClosure": "first complete 200-presentation ring",
+  "summaries": [
+    "keypressToPresent: n=200 avg=68.26ms p50=66.40ms p95=83.83ms p99=163.80ms max=179.09ms"
+  ],
+  "executableSHA256": "3124a34d95fa751cce072dad129d210d8383b8670a6e57ad50d5b3a444b5d1ef",
+  "powerAtLaunch": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t94%; charging; 0:26 remaining present: true\n",
+  "powerAtEnd": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t95%; charging; 0:26 remaining present: true\n",
+  "continuousPowerMonitoring": false
+}
+```
+
+```text
+keypressToPresent: n=200 avg=68.26ms p50=66.40ms p95=83.83ms p99=163.80ms max=179.09ms
+```
+
+### power-normal-02-after
+
+```json
+{
+  "kind": "human",
+  "completedUTC": "2026-10-10T06:19:04.896420+00:00",
+  "stage": "power-normal-02-after",
+  "pid": 2785,
+  "automaticClosure": "first complete 200-presentation ring",
+  "summaries": [
+    "keypressToPresent: n=200 avg=71.06ms p50=69.30ms p95=85.25ms p99=173.80ms max=174.71ms rate=0.0/0.0/defaultHz lowPower=false"
+  ],
+  "executableSHA256": "42e7fa41bd1fc243d0aa9105d9a9007b077a90ba553dab4f26ccfb47551a6cf7",
+  "powerAtLaunch": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t95%; charging; 0:26 remaining present: true\n",
+  "powerAtEnd": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t95%; charging; 0:26 remaining present: true\n",
+  "continuousPowerMonitoring": false
+}
+```
+
+```text
+callbackLead: n=200 avg=50.75ms p50=49.91ms p95=49.94ms p99=142.41ms max=149.89ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=1.17ms p50=0.01ms p95=16.68ms p99=16.68ms max=16.68ms rate=0.0/0.0/defaultHz lowPower=false
+keyDelivery: n=200 avg=6.81ms p50=4.07ms p95=17.71ms p99=20.11ms max=20.75ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=6.93ms p50=4.21ms p95=17.76ms p99=20.22ms max=20.85ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=17.00ms p50=16.67ms p95=16.67ms p99=33.16ms max=66.66ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=1.04ms p50=0.17ms p95=4.56ms p99=6.34ms max=7.40ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=71.06ms p50=69.30ms p95=85.25ms p99=173.80ms max=174.71ms rate=0.0/0.0/defaultHz lowPower=false
+echoToMain: n=200 avg=0.92ms p50=0.17ms p95=4.57ms p99=6.35ms max=7.41ms rate=0.0/0.0/defaultHz lowPower=false
+mainToFrame: n=200 avg=12.78ms p50=12.08ms p95=15.97ms p99=98.62ms max=111.35ms rate=0.0/0.0/defaultHz lowPower=false
+frameToGlass: n=200 avg=50.81ms p50=49.29ms p95=65.80ms p99=66.20ms max=66.21ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### power-normal-03-before
+
+```json
+{
+  "kind": "human",
+  "completedUTC": "2026-10-10T06:19:17.957357+00:00",
+  "stage": "power-normal-03-before",
+  "pid": 2799,
+  "automaticClosure": "first complete 200-presentation ring",
+  "summaries": [
+    "keypressToPresent: n=200 avg=70.40ms p50=68.91ms p95=85.45ms p99=168.18ms max=183.51ms"
+  ],
+  "executableSHA256": "3124a34d95fa751cce072dad129d210d8383b8670a6e57ad50d5b3a444b5d1ef",
+  "powerAtLaunch": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t95%; charging; 0:26 remaining present: true\n",
+  "powerAtEnd": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t95%; charging; 0:25 remaining present: true\n",
+  "continuousPowerMonitoring": false
+}
+```
+
+```text
+keypressToPresent: n=200 avg=70.40ms p50=68.91ms p95=85.45ms p99=168.18ms max=183.51ms
+```
+
+### power-normal-03-after
+
+```json
+{
+  "kind": "human",
+  "completedUTC": "2026-10-10T06:19:28.987155+00:00",
+  "stage": "power-normal-03-after",
+  "pid": 2811,
+  "automaticClosure": "first complete 200-presentation ring",
+  "summaries": [
+    "keypressToPresent: n=200 avg=70.12ms p50=69.02ms p95=83.47ms p99=142.45ms max=155.81ms rate=0.0/0.0/defaultHz lowPower=false"
+  ],
+  "executableSHA256": "42e7fa41bd1fc243d0aa9105d9a9007b077a90ba553dab4f26ccfb47551a6cf7",
+  "powerAtLaunch": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t95%; charging; 0:26 remaining present: true\n",
+  "powerAtEnd": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t96%; charging; 0:25 remaining present: true\n",
+  "continuousPowerMonitoring": false
+}
+```
+
+```text
+callbackLead: n=200 avg=51.83ms p50=49.92ms p95=49.95ms p99=149.90ms max=149.93ms rate=0.0/0.0/defaultHz lowPower=false
+presentationSlip: n=200 avg=0.51ms p50=0.01ms p95=0.02ms p99=16.68ms max=16.68ms rate=0.0/0.0/defaultHz lowPower=false
+keyDelivery: n=200 avg=7.27ms p50=4.80ms p95=17.44ms p99=21.11ms max=23.40ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToOutput: n=200 avg=7.38ms p50=4.91ms p95=17.53ms p99=21.16ms max=23.51ms rate=0.0/0.0/defaultHz lowPower=false
+frameInterval: n=200 avg=17.21ms p50=16.67ms p95=16.67ms p99=66.66ms max=66.66ms rate=0.0/0.0/defaultHz lowPower=false
+wakeHop: n=200 avg=1.15ms p50=0.19ms p95=4.30ms p99=6.31ms max=7.92ms rate=0.0/0.0/defaultHz lowPower=false
+echoToMain: n=200 avg=1.00ms p50=0.18ms p95=4.08ms p99=6.32ms max=7.92ms rate=0.0/0.0/defaultHz lowPower=false
+mainToFrame: n=200 avg=12.14ms p50=12.27ms p95=16.00ms p99=81.75ms max=86.58ms rate=0.0/0.0/defaultHz lowPower=false
+frameToGlass: n=200 avg=50.07ms p50=49.30ms p95=65.73ms p99=65.95ms max=66.23ms rate=0.0/0.0/defaultHz lowPower=false
+keypressToPresent: n=200 avg=70.12ms p50=69.02ms p95=83.47ms p99=142.45ms max=155.81ms rate=0.0/0.0/defaultHz lowPower=false
+```
+
+### power-low-01-before
+
+```json
+{
+  "kind": "human",
+  "completedUTC": "2026-10-10T06:23:04.931308+00:00",
+  "stage": "power-low-01-before",
+  "pid": 3112,
+  "automaticClosure": "first complete 200-presentation ring",
+  "summaries": [
+    "keypressToPresent: n=200 avg=185.71ms p50=184.76ms p95=220.41ms p99=232.61ms max=233.28ms"
+  ],
+  "executableSHA256": "3124a34d95fa751cce072dad129d210d8383b8670a6e57ad50d5b3a444b5d1ef",
+  "powerAtLaunch": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t97%; charging; 0:23 remaining present: true\n",
+  "powerAtEnd": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t97%; charging; 0:23 remaining present: true\n",
+  "continuousPowerMonitoring": false
+}
+```
+
+```text
+keypressToPresent: n=200 avg=185.71ms p50=184.76ms p95=220.41ms p99=232.61ms max=233.28ms
+```
+
+### power-low-01-after
+
+```json
+{
+  "kind": "human",
+  "completedUTC": "2026-10-10T06:23:15.979413+00:00",
+  "stage": "power-low-01-after",
+  "pid": 3128,
+  "automaticClosure": "first complete 200-presentation ring",
+  "summaries": [
+    "keypressToPresent: n=200 avg=67.99ms p50=68.17ms p95=82.46ms p99=91.35ms max=145.74ms rate=0.0/0.0/defaultHz lowPower=true"
+  ],
+  "executableSHA256": "42e7fa41bd1fc243d0aa9105d9a9007b077a90ba553dab4f26ccfb47551a6cf7",
+  "powerAtLaunch": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t97%; charging; 0:23 remaining present: true\n",
+  "powerAtEnd": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t97%; charging; 0:23 remaining present: true\n",
+  "continuousPowerMonitoring": false
+}
+```
+
+```text
+callbackLead: n=200 avg=53.83ms p50=49.91ms p95=49.94ms p99=149.89ms max=149.91ms rate=0.0/0.0/defaultHz lowPower=true
+presentationSlip: n=200 avg=0.60ms p50=0.10ms p95=0.12ms p99=16.78ms max=16.78ms rate=0.0/0.0/defaultHz lowPower=true
+keyDelivery: n=200 avg=6.73ms p50=4.31ms p95=17.65ms p99=20.10ms max=22.40ms rate=0.0/0.0/defaultHz lowPower=true
+keypressToOutput: n=200 avg=6.83ms p50=4.45ms p95=17.79ms p99=20.25ms max=22.49ms rate=0.0/0.0/defaultHz lowPower=true
+frameInterval: n=200 avg=17.67ms p50=16.67ms p95=16.67ms p99=66.66ms max=66.66ms rate=0.0/0.0/defaultHz lowPower=true
+wakeHop: n=200 avg=1.53ms p50=0.18ms p95=5.23ms p99=9.25ms max=18.49ms rate=0.0/0.0/defaultHz lowPower=true
+keypressToPresent: n=200 avg=67.99ms p50=68.17ms p95=82.46ms p99=91.35ms max=145.74ms rate=0.0/0.0/defaultHz lowPower=true
+echoToMain: n=200 avg=1.25ms p50=0.16ms p95=4.66ms p99=7.93ms max=18.49ms rate=0.0/0.0/defaultHz lowPower=true
+mainToFrame: n=200 avg=10.87ms p50=11.62ms p95=15.85ms p99=16.03ms max=93.22ms rate=0.0/0.0/defaultHz lowPower=true
+frameToGlass: n=200 avg=49.77ms p50=49.40ms p95=49.69ms p99=66.06ms max=66.28ms rate=0.0/0.0/defaultHz lowPower=true
+```
+
+### power-low-02-before
+
+```json
+{
+  "kind": "human",
+  "completedUTC": "2026-10-10T06:24:21.232361+00:00",
+  "stage": "power-low-02-before",
+  "pid": 3141,
+  "automaticClosure": "first complete 200-presentation ring",
+  "summaries": [
+    "keypressToPresent: n=200 avg=188.52ms p50=183.25ms p95=227.51ms p99=243.00ms max=395.72ms"
+  ],
+  "executableSHA256": "3124a34d95fa751cce072dad129d210d8383b8670a6e57ad50d5b3a444b5d1ef",
+  "powerAtLaunch": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t97%; charging; 0:23 remaining present: true\n",
+  "powerAtEnd": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t97%; charging; 0:21 remaining present: true\n",
+  "continuousPowerMonitoring": false
+}
+```
+
+```text
+keypressToPresent: n=200 avg=188.52ms p50=183.25ms p95=227.51ms p99=243.00ms max=395.72ms
+```
+
+### power-low-02-after
+
+```json
+{
+  "kind": "human",
+  "completedUTC": "2026-10-10T06:23:43.080407+00:00",
+  "stage": "power-low-02-after",
+  "pid": 3157,
+  "automaticClosure": "first complete 200-presentation ring",
+  "summaries": [
+    "keypressToPresent: n=200 avg=69.32ms p50=68.33ms p95=84.01ms p99=166.93ms max=171.35ms rate=0.0/0.0/defaultHz lowPower=true"
+  ],
+  "executableSHA256": "42e7fa41bd1fc243d0aa9105d9a9007b077a90ba553dab4f26ccfb47551a6cf7",
+  "powerAtLaunch": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t97%; charging; 0:23 remaining present: true\n",
+  "powerAtEnd": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t97%; charging; 0:23 remaining present: true\n",
+  "continuousPowerMonitoring": false
+}
+```
+
+```text
+callbackLead: n=200 avg=54.85ms p50=49.91ms p95=145.79ms p99=149.90ms max=149.90ms rate=0.0/0.0/defaultHz lowPower=true
+presentationSlip: n=200 avg=0.62ms p50=0.12ms p95=0.14ms p99=16.80ms max=16.80ms rate=0.0/0.0/defaultHz lowPower=true
+keyDelivery: n=200 avg=6.31ms p50=4.77ms p95=14.05ms p99=18.74ms max=19.31ms rate=0.0/0.0/defaultHz lowPower=true
+keypressToOutput: n=200 avg=6.42ms p50=4.86ms p95=14.13ms p99=18.79ms max=19.46ms rate=0.0/0.0/defaultHz lowPower=true
+frameInterval: n=200 avg=17.92ms p50=16.67ms p95=16.67ms p99=66.66ms max=66.66ms rate=0.0/0.0/defaultHz lowPower=true
+wakeHop: n=200 avg=1.09ms p50=0.18ms p95=4.15ms p99=5.42ms max=5.98ms rate=0.0/0.0/defaultHz lowPower=true
+echoToMain: n=200 avg=0.95ms p50=0.17ms p95=3.73ms p99=5.43ms max=5.99ms rate=0.0/0.0/defaultHz lowPower=true
+mainToFrame: n=200 avg=12.09ms p50=12.30ms p95=15.98ms p99=98.33ms max=98.87ms rate=0.0/0.0/defaultHz lowPower=true
+frameToGlass: n=200 avg=50.18ms p50=49.40ms p95=65.77ms p99=65.94ms max=66.33ms rate=0.0/0.0/defaultHz lowPower=true
+keypressToPresent: n=200 avg=69.32ms p50=68.33ms p95=84.01ms p99=166.93ms max=171.35ms rate=0.0/0.0/defaultHz lowPower=true
+```
+
+### power-low-03-before
+
+```json
+{
+  "kind": "human",
+  "completedUTC": "2026-10-10T06:24:00.162043+00:00",
+  "stage": "power-low-03-before",
+  "pid": 3172,
+  "automaticClosure": "first complete 200-presentation ring",
+  "summaries": [
+    "keypressToPresent: n=200 avg=186.87ms p50=184.54ms p95=221.09ms p99=234.39ms max=241.38ms"
+  ],
+  "executableSHA256": "3124a34d95fa751cce072dad129d210d8383b8670a6e57ad50d5b3a444b5d1ef",
+  "powerAtLaunch": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t97%; charging; 0:23 remaining present: true\n",
+  "powerAtEnd": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t97%; charging; 0:21 remaining present: true\n",
+  "continuousPowerMonitoring": false
+}
+```
+
+```text
+keypressToPresent: n=200 avg=186.87ms p50=184.54ms p95=221.09ms p99=234.39ms max=241.38ms
+```
+
+### power-low-03-after
+
+```json
+{
+  "kind": "human",
+  "completedUTC": "2026-10-10T06:24:11.182423+00:00",
+  "stage": "power-low-03-after",
+  "pid": 3187,
+  "automaticClosure": "first complete 200-presentation ring",
+  "summaries": [
+    "keypressToPresent: n=200 avg=71.71ms p50=70.28ms p95=86.85ms p99=174.71ms max=183.27ms rate=0.0/0.0/defaultHz lowPower=true"
+  ],
+  "executableSHA256": "42e7fa41bd1fc243d0aa9105d9a9007b077a90ba553dab4f26ccfb47551a6cf7",
+  "powerAtLaunch": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t97%; charging; 0:23 remaining present: true\n",
+  "powerAtEnd": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36110435)\t97%; charging; 0:21 remaining present: true\n",
+  "continuousPowerMonitoring": false
+}
+```
+
+```text
+callbackLead: n=200 avg=58.70ms p50=49.91ms p95=149.78ms p99=149.91ms max=149.92ms rate=0.0/0.0/defaultHz lowPower=true
+presentationSlip: n=200 avg=1.27ms p50=0.01ms p95=16.68ms p99=16.70ms max=16.71ms rate=0.0/0.0/defaultHz lowPower=true
+keyDelivery: n=200 avg=6.92ms p50=5.23ms p95=16.32ms p99=18.33ms max=20.07ms rate=0.0/0.0/defaultHz lowPower=true
+keypressToOutput: n=200 avg=7.03ms p50=5.33ms p95=16.43ms p99=18.45ms max=20.12ms rate=0.0/0.0/defaultHz lowPower=true
+frameInterval: n=200 avg=18.67ms p50=16.67ms p95=16.67ms p99=66.66ms max=66.66ms rate=0.0/0.0/defaultHz lowPower=true
+wakeHop: n=200 avg=1.38ms p50=0.21ms p95=4.77ms p99=5.81ms max=6.71ms rate=0.0/0.0/defaultHz lowPower=true
+keypressToPresent: n=200 avg=71.71ms p50=70.28ms p95=86.85ms p99=174.71ms max=183.27ms rate=0.0/0.0/defaultHz lowPower=true
+echoToMain: n=200 avg=1.08ms p50=0.18ms p95=4.35ms p99=5.81ms max=6.71ms rate=0.0/0.0/defaultHz lowPower=true
+mainToFrame: n=200 avg=14.13ms p50=12.44ms p95=16.23ms p99=98.61ms max=98.72ms rate=0.0/0.0/defaultHz lowPower=true
+frameToGlass: n=200 avg=50.67ms p50=49.30ms p95=65.84ms p99=66.22ms max=66.27ms rate=0.0/0.0/defaultHz lowPower=true
+```

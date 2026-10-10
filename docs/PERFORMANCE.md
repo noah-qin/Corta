@@ -611,7 +611,7 @@ Power Mode off, give DisplayLink p50 **83.75–84.12 ms** and opt-in on-demand
 p50 **33.94–34.21 ms**, with lower p95/p99. Three Typometer rounds confirm the
 direction: **54.81–56.37 ms → 22.26–24.12 ms**. Internal and external gains
 differ by about one frame; the old calibration offset is not reused. Human
-rounds were deferred by the user. #279's external baseline is now closed.
+rounds were subsequently recorded on reported battery power; these are supplemental, not verified mains acceptance. #279's external baseline is now closed.
 
 The first resumed callback has approximately the same 49.9 ms target lead as
 steady callbacks; resume→callback is approximately 16.4 ms. No additional
@@ -620,7 +620,7 @@ CAMetalDisplayLink/nextDrawable prototype trapped twice and was removed; the
 opt-in experiment uses separate CADisplayLink pacing and only bypasses pacing
 for paused-link echoes within 50 ms of input, rate-limited to one refresh.
 **DisplayLink stays the default:** three alternating flood rounds show higher experimental tails, so the promotion
-gate fails. Manual/tearing acceptance is still pending; scripted power-mode pairs are recorded below.
+gate fails. Verified-mains driver/tearing acceptance is still pending; scripted power-mode pairs are recorded below.
 
 [Full environment, decomposition, raw rounds and acceptance limits](test-results/2026-10-09-input-followup.md)
 also record final full Unit, D17, idle/occluded Activity Monitor counters and
@@ -643,8 +643,12 @@ does not wake it or re-present unchanged frames.
 Three scripted power-mode pairs (October 9–10, shipping DisplayLink driver)
 measure low-power p50 medians **186.64 → 64.08 ms** and normal-mode medians
 **108.48 → 107.23 ms**. Low-power target-interval p50/p99 is 16.67/16.67 ms.
-XCTest input cadence differs by power mode; human input and energy limits
-remain in the linked record. No 120 Hz result or energy equivalence is inferred
+XCTest input cadence differs by power mode. Later three human mains pairs
+per power mode (current PTY-wakeup build) give normal p50 medians
+**68.32 → 69.02 ms**, low-power **184.54 → 68.33 ms**. Current normal
+first-pair p99 175.47 ms exceeds old max 169.47 ms; mixed key content and
+prelaunched inactive processes limit the result. Energy/visual acceptance
+and the full raw distributions remain in the linked record. No 120 Hz result or energy equivalence is inferred
 from policy tests.
 
 

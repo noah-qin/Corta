@@ -48,7 +48,7 @@ of magnitude, with a one-frame size difference. They are separate event and
 presentation instruments; the older #279 calibration offset is not subtracted
 from these sessions. #279 is now closed and its baseline remains in
 [the cross-terminal record](../history/2026-10-09-CROSS-TERMINAL-RUN.md).
-A person typing three alternating rounds is deferred by the user, not replaced
+At the time of these scripted runs, human alternating rounds were deferred by the user, not replaced
 by either synthetic instrument.
 
 Correlated round-one mean stages for DisplayLink are approximately 2.20 ms
@@ -392,9 +392,98 @@ The earlier three power-mode pairs and the same-binary driver experiment
 precede this idle-reader optimization; they remain explicitly earlier-build
 measurements. Renderer code and the offscreen D17 path are unchanged by it.
 
+
+## Human driver comparison, October 10
+
+The user physically typed in six alternating isolated launches, DisplayLink
+then on-demand, three pairs. Same current functional binary after the PTY
+close-wakeup change: SHA-256
+`42e7fa41bd1fc243d0aa9105d9a9007b077a90ba553dab4f26ccfb47551a6cf7`,
+source commit `69fd44c`. Menlo 14, 120×40, blink off, shell `cat` discarding
+input after terminal echo; lowPower=false, built-in 60 Hz panel. The user
+subsequently clarified that the preceding whole batch was unplugged. Its
+earlier AC label was incorrect: these are reported battery-powered sessions,
+without continuous power-state capture, and are supplemental rather than
+verified mains acceptance. No
+scripted keystrokes were sent. Each launch was requested to receive about
+300 individually pressed digits. Exact physical key count/cadence was not
+recorded; each produced at least one complete 200-presentation ring.
+
+The first complete ring from each launch is the comparison; all subsequent
+rings are retained below as supplemental data, without picking the best.
+At launch verification of the sixth session, a short Latin letter sequence
+was already visible before the final digit instruction. These inputs are
+not separated or discarded; this is a mixed ordinary-key input limitation,
+so a digits-only claim is not made.
+
+| Pair | DisplayLink p50 / p95 / p99 ms | On-demand p50 / p95 / p99 ms |
+| :--- | :--- | :--- |
+| 1 | 63.11 / 82.81 / 145.49 | 38.02 / 60.31 / 66.58 |
+| 2 | 68.27 / 86.17 / 176.71 | 38.25 / 57.89 / 66.73 |
+| 3 | 68.61 / 84.44 / 171.45 | 36.40 / 57.59 / 67.36 |
+
+In these reported battery-powered sessions, median p50 improves **68.27 → 38.02 ms**, 30.25 ms (more than one
+60 Hz frame). Every paired p95/p99 improves. This supports the latency
+direction of the scripted/external measurements, but does not override
+the failed experimental flood gate or pending visual/energy acceptance.
+The first old-version human power baseline was likewise completed unplugged
+and retained as supplemental, to be repeated on confirmed mains.
+The six test processes were closed individually and the original Pinyin
+input source restored. The separate human old/new power-policy comparisons
+are recorded in the following section.
+
+
+## Human mains and Low Power policy pairs, October 10
+
+Twelve human launches completed three old/new pairs under normal mains power,
+then three old/new pairs under Low Power Mode on mains. The user personally
+changed Battery settings to Only on Power Adapter before the low-power series.
+Each launch used DisplayLink, Menlo 14, 120×40, blink off, isolated config,
+and shell echo; the first complete 200-presentation ring triggered automatic
+save/close. No synthetic keystrokes were sent. Both launch/end snapshots of
+all twelve sessions report AC Power. Power was not continuously monitored.
+Low-mode setting snapshots show AC lowpowermode=1, Battery=0; changed-app
+rings report lowPower=true (normal rings false). Original Never setting and
+Pinyin input source were restored after the series.
+
+Old binary SHA-256: `3124a34d95fa751cce072dad129d210d8383b8670a6e57ad50d5b3a444b5d1ef`
+(baseline `b0917dd`). Current functional binary:
+`42e7fa41bd1fc243d0aa9105d9a9007b077a90ba553dab4f26ccfb47551a6cf7`
+(source `69fd44c`). Normal first pair was launched individually; remaining
+three normal windows and all six low-power windows were prelaunched with
+blink disabled, then focused sequentially after the previous process exited.
+Consequently later runs have additional inactive test processes; this is
+not an identical process-count experiment. The tiny watchers check metric
+files once per second. The user was instructed to type individual digits,
+but short Latin text was seen during some launch verifications, including
+normal-after-1 and low-before-1; exact key count/content/cadence was not
+recorded. Results are mixed ordinary physical-key sessions, not digits-only
+proof. Typed content is not committed.
+
+| Mode / pair | Old p50 / p95 / p99 ms | Current p50 / p95 / p99 ms |
+| :--- | :--- | :--- |
+| normal / 1 | 68.32 / 84.55 / 169.47 | 68.74 / 84.16 / 175.47 |
+| normal / 2 | 66.40 / 83.83 / 163.80 | 69.30 / 85.25 / 173.80 |
+| normal / 3 | 68.91 / 85.45 / 168.18 | 69.02 / 83.47 / 142.45 |
+| low / 1 | 184.76 / 220.41 / 232.61 | 68.17 / 82.46 / 91.35 |
+| low / 2 | 183.25 / 227.51 / 243.00 | 68.33 / 84.01 / 166.93 |
+| low / 3 | 184.54 / 221.09 / 234.39 | 70.28 / 86.85 / 174.71 |
+
+Normal p50 medians are **68.32 → 69.02 ms**, a +0.70 ms difference within
+the 2.51 ms old-run range. Normal old/new median p99 is **168.18 →
+173.80 ms**; current first-pair p99 **175.47 ms** exceeds the old maximum
+**169.47 ms**, so strict tail non-regression is not passed. Do not omit it.
+Low-power p50 medians are **184.54 → 68.33 ms**; current low-power median
+is within the normal old-run range (66.40–68.91 ms), and within 0.69 ms of
+current normal median 69.02 ms. Current low-power range 68.17–70.28 overlaps
+current normal 68.74–69.30; not every low-power round lies within that range.
+All three low-power p95/p99 improve relative to their old counterparts.
+This supports removal of the low-power typing penalty on this 60 Hz panel;
+no 120 Hz, energy, tearing or strict tail/zero-wakeup pass is inferred.
+
 ## Outstanding acceptance
 
-Human three-round typing is explicitly deferred. Scripted Normal/Low Power pairs are complete; human power-mode pairs,
+Human driver typing has completed with the mixed-key limitation above. Scripted and human Normal/Low Power pairs are recorded with the limits above; verified-mains driver comparison, strict normal tails,
 120 Hz if a panel becomes available, flood-tail outliers and Activity Monitor energy
 comparisons, zero-process-wakeup attribution, and the complete
 D14 real-program/IME/windowed/fullscreen visual checklist remain gates. These
