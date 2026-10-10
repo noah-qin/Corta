@@ -531,3 +531,35 @@ fixes, and preserve negative experiment records and the quantified driver
 floor. Default four-pane non-regression and matched-cadence low-power gates
 are now established. The proposed merge accepts application quiescence with
 the diagnosed platform floor, not a fabricated absolute-zero measurement.
+
+## Completed live physical-screen observation
+
+After the initial record above, the user requested and then explicitly started
+the live observation. The final retained Benchmark executable
+`16017f444d3e80bba3f401686ccc8624a1129176f5be5b89bc1eb59fe788548f`
+was launched in two fresh isolated stages. A synchronized-output animation
+moves a bright vertical stripe across aligned text rows. Each driver is
+shown for twelve seconds in a window and twelve seconds in native fullscreen:
+
+| Driver | Window | Fullscreen |
+| --- | --- | --- |
+| displaylink (default) | User observed no anomaly | User observed no anomaly |
+| ondemand (synchronized experiment) | User observed no anomaly | User observed no anomaly |
+
+After both groups ended, the user answered the explicit tearing/flicker/row
+misalignment question **“没有看到异常”**. This supplies the physical-display
+observation that screenshots alone could not provide. It is an observed pass
+for these scenes on the available 60 Hz panel, not a universal guarantee for
+every display. No-sync remains withdrawn and was not tested or restored.
+All four phase captures were saved; the inspected fullscreen captures show
+straight stripes, aligned rows and correct driver/fullscreen labels.
+The helper exited successfully, both owned PIDs (15531, 15563) were closed,
+and the original SCIM input source was restored. The local phase record is
+`/tmp/corta-visual-human-review-record.json`; stages are
+`/tmp/corta-final-d14/visual-human-1791655971670329000-{displaylink,ondemand}`.
+
+The previous unperformed-observation statements are historical and are
+superseded by this completed run. Remaining idle process counters retain
+the diagnosed AGX/platform floor described above; an absolute zero counter
+is still not claimed. No runtime source changed after the passing final
+flood, power pairs and 962-test Unit run.

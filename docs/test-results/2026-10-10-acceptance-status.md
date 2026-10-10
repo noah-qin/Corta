@@ -73,3 +73,5 @@ The combined PR remains draft: passing CI does not fill the outstanding
 Latest foreground retry: the directory ghost/IME overlap was fixed and full Unit now passes 962 tests. Three additional default four-pane pairs still fail GPU tails; CPU/wakeup proxy results and the confirmed blocked reader are in the later record. No completion/merge is inferred.
 
 October 11 merge follow-up: the [final validation](2026-10-11-merge-validation.md) corrects flood sampling before teardown, records three passing sustained default-driver pairs and a final-source check, matches scripted input cadence across power modes, withdraws no-sync, and attributes the three-second idle timer to Apple AGX deferred GPU setup. Historical negative results above are retained with their method limits; absolute zero process wakeups and an unperformed human panel observation are not claimed.
+
+The user subsequently completed the final windowed/fullscreen live observation for both retained drivers and reported no tearing, flicker or row misalignment. See the completed live-observation section of the [final validation](2026-10-11-merge-validation.md).
