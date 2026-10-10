@@ -524,8 +524,13 @@ remain unresolved; this positive latency comparison does not pass those.
 
 ## Outstanding acceptance
 
-Human driver typing has completed with the mixed-key limitation above. Scripted and human Normal/Low Power pairs are recorded with the limits above; mains driver pairs are also complete; strict normal tails,
-120 Hz if a panel becomes available, flood-tail outliers and Activity Monitor energy
-comparisons, zero-process-wakeup attribution, and the complete
-D14 real-program/IME/windowed/fullscreen visual checklist remain gates. These
-are not replaced by policy-table tests, offscreen equivalence or static images.
+The [issue-by-issue audit](2026-10-10-acceptance-status.md) separates completed
+#281/#283 implementation and core/renderer acceptance from the remaining
+#280/#282 runtime gates. Human normal/Low Power and mains driver pairs are
+complete with their recorded limits. Experimental/default flood outliers,
+energy equivalence, literal scripted normal/low-power spread, strict
+zero-process-wakeup attribution and complete temporal/overlay D14 checks
+remain unresolved. Normal p99 outliers remain evidence, but are not a new
+independent #282-only criterion. A 120 Hz panel is unavailable, as the issue
+explicitly allows. The user now disallows desktop-disrupting automation;
+background verification cannot certify foreground temporal tearing.
