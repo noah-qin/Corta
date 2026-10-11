@@ -14,6 +14,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import Foundation
+
 /// The Kitty graphics protocol (`DESIGN.md` §6): inline images as APC
 /// sequences, as <https://sw.kovidgoyal.net/kitty/graphics-protocol/>
 /// specifies — the format `icat`, plot libraries and TUI file previewers
@@ -70,6 +72,8 @@ public enum KittyGraphics {
         public var width: Int
         public var height: Int
         public var bytes: [UInt8]
+        /// Diagnostic-only final-payload timestamp, on the drawable uptime clock.
+        public var receivedAt: TimeInterval? = nil
 
         /// Height in pixels without decoding: `v=`, or for a PNG the `IHDR`
         /// chunk every PNG starts with (big-endian, bytes 20–23). Nil when a

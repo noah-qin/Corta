@@ -247,7 +247,9 @@ public final class TerminalSession: @unchecked Sendable {
 
     private func scheduleCompression() {
         let start = compressionScheduled.withLock { active in
-            if active { return false }; active = true; return true
+            if active { return false }
+            active = true
+            return true
         }
         guard start else { return }
         compressionQueue.async { [weak self] in
@@ -411,6 +413,31 @@ public final class TerminalSession: @unchecked Sendable {
         ReaderBox(session: self).start()
     }
 
+    public enum ReaderPriority: Int, Sendable {
+        case interactive = 0
+        case background = 1
+    }
+    private let requestedReaderPriority = Atomic<Int>(ReaderPriority.interactive.rawValue)
+    private let appliedReaderPriority = Atomic<Int>(ReaderPriority.interactive.rawValue)
+
+    /// Only the reader changes its pthread QoS. Requests do not wake an idle PTY.
+    public func setReaderPriority(_ priority: ReaderPriority) {
+        requestedReaderPriority.store(priority.rawValue, ordering: .releasing)
+    }
+    public var readerPriority: ReaderPriority {
+        ReaderPriority(rawValue: appliedReaderPriority.load(ordering: .acquiring)) ?? .interactive
+    }
+    private func applyReaderPriority() {
+        let requested = requestedReaderPriority.load(ordering: .acquiring)
+        guard requested != appliedReaderPriority.load(ordering: .relaxed) else { return }
+        let qos =
+            requested == ReaderPriority.background.rawValue
+            ? QOS_CLASS_UTILITY : QOS_CLASS_USER_INITIATED
+        if pthread_set_qos_class_self_np(qos, 0) == 0 {
+            appliedReaderPriority.store(requested, ordering: .releasing)
+        }
+    }
+
     // MARK: - Reading (runs on `readerThread` only)
 
     fileprivate func runReaderLoop() {
@@ -423,6 +450,7 @@ public final class TerminalSession: @unchecked Sendable {
         batch.reserveCapacity(Self.batchByteCap)
 
         while !stopped.withLock({ $0 }) {
+            applyReaderPriority()
             // Between batches too: a flood is mostly single-slice batches.
             yieldToStateWaiters()
             batch.removeAll(keepingCapacity: true)
@@ -451,6 +479,7 @@ public final class TerminalSession: @unchecked Sendable {
                 if !source.isReadable() { break }
             }
 
+            applyReaderPriority()
             if !batch.isEmpty {
                 // Under the lock, in slices, so a snapshot or resize never waits
                 // behind a whole batch.
@@ -638,7 +667,8 @@ public final class TerminalSession: @unchecked Sendable {
     /// returns; a blocking `write(2)` measured 43 ms per MB once the PTY filled.
     @discardableResult
     public func write(_ bytes: [UInt8]) -> WriteOutcome {
-        enqueueWrite([bytes])
+        setReaderPriority(.interactive)
+        return enqueueWrite([bytes])
     }
 
     /// Every chunk or none, under one backlog check. Admitted while the
@@ -647,7 +677,8 @@ public final class TerminalSession: @unchecked Sendable {
     /// instead, whose cut is closed rather than left in paste mode.
     @discardableResult
     public func write(chunks: [[UInt8]]) -> WriteOutcome {
-        enqueueWrite(chunks)
+        setReaderPriority(.interactive)
+        return enqueueWrite(chunks)
     }
 
     /// A paste: as `write(chunks:)`, but its queued chunks can be dropped
@@ -657,7 +688,8 @@ public final class TerminalSession: @unchecked Sendable {
     /// the paste's last chunk on its own, so a cut never splits it.
     @discardableResult
     public func write(paste chunks: [[UInt8]], closing: [UInt8]?) -> WriteOutcome {
-        enqueueWrite(chunks, kind: .paste(closing: closing))
+        setReaderPriority(.interactive)
+        return enqueueWrite(chunks, kind: .paste(closing: closing))
     }
 
     /// A paste is still queued for the child.

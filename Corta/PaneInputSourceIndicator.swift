@@ -32,7 +32,7 @@ import CortaTerminal
     var sourceProvider: () -> InputSourceState? = { SystemInputSource.current() }
 
     init() {
-        view.isHidden = true
+        if !view.isHidden { view.isHidden = true }
     }
 
     isolated deinit { stop() }
@@ -71,7 +71,7 @@ import CortaTerminal
         notificationTokens.removeAll()
         for token in distributedTokens { DistributedNotificationCenter.default().removeObserver(token) }
         distributedTokens.removeAll()
-        view.isHidden = true
+        if !view.isHidden { view.isHidden = true }
         placement.reset()
     }
 
@@ -82,7 +82,7 @@ import CortaTerminal
             configuration.inputSourceIndicator != .off,
             configuration.inputSourceIndicator != .auto || automaticallyVisible
         else {
-            view.isHidden = true
+            if !view.isHidden { view.isHidden = true }
             placement.reset()
             return
         }
@@ -94,27 +94,32 @@ import CortaTerminal
         guard !promptPlaced || (scrollOffset == 0 && !grid.isAlternateScreenActive
             && (configuration.inputSourceIndicator == .always || !hasIntegration || promptRow != nil))
         else {
-            view.isHidden = true
+            if !view.isHidden { view.isHidden = true }
             placement.reset()
             return
         }
         if !promptPlaced {
             view.update(source: source, configuration: configuration)
-            view.frame = CGRect(x: 0, y: 0, width: 28, height: 24)
-            view.isHidden = false
+            let frame = CGRect(x: 0, y: 0, width: 28, height: 24)
+            if view.frame != frame { view.frame = frame }
+            if view.isHidden { view.isHidden = false }
             placement.reset()
             return
         }
         let size = CGSize(width: max(24, cellSize.width * 2 + 8), height: max(12, cellSize.height - 2))
         guard let row = placement.row(grid: grid, promptRow: promptRow,
             badgeColumns: Int(ceil((size.width + 4) / cellSize.width)), compositionRect: compositionRect,
-            cellSize: cellSize, topInset: topInset) else { view.isHidden = true; return }
+            cellSize: cellSize, topInset: topInset) else {
+            if !view.isHidden { view.isHidden = true }
+            return }
         let rect = CGRect(x: TerminalLayout.insets.left + CGFloat(grid.columns) * cellSize.width - size.width,
             y: topInset + CGFloat(row) * cellSize.height + 1, width: size.width, height: size.height)
-        guard !blockedRects.contains(where: { $0.intersects(rect) }) else { view.isHidden = true; return }
+        guard !blockedRects.contains(where: { $0.intersects(rect) }) else {
+            if !view.isHidden { view.isHidden = true }
+            return }
         view.update(source: source, configuration: configuration)
         if view.frame != rect { view.frame = rect }
-        view.isHidden = false
+        if view.isHidden { view.isHidden = false }
     }
 }
 

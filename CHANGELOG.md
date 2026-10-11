@@ -12,6 +12,18 @@ Versioning for compatibility changes.
 
 ### Changed
 
+- Kitty PNG decoding writes into anonymous shared pixel memory inherited by
+  the sandboxed helper. Metal wraps the mapping without copying and blits it
+  into a private texture on the GPU; raw RGB/RGBA pixels are reordered directly
+  into shared storage.
+- Hidden panes request utility reader QoS after a two-second grace; keyboard
+  input and paste restore interactive priority before queuing bytes.
+- Idle blinking cursors hand off to Core Animation after a presented
+  cursorless frame, and return to Metal through versioned presentation callbacks.
+- Native shell and input-source overlays update only when their presentation
+  changes. An opt-in per-window render thread is available for acceptance
+  testing through `CORTA_RENDER_THREAD=1`.
+
 - Render instances use half the upload bytes, with exact floating-point glyph
   geometry and image crops. Glyph atlases allocate grayscale height on demand
   and keep color storage small until color glyphs appear.
@@ -30,6 +42,11 @@ Versioning for compatibility changes.
   power-mode measurements and idle/flood CPU checks are recorded.
 
 ### Fixed
+
+- IME candidate coordinates refresh after window, layout, cursor and font
+  changes, and use the marked-text caret rather than a stale cursor anchor.
+- Ended sessions show a compact centered card with accessible restart and
+  close actions that fit narrow panes.
 
 - Square table corners stop at the joined strokes instead of protruding past
   the border. Square and rounded corners are verified at fractional scales.

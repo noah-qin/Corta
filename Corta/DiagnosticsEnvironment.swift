@@ -29,24 +29,49 @@ import OSLog
 nonisolated enum DiagnosticsEnvironment {
     /// The variable names, for documentation and the stripping test.
     enum Switch: String, CaseIterable {
+        case renderThread = "CORTA_RENDER_THREAD"
+        case mainStall = "CORTA_MAIN_STALL"
         case frameDriver = "CORTA_FRAME_DRIVER"
         case frameLatency = "CORTA_FRAME_LATENCY"
         case maxDrawables = "CORTA_MAX_DRAWABLES"
         case renderMetrics = "CORTA_RENDER_METRICS"
+        case renderMetricsFrames = "CORTA_RENDER_METRICS_FRAMES"
         case renderMetricsKeystrokes = "CORTA_RENDER_METRICS_KEYSTROKES"
         case restoreWindows = "CORTA_RESTORE_WINDOWS"
         case sftpSSH = "CORTA_SFTP_SSH"
         case stageDirectory = "CORTA_STAGE_DIR"
 
-        /// Whether a Release build reads it. Only the switch that substitutes
-        /// a program is withheld; the rest measure or stage a build.
-        var isHonouredInRelease: Bool { self != .sftpSSH }
+        /// Whether a Release build reads it. Program substitution and deliberate main-thread stalls are
+        /// withheld; the remaining switches measure or stage a build.
+        var isHonouredInRelease: Bool { self != .sftpSSH && self != .mainStall }
     }
 
     typealias Environment = [String: String]
 
     private static func value(_ name: Switch, in environment: Environment) -> String? {
         environment[name.rawValue]
+    }
+
+    // The experimental path stays opt-in until the interactive acceptance matrix passes.
+    static func usesRenderThread(in environment: Environment = ProcessInfo.processInfo.environment)
+        -> Bool
+    {
+        value(.renderThread, in: environment) == "1"
+    }
+    struct MainStall: Equatable, Sendable {
+        var milliseconds: Double
+        var periodMilliseconds: Double
+    }
+    static func mainStall(
+        in environment: Environment = ProcessInfo.processInfo.environment,
+        enabled: Bool = DiagnosticsEnvironment.supportsStallInjection
+    ) -> MainStall? {
+        guard enabled, let raw = value(.mainStall, in: environment) else { return nil }
+        let parts = raw.split(separator: "/")
+        guard parts.count == 2, let ms = Double(parts[0]), let period = Double(parts[1]),
+            ms.isFinite, period.isFinite, ms > 0, ms <= 1000, period > ms
+        else { return nil }
+        return MainStall(milliseconds: ms, periodMilliseconds: period)
     }
 
     enum FrameDriver: String, CaseIterable {
@@ -101,6 +126,15 @@ nonisolated enum DiagnosticsEnvironment {
             return nil
         }
         return URL(fileURLWithPath: raw)
+    }
+
+    static func renderMetricsFrames(
+        in environment: Environment = ProcessInfo.processInfo.environment
+    ) -> Int? {
+        guard let raw = value(.renderMetricsFrames, in: environment), let count = Int(raw),
+            (1...6000).contains(count)
+        else { return nil }
+        return count
     }
 
     /// `CORTA_RENDER_METRICS_KEYSTROKES=<n>`, n > 0: keystrokes per
@@ -166,6 +200,14 @@ nonisolated enum DiagnosticsEnvironment {
         true
         #else
         false
+        #endif
+    }
+
+    static var supportsStallInjection: Bool {
+        #if DEBUG || BENCHMARK
+            true
+        #else
+            false
         #endif
     }
 

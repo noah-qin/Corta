@@ -31,6 +31,7 @@ final class TerminalView: NSView, CALayerDelegate {
     /// `TerminalView+Scroll.swift` reports gesture phases to it.
     var renderPolicy: RenderPolicy?
     /// Pauses rendering while the window is occluded; replaced when changing windows.
+    private var inputGeometryObservers: [NSObjectProtocol] = []
     private var occlusionObserver: NSObjectProtocol?
     /// Mouse-moved tracking for ⌘-hover link feedback; `.inVisibleRect`
     /// keeps it glued to the visible area across resizes.
@@ -69,6 +70,18 @@ final class TerminalView: NSView, CALayerDelegate {
         set { frameScheduler.shouldRenderFrame = newValue }
     }
 
+    var threadedRender: (@Sendable (CGSize, CAMetalDrawable) -> (pending: Bool, drawn: Bool))? {
+        get { frameScheduler.threadedRender }
+        set { frameScheduler.threadedRender = newValue }
+    }
+    var threadedMetricsRedraw: (@Sendable () -> Bool)?
+    var onThreadDriverChange: ((ThreadFrameDriver?) -> Void)?
+    func refreshFrameDriver() {
+        frameScheduler.attach(to: window)
+        onThreadDriverChange?(frameScheduler.threadDriver)
+    }
+    var threadDriver: ThreadFrameDriver? { frameScheduler.threadDriver }
+
     var onKeyBytes: (([UInt8]) -> Void)?
     /// The key event the input context is handling right now: set around
     /// `handleEvent`, so a command the IME answers it with is encoded from
@@ -93,6 +106,7 @@ final class TerminalView: NSView, CALayerDelegate {
     let shellOverlay = ShellOverlayView()
     var onInputContextChange: (() -> Void)?
     var inputCompositionRect: CGRect?
+    var lastInputCompositionScreenRect: CGRect?
 
     /// A live resize ended; deliver the final size without the debounce.
     var onLiveResizeEnded: (() -> Void)?
@@ -258,24 +272,37 @@ final class TerminalView: NSView, CALayerDelegate {
     var isRendering: Bool { frameScheduler.isAttached }
 
     func stopRendering() {
+        for observer in inputGeometryObservers { NotificationCenter.default.removeObserver(observer) }
+        inputGeometryObservers.removeAll()
         if let occlusionObserver {
             NotificationCenter.default.removeObserver(occlusionObserver)
             self.occlusionObserver = nil
         }
         renderPolicy = nil
         frameScheduler.attach(to: nil)
+        onThreadDriverChange?(nil)
     }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        for observer in inputGeometryObservers { NotificationCenter.default.removeObserver(observer) }
+        inputGeometryObservers.removeAll()
         if let occlusionObserver {
             NotificationCenter.default.removeObserver(occlusionObserver)
             self.occlusionObserver = nil
         }
-        frameScheduler.attach(to: window)
+        refreshFrameDriver()
         renderPolicy = nil
         guard let window else { return }
         updateDrawableSize()
+        for name in [NSWindow.didMoveNotification, NSWindow.didResizeNotification,
+            NSWindow.didChangeScreenNotification] {
+            inputGeometryObservers.append(NotificationCenter.default.addObserver(
+                forName: name, object: window, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.refreshInputCompositionGeometry() }
+                })
+        }
+        refreshInputCompositionGeometry()
         renderPolicy = RenderPolicy(scheduler: frameScheduler, window: window)
         // Pause rendering while occluded. The PTY reader keeps draining
         // (`PERFORMANCE.md` §2.1), so a hidden pane's output waits, not lost.
@@ -288,9 +315,10 @@ final class TerminalView: NSView, CALayerDelegate {
     }
 
     private func updateOcclusionState() {
+        paneController?.updateReaderPriority()
         guard let window else { return }
         if window.occlusionState.contains(.visible) {
-            frameScheduler.resume()
+            frameScheduler.isPaused = false
         } else {
             frameScheduler.isPaused = true
         }
@@ -307,6 +335,7 @@ final class TerminalView: NSView, CALayerDelegate {
         updateDrawableSize()
         updateExteriorCornerMask()
         positionToast()
+        refreshInputCompositionGeometry()
     }
 
     /// A pinch arrives as deltas, then a phase end; without the end, the next
@@ -366,6 +395,7 @@ final class TerminalView: NSView, CALayerDelegate {
 
     /// Shared input hook, independent of diagnostic sampling.
     func noteUserInput() {
+        paneController?.updateReaderPriority(input: true)
         frameScheduler.noteInput()
         renderPolicy?.noteInput()
     }
@@ -374,7 +404,9 @@ final class TerminalView: NSView, CALayerDelegate {
     /// never reached the glass wakes this pane for another.
     func noteKeystrokeForMetrics(at timestamp: TimeInterval) {
         guard RenderMetrics.isEnabled else { return }
-        RenderMetrics.noteKeystroke(at: timestamp) { [weak self] in
+        let threadedRedraw = threadedMetricsRedraw
+        RenderMetrics.noteKeystroke(at: timestamp) { [weak self, threadedRedraw] in
+            if threadedRedraw?() == true { return }
             DispatchQueue.main.async { self?.setNeedsRedraw() }
         }
     }

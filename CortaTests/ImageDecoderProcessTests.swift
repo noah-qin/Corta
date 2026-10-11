@@ -14,7 +14,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import Darwin
 import Foundation
+import Metal
 import Testing
 
 @testable import Corta
@@ -24,7 +26,40 @@ import Testing
 /// `KittyPNGDecodeTests` drives the real helper end to end.
 @Suite("Image decoder process")
 struct ImageDecoderProcessTests {
-    private static let png: [UInt8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3]
+    private final class WeakPixels {
+        weak var value: ImageDecoderProcess.SharedPixels?
+        init(_ value: ImageDecoderProcess.SharedPixels?) { self.value = value }
+    }
+    private static let png: [UInt8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+        0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 1, 0, 0, 0, 1,
+    ]
+
+    @Test func dimensionsAreValidatedBeforeAllocating() {
+        #expect(ImageDecoderProcess.pngDimensions(Self.png)?.width == 1)
+        var bytes = Self.png
+        bytes[16] = 255
+        #expect(ImageDecoderProcess.pngDimensions(bytes) == nil)
+        #expect(ImageDecoderProcess.pngDimensions(Array(Self.png.dropLast())) == nil)
+    }
+    @Test func noCopyBufferOwnsTheMappingUntilTheTextureIsReleased() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        var pixels = ImageDecoderProcess.SharedPixels(
+            width: 4, height: 3,
+            alignment: device.minimumLinearTextureAlignment(for: .bgra8Unorm))
+        _ = try #require(pixels)
+        let released = WeakPixels(pixels)
+        let descriptor = try #require(pixels).descriptor
+        #expect(descriptor >= 4)
+        #expect(fcntl(descriptor, F_GETFD) & FD_CLOEXEC != 0)
+        memset(try #require(pixels).address, 7, try #require(pixels).length)
+        var texture = try #require(pixels).texture(device: device, width: 4, height: 3)
+        #expect(texture != nil)
+        #expect(texture?.buffer != nil)
+        pixels = nil
+        #expect(released.value != nil)
+        texture = nil
+        #expect(released.value == nil)
+    }
 
     @Test("the decoder is embedded beside corta-exec")
     func helperIsEmbedded() throws {
@@ -53,9 +88,10 @@ struct ImageDecoderProcessTests {
     func parsing() {
         let header: [UInt8] = [2, 0, 0, 0, 1, 0, 0, 0]
         let pixels = [UInt8](repeating: 7, count: 8)
-        #expect(ImageDecoderProcess.parse(header + pixels)
-            == .init(width: 2, height: 1, bgra: pixels))
-        #expect(ImageDecoderProcess.parse(header + pixels.dropLast()) == nil)
+        #expect(ImageDecoderProcess.parse(header)?.width == 2)
+        #expect(ImageDecoderProcess.parse(header)?.height == 1)
+        #expect(ImageDecoderProcess.parse(header + pixels) == nil)
+        #expect(ImageDecoderProcess.parse(Array(header.dropLast())) == nil)
         #expect(ImageDecoderProcess.parse([0, 0, 0, 0, 1, 0, 0, 0]) == nil)
         #expect(ImageDecoderProcess.parse([0, 0x40, 0, 0, 1, 0, 0, 0]) == nil)  // 16384 wide
     }

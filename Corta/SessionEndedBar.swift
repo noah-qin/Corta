@@ -67,20 +67,25 @@ final class SessionEndedBar: NSView {
         message = Self.message(for: exit, isConnection: isConnection)
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.cornerRadius = 8
-        layer?.borderWidth = 1
+        identifier = NSUserInterfaceItemIdentifier("Corta.SessionEnded")
+        layer?.cornerRadius = 12
+        layer?.borderWidth = 0.5
+        layer?.shadowColor = NSColor.black.cgColor
+        layer?.shadowOpacity = 0.08
+        layer?.shadowRadius = 8
+        layer?.shadowOffset = CGSize(width: 0, height: -2)
         updateColors()
 
         let icon = NSImageView()
         icon.image = NSImage(
             systemSymbolName: exit.isCleanExit ? "checkmark.circle" : "exclamationmark.circle",
             accessibilityDescription: nil)
-        icon.symbolConfiguration = .init(pointSize: 13, weight: .regular)
+        icon.symbolConfiguration = .init(pointSize: 18, weight: .regular)
         icon.contentTintColor = .secondaryLabelColor
         icon.setAccessibilityElement(false)
 
         let label = NSTextField(labelWithString: message)
-        label.font = .systemFont(ofSize: 12, weight: .medium)
+        label.font = .systemFont(ofSize: 12, weight: .regular)
         label.textColor = .labelColor
         label.lineBreakMode = .byTruncatingTail
         label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -88,7 +93,7 @@ final class SessionEndedBar: NSView {
         let newSession = NSButton(
             title: L10n.text(isConnection ? "failure.button.reconnect" : "session.ended.newSession"),
             target: self, action: #selector(newSessionTapped))
-        newSession.controlSize = .small
+        newSession.controlSize = .regular
         newSession.bezelStyle = .rounded
         newSession.toolTip = L10n.text(
             isConnection ? "session.ended.confirm.remoteMessage" : "session.ended.confirm.message")
@@ -96,16 +101,17 @@ final class SessionEndedBar: NSView {
 
         let close = NSButton(
             title: L10n.text("menu.closePane"), target: self, action: #selector(closeTapped))
-        close.controlSize = .small
-        close.bezelStyle = .rounded
+        close.controlSize = .regular
+        close.bezelStyle = .inline
+        close.contentTintColor = .secondaryLabelColor
         closeButton = close
 
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
         let stack = NSStackView(views: [icon, label, spacer, newSession, close])
         stack.orientation = .horizontal
-        stack.spacing = 8
-        stack.edgeInsets = NSEdgeInsets(top: 5, left: 10, bottom: 5, right: 6)
+        stack.spacing = 12
+        stack.edgeInsets = NSEdgeInsets(top: 10, left: 14, bottom: 10, right: 12)
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
         NSLayoutConstraint.activate([
@@ -123,19 +129,23 @@ final class SessionEndedBar: NSView {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    /// Pins the bar across `view`, `inset` in from the top or the bottom
+    /// Centers a compact card in `view`, `inset` in from the top or bottom
     /// edge, and announces it. It never takes the keyboard: a key pressed
     /// in a dead pane must not start or close anything.
     func present(in view: NSView, atTop: Bool, inset: CGFloat) {
         translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(self)
         NSLayoutConstraint.activate([
-            leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
-            trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
+            centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 12),
+            trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -12),
             atTop
-                ? topAnchor.constraint(equalTo: view.topAnchor, constant: inset)
-                : bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -inset),
+                ? topAnchor.constraint(equalTo: view.topAnchor, constant: max(inset, 16))
+                : bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -max(inset, 16)),
         ])
+        let preferredWidth = widthAnchor.constraint(equalToConstant: 560)
+        preferredWidth.priority = .defaultHigh
+        preferredWidth.isActive = true
         NSAccessibility.post(element: self, notification: .layoutChanged)
         if NSWorkspace.shared.isVoiceOverEnabled {
             NSAccessibility.post(
@@ -154,7 +164,7 @@ final class SessionEndedBar: NSView {
 
     private func updateColors() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.96).cgColor
+            layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
             layer?.borderColor = NSColor.separatorColor.cgColor
         }
     }

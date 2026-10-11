@@ -32,10 +32,12 @@ import Synchronization
 /// sandboxed runner that cannot read the unified log — gets the numbers.
 nonisolated enum RenderMetrics {
     enum Metric: String, CaseIterable {
+        case imageToPresent
         case keyDelivery
         case keypressToOutput
         case presentationSlip
         case echoToMain
+        case outputToFrame
         case mainToFrame
         case frameToGlass
         case wakeHop
@@ -62,7 +64,7 @@ nonisolated enum RenderMetrics {
     private static let log = OSLog(subsystem: "dev.noahqin.Corta", category: "render-metrics")
 
     /// Samples per summary: ~10 s at 60 Hz.
-    private static let capacity = 600
+    private static let capacity = DiagnosticsEnvironment.renderMetricsFrames() ?? 600
     /// 200 keystrokes, as earlier runs used; override with
     /// `CORTA_RENDER_METRICS_KEYSTROKES=<n>`.
     private static let keystrokeCapacity = DiagnosticsEnvironment.renderMetricsKeystrokes() ?? 200
@@ -73,6 +75,7 @@ nonisolated enum RenderMetrics {
         var samples: [Metric: [Double]] = [:]
         var pending: PendingKeystroke?
         var conditions: Conditions?
+        var presentedImages: Set<TimeInterval> = []
     }
 
     private struct Conditions: Sendable {
@@ -101,7 +104,8 @@ nonisolated enum RenderMetrics {
             state.samples[metric, default: []].append(milliseconds)
             let limit: Int
             switch metric {
-            case .keypressToPresent, .keyDelivery, .keypressToOutput, .presentationSlip, .echoToMain, .mainToFrame, .frameToGlass, .wakeHop, .callbackLead, .firstAfterResume, .resumeToCallback, .frameInterval:
+            case .imageToPresent: limit = 1
+            case .keypressToPresent, .keyDelivery, .keypressToOutput, .presentationSlip, .echoToMain, .outputToFrame, .mainToFrame, .frameToGlass, .wakeHop, .callbackLead, .firstAfterResume, .resumeToCallback, .frameInterval:
                 limit = keystrokeCapacity
             case .drawableWait, .cpuFrame, .gpu, .gpuExecution, .gpuFeedbackDelay:
                 limit = capacity
@@ -165,6 +169,24 @@ nonisolated enum RenderMetrics {
         defer { try? handle.close() }
         _ = try? handle.seekToEnd()
         try? handle.write(contentsOf: Data(line.utf8))
+    }
+
+    /// Registered only when a ready image texture is encoded into this frame.
+    /// A replaced drawable cannot complete the measurement; later frames retry.
+    static func noteImagePresent(of drawable: MTLDrawable, receivedAt: TimeInterval) {
+        guard isEnabled, !state.withLock({ $0.presentedImages.contains(receivedAt) }) else { return }
+        drawable.addPresentedHandler { drawable in
+            guard drawable.presentedTime > 0 else { return }
+            let elapsed = drawable.presentedTime - receivedAt
+            guard elapsed >= 0, elapsed < 30 else { return }
+            let first = state.withLock { state in
+                guard !state.presentedImages.contains(receivedAt) else { return false }
+                if state.presentedImages.count >= 512 { state.presentedImages.removeAll(keepingCapacity: true) }
+                state.presentedImages.insert(receivedAt)
+                return true
+            }
+            if first { record(.imageToPresent, milliseconds: elapsed * 1000) }
+        }
     }
 
     // MARK: - Keypress → glass
@@ -250,10 +272,13 @@ nonisolated enum RenderMetrics {
             }
             let seconds = presented.presentedTime - keystroke.timestamp
             guard seconds >= 0, seconds < 2 else { return }
+            if let outputAt = keystroke.outputAt {
+                record(.outputToFrame, milliseconds: (frameAt - outputAt) * 1000)
+            }
+            record(.frameToGlass, milliseconds: (presented.presentedTime - frameAt) * 1000)
             if let outputAt = keystroke.outputAt, let mainAt = keystroke.mainAt {
                 record(.echoToMain, milliseconds: (mainAt - outputAt) * 1000)
                 record(.mainToFrame, milliseconds: (frameAt - mainAt) * 1000)
-                record(.frameToGlass, milliseconds: (presented.presentedTime - frameAt) * 1000)
             }
             record(.keypressToPresent, milliseconds: seconds * 1000)
         }

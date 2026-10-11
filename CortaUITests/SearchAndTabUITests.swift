@@ -25,7 +25,8 @@ final class SearchAndTabUITests: XCTestCase {
 
     @MainActor
     func testCommandFOpensTheSearchBarAndEscapeClosesIt() throws {
-        let app = XCUIApplication()
+        let app = UIFixtures.app(stage: try UIFixtures.stage("measurement"), runner: Self.self, usingTestTarget: true)
+        defer { app.terminate() }
         // Session restore would otherwise carry the previous
         // test's windows into this one; the suite asserts window counts.
         app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
@@ -47,7 +48,8 @@ final class SearchAndTabUITests: XCTestCase {
 
     @MainActor
     func testCommandTOpensATab() throws {
-        let app = XCUIApplication()
+        let app = UIFixtures.app(stage: try UIFixtures.stage("measurement"), runner: Self.self, usingTestTarget: true)
+        defer { app.terminate() }
         // Session restore would otherwise carry the previous
         // test's windows into this one; the suite asserts window counts.
         app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
@@ -83,7 +85,8 @@ final class SearchAndTabUITests: XCTestCase {
     /// that the panes keep their row count; after that the frame is fixed.
     @MainActor
     func testTabsDoNotShrinkTheWindow() throws {
-        let app = XCUIApplication()
+        let app = UIFixtures.app(stage: try UIFixtures.stage("measurement"), runner: Self.self, usingTestTarget: true)
+        defer { app.terminate() }
         // Session restore would otherwise carry the previous
         // test's windows into this one; the suite asserts window counts.
         app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"

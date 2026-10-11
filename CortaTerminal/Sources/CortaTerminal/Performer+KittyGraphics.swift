@@ -159,7 +159,8 @@ extension Performer {
         case .png:
             break  // Decoded (and validated) by the app layer, which owns ImageIO.
         }
-        let data = KittyGraphics.ImageData(format: format, width: width, height: height, bytes: bytes)
+        var data = KittyGraphics.ImageData(format: format, width: width, height: height, bytes: bytes)
+        data.receivedAt = ProcessInfo.processInfo.systemUptime
         let storedID: KittyGraphics.ImageID
         let refusal: ImagePlacementTable.StoreRefusal?
         if imageID.rawValue == 0 {

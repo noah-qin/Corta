@@ -36,8 +36,8 @@ struct DiagnosticsEnvironmentTests {
         #expect(child["PATH"] == "/usr/bin:/bin")
     }
 
-    @Test func onlyTheProgramSubstitutionIsWithheldFromRelease() {
-        #expect(Switch.allCases.filter { !$0.isHonouredInRelease } == [.sftpSSH])
+    @Test func releaseWithholdsProgramSubstitutionAndStallInjection() {
+        #expect(Switch.allCases.filter { !$0.isHonouredInRelease } == [.mainStall, .sftpSSH])
     }
 
     @Test func frameDriverDefaultsAndDocumentedValues() {

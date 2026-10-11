@@ -36,6 +36,30 @@ stage() {
 }
 
 stage measurement 'columns = 120\nrows = 40\nfont-size = 14\nrestore-windows = false\ncursor-blink = false\nstatus-bar = false\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
+cat > "$root/measurement/kitty-shell" <<'SH'
+#!/bin/sh
+sleep 2
+printf '%s\n' "$PPID" > "/tmp/corta-kitty-parent-${KITTY_CASE_LABEL}.txt"
+sleep 2
+/opt/homebrew/bin/kitten icat --transfer-mode=stream --passthrough=none --stdin=no --use-window-size=120,40,8192,8192 --place=60x20@0x0 /tmp/corta-4096.png
+printf '\nkitten-complete\n'
+exec /bin/sh
+SH
+chmod 700 "$root/measurement/kitty-shell"
+for workload in flood idle; do
+  cat > "$root/measurement/energy-$workload-shell" <<SH
+#!/bin/sh
+printf '%s\\n' "\$PPID" > "/tmp/corta-energy-$workload-parent.txt"
+SH
+  if [[ "$workload" == flood ]]; then
+    printf 'sleep 3\nexec /usr/bin/yes\n' >> "$root/measurement/energy-$workload-shell"
+  else
+    printf 'exec /bin/zsh\n' >> "$root/measurement/energy-$workload-shell"
+  fi
+  chmod 700 "$root/measurement/energy-$workload-shell"
+done
+stage session-ended 'appearance = light\ncolumns = 100\nrows = 28\nrestore-windows = false\ncursor-blink = false\ninput-source-indicator = off\nconfirm-close = false\n'
+stage session-ended-narrow 'appearance = light\ncolumns = 42\nrows = 24\nrestore-windows = false\ncursor-blink = false\ninput-source-indicator = off\nconfirm-close = false\n'
 stage terminal-recovery 'restore-windows = false\ncursor-blink = false\nstatus-bar = false\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\ncolumns = 90\nrows = 24\n'
 stage cursor-oversized 'columns = 500\nrows = 300\nrestore-windows = true\ncursor-shape = bar\ncursor-blink = true\n'
 stage cursor-blink 'appearance = light\ncolumns = 90\nrows = 24\nrestore-windows = false\ncursor-shape = bar\ncursor-blink = true\n'

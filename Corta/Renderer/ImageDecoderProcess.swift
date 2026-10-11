@@ -17,6 +17,7 @@
 import CortaTerminal
 import Darwin
 import Foundation
+import Metal
 
 /// Kitty PNG decoding out of process: `corta-image-decoder`, embedded beside
 /// `corta-exec`, decodes under the `pure-computation` sandbox (its doc
@@ -27,7 +28,7 @@ import Foundation
 /// queue of its own, and killing a decoder that ran past `timeout` by a pid
 /// someone else may already have reaped could signal a stranger
 /// (`SECURITY.md` S08). Every descriptor is close-on-exec before the spawn,
-/// and the child gets only its three, an empty environment and its own
+/// and the child gets only stdin/stdout/stderr plus the pixel descriptor, an empty environment and its own
 /// session.
 ///
 /// Blocking, for the decode scheduler's queue — never the main thread.
@@ -38,10 +39,114 @@ nonisolated enum ImageDecoderProcess {
     /// running after this is killed and the image is not drawn.
     static let timeout: Duration = .seconds(10)
 
-    struct Decoded: Equatable {
+    /// Owns the anonymous mapping until its Metal buffer's final owner releases it.
+    /// The decode worker writes it before publication; afterwards pixels are immutable.
+    // The decode worker is the sole writer before publication; Metal only
+    // samples immutable pixels and may release ownership on its completion thread.
+    final class SharedPixels: @unchecked Sendable {
+        private static let mappingBudget = GlobalTextureBudget(
+            limit: KittyGraphics.maximumGlobalTextureBytes)
+        let descriptor: Int32
+        let address: UnsafeMutableRawPointer
+        let length: Int
+        let bytesPerRow: Int
+        init?(width: Int, height: Int, alignment: Int) {
+            guard width > 0, height > 0, width <= KittyGraphics.maximumImageDimension,
+                height <= KittyGraphics.maximumImageDimension,
+                width <= KittyGraphics.maximumImagePixels / height
+            else { return nil }
+            let alignment = max(4, alignment)
+            bytesPerRow = ((width * 4 + alignment - 1) / alignment) * alignment
+            let page = Int(getpagesize())
+            length = ((bytesPerRow * height + page - 1) / page) * page
+            guard length <= KittyGraphics.maximumImageBytes, Self.mappingBudget.tryReserve(length)
+            else {
+                return nil
+            }
+            let allocationLength = length
+            var allocated = false
+            defer { if !allocated { Self.mappingBudget.release(allocationLength) } }
+            let name = "/corta-" + UUID().uuidString.prefix(20)
+            let opened = name.withCString {
+                sharedMemoryOpen($0, O_RDWR | O_CREAT | O_EXCL, mode_t(0o600))
+            }
+            guard opened >= 0 else { return nil }
+            shm_unlink(name)
+            // Spawn actions must have distinct source/destination descriptors:
+            // dup2(3, 3) does not reliably clear CLOEXEC under CLOEXEC_DEFAULT.
+            let fd = opened < 4 ? fcntl(opened, F_DUPFD_CLOEXEC, 4) : opened
+            if opened < 4 { close(opened) }
+            guard fd >= 4 else { return nil }
+            _ = fcntl(fd, F_SETFD, FD_CLOEXEC)
+            guard ftruncate(fd, off_t(length)) == 0,
+                let mapping = mmap(nil, length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0),
+                mapping != MAP_FAILED
+            else {
+                close(fd)
+                return nil
+            }
+            descriptor = fd
+            address = mapping
+            allocated = true
+        }
+        deinit {
+            munmap(address, length)
+            close(descriptor)
+            Self.mappingBudget.release(length)
+        }
+        func texture(device: MTLDevice, width: Int, height: Int) -> MTLTexture? {
+            guard
+                let buffer = device.makeBuffer(
+                    bytesNoCopy: address, length: length,
+                    options: .storageModeShared, deallocator: { [self] _, _ in _ = self })
+            else { return nil }
+            let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+                pixelFormat: .bgra8Unorm, width: width, height: height, mipmapped: false)
+            descriptor.storageMode = .shared
+            descriptor.usage = .shaderRead
+            return buffer.makeTexture(descriptor: descriptor, offset: 0, bytesPerRow: bytesPerRow)
+        }
+        func packedBytes(width: Int, height: Int) -> [UInt8] {
+            var result = [UInt8]()
+            result.reserveCapacity(width * height * 4)
+            for row in 0..<height {
+                result.append(
+                    contentsOf: UnsafeBufferPointer(
+                        start: address.advanced(by: row * bytesPerRow).assumingMemoryBound(
+                            to: UInt8.self),
+                        count: width * 4))
+            }
+            return result
+        }
+    }
+
+    struct Decoded {
         var width: Int
         var height: Int
-        var bgra: [UInt8]
+        var pixels: SharedPixels
+        // Inspection only; the texture path never asks for a packed CPU copy.
+        var bgra: [UInt8] { pixels.packedBytes(width: width, height: height) }
+    }
+
+    static func pngDimensions(_ bytes: [UInt8]) -> (width: Int, height: Int)? {
+        guard bytes.count >= 24,
+            bytes.prefix(16).elementsEqual([
+                0x89, 0x50, 0x4e, 0x47, 13, 10, 26, 10,
+                0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52,
+            ])
+        else { return nil }
+        func word(_ at: Int) -> Int {
+            Int(
+                UInt32(bytes[at]) << 24 | UInt32(bytes[at + 1]) << 16
+                    | UInt32(bytes[at + 2]) << 8 | UInt32(bytes[at + 3]))
+        }
+        let width = word(16)
+        let height = word(20)
+        guard width > 0, height > 0, width <= KittyGraphics.maximumImageDimension,
+            height <= KittyGraphics.maximumImageDimension,
+            width <= KittyGraphics.maximumImagePixels / height
+        else { return nil }
+        return (width, height)
     }
 
     /// The helper in the running app's `Contents/MacOS`.
@@ -54,9 +159,13 @@ nonisolated enum ImageDecoderProcess {
     /// disagrees with its own header.
     static func decodePNG(
         _ bytes: [UInt8], helper: String? = ImageDecoderProcess.bundledHelper,
-        timeout: Duration = ImageDecoderProcess.timeout
+        timeout: Duration = ImageDecoderProcess.timeout, alignment: Int = 256
     ) -> Decoded? {
-        guard let helper, !bytes.isEmpty, bytes.count <= KittyGraphics.maximumImageBytes else {
+        guard let helper, bytes.count <= KittyGraphics.maximumImageBytes,
+            let dimensions = pngDimensions(bytes),
+            let pixels = SharedPixels(
+                width: dimensions.width, height: dimensions.height, alignment: alignment)
+        else {
             return nil
         }
         var toChild: [Int32] = [-1, -1]
@@ -67,7 +176,10 @@ nonisolated enum ImageDecoderProcess {
             close(toChild[1])
             return nil
         }
-        for descriptor in toChild + fromChild { _ = fcntl(descriptor, F_SETFD, FD_CLOEXEC) }
+        guard normalizeDescriptors(&toChild), normalizeDescriptors(&fromChild) else {
+            for fd in toChild + fromChild { close(fd) }
+            return nil
+        }
 
         var actions: posix_spawn_file_actions_t?
         posix_spawn_file_actions_init(&actions)
@@ -75,6 +187,7 @@ nonisolated enum ImageDecoderProcess {
         posix_spawn_file_actions_adddup2(&actions, toChild[0], 0)
         posix_spawn_file_actions_adddup2(&actions, fromChild[1], 1)
         posix_spawn_file_actions_addopen(&actions, 2, "/dev/null", O_WRONLY, 0)
+        posix_spawn_file_actions_adddup2(&actions, pixels.descriptor, 3)
         var attributes: posix_spawnattr_t?
         posix_spawnattr_init(&attributes)
         defer { posix_spawnattr_destroy(&attributes) }
@@ -103,15 +216,46 @@ nonisolated enum ImageDecoderProcess {
             return nil
         }
 
+        var input = [UInt8]()
+        for word in [dimensions.width, dimensions.height, pixels.bytesPerRow] {
+            let value = UInt32(word)
+            input += (0..<4).map { UInt8(truncatingIfNeeded: value >> ($0 * 8)) }
+        }
+        input += bytes
+        let deadline = ContinuousClock.now + timeout
         let output = exchange(
-            input: bytes, writeTo: toChild[1], readFrom: fromChild[0],
-            limit: 8 + KittyGraphics.maximumImagePixels * 4,
-            deadline: ContinuousClock.now + timeout)
+            input: input, writeTo: toChild[1], readFrom: fromChild[0],
+            limit: 8, deadline: deadline)
         if output == nil { kill(pid, SIGKILL) }
         var status: Int32 = 0
-        while waitpid(pid, &status, 0) < 0, errno == EINTR {}
+        while true {
+            let waited = waitpid(pid, &status, WNOHANG)
+            if waited == pid { break }
+            if waited < 0, errno != EINTR { return nil }
+            if ContinuousClock.now >= deadline { kill(pid, SIGKILL) }
+            usleep(1000)
+        }
         guard let output, status == 0 else { return nil }
-        return parse(output)
+        guard let reported = parse(output), reported.width == dimensions.width,
+            reported.height == dimensions.height
+        else { return nil }
+        return Decoded(width: reported.width, height: reported.height, pixels: pixels)
+    }
+
+    /// Keep all spawn sources away from stdin/stdout/stderr and the pixel destination.
+    private static func normalizeDescriptors(_ descriptors: inout [Int32]) -> Bool {
+        for index in descriptors.indices {
+            let source = descriptors[index]
+            if source < 4 {
+                let copy = fcntl(source, F_DUPFD_CLOEXEC, 4)
+                guard copy >= 4 else { return false }
+                close(source)
+                descriptors[index] = copy
+            } else {
+                _ = fcntl(source, F_SETFD, FD_CLOEXEC)
+            }
+        }
+        return true
     }
 
     /// Writes `input` and reads to end of file, both against `deadline`, with
@@ -174,9 +318,9 @@ nonisolated enum ImageDecoderProcess {
         }
     }
 
-    /// The header's dimensions under the caps, and exactly their pixels.
-    static func parse(_ output: [UInt8]) -> Decoded? {
-        guard output.count >= 8 else { return nil }
+    /// Exactly the bounded success header, never pixel data on stdout.
+    static func parse(_ output: [UInt8]) -> (width: Int, height: Int)? {
+        guard output.count == 8 else { return nil }
         func word(_ at: Int) -> Int {
             Int(
                 UInt32(output[at]) | UInt32(output[at + 1]) << 8 | UInt32(output[at + 2]) << 16
@@ -186,9 +330,13 @@ nonisolated enum ImageDecoderProcess {
         let height = word(4)
         guard width > 0, height > 0, width <= KittyGraphics.maximumImageDimension,
             height <= KittyGraphics.maximumImageDimension,
-            width <= KittyGraphics.maximumImagePixels / height,
-            output.count == 8 + width * height * 4
+            width <= KittyGraphics.maximumImagePixels / height
         else { return nil }
-        return Decoded(width: width, height: height, bgra: Array(output[8...]))
+        return (width, height)
     }
 }
+
+@_silgen_name("corta_shared_memory_open")
+nonisolated private func sharedMemoryOpen(
+    _ name: UnsafePointer<CChar>, _ flags: Int32, _ mode: mode_t
+) -> Int32

@@ -33,6 +33,15 @@ final class ShellOverlayView: NSView {
     var isInputComposing = false {
         didSet { if isInputComposing { hideCompletion() } }
     }
+    private struct CompletionPresentation: Equatable {
+        var state: DirectoryCompletion?
+        var anchor: CGRect
+        var bounds: CGRect
+        var font: NSFont
+        var baseline: CGFloat
+        var composing: Bool
+    }
+    private var lastCompletionPresentation: CompletionPresentation?
     private var preview: DirectoryGhostView?
     private var candidateRow: DirectoryCandidateRowView?
     /// Native completion previews occupy space outside the terminal grid.
@@ -54,6 +63,11 @@ final class ShellOverlayView: NSView {
 
     func showCompletion(_ state: DirectoryCompletion?, anchor: CGRect,
         font: NSFont = .monospacedSystemFont(ofSize: 14, weight: .regular), baseline: CGFloat = 12) {
+        let presentation = CompletionPresentation(
+            state: state, anchor: anchor, bounds: bounds,
+            font: font, baseline: baseline, composing: isInputComposing)
+        guard lastCompletionPresentation != presentation else { return }
+        lastCompletionPresentation = presentation
         guard !isInputComposing, let state, let suffix = state.previewSuffix, !suffix.isEmpty else {
             completion = nil
             preview?.removeFromSuperview()
@@ -71,7 +85,8 @@ final class ShellOverlayView: NSView {
             ghost.frame = CGRect(x: anchor.minX, y: anchor.minY,
                 width: max(0, bounds.width - TerminalLayout.insets.right - anchor.minX), height: anchor.height)
             ghost.toolTip = L10n.text("completion.hint")
-            if preview == nil { addSubview(ghost); preview = ghost }
+            if preview == nil { addSubview(ghost)
+                preview = ghost }
             ghost.needsDisplay = true
         } else {
             preview?.removeFromSuperview()
@@ -95,7 +110,8 @@ final class ShellOverlayView: NSView {
         row.coversOutput = !fitsBelow
         row.update(state: state, font: font)
         row.toolTip = L10n.text("completion.hint")
-        if candidateRow == nil { addSubview(row); candidateRow = row }
+        if candidateRow == nil { addSubview(row)
+            candidateRow = row }
         row.needsDisplay = true
     }
 
@@ -170,7 +186,8 @@ private final class DirectoryCandidateRowView: NSView {
             end += 1
         }
         let muted: [NSAttributedString.Key: Any] = [
-            .font: font, .foregroundColor: NSColor.secondaryLabelColor.withAlphaComponent(0.35).cgColor]
+            .font: font, .foregroundColor: NSColor.secondaryLabelColor.withAlphaComponent(0.35).cgColor,
+        ]
         let result = NSMutableAttributedString(string: start > 0 ? "…  " : "", attributes: muted)
         for index in start..<end {
             if index > start { result.append(NSAttributedString(string: gap, attributes: muted)) }

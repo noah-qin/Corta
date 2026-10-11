@@ -99,6 +99,34 @@ final class MeasurementUITests: XCTestCase {
         app.terminate()
     }
 
+    /// Controlled shell records only its app parent PID for an external,
+    /// app-only Activity Monitor trace. Rendering must stay occluded.
+    @MainActor func testOccludedFloodCPUAndWakeups() throws {
+        let app = makeApp(renderMetrics: false)
+        app.launchEnvironment["SHELL"] = measurementStage.appendingPathComponent("energy-flood-shell").path
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
+        app.windows.firstMatch.buttons[XCUIIdentifierMinimizeWindow].click()
+        pause(5)
+        measure(metrics: [XCTCPUMetric(application: app)], options: Self.fourSecondSamples) {
+            pause(4)
+        }
+    }
+
+    @MainActor func testIdleBlinkCPUAndWakeups() throws {
+        let app = UIFixtures.app(stage: try UIFixtures.stage("cursor-blink"), runner: Self.self, usingTestTarget: true)
+        app.launchEnvironment["SHELL"] = measurementStage.appendingPathComponent("energy-idle-shell").path
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
+        UIFixtures.requireFixturePrompt(in: app)
+        pause(3)
+        measure(metrics: [XCTCPUMetric(application: app)], options: Self.fourSecondSamples) {
+            pause(4)
+        }
+    }
+
     // MARK: - P11 / P07: a sustained flood, 1, 2 and 4 panes
 
     @MainActor func testFloodOnePane() throws { try flood(panes: 1) }
@@ -212,6 +240,39 @@ final class MeasurementUITests: XCTestCase {
         app.terminate()
     }
 
+    @MainActor func testKitty4096PNGToGlass() throws {
+        let previous = LatinInputSource.select()
+        defer { LatinInputSource.restore(previous) }
+        let shell = measurementStage.appendingPathComponent("kitty-shell").path
+        guard FileManager.default.fileExists(atPath: "/tmp/corta-4096.png"),
+            FileManager.default.isExecutableFile(atPath: shell),
+            FileManager.default.isExecutableFile(atPath: "/opt/homebrew/bin/kitten") else {
+            throw XCTSkip("Prepare the 4096 PNG, staged kitty-shell and kitten before the measurement")
+        }
+        for round in 1...3 {
+            metricsFile = measurementStage.appendingPathComponent("kitty-metrics-\(UUID().uuidString).log")
+            let app = makeApp()
+            app.launchEnvironment["SHELL"] = shell
+            let label = ProcessInfo.processInfo.environment["CORTA_MEASUREMENT_CASE"] ?? "after"
+            app.launchEnvironment["KITTY_CASE_LABEL"] = "\(label)-\(round)"
+            app.launch()
+            XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
+            pause(5)
+            report(["Kitty terminal: " + ((app.textViews.firstMatch.value as? String) ?? "no AX text")])
+            let initialShot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+            initialShot.name = "kitty-live-diagnostic"
+            initialShot.lifetime = .keepAlways
+            add(initialShot)
+            let lines = try waitForMetrics(["imageToPresent"], timeout: 30)
+            report(lines.map { "Kitty 4096 PNG round \(round): \($0)" })
+            let shot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+            shot.name = "kitty-4096-presented-\(round)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            app.terminate()
+        }
+    }
+
     // MARK: - Keypress to glass (§5.7)
 
     /// 320 digits about 150 ms apart; the app closes each sample when the
@@ -225,7 +286,9 @@ final class MeasurementUITests: XCTestCase {
     @MainActor
     func testKeypressToGlass() throws {
         let app = try launchSettled()
-        for index in 0..<320 {
+        let count = ProcessInfo.processInfo.environment["CORTA_MEASUREMENT_KEY_COUNT"].flatMap(Int.init) ?? 320
+        guard (32...2000).contains(count) else { return XCTFail("keypress count must be 32...2000") }
+        for index in 0..<count {
             guard app.state == .runningForeground else {
                 return XCTFail("Corta left the foreground after \(index) keystrokes; typing stopped")
             }
@@ -252,7 +315,8 @@ final class MeasurementUITests: XCTestCase {
             for type in item.types { if let data = item.data(forType: type) { copy.setData(data, forType: type) } }
             return copy
         }
-        addTeardownBlock { clipboard.clearContents(); clipboard.writeObjects(saved) }
+        addTeardownBlock { clipboard.clearContents()
+            clipboard.writeObjects(saved) }
         clipboard.clearContents()
         clipboard.setString("paste-check-280", forType: .string)
         app.typeKey("v", modifierFlags: .command)
@@ -279,7 +343,8 @@ final class MeasurementUITests: XCTestCase {
         app.launchEnvironment["SHELL"] = "/bin/sh"
         if renderMetrics { app.launchEnvironment["CORTA_RENDER_METRICS"] = metricsFile.path }
         let runner = ProcessInfo.processInfo.environment
-        for key in ["CORTA_MAX_DRAWABLES", "CORTA_FRAME_LATENCY", "CORTA_RENDER_METRICS_KEYSTROKES", "CORTA_FRAME_DRIVER"] {
+        for key in ["CORTA_MAX_DRAWABLES", "CORTA_FRAME_LATENCY", "CORTA_RENDER_METRICS_KEYSTROKES", "CORTA_FRAME_DRIVER", "CORTA_RENDER_THREAD", "CORTA_MAIN_STALL",
+        ] {
             if let value = runner[key] { app.launchEnvironment[key] = value }
         }
         return app
@@ -327,7 +392,8 @@ final class MeasurementUITests: XCTestCase {
             app.typeKey("D", modifierFlags: [.command, .shift])  // left splits down
             pause(1.5)
             return [CGVector(dx: 0.25, dy: 0.25), CGVector(dx: 0.75, dy: 0.25),
-                    CGVector(dx: 0.25, dy: 0.75), CGVector(dx: 0.75, dy: 0.75)]
+                    CGVector(dx: 0.25, dy: 0.75), CGVector(dx: 0.75, dy: 0.75),
+            ]
         default:
             return [CGVector(dx: 0.5, dy: 0.5)]
         }

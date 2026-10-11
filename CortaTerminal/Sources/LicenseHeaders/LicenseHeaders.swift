@@ -85,7 +85,8 @@ public enum LicenseHeaders {
         ("**/*.md", .reuse),
         ("NOTICE", .reuse),
 
-        // Source.
+        // Source. The sole C file is the D02 system varargs ABI bridge.
+        ("Corta/SharedMemory.c", .header(.slashes)),
         ("**/*.swift", .header(.slashes)),
         ("**/*.metal", .header(.slashes)),
         ("**/*.sh", .header(.hash)),

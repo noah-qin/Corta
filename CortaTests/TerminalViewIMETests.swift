@@ -740,6 +740,56 @@ struct TerminalViewIMETests {
         #expect(!first.hasMarkedText())
     }
 
+    @Test func candidateAnchorFollowsPreeditSelectionAndReanchorsWithoutAnotherKey() throws {
+        let window = NSWindow(contentRect: NSRect(x: 200, y: 300, width: 400, height: 300),
+            styleMask: [.titled], backing: .buffered, defer: false)
+        let view = Self.makeView()
+        window.contentView?.addSubview(view)
+        var cell = CGRect(x: 16, y: 34, width: 8, height: 17)
+        view.cursorRectProvider = { cell }
+        view.setMarkedText("zhong", selectedRange: NSRange(location: 5, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(view.selectedRange() == NSRange(location: 5, length: 0))
+        let start = view.firstRect(forCharacterRange: NSRange(location: 0, length: 0), actualRange: nil)
+        let caret = view.firstRect(forCharacterRange: view.selectedRange(), actualRange: nil)
+        #expect(caret.minX > start.minX + cell.width)
+        #expect(caret.minY == start.minY)
+        cell.origin = CGPoint(x: 40, y: 68)
+        view.refreshInputCompositionGeometry()
+        let moved = view.firstRect(forCharacterRange: view.selectedRange(), actualRange: nil)
+        #expect(moved.minX - caret.minX == 24)
+        #expect(moved.minY - caret.minY == -34)
+        #expect(view.inputCompositionRect?.origin == cell.origin)
+        #expect(view.lastInputCompositionScreenRect == moved)
+        let overlay = try #require(view.subviews.compactMap { $0 as? MarkedTextOverlayView }.first)
+        #expect(overlay.markedText?.string == "zhong")
+    }
+
+    @Test func candidateRangeClampsAndGeometryRefreshUsesTheNewFont() throws {
+        let window = NSWindow(contentRect: NSRect(x: 200, y: 300, width: 400, height: 300),
+            styleMask: [.titled], backing: .buffered, defer: false)
+        let view = Self.makeView()
+        window.contentView?.addSubview(view)
+        view.cursorRectProvider = { CGRect(x: 8, y: 17, width: 8, height: 17) }
+        var fontSize: CGFloat = 12
+        view.preeditFontProvider = { NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular) }
+        view.setMarkedText("zhong", selectedRange: NSRange(location: 5, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0))
+        let before = view.firstRect(forCharacterRange: view.selectedRange(), actualRange: nil)
+        var actual = NSRange(location: 0, length: 0)
+        let end = view.firstRect(forCharacterRange: NSRange(location: 999, length: 999), actualRange: &actual)
+        #expect(actual == NSRange(location: 5, length: 0))
+        #expect(end == before)
+        fontSize = 24
+        view.refreshInputCompositionGeometry()
+        let after = view.firstRect(forCharacterRange: view.selectedRange(), actualRange: nil)
+        #expect(after.minX > before.minX)
+        #expect(after.height > before.height)
+        view.unmarkText()
+        #expect(view.selectedRange().location == NSNotFound)
+        #expect(view.lastInputCompositionScreenRect == nil)
+    }
+
     // MARK: - NSTextInputClient read-side defaults
 
     @Test func readSideQueriesExposeNoBackingStore() {

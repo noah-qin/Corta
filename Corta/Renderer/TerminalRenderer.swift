@@ -17,7 +17,9 @@
 import CoreGraphics
 import CoreText
 import CortaTerminal
+import Foundation
 import Metal
+import Synchronization
 import simd
 
 /// A document position; negative rows are scrollback. Never a viewport row:
@@ -52,7 +54,32 @@ public nonisolated struct TerminalSelection: Equatable, Sendable {
 /// `public`, with the few members `CortaPerformanceTests` drives: that bundle
 /// imports the app without `@testable`, because `-enable-testing` inhibits
 /// the optimisation its Release figure exists to measure (#110).
-public nonisolated final class TerminalRenderer {
+public nonisolated final class TerminalRenderer: @unchecked Sendable {
+    // Frames own renderer mutations on the window render thread. Main-thread
+    // font commands serialize with complete frames; geometry reads use a mailbox.
+    // Main constructs an immutable font command; the window render thread
+    // consumes it between complete frames. CTFont exposes no mutable state.
+    // The window render thread produces an immutable CGImage; main consumes
+    // it as a Core Animation layer's contents after the presented callback.
+    private struct CursorCapture: @unchecked Sendable {
+        let image: CGImage
+        let column: Int
+        let columns: Int
+    }
+    private struct FontCommand: @unchecked Sendable {
+        let font: CTFont
+        let scale: CGFloat
+    }
+    private struct Owner: Sendable { weak var thread: RenderThread? }
+    private let renderOwner = Mutex(Owner())
+    func setRenderOwner(_ thread: RenderThread?) { renderOwner.withLock { $0.thread = thread } }
+
+    private let access = NSRecursiveLock()
+    func withExclusiveAccess<T>(_ body: () throws -> T) rethrows -> T {
+        access.lock()
+        defer { access.unlock() }
+        return try body()
+    }
     private(set) var backend: Metal4Backend
     private(set) var backendGeneration = 0
     private var recoveryAttempts = 0
@@ -60,7 +87,13 @@ public nonisolated final class TerminalRenderer {
     /// At most three replaced queues are retained per renderer.
     private var retiredBackends: [Metal4Backend] = []
     let glyphAtlas: GlyphAtlas
-    public private(set) var metrics: CellMetrics
+    private struct Geometry: Sendable {
+        var metrics: CellMetrics
+        var points: CellMetrics
+        var scale: CGFloat
+    }
+    private let geometry: Mutex<Geometry>
+    private var metricsValue: CellMetrics
     /// Its own texture cache: images share no eviction policy with glyphs.
     let kittyImageRenderer: KittyImageRenderer
     /// Cached because `draw` takes no `Grid`.
@@ -202,8 +235,12 @@ public nonisolated final class TerminalRenderer {
         [cachedBackground, cachedGlyphs, cachedColorGlyphs]
     }
 
-    private(set) var pointMetrics: CellMetrics
-    private(set) var scale: CGFloat
+    private var pointMetricsValue: CellMetrics
+    private var scaleValue: CGFloat
+
+    public var metrics: CellMetrics { geometry.withLock { $0.metrics } }
+    var pointMetrics: CellMetrics { geometry.withLock { $0.points } }
+    var scale: CGFloat { geometry.withLock { $0.scale } }
 
     /// - Parameter scale: glyphs rasterise at `size × scale` and `metrics` are
     ///   pixels, the shader's space; 1× on a 2× display rendered half-size and
@@ -212,9 +249,10 @@ public nonisolated final class TerminalRenderer {
     ///   `nil` is `GlyphAtlas.atlasSize`.
     /// - Throws: `Metal4BackendError.metal4Unsupported` on a GPU without
     ///   `MTLGPUFamily.metal4`. There is no other renderer to fall back to.
-    public init(device: MTLDevice, font: CTFont, scale: CGFloat, atlasPixelSize: Int? = nil, atlasStorageMode: MTLStorageMode = .shared) throws {
+    public init(
+        device: MTLDevice, font: CTFont, scale scaleValue: CGFloat, atlasPixelSize: Int? = nil, atlasStorageMode: MTLStorageMode = .shared) throws {
         let atlasFont = CTFontCreateCopyWithAttributes(
-            font, CTFontGetSize(font) * scale, nil, nil)
+            font, CTFontGetSize(font) * scaleValue, nil, nil)
         self.backend = try Metal4Backend(device: device)
         // The atlas is per pane, unlike the pipelines: it is mutable and its
         // eviction forces full rebuilds, so sharing would couple every pane's
@@ -224,9 +262,11 @@ public nonisolated final class TerminalRenderer {
         self.glyphAtlas = try GlyphAtlas(
             device: device, font: atlasFont, atlasPixelSize: atlasPixelSize ?? GlyphAtlas.atlasSize, storageMode: atlasStorageMode)
         self.kittyImageRenderer = KittyImageRenderer(device: device)
-        self.pointMetrics = CellMetrics(font: font, scale: scale)
-        self.metrics = self.pointMetrics.scaled(by: scale)
-        self.scale = scale
+        self.pointMetricsValue = CellMetrics(font: font, scale: scaleValue)
+        self.metricsValue = self.pointMetricsValue.scaled(by: scaleValue)
+        self.scaleValue = scaleValue
+        self.geometry = Mutex(
+            Geometry(metrics: metricsValue, points: pointMetricsValue, scale: scaleValue))
         // A reset or eviction while a frame is queued moves the atlas to
         // fresh textures; the old ones go when those frames complete.
         glyphAtlas.texturesInUse = { [weak self] in
@@ -239,20 +279,137 @@ public nonisolated final class TerminalRenderer {
         }
     }
 
+    /// Uses the very same row instances, atlas and Metal shader as the live
+    /// block cursor, including wide glyphs, emoji, rules and box drawing.
+    /// The small offscreen target is read only after GPU completion.
+    func cursorImage(grid: Grid) -> (image: CGImage, column: Int, columns: Int)? {
+        if let owner = renderOwner.withLock({ $0.thread }), !owner.isCurrent {
+            let result = Mutex<CursorCapture?>(nil)
+            owner.barrier { [self] in
+                if let capture = cursorImage(grid: grid) {
+                    result.withLock {
+                        $0 = CursorCapture(
+                            image: capture.image, column: capture.column, columns: capture.columns)
+                    }
+                }
+            }
+            return result.withLock { $0.map { ($0.image, $0.column, $0.columns) } }
+        }
+        return withExclusiveAccess {
+            let row = grid.cursor.row
+            var column = grid.cursor.column
+            guard row >= 0, row < grid.rows, column >= 0, column < grid.columns else { return nil }
+            guard let line = grid.line(atAbsoluteRow: grid.scrollback.totalPushed + row) else {
+                return nil
+            }
+            if column < line.count, line[column].attributes.contains(.wideSpacer), column > 0 {
+                column -= 1
+            }
+            let columns = column < line.count && line[column].attributes.contains(.wide) ? 2 : 1
+            let width = max(1, Int(metricsValue.cellWidth) * columns)
+            let height = max(1, Int(metricsValue.cellHeight))
+            let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+                pixelFormat: .bgra8Unorm, width: width, height: height, mipmapped: false)
+            descriptor.storageMode = .shared
+            descriptor.usage = [.renderTarget, .shaderRead]
+            guard let target = backend.device.makeTexture(descriptor: descriptor),
+                let capture = try? Metal4Backend(device: backend.device)
+            else { return nil }
+            let previousCursor = blockCursor
+            let previousPalette = framePalette
+            blockCursor = BlockCursor(row: row, column: column)
+            framePalette = themeVariant ?? TerminalColorPalette.activeVariant
+            defer {
+                blockCursor = previousCursor
+                framePalette = previousPalette
+            }
+            var backgrounds: [QuadInstance] = []
+            var glyphs: [QuadInstance] = []
+            var colors: [QuadInstance] = []
+            appendRowInstances(
+                line: line, row: row, graphemes: grid.graphemes,
+                background: &backgrounds, glyphs: &glyphs, colorGlyphs: &colors)
+            let size = CGSize(width: width, height: height)
+            let origin = SIMD2<Float>(
+                Float(column) * Float(metricsValue.cellWidth),
+                Float(row) * Float(metricsValue.cellHeight))
+            for index in backgrounds.indices { backgrounds[index].origin -= origin }
+            for index in glyphs.indices { glyphs[index].origin -= origin }
+            for index in colors.indices { colors[index].origin -= origin }
+            let rect = CGRect(origin: .zero, size: size)
+            let color = framePalette.cursor
+            guard
+                capture.beginFrame(
+                    target: target,
+                    clearColor: MTLClearColorMake(
+                        Double(color.x), Double(color.y), Double(color.z), 1),
+                    label: "Corta.cursor.capture")
+            else { return nil }
+            capture.drawSolidQuads(backgrounds, rect: rect, drawableSize: size)
+            capture.drawGlyphQuads(
+                glyphs, atlas: glyphAtlas.texture, atlasRects: glyphAtlas.atlasRects,
+                rect: rect, drawableSize: size)
+            capture.drawColorQuads(
+                colors, atlas: glyphAtlas.colorTexture, atlasRects: glyphAtlas.atlasRects,
+                rect: rect, drawableSize: size)
+            let done = DispatchSemaphore(value: 0)
+            let succeeded = Atomic<Bool>(false)
+            capture.endFrame(presenting: nil) { error in
+                succeeded.store(error == nil, ordering: .releasing)
+                done.signal()
+            }
+            guard done.wait(timeout: .now() + 2) == .success,
+                succeeded.load(ordering: .acquiring)
+            else { return nil }
+            var bytes = [UInt8](repeating: 0, count: width * height * 4)
+            bytes.withUnsafeMutableBytes {
+                target.getBytes(
+                    $0.baseAddress!, bytesPerRow: width * 4,
+                    from: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)
+            }
+            guard let provider = CGDataProvider(data: Data(bytes) as CFData),
+                let space = CGColorSpace(name: CGColorSpace.sRGB),
+                let image = CGImage(
+                    width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
+                    bytesPerRow: width * 4, space: space,
+                    bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue)
+                        .union(.byteOrder32Little), provider: provider, decode: nil,
+                    shouldInterpolate: false, intent: .defaultIntent)
+            else { return nil }
+            return (image, column, columns)
+        }
+    }
+
     /// Reuses pipelines and texture; a new renderer per keystroke stuttered
     /// under key repeat.
     func setFont(_ font: CTFont, scale newScale: CGFloat) {
+        if let owner = renderOwner.withLock({ $0.thread }), !owner.isCurrent {
+            let command = FontCommand(font: font, scale: newScale)
+            owner.barrier { [self] in setFont(command.font, scale: command.scale) }
+            return
+        }
+        access.lock()
+        defer { access.unlock() }
         let atlasFont = CTFontCreateCopyWithAttributes(
             font, CTFontGetSize(font) * newScale, nil, nil)
         glyphAtlas.reset(font: atlasFont)
-        pointMetrics = CellMetrics(font: font, scale: newScale)
-        metrics = pointMetrics.scaled(by: newScale)
-        scale = newScale
+        pointMetricsValue = CellMetrics(font: font, scale: newScale)
+        metricsValue = pointMetricsValue.scaled(by: newScale)
+        scaleValue = newScale
+        geometry.withLock {
+            $0 = Geometry(metrics: metricsValue, points: pointMetricsValue, scale: scaleValue)
+        }
         invalidate()
     }
 
     /// For the frame-CPU baseline's worst case.
     public func invalidate() {
+        if let owner = renderOwner.withLock({ $0.thread }), !owner.isCurrent {
+            owner.post { [self] in invalidate() }
+            return
+        }
+        access.lock()
+        defer { access.unlock() }
         needsFullRebuild = true
     }
 
@@ -260,6 +417,8 @@ public nonisolated final class TerminalRenderer {
     /// An unusable device cannot cause an unlimited reconstruction loop.
     @discardableResult
     func recoverBackendIfNeeded() throws -> Bool {
+        access.lock()
+        defer { access.unlock() }
         retiredBackends.removeAll { !$0.hasFramesInFlight }
         guard backend.requiresRecovery else { return false }
         guard recoveryAttempts < 3 else { throw Metal4BackendError.recoveryExhausted }
@@ -281,6 +440,8 @@ public nonisolated final class TerminalRenderer {
         indexedOverrides: IndexedColorOverrides = [:], indexedOverridesGeneration: UInt64 = 0,
         cursorStyle: CursorStyle? = nil
     ) -> Bool {
+        access.lock()
+        defer { access.unlock() }
         let effectiveCursorStyle = cursorStyle ?? grid.cursorStyle
         self.indexedOverrides = indexedOverrides
         framePalette = themeVariant ?? TerminalColorPalette.activeVariant
@@ -350,7 +511,7 @@ public nonisolated final class TerminalRenderer {
         kittyImageRenderer.update(
             table: grid.imagePlacements, rows: grid.rows, offset: offset,
             scrollbackTotalPushed: grid.scrollback.totalPushed,
-            cellWidth: Float(metrics.cellWidth), cellHeight: Float(metrics.cellHeight))
+            cellWidth: Float(metricsValue.cellWidth), cellHeight: Float(metricsValue.cellHeight))
         cachedImagePlacements = grid.imagePlacements
         cachedCursor = grid.cursor
         cachedCursorStyle = effectiveCursorStyle
@@ -416,6 +577,8 @@ public nonisolated final class TerminalRenderer {
         drawable: (any MTLDrawable)?, label: String,
         onCompleted: (@Sendable ((any Error)?) -> Void)?
     ) -> Bool {
+        access.lock()
+        defer { access.unlock() }
         let drawing = backend.beginFrame(target: target, clearColor: clearColor, label: label)
         backend.drawSolidQuads(cachedBackground, rect: rect, drawableSize: drawableSize)
         if !cachedMarks.isEmpty {
@@ -430,10 +593,10 @@ public nonisolated final class TerminalRenderer {
         }
         if cachedImagePlacements.placementCount > 0 {
             kittyImageRenderer.draw(
-                table: cachedImagePlacements, cellWidth: Float(metrics.cellWidth),
-                cellHeight: Float(metrics.cellHeight), rows: cachedLines.count, offset: cachedOffset,
+                table: cachedImagePlacements, cellWidth: Float(metricsValue.cellWidth),
+                cellHeight: Float(metricsValue.cellHeight), rows: cachedLines.count, offset: cachedOffset,
                 scrollbackTotalPushed: cachedScrollbackTotalPushed, rect: rect,
-                drawableSize: drawableSize, backend: backend)
+                drawableSize: drawableSize, backend: backend, drawable: drawable)
         }
         let images = kittyImageRenderer
         backend.endFrame(presenting: drawable) { error in
@@ -499,7 +662,7 @@ public nonisolated final class TerminalRenderer {
         var retainedHistoryRows = min(grid.rows, max(0, cachedOffset))
         var oldCursorRow = previousBlockCursor?.row ?? -1
         func shift(top: Int, bottom: Int, delta: Int) {
-            applyShift(top: top, bottom: bottom, delta: delta, cellHeight: Float(metrics.cellHeight))
+            applyShift(top: top, bottom: bottom, delta: delta, cellHeight: Float(metricsValue.cellHeight))
             shifted = true
             if oldCursorRow >= top && oldCursorRow <= bottom {
                 oldCursorRow -= delta
@@ -691,8 +854,8 @@ public nonisolated final class TerminalRenderer {
         searchMatches: [TerminalSelection] = [], currentSearchMatchIndex: Int? = nil,
         hoveredLink: TerminalSelection? = nil
     ) {
-        let cellWidth = Float(metrics.cellWidth)
-        let cellHeight = Float(metrics.cellHeight)
+        let cellWidth = Float(metricsValue.cellWidth)
+        let cellHeight = Float(metricsValue.cellHeight)
         overlayScratch.removeAll(keepingCapacity: true)
         if let selection {
             overlayScratch.append(
@@ -715,7 +878,7 @@ public nonisolated final class TerminalRenderer {
                 hoveredLink, grid: grid, offset: offset, cellWidth: cellWidth,
                 cellHeight: cellHeight, color: frameOverlay.linkUnderline)
             {
-                let thickness = max(1, Float(scale).rounded(.down))
+                let thickness = max(1, Float(scaleValue).rounded(.down))
                 overlayScratch.append(
                     QuadInstance(
                         origin: .init(quad.origin.x, quad.origin.y + cellHeight - thickness * 2),
@@ -756,9 +919,9 @@ public nonisolated final class TerminalRenderer {
         background: inout [QuadInstance], glyphs: inout [QuadInstance],
         colorGlyphs: inout [QuadInstance]
     ) {
-        let cellWidth = Float(metrics.cellWidth)
-        let cellHeight = Float(metrics.cellHeight)
-        let baseline = Float(metrics.baselineOffset)
+        let cellWidth = Float(metricsValue.cellWidth)
+        let cellHeight = Float(metricsValue.cellHeight)
+        let baseline = Float(metricsValue.baselineOffset)
         // Once per row: the property retains the ANSI array on every touch.
         let palette = framePalette
         // The block cursor's columns in this row — two under a wide
@@ -786,8 +949,10 @@ public nonisolated final class TerminalRenderer {
             }
         }
         var previousColors = SIMD2<UInt64>(repeating: .max)
-        var fg = SIMD4<Float>.zero, bg = fg
-        var packedFG: UInt32 = 0, packedBG: UInt32 = 0
+        var fg = SIMD4<Float>.zero
+        var bg = fg
+        var packedFG: UInt32 = 0
+        var packedBG: UInt32 = 0
         for column in 0..<line.count {
             let cell = line[column]
             let attributes = cell.attributes
@@ -807,7 +972,8 @@ public nonisolated final class TerminalRenderer {
                 fg = reversed ? resolvedBg : resolvedFg
                 bg = reversed ? resolvedFg : resolvedBg
                 if attributes.contains(.dim) { fg.w *= Self.dimAlpha }
-                if underCursor { fg = palette.background; bg = palette.cursor }
+                if underCursor { fg = palette.background
+                    bg = palette.cursor }
                 packedFG = QuadInstance.packColor(fg)
                 packedBG = QuadInstance.packColor(bg)
             }
@@ -826,14 +992,14 @@ public nonisolated final class TerminalRenderer {
                 attributes.contains(.underline) || !cell.hyperlink.isNone
             {
                 // A spacer draws it too, so it spans a wide character.
-                let thickness = max(1, Float(scale).rounded(.down))
+                let thickness = max(1, Float(scaleValue).rounded(.down))
                 background.append(
                     QuadInstance(
                         origin: .init(origin.x, origin.y + baseline + thickness),
                         size: .init(cellWidth, thickness), color: fg))
             }
             if hasRuleOrHiddenWork, !isInvisible, attributes.contains(.strikethrough) {
-                let thickness = max(1, Float(scale).rounded(.down))
+                let thickness = max(1, Float(scaleValue).rounded(.down))
                 background.append(
                     QuadInstance(
                         // Roughly mid x-height; the real metric is per font.
@@ -846,7 +1012,7 @@ public nonisolated final class TerminalRenderer {
             // a grid of gaps between block characters (`BlockElements`).
             if cell.scalar >= 0x2500, cell.scalar <= 0x257F,
                 let pieces = BoxDrawing.pieces(for: cell.scalar, width: cellWidth,
-                                               height: cellHeight, scale: Float(scale)) {
+                                               height: cellHeight, scale: Float(scaleValue)) {
                 // Stroke arms overlap at junctions. Resolve faint text over
                 // its cell background once, so overlap cannot brighten it.
                 let stroke = SIMD4<Float>(
@@ -966,7 +1132,7 @@ public nonisolated final class TerminalRenderer {
         at origin: SIMD2<Float>, cellWidth: Float, cellHeight: Float, color: SIMD4<Float>,
         into background: inout [QuadInstance]
     ) {
-        let thickness = max(1, Float(scale).rounded(.down))
+        let thickness = max(1, Float(scaleValue).rounded(.down))
         let inset = max(thickness, (cellWidth * 0.12).rounded())
         let top = origin.y + max(thickness, (cellHeight * 0.15).rounded())
         let width = max(thickness * 2, cellWidth - inset * 2)
@@ -990,8 +1156,8 @@ public nonisolated final class TerminalRenderer {
     /// the inset — never over a cell. As tall as the grid.
     func markRect(beside rect: CGRect) -> CGRect {
         CGRect(
-            x: rect.minX - TerminalLayout.statusRuleOffset * scale, y: rect.minY,
-            width: TerminalLayout.statusRuleWidth * scale, height: rect.height)
+            x: rect.minX - TerminalLayout.statusRuleOffset * scaleValue, y: rect.minY,
+            width: TerminalLayout.statusRuleWidth * scaleValue, height: rect.height)
     }
 
     /// One rule per prompt row with an outcome, from the rows this frame
@@ -1001,8 +1167,8 @@ public nonisolated final class TerminalRenderer {
     private func rebuildMarks(alternateScreen: Bool) {
         cachedMarks.removeAll(keepingCapacity: true)
         guard drawsCommandMarks, !alternateScreen else { return }
-        let cellHeight = Float(metrics.cellHeight)
-        let point = Float(scale)
+        let cellHeight = Float(metricsValue.cellHeight)
+        let point = Float(scaleValue)
         let width = Float(TerminalLayout.statusRuleWidth) * point
         // At least a point, however small the font.
         let height = max(point, cellHeight - 4 * point)

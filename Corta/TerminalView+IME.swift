@@ -68,6 +68,7 @@ extension TerminalView: NSTextInputClient {
         overlay.show(
             attributed, at: cursorRectProvider?() ?? .zero, caret: selectedRange.location)
         inputCompositionRect = overlay.frame
+        refreshInputCompositionGeometry()
         onInputContextChange?()
     }
 
@@ -88,6 +89,8 @@ extension TerminalView: NSTextInputClient {
         guard existingMarkedTextOverlay?.markedText != nil || inputCompositionRect != nil else { return }
         existingMarkedTextOverlay?.hide()
         inputCompositionRect = nil
+        lastInputCompositionScreenRect = nil
+        inputContext?.invalidateCharacterCoordinates()
         shellOverlay.isInputComposing = false
         onInputContextChange?()
     }
@@ -105,7 +108,10 @@ extension TerminalView: NSTextInputClient {
 
     /// No backing store is exposed to input methods.
     func selectedRange() -> NSRange {
-        NSRange(location: NSNotFound, length: 0)
+        guard let overlay = existingMarkedTextOverlay, overlay.markedText != nil else {
+            return NSRange(location: NSNotFound, length: 0)
+        }
+        return NSRange(location: overlay.caretLocation, length: 0)
     }
 
     func attributedSubstring(
@@ -118,11 +124,37 @@ extension TerminalView: NSTextInputClient {
         [.underlineStyle, .underlineColor, .markedClauseSegment, .font, .foregroundColor]
     }
 
-    /// The cursor cell in screen coordinates, computed on demand so it
-    /// follows window moves.
+    /// The marked range (or terminal cursor) in screen coordinates, computed
+    /// on demand and invalidated when its anchor moves.
     func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
-        guard let cell = cursorRectProvider?(), let window else { return .zero }
+        guard let window else { return .zero }
+        let rect: CGRect
+        if let overlay = existingMarkedTextOverlay, let text = overlay.markedText {
+            let location = range.location == NSNotFound ? overlay.caretLocation
+                : min(max(0, range.location), text.length)
+            let length = min(range.length, text.length - location)
+            let actual = NSRange(location: location, length: length)
+            actualRange?.pointee = actual
+            rect = overlay.characterRect(for: actual)
+            return window.convertToScreen(overlay.convert(rect, to: nil))
+        }
+        guard let cell = cursorRectProvider?() else { return .zero }
+        actualRange?.pointee = NSRange(location: NSNotFound, length: 0)
         return window.convertToScreen(convert(cell, to: nil))
+    }
+
+    /// AppKit caches candidate geometry. A live provider alone does not tell
+    /// the input method to query again after a resize, pane move or cursor move.
+    func refreshInputCompositionGeometry() {
+        guard let overlay = existingMarkedTextOverlay, let text = overlay.markedText,
+            let cell = cursorRectProvider?() else { return }
+        if let font = preeditFontProvider?() { overlay.font = font }
+        overlay.show(overlay.sourceMarkedText ?? text, at: cell, caret: overlay.caretLocation)
+        inputCompositionRect = overlay.frame
+        let rect = firstRect(forCharacterRange: selectedRange(), actualRange: nil)
+        guard rect != lastInputCompositionScreenRect else { return }
+        lastInputCompositionScreenRect = rect
+        inputContext?.invalidateCharacterCoordinates()
     }
 
     func characterIndex(for point: NSPoint) -> Int {
@@ -184,6 +216,7 @@ extension TerminalView: NSTextInputClient {
 final class MarkedTextOverlayView: NSView {
     /// The preedit with the IME's attributes; nil while hidden.
     private(set) var markedText: NSAttributedString?
+    private(set) var sourceMarkedText: NSAttributedString?
     /// The caret's offset into `markedText`, in UTF-16 units, clamped to it.
     private(set) var caretLocation = 0
 
@@ -226,6 +259,7 @@ final class MarkedTextOverlayView: NSView {
     /// subviews, so it would paint over a split's divider. `caret` is the
     /// IME's selection; `NSNotFound` or past the end puts it at the end.
     func show(_ attributed: NSAttributedString, at cell: CGRect, caret: Int = NSNotFound) {
+        sourceMarkedText = attributed.copy() as? NSAttributedString
         let display = displayString(for: attributed)
         markedText = display
         caretLocation = caret == NSNotFound ? display.length : min(max(0, caret), display.length)
@@ -250,8 +284,20 @@ final class MarkedTextOverlayView: NSView {
                 .size().width)
     }
 
+    /// Character-range geometry uses the same attributed shaping as the preedit.
+    /// Clamp the caret to the visible overlay near the pane's right edge.
+    func characterRect(for range: NSRange) -> CGRect {
+        guard let text = markedText else { return .zero }
+        let x = ceil(text.attributedSubstring(from: NSRange(location: 0, length: range.location)).size().width)
+        let end = ceil(text.attributedSubstring(from: NSRange(location: 0, length: NSMaxRange(range))).size().width)
+        let left = min(x, max(0, bounds.width - Self.caretWidth))
+        return CGRect(x: left, y: 0,
+            width: min(max(Self.caretWidth, end - x), bounds.width - left), height: bounds.height)
+    }
+
     func hide() {
         markedText = nil
+        sourceMarkedText = nil
         isHidden = true
     }
 

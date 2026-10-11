@@ -39,6 +39,9 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
     /// pending. The drawable is presented either way; `false` only pauses.
     var shouldRenderFrame: (() -> Bool)?
 
+    var threadedRender: (@Sendable (CGSize, CAMetalDrawable) -> (pending: Bool, drawn: Bool))?
+    private(set) var threadDriver: ThreadFrameDriver?
+
     private let driver: DiagnosticsEnvironment.FrameDriver
     private weak var window: NSWindow?
     private var lastInput: CFTimeInterval?
@@ -70,12 +73,15 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
     }
 
     isolated deinit {
+        threadDriver?.detach()
         link?.invalidate()
         pacingLink?.invalidate()
     }
 
     /// Recreates the link for `window`; nil tears it down.
     func attach(to window: NSWindow?) {
+        threadDriver?.detach()
+        threadDriver = nil
         self.window = window
         owesDraw = false
         lastInput = nil
@@ -89,6 +95,16 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         previousPresentationTimestamp = nil
         guard window != nil else {
             link = nil
+            return
+        }
+        if DiagnosticsEnvironment.usesRenderThread(), driver == .displaylink,
+            let window, let threadedRender
+        {
+            let threaded = ThreadFrameDriver(
+                owner: WindowRenderThreads.thread(for: window),
+                layer: metalLayer, render: threadedRender)
+            threadDriver = threaded
+            threaded.attach(range: desiredFrameRateRange)
             return
         }
         if driver != .displaylink {
@@ -117,6 +133,8 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
 
     /// Wakes the scheduler for the next vsync. Idempotent, main thread.
     func resume() {
+        guard window?.occlusionState.contains(.visible) != false else { return }
+        threadDriver?.resume()
         if RenderMetrics.isEnabled, isPaused {
             resumedAt = CACurrentMediaTime()
             previousPresentationTimestamp = nil
@@ -174,17 +192,20 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
     }
 
     /// Whether a display link is on the run loop for this layer.
-    var isAttached: Bool { link != nil || pacingLink != nil }
+    var isAttached: Bool { threadDriver != nil || link != nil || pacingLink != nil }
 
     var isPaused: Bool {
         get { link?.isPaused ?? pacingLink?.isPaused ?? true }
         set {
             if newValue {
+                threadDriver?.setVisible(false)
                 resumedAt = nil
                 previousPresentationTimestamp = nil
                 link?.isPaused = true
                 pacingLink?.isPaused = true
-            } else { resume() }
+            } else {
+                threadDriver?.setVisible(true)
+                resume() }
         }
     }
 
@@ -195,6 +216,7 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         get { desiredFrameRateRange }
         set {
             desiredFrameRateRange = newValue
+            threadDriver?.setRange(newValue)
             link?.preferredFrameRateRange = newValue
             pacingLink?.preferredFrameRateRange = newValue
         }
@@ -277,8 +299,13 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         }
         let stillPending = shouldRenderFrame?() ?? true
         let drawn: Bool
-        if let onRenderFrame { drawn = onRenderFrame(metalLayer.drawableSize, update.drawable) }
-        else { update.drawable.present(); drawn = true }
+        if let onRenderFrame { drawn = onRenderFrame(
+                CGSize(
+                    width: update.drawable.texture.width, height: update.drawable.texture.height),
+                update.drawable)
+        } else {
+            update.drawable.present()
+            drawn = true }
         if Self.mayPause(stillPending: stillPending, drawn: drawn) {
             link.isPaused = true
             previousPresentationTimestamp = nil

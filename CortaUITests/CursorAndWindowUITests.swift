@@ -83,6 +83,35 @@ final class CursorAndWindowUITests: XCTestCase {
         XCTAssertGreaterThan(Set(captures).count, 1, "the enabled cursor must blink on an idle terminal")
     }
 
+    @MainActor func testIdleCursorStopsAppFramesAfterHandoff() throws {
+        continueAfterFailure = false
+        let stage = try preparedStage("cursor-blink")
+        let app = makeApp(stage: stage)
+        let metrics = stage.appendingPathComponent("cursor-idle-\(UUID().uuidString).log")
+        app.launchEnvironment["CORTA_RENDER_METRICS"] = metrics.path
+        app.launchEnvironment["CORTA_RENDER_METRICS_FRAMES"] = "1"
+        app.launchEnvironment["CORTA_RENDER_THREAD"] =
+            ProcessInfo.processInfo.environment["CORTA_RENDER_THREAD"] ?? "0"
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 3)
+        func frameLines() -> [String] {
+            ((try? String(contentsOf: metrics, encoding: .utf8)) ?? "").split(separator: "\n")
+                .map(String.init).filter { $0.hasPrefix("cpuFrame:") }
+        }
+        let before = frameLines()
+        XCTAssertFalse(before.isEmpty, "the pane must have rendered before the quiet interval")
+        Thread.sleep(forTimeInterval: 3)
+        XCTAssertEqual(
+            frameLines().count, before.count, "Core Animation blinking must owe no app frames")
+        let attachment = XCTAttachment(
+            string: (try? String(contentsOf: metrics, encoding: .utf8)) ?? "")
+        attachment.name = "idle-cursor-metrics"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     /// The stage `stage-ui-fixtures.sh` prepared for `name`: the sandboxed
     /// runner cannot write one the app could read.
     private func preparedStage(_ name: String) throws -> URL {
@@ -102,6 +131,8 @@ final class CursorAndWindowUITests: XCTestCase {
         app.launchEnvironment["CORTA_STAGE_DIR"] = stage.path
         app.launchEnvironment["ZDOTDIR"] = stage.path
         app.launchEnvironment["SHELL"] = "/bin/zsh"
+        app.launchEnvironment["CORTA_RENDER_THREAD"] =
+            ProcessInfo.processInfo.environment["CORTA_RENDER_THREAD"] ?? "0"
         return app
     }
 

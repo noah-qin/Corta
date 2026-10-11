@@ -274,7 +274,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         ApplicationsFolderMover.promptIfNeeded()
     }
 
+    private var stallTimer: Timer?
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+        if let stall = DiagnosticsEnvironment.mainStall() {
+            let timer = Timer(timeInterval: stall.periodMilliseconds / 1000, repeats: true) { _ in
+                Thread.sleep(forTimeInterval: stall.milliseconds / 1000)
+            }
+            stallTimer = timer
+            RunLoop.main.add(timer, forMode: .common)
+        }
         #if CORTA_HEADLESS_TESTS
         return
         #endif
@@ -449,6 +457,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
+        stallTimer?.invalidate()
+        stallTimer = nil
         isTerminating = true
         flushLayoutSave()
         DirectoryHistoryStore.shared.flush()

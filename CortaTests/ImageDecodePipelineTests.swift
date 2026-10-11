@@ -14,12 +14,12 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import CortaTerminal
 import Foundation
 import Metal
 import Testing
 
 @testable import Corta
-import CortaTerminal
 
 /// Image decoding lives off the frame path. The frame path
 /// (`texture(for:)`, `draw`) is a pure cache lookup; `update(table:...)`
@@ -28,6 +28,37 @@ import CortaTerminal
 /// when the last placement disappears.
 @Suite("Image decode pipeline", .serialized, .metalSerialized)
 struct ImageDecodePipelineTests {
+    @Test("a slow GPU upload cannot block the frame's cache lookups")
+    func cacheLookupDoesNotWaitForUpload() throws {
+        let device = try #require(Self.makeDevice())
+        let entered = DispatchSemaphore(value: 0)
+        let release = DispatchSemaphore(value: 0)
+        let finished = DispatchSemaphore(value: 0)
+        let renderer = KittyImageRenderer(
+            device: device,
+            makeTexture: { descriptor in
+                entered.signal()
+                _ = release.wait(timeout: .now() + 2)
+                return device.makeTexture(descriptor: descriptor)
+            })
+        var terminal = Terminal(rows: 10, columns: 40)
+        Self.placeRGBA(&terminal, id: 1, byte: 255)
+        let id = KittyGraphics.ImageID(rawValue: 1)
+        let data = try #require(Self.table(of: terminal).image(id))
+        DispatchQueue.global().async {
+            _ = renderer.texture(for: id, data: data)
+            finished.signal()
+        }
+        #expect(entered.wait(timeout: .now() + 5) == .success)
+        let start = DispatchTime.now().uptimeNanoseconds
+        #expect(renderer.texture(for: id) == nil)
+        let milliseconds = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6
+        release.signal()
+        #expect(finished.wait(timeout: .now() + 5) == .success)
+        #expect(milliseconds < 100)
+        #expect(renderer.texture(for: id) != nil)
+    }
+
     @Test("replacements and deletions do not orphan queued jobs")
     func replacementBacklogIsBoundedAndCoalesced() throws {
         let device = try #require(Self.makeDevice())

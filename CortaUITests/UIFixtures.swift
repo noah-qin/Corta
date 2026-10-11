@@ -62,6 +62,9 @@ enum UIFixtures {
         app.launchEnvironment["ZDOTDIR"] = stage.path
         app.launchEnvironment["SHELL"] = "/bin/zsh"
         app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
+        if let mode = ProcessInfo.processInfo.environment["CORTA_RENDER_THREAD"] {
+            app.launchEnvironment["CORTA_RENDER_THREAD"] = mode
+        }
         return app
     }
 

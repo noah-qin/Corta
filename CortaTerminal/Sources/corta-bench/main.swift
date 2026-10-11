@@ -23,6 +23,28 @@ import Synchronization
 
 let focusedHistoryBenchmarks = CommandLine.arguments.contains("--history") || CommandLine.arguments.contains("--reflow-only")
 
+if CommandLine.arguments.contains("--reader-qos") {
+    let utility = CommandLine.arguments.contains("--utility")
+    let finished = DispatchSemaphore(value: 0)
+    let thread = Thread {
+        let qos = utility ? QOS_CLASS_UTILITY : QOS_CLASS_USER_INITIATED
+        print(
+            "reader QoS benchmark: \(utility ? "utility" : "user-initiated"), set=\(pthread_set_qos_class_self_np(qos, 0))"
+        )
+        if CommandLine.arguments.contains("--real-producers") {
+            benchmarkRealReaderProducers(priority: utility ? .background : .interactive)
+        } else {
+            benchmarkFeedUnderSnapshotter()
+            benchmarkWriteBackpressure()
+            for _ in 0..<3 { benchmarkReaderProducer(priority: utility ? .background : .interactive) }
+        }
+        finished.signal()
+    }
+    thread.start()
+    finished.wait()
+    exit(0)
+}
+
 /// `corta-bench` — measures the numbers `docs/PERFORMANCE.md` §1 sets
 /// targets for, so they are recorded, not estimated. Run release for real numbers:
 ///
@@ -1018,6 +1040,95 @@ func peakResidentBytes() -> UInt64 {
     var usage = rusage()
     guard getrusage(RUSAGE_SELF, &usage) == 0 else { return 0 }
     return UInt64(usage.ru_maxrss)
+}
+
+// MARK: - Reader priority producer measurements
+
+/// Actual build/find children; parent CPU excludes their compilation/traversal.
+func benchmarkRealReaderProducers(priority: TerminalSession.ReaderPriority) {
+    let root = "/tmp/corta-reader-producers"
+    let repositoryIndex = CommandLine.arguments.firstIndex(of: "--repository")
+    let repository = repositoryIndex.flatMap { index in
+        CommandLine.arguments.indices.contains(index + 1) ? CommandLine.arguments[index + 1] : nil
+    }
+    func quote(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "'\"'\"'") + "'" }
+    let package = quote(repository ?? "\(root)/project")
+    let find: String
+    if CommandLine.arguments.contains("--bounded-root-find") {
+        find = "/usr/bin/find / -xdev -maxdepth 4"
+    } else if CommandLine.arguments.contains("--root-find") {
+        find = "/usr/bin/find / -xdev"
+    } else {
+        find = "for n in 1 2 3 4 5 6 7 8 9 10; do /usr/bin/find '\(root)/tree' -type f; done"
+    }
+    func cpu(_ usage: rusage) -> Double {
+        Double(usage.ru_utime.tv_sec + usage.ru_stime.tv_sec)
+            + Double(usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) / 1e6
+    }
+    for round in 1...3 {
+        let build = "\(root)/build-\(priority)-\(round)-\(UUID().uuidString)"
+        let workloads = [("swift-build", "/usr/bin/swift build -v --package-path \(package) --scratch-path \(quote(build))"),
+            ("find", find)]
+        for (name, command) in workloads {
+            do {
+                var before = rusage()
+                _ = getrusage(RUSAGE_SELF, &before)
+                let start = DispatchTime.now().uptimeNanoseconds
+                let session = try TerminalSession(executable: "/bin/sh", arguments: ["-c", command],
+                    size: TerminalSize(rows: 4, columns: 200))
+                let done = DispatchSemaphore(value: 0)
+                let outcome = Mutex<ChildExit?>(nil)
+                session.onChildExit = { exit in outcome.withLock { $0 = exit }; done.signal() }
+                session.setReaderPriority(priority)
+                session.start()
+                let finished = done.wait(timeout: .now() + 180) == .success
+                var after = rusage()
+                _ = getrusage(RUSAGE_SELF, &after)
+                let elapsed = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9
+                print("real-producer \(name) round=\(round) reader=\(session.readerPriority) finished=\(finished) exit=\(String(describing: outcome.withLock { $0 })) elapsed=\(String(format: "%.3f", elapsed))s parentCPU=\(String(format: "%.6f", cpu(after)-cpu(before)))s")
+                fflush(stdout)
+                session.stop()
+            } catch { print("real-producer failed: \(error)") }
+        }
+    }
+}
+
+/// Actual child write durations, beside the CPU feed/backpressure drivers.
+func benchmarkReaderProducer(priority: TerminalSession.ReaderPriority) {
+    let script = """
+        import os,time
+        samples=[]
+        line=b'x'*200+b'\\r\\n'
+        begin=time.monotonic()
+        for i in range(2000):
+            deadline=begin+i/1000
+            delay=deadline-time.monotonic()
+            if delay>0: time.sleep(delay)
+            before=time.perf_counter_ns()
+            os.write(1,line)
+            samples.append((time.perf_counter_ns()-before)/1000)
+        samples.sort()
+        os.write(1,('qos-producer p50=%.1fus p99=%.1fus max=%.1fus over1ms=%d\\r\\n' %
+            (samples[1000],samples[1980],samples[-1],sum(v>1000 for v in samples))).encode())
+        """
+    do {
+        let session = try TerminalSession(
+            executable: "/usr/bin/python3", arguments: ["-c", script],
+            size: TerminalSize(rows: 4, columns: 200))
+        let done = DispatchSemaphore(value: 0)
+        session.onChildExit = { _ in done.signal() }
+        session.setReaderPriority(priority)
+        session.start()
+        defer { session.stop() }
+        guard done.wait(timeout: .now() + 10) == .success else {
+            print("qos producer timed out")
+            return
+        }
+        print(
+            "reader \(session.readerPriority): "
+                + session.snapshot().logicalLines().map(\.text)
+                .filter { $0.contains("qos-producer") }.joined(separator: " "))
+    } catch { print("qos producer failed: \(error)") }
 }
 
 // MARK: - Search response distribution (P11)

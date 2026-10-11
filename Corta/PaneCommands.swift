@@ -302,6 +302,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     /// including saying so when the child is not reading, rather than
     /// dropping the drop without a word.
     private func pasteNow(_ sanitized: String) {
+        (host as? ViewController)?.updateReaderPriority(input: true)
         host?.pointer.returnToBottomOnInput()
         sendPaste(sanitized)
     }

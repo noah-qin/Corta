@@ -41,6 +41,13 @@ the fuzz harness and the golden-file tests possible on day one.
 **Consequence.** `CortaTerminal` has zero third-party dependencies. The
 app links one (Sparkle, for updates), and only the app.
 
+**System ABI exception (2026-10-11, #291).** The app has one tiny C wrapper
+for Darwin’s variadic `shm_open`. Swift cannot bind that variadic function
+with a fixed-argument declaration on arm64: the argument ABI differs. The
+wrapper preserves the system ABI; it contains no terminal logic, codec or
+third-party dependency. Anonymous shared pixels are still owned and bounded
+by Swift. This exception does not permit a C terminal core.
+
 ## D03 — Lines carry a `wrapped` flag from the first commit
 
 **Decision.** Every grid row records whether it is a soft continuation of
@@ -70,6 +77,13 @@ without launching an app.
 
 **Consequence.** Types in the core are `Sendable` by construction or
 explicitly not shared. The app owns every main-thread hand-off.
+
+**Render experiment (2026-10-11, #284).** `CORTA_RENDER_THREAD=1` confines
+renderer mutation and display links to one serial run loop per window. Main
+publishes immutable inputs through a mutex mailbox and consumes coalesced
+feedback; the reader directly wakes the owner. The default stays on main
+while the measured keypress latency gate fails. See the linked performance
+record before enabling the experiment by default.
 
 ## D05 — Cells are fixed-size; complex graphemes spill to a side table
 

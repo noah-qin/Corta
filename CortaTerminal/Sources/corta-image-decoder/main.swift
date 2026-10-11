@@ -31,10 +31,9 @@ import ImageIO
 /// handed. An XPC service would contain it the same way; a helper beside
 /// `corta-exec` needs no new target type and is spawned the same way.
 ///
-/// Protocol: the PNG on standard input until end of file (at most
-/// `maximumInputBytes`); on success, width and height as little-endian
-/// `UInt32`s then `width × height × 4` bytes of premultiplied BGRA on
-/// standard output, exit status 0. Anything else — not a PNG, over the
+/// Protocol: three little-endian UInt32s (width, height, row stride), then
+/// the PNG on stdin. FD 3 is the anonymous shared pixel mapping. On success,
+/// stdout contains only width and height as little-endian UInt32s, exit 0. Anything else — not a PNG, over the
 /// caps, a decode failure, a sandbox that could not be entered — is a
 /// nonzero exit with nothing written. The app checks the sizes again; it
 /// trusts this process no more than the stream.
@@ -56,7 +55,9 @@ let sandboxNamed: UInt64 = 0x0001
 /// The decode the app did in process (`KittyImageRenderer.decodePNG`):
 /// the signature, `public.png` and nothing ImageIO sniffs instead, and the
 /// header's dimensions under the caps before a pixel is decoded.
-func decode(_ bytes: [UInt8]) -> (width: Int, height: Int, bgra: [UInt8])? {
+func decode(_ bytes: [UInt8], mapping: UnsafeMutableRawPointer? = nil,
+    expectedWidth: Int? = nil, expectedHeight: Int? = nil, stride: Int? = nil
+) -> (width: Int, height: Int)? {
     guard bytes.starts(with: pngSignature) else { return nil }
     let options = [kCGImageSourceTypeIdentifierHint: "public.png"] as CFDictionary
     guard let source = CGImageSourceCreateWithData(Data(bytes) as CFData, options),
@@ -69,19 +70,18 @@ func decode(_ bytes: [UInt8]) -> (width: Int, height: Int, bgra: [UInt8])? {
         let image = CGImageSourceCreateImageAtIndex(source, 0, nil),
         image.width == width, image.height == height
     else { return nil }
-    var bgra = [UInt8](repeating: 0, count: width * height * 4)
-    let drawn = bgra.withUnsafeMutableBytes { buffer -> Bool in
-        guard
-            let context = CGContext(
-                data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
-                bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+    guard expectedWidth == nil || expectedWidth == width,
+        expectedHeight == nil || expectedHeight == height
+    else { return nil }
+    guard
+        let context = CGContext(
+            data: mapping, width: width, height: height, bitsPerComponent: 8,
+            bytesPerRow: stride ?? width * 4, space: CGColorSpaceCreateDeviceRGB(),
                 bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
                     | CGBitmapInfo.byteOrder32Little.rawValue)
-        else { return false }
+        else { return nil }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        return true
-    }
-    return drawn ? (width, height, bgra) : nil
+        return (width, height)
 }
 
 /// A 1×1 PNG decoded before the sandbox closes, so ImageIO and CoreGraphics
@@ -95,6 +95,17 @@ let warmUp: [UInt8] = [
     0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
 ]
 guard decode(warmUp) != nil else { exit(2) }
+
+// Acquire only the inherited, already unlinked object before entering the sandbox.
+var sharedStat = stat()
+guard fstat(3, &sharedStat) == 0, sharedStat.st_size > 0,
+    sharedStat.st_size <= maximumPixels * 4 + maximumDimension * 4096
+else { exit(4) }
+let mappedLength = Int(sharedStat.st_size)
+guard let mapping = mmap(nil, mappedLength, PROT_READ | PROT_WRITE, MAP_SHARED, 3, 0),
+    mapping != MAP_FAILED
+else { exit(4) }
+close(3)
 
 var sandboxError: UnsafeMutablePointer<CChar>?
 guard sandboxInit("pure-computation", sandboxNamed, &sandboxError) == 0 else { exit(3) }
@@ -110,7 +121,7 @@ func readInput() -> [UInt8]? {
             if errno == EINTR { continue }
             return nil
         }
-        guard bytes.count + count <= maximumInputBytes else { return nil }
+        guard bytes.count + count <= maximumInputBytes + 12 else { return nil }
         bytes.append(contentsOf: chunk[0..<count])
     }
 }
@@ -130,10 +141,44 @@ func writeAll(_ bytes: [UInt8]) -> Bool {
     return true
 }
 
-guard let input = readInput(), let image = decode(input) else { exit(1) }
-var header: [UInt8] = []
-for value in [UInt32(image.width), UInt32(image.height)] {
-    withUnsafeBytes(of: value.littleEndian) { header.append(contentsOf: $0) }
+guard let input = readInput(), input.count >= 12 else { exit(1) }
+func word(_ at: Int) -> Int {
+    Int(
+        UInt32(input[at]) | UInt32(input[at + 1]) << 8
+            | UInt32(input[at + 2]) << 16 | UInt32(input[at + 3]) << 24)
 }
-guard writeAll(header), writeAll(image.bgra) else { exit(1) }
+let width = word(0)
+let height = word(4)
+let stride = word(8)
+guard width > 0, height > 0, width <= maximumDimension, height <= maximumDimension,
+    width <= maximumPixels / height, stride >= width * 4, stride % 4 == 0,
+    stride <= mappedLength / height
+else { exit(1) }
+// This check runs after mapping and sandbox entry on every decode. A denied
+// open proves the inherited mapping did not reopen the filesystem boundary.
+let forbidden = open("/etc/passwd", O_RDONLY)
+guard forbidden < 0 else {
+    close(forbidden)
+    exit(5)
+}
+guard
+    let decoded = decode(
+        Array(input.dropFirst(12)), mapping: mapping,
+        expectedWidth: width, expectedHeight: height, stride: stride)
+else { exit(1) }
+var header = [UInt8]()
+for word in [decoded.width, decoded.height] {
+    let value = UInt32(word)
+    header += (0..<4).map { UInt8(truncatingIfNeeded: value >> ($0 * 8)) }
+}
+var written = 0
+while written < header.count {
+    let count = header.withUnsafeBytes {
+        Darwin.write(1, $0.baseAddress! + written, $0.count - written)
+    }
+    if count < 0, errno == EINTR { continue }
+    guard count > 0 else { exit(1) }
+    written += count
+}
+munmap(mapping, mappedLength)
 exit(0)

@@ -408,7 +408,7 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
     func updateShellOverlay(grid: Grid) {
         guard let terminalView, let terminalRenderer else { return }
         let overlay = terminalView.shellOverlay
-        overlay.frame = terminalView.bounds
+        if overlay.frame != terminalView.bounds { overlay.frame = terminalView.bounds }
         let metrics = terminalRenderer.pointMetrics
         let content = PaneFrameLoop.contentRect(in: terminalView.bounds.size, scale: 1,
             gridHeight: CGFloat(grid.rows) * metrics.cellHeight, topInset: topInset)

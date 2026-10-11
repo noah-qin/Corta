@@ -52,6 +52,9 @@ public final class OutputWakeGate: Sendable {
         pending.exchange(false, ordering: .acquiringAndReleasing)
     }
 
+    /// Non-consuming peek: a rendered frame parks only when no newer batch is waiting.
+    public var hasPending: Bool { pending.load(ordering: .acquiring) }
+
     /// When the reader last noted output, on the `DispatchTime` uptime
     /// clock; zero before any. Read by what must see every batch rather
     /// than one per frame — a quiet-period timer keeps running while a

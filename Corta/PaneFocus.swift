@@ -54,6 +54,105 @@ final class PaneFocus: NSObject {
     private(set) var lastReportedFocus: Bool?
     private var isObservingWindows = false
 
+    private let handoff = CursorHandoffMailbox()
+    var handoffSignal: CursorHandoffMailbox { handoff }
+    private var lastCursorOutputRevision: UInt64 = 0
+    private var idleCursorLayer: CALayer?
+    private var pendingCursorLayer: CALayer?
+    private var lastCursorGrid: Grid?
+    private var blinkIsInvalidating = false
+    private var cursorOffAt: CFTimeInterval?
+    var presentationToken: UInt64 { handoff.token }
+    var presentationPending: Bool {
+        handoff.phase == .awaitingLayer || handoff.phase == .awaitingMetal
+    }
+
+    /// Input and UI changes reset Metal's cursor, retaining the old layer until
+    /// the replacement drawable actually reaches glass.
+    func noteCursorActivity() {
+        guard !blinkIsInvalidating else { return }
+        handoff.takeBack()
+        pendingCursorLayer = nil
+        cursorBlinkVisible = true
+        cursorBlinkTimer?.invalidate()
+        cursorBlinkTimer = nil
+        if let layer = idleCursorLayer {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            layer.removeAllAnimations()
+            layer.opacity = 1
+            CATransaction.commit()
+        }
+    }
+    func framePresented(token: UInt64) {
+        let previous = handoff.phase
+        guard handoff.presented(token) else { return }
+        if previous == .awaitingLayer {
+            guard canBlinkCursor, let layer = pendingCursorLayer else {
+                stopCursorBlink()
+                return
+            }
+            pendingCursorLayer = nil
+            idleCursorLayer = layer
+            (host as? ViewController)?.terminalView?.layer?.addSublayer(layer)
+            let blink = CAKeyframeAnimation(keyPath: "opacity")
+            blink.values = [0, 1, 0]
+            blink.keyTimes = [0, 0.5, 1]
+            blink.calculationMode = .discrete
+            blink.duration = 1
+            blink.repeatCount = .infinity
+            blink.beginTime = cursorOffAt ?? CACurrentMediaTime()
+            layer.add(blink, forKey: "cursor.blink")
+        } else {
+            idleCursorLayer?.removeFromSuperlayer()
+            idleCursorLayer = nil
+        }
+    }
+    private func makeIdleCursorLayer() -> CALayer? {
+        guard let pane = host as? ViewController, let grid = lastCursorGrid,
+            let renderer = pane.terminalRenderer, let view = pane.terminalView,
+            !view.hasMarkedText(), pane.selection == nil,
+            pane.search.highlights.isEmpty, pane.pointer.hoveredLink == nil,
+            grid.imagePlacements.placementCount == 0
+        else { return nil }
+        let metrics = renderer.pointMetrics
+        let scale = renderer.scale
+        let style = lastBlinkStyle ?? .block
+        var column = grid.cursor.column
+        var columns = 1
+        let layer = CALayer()
+        layer.actions = ["opacity": NSNull(), "position": NSNull(), "bounds": NSNull()]
+        layer.contentsScale = scale
+        layer.opacity = 0
+        layer.backgroundColor =
+            NSColor(
+                srgbRed: CGFloat(TerminalColorPalette.activeVariant.cursor.x),
+                green: CGFloat(TerminalColorPalette.activeVariant.cursor.y),
+                blue: CGFloat(TerminalColorPalette.activeVariant.cursor.z), alpha: 1
+            ).cgColor
+        if style == .blinkingBlock {
+            guard let capture = renderer.cursorImage(grid: grid) else { return nil }
+            column = capture.column
+            columns = capture.columns
+            layer.contents = capture.image
+        }
+        let content = PaneFrameLoop.contentRect(
+            in: view.bounds.size, scale: 1,
+            gridHeight: CGFloat(grid.rows) * metrics.cellHeight, topInset: pane.topInset)
+        var frame = CGRect(
+            x: content.minX + CGFloat(column) * metrics.cellWidth,
+            y: content.minY + CGFloat(grid.cursor.row) * metrics.cellHeight,
+            width: metrics.cellWidth * CGFloat(columns), height: metrics.cellHeight)
+        let stroke = max(2, floor(metrics.cellHeight * scale / 8)) / scale
+        if style == .blinkingBar { frame.size.width = stroke }
+        if style == .blinkingUnderline {
+            frame.origin.y += frame.height - stroke
+            frame.size.height = stroke
+        }
+        layer.frame = frame
+        return layer
+    }
+
     private var cursorBlinkTimer: Timer?
     /// False for the off half of a blink.
     private(set) var cursorBlinkVisible = true
@@ -222,6 +321,7 @@ final class PaneFocus: NSObject {
 
     @objc private func windowFocusChanged(_ note: Notification) {
         guard let window = note.object as? NSWindow, window === host?.view.window else { return }
+        (host as? ViewController)?.updateReaderPriority()
         reportIfNeeded()
         // Cmd-Tab drops the ring even though the focused pane doesn't change.
         applyAppearance()
@@ -250,6 +350,10 @@ final class PaneFocus: NSObject {
     }
 
     func stopCursorBlink() {
+        if handoff.phase != .metal { handoff.stop() }
+        idleCursorLayer?.removeFromSuperlayer()
+        idleCursorLayer = nil
+        pendingCursorLayer = nil
         cursorBlinkTimer?.invalidate()
         cursorBlinkTimer = nil
         cursorBlinkVisible = true
@@ -257,19 +361,25 @@ final class PaneFocus: NSObject {
 
     /// Per frame: a blinking style blinks while it may, and a moved cursor,
     /// a changed style or new output restarts it visible.
-    func updateCursorBlink(grid: Grid, style: CursorStyle, reset: Bool) {
+    func updateCursorBlink(grid: Grid, style: CursorStyle, reset: Bool, outputRevision: UInt64? = nil
+    ) {
         let blinking = style == .blinkingBlock || style == .blinkingBar || style == .blinkingUnderline
         // A hidden cursor (`?25l`) has nothing to blink: no 2 Hz redraws.
         guard blinking && canBlinkCursor && grid.isCursorVisible else {
             stopCursorBlink()
             return
         }
-        if reset || lastBlinkCursor != grid.cursor || lastBlinkStyle != style {
-            stopCursorBlink()
+        if reset || lastBlinkCursor != grid.cursor || lastBlinkStyle != style
+            || handoff.phase == .awaitingMetal
+        {
+            noteCursorActivity()
         }
+        lastCursorGrid = grid
+        lastCursorOutputRevision = outputRevision ?? handoff.snapshot.outputRevision
         lastBlinkCursor = grid.cursor
         lastBlinkStyle = style
-        guard cursorBlinkTimer == nil else { return }
+        guard cursorBlinkTimer == nil, handoff.phase == .metal || handoff.phase == .awaitingMetal
+        else { return }
         let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
@@ -277,8 +387,20 @@ final class PaneFocus: NSObject {
                     self.stopCursorBlink()
                     return
                 }
+                guard self.handoff.phase == .metal else { return }
                 self.cursorBlinkVisible.toggle()
+                if !self.cursorBlinkVisible { self.cursorOffAt = CACurrentMediaTime() }
+                if !self.cursorBlinkVisible, let layer = self.makeIdleCursorLayer(),
+                    self.handoff.handOff(expectedOutputRevision: self.lastCursorOutputRevision)
+                        != nil
+                {
+                    self.pendingCursorLayer = layer
+                    self.cursorBlinkTimer?.invalidate()
+                    self.cursorBlinkTimer = nil
+                }
+                self.blinkIsInvalidating = true
                 self.host?.invalidateDisplay()
+                self.blinkIsInvalidating = false
             }
         }
         timer.tolerance = 0.05

@@ -33,6 +33,37 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     var terminalView: TerminalView!
     var terminalRenderer: TerminalRenderer!
     var session: TerminalSession!
+    private var readerDemotion: DispatchWorkItem?
+    private var readerHiddenSince: TimeInterval?
+    private var readerLastInput: TimeInterval?
+
+    func updateReaderPriority(input: Bool = false) {
+        guard let session, !didTeardown else { return }
+        readerDemotion?.cancel()
+        readerDemotion = nil
+        let now = ProcessInfo.processInfo.systemUptime
+        if input { readerLastInput = now }
+        let window = view.window
+        let visible =
+            window?.occlusionState.contains(.visible) == true && !view.isHiddenOrHasHiddenAncestor
+        let selected = window?.tabGroup.map { $0.selectedWindow === window } ?? true
+        if visible && selected {
+            readerHiddenSince = nil
+        } else if readerHiddenSince == nil {
+            readerHiddenSince = now
+        }
+        let priority = ReaderPriorityPolicy.priority(
+            visible: visible, selected: selected,
+            hiddenSince: readerHiddenSince, lastInput: readerLastInput, now: now)
+        session.setReaderPriority(priority)
+        if priority == .interactive, !(visible && selected) {
+            let work = DispatchWorkItem { [weak self] in self?.updateReaderPriority() }
+            readerDemotion = work
+            DispatchQueue.main.asyncAfter(
+                deadline: .now() + ReaderPriorityPolicy.grace, execute: work)
+        }
+    }
+
     /// Decides when a frame is owed and draws it; the pane supplies the
     /// content and the output-batch stage.
     private(set) lazy var frameLoop = makeFrameLoop()
@@ -380,6 +411,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     }
 
     private func installTerminalCallbacks(on view: TerminalView) {
+        publishRenderInputs()
         frameLoop.install(on: view)
         pointer.install(on: view)
         // `view` weakly too: the closure is stored on it, and a strong capture
@@ -396,6 +428,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         view.onCompletionKey = { [weak self] event in self?.shell.handleDirectoryCompletionKey(event) ?? false }
         view.onKeyBytes = { [weak self, weak view] bytes in
             guard let self, self.isOperable else { return }
+            updateReaderPriority(input: true)
             if bytes.contains(0x0D) { taskNotifier.noteCommandSubmitted(in: view?.window) }
             pointer.returnToBottomOnInput()
             // Ctrl-C under a large paste: queued behind it, the interrupt
@@ -517,6 +550,21 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
                 detail: L10n.text("failure.runtimeHint"),
                 canRetry: !reconnect, canReconnect: reconnect, takesFocus: self.isFocusedPane)
         }
+        loop.cursorHandoffSignal = focus.handoffSignal
+        loop.presentationPending = { [weak self] in self?.focus.presentationPending ?? false }
+        loop.presentationToken = { [weak self] in self?.focus.presentationToken ?? 0 }
+        loop.onPresented = { [weak self] in
+            self?.focus.framePresented(token: $0)
+            self?.publishRenderInputs()
+        }
+        loop.afterThreadedFrame = { [weak self] grid, output, bell, revision, metadata in
+            guard let self, !self.didTeardown else { return }
+            if output { self.noteOutputBatch() }
+            if bell { self.handleBell() }
+            self.afterFrame(
+                grid: grid, hasOutput: output, cursorRevision: revision, inputMetadata: metadata)
+            self.publishRenderInputs()
+        }
         loop.topInset = { [weak self] in self?.topInset ?? 0 }
         return loop
     }
@@ -575,25 +623,27 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         }
     }
 
-    /// What this frame draws, and the overlays placed against it.
-    private func frameContent(hasOutput: Bool) -> PaneFrameLoop.Content? {
-        guard let session, let terminalRenderer else { return nil }
+    /// Main-thread effects consume the frame snapshot, independently of GPU work.
+    private func afterFrame(
+        grid: Grid, hasOutput: Bool, cursorRevision: UInt64? = nil,
+        inputMetadata: RenderInputSourceMetadata? = nil
+    ) {
+        guard session != nil, let terminalRenderer, terminalView != nil else { return }
+        terminalView.refreshInputCompositionGeometry()
         let configuration = ConfigurationStore.shared.configuration
-        let inputSnapshot = configuration.inputSourceIndicator == .off ? nil : session.inputLineSnapshot()
-        let grid = inputSnapshot?.grid ?? session.snapshot()
         splitController?.placeInputSourceIndicator(from: self, configuration: configuration)
-        terminalRenderer.drawsCommandMarks = configuration.commandStatusMarks
         shell.updateShellOverlay(grid: grid)
-        if let inputSnapshot {
+        if let inputMetadata {
             let metrics = terminalRenderer.pointMetrics
-            inputSourceIndicator.update(grid: grid, hasIntegration: inputSnapshot.hasIntegration,
-                promptRow: inputSnapshot.promptRow,
+            inputSourceIndicator.update(
+                grid: grid, hasIntegration: inputMetadata.hasIntegration,
+                promptRow: inputMetadata.promptRow,
                 focused: focus.hasUserFocus && view.window?.firstResponder === terminalView,
                 scrollOffset: scrollOffset, configuration: configuration,
                 cellSize: CGSize(width: metrics.cellWidth, height: metrics.cellHeight),
                 topInset: topInset, compositionRect: terminalView.inputCompositionRect,
                 blockedRects: terminalView.shellOverlay.occupiedRects + (search.bar.map { [$0.frame] } ?? []))
-        } else { inputSourceIndicator.view.isHidden = true }
+        } else if !inputSourceIndicator.view.isHidden { inputSourceIndicator.view.isHidden = true }
         if hasOutput, scrollOffset > 0, let anchor = scrollAnchorTotalPushed {
             // Keep the viewport on the same document row while scrolled away.
             // From this frame's own snapshot — a separate read could see more rows
@@ -606,18 +656,56 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             }
         }
         let cursorStyle = focus.effectiveCursorStyle(grid: grid)
-        focus.updateCursorBlink(grid: grid, style: cursorStyle, reset: hasOutput)
-        return PaneFrameLoop.Content(
-            grid: grid, scrollOffset: scrollOffset,
-            // `?25l`: a program drawing its own screen hid the cursor. A
-            // preedit draws its own caret (`MarkedTextOverlayView`).
-            cursorVisible: scrollOffset == 0 && isFocusedPane && grid.isCursorVisible
-                && focus.cursorBlinkVisible && !terminalView.hasMarkedText()
+        focus.updateCursorBlink(grid: grid, style: cursorStyle, reset: hasOutput, outputRevision: cursorRevision)
+    }
+
+    private func renderInputs() -> RenderInputs {
+        let config = ConfigurationStore.shared.configuration
+        return RenderInputs(
+            readsInputSourceMetadata: config.inputSourceIndicator != .off,
+            scrollOffset: scrollOffset, scrollAnchorTotalPushed: scrollAnchorTotalPushed,
+            cursorPresentationPending: focus.presentationPending,
+            cursorPresentationToken: focus.presentationToken,
+            cursorVisible: scrollOffset == 0 && isFocusedPane
+                && terminalView?.hasMarkedText() != true
                 && sessionEndedBar == nil,
+            cursorStyle: config.cursorShape.style(blinking: config.cursorBlink),
+            cursorBlinkVisible: focus.cursorBlinkVisible,
             selection: selection,
             searchMatches: search.highlights,
             currentSearchMatchIndex: search.currentMatchIndex, hoveredLink: pointer.hoveredLink,
-            cursorStyle: cursorStyle)
+            drawsCommandMarks: config.commandStatusMarks, topInset: topInset,
+            theme: TerminalColorPalette.activeVariant)
+    }
+    private func publishRenderInputs() {
+        guard let engine = frameLoop.threadedEngine else { return }
+        if engine.inputs.publish(renderInputs()), terminalView?.threadDriver != nil {
+            engine.invalidate()
+        }
+    }
+
+    private func frameContent(hasOutput: Bool) -> PaneFrameLoop.Content? {
+        guard let session, let terminalRenderer else { return nil }
+        let revision = focus.handoffSignal.snapshot.outputRevision
+        let inputSnapshot =
+            renderInputs().readsInputSourceMetadata ? session.inputLineSnapshot() : nil
+        let grid = inputSnapshot?.grid ?? session.snapshot()
+        let metadata = inputSnapshot.map {
+            RenderInputSourceMetadata(
+                hasIntegration: $0.hasIntegration, promptRow: $0.promptRow)
+        }
+        afterFrame(
+            grid: grid, hasOutput: hasOutput, cursorRevision: revision, inputMetadata: metadata)
+        let inputs = renderInputs()
+        terminalRenderer.drawsCommandMarks = inputs.drawsCommandMarks
+        return PaneFrameLoop.Content(
+            grid: grid, scrollOffset: inputs.scrollOffset,
+            cursorVisible: inputs.cursorVisible && grid.isCursorVisible
+                && inputs.cursorBlinkVisible,
+            selection: inputs.selection, searchMatches: inputs.searchMatches,
+            currentSearchMatchIndex: inputs.currentSearchMatchIndex,
+            hoveredLink: inputs.hoveredLink,
+            cursorStyle: focus.effectiveCursorStyle(grid: grid))
     }
 
     private func handleBell() {
@@ -698,6 +786,9 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
 
     /// For local changes that produce no output.
     func invalidateDisplay() {
+        focus.noteCursorActivity()
+        updateReaderPriority()
+        publishRenderInputs()
         frameLoop.invalidate()
     }
 
@@ -868,6 +959,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// Behind Try Again (the ladder) and Reconnect (the exact command).
     func rebuildPane(strictRespawn: Bool) {
         terminalView?.stopRendering()
+        readerDemotion?.cancel()
+        readerDemotion = nil
         frameLoop.detach()
         session?.stop()
         session = nil

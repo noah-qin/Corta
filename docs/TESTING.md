@@ -521,10 +521,13 @@ single reader to the code.
 
 | Variable | Values | Builds | Effect |
 | --- | --- | --- | --- |
+| `CORTA_RENDER_THREAD` | `0` (default), `1` | all | Experimental per-window render run loop; `ondemand` keeps its main-thread driver; default changes only after the #284 acceptance matrix |
+| `CORTA_MAIN_STALL` | `<ms>/<period-ms>`, e.g. `8/33` | Debug / Benchmark only | Repeated bounded main-thread stall for the render-thread A/B; ignored in Release |
 | `CORTA_FRAME_DRIVER` | `displaylink` (default), `ondemand` | all | Experimental echo presentation with separate CADisplayLink pacing; immediate acquisition only while paused; the unaccepted no-sync experiment was removed, so both retained drivers use display synchronization |
 | `CORTA_FRAME_LATENCY` | number ≥ 1 | all | The display link's `preferredFrameLatency` (default 2; `PERFORMANCE.md` §5.7) |
 | `CORTA_MAX_DRAWABLES` | `2` or `3` | all | The Metal layer's drawable count (default 3), for a double-buffering A/B |
 | `CORTA_RENDER_METRICS` | any; an absolute path also writes there | all | Frame-timing percentiles to the `render-metrics` log category, and to the file |
+| `CORTA_RENDER_METRICS_FRAMES` | integer 1–6000 | all | Frames per CPU/GPU summary (default 600); `1` makes idle-cursor frame cessation observable |
 | `CORTA_RENDER_METRICS_KEYSTROKES` | integer > 0 | all | Keystrokes per keypress-to-present summary (default 200) |
 | `CORTA_RESTORE_WINDOWS` | `0` | all | Skips reopening last run's windows |
 | `CORTA_STAGE_DIR` | absolute path | all | Config, Application Support and rc files move into it (`AppPaths`) |
@@ -803,3 +806,44 @@ reverses keyboard history navigation every 100 events so the 600-frame ring fill
 the scroll limit clamps. `testFourPanePromptMemory` measures the actual window
 in addition to the offscreen texture-resource figures. Results and hardware
 limitations are in [the dated record](test-results/2026-10-11-memory-core-optimization.md).
+
+
+### Shared-image and render-owner verification
+
+The #291/#284/#290 [measurement record](test-results/2026-10-11-render-image-energy.md)
+names passing automated checks and outstanding acceptance gates. Use
+`swift run -c release --package-path CortaTerminal corta-bench --reader-qos`
+and add `--utility` for the reader scheduling comparison.
+`CursorAndWindowUITests` propagates `TEST_RUNNER_CORTA_RENDER_THREAD`; its quiet
+cursor test lowers the render-metric flush capacity to one so a continued
+2 Hz application blink cannot hide below the default 600-frame summary.
+Measurement tests belong to the **Release** test plan, not the UI plan.
+
+### Follow-up image and producer measurements (#291/#290)
+
+Generate the owned 4096×4096 PNG using
+`swift script/fixtures/kitty4096.swift`; it writes `/tmp/corta-4096.png`.
+`stage-ui-fixtures.sh` supplies the measurement stage's executable
+`kitty-shell`. With `/opt/homebrew/bin/kitten` installed, run Release-plan
+`MeasurementUITests/testKitty4096PNGToGlass` under Benchmark. The staged shell
+uses icat stream transfer and a declared window size to prevent source resizing.
+`imageToPresent` starts when the final validated payload is stored and ends
+on a positive drawable timestamp with a ready image quad. This includes
+decode, GPU upload and compositor presentation, and excludes earlier payload
+transmission. `outputToFrame` separates output arrival from frame encoding;
+`frameToGlass` remains independent of a main-thread feedback stamp.
+
+`python3 script/prepare_reader_qos_fixtures.py` prepares an isolated small Swift
+package and 5,000 files. Build the Release `corta-bench`, then use
+`--reader-qos --real-producers` with and without `--utility`. Each launches
+three actual cold-scratch Swift builds and ten-pass find processes through
+PTYs, reporting completion, requested reader priority, wall time and parent
+CPU. These are throughput/CPU proxies, not watts. The
+[follow-up record](test-results/2026-10-11-followup.md) preserves the results
+and UI automation limits.
+
+The real-producer benchmark also accepts `--repository <package-path>` for
+an actual repository’s Swift package, `--root-find` for full same-filesystem
+root traversal, or `--bounded-root-find` for depth4. These ranges are distinct
+and must be named in a result. A timed-out or interrupted full traversal is
+not a passing completed root-find run. Each producer has a180-second deadline.

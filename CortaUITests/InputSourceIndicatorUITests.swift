@@ -124,6 +124,58 @@ final class InputSourceIndicatorUITests: XCTestCase {
         attach(app.windows.firstMatch, name: "input-source-dark-fallback")
     }
 
+    @MainActor func testPinyinCandidatesFollowWindowMovement() throws {
+        continueAfterFailure = false
+        let previous = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
+        defer { TISSelectInputSource(previous) }
+        guard let sources = TISCreateInputSourceList(nil, false)?.takeRetainedValue() as? [TISInputSource],
+            let pinyin = sources.first(where: { source in
+                guard let raw = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) else { return false }
+                let id = Unmanaged<CFString>.fromOpaque(raw).takeUnretainedValue() as String
+                return id == "com.apple.inputmethod.SCIM.ITABC"
+            }) else { throw XCTSkip("No enabled Pinyin input source; no input sources installed") }
+        _ = LatinInputSource.select()
+        let app = UIFixtures.app(stage: try UIFixtures.stage("input-source-cjk"), runner: Self.self, usingTestTarget: true)
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
+        UIFixtures.requireFixturePrompt(in: app)
+        app.typeText("cat > /dev/null\n")
+        XCTAssertEqual(TISSelectInputSource(pinyin), noErr)
+        for letter in "zhongwen" { app.typeKey(String(letter), modifierFlags: []) }
+        Thread.sleep(forTimeInterval: 1)
+        let candidateApp = XCUIApplication(bundleIdentifier: "com.apple.inputmethod.SCIM")
+        let candidate = candidateApp.windows.firstMatch
+        let exposed = candidate.waitForExistence(timeout: 5)
+        let beforeShot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        beforeShot.name = "pinyin-candidate-before-move"
+        beforeShot.lifetime = .keepAlways
+        add(beforeShot)
+        let before = exposed ? candidate.frame : .zero
+        let window = app.windows.firstMatch
+        let windowBefore = window.frame
+        app.activate()
+        let title = window.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.025))
+        title.press(forDuration: 0.1, thenDragTo: title.withOffset(CGVector(dx: 120, dy: 90)))
+        Thread.sleep(forTimeInterval: 1)
+        let after = exposed ? candidate.frame : .zero
+        let delta = CGPoint(x: window.frame.minX - windowBefore.minX, y: window.frame.minY - windowBefore.minY)
+        guard abs(delta.x) + abs(delta.y) > 40 else {
+            throw XCTSkip("XCTest did not move the window while the system candidate panel was active; no candidate-following result claimed")
+        }
+        if exposed {
+            XCTAssertEqual(after.minX - before.minX, delta.x, accuracy: 8)
+            XCTAssertEqual(after.minY - before.minY, delta.y, accuracy: 8)
+        }
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot.name = "pinyin-candidate-follows-window"
+        shot.lifetime = .keepAlways
+        add(shot)
+        app.typeKey(.escape, modifierFlags: [])
+        app.typeKey("c", modifierFlags: .control)
+        if !exposed { throw XCTSkip("Candidate AX geometry unavailable; before/after screen captures require visual review") }
+    }
+
     @MainActor func testInstalledCJKInputSourcesUpdateWithoutTyping() throws {
         let previous = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
         defer { TISSelectInputSource(previous) }
