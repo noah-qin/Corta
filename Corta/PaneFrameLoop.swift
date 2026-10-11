@@ -345,12 +345,12 @@ final class PaneFrameLoop {
         let background = TerminalColorPalette.clearColor
         let commit = InputLatencySignposts.begin(.commit)
         let token = preparedPresentationToken
-        let accepted = Atomic<Bool>(false)
-        if preparedPresentationPending {
+        let accepted = preparedPresentationPending ? FrameAcceptanceMarker() : nil
+        if let accepted {
             drawable.addPresentedHandler { [weak self] presented in
                 let reachedGlass = presented.presentedTime > 0
                 Task { @MainActor in
-                    guard accepted.load(ordering: .acquiring), let self, self.isCurrent(generation)
+                    guard accepted.isAccepted, let self, self.isCurrent(generation)
                     else {
                         return
                     }
@@ -375,7 +375,7 @@ final class PaneFrameLoop {
             drawable: drawable, label: "Corta.frame.\(ObjectIdentifier(self).hashValue)",
             onCompleted: onCompleted)
         InputLatencySignposts.end(.commit, commit)
-        accepted.store(drawn, ordering: .releasing)
+        accepted?.finishEncoding(drawn)
         watchGPU(generation: generation, backendGeneration: backendGeneration)
         return drawn
     }

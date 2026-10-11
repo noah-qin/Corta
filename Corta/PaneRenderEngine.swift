@@ -215,15 +215,15 @@ nonisolated final class PaneRenderEngine: @unchecked Sendable {
                 in: size, scale: renderer.scale,
                 gridHeight: CGFloat(renderer.cachedRowCount) * renderer.metrics.cellHeight,
                 topInset: inputs.topInset)
-            let accepted = Atomic<Bool>(false)
             let expectsVisibleCursor = cursor?.phase == .awaitingMetal
-            if cursor?.pending ?? inputs.cursorPresentationPending, !synchronized,
-                cachedCursorVisible == expectsVisibleCursor
-            {
+            let tracksCursor = (cursor?.pending ?? inputs.cursorPresentationPending)
+                && !synchronized && cachedCursorVisible == expectsVisibleCursor
+            let accepted = tracksCursor ? FrameAcceptanceMarker() : nil
+            if let accepted {
                 drawable.addPresentedHandler { [weak self, presented] drawable in
                     let reachedGlass = drawable.presentedTime > 0
                     Task { @MainActor in
-                        guard accepted.load(ordering: .acquiring) else { return }
+                        guard accepted.isAccepted else { return }
                         let token = cursor?.token ?? inputs.cursorPresentationToken
                         guard reachedGlass else {
                             if let snapshot = self?.cursorSignal?.snapshot, snapshot.pending,
@@ -255,7 +255,7 @@ nonisolated final class PaneRenderEngine: @unchecked Sendable {
                 if let error, case Metal4BackendError.frameDropped = error { return }
                 if error != nil { self?.invalidate() }
             }
-            accepted.store(drawn, ordering: .releasing)
+            accepted?.finishEncoding(drawn)
             armWatchdog()
             // Damage consumed by this draw is not work owed by the next draw.
             // The driver parks only once this quiet generation reaches glass.

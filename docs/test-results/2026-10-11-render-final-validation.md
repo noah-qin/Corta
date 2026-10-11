@@ -164,3 +164,19 @@ in an isolated stage with the default main render owner. License checking passed
 normal/narrow-window checks remain valid for their unchanged runtime paths.
 Security configuration and PNG content hashes were checked against all 22
 excluded local files; they were unchanged and are not part of the commit.
+
+## CI compiler compatibility follow-up (2026-10-12)
+
+The first PR CI build rejected a local noncopyable `Atomic<Bool>` captured by
+both a GPU callback and a main-actor task (`sending 'accepted' risks causing
+data races`). The acquisition/release operations now live in a checked-Sendable
+reference marker. It is allocated only when a cursor presentation is pending,
+so ordinary frames allocate no marker. Neither CI configuration nor concurrency
+checking was relaxed. An owner-boundary regression checks accepted and dropped
+encodings through the shared reference.
+
+After this change the full TSan plan passed 988 tests in 152 suites in 38.549 s,
+with the same four known issues. The optimized plan and final flood/memory cases
+passed again. D17 mean/p50/p95/p99: 0.302 / 0.290 / 0.498 / 0.986 ms; one-pane
+CPU p99 0.07 ms, GPU p99 0.63 ms, interval p99 16.67 ms. Closed-window absolute
+physical memory over five cycles: 104.170 / 104.416 / 104.449 / 104.449 / 104.433 MB.

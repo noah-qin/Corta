@@ -16,6 +16,15 @@
 
 import Synchronization
 
+/// A copyable Sendable reference keeps the noncopyable atomic's storage shared
+/// across the GPU callback and main-actor hop, including older Swift compilers.
+/// Created only for cursor handoff frames, never the ordinary frame hot path.
+nonisolated final class FrameAcceptanceMarker: Sendable {
+    private let accepted = Atomic<Bool>(false)
+    var isAccepted: Bool { accepted.load(ordering: .acquiring) }
+    func finishEncoding(_ drawn: Bool) { accepted.store(drawn, ordering: .releasing) }
+}
+
 /// Completion tracking independent of display-link callbacks. A hung queue
 /// can exhaust the drawable pool, preventing even a dropped-frame callback.
 /// Only this mutex-protected value state crosses from main to GPU feedback.

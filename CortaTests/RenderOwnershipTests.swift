@@ -85,6 +85,19 @@ struct RenderOwnershipTests {
         #expect(!presentation.startBlink(beginTime: CACurrentMediaTime()))
     }
 
+    @Test func encodingAcceptanceCrossesTheOwnerBoundary() {
+        let accepted = FrameAcceptanceMarker()
+        let dropped = FrameAcceptanceMarker()
+        let owner = RenderThread()
+        #expect(!accepted.isAccepted)
+        owner.barrier {
+            accepted.finishEncoding(true)
+            dropped.finishEncoding(false)
+        }
+        #expect(accepted.isAccepted)
+        #expect(!dropped.isAccepted)
+    }
+
     @Test func readerDemotionHasAGraceAndInputWins() {
         #expect(
             ReaderPriorityPolicy.priority(
