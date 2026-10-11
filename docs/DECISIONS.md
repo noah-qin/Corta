@@ -591,6 +591,14 @@ later, which presenting inside the transaction does not change for a
 the Metal pass (#238), not synchronised by presentation. Reopen this only
 with a measurement in which the property closes the gap.
 
+The standalone idle cursor (#290) draws only while the terminal is static.
+On activity its animation/opacity is retired under a mutex and an explicit
+flushed CA transaction before publishing a takeback token to the renderer.
+Its view attachment and removal stay on main. Waiting for a main-actor removal
+after drawing the new Metal cursor exposed duplicate positions; holding the
+old Metal position until removal instead added measured staleness. Neither
+approach is used. Metal presentation remains independent of CA transactions.
+
 
 ## D26 — Releases ship as a disk image
 

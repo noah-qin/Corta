@@ -101,6 +101,9 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
 
     // MARK: - Damage-tracked instance cache
 
+    /// Earliest time this cached grid could contain an echo. Set before snapshotting,
+    /// never at submission: output may arrive while older instances are encoded.
+    var echoSnapshotAt: TimeInterval?
     private var cachedLines: [Line] = []
     /// Live-screen fast path only; meaningless for rows rebuilt in history.
     private var cachedRevisions: [UInt64] = []
@@ -599,7 +602,7 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
                 drawableSize: drawableSize, backend: backend, drawable: drawable)
         }
         let images = kittyImageRenderer
-        backend.endFrame(presenting: drawable) { error in
+        backend.endFrame(presenting: drawable, echoSnapshotAt: echoSnapshotAt) { error in
             if error == nil { images.noteGPUCompletion() }
             onCompleted?(error)
         }

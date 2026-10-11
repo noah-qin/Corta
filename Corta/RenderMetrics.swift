@@ -73,7 +73,7 @@ nonisolated enum RenderMetrics {
     /// make render-path calls `async`. The summary file has its own.
     private struct State {
         var samples: [Metric: [Double]] = [:]
-        var pending: PendingKeystroke?
+        var echo = KeystrokeTracker()
         var conditions: Conditions?
         var presentedImages: Set<TimeInterval> = []
     }
@@ -193,13 +193,36 @@ nonisolated enum RenderMetrics {
 
     /// One keystroke in flight. A newer one replaces one that never echoed;
     /// that sample is dropped, never guessed.
-    private struct PendingKeystroke: Sendable {
+    struct PendingKeystroke: Sendable {
+        var sequence: UInt64
         var timestamp: TimeInterval
         var outputLanded = false
         var outputAt: TimeInterval?
         var mainAt: TimeInterval?
         /// Asks the pane for another frame (`TerminalView.setNeedsRedraw`).
         var requestFrame: @Sendable () -> Void
+    }
+
+    /// Snapshot ordering and drawable replacement are separate: an old retry
+    /// cannot restore its sample after a newer key has already been submitted.
+    struct KeystrokeTracker {
+        var pending: PendingKeystroke?
+        private var sequence: UInt64 = 0
+        mutating func note(timestamp: TimeInterval, requestFrame: @escaping @Sendable () -> Void) {
+            sequence &+= 1
+            pending = PendingKeystroke(sequence: sequence, timestamp: timestamp, requestFrame: requestFrame)
+        }
+        mutating func take(snapshotAt: TimeInterval?) -> PendingKeystroke? {
+            guard let snapshotAt, let pending, let outputAt = pending.outputAt,
+                outputAt <= snapshotAt else { return nil }
+            self.pending = nil
+            return pending
+        }
+        mutating func retry(_ sample: PendingKeystroke) -> Bool {
+            guard pending == nil, sequence == sample.sequence else { return false }
+            pending = sample
+            return true
+        }
     }
 
     /// Called at `TerminalView`'s three delivery sites. `NSEvent.timestamp`
@@ -210,7 +233,7 @@ nonisolated enum RenderMetrics {
     static func noteKeystroke(at timestamp: TimeInterval, requestFrame: @escaping @Sendable () -> Void) {
         guard isEnabled else { return }
         record(.keyDelivery, milliseconds: (CACurrentMediaTime() - timestamp) * 1000)
-        state.withLock { $0.pending = PendingKeystroke(timestamp: timestamp, requestFrame: requestFrame) }
+        state.withLock { $0.echo.note(timestamp: timestamp, requestFrame: requestFrame) }
     }
 
     /// A parse batch landed (reader thread); the first after a keystroke is
@@ -218,10 +241,10 @@ nonisolated enum RenderMetrics {
     static func noteOutputForKeystroke() {
         guard isEnabled else { return }
         let elapsed: Double? = state.withLock { state in
-            guard let pending = state.pending, !pending.outputLanded else { return nil }
+            guard let pending = state.echo.pending, !pending.outputLanded else { return nil }
             let now = CACurrentMediaTime()
-            state.pending?.outputLanded = true
-            state.pending?.outputAt = now
+            state.echo.pending?.outputLanded = true
+            state.echo.pending?.outputAt = now
             return (now - pending.timestamp) * 1000
         }
         if let elapsed { record(.keypressToOutput, milliseconds: elapsed) }
@@ -230,8 +253,8 @@ nonisolated enum RenderMetrics {
     static func noteMainHopForKeystroke() {
         guard isEnabled else { return }
         state.withLock { state in
-            guard state.pending?.outputLanded == true, state.pending?.mainAt == nil else { return }
-            state.pending?.mainAt = CACurrentMediaTime()
+            guard state.echo.pending?.outputLanded == true, state.echo.pending?.mainAt == nil else { return }
+            state.echo.pending?.mainAt = CACurrentMediaTime()
         }
     }
 
@@ -246,13 +269,9 @@ nonisolated enum RenderMetrics {
 
     /// Before presenting: if an echo is on the grid, this drawable's presented
     /// handler closes the sample when it is actually on screen.
-    static func notePresent(of drawable: MTLDrawable) {
+    static func notePresent(of drawable: MTLDrawable, snapshotAt: TimeInterval?) {
         guard isEnabled else { return }
-        let landed: PendingKeystroke? = state.withLock { state in
-            guard let keystroke = state.pending, keystroke.outputLanded else { return nil }
-            state.pending = nil
-            return keystroke
-        }
+        let landed = state.withLock { $0.echo.take(snapshotAt: snapshotAt) }
         guard let keystroke = landed else { return }
         let frameAt = CACurrentMediaTime()
         drawable.addPresentedHandler { presented in
@@ -262,11 +281,7 @@ nonisolated enum RenderMetrics {
             // display link parks, and without one the sample waits for the next
             // keystroke, which replaces it — under XCTest that lost five in six.
             guard presented.presentedTime > 0 else {
-                let repended = state.withLock { state in
-                    guard state.pending == nil else { return false }
-                    state.pending = keystroke
-                    return true
-                }
+                let repended = state.withLock { $0.echo.retry(keystroke) }
                 if repended { keystroke.requestFrame() }
                 return
             }

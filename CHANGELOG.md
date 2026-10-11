@@ -43,8 +43,10 @@ Versioning for compatibility changes.
 
 ### Fixed
 
-- IME candidate coordinates refresh after window, layout, cursor and font
-  changes, and use the marked-text caret rather than a stale cursor anchor.
+- Idle blinking cursors retire their overlay before rendering resumes, avoiding
+  duplicate positions and a stale cursor waiting for the main thread.
+- Input and accessibility cell coordinates match bottom-anchored rendering
+  while a live resize temporarily makes the grid taller than its pane.
 - Ended sessions show a compact centered card with accessible restart and
   close actions that fit narrow panes.
 

@@ -150,6 +150,7 @@ nonisolated final class ThreadFrameDriver: NSObject, CAMetalDisplayLinkDelegate,
             if visible.load(ordering: .acquiring) {
                 wakeEpoch &+= 1
                 quietEligible = false
+                link?.preferredFrameRateRange = range
                 if link?.isPaused == true { resumedAt = CACurrentMediaTime() }
                 link?.isPaused = false
             }
@@ -168,8 +169,14 @@ nonisolated final class ThreadFrameDriver: NSObject, CAMetalDisplayLinkDelegate,
     func setRange(_ range: CAFrameRateRange) {
         owner.post { [self] in
             self.range = range
-            link?.preferredFrameRateRange = range
+            link?.preferredFrameRateRange = quietEligible ? Self.waitingRange(for: range) : range
         }
+    }
+    /// Keep the link active until the last frame reaches glass, without
+    /// submitting unchanged replacements every vsync while it is in flight.
+    static func waitingRange(for range: CAFrameRateRange) -> CAFrameRateRange {
+        let ceiling: Float = range.maximum > 0 ? min(15, range.maximum) : 15
+        return CAFrameRateRange(minimum: ceiling, maximum: ceiling, preferred: ceiling)
     }
     func metalDisplayLink(_ link: CAMetalDisplayLink, needsUpdate update: CAMetalDisplayLink.Update)
     {
@@ -222,5 +229,6 @@ nonisolated final class ThreadFrameDriver: NSObject, CAMetalDisplayLinkDelegate,
         // a later wake invalidates the old frame's permission to park.
         quietEligible = !result.pending && result.drawn
         acceptedQuietFrame.store(quietEligible, ordering: .releasing)
+        link.preferredFrameRateRange = quietEligible ? Self.waitingRange(for: range) : range
     }
 }

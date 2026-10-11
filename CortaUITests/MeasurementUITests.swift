@@ -161,8 +161,18 @@ final class MeasurementUITests: XCTestCase {
         // Read the latest full rings while every producer is still running.
         // Stopping panes one by one can fill another ring with a changing
         // workload, so its tail is not an N-pane steady-state measurement.
-        let lines = try waitForMetrics(["cpuFrame", "gpu"], timeout: 10)
+        let lines = try waitForMetrics(["cpuFrame", "gpu", "frameInterval"], timeout: 10)
         report(lines.map { "\(panes)-pane flood \($0)" })
+        if ProcessInfo.processInfo.environment["CORTA_RENDER_THREAD"] == "1",
+            !ProcessInfo.processInfo.isLowPowerModeEnabled {
+            let interval = try XCTUnwrap(lines.first(where: { $0.hasPrefix("frameInterval:") }))
+            let p99Field = try XCTUnwrap(interval.components(separatedBy: " ")
+                .first(where: { $0.hasPrefix("p99=") }))
+            let p99 = try XCTUnwrap(Double(p99Field.dropFirst(4)
+                .replacingOccurrences(of: "ms", with: "")))
+            let fps = NSScreen.main?.maximumFramesPerSecond ?? 60
+            XCTAssertLessThanOrEqual(p99, 1500 / Double(fps), "threaded flood must stay within 1.5 display intervals")
+        }
         for centre in centres {
             focus(app, at: centre, panes: panes)
             app.typeKey("c", modifierFlags: .control)

@@ -239,7 +239,9 @@ final class PaneFrameLoop {
         let forced = needsRedraw || wasSynchronizedOutputActive
         needsRedraw = false
         wasSynchronizedOutputActive = false
+        let snapshotAt = RenderMetrics.isEnabled ? CACurrentMediaTime() : nil
         guard let content = content?(hasOutput) else { return forced }
+        renderer.echoSnapshotAt = snapshotAt
         cachedCursorVisible = content.cursorVisible
         let cursor = cursorHandoffSignal?.snapshot
         preparedPresentationToken = cursor?.token ?? presentationToken()

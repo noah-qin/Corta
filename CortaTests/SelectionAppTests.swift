@@ -269,6 +269,19 @@ struct SelectionCellMappingTests {
         #expect(position.row == 3)
     }
 
+    @Test func inputCellFrameMatchesHitTestingDuringLiveResize() {
+        let grid = Grid(rows: 30, columns: 120)
+        for height in [Self.exactHeight(rows: 30) + 5, Self.exactHeight(rows: 30) - 2 * Self.metrics.cellHeight] {
+            let cell = PanePointer.cellFrame(row: 3, column: 2, viewHeight: height,
+                metrics: Self.metrics, rows: grid.rows, topInset: Self.topInset)
+            let position = PanePointer.documentPosition(for: CGPoint(x: cell.midX, y: cell.midY),
+                viewHeight: height, metrics: Self.metrics, grid: grid, scrollOffset: 0, topInset: Self.topInset)
+            #expect(position.row == 3)
+            #expect(position.column == 2)
+            #expect(cell.height == Self.metrics.cellHeight)
+        }
+    }
+
     @Test func theScrollOffsetMovesEventsIntoDocumentRows() {
         let grid = Grid(rows: 30, columns: 120)
         let point = CGPoint(

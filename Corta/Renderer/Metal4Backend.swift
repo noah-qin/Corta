@@ -425,14 +425,13 @@ public nonisolated final class Metal4Backend {
     /// after the GPU finishes, with the commit's error — or at once with
     /// `.frameDropped` for a frame that was not drawn.
     func endFrame(
-        presenting drawable: (any MTLDrawable)?, onCompleted: (@Sendable ((any Error)?) -> Void)?
+        presenting drawable: (any MTLDrawable)?, echoSnapshotAt: TimeInterval? = nil, onCompleted: (@Sendable ((any Error)?) -> Void)?
     ) {
         guard let encoder else {
             // An unpresented drawable is never recycled (`FrameScheduler`),
             // so a dropped frame still presents; it shows the drawable's last
             // contents for one refresh.
             if let drawable {
-                RenderMetrics.notePresent(of: drawable)
                 drawable.present()
             }
             onCompleted?(Metal4BackendError.frameDropped)
@@ -473,7 +472,7 @@ public nonisolated final class Metal4Backend {
         if let drawable {
             // After the commits targeting it, before presenting (MTL4 contract).
             queue.signalDrawable(drawable)
-            RenderMetrics.notePresent(of: drawable)
+            RenderMetrics.notePresent(of: drawable, snapshotAt: echoSnapshotAt)
             drawable.present()
         }
     }

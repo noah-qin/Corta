@@ -160,6 +160,7 @@ nonisolated final class PaneRenderEngine: @unchecked Sendable {
                 if session.isSynchronizedOutputEnabled {
                     synchronized = true
                 } else {
+                    renderer.echoSnapshotAt = RenderMetrics.isEnabled ? CACurrentMediaTime() : nil
                     let inputSnapshot =
                         inputs.readsInputSourceMetadata ? session.inputLineSnapshot() : nil
                     let grid = inputSnapshot?.grid ?? session.snapshot()

@@ -57,8 +57,8 @@ final class PaneFocus: NSObject {
     private let handoff = CursorHandoffMailbox()
     var handoffSignal: CursorHandoffMailbox { handoff }
     private var lastCursorOutputRevision: UInt64 = 0
-    private var idleCursorLayer: CALayer?
-    private var pendingCursorLayer: CALayer?
+    private var idleCursorLayer: CursorLayerPresentation?
+    private var pendingCursorLayer: CursorLayerPresentation?
     private var lastCursorGrid: Grid?
     private var blinkIsInvalidating = false
     private var cursorOffAt: CFTimeInterval?
@@ -67,8 +67,8 @@ final class PaneFocus: NSObject {
         handoff.phase == .awaitingLayer || handoff.phase == .awaitingMetal
     }
 
-    /// Input and UI changes reset Metal's cursor, retaining the old layer until
-    /// the replacement drawable actually reaches glass.
+    /// Retire the independent CA cursor before submitting a replacement Metal
+    /// frame. Its graph removal still waits for a positive presented callback.
     func noteCursorActivity() {
         guard !blinkIsInvalidating else { return }
         handoff.takeBack()
@@ -76,13 +76,6 @@ final class PaneFocus: NSObject {
         cursorBlinkVisible = true
         cursorBlinkTimer?.invalidate()
         cursorBlinkTimer = nil
-        if let layer = idleCursorLayer {
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            layer.removeAllAnimations()
-            layer.opacity = 1
-            CATransaction.commit()
-        }
     }
     func framePresented(token: UInt64) {
         let previous = handoff.phase
@@ -94,21 +87,14 @@ final class PaneFocus: NSObject {
             }
             pendingCursorLayer = nil
             idleCursorLayer = layer
-            (host as? ViewController)?.terminalView?.layer?.addSublayer(layer)
-            let blink = CAKeyframeAnimation(keyPath: "opacity")
-            blink.values = [0, 1, 0]
-            blink.keyTimes = [0, 0.5, 1]
-            blink.calculationMode = .discrete
-            blink.duration = 1
-            blink.repeatCount = .infinity
-            blink.beginTime = cursorOffAt ?? CACurrentMediaTime()
-            layer.add(blink, forKey: "cursor.blink")
+            (host as? ViewController)?.terminalView?.layer?.addSublayer(layer.layer)
+            _ = layer.startBlink(beginTime: cursorOffAt ?? CACurrentMediaTime())
         } else {
-            idleCursorLayer?.removeFromSuperlayer()
+            idleCursorLayer?.layer.removeFromSuperlayer()
             idleCursorLayer = nil
         }
     }
-    private func makeIdleCursorLayer() -> CALayer? {
+    private func makeIdleCursorLayer() -> CursorLayerPresentation? {
         guard let pane = host as? ViewController, let grid = lastCursorGrid,
             let renderer = pane.terminalRenderer, let view = pane.terminalView,
             !view.hasMarkedText(), pane.selection == nil,
@@ -150,7 +136,7 @@ final class PaneFocus: NSObject {
             frame.size.height = stroke
         }
         layer.frame = frame
-        return layer
+        return CursorLayerPresentation(layer: layer)
     }
 
     private var cursorBlinkTimer: Timer?
@@ -351,7 +337,7 @@ final class PaneFocus: NSObject {
 
     func stopCursorBlink() {
         if handoff.phase != .metal { handoff.stop() }
-        idleCursorLayer?.removeFromSuperlayer()
+        idleCursorLayer?.layer.removeFromSuperlayer()
         idleCursorLayer = nil
         pendingCursorLayer = nil
         cursorBlinkTimer?.invalidate()
@@ -391,7 +377,8 @@ final class PaneFocus: NSObject {
                 self.cursorBlinkVisible.toggle()
                 if !self.cursorBlinkVisible { self.cursorOffAt = CACurrentMediaTime() }
                 if !self.cursorBlinkVisible, let layer = self.makeIdleCursorLayer(),
-                    self.handoff.handOff(expectedOutputRevision: self.lastCursorOutputRevision)
+                    self.handoff.handOff(expectedOutputRevision: self.lastCursorOutputRevision,
+                        presentation: layer)
                         != nil
                 {
                     self.pendingCursorLayer = layer

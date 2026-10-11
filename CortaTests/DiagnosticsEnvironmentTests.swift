@@ -148,3 +148,46 @@ struct DiagnosticsEnvironmentTests {
         #expect(offenders.isEmpty, "\(offenders)")
     }
 }
+
+struct KeystrokeMeasurementTests {
+    @Test func aSnapshotBeforeEchoCannotCompleteTheKey() {
+        var tracker = RenderMetrics.KeystrokeTracker()
+        tracker.note(timestamp: 1, requestFrame: {})
+        tracker.pending?.outputAt = 2
+        #expect(tracker.take(snapshotAt: 1.9) == nil)
+        #expect(tracker.pending != nil)
+        #expect(tracker.take(snapshotAt: 2)?.timestamp == 1)
+        #expect(tracker.pending == nil)
+    }
+
+    @Test func replacedDrawableRetriesTheSameKeyUntilItReachesGlass() throws {
+        var tracker = RenderMetrics.KeystrokeTracker()
+        tracker.note(timestamp: 1, requestFrame: {})
+        tracker.pending?.outputAt = 2
+        let firstSample = tracker.take(snapshotAt: 2)
+        let first = try #require(firstSample)
+        let retried = tracker.retry(first)
+        #expect(retried)
+        #expect(tracker.take(snapshotAt: 3)?.sequence == first.sequence)
+    }
+
+    @Test func oldDrawableCannotRestoreAKeyAfterANewerKeyWasSubmitted() throws {
+        var tracker = RenderMetrics.KeystrokeTracker()
+        tracker.note(timestamp: 1, requestFrame: {})
+        tracker.pending?.outputAt = 2
+        let oldSample = tracker.take(snapshotAt: 2)
+        let old = try #require(oldSample)
+        tracker.note(timestamp: 1, requestFrame: {})
+        tracker.pending?.outputAt = 3
+        let newSample = tracker.take(snapshotAt: 3)
+        let new = try #require(newSample)
+        let oldRetried = tracker.retry(old)
+        #expect(!oldRetried)
+        #expect(tracker.pending == nil)
+        let newRetried = tracker.retry(new)
+        #expect(newRetried)
+        let lateOldRetried = tracker.retry(old)
+        #expect(!lateOldRetried)
+        #expect(tracker.pending?.sequence == new.sequence)
+    }
+}

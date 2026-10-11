@@ -134,11 +134,19 @@ final class PanePointer: NSObject {
 
     /// A screen cell's rect in the terminal view's coordinates.
     private func cellRect(row: Int, column: Int) -> CGRect? {
-        guard let terminalRenderer else { return nil }
-        let metrics = terminalRenderer.pointMetrics
-        return CGRect(
-            x: TerminalLayout.insets.left + CGFloat(column) * metrics.cellWidth,
-            y: topInset + CGFloat(row) * metrics.cellHeight,
+        guard let terminalRenderer, let terminalView, let session else { return nil }
+        return Self.cellFrame(row: row, column: column, viewHeight: terminalView.bounds.height,
+            metrics: terminalRenderer.pointMetrics, rows: session.snapshot().rows, topInset: topInset)
+    }
+
+    /// IME, accessibility and pointer hit testing share the renderer's anchor,
+    /// including a grid that temporarily overflows during a live resize.
+    nonisolated static func cellFrame(row: Int, column: Int, viewHeight: CGFloat,
+        metrics: CellMetrics, rows: Int, topInset: CGFloat) -> CGRect {
+        let rect = PaneFrameLoop.contentRect(in: CGSize(width: 0, height: viewHeight), scale: 1,
+            gridHeight: CGFloat(rows) * metrics.cellHeight, topInset: topInset)
+        return CGRect(x: TerminalLayout.insets.left + CGFloat(column) * metrics.cellWidth,
+            y: rect.minY + CGFloat(row) * metrics.cellHeight,
             width: metrics.cellWidth, height: metrics.cellHeight)
     }
 

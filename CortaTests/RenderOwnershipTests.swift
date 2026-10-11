@@ -17,6 +17,7 @@
 import CortaTerminal
 import Foundation
 import Metal
+import QuartzCore
 import Synchronization
 import Testing
 
@@ -65,6 +66,25 @@ struct RenderOwnershipTests {
         #expect(signal.handOff(expectedOutputRevision: revision) == nil)
     }
 
+    @Test @MainActor func readerRetiresLayerBeforePublishingTakeback() {
+        let signal = CursorHandoffMailbox()
+        signal.setSessionGeneration(3)
+        let layer = CALayer()
+        let presentation = CursorLayerPresentation(layer: layer)
+        _ = signal.handOff(expectedOutputRevision: 0, presentation: presentation)
+        #expect(presentation.startBlink(beginTime: CACurrentMediaTime()))
+        signal.noteOutput(generation: 2)
+        // An unattached test layer need not retain a committed animation;
+        // stale output must leave its presentation eligible to start.
+        #expect(presentation.startBlink(beginTime: CACurrentMediaTime()))
+        let owner = RenderThread()
+        owner.barrier { signal.noteOutput(generation: 3) }
+        #expect(signal.phase == .awaitingMetal)
+        #expect(layer.opacity == 0)
+        #expect(layer.animationKeys() == nil)
+        #expect(!presentation.startBlink(beginTime: CACurrentMediaTime()))
+    }
+
     @Test func readerDemotionHasAGraceAndInputWins() {
         #expect(
             ReaderPriorityPolicy.priority(
@@ -108,6 +128,15 @@ struct RenderOwnershipTests {
         owner = nil
         #expect(released.value == nil)
     }
+    @Test func quietPresentationWaitNeverRaisesThePolicyCeiling() {
+        let normal = ThreadFrameDriver.waitingRange(for: CAFrameRateRange(minimum: 30, maximum: 60, preferred: 60))
+        #expect(normal.maximum == 15)
+        #expect(normal.preferred == 15)
+        let limited = ThreadFrameDriver.waitingRange(for: CAFrameRateRange(minimum: 5, maximum: 10, preferred: 10))
+        #expect(limited.maximum == 10)
+        #expect(limited.preferred == 10)
+    }
+
     @Test func stallSeamIsBoundedAndAbsentFromRelease() {
         #expect(!DiagnosticsEnvironment.usesRenderThread(in: [:]))
         #expect(DiagnosticsEnvironment.usesRenderThread(in: ["CORTA_RENDER_THREAD": "1"]))
