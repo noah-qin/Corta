@@ -157,6 +157,7 @@ public nonisolated final class TerminalRenderer {
 
     /// Secondary but readable on dark and light; zero is `invisible`'s job.
     private static let dimAlpha: Float = 0.55
+    private static let colorAttributeMask = CellAttributes.reverse.rawValue | CellAttributes.dim.rawValue
 
     private(set) var lastRebuiltRowCount = 0
 
@@ -183,6 +184,12 @@ public nonisolated final class TerminalRenderer {
     private var cachedMarks: [QuadInstance] = []
     private var marksAreStale = true
 
+    /// Resource counters used by Release measurement drivers.
+    public var atlasAllocatedBytes: Int { glyphAtlas.texture.allocatedSize + glyphAtlas.colorTexture.allocatedSize }
+    public var instanceStride: Int { MemoryLayout<QuadInstance>.stride }
+    public var uploadedInstanceBytes: Int { backend.uploadedInstanceBytes }
+    public var uploadedRectangleBytes: Int { backend.uploadedRectangleBytes }
+
     /// Rows in the cached frame: the grid height `draw` lays out.
     var cachedRowCount: Int { cachedLines.count }
 
@@ -205,16 +212,17 @@ public nonisolated final class TerminalRenderer {
     ///   `nil` is `GlyphAtlas.atlasSize`.
     /// - Throws: `Metal4BackendError.metal4Unsupported` on a GPU without
     ///   `MTLGPUFamily.metal4`. There is no other renderer to fall back to.
-    public init(device: MTLDevice, font: CTFont, scale: CGFloat, atlasPixelSize: Int? = nil) throws {
+    public init(device: MTLDevice, font: CTFont, scale: CGFloat, atlasPixelSize: Int? = nil, atlasStorageMode: MTLStorageMode = .shared) throws {
         let atlasFont = CTFontCreateCopyWithAttributes(
             font, CTFontGetSize(font) * scale, nil, nil)
         self.backend = try Metal4Backend(device: device)
         // The atlas is per pane, unlike the pipelines: it is mutable and its
         // eviction forces full rebuilds, so sharing would couple every pane's
-        // damage tracking to all panes' glyph churn — per frame — to save ~20 MB.
+        // damage tracking to other panes' glyph churn. Lazy allocation makes
+        // a prompt's atlas small; the ceiling is still about 20 MiB per pane.
         // A shared read-only ASCII layer would be a new design, not a lookup.
         self.glyphAtlas = try GlyphAtlas(
-            device: device, font: atlasFont, atlasPixelSize: atlasPixelSize ?? GlyphAtlas.atlasSize)
+            device: device, font: atlasFont, atlasPixelSize: atlasPixelSize ?? GlyphAtlas.atlasSize, storageMode: atlasStorageMode)
         self.kittyImageRenderer = KittyImageRenderer(device: device)
         self.pointMetrics = CellMetrics(font: font, scale: scale)
         self.metrics = self.pointMetrics.scaled(by: scale)
@@ -414,10 +422,10 @@ public nonisolated final class TerminalRenderer {
             backend.drawSolidQuads(cachedMarks, rect: markRect(beside: rect), drawableSize: drawableSize)
         }
         backend.drawGlyphQuads(
-            cachedGlyphs, atlas: glyphAtlas.texture, rect: rect, drawableSize: drawableSize)
+            cachedGlyphs, atlas: glyphAtlas.texture, atlasRects: glyphAtlas.atlasRects, rect: rect, drawableSize: drawableSize)
         if !cachedColorGlyphs.isEmpty {
             backend.drawColorQuads(
-                cachedColorGlyphs, atlas: glyphAtlas.colorTexture, rect: rect,
+                cachedColorGlyphs, atlas: glyphAtlas.colorTexture, atlasRects: glyphAtlas.atlasRects, rect: rect,
                 drawableSize: drawableSize)
         }
         if cachedImagePlacements.placementCount > 0 {
@@ -777,34 +785,36 @@ public nonisolated final class TerminalRenderer {
                         size: .init(cellWidth, cellHeight), color: palette.cursor))
             }
         }
+        var previousColors = SIMD2<UInt64>(repeating: .max)
+        var fg = SIMD4<Float>.zero, bg = fg
+        var packedFG: UInt32 = 0, packedBG: UInt32 = 0
         for column in 0..<line.count {
             let cell = line[column]
             let attributes = cell.attributes
             let reversed = attributes.contains(.reverse)
-            // Resolve each role first, then swap: swapping raw colours re-resolves
-            // both `.default`s to the same values, and a reversed cell (a `less`
-            // search hit) showed no highlight.
-            let resolvedFg = palette.resolveForeground(cell.foreground, indexedOverrides: indexedOverrides)
-            let resolvedBg = palette.resolveBackground(cell.background, indexedOverrides: indexedOverrides)
-            var fg = reversed ? resolvedBg : resolvedFg
-            var bg = reversed ? resolvedFg : resolvedBg
-            // SGR 2: alpha on the foreground — one multiply, and correct over a
-            // coloured background, where blending to the default would tint it.
-            if attributes.contains(.dim) { fg.w *= Self.dimAlpha }
-            // The block cursor, as Terminal.app draws it: an opaque cell in the
-            // cursor colour, its character — and rules, box and block pieces —
-            // in the theme background. Not the cell's own background: under
-            // reverse video that is the foreground, often the cursor colour.
             let underCursor = column >= cursorStart && column < cursorEnd
-            if underCursor {
-                fg = palette.background
-                bg = palette.cursor
+            // The palette is a snapshot for this row. Raw roles, color rendition
+            // bits and cursor coverage fully determine both resolved colors.
+            // Compare two integer words instead of eight Float lanes per cell.
+            let colors = SIMD2<UInt64>(
+                UInt64(cell.foreground.rawValue) << 32 | UInt64(cell.background.rawValue),
+                UInt64(attributes.rawValue & Self.colorAttributeMask) << 1 | (underCursor ? 1 : 0))
+            if colors != previousColors {
+                previousColors = colors
+                // Resolve roles before reversing: the two default roles differ.
+                let resolvedFg = palette.resolveForeground(cell.foreground, indexedOverrides: indexedOverrides)
+                let resolvedBg = palette.resolveBackground(cell.background, indexedOverrides: indexedOverrides)
+                fg = reversed ? resolvedBg : resolvedFg
+                bg = reversed ? resolvedFg : resolvedBg
+                if attributes.contains(.dim) { fg.w *= Self.dimAlpha }
+                if underCursor { fg = palette.background; bg = palette.cursor }
+                packedFG = QuadInstance.packColor(fg)
+                packedBG = QuadInstance.packColor(bg)
             }
-
             let origin = SIMD2<Float>(Float(column) * cellWidth, Float(row) * cellHeight)
             if underCursor || !(reversed ? cell.foreground : cell.background).isDefault || reversed {
                 background.append(
-                    QuadInstance(origin: origin, size: .init(cellWidth, cellHeight), color: bg))
+                    QuadInstance(origin: origin, size: .init(cellWidth, cellHeight), rgba: packedBG))
             }
 
             // Rules, not glyphs. An OSC 8 link is always underlined — `ls
@@ -925,7 +935,7 @@ public nonisolated final class TerminalRenderer {
                 glyphOrigin.y = glyphOrigin.y.rounded()
             }
             // Color glyphs go to the color pass; coverage would flatten them.
-            let instance = QuadInstance(origin: glyphOrigin, size: glyphSize, color: fg, uvRect: info.uvRect)
+            let instance = QuadInstance(origin: glyphOrigin, size: glyphSize, rgba: packedFG, atlasIndex: info.atlasIndex)
             if info.isColor {
                 colorGlyphs.append(instance)
             } else {

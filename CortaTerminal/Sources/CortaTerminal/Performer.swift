@@ -31,6 +31,8 @@ public struct Performer: ParserPerformer, Sendable {
     /// way.
     public var state = PerformerState()
 
+    var imageAllowanceProvider: (@Sendable () -> Int)?
+
     public init(grid: Grid) {
         self.grid = grid
     }

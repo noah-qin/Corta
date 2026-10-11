@@ -355,8 +355,7 @@ public struct Grid: Sendable {
         lead.attributes.insert(.wide)
         var spacer = pen.cell(0x20)
         spacer.attributes.insert(.wideSpacer)
-        lines[cursor.row][cursor.column] = lead
-        lines[cursor.row][cursor.column + 1] = spacer
+        lines[cursor.row].overwriteWide(lead, spacer: spacer, at: cursor.column)
         if cursor.column + 2 >= columns {
             // The pair ended in the last column: the cursor rests on the
             // spacer with the wrap armed, exactly as a narrow write does.
@@ -684,6 +683,17 @@ public struct Grid: Sendable {
         pendingWrap = false
     }
 
+    func nextCompressionWork() -> Scrollback.CompressionWork? {
+        scrollback.nextCompressionWork() ?? suspendedMain?.grid.scrollback.nextCompressionWork()
+    }
+    mutating func installCompression(_ result: Scrollback.CompressionResult) {
+        if scrollback.installCompression(result) { return }
+        if let suspended = suspendedMain {
+            var main = suspended.grid
+            if main.scrollback.installCompression(result) { suspendedMain = SuspendedScreen(main) }
+        }
+    }
+
     /// Discards the scrollback, screen untouched — after pasting a secret —
     /// and the images wholly in it (`ED 3`).
     public mutating func clearScrollback() {
@@ -828,11 +838,7 @@ public struct Grid: Sendable {
                 live.insert(cell.hyperlink)
             }
         }
-        for index in 0..<scrollback.count {
-            for cell in scrollback[index].cells where !cell.hyperlink.isNone {
-                live.insert(cell.hyperlink)
-            }
-        }
+        live.formUnion(scrollback.liveHyperlinkIDs())
         live.remove(.none)
         return live
     }
@@ -845,11 +851,7 @@ public struct Grid: Sendable {
                 live.insert(cell.grapheme)
             }
         }
-        for index in 0..<scrollback.count {
-            for cell in scrollback[index].cells where !cell.grapheme.isNone {
-                live.insert(cell.grapheme)
-            }
-        }
+        live.formUnion(scrollback.liveGraphemeIDs())
         return live
     }
 

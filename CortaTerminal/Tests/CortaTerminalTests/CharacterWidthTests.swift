@@ -30,6 +30,16 @@ import Testing
 ///   - `emoji-data.txt` 17.0.0       — Emoji_Presentation=Yes -> 2
 @Suite("Character width")
 struct CharacterWidthTests {
+    @Test func ideographFastRangesMatchGeneratedTable() throws {
+        for block in [UInt32(0x3400)...UInt32(0x4DBF), UInt32(0x4E00)...UInt32(0x9FFF)] {
+            for value in block {
+                let range = try #require(characterWidthRanges.first { value >= $0.lower && value <= $0.upper })
+                #expect(range.width == 2)
+                #expect(displayWidth(of: try #require(Unicode.Scalar(value))) == Int(range.width))
+            }
+        }
+    }
+
     /// (scalar, expected width) — table-driven over checked-in scalars.
     static let cases: [(UInt32, Int)] = [
         // ASCII — plain letters and space are 1 (default; no rule matches).

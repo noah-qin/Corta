@@ -21,6 +21,11 @@ public struct Terminal: Sendable {
     private var parser = Parser()
     private var performer: Performer
 
+    var imageAllowanceProvider: (@Sendable () -> Int)? {
+        get { performer.imageAllowanceProvider }
+        set { performer.imageAllowanceProvider = newValue }
+    }
+
     public init(
         rows: Int = 24,
         columns: Int = 80,
@@ -31,6 +36,19 @@ public struct Terminal: Sendable {
             grid: Grid(rows: rows, columns: columns, scrollbackLimit: scrollbackLimit)
         )
         self.performer.state.commandRecords = CommandRecordStore(capacity: commandHistoryLimit)
+    }
+
+    /// Standalone-core maintenance. Sessions schedule this work off their
+    /// state lock; callers holding their own terminal choose an idle point.
+    public mutating func compressColdScrollback() {
+        while let work = performer.grid.nextCompressionWork() { performer.grid.installCompression(work.compress()) }
+    }
+
+    func nextCompressionWork() -> Scrollback.CompressionWork? {
+        performer.grid.nextCompressionWork()
+    }
+    mutating func installCompression(_ result: Scrollback.CompressionResult) {
+        performer.grid.installCompression(result)
     }
 
     /// Independent of `reset()`, as clearing directory history is of clearing

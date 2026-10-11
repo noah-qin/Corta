@@ -144,9 +144,14 @@ nonisolated enum BoxDrawing {
         }
         var pieces = Pieces()
         let light = max(1, scale.rounded(.down))
-        // Every arm extends into the centre by half the heavier stroke,
-        // so mixed-weight junctions join without a hole.
-        let overlap = light
+        // Join at the widest perpendicular stroke. Extending past that
+        // stroke makes square corners sprout pixels outside their border.
+        let verticalWeight = max((arms >> 4) & 3, (arms >> 6) & 3)
+        let horizontalWeight = max(arms & 3, (arms >> 2) & 3)
+        let verticalThickness = min(min(width, height), light * Float(verticalWeight))
+        let horizontalThickness = min(min(width, height), light * Float(horizontalWeight))
+        let joinX = ((width - verticalThickness) / 2).rounded(.down)
+        let joinY = ((height - horizontalThickness) / 2).rounded(.down)
         for direction in 0..<4 {
             let weight = (arms >> (direction * 2)) & 3
             guard weight != 0 else { continue }
@@ -154,12 +159,10 @@ nonisolated enum BoxDrawing {
             let x = ((width - thickness) / 2).rounded(.down)
             let y = ((height - thickness) / 2).rounded(.down)
             switch direction {
-            case 0: pieces.append(.init(0, y, min(width, width / 2 + overlap), thickness))
-            case 1: pieces.append(.init(max(0, width / 2 - overlap), y,
-                                       width - max(0, width / 2 - overlap), thickness))
-            case 2: pieces.append(.init(x, 0, thickness, min(height, height / 2 + overlap)))
-            default: pieces.append(.init(x, max(0, height / 2 - overlap), thickness,
-                                         height - max(0, height / 2 - overlap)))
+            case 0: pieces.append(.init(0, y, joinX + verticalThickness, thickness))
+            case 1: pieces.append(.init(joinX, y, width - joinX, thickness))
+            case 2: pieces.append(.init(x, 0, thickness, joinY + horizontalThickness))
+            default: pieces.append(.init(x, joinY, thickness, height - joinY))
             }
         }
         return pieces

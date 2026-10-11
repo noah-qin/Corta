@@ -557,6 +557,9 @@ let characterWidthRanges: [CharacterWidthRange] = [
 public func displayWidth(of scalar: Unicode.Scalar) -> Int {
     let value = scalar.value
     if value >= 0x20, value < 0x7F { return 1 }
+    // The generated Unicode ranges assign width 2 throughout these two
+    // ideograph blocks. Avoid a binary search for ordinary Chinese prose.
+    if (0x3400...0x4DBF).contains(value) || (0x4E00...0x9FFF).contains(value) { return 2 }
     var low = 0
     var high = characterWidthRanges.count
     while low < high {

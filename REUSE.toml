@@ -32,6 +32,7 @@ path = [
   "CortaTerminal/Tests/Fuzz/**",
   "CortaTests/RenderReferences/**",
   "docs/esctest/**",
+  "docs/test-results/memory-core-2026-10-11/**",
   "Corta.xcodeproj/**",
   "Corta/Assets.xcassets/**",
   "Corta/Localizable.xcstrings",
@@ -50,6 +51,7 @@ path = [
   "docs/brand/*.png",
   "docs/brand/*.gif",
   "docs/test-results/issue-228-*.png",
+  "docs/test-results/memory-core-2026-10-11/table-*.png",
   "AppIcon.icon/**",
   "AppIconDev.icon/**",
 ]

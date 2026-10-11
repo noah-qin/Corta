@@ -24,7 +24,7 @@ final class InputSourceIndicatorUITests: XCTestCase {
         let previous = LatinInputSource.select()
         defer { LatinInputSource.restore(previous) }
         let stage = try UIFixtures.stage("input-source-toolbar")
-        let app = UIFixtures.app(stage: stage, runner: Self.self)
+        let app = UIFixtures.app(stage: stage, runner: Self.self, usingTestTarget: true)
         app.launch()
         app.activate()
         defer { app.terminate() }
@@ -46,8 +46,12 @@ final class InputSourceIndicatorUITests: XCTestCase {
         }, evaluatedWith: nil)
         waitForExpectations(timeout: 5)
         XCTAssertFalse((app.textViews.firstMatch.value as? String)?.contains("\nline-1\n") == true)
+        let liveViewport = app.textViews.firstMatch.value as? String
         app.typeKey(.home, modifierFlags: .shift)
-        waitForAbsence(badge)
+        XCTAssertNotEqual(app.textViews.firstMatch.value as? String, liveViewport)
+        // Toolbar placement stays visible in history; only a prompt overlay
+        // steps aside when the viewport leaves the command line.
+        XCTAssertTrue(badge.exists)
         app.typeKey(.end, modifierFlags: .shift)
         XCTAssertTrue(badge.waitForExistence(timeout: 5))
         app.typeText("clear\n")
@@ -66,12 +70,12 @@ final class InputSourceIndicatorUITests: XCTestCase {
         attach(window, name: "input-source-long-command")
         app.typeKey("c", modifierFlags: .control)
         app.typeText("sleep 15\n")
-        waitForAbsence(badge)
+        XCTAssertTrue(badge.exists)
         app.typeKey("c", modifierFlags: .control)
         XCTAssertTrue(badge.waitForExistence(timeout: 5))
-        // A real alternate-screen program must suppress even the persistent mode.
+        // A toolbar badge covers no output and stays available in a program.
         app.typeText("printf '\\033[?1049h'; sleep 15; printf '\\033[?1049l'\n")
-        waitForAbsence(badge)
+        XCTAssertTrue(badge.exists)
         app.typeKey("c", modifierFlags: .control)
         app.typeText("printf '\\033[?1049l'\n")
         XCTAssertTrue(badge.waitForExistence(timeout: 5))
@@ -86,7 +90,7 @@ final class InputSourceIndicatorUITests: XCTestCase {
         mode.click(); mode.menuItems["Off"].click()
         let config = try String(contentsOf: stage.appendingPathComponent("config"), encoding: .utf8)
         XCTAssertTrue(config.contains("input-source-indicator = off"))
-        mode.click(); mode.menuItems["While entering commands"].click()
+        mode.click(); mode.menuItems["Automatically"].click()
         let position = settings.popUpButtons["input-source-indicator-position"]
         XCTAssertTrue(position.exists)
         position.click(); position.menuItems["Right edge of command line"].click()
@@ -109,7 +113,7 @@ final class InputSourceIndicatorUITests: XCTestCase {
 
     @MainActor func testDarkAppearanceAndFallbackWithoutIntegration() throws {
         let stage = try UIFixtures.stage("input-source-dark")
-        let app = UIFixtures.app(stage: stage, runner: Self.self)
+        let app = UIFixtures.app(stage: stage, runner: Self.self, usingTestTarget: true)
         app.launchEnvironment["SHELL"] = stage.appendingPathComponent("plain-shell").path
         app.launchEnvironment["PS1"] = "demo ❯ "
         app.launch()
@@ -136,7 +140,7 @@ final class InputSourceIndicatorUITests: XCTestCase {
             }
         guard !chosen.isEmpty else { throw XCTSkip("No enabled built-in CJK source; no sources installed for testing") }
         let stage = try UIFixtures.stage("input-source-cjk")
-        let app = UIFixtures.app(stage: stage, runner: Self.self)
+        let app = UIFixtures.app(stage: stage, runner: Self.self, usingTestTarget: true)
         app.launch()
         defer { app.terminate() }
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
@@ -155,7 +159,7 @@ final class InputSourceIndicatorUITests: XCTestCase {
         let previous = LatinInputSource.select()
         defer { LatinInputSource.restore(previous) }
         let stage = try UIFixtures.stage("input-source-prompt")
-        let app = UIFixtures.app(stage: stage, runner: Self.self)
+        let app = UIFixtures.app(stage: stage, runner: Self.self, usingTestTarget: true)
         app.launch(); app.activate()
         defer { app.terminate() }
         UIFixtures.requireFixturePrompt(in: app)

@@ -398,9 +398,9 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         forEachVisiblePlacement(
             table: table, cellWidth: cellWidth, cellHeight: cellHeight, rows: rows,
             offset: offset, scrollbackTotalPushed: scrollbackTotalPushed
-        ) { instance, texture in
+        ) { instance, texture, sourceUVRect in
             backend.drawColorQuads(
-                [instance], atlas: texture, rect: rect, drawableSize: drawableSize, transient: true)
+                [instance], atlas: texture, rect: rect, drawableSize: drawableSize, imageUVRect: sourceUVRect, transient: true)
         }
     }
 
@@ -408,7 +408,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     private func forEachVisiblePlacement(
         table: ImagePlacementTable, cellWidth: Float, cellHeight: Float, rows: Int,
         offset: Int, scrollbackTotalPushed: Int,
-        body: (QuadInstance, MTLTexture) -> Void
+        body: (QuadInstance, MTLTexture, SIMD4<Float>) -> Void
     ) {
         let placements = table.orderedPlacements().sorted { $0.zIndex < $1.zIndex }
         guard !placements.isEmpty else { return }
@@ -428,8 +428,8 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
             let instance = QuadInstance(
                 origin: .init(Float(placement.column) * cellWidth, Float(viewportRow) * cellHeight),
                 size: .init(Float(columns) * cellWidth, Float(placementRows) * cellHeight),
-                color: .one, uvRect: Self.sourceUVRect(for: placement))
-            body(instance, texture)
+                color: .one, atlasIndex: .max)
+            body(instance, texture, Self.sourceUVRect(for: placement))
         }
     }
 
@@ -569,7 +569,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .bgra8Unorm, width: decoded.width, height: decoded.height, mipmapped: false)
         descriptor.usage = [.shaderRead]
-        descriptor.storageMode = .managed
+        descriptor.storageMode = .shared
         guard let texture = makeTextureImpl(descriptor) else { return nil }
         decoded.bgra.withUnsafeBytes { raw in
             // Non-empty (`decode` rejects zero), but never trap.

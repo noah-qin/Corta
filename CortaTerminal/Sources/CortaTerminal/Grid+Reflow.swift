@@ -87,18 +87,25 @@ extension Grid {
     mutating func reflow(toColumns newColumns: Int, newRows: Int) {
         guard newColumns > 0 else { return }
         let oldScrollbackCount = scrollback.count
-        var oldRows = scrollback.lines
-        oldRows.append(contentsOf: lines)
-        guard !oldRows.isEmpty else {
+        let oldRowCount = oldScrollbackCount + lines.count
+        guard oldRowCount > 0 else {
             columns = newColumns
             lines = ScreenLines(repeating: Line(), count: newRows)
             return
         }
 
-        let cursorOldRow = min(oldScrollbackCount + cursor.row, oldRows.count - 1)
+        let cursorOldRow = min(oldScrollbackCount + cursor.row, oldRowCount - 1)
         // A pending wrap sits after the last column's character, not on it.
+        var historyReader = Scrollback.LineReader()
         let rewrapped = Self.rewrap(
-            oldRows, toColumns: newColumns, cursorRow: cursorOldRow,
+            rowCount: oldRowCount, appendLineAt: { index, cells in
+                if index < oldScrollbackCount {
+                    return scrollback.appendCells(at: index, reader: &historyReader, into: &cells)
+                }
+                let line = lines[index - oldScrollbackCount]
+                cells.append(contentsOf: line.cells)
+                return (line.wrapped, line.mark)
+            }, toColumns: newColumns, cursorRow: cursorOldRow,
             cursorColumn: cursor.column + (pendingWrap ? 1 : 0))
         let oldBase = scrollback.totalPushed - oldScrollbackCount
 
@@ -159,15 +166,15 @@ extension Grid {
     /// an output-start one. `newStartOfOldRow` is where each old row's first
     /// cell went.
     private static func rewrap(
-        _ rows: [Line], toColumns newColumns: Int, cursorRow oldCursorRow: Int, cursorColumn oldCursorColumn: Int
+        rowCount: Int, appendLineAt: (Int, inout [Cell]) -> (wrapped: Bool, mark: LineMark), toColumns newColumns: Int, cursorRow oldCursorRow: Int, cursorColumn oldCursorColumn: Int
     ) -> (
         rows: [Line], cursorRow: Int, cursorColumn: Int, cursorPendingWrap: Bool,
         newStartOfOldRow: [(row: Int, column: Int)]
     ) {
         var result: [Line] = []
-        result.reserveCapacity(rows.count)
+        result.reserveCapacity(rowCount)
         var newStartOfOldRow: [(row: Int, column: Int)] = []
-        newStartOfOldRow.reserveCapacity(rows.count)
+        newStartOfOldRow.reserveCapacity(rowCount)
         var cursorRow = 0
         var cursorColumn = 0
         var cursorPendingWrap = false
@@ -177,15 +184,17 @@ extension Grid {
         // two arrays for each of hundreds of thousands of history lines.
         var cells: [Cell] = []
         var rowStarts: [Int] = []
-        while index < rows.count {
+        var rowMarks: [LineMark] = []
+        while index < rowCount {
             let chainStart = index
             cells.removeAll(keepingCapacity: true)
             rowStarts.removeAll(keepingCapacity: true)
+            rowMarks.removeAll(keepingCapacity: true)
             while true {
-                let line = rows[index]
                 rowStarts.append(cells.count)
-                cells.append(contentsOf: line.cells)
-                let isLast = !line.wrapped || index == rows.count - 1
+                let metadata = appendLineAt(index, &cells)
+                rowMarks.append(metadata.mark)
+                let isLast = !metadata.wrapped || index == rowCount - 1
                 index += 1
                 if isLast { break }
             }
@@ -207,7 +216,7 @@ extension Grid {
             for (offset, start) in wrapped.rowOfStart.enumerated() {
                 let newRow = start.row
                 newStartOfOldRow.append((result.count + newRow, start.column))
-                let mark = rows[chainStart + offset].mark
+                let mark = rowMarks[offset]
                 guard mark != .none else { continue }
                 let existing = wrapped.rows[newRow].mark
                 if existing == .none || (mark.isPrompt && !existing.isPrompt) {
@@ -267,6 +276,28 @@ extension Grid {
 
         var i = 0
         while i < cells.count {
+            // Most logical lines contain no wide pairs. Copy their cells in
+            // row-sized runs, preserving every colour/attribute, instead of
+            // growing and assigning the row once for each cell.
+            if cells[i].attributes.rawValue & 0x0300 == 0 {
+                if column >= newColumns {
+                    current.wrapped = true; rows.append(current)
+                    current = Line(); current.reserveCapacity(min(newColumns, cells.count - i))
+                    column = 0
+                }
+                var end = i + 1
+                let limit = min(cells.count, i + newColumns - column)
+                while end < limit, cells[end].attributes.rawValue & 0x0300 == 0 { end += 1 }
+                while rowOfStart.count < rowStarts.count, rowStarts[rowOfStart.count] < end {
+                    rowOfStart.append((rows.count, column + max(0, rowStarts[rowOfStart.count] - i)))
+                }
+                if let targetIndex, targetIndex >= i, targetIndex < end {
+                    cursorRow = rows.count; cursorColumn = column + targetIndex - i
+                }
+                current.appendNarrowCells(cells[i..<end])
+                column += end - i; i = end
+                continue
+            }
             let cell = cells[i]
             // A lead whose spacer is missing is drawn narrow rather than read
             // past: the grid never writes one, but a reflow must not trust

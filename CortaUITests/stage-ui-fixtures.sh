@@ -56,7 +56,7 @@ for name in input-source-toolbar input-source-cjk input-source-dark input-source
   printf "PROMPT='demo ❯ '\nRPROMPT=''\n" > "$root/$name/.zshrc"
 done
 # A shell without integration, for the fallback placement.
-printf '#!/bin/sh\nexec /bin/sh --noprofile --norc -i\n' > "$root/input-source-dark/plain-shell"
+printf '#!/bin/sh\nexport PS1="demo ❯ "\nexec /bin/sh --noprofile --norc -i\n' > "$root/input-source-dark/plain-shell"
 chmod 700 "$root/input-source-dark/plain-shell"
 
 # Directory completion: the folders it offers, one of them hidden, one of

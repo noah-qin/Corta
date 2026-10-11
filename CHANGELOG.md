@@ -12,6 +12,13 @@ Versioning for compatibility changes.
 
 ### Changed
 
+- Render instances use half the upload bytes, with exact floating-point glyph
+  geometry and image crops. Glyph atlases allocate grayscale height on demand
+  and keep color storage small until color glyphs appear.
+- Cold scrollback compresses in memory outside the terminal lock. Resize,
+  dumps and search stream history; repeated ASCII searches share a bounded
+  index. ASCII parsing and common CJK grid writes use measured fast paths.
+
 - Scrolling output reuses screen row buffers and avoids a trim-induced copy
   when pushing rows into history. Region and history scrolling reuse retained
   render instances; output while anchored in history no longer rebuilds the
@@ -23,6 +30,9 @@ Versioning for compatibility changes.
   power-mode measurements and idle/flood CPU checks are recorded.
 
 ### Fixed
+
+- Square table corners stop at the joined strokes instead of protruding past
+  the border. Square and rounded corners are verified at fractional scales.
 
 - Directory completion hints are hidden while an input method composes text,
   so they no longer overlap the preedit text or candidate panel.

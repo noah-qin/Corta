@@ -94,6 +94,20 @@ public struct Line: Equatable, Sendable {
         }
     }
 
+    /// Reflow already validated a contiguous narrow run and reserved its row.
+    mutating func appendNarrowCells(_ contents: ArraySlice<Cell>) {
+        cells.append(contentsOf: contents)
+    }
+
+    /// Install a wide pair with one growth and one mutable-buffer borrow.
+    mutating func overwriteWide(_ lead: Cell, spacer: Cell, at column: Int) {
+        grow(to: column + 2)
+        cells.withUnsafeMutableBufferPointer { buffer in
+            buffer[column] = lead
+            buffer[column + 1] = spacer
+        }
+    }
+
     /// One in-row ASCII run: only the two ends can split a wide pair. Writes
     /// through the buffer pointer — `grow(to:)` already fixed the length, so
     /// per-element bounds checks are redundant.

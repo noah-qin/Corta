@@ -208,7 +208,7 @@ import Testing
         let placed = TerminalRenderer.colorGlyphPlacement(
             info, cellOrigin: .zero, boxWidth: boxWidth, cellHeight: cellHeight)
         let instance = QuadInstance(
-            origin: placed.origin, size: placed.size, color: .init(1, 1, 1, 1), uvRect: info.uvRect)
+            origin: placed.origin, size: placed.size, color: .init(1, 1, 1, 1), atlasIndex: info.atlasIndex)
 
         // Three cells wide: the pair's box plus one neighbour.
         let width = Int(cellWidth) * 3
@@ -223,7 +223,7 @@ import Testing
         #expect(
             renderer.backend.renderFrameAndWait(into: texture) {
                 $0.drawColorQuads(
-                    [instance], atlas: renderer.glyphAtlas.colorTexture,
+                    [instance], atlas: renderer.glyphAtlas.colorTexture, atlasRects: renderer.glyphAtlas.atlasRects,
                     rect: CGRect(x: 0, y: 0, width: width, height: height),
                     drawableSize: CGSize(width: width, height: height))
             })

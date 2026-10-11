@@ -20,6 +20,7 @@ import Foundation
 extension Performer {
     public mutating func apcDispatch(_ bytes: ArraySlice<UInt8>) {
         guard let command = KittyGraphicsParser.parse(bytes) else { return }
+        if let imageAllowanceProvider { state.imageByteAllowance = imageAllowanceProvider() }
         switch command {
         case .transmit(let header, let payloadBase64, let moreChunks, let display):
             receiveChunk(header: header, display: display, payloadBase64: payloadBase64, moreChunks: moreChunks)

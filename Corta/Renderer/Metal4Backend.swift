@@ -209,13 +209,14 @@ public nonisolated final class Metal4Backend {
         /// Growth replaces the buffer rather than write memory an earlier
         /// draw of this frame still reads.
         func append(
-            instances: UnsafeRawPointer, instanceByteCount: Int, uniforms: QuadUniforms,
+            instances: UnsafeRawPointer, instanceByteCount: Int, uniforms: QuadUniforms, atlasRects: [SIMD4<UInt16>],
             slot: Int, device: MTLDevice, residencySet: any MTLResidencySet,
             retire: (MTLBuffer) -> Void
-        ) -> (instances: MTLGPUAddress, uniforms: MTLGPUAddress)? {
+        ) -> (instances: MTLGPUAddress, uniforms: MTLGPUAddress, rects: MTLGPUAddress)? {
             let instanceOffset = Self.align(used)
             let uniformOffset = Self.align(instanceOffset + instanceByteCount)
-            let needed = uniformOffset + MemoryLayout<QuadUniforms>.stride
+            let rectOffset = Self.align(uniformOffset + MemoryLayout<QuadUniforms>.stride)
+            let needed = rectOffset + atlasRects.count * MemoryLayout<SIMD4<UInt16>>.stride
             if buffers[slot] == nil || buffers[slot]!.length < needed {
                 let newLength = max(needed, (buffers[slot]?.length ?? 0) * 2)
                 guard
@@ -239,8 +240,14 @@ public nonisolated final class Metal4Backend {
                 buffer.contents().advanced(by: uniformOffset)
                     .copyMemory(from: base, byteCount: raw.count)
             }
+            atlasRects.withUnsafeBytes { raw in
+                if let base = raw.baseAddress, !raw.isEmpty {
+                    buffer.contents().advanced(by: rectOffset).copyMemory(from: base, byteCount: raw.count)
+                }
+            }
             used = needed
-            return (buffer.gpuAddress + UInt64(instanceOffset), buffer.gpuAddress + UInt64(uniformOffset))
+            return (buffer.gpuAddress + UInt64(instanceOffset), buffer.gpuAddress + UInt64(uniformOffset),
+                    buffer.gpuAddress + UInt64(atlasRects.isEmpty ? uniformOffset : rectOffset))
         }
 
         private static func align(_ offset: Int) -> Int {
@@ -249,6 +256,8 @@ public nonisolated final class Metal4Backend {
         }
     }
 
+    private(set) var uploadedInstanceBytes = 0
+    private(set) var uploadedRectangleBytes = 0
     private let solidRing = InstanceBufferRing()
     private let glyphRing = InstanceBufferRing()
     private let colorGlyphRing = InstanceBufferRing()
@@ -292,9 +301,10 @@ public nonisolated final class Metal4Backend {
         }
 
         let tableDescriptor = MTL4ArgumentTableDescriptor()
-        // buffer(0) instances, buffer(1) uniforms, texture(0) atlas,
+        // buffer(0) instances, buffer(1) uniforms, buffer(2) pixel rectangles,
+        // texture(0) atlas,
         // sampler(0) — as `Shaders.metal` declares.
-        tableDescriptor.maxBufferBindCount = 2
+        tableDescriptor.maxBufferBindCount = 3
         tableDescriptor.maxTextureBindCount = 1
         tableDescriptor.maxSamplerStateBindCount = 1
         tableDescriptor.initializeBindings = true
@@ -379,6 +389,8 @@ public nonisolated final class Metal4Backend {
         lastScissor = nil
         lastViewport = nil
         lastPipeline = nil
+        uploadedInstanceBytes = 0
+        uploadedRectangleBytes = 0
         solidRing.beginFrame()
         glyphRing.beginFrame()
         colorGlyphRing.beginFrame()
@@ -392,20 +404,20 @@ public nonisolated final class Metal4Backend {
     }
 
     func drawGlyphQuads(
-        _ instances: [QuadInstance], atlas: MTLTexture, rect: CGRect, drawableSize: CGSize
+        _ instances: [QuadInstance], atlas: MTLTexture, atlasRects: [SIMD4<UInt16>] = [], rect: CGRect, drawableSize: CGSize
     ) {
         draw(
-            instances, ring: glyphRing, pipeline: glyphPipeline, atlas: atlas,
+            instances, ring: glyphRing, pipeline: glyphPipeline, atlas: atlas, atlasRects: atlasRects,
             rect: rect, drawableSize: drawableSize, label: "Corta.glyph")
     }
 
     /// Untinted premultiplied sampling: colour glyphs and Kitty images.
     func drawColorQuads(
-        _ instances: [QuadInstance], atlas: MTLTexture, rect: CGRect, drawableSize: CGSize,
-        transient: Bool = false
+        _ instances: [QuadInstance], atlas: MTLTexture, atlasRects: [SIMD4<UInt16>] = [], rect: CGRect, drawableSize: CGSize,
+        imageUVRect: SIMD4<Float> = .zero, transient: Bool = false
     ) {
         draw(
-            instances, ring: colorGlyphRing, pipeline: colorGlyphPipeline, atlas: atlas,
+            instances, ring: colorGlyphRing, pipeline: colorGlyphPipeline, atlas: atlas, atlasRects: atlasRects, imageUVRect: imageUVRect,
             rect: rect, drawableSize: drawableSize, label: "Corta.colorGlyph", transientTexture: transient)
     }
 
@@ -479,6 +491,8 @@ public nonisolated final class Metal4Backend {
         ring: InstanceBufferRing,
         pipeline: MTLRenderPipelineState,
         atlas: MTLTexture?,
+        atlasRects: [SIMD4<UInt16>] = [],
+        imageUVRect: SIMD4<Float> = .zero,
         rect: CGRect,
         drawableSize: CGSize,
         label: String,
@@ -499,22 +513,27 @@ public nonisolated final class Metal4Backend {
         let uniforms = QuadUniforms(
             rectOrigin: SIMD2<Float>(Float(rect.minX), Float(rect.minY)),
             rectSize: SIMD2<Float>(Float(rect.width), Float(rect.height)),
-            drawableSize: SIMD2<Float>(Float(drawableSize.width), Float(drawableSize.height))
+            drawableSize: SIMD2<Float>(Float(drawableSize.width), Float(drawableSize.height)),
+            atlasSize: SIMD2<Float>(Float(atlas?.width ?? 1), Float(atlas?.height ?? 1)),
+            imageUVRect: imageUVRect
         )
         let instanceByteCount = MemoryLayout<QuadInstance>.stride * instances.count
         guard
-            let addresses = instances.withUnsafeBytes({ raw -> (MTLGPUAddress, MTLGPUAddress)? in
+            let addresses = instances.withUnsafeBytes({ raw -> (MTLGPUAddress, MTLGPUAddress, MTLGPUAddress)? in
                 guard let base = raw.baseAddress else { return nil }
                 return ring.append(
-                    instances: base, instanceByteCount: instanceByteCount, uniforms: uniforms,
+                    instances: base, instanceByteCount: instanceByteCount, uniforms: uniforms, atlasRects: atlasRects,
                     slot: currentSlot, device: device, residencySet: residencySet
                 ) { [self] buffer in
                     retiredBuffers.append((frame: frameNumber, buffer: buffer))
                 }
             })
         else { return }
+        uploadedInstanceBytes += instanceByteCount
+        uploadedRectangleBytes += atlasRects.count * MemoryLayout<SIMD4<UInt16>>.stride
         argumentTable.setAddress(addresses.0, index: 0)
         argumentTable.setAddress(addresses.1, index: 1)
+        argumentTable.setAddress(addresses.2, index: 2)
         if let atlas {
             makeResident(atlas, transient: transientTexture)
             argumentTable.setTexture(atlas.gpuResourceID, index: 0)

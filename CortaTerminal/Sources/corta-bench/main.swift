@@ -14,13 +14,14 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import Compression
 import CortaTerminal
 import Darwin
 import Dispatch
 import Foundation
 import Synchronization
 
-let focusedHistoryBenchmarks = CommandLine.arguments.contains("--history")
+let focusedHistoryBenchmarks = CommandLine.arguments.contains("--history") || CommandLine.arguments.contains("--reflow-only")
 
 /// `corta-bench` — measures the numbers `docs/PERFORMANCE.md` §1 sets
 /// targets for, so they are recorded, not estimated. Run release for real numbers:
@@ -38,6 +39,17 @@ func currentResidentBytes() -> UInt64 {
     }
     guard result == KERN_SUCCESS else { return 0 }
     return info.resident_size
+}
+
+func currentFootprintBytes() -> UInt64 {
+    var info = task_vm_info_data_t()
+    var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
+    let result = withUnsafeMutablePointer(to: &info) { pointer in
+        pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+            task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+        }
+    }
+    return result == KERN_SUCCESS ? info.phys_footprint : 0
 }
 
 func megabytes(_ bytes: UInt64) -> Double { Double(bytes) / 1_048_576 }
@@ -142,20 +154,122 @@ func benchmarkParseThroughput() {
     print("core feed throughput: \(String(format: "%.1f", mibps)) MiB/s (\(corpus.count) bytes in \(String(format: "%.3f", elapsedSeconds))s)")
 }
 
+// Synthetic workloads; never captured terminal output.
+func benchmarkUnicodeCorpora() {
+    struct Counter: ParserPerformer {
+        var count = 0
+        mutating func print(_ scalar: UInt32) { count &+= 1 }
+        mutating func printASCII(_ bytes: ArraySlice<UInt8>) { count &+= bytes.count }
+        mutating func execute(_ byte: UInt8) {}
+    }
+    for (name, line) in [
+        ("ASCII", "\u{1B}[32mdrwxr-xr-x\u{1B}[0m user file.log\r\n"),
+        ("CJK", "\u{1B}[32m终端性能测试 日本語の文章 输出历史与搜索\u{1B}[0m\r\n"),
+        ("emoji", "┌────┐ │ ✅ 🚀 👩🏽‍💻 🌈 │ └────┘\r\n"),
+        ("AI CLI", "\u{1B}[36m│ 分析代码 ✅\u{1B}[0m changes: +42 −12 ├── src/main.swift 🚀\r\n")
+    ] {
+        let unit = Array(line.utf8)
+        let corpus = Array(repeating: unit, count: max(1, 8 * 1_048_576 / unit.count)).flatMap { $0 }
+        let sampleOption = CommandLine.arguments.firstIndex(of: "--unicode-samples")
+        let requested = sampleOption.flatMap { $0 + 1 < CommandLine.arguments.count ? Int(CommandLine.arguments[$0 + 1]) : nil } ?? 5
+        let sampleCount = min(20, max(1, requested))
+        for mode in 0..<3 {
+            var samples: [Double] = []
+            var checksum = 0
+            for iteration in 0...sampleCount {
+                var parser = Parser(), counter = Counter()
+                var terminal = Terminal(rows: 50, columns: 200, scrollbackLimit: mode == 1 ? 0 : 10_000)
+                let start = DispatchTime.now().uptimeNanoseconds
+                if mode == 0 { parser.parse(corpus, performer: &counter) }
+                else { terminal.feed(corpus) }
+                let seconds = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9
+                if iteration > 0 { samples.append(seconds) }
+                checksum &+= counter.count + terminal.grid.scrollback.count + terminal.grid.cursor.column
+                    + Int(terminal.grid.line(0)[0].scalar)
+            }
+            samples.sort()
+            let rate = throughput(corpus.count, elapsedSeconds: samples[samples.count / 2])
+            let low = throughput(corpus.count, elapsedSeconds: samples.last!)
+            let high = throughput(corpus.count, elapsedSeconds: samples.first!)
+            print("unicode \(name) \(["parser", "grid", "feed"][mode]): \(String(format: "%.1f", rate)) MiB/s checksum \(checksum) (n=\(sampleCount), range \(String(format: "%.1f", low))–\(String(format: "%.1f", high)), one warmup)")
+        }
+
+    }
+}
+
+func benchmarkCompressionCodecs() {
+    for name in ["SGR ls", "log", "CJK"] {
+        var terminal = Terminal(rows: 1, columns: 120, scrollbackLimit: 100_000)
+        for row in 0..<100_001 {
+            let text: String
+            switch name {
+            case "SGR ls": text = "\u{1B}[\(31 + row % 7)mdrwxr-xr-x\u{1B}[0m user file-\(row).log " + String(repeating: "abc", count: 29)
+            case "log": text = "2026-10-11 INFO request \(row) status=\(200 + row % 5) latency=\(row % 997)ms " + String(repeating: "data", count: 16)
+            default: text = "记录 \(row) 终端历史压缩测试 日本語の文章 输出历史与搜索 " + String(repeating: "中文", count: 14)
+            }
+            terminal.feed(Array((text + "\r\n").utf8))
+        }
+        for (codecName, codec) in [("LZ4", COMPRESSION_LZ4), ("LZFSE", COMPRESSION_LZFSE)] {
+            for shuffled in [false, true] {
+                var rawBytes = 0, encodedBytes = 0
+                var encodeNS: UInt64 = 0, decodeNS: UInt64 = 0
+                terminal.grid.scrollback.withCellBatches { cells in
+                    let raw = Array(UnsafeRawBufferPointer(cells))
+                    guard !raw.isEmpty else { return }
+                    let count = cells.count, stride = MemoryLayout<Cell>.stride
+                    let start = DispatchTime.now().uptimeNanoseconds
+                    var source = raw
+                    if shuffled {
+                        source = [UInt8](repeating: 0, count: raw.count)
+                        for byte in 0..<stride { for cell in 0..<count { source[byte * count + cell] = raw[cell * stride + byte] } }
+                    }
+                    var output = [UInt8](repeating: 0, count: source.count + 65536)
+                    let size = source.withUnsafeBufferPointer { src in output.withUnsafeMutableBufferPointer { dst in
+                        compression_encode_buffer(dst.baseAddress!, dst.count, src.baseAddress!, src.count, nil, codec)
+                    } }
+                    encodeNS += DispatchTime.now().uptimeNanoseconds - start
+                    precondition(size > 0)
+                    let decodeStart = DispatchTime.now().uptimeNanoseconds
+                    var decoded = [UInt8](repeating: 0, count: raw.count)
+                    let sizeOut = output.withUnsafeBufferPointer { src in decoded.withUnsafeMutableBufferPointer { dst in
+                        compression_decode_buffer(dst.baseAddress!, dst.count, src.baseAddress!, size, nil, codec)
+                    } }
+                    if shuffled {
+                        var unshuffled = [UInt8](repeating: 0, count: raw.count)
+                        for byte in 0..<stride { for cell in 0..<count { unshuffled[cell * stride + byte] = decoded[byte * count + cell] } }
+                        decoded = unshuffled
+                    }
+                    decodeNS += DispatchTime.now().uptimeNanoseconds - decodeStart
+                    precondition(sizeOut == raw.count && decoded == raw)
+                    rawBytes += raw.count; encodedBytes += size
+                }
+                print("compression \(name) 100k rows \(codecName) \(shuffled ? "shuffled" : "raw"): \(String(format: "%.2f", Double(rawBytes) / Double(encodedBytes)))x encode \(String(format: "%.1f", throughput(rawBytes, elapsedSeconds: Double(encodeNS) / 1e9))) decode \(String(format: "%.1f", throughput(rawBytes, elapsedSeconds: Double(decodeNS) / 1e9))) MiB/s including shuffle/scratch; raw bytes \(rawBytes)")
+            }
+        }
+    }
+}
+
 // MARK: - Scrollback memory at 100k lines
 
 func benchmarkScrollbackMemory() {
     let before = currentResidentBytes()
+    let footprintBefore = currentFootprintBytes()
     var terminal = Terminal(rows: 50, columns: 200, scrollbackLimit: 100_000)
     // 100k lines of realistic width so evicted rows aren't free of cost.
     let line = String(repeating: "x", count: 120) + "\r\n"
     let lineBytes = Array(line.utf8)
-    for _ in 0..<100_000 {
+    for row in 0..<100_000 {
         terminal.feed(lineBytes)
+        // Standalone Terminal has no reader queue. Model the session's idle
+        // maintenance as batches seal, rather than deferring a whole history.
+        if row.isMultiple(of: 256) { terminal.compressColdScrollback() }
     }
+    terminal.compressColdScrollback()
+    let footprintAfter = currentFootprintBytes()
     let after = currentResidentBytes()
+    print("compressed history footprint delta: \(Int64(footprintAfter) - Int64(footprintBefore)) bytes")
     print(
-        "memory @ 100k scrollback lines: \(String(format: "%.1f", megabytes(after - before))) MB "
+        "memory @ 100k scrollback lines: \(String(format: "%.1f", Double(Int64(after) - Int64(before)) / 1_048_576)) MB "
             + "(resident before \(String(format: "%.1f", megabytes(before))) MB, after \(String(format: "%.1f", megabytes(after))) MB)"
     )
 }
@@ -305,6 +419,58 @@ func profileSteadyScrolling() {
     print("scroll allocations: STEADY ends (\(batches) MiB batches)")
 }
 
+@inline(never) func makeColdHistory() -> Grid {
+    var terminal = Terminal(rows: 50, columns: 120, scrollbackLimit: 100_000)
+    for row in 0..<100_050 {
+        terminal.feed(Array(("log \(row) " + String(repeating: "abcdef0123456789", count: 6) + " needle\r\n").utf8))
+        if !CommandLine.arguments.contains("--deferred"), row.isMultiple(of: 256) { terminal.compressColdScrollback() }
+    }
+    return terminal.grid
+}
+if CommandLine.arguments.contains("--cold-history") {
+    var grid = makeColdHistory()
+    print("history before drain cells \(grid.scrollback.storedCellBytes) RSS \(currentResidentBytes()) footprint \(currentFootprintBytes())")
+    let start = DispatchTime.now().uptimeNanoseconds
+    grid.scrollback.compressColdBatches()
+    var mallocStats = malloc_statistics_t()
+    malloc_zone_statistics(nil, &mallocStats)
+    print("malloc in use \(mallocStats.size_in_use) allocated \(mallocStats.size_allocated)")
+    print("history compressed cells \(grid.scrollback.storedCellBytes) capacity \(grid.scrollback.retainedCellCapacityBytes) RSS \(currentResidentBytes()) footprint \(currentFootprintBytes()) batches \(grid.scrollback.compressedBatchCount) encode ms \(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6)")
+    for query in ["absent", "needle", "log 90000"] {
+        for run in 0..<3 {
+            let start = DispatchTime.now().uptimeNanoseconds
+            let matches = Search.find(query, in: grid)
+            print("history search \(query) run \(run): \(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6) ms count \(matches.count) RSS \(currentResidentBytes())")
+        }
+    }
+    let reflow = DispatchTime.now().uptimeNanoseconds
+    grid.resize(rows: 50, columns: 80)
+    print("history reflow ms \(Double(DispatchTime.now().uptimeNanoseconds - reflow) / 1e6) RSS \(currentResidentBytes())")
+    exit(0)
+}
+if CommandLine.arguments.contains("--profile-cjk") {
+    let bytes = Array(String(repeating: "\u{1B}[32m终端性能测试 日本語の文章 输出历史与搜索\u{1B}[0m\r\n", count: 10000).utf8)
+    var terminal = Terminal(rows: 50, columns: 200, scrollbackLimit: 10000)
+    for _ in 0..<2000 { terminal.feed(bytes) }
+    print(terminal.grid.scrollback.totalPushed)
+    exit(0)
+}
+if CommandLine.arguments.contains("--search-only") {
+    var grid = { () -> Grid in
+        var terminal = Terminal(rows: 50, columns: 120, scrollbackLimit: 100_000)
+        for _ in 0..<100_000 { terminal.feed(Array("the quick brown fox jumps over the lazy dog\r\n".utf8)) }
+        return terminal.grid
+    }()
+    if CommandLine.arguments.contains("--compressed") { grid.scrollback.compressColdBatches() }
+    for _ in 0..<5 {
+        let start = DispatchTime.now().uptimeNanoseconds
+        let matches = Search.find("fox", in: grid)
+        print("search-only \(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6) ms \(matches.count)")
+    }
+    exit(0)
+}
+if CommandLine.arguments.contains("--unicode") { benchmarkUnicodeCorpora(); exit(0) }
+if CommandLine.arguments.contains("--compression") { benchmarkCompressionCodecs(); exit(0) }
 if CommandLine.arguments.contains("--scroll-allocations") {
     profileSteadyScrolling()
     exit(0)
@@ -352,6 +518,7 @@ func benchmarkReflowCost() {
         terminal.feed(lineBytes)
     }
 
+    if CommandLine.arguments.contains("--compressed") { terminal.compressColdScrollback() }
     let start = DispatchTime.now()
     var grid = terminal.grid
     grid.resize(rows: 50, columns: 80)
@@ -361,6 +528,7 @@ func benchmarkReflowCost() {
             + "(one resize call; ResizeDebouncer coalesces a live drag to ~1 call/100ms)")
 }
 
+if CommandLine.arguments.contains("--reflow-only") { benchmarkReflowCost(); exit(0) }
 benchmarkReflowCost()
 
 // MARK: - Resize delivery strategies

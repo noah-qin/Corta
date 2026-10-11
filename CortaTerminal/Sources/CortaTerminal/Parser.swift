@@ -111,37 +111,47 @@ public struct Parser: Sendable {
     /// A slice, so the reader feeds its batch in lock-sized pieces without
     /// copying each one into an `Array` of its own.
     ///
-    /// The run-boundary scan reads through `bytes.span`: the subscript
-    /// re-checks bounds and the exclusivity/COW flag on every access, which
-    /// is pure overhead here since the storage is fixed for the duration of
-    /// the scan. `Span` gives the same no-bounds-check-in-release access an
-    /// `UnsafeBufferPointer` would, without the unsafe type: the borrow is
-    /// checked at compile time against `bytes`' lifetime instead of being
-    /// the caller's manual promise. Measured on `corta-bench`
-    /// (`docs/PERFORMANCE.md` §5), this widened parser-only throughput
-    /// without changing `advance`'s per-byte dispatch, which every non-run
-    /// byte and every control-state byte still goes through unchanged.
-    /// The span counts from zero; the slice's own indices start at
-    /// `startIndex`.
+    /// Bounds-checked unaligned 16-byte loads classify printable runs. A
+    /// scalar tail and every control-state byte still use `advance`; the
+    /// borrowed pointer cannot escape `withUnsafeBytes`.
     public mutating func parse<P: ParserPerformer>(
         _ bytes: ArraySlice<UInt8>,
         performer: inout P
     ) {
         let span = bytes.span
-        let base = bytes.startIndex
         var offset = 0
         while offset < span.count {
             if case .ground = state, span[offset] >= 0x20, span[offset] < 0x7F {
+                // Short ANSI-separated runs do not amortize borrowing and
+                // classifying a full vector. Keep their original span scan.
                 var end = offset + 1
-                while end < span.count, span[end] >= 0x20, span[end] < 0x7F {
-                    end += 1
+                let scalarLimit = min(span.count, offset + 16)
+                while end < scalarLimit, span[end] >= 0x20, span[end] < 0x7F { end += 1 }
+                if end == scalarLimit, end < span.count, span[end] >= 0x20, span[end] < 0x7F {
+                    end = Self.asciiRunEnd(bytes, from: end)
                 }
-                performer.printASCII(bytes[(base + offset)..<(base + end)])
+                performer.printASCII(bytes[(bytes.startIndex + offset)..<(bytes.startIndex + end)])
                 offset = end
             } else {
                 advance(span[offset], performer: &performer)
                 offset += 1
             }
+        }
+    }
+
+    @inline(__always)
+    private static func asciiRunEnd(_ bytes: ArraySlice<UInt8>, from start: Int) -> Int {
+        bytes.withUnsafeBytes { raw in
+            var end = start + 1
+            while end + 16 <= raw.count {
+                let lanes = raw.loadUnaligned(fromByteOffset: end, as: SIMD16<UInt8>.self)
+                // Wrapping subtraction maps printable ASCII to 0...94;
+                // controls and non-ASCII all land above that interval.
+                if any((lanes &- SIMD16(repeating: 0x20)) .>= SIMD16(repeating: 0x5F)) { break }
+                end += 16
+            }
+            while end < raw.count, raw[end] >= 0x20, raw[end] < 0x7F { end += 1 }
+            return end
         }
     }
 

@@ -89,13 +89,13 @@ struct RenderReferenceTests {
     static let glyphInstances: [QuadInstance] = [
         QuadInstance(
             origin: .init(2, 2), size: .init(32, 32), color: .init(1, 1, 0, 0.9),
-            uvRect: .init(0, 0, 1, 1)),
+            atlasIndex: 1),
         QuadInstance(
             origin: .init(30, 10), size: .init(16, 16), color: .init(0, 1, 1, 1),
-            uvRect: .init(0.25, 0.25, 0.5, 0.5)),
+            atlasIndex: 2),
     ]
     static let colorInstances: [QuadInstance] = [
-        QuadInstance(origin: .init(20, 8), size: .init(24, 24), color: .one, uvRect: .init(0, 0, 1, 1))
+        QuadInstance(origin: .init(20, 8), size: .init(24, 24), color: .one, atlasIndex: 1)
     ]
 
     /// A 4x2-pixel RGBA image, transmitted and placed over 4x2 cells.
@@ -188,7 +188,8 @@ struct RenderReferenceTests {
     }
 
     /// Records `texture` as `name`, or compares it with the recorded one.
-    /// One code value per channel is blend rounding; more is a difference.
+    /// One code value per channel covers RGBA8 quantization of computed
+    /// colors and blend rounding; more is a rendering difference.
     static func check(
         _ texture: MTLTexture, named name: String, sourceLocation: SourceLocation = #_sourceLocation
     ) throws {
@@ -226,8 +227,8 @@ struct RenderReferenceTests {
         let completed = backend.renderFrameAndWait(into: target, clearColor: clearColor) { backend in
             guard !empty else { return }
             backend.drawSolidQuads(solidInstances, rect: rect, drawableSize: drawableSize)
-            backend.drawGlyphQuads(glyphInstances, atlas: coverage, rect: rect, drawableSize: drawableSize)
-            backend.drawColorQuads(colorInstances, atlas: color, rect: rect, drawableSize: drawableSize)
+            backend.drawGlyphQuads(glyphInstances, atlas: coverage, atlasRects: [.init(0, 0, 16, 16), .init(4, 4, 8, 8)], rect: rect, drawableSize: drawableSize)
+            backend.drawColorQuads(colorInstances, atlas: color, atlasRects: [.init(0, 0, 16, 16)], rect: rect, drawableSize: drawableSize)
         }
         #expect(completed, "the frame never completed")
         return target

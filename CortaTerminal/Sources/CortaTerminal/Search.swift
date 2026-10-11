@@ -319,6 +319,7 @@ public enum Search {
         // the needle's — `a`×4095 then `b` against a long line of `a`.
         let reversedNeedle = needle.map { Array($0.reversed()) } ?? []
         let failure = needle == nil ? [] : failureTable(reversedNeedle)
+        var historyReader = Scrollback.ASCIIReader()
         var haystack = ContiguousArray<UInt8>()
         var haystackRows = ContiguousArray<Int32>()
         var haystackColumns = ContiguousArray<Int32>()
@@ -346,7 +347,7 @@ public enum Search {
                 grid.fillWithASCIILogicalLine(
                     firstRow: span.firstRow, lastRow: span.lastRow,
                     text: &haystack, rows: &haystackRows, columns: &haystackColumns,
-                    nonASCIIIsOpaque: nonASCIIIsOpaque)
+                    historyReader: &historyReader, nonASCIIIsOpaque: nonASCIIIsOpaque)
             {
                 guard !haystack.isEmpty else { continue }
                 if shouldStop() { break }
@@ -358,6 +359,19 @@ public enum Search {
                 var index = haystack.count - 1
                 var sincePoll = 0
                 while index >= 0 {
+                    if matched == 0, index >= 15 {
+                        let lanes = haystack.withUnsafeBytes {
+                            $0.loadUnaligned(fromByteOffset: index - 15, as: SIMD16<UInt8>.self)
+                        }
+                        let upper = (lanes .>= SIMD16(repeating: 0x41)) .& (lanes .<= SIMD16(repeating: 0x5A))
+                        let folded = caseSensitive ? lanes : lanes.replacing(with: lanes &+ SIMD16(repeating: 0x20), where: upper)
+                        if !any(folded .== SIMD16(repeating: reversedNeedle[0])) {
+                            index -= 16
+                            sincePoll += 16
+                            if sincePoll >= stopPollInterval { sincePoll = 0; if shouldStop() { break lineLoop } }
+                            continue
+                        }
+                    }
                     let byte = fold[Int(haystack[index])]
                     while matched > 0, byte != reversedNeedle[matched] {
                         matched = failure[matched - 1]
@@ -380,7 +394,7 @@ public enum Search {
                     // A cancelled sweep stops inside a long line too, not
                     // only between lines and at matches.
                     sincePoll += 1
-                    if sincePoll == stopPollInterval {
+                    if sincePoll >= stopPollInterval {
                         sincePoll = 0
                         if shouldStop() { break lineLoop }
                     }
