@@ -400,7 +400,7 @@ import Testing
         let cellWidth: Float = 40, cellHeight: Float = 40
         let instance = QuadInstance(
             origin: .init(info.bearing.x, cellHeight - info.bearing.y - info.size.y),
-            size: info.size, color: .init(1, 1, 1, 1), uvRect: info.uvRect)
+            size: info.size, color: .init(1, 1, 1, 1), atlasIndex: info.atlasIndex)
 
         let target = MetalRenderTarget.make(
             device: device, width: Int(cellWidth), height: Int(cellHeight))
@@ -408,7 +408,7 @@ import Testing
         #expect(
             backend.renderFrameAndWait(into: target) {
                 $0.drawGlyphQuads(
-                    [instance], atlas: atlas.texture,
+                    [instance], atlas: atlas.texture, atlasRects: atlas.atlasRects,
                     rect: CGRect(x: 0, y: 0, width: Double(cellWidth), height: Double(cellHeight)),
                     drawableSize: CGSize(width: Double(cellWidth), height: Double(cellHeight)))
             })

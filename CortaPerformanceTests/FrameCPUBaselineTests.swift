@@ -36,6 +36,44 @@ extension PerformanceSuites {
     /// `TestPlans/Release` (see `PerformanceSuites`). The report names the
     /// configuration it was built in.
     @Suite struct FrameCPUBaselineTests {
+        /// The GPU-expansion gate is the existing 4 ms CPU budget, measured
+        /// for four 400x120 panes. CPU-only timing ends before GPU waits.
+        @Test func measureLargeGridGate() throws {
+            let device = try #require(MTLCreateSystemDefaultDevice())
+            let font = CTFontCreateWithName("Menlo" as CFString, 12, nil)
+            let renderers = try (0..<4).map { _ in try TerminalRenderer(device: device, font: font, scale: 1) }
+            let columns = 400, rows = 120
+            var terminal = Terminal(rows: rows, columns: columns, scrollbackLimit: 0)
+            for row in 0..<rows {
+                terminal.feed(Array("\u{1B}[\(31 + row % 7)m\(String(repeating: "x", count: columns - 1))\r\n".utf8))
+            }
+            let width = Int(renderers[0].metrics.cellWidth * CGFloat(columns))
+            let height = Int(renderers[0].metrics.cellHeight * CGFloat(rows))
+            let targets = try renderers.map { _ in try BenchmarkBuild.renderTarget(device: device, width: width, height: height) }
+            let rect = CGRect(x: 0, y: 0, width: width, height: height)
+            let completed = DispatchSemaphore(value: 0)
+            var report = "four 400x120 panes, CPU-only, gate 4 ms p50, \(BenchmarkBuild.configuration)\n"
+            for full in [false, true] {
+                var durations: [Double] = []
+                for iteration in 0..<65 {
+                    terminal.feed(Array("\u{1B}[1;1H\(iteration % 2 == 0 ? "y" : "z")".utf8))
+                    if full { renderers.forEach { $0.invalidate() } }
+                    let start = DispatchTime.now().uptimeNanoseconds
+                    for (renderer, target) in zip(renderers, targets) {
+                        renderer.render(grid: terminal.grid, rect: rect, drawableSize: rect.size,
+                            cursorVisible: true, selection: nil, target: target,
+                            clearColor: MTLClearColorMake(0, 0, 0, 1)) { _ in completed.signal() }
+                    }
+                    let ms = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6
+                    for _ in renderers { completed.wait() }
+                    if iteration >= 5 { durations.append(ms) }
+                }
+                durations.sort()
+                report += "\(full ? "full rebuild" : "one row dirty"): p50 \(durations[30]) ms, p95 \(durations[57]) ms, p99 \(durations[59]) ms, max \(durations[59]) ms\n"
+            }
+            try report.write(toFile: "/tmp/corta-large-grid-gate.txt", atomically: true, encoding: .utf8)
+        }
+
         @Test func measureFrameCPUTime() throws {
             guard let device = MTLCreateSystemDefaultDevice() else {
                 Issue.record("No Metal device available in this environment")
@@ -82,10 +120,13 @@ extension PerformanceSuites {
 
             let average = durations.reduce(0, +) / Double(durations.count)
             let sorted = durations.sorted()
+            let p50 = sorted[sorted.count / 2]
             let p95 = sorted[Int(Double(sorted.count) * 0.95)]
+            let p99 = sorted[min(sorted.count - 1, Int(Double(sorted.count) * 0.99))]
+            let maximum = sorted.last!
 
             let report =
-                "frame CPU time (\(columns)x\(rows), full screen, \(BenchmarkBuild.configuration)): avg \(String(format: "%.3f", average)) ms, p95 \(String(format: "%.3f", p95)) ms, over \(iterations) iterations\n"
+                "frame CPU time (\(columns)x\(rows), full screen, \(BenchmarkBuild.configuration)): avg \(String(format: "%.3f", average)) ms, p50 \(String(format: "%.3f", p50)) ms, p95 \(String(format: "%.3f", p95)) ms, p99 \(String(format: "%.3f", p99)) ms, max \(String(format: "%.3f", maximum)) ms, over \(iterations) iterations\n"
             let outputPath =
                 ProcessInfo.processInfo.environment["CORTA_BASELINE_OUTPUT"]
                 ?? "/tmp/corta-frame-cpu-baseline.txt"

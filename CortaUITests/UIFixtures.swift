@@ -45,11 +45,17 @@ enum UIFixtures {
     /// The development app built beside this runner — not Launch Services'
     /// pick among the checkouts that share its bundle identifier — against
     /// `stage`, with the stage's zshrc and English.
-    @MainActor static func app(stage: URL, runner: AnyClass) -> XCUIApplication {
+    @MainActor static func app(
+        stage: URL, runner: AnyClass, usingTestTarget: Bool = false
+    ) -> XCUIApplication {
         let products = Bundle(for: runner).bundleURL
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
-        let app = XCUIApplication(url: products.appendingPathComponent("CortaDev.app"))
+        let applicationURL = products.appendingPathComponent("CortaDev.app").resolvingSymlinksInPath()
+        print("UI fixture application: \(applicationURL.path)")
+        // XCTest owns the target path in its run configuration. The default
+        // target avoids explicit-URL launch failures on measurement runners.
+        let app = usingTestTarget ? XCUIApplication() : XCUIApplication(url: applicationURL)
         app.launchArguments = ["-AppleLanguages", "(en)"]
         app.launchEnvironment["HOME"] = stage.path
         app.launchEnvironment["CORTA_STAGE_DIR"] = stage.path

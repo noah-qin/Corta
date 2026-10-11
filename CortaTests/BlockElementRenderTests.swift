@@ -77,34 +77,56 @@ struct BlockElementRenderTests {
     /// A font glyph can have the right advance yet leave a gap at every cell.
     @Test func tableBordersMeetAtEveryCellBoundary() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
-        for size: CGFloat in [12, 17] {
-            for scale: CGFloat in [1, 2] {
+        for size: CGFloat in [12, 14, 17, 40] {
+            for scale: CGFloat in [1, 1.25, 1.5, 2, 3] {
                 let renderer = try TerminalRenderer(device: device,
                     font: TerminalFont.primary(ofSize: size), scale: scale)
-                var terminal = Terminal(rows: 3, columns: 5)
-                terminal.feed(Array("\u{1B}[37m┌───┐\r\n│   │\r\n└───┘".utf8))
-                let w = Int(renderer.metrics.cellWidth), h = Int(renderer.metrics.cellHeight)
-                let texture = MetalRenderTarget.make(device: device, width: 5 * w, height: 3 * h)
-                renderer.renderAndWait(grid: terminal.grid,
-                    rect: CGRect(x: 0, y: 0, width: 5*w, height: 3*h),
-                    drawableSize: CGSize(width: 5*w, height: 3*h), cursorVisible: false,
-                    selection: nil, target: texture)
-                var bytes = [UInt8](repeating: 0, count: 5*w*3*h*4)
-                texture.getBytes(&bytes, bytesPerRow: 5*w*4,
-                    from: MTLRegionMake2D(0, 0, 5*w, 3*h), mipmapLevel: 0)
-                let stroke = max(1, Int(scale))
-                let midX = (w-stroke)/2, midY = (h-stroke)/2
-                func ink(_ x: Int, _ y: Int) -> Bool {
-                    let i = (y*5*w+x)*4
-                    return Int(bytes[i])+Int(bytes[i+1])+Int(bytes[i+2]) > 100
-                }
-                for x in midX..<(4*w+midX) {
-                    #expect(ink(x, midY), "top border gap at \(x), size \(size), scale \(scale)")
-                    #expect(ink(x, 2*h+midY), "bottom border gap at \(x)")
-                }
-                for y in midY..<(2*h+midY) {
-                    #expect(ink(midX, y), "left border gap at \(y)")
-                    #expect(ink(4*w+midX, y), "right border gap at \(y)")
+                for (weight, border) in [(1, "┌───┐\r\n│   │\r\n└───┘"),
+                                         (2, "┏━━━┓\r\n┃   ┃\r\n┗━━━┛")] {
+                    var terminal = Terminal(rows: 3, columns: 5)
+                    terminal.feed(Array("\u{1B}[37m\(border)".utf8))
+                    let w = Int(renderer.metrics.cellWidth), h = Int(renderer.metrics.cellHeight)
+                    let texture = MetalRenderTarget.make(device: device, width: 5 * w, height: 3 * h)
+                    renderer.renderAndWait(grid: terminal.grid,
+                        rect: CGRect(x: 0, y: 0, width: 5*w, height: 3*h),
+                        drawableSize: CGSize(width: 5*w, height: 3*h), cursorVisible: false,
+                        selection: nil, target: texture)
+                    var bytes = [UInt8](repeating: 0, count: 5*w*3*h*4)
+                    texture.getBytes(&bytes, bytesPerRow: 5*w*4,
+                        from: MTLRegionMake2D(0, 0, 5*w, 3*h), mipmapLevel: 0)
+                    let stroke = max(1, Int(scale)) * weight
+                    let midX = (w-stroke)/2, midY = (h-stroke)/2
+                    func ink(_ x: Int, _ y: Int) -> Bool {
+                        let i = (y*5*w+x)*4
+                        return Int(bytes[i])+Int(bytes[i+1])+Int(bytes[i+2]) > 100
+                    }
+                    if size == 17 && scale == 2 {
+                        MetalRenderTarget.attachPNG(texture, named: "square-table-corners-17-2-weight-\(weight).png")
+                    }
+                    for x in midX..<(4*w+midX) {
+                        #expect(ink(x, midY), "top border gap at \(x), size \(size), scale \(scale)")
+                        #expect(ink(x, 2*h+midY), "bottom border gap at \(x)")
+                    }
+                    for y in midY..<(2*h+midY) {
+                        #expect(ink(midX, y), "left border gap at \(y)")
+                        #expect(ink(4*w+midX, y), "right border gap at \(y)")
+                    }
+                    // The connected border must also stop at its four square
+                    // outside edges: overlap at a join must not make a spur.
+                    for y in 0..<(3*h) {
+                        for x in 0..<(5*w) {
+                            let horizontal = x >= midX && x < 4*w+midX+stroke &&
+                                ((y >= midY && y < midY+stroke) ||
+                                 (y >= 2*h+midY && y < 2*h+midY+stroke))
+                            let vertical = y >= midY && y < 2*h+midY+stroke &&
+                                ((x >= midX && x < midX+stroke) ||
+                                 (x >= 4*w+midX && x < 4*w+midX+stroke))
+                            if !horizontal && !vertical {
+                                #expect(!ink(x, y), "border spur at \(x),\(y), size \(size), scale \(scale)")
+                            }
+                        }
+                    }
+
                 }
             }
         }
@@ -117,7 +139,7 @@ struct BlockElementRenderTests {
     @Test func roundedCornersJoinTheirSides() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
         for size: CGFloat in [12, 14, 17, 40] {
-            for scale: CGFloat in [1, 2] {
+            for scale: CGFloat in [1, 1.25, 1.5, 2, 3] {
                 let renderer = try TerminalRenderer(device: device,
                     font: TerminalFont.primary(ofSize: size), scale: scale)
                 var terminal = Terminal(rows: 3, columns: 5)
@@ -152,6 +174,9 @@ struct BlockElementRenderTests {
                             queue.append((nx, ny))
                         }
                     }
+                }
+                if size == 17 && scale == 2 {
+                    MetalRenderTarget.attachPNG(texture, named: "rounded-table-corners-17-2.png")
                 }
                 let context = "size \(size), scale \(scale)"
                 #expect(seen[(h + h / 2) * width + midX], "left side cut off, \(context)")

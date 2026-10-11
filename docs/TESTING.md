@@ -784,3 +784,22 @@ inspect the complete call tree. The reserved history arena and row-index arrays
 allocate per 256-row batch; a missing per-line Line path is the criterion, not
 zero total allocations. The [October 9 follow-up](test-results/2026-10-09-input-followup.md)
 records the successful profile and temporary signing method.
+
+## Memory/core optimization verification (#286–#289)
+
+Run `swift test --package-path CortaTerminal --filter ScrollbackCompressionTests`
+for compression, snapshots, concurrent cache reads, ID reclamation and clear.
+`CORTA_DIFFERENTIAL_CASES=1000000 swift test --package-path CortaTerminal
+--filter ParserSIMDTests` compares vector parsing to scalar dispatch with
+random slices. The regular fuzz corpus and two 500k seeded mutation runs
+remain required. Use a quiet machine for the real-PTY 100 MB drain test;
+its 30-second ceiling is not a throughput benchmark.
+
+`CompactAtlasTests` checks the 24-byte ABI, Float geometry, fractional image
+UV sampling, growth/retirement and failed allocations. The Release performance
+plan writes upload bytes, D17, four-pane 400×120 CPU and atlas storage reports.
+The interactive measurement suite checks live producers in each pane and
+reverses keyboard history navigation every 100 events so the 600-frame ring fills before
+the scroll limit clamps. `testFourPanePromptMemory` measures the actual window
+in addition to the offscreen texture-resource figures. Results and hardware
+limitations are in [the dated record](test-results/2026-10-11-memory-core-optimization.md).

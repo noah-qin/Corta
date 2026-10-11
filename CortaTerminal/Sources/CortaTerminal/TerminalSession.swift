@@ -242,6 +242,29 @@ public final class TerminalSession: @unchecked Sendable {
     /// Shared with the app's other sessions; charged after every slice and
     /// released when this session stops.
     private let imageBudget: ImageMemoryBudget?
+    private let compressionQueue = DispatchQueue(label: "Corta.scrollback.compression", qos: .utility)
+    private let compressionScheduled = Mutex(false)
+
+    private func scheduleCompression() {
+        let start = compressionScheduled.withLock { active in
+            if active { return false }; active = true; return true
+        }
+        guard start else { return }
+        compressionQueue.async { [weak self] in
+            guard let self else { return }
+            while !self.stopped.withLock({ $0 }) {
+                guard let work = self.state.withLock({ $0.terminal.nextCompressionWork() }) else { break }
+                let result = work.compress()
+                self.state.withLock { $0.terminal.installCompression(result) }
+                self.yieldToStateWaiters()
+            }
+            self.compressionScheduled.withLock { $0 = false }
+            // Close the final feed / drain race without keeping an idle timer.
+            if !self.stopped.withLock({ $0 }), self.state.withLock({ $0.terminal.nextCompressionWork() != nil }) {
+                self.scheduleCompression()
+            }
+        }
+    }
     /// The last figure reported, written under `state`'s lock.
     private let reportedImageBytes = Mutex(0)
 
@@ -361,6 +384,14 @@ public final class TerminalSession: @unchecked Sendable {
         terminal.grid.cellPixelHeight = size.cellPixelHeight
         terminal.grid.cellPixelWidth = size.cellPixelWidth
         self.state = Mutex(State(terminal: terminal))
+        if let imageBudget {
+            state.withLock { current in
+                current.terminal.imageAllowanceProvider = { [weak self] in
+                    guard let self else { return 0 }
+                    return imageBudget.allowance(for: ObjectIdentifier(self))
+                }
+            }
+        }
     }
 
     deinit {
@@ -431,12 +462,6 @@ public final class TerminalSession: @unchecked Sendable {
                     let slice = batch[offset..<end]
                     let applied = state.withLock { current -> (responses: [UInt8], episode: Int?) in
                         let episodeBefore = current.terminal.synchronizedOutputEpisode
-                        // Only a slice that can start or end an APC (`ESC _`,
-                        // `ESC \`) can store an image; others skip the shared lock.
-                        if let imageBudget, slice.contains(0x5F) || slice.contains(0x5C) {
-                            current.terminal.imageByteAllowance =
-                                imageBudget.allowance(for: ObjectIdentifier(self))
-                        }
                         current.terminal.feed(slice)
                         reportImageBytes(current.terminal)
                         let sliceResponses = current.terminal.takeOutput()
@@ -453,6 +478,7 @@ public final class TerminalSession: @unchecked Sendable {
                     }
                     if let newEpisode = applied.episode { episode = newEpisode }
                     offset = end
+                    scheduleCompression()
                     // After the last slice too: the next batch's first slice is
                     // one `read(2)` away, sooner than a waiter's wake, so a flood
                     // of one-slice batches would never leave a gap.
@@ -942,6 +968,7 @@ public final class TerminalSession: @unchecked Sendable {
                     current.terminal.grid.cellPixelWidth = size.cellPixelWidth
                 }
             }
+            scheduleCompression()
             try? pty.resize(to: size)
             callbacks.withLock { $0.onOutput }?()
         }

@@ -119,6 +119,12 @@ idiomatic Swift.
 | Triple-buffer the Metal instance buffer                   | Avoids a CPU/GPU stall waiting on the previous frame        |
 | Rebuild the instance buffer only on damage                | Idle CPU must be ~0%; a static screen rebuilds nothing      |
 
+Instances occupy 24 bytes: two `Float2` geometry fields, RGBA8 and a
+rectangle index. The 8-byte atlas rectangle table uploads alongside instances.
+Glyph UVs normalize integer pixel rectangles using the actual texture size;
+Kitty draws retain fractional source UVs in a per-draw uniform. Cell stays
+16 bytes. Negative bearings and fractional geometry are retained.
+
 ### On damage tracking
 
 With instanced quads, redrawing a full screen on the GPU is already
@@ -189,9 +195,15 @@ justified here: a full array copy is a sub-millisecond `memcpy`
   Fixed 200-cell rows over 100k lines is ~320 MB (`DECISIONS.md` D05).
 - **Scrollback is a ring buffer** with a configured line cap; eviction is
   O(1) and never a reallocation of the whole history.
-- **The glyph atlas is bounded**: a full 2048×2048 page is reset on
-  exhaustion and re-rasterised on demand (`DESIGN.md` §7, hard part 4). A
-  CJK session exceeds a single page.
+- **The glyph atlas is bounded and lazy**: grayscale starts at 2048×128,
+  color at 1×1, growing height to the 2048 ceiling as needed. Pixel rectangles
+  remain stable across growth; old textures retire after queued frames.
+  Exhausted pages evict independently. Apple silicon uses shared storage.
+- **Cold history is compressed in memory** in 256-row arenas. Four newest
+  sealed batches and the tail stay plain; LZ4 encoding and ID scans run outside
+  the session lock. Decoded arenas are bounded to four batches / 8 MiB,
+  shared ASCII planes to 32 MiB. Clear invalidates both caches. Reflow and dumps
+  stream batches rather than materializing the whole history.
 - **Every unbounded input has a cap** — OSC/DCS string length, CSI
   parameter count and magnitude. See `SECURITY.md` §3; these are
   simultaneously a memory-safety and a denial-of-service concern.
@@ -546,6 +558,16 @@ Throughput (vtebench ms per 1 MiB sample, lower is faster; `cat` in MiB/s):
 ---
 
 ### 5.6 Numbers by release
+
+The 2026-10-11 same-M5/toolchain optimization run measures 100k history
+RSS increment **185 → 11.4 MiB** (maintained ingestion), CJK feed median
+**70.8 → 87.4 MiB/s**, and AI ANSI feed **123.3 → 133.7 MiB/s**.
+The Unicode driver measures five samples after one warmup. ASCII feed
+**345.2 → 340.3 MiB/s** has overlapping ranges; it is not an unqualified
+speedup. Warm ASCII history search is approximately **25.6 → 20.8 ms**;
+first-query setup is slower (**27.2 → 44.7 ms**).
+[The dated record](test-results/2026-10-11-memory-core-optimization.md)
+provides corpora, distributions, stage gates and verification limits.
 
 One column per release, on the machine §5.2 records. A cell says *not
 re-measured* rather than carrying an older figure forward. Each release's
@@ -1226,3 +1248,23 @@ with the two reserved history arrays still allocated once per 256-row batch.
 It also records final full Unit and D17, live flood tails and outstanding gates.
 
 October 11 merge follow-up: the [final validation](test-results/2026-10-11-merge-validation.md) corrects flood sampling before teardown, records three passing sustained default-driver pairs and a final-source check, matches scripted input cadence across power modes, withdraws no-sync, and attributes the three-second idle timer to Apple AGX deferred GPU setup. Historical negative results above are retained with their method limits; absolute zero process wakeups and an unperformed human panel observation are not claimed.
+
+### 5.15 Memory and core optimization (#286–#289, 2026-10-11)
+
+The same-machine before/after record, codec experiment, Unicode corpus,
+parser profile, stage gates and verification limits are in
+[test-results/2026-10-11-memory-core-optimization.md](test-results/2026-10-11-memory-core-optimization.md).
+Run `corta-bench --unicode`, `--compression`, `--memory-only`,
+`--search-only --compressed`, `--reflow-only --compressed` or `--cold-history`
+for the new drivers. `--unicode` defaults to five measured samples after
+one warmup per mode; `--unicode-samples N` selects 1–20 samples. Maintenance runs during ingestion in the memory driver;
+`--cold-history --deferred` demonstrates allocator high-water retention when
+compression is postponed until the entire uncompressed history exists.
+
+The SIMD parser differential test has a scalar `advance` reference and
+random feed boundaries. `CORTA_DIFFERENTIAL_CASES=1000000 swift test
+--package-path CortaTerminal --filter ParserSIMDTests` runs the acceptance load.
+The four-pane 400×120 CPU gate has one render target per pane. GPU cell
+expansion remains dependent on #284; these pre-dependency figures do not
+approve that stage. Row-relative instance positions and shared ASCII atlases
+failed their benefit gates and were not adopted.

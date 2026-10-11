@@ -85,6 +85,8 @@ extension PerformanceSuites {
             /// slot is free only once its previous frame completed
             /// (`Metal4Backend`), so without the wait the fourth frame would
             /// time the GPU instead of the CPU.
+            var uploadBytes: [String: [Int]] = [:]
+            var scenarioName = ""
             let completed = DispatchSemaphore(value: 0)
             func drawFrame(grid: Grid, offset: Int = 0) -> Double {
                 let start = DispatchTime.now()
@@ -94,6 +96,7 @@ extension PerformanceSuites {
                 ) { _ in completed.signal() }
                 let elapsedMs =
                     Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000
+                uploadBytes[scenarioName, default: []].append(renderer.uploadedInstanceBytes + renderer.uploadedRectangleBytes)
                 completed.wait()
                 return elapsedMs
             }
@@ -117,18 +120,22 @@ extension PerformanceSuites {
             }
 
             var typed = false
+            scenarioName = "typing"
             let typing = runScenario { terminal in
                 // Alternate so the write is never a same-scalar no-op.
                 terminal.feed(Array((typed ? "z" : "y").utf8))
                 typed.toggle()
             }
+            scenarioName = "scroll"
             let scroll = runScenario { terminal in
                 terminal.feed(Array("\r\n".utf8))
             }
+            scenarioName = "full rebuild"
             let fullRebuild = runScenario { _ in
                 renderer.invalidate()
             }
             var redraws = 0
+            scenarioName = "redraw"
             let redraw = runScenario { terminal in
                 redraws += 1
                 var bytes = Array("\u{1B}[H".utf8)
@@ -142,6 +149,7 @@ extension PerformanceSuites {
             }
 
             let blocks = Array("█▓▒░▀▄▌▐▖▗▘▙▚▛▜▝▞▟▁▂▃▄▅▆▇".unicodeScalars)
+            scenarioName = "blocks"
             let blockRebuild = runScenario { terminal in
                 if terminal.grid.line(0)[0].scalar != blocks[0].value {
                     var bytes = Array("\u{1B}[H".utf8)
@@ -158,15 +166,17 @@ extension PerformanceSuites {
                 renderer.invalidate()
             }
 
+            scenarioName = "region scroll"
             let regionScroll = runScenario { terminal in
                 terminal.feed(Array("\u{1B}[1;39r\u{1B}[39;1H\r\n\u{1B}[32m\(String(repeating: "x", count: columns - 1))\u{1B}[0m".utf8))
             }
             func historyScenario(step: Int, flood: Bool) -> [Double] {
                 var terminal = makeTerminal()
-                for i in 0..<800 {
+                for i in 0..<8000 {
                     terminal.feed(Array("\u{1B}[\(31 + i % 7)m\(String(repeating: "x", count: columns - 1))\u{1B}[0m\r\n".utf8))
                 }
-                var offset = 400
+                terminal.compressColdScrollback()
+                var offset = 4000
                 _ = drawFrame(grid: terminal.grid, offset: offset)
                 var values: [Double] = []
                 for i in 0..<(iterations + 5) {
@@ -182,8 +192,11 @@ extension PerformanceSuites {
                 }
                 return values
             }
+            scenarioName = "history scroll by 1"
             let historyOne = historyScenario(step: 1, flood: false)
+            scenarioName = "history scroll by third"
             let historyThird = historyScenario(step: rows / 3, flood: false)
+            scenarioName = "flood while scrolled back"
             let anchoredFlood = historyScenario(step: 0, flood: true)
 
             func summarise(_ name: String, _ durations: [Double]) -> String {
@@ -199,6 +212,8 @@ extension PerformanceSuites {
             }
 
             let report = """
+                instance stride: \(renderer.instanceStride) bytes; uploads include rectangle table
+                \(uploadBytes.keys.sorted().map { "\($0): \(uploadBytes[$0]!.sorted()[uploadBytes[$0]!.count / 2]) bytes/frame p50" }.joined(separator: "\n"))
                 instance upload benchmark (\(columns)x\(rows), full text screen, Menlo 14 @1x, \(BenchmarkBuild.configuration))
                 \(summarise("typing (1 row dirty)      ", typing))
                 \(summarise("scroll (shift + 1 row)    ", scroll))

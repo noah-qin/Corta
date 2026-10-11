@@ -65,7 +65,7 @@ import Testing
                 array.flatMap { instance in
                     [instance.origin.x, instance.origin.y, instance.size.x, instance.size.y,
                      instance.color.x, instance.color.y, instance.color.z, instance.color.w,
-                     instance.uvRect.x, instance.uvRect.y, instance.uvRect.z, instance.uvRect.w]
+                     Float(instance.atlasIndex)]
                 }
             }
         }
@@ -345,7 +345,7 @@ import Testing
             arrays.map { $0.flatMap { q in
                 [q.origin.x, q.origin.y, q.size.x, q.size.y,
                  q.color.x, q.color.y, q.color.z, q.color.w,
-                 q.uvRect.x, q.uvRect.y, q.uvRect.z, q.uvRect.w]
+                 Float(q.atlasIndex)]
             } }
         }
         renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
@@ -415,10 +415,10 @@ import Testing
         terminal.feed(Array("\u{1B}[1;1HZZZZ\u{1B}[4;1H\r\n".utf8))
         let offset = 1 + terminal.grid.scrollback.totalPushed - total
         renderer.updateInstances(grid: terminal.grid, scrollOffset: offset, cursorVisible: false, selection: nil)
-        let instances = renderer.cachedInstances.map { $0.map { [$0.origin.x, $0.origin.y, $0.uvRect.x, $0.uvRect.y] } }
+        let instances = renderer.cachedInstances.map { $0.map { [$0.origin.x, $0.origin.y, Float($0.atlasIndex)] } }
         renderer.invalidate()
         renderer.updateInstances(grid: terminal.grid, scrollOffset: offset, cursorVisible: false, selection: nil)
-        #expect(renderer.cachedInstances.map { $0.map { [$0.origin.x, $0.origin.y, $0.uvRect.x, $0.uvRect.y] } } == instances)
+        #expect(renderer.cachedInstances.map { $0.map { [$0.origin.x, $0.origin.y, Float($0.atlasIndex)] } } == instances)
     }
 
 }

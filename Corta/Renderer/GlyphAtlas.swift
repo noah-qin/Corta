@@ -101,8 +101,10 @@ nonisolated final class GlyphAtlas {
     }
 
     struct GlyphInfo {
-        /// Atlas UV rect: (x, y, width, height), normalised to [0, 1].
+        /// Diagnostic UV rect normalised to the virtual ceiling. Rendering
+        /// uses atlasIndex and integer pixel rectangles, not these UVs.
         var uvRect: SIMD4<Float>
+        var atlasIndex: UInt32 = 0
         /// Bitmap size, in pixels.
         var size: SIMD2<Float>
         /// From the pen origin to the bitmap's top-left, in pixels.
@@ -121,6 +123,7 @@ nonisolated final class GlyphAtlas {
         let regionOrigin: (x: Int, y: Int)
         let regionSize: (width: Int, height: Int)
         var cache: [GlyphKey: GlyphInfo] = [:]
+        var rectangleIndices: [SIMD4<UInt16>: UInt32] = [:]
         var clusterCache: [ClusterKey: GlyphInfo] = [:]
         /// The ASCII page's cache, indexed by `(style << 7) | scalar`: the
         /// per-cell lookup is an index, not a hash. Empty on other pages.
@@ -170,7 +173,7 @@ nonisolated final class GlyphAtlas {
     /// The smallest edge `init` falls back to; still dozens of glyphs.
     static let minimumAtlasPixelSize = 64
 
-    /// The edge actually allocated, after any fallback.
+    /// The virtual ceiling, after fallback; physical texture height grows.
     private(set) var atlasPixelSize: Int
     /// Allocation fell back to a smaller size; capacity is reduced.
     private(set) var isDegraded = false
@@ -178,15 +181,35 @@ nonisolated final class GlyphAtlas {
     /// Premultiplied bgra, as `CTRunDraw` produces and the color pipeline
     /// blends.
     private(set) var colorTexture: MTLTexture
+    private(set) var atlasRects: [SIMD4<UInt16>] = []
+    private var freeRectangleIndices: [UInt32] = []
+    private func rectangleIndex(page: AtlasPage, x: Int, y: Int, width: Int, height: Int) -> UInt32 {
+        let rect = SIMD4<UInt16>(UInt16(x), UInt16(y), UInt16(width), UInt16(height))
+        if let index = page.rectangleIndices[rect] { return index }
+        let index: UInt32
+        if let free = freeRectangleIndices.popLast() {
+            index = free; atlasRects[Int(index) - 1] = rect
+        } else {
+            index = UInt32(atlasRects.count + 1); atlasRects.append(rect)
+        }
+        page.rectangleIndices[rect] = index
+        return index
+    }
+    private func clearRectangleTable() {
+        atlasRects.removeAll(keepingCapacity: true)
+        freeRectangleIndices.removeAll(keepingCapacity: true)
+        for page in [asciiPage, shapedPage, colorPage] { page.rectangleIndices.removeAll(keepingCapacity: true) }
+    }
+
     /// Indexed by `Style.rawValue`, with whether each bold is synthetic.
     private var fonts: [CTFont]
     private var isSyntheticBold: [Bool]
     /// The two-cell box a color glyph is rasterised to fit, in pixels.
     private var colorBox: CGSize
 
-    /// Top half of the grayscale texture.
+    /// Font-sized ASCII region at the top of the grayscale texture.
     private var asciiPage: AtlasPage
-    /// Bottom half of the grayscale texture.
+    /// Shaped region below the ASCII shelves.
     private var shapedPage: AtlasPage
     /// The whole color texture.
     private var colorPage: AtlasPage
@@ -211,6 +234,7 @@ nonisolated final class GlyphAtlas {
     var onTextureRetired: (MTLTexture) -> Void = { _ in }
     /// Textures moved away from, for tests.
     private(set) var textureReplacementCount = 0
+    private let storageMode: MTLStorageMode
     private let allocateTexture: (MTLTextureDescriptor) -> MTLTexture?
 
     /// Shapes `glyph(shaping:)` and `glyph(forCluster:)` may still run before
@@ -251,6 +275,7 @@ nonisolated final class GlyphAtlas {
     ///   device.
     init(
         device: MTLDevice, font: CTFont, atlasPixelSize: Int = GlyphAtlas.atlasSize,
+        storageMode: MTLStorageMode = .shared,
         makeTexture: ((MTLTextureDescriptor) -> MTLTexture?)? = nil
     ) throws {
         // Pinned here too, so the atlas is the one choke point for the cascade.
@@ -260,6 +285,7 @@ nonisolated final class GlyphAtlas {
 
         let allocate = makeTexture ?? { device.makeTexture(descriptor: $0) }
         self.allocateTexture = allocate
+        self.storageMode = storageMode
         // Halve and retry down to `minimumAtlasPixelSize`, then give up — as a
         // thrown error the pane shows as a renderer failure, where a trap took
         // every window down with it.
@@ -267,13 +293,13 @@ nonisolated final class GlyphAtlas {
         var allocated: (gray: MTLTexture, color: MTLTexture)?
         while true {
             let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-                pixelFormat: .r8Unorm, width: size, height: size, mipmapped: false)
+                pixelFormat: .r8Unorm, width: size, height: min(128, size), mipmapped: false)
             descriptor.usage = [.shaderRead]
-            descriptor.storageMode = .managed
+            descriptor.storageMode = storageMode
             let colorDescriptor = MTLTextureDescriptor.texture2DDescriptor(
-                pixelFormat: .bgra8Unorm, width: size, height: size, mipmapped: false)
+                pixelFormat: .bgra8Unorm, width: 1, height: 1, mipmapped: false)
             colorDescriptor.usage = [.shaderRead]
-            colorDescriptor.storageMode = .managed
+            colorDescriptor.storageMode = storageMode
             if let gray = allocate(descriptor), let color = allocate(colorDescriptor) {
                 allocated = (gray, color)
                 break
@@ -289,7 +315,7 @@ nonisolated final class GlyphAtlas {
         self.atlasPixelSize = size
         self.isDegraded = size < atlasPixelSize
 
-        (self.asciiPage, self.shapedPage, self.colorPage) = Self.makePages(atlasPixelSize: size)
+        (self.asciiPage, self.shapedPage, self.colorPage) = Self.makePages(atlasPixelSize: size, font: base)
 
         var white: UInt8 = 255
         texture.replace(
@@ -306,31 +332,40 @@ nonisolated final class GlyphAtlas {
 
     /// The three pages' fixed regions, fresh each call so `init` and `reset`
     /// never rewind them by hand.
-    private static func makePages(atlasPixelSize: Int) -> (ascii: AtlasPage, shaped: AtlasPage, color: AtlasPage) {
-        let half = atlasPixelSize / 2
+    private static func makePages(atlasPixelSize: Int, font: CTFont) -> (ascii: AtlasPage, shaped: AtlasPage, color: AtlasPage) {
+        let metrics = CellMetrics(font: font)
+        // Reserve complete shelves for 95 printable glyphs in each face. Keep
+        // the tiny test/fallback atlas split, so eviction remains exercised.
+        let glyphWidth = max(1, Int(ceil(metrics.cellWidth)) + 4)
+        let shelfHeight = max(1, Int(ceil(metrics.cellHeight)) + 4)
+        let perShelf = max(1, atlasPixelSize / glyphWidth)
+        let required = 1 + ((95 * 4 + perShelf - 1) / perShelf) * shelfHeight
+        let asciiHeight = min(atlasPixelSize / 2, required)
         let ascii = AtlasPage(
-            regionOrigin: (0, 0), regionSize: (atlasPixelSize, half), reservedFirstRow: true)
+            regionOrigin: (0, 0), regionSize: (atlasPixelSize, asciiHeight), reservedFirstRow: true)
         let shaped = AtlasPage(
-            regionOrigin: (0, half), regionSize: (atlasPixelSize, atlasPixelSize - half),
+            regionOrigin: (0, asciiHeight), regionSize: (atlasPixelSize, atlasPixelSize - asciiHeight),
             reservedFirstRow: false)
         let color = AtlasPage(
             regionOrigin: (0, 0), regionSize: (atlasPixelSize, atlasPixelSize), reservedFirstRow: false)
         return (ascii, shaped, color)
     }
 
-    /// Re-points the atlas at a new font, keeping the texture and pipelines:
+    /// Re-points the atlas at a new font, shrinking textures and keeping pipelines:
     /// ⌘= / ⌘- call this per key repeat.
     func reset(font newFont: CTFont) {
         let base = TerminalFont.pinningCascadeList(newFont, size: CTFontGetSize(newFont))
         (fonts, isSyntheticBold) = Self.faces(of: base)
         colorBox = Self.colorBox(for: base)
-        (asciiPage, shapedPage, colorPage) = Self.makePages(atlasPixelSize: atlasPixelSize)
+        (asciiPage, shapedPage, colorPage) = Self.makePages(atlasPixelSize: atlasPixelSize, font: base)
         evictionCount += 1
         generation += 1
-        if texturesInUse() {
-            // Nothing of the old font is kept: fresh, empty textures.
-            replaceTexture(.grayscale, copying: false)
-            replaceTexture(.color, copying: false)
+        clearRectangleTable()
+        if texturesInUse() || texture.height > min(128, atlasPixelSize) {
+            if !replaceTexture(.grayscale, copying: false, height: min(128, atlasPixelSize)) { blockedTextureWrites.insert(.grayscale) }
+        }
+        if colorTexture.width != 1 {
+            if !replaceTexture(.color, copying: false, height: 1, width: 1) { blockedTextureWrites.insert(.color) }
         }
         var white: UInt8 = 255
         texture.replace(
@@ -559,6 +594,12 @@ nonisolated final class GlyphAtlas {
         guard let data = context.data else {
             return GlyphInfo(uvRect: .zero, size: .zero, bearing: .zero)
         }
+        guard ensureHeight(.grayscale, required: origin.y + height) else {
+            page.evict(reservedFirstRow: page === asciiPage)
+            evictionCount += 1
+            generation += 1
+            return GlyphInfo(uvRect: .zero, size: .zero, bearing: .zero, isMissing: true)
+        }
         texture.replace(
             region: MTLRegionMake2D(origin.x, origin.y, width, height),
             mipmapLevel: 0, withBytes: data, bytesPerRow: width)
@@ -567,6 +608,7 @@ nonisolated final class GlyphAtlas {
             uvRect: SIMD4<Float>(
                 Float(origin.x) / Float(atlasPixelSize), Float(origin.y) / Float(atlasPixelSize),
                 Float(width) / Float(atlasPixelSize), Float(height) / Float(atlasPixelSize)),
+            atlasIndex: rectangleIndex(page: page, x: origin.x, y: origin.y, width: width, height: height),
             size: SIMD2<Float>(Float(width), Float(height)),
             bearing: SIMD2<Float>(Float(bbox.minX), Float(bbox.minY))
         )
@@ -652,6 +694,12 @@ nonisolated final class GlyphAtlas {
         }
 
         guard let data = context.data else { return empty }
+        guard ensureHeight(.color, required: origin.y + height) else {
+            colorPage.evict(reservedFirstRow: false)
+            evictionCount += 1
+            generation += 1
+            return empty
+        }
         colorTexture.replace(
             region: MTLRegionMake2D(origin.x, origin.y, width, height),
             mipmapLevel: 0, withBytes: data, bytesPerRow: width * 4)
@@ -660,6 +708,7 @@ nonisolated final class GlyphAtlas {
             uvRect: SIMD4<Float>(
                 Float(origin.x) / Float(atlasPixelSize), Float(origin.y) / Float(atlasPixelSize),
                 Float(width) / Float(atlasPixelSize), Float(height) / Float(atlasPixelSize)),
+            atlasIndex: rectangleIndex(page: colorPage, x: origin.x, y: origin.y, width: width, height: height),
             size: SIMD2<Float>(Float(width), Float(height)),
             bearing: SIMD2<Float>(Float(bbox.minX), Float(bbox.minY)),
             isColor: true
@@ -669,30 +718,49 @@ nonisolated final class GlyphAtlas {
     /// Resets one page in place: its allocator rewinds and its caches clear,
     /// so every lookup re-rasterises into rewritten texels.
     private func evict(_ page: AtlasPage) {
+        freeRectangleIndices.append(contentsOf: page.rectangleIndices.values)
+        page.rectangleIndices.removeAll(keepingCapacity: true)
         page.evict(reservedFirstRow: page === asciiPage)
         evictionCount += 1
         generation += 1
         if texturesInUse() {
             // The page's texels are about to be overwritten. The other
             // grayscale page shares the texture, so its texels come along.
-            replaceTexture(page === colorPage ? .color : .grayscale, copying: true)
+            let kind: TextureKind = page === colorPage ? .color : .grayscale
+            if !replaceTexture(kind, copying: true) { blockedTextureWrites.insert(kind) }
         }
     }
 
-    private enum TextureKind { case grayscale, color }
+    private enum TextureKind: Hashable { case grayscale, color }
+    /// Failed retirement allocation must never let a later miss overwrite
+    /// texels referenced by an in-flight frame.
+    private var blockedTextureWrites: Set<TextureKind> = []
 
-    /// Moves one texture to a fresh one of the same shape, with the old
-    /// one's texels when `copying` (managed storage: the CPU copy is the
-    /// whole truth, as only the CPU writes an atlas). The old texture is
-    /// left exactly as queued frames recorded it. Without memory for a
-    /// second texture the old one is rewritten, as it always was.
-    private func replaceTexture(_ kind: TextureKind, copying: Bool) {
+    /// Moves one texture to a fresh allocation, retaining the old
+    /// texels when `copying`. Only the CPU writes an atlas; the readback
+    /// works for both shared and managed storage. The old texture is
+    /// left exactly as queued frames recorded it. Failed allocation leaves
+    /// the old texture intact and the caller omits the unavailable glyph.
+    private func ensureHeight(_ kind: TextureKind, required: Int) -> Bool {
+        if blockedTextureWrites.contains(kind) {
+            if texturesInUse(), !replaceTexture(kind, copying: true) { return false }
+            blockedTextureWrites.remove(kind)
+        }
+        let old = kind == .color ? colorTexture : texture
+        if old.height >= required, old.width == atlasPixelSize { return true }
+        var height = min(atlasPixelSize, max(128, old.height))
+        while height < required { height = min(atlasPixelSize, height * 2) }
+        return replaceTexture(kind, copying: true, height: height, width: atlasPixelSize)
+    }
+
+    @discardableResult
+    private func replaceTexture(_ kind: TextureKind, copying: Bool, height: Int? = nil, width: Int? = nil) -> Bool {
         let old = kind == .color ? colorTexture : texture
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: old.pixelFormat, width: old.width, height: old.height, mipmapped: false)
+            pixelFormat: old.pixelFormat, width: width ?? old.width, height: height ?? old.height, mipmapped: false)
         descriptor.usage = [.shaderRead]
-        descriptor.storageMode = .managed
-        guard let fresh = allocateTexture(descriptor) else { return }
+        descriptor.storageMode = storageMode
+        guard let fresh = allocateTexture(descriptor) else { return false }
         if copying {
             let bytesPerRow = old.width * (old.pixelFormat == .bgra8Unorm ? 4 : 1)
             let region = MTLRegionMake2D(0, 0, old.width, old.height)
@@ -710,7 +778,9 @@ nonisolated final class GlyphAtlas {
         case .grayscale: texture = fresh
         case .color: colorTexture = fresh
         }
+        blockedTextureWrites.remove(kind)
         textureReplacementCount += 1
         onTextureRetired(old)
+        return true
     }
 }

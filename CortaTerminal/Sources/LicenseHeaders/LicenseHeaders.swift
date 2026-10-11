@@ -70,6 +70,8 @@ public enum LicenseHeaders {
         ("docs/brand/*.png", .reuse),
         ("docs/brand/*.gif", .reuse),
         ("docs/test-results/issue-228-*.png", .reuse),
+        ("docs/test-results/memory-core-2026-10-11/*.png", .reuse),
+        ("docs/test-results/memory-core-2026-10-11/raw-benchmarks.txt", .reuse),
         ("AppIcon.icon/**", .reuse),
         ("AppIconDev.icon/**", .reuse),
         ("Corta/Acknowledgements/**", .reuse),

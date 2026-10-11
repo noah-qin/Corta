@@ -115,10 +115,17 @@ final class MeasurementUITests: XCTestCase {
         let app = try launchSettled()
         let centres = split(app, into: panes)
         for centre in centres {
-            app.windows.firstMatch.coordinate(withNormalizedOffset: centre).click()
+            focus(app, at: centre, panes: panes)
             app.typeText("yes\n")
         }
         pause(2)
+        XCTAssertEqual(app.textViews.count, panes, "the requested panes were not created")
+        for pane in app.textViews.allElementsBoundByIndex {
+            let text = pane.value as? String ?? ""
+            XCTAssertGreaterThanOrEqual(text.components(separatedBy: .newlines)
+                .filter { $0.trimmingCharacters(in: .whitespaces) == "y" }.count, 8,
+                "every pane must have a live yes producer before measuring")
+        }
         measure(metrics: [XCTCPUMetric(application: app), XCTMemoryMetric(application: app)],
                 options: Self.fourSecondSamples) {
             pause(4)
@@ -129,7 +136,7 @@ final class MeasurementUITests: XCTestCase {
         let lines = try waitForMetrics(["cpuFrame", "gpu"], timeout: 10)
         report(lines.map { "\(panes)-pane flood \($0)" })
         for centre in centres {
-            app.windows.firstMatch.coordinate(withNormalizedOffset: centre).click()
+            focus(app, at: centre, panes: panes)
             app.typeKey("c", modifierFlags: .control)
         }
         removeMetricsFile(through: app)
@@ -153,12 +160,29 @@ final class MeasurementUITests: XCTestCase {
         app = try launchSettled()
         app.typeText("i=0; while [ $i -lt 10000 ]; do printf 'history %s\\r\\n' \"$i\"; i=$((i+1)); done\n")
         pause(3)
-        for _ in 0..<800 {
-            app.windows.firstMatch.scroll(byDeltaX: 0, deltaY: 20)
+        let terminal = app.textViews.firstMatch
+        let liveViewport = terminal.value as? String
+        app.typeKey(.pageUp, modifierFlags: .shift)
+        XCTAssertNotEqual(terminal.value as? String, liveViewport, "history navigation must change the viewport")
+        for step in 0..<700 {
+            // Keyboard navigation avoids XCTest wheel synthesis against an
+            // unavailable display rect. Reverse before either end clamps.
+            app.typeKey((step / 100).isMultiple(of: 2) ? .pageUp : .pageDown, modifierFlags: .shift)
             pause(0.03)
         }
         report(try waitForMetrics(["cpuFrame", "gpu"], timeout: 10).map { "history scroll \($0)" })
         removeMetricsFile(through: app)
+        app.terminate()
+    }
+
+    @MainActor func testFourPanePromptMemory() throws {
+        let app = try launchSettled(renderMetrics: false)
+        _ = split(app, into: 4)
+        XCTAssertEqual(app.textViews.count, 4)
+        pause(2)
+        measure(metrics: [XCTMemoryMetric(application: app)], options: Self.fourSecondSamples) {
+            pause(4)
+        }
         app.terminate()
     }
 
@@ -247,7 +271,7 @@ final class MeasurementUITests: XCTestCase {
 
     @MainActor
     private func makeApp(renderMetrics: Bool = true) -> XCUIApplication {
-        let app = UIFixtures.app(stage: measurementStage, runner: Self.self)
+        let app = UIFixtures.app(stage: measurementStage, runner: Self.self, usingTestTarget: true)
         // Session restore would carry the previous test's windows in.
         app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
         // No rc files: the prompt is up at once and nothing redraws around
@@ -276,11 +300,19 @@ final class MeasurementUITests: XCTestCase {
         return app
     }
 
+    @MainActor
+    private func focus(_ app: XCUIApplication, at centre: CGVector, panes: Int) {
+        guard panes > 1 else { return }
+        app.typeKey(.leftArrow, modifierFlags: [.command, .option])
+        if panes == 4 { app.typeKey(.upArrow, modifierFlags: [.command, .option]) }
+        if centre.dx > 0.5 { app.typeKey(.rightArrow, modifierFlags: [.command, .option]) }
+        if panes == 4, centre.dy > 0.5 { app.typeKey(.downArrow, modifierFlags: [.command, .option]) }
+    }
+
     /// Splits the window into `panes` (1, 2 or 4) and returns each pane's
-    /// centre as a normalised offset in the window, for clicking into it.
+    /// centre as a normalised offset, mapped to keyboard focus directions.
     @MainActor
     private func split(_ app: XCUIApplication, into panes: Int) -> [CGVector] {
-        let window = app.windows.firstMatch
         switch panes {
         case 2:
             app.typeKey("d", modifierFlags: .command)  // left | right
@@ -291,7 +323,7 @@ final class MeasurementUITests: XCTestCase {
             pause(1)
             app.typeKey("D", modifierFlags: [.command, .shift])  // right splits down
             pause(1)
-            window.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.5)).click()
+            app.typeKey(.leftArrow, modifierFlags: [.command, .option])
             app.typeKey("D", modifierFlags: [.command, .shift])  // left splits down
             pause(1.5)
             return [CGVector(dx: 0.25, dy: 0.25), CGVector(dx: 0.75, dy: 0.25),

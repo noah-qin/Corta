@@ -184,8 +184,8 @@ import Testing
         #expect(backend.renderFrameAndWait(into: target) { backend in
             if let image {
                 backend.drawColorQuads(
-                    [QuadInstance(origin: .zero, size: .init(20, 20), color: .one, uvRect: .init(0, 0, 1, 1))],
-                    atlas: image, rect: rect, drawableSize: rect.size, transient: true)
+                    [QuadInstance(origin: .zero, size: .init(20, 20), color: .one, atlasIndex: 1)],
+                    atlas: image, atlasRects: [.init(0, 0, UInt16(image.width), UInt16(image.height))], rect: rect, drawableSize: rect.size, transient: true)
             }
         })
         image = nil

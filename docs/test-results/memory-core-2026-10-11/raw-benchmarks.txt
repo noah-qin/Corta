@@ -1,0 +1,289 @@
+corta-286-frame-before-final
+frame CPU time (120x40, full screen, Release, -O): avg 0.446 ms, p50 0.436 ms, p95 0.659 ms, p99 1.334 ms, max 1.334 ms, over 60 iterations
+
+
+corta-286-frame-after-final
+frame CPU time (120x40, full screen, Release, -O): avg 0.350 ms, p50 0.335 ms, p95 0.586 ms, p99 0.953 ms, max 0.953 ms, over 60 iterations
+
+
+corta-286-gate-before-final
+four 400x120 panes, CPU-only, gate 4 ms p50, Release, -O
+one row dirty: p50 0.3055 ms, p95 0.37675 ms, p99 0.402875 ms, max 0.402875 ms
+full rebuild: p50 4.323 ms, p95 7.809459 ms, p99 9.208709 ms, max 9.208709 ms
+
+
+corta-286-gate-after-final
+four 400x120 panes, CPU-only, gate 4 ms p50, Release, -O
+one row dirty: p50 0.213625 ms, p95 0.28875 ms, p99 0.380792 ms, max 0.380792 ms
+full rebuild: p50 3.66175 ms, p95 7.47925 ms, p99 14.952375 ms, max 14.952375 ms
+
+
+corta-286-upload-before-final
+instance stride: 48 bytes; uploads include rectangle table
+blocks: 321168 bytes/frame p50
+flood while scrolled back: 228480 bytes/frame p50
+full rebuild: 222816 bytes/frame p50
+history scroll by 1: 228480 bytes/frame p50
+history scroll by third: 228480 bytes/frame p50
+redraw: 171888 bytes/frame p50
+region scroll: 222816 bytes/frame p50
+scroll: 34320 bytes/frame p50
+typing: 224400 bytes/frame p50
+instance upload benchmark (120x40, full text screen, Menlo 14 @1x, Release, -O)
+typing (1 row dirty)      : p50 0.019 ms, p95 0.046 ms, p99 0.053 ms, max 0.053 ms (n=60)
+scroll (shift + 1 row)    : p50 0.018 ms, p95 0.042 ms, p99 0.049 ms, max 0.049 ms (n=60)
+full rebuild              : p50 0.131 ms, p95 0.142 ms, p99 0.152 ms, max 0.152 ms (n=60)
+every row redrawn         : p50 0.119 ms, p95 0.133 ms, p99 0.142 ms, max 0.142 ms (n=60)
+full rebuild, blocks      : p50 0.125 ms, p95 0.132 ms, p99 0.148 ms, max 0.148 ms (n=60)
+region scroll by 1        : p50 0.030 ms, p95 0.034 ms, p99 0.045 ms, max 0.045 ms (n=60)
+history scroll by 1       : p50 0.017 ms, p95 0.018 ms, p99 0.019 ms, max 0.019 ms (n=60)
+history scroll by third   : p50 0.017 ms, p95 0.019 ms, p99 0.020 ms, max 0.020 ms (n=60)
+flood while scrolled back : p50 0.118 ms, p95 0.122 ms, p99 0.127 ms, max 0.127 ms (n=60)
+
+
+corta-286-upload-after-final
+instance stride: 24 bytes; uploads include rectangle table
+blocks: 160584 bytes/frame p50
+flood while scrolled back: 114264 bytes/frame p50
+full rebuild: 111432 bytes/frame p50
+history scroll by 1: 114264 bytes/frame p50
+history scroll by third: 114264 bytes/frame p50
+redraw: 85968 bytes/frame p50
+region scroll: 111432 bytes/frame p50
+scroll: 17184 bytes/frame p50
+typing: 112224 bytes/frame p50
+instance upload benchmark (120x40, full text screen, Menlo 14 @1x, Release, -O)
+typing (1 row dirty)      : p50 0.017 ms, p95 0.047 ms, p99 0.065 ms, max 0.065 ms (n=60)
+scroll (shift + 1 row)    : p50 0.034 ms, p95 0.083 ms, p99 0.103 ms, max 0.103 ms (n=60)
+full rebuild              : p50 0.121 ms, p95 0.144 ms, p99 0.189 ms, max 0.189 ms (n=60)
+every row redrawn         : p50 0.107 ms, p95 0.138 ms, p99 0.830 ms, max 0.830 ms (n=60)
+full rebuild, blocks      : p50 0.121 ms, p95 0.142 ms, p99 0.173 ms, max 0.173 ms (n=60)
+region scroll by 1        : p50 0.030 ms, p95 0.051 ms, p99 0.058 ms, max 0.058 ms (n=60)
+history scroll by 1       : p50 0.017 ms, p95 0.024 ms, p99 0.027 ms, max 0.027 ms (n=60)
+history scroll by third   : p50 0.016 ms, p95 0.024 ms, p99 0.037 ms, max 0.037 ms (n=60)
+flood while scrolled back : p50 0.110 ms, p95 0.136 ms, p99 0.153 ms, max 0.153 ms (n=60)
+
+
+corta-286-storage-before-final
+four-pane atlas storage (Menlo 12 @2x, Release, -O)
+MTLStorageMode(rawValue: 1): texture allocated [21233664, 21233664, 21233664, 21233664], device delta 84934656, footprint delta 1196056, init 4.982916 ms
+MTLStorageMode(rawValue: 0): texture allocated [21233664, 21233664, 21233664, 21233664], device delta 84934656, footprint delta 1196056, init 2.791375 ms
+
+
+corta-286-storage-after-final
+four-pane atlas storage (Menlo 12 @2x, Release, -O)
+MTLStorageMode(rawValue: 1): texture allocated [278656, 278656, 278656, 278656], device delta 1245184, footprint delta 212992, init 3.727167 ms
+MTLStorageMode(rawValue: 0): texture allocated [278656, 278656, 278656, 278656], device delta 1114112, footprint delta 196608, init 1.499584 ms
+
+
+corta-289-unicode-before-measured-final
+unicode ASCII parser: 700.7 MiB/s checksum 34513248 (n=5, range 518.7–757.4, one warmup)
+unicode ASCII grid: 89.0 MiB/s checksum 600 (n=5, range 87.6–89.5, one warmup)
+unicode ASCII feed: 345.2 MiB/s checksum 60600 (n=5, range 342.5–345.9, one warmup)
+unicode CJK parser: 229.6 MiB/s checksum 15099654 (n=5, range 226.6–234.0, one warmup)
+unicode CJK grid: 55.5 MiB/s checksum 194736 (n=5, range 55.3–55.7, one warmup)
+unicode CJK feed: 70.8 MiB/s checksum 254736 (n=5, range 70.5–71.1, one warmup)
+unicode emoji parser: 222.4 MiB/s checksum 18302448 (n=5, range 222.3–228.0, one warmup)
+unicode emoji grid: 54.9 MiB/s checksum 56904 (n=5, range 54.2–55.5, one warmup)
+unicode emoji feed: 70.6 MiB/s checksum 116904 (n=5, range 70.5–70.8, one warmup)
+unicode AI CLI parser: 364.5 MiB/s checksum 28940724 (n=5, range 356.9–370.4, one warmup)
+unicode AI CLI grid: 85.4 MiB/s checksum 56844 (n=5, range 84.5–86.2, one warmup)
+unicode AI CLI feed: 123.3 MiB/s checksum 116844 (n=5, range 122.9–123.5, one warmup)
+
+
+corta-289-unicode-after-measured-final
+unicode ASCII parser: 628.8 MiB/s checksum 34513248 (n=5, range 551.1–703.6, one warmup)
+unicode ASCII grid: 89.0 MiB/s checksum 600 (n=5, range 88.7–89.0, one warmup)
+unicode ASCII feed: 340.3 MiB/s checksum 60600 (n=5, range 336.4–343.1, one warmup)
+unicode CJK parser: 236.7 MiB/s checksum 15099654 (n=5, range 205.3–247.4, one warmup)
+unicode CJK grid: 65.9 MiB/s checksum 194736 (n=5, range 65.6–66.1, one warmup)
+unicode CJK feed: 87.4 MiB/s checksum 254736 (n=5, range 87.0–87.5, one warmup)
+unicode emoji parser: 202.1 MiB/s checksum 18302448 (n=5, range 199.7–230.8, one warmup)
+unicode emoji grid: 55.2 MiB/s checksum 56904 (n=5, range 55.2–55.5, one warmup)
+unicode emoji feed: 70.6 MiB/s checksum 116904 (n=5, range 70.1–70.8, one warmup)
+unicode AI CLI parser: 394.5 MiB/s checksum 28940724 (n=5, range 385.6–398.6, one warmup)
+unicode AI CLI grid: 89.9 MiB/s checksum 56844 (n=5, range 89.5–90.0, one warmup)
+unicode AI CLI feed: 133.7 MiB/s checksum 116844 (n=5, range 133.3–133.9, one warmup)
+
+
+corta-288-memory-closeout
+compressed history footprint delta: 11714584 bytes
+memory @ 100k scrollback lines: 11.4 MB (resident before 5.7 MB, after 17.1 MB)
+
+
+corta-288-reflow-closeout
+reflow cost, 100k-line scrollback, 120 -> 80 columns: 54.1 ms (one resize call; ResizeDebouncer coalesces a live drag to ~1 call/100ms)
+
+
+corta-288-codecs100k
+compression SGR ls 100k rows LZ4 raw: 38.26x encode 11182.4 decode 31644.6 MiB/s including shuffle/scratch; raw bytes 188624144
+compression SGR ls 100k rows LZ4 shuffled: 109.03x encode 2155.1 decode 1845.3 MiB/s including shuffle/scratch; raw bytes 188624144
+compression SGR ls 100k rows LZFSE raw: 119.28x encode 234.9 decode 22665.6 MiB/s including shuffle/scratch; raw bytes 188624144
+compression SGR ls 100k rows LZFSE shuffled: 232.95x encode 207.9 decode 2297.2 MiB/s including shuffle/scratch; raw bytes 188624144
+compression log 100k rows LZ4 raw: 53.06x encode 14253.3 decode 39532.0 MiB/s including shuffle/scratch; raw bytes 190046400
+compression log 100k rows LZ4 shuffled: 87.24x encode 2151.0 decode 1645.7 MiB/s including shuffle/scratch; raw bytes 190046400
+compression log 100k rows LZFSE raw: 122.84x encode 220.2 decode 19915.3 MiB/s including shuffle/scratch; raw bytes 190046400
+compression log 100k rows LZFSE shuffled: 325.02x encode 192.3 decode 2340.5 MiB/s including shuffle/scratch; raw bytes 190046400
+compression CJK 100k rows LZ4 raw: 86.93x encode 15618.4 decode 38380.4 MiB/s including shuffle/scratch; raw bytes 179024048
+compression CJK 100k rows LZ4 shuffled: 109.70x encode 1550.9 decode 1615.8 MiB/s including shuffle/scratch; raw bytes 179024048
+compression CJK 100k rows LZFSE raw: 261.47x encode 216.1 decode 17908.0 MiB/s including shuffle/scratch; raw bytes 179024048
+compression CJK 100k rows LZFSE shuffled: 437.02x encode 186.8 decode 1390.7 MiB/s including shuffle/scratch; raw bytes 179024048
+
+
+corta-289-search-before-clean1
+search-only 27.207209 ms 100000
+search-only 25.636041 ms 100000
+search-only 25.567583 ms 100000
+search-only 25.468459 ms 100000
+search-only 25.66425 ms 100000
+
+
+corta-289-search-final
+search-only 44.69875 ms 100000
+search-only 20.018167 ms 100000
+search-only 20.8215 ms 100000
+search-only 20.75525 ms 100000
+search-only 20.515334 ms 100000
+
+
+corta-286-measurement-target-check.log
+measurement: machine: Mac17,3 / Apple M5; macOS Version 27.0.1 (Build 26A434)
+measurement: build: Release, -O
+measurement: max drawables: default; frame latency: default
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:129: Test Case '-[CortaUITests.MeasurementUITests testFloodFourPanes]' measured [CPU Instructions Retired (dev), kI] average: 59352235.801, relative standard deviation: 0.077%, values: [59359131.664000, 59411840.297000, 59308922.993000, 59389430.340000, 59291853.711000], performanceMetricID:com.apple.dt.XCTMetric_CPU-dev.noahqin.Corta.dev.instructions_retired, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:129: Test Case '-[CortaUITests.MeasurementUITests testFloodFourPanes]' measured [Absolute Memory Physical (dev), kB] average: 175385.198, relative standard deviation: 0.058%, values: [175293.448000, 175277.064000, 175342.600000, 175506.440000, 175506.440000], performanceMetricID:com.apple.dt.XCTMetric_Memory-dev.noahqin.Corta.dev.physical_absolute, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:129: Test Case '-[CortaUITests.MeasurementUITests testFloodFourPanes]' measured [CPU Time (dev), s] average: 16.289, relative standard deviation: 0.042%, values: [16.289093, 16.299919, 16.283078, 16.292699, 16.280744], performanceMetricID:com.apple.dt.XCTMetric_CPU-dev.noahqin.Corta.dev.time, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:129: Test Case '-[CortaUITests.MeasurementUITests testFloodFourPanes]' measured [Memory Peak Physical (dev), kB] average: 175388.475, relative standard deviation: 0.056%, values: [175293.448000, 175293.448000, 175342.600000, 175506.440000, 175506.440000], performanceMetricID:com.apple.dt.XCTMetric_Memory-dev.noahqin.Corta.dev.physical_peak, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:129: Test Case '-[CortaUITests.MeasurementUITests testFloodFourPanes]' measured [CPU Cycles (dev), kC] average: 69522306.089, relative standard deviation: 0.067%, values: [69529124.169000, 69584363.724000, 69483762.591000, 69557260.545000, 69457019.418000], performanceMetricID:com.apple.dt.XCTMetric_CPU-dev.noahqin.Corta.dev.cycles, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:129: Test Case '-[CortaUITests.MeasurementUITests testFloodFourPanes]' measured [Memory Physical (dev), kB] average: 49.152, relative standard deviation: 129.957%, values: [32.768000, -16.384000, 65.536000, 163.840000, 0.000000], performanceMetricID:com.apple.dt.XCTMetric_Memory-dev.noahqin.Corta.dev.physical, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+measurement: 4-pane flood cpuFrame: n=600 avg=0.13ms p50=0.12ms p95=0.20ms p99=0.26ms max=0.37ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 4-pane flood gpu: n=600 avg=0.34ms p50=0.34ms p95=0.47ms p99=0.49ms max=0.56ms rate=0.0/0.0/defaultHz lowPower=false
+Test Case '-[CortaUITests.MeasurementUITests testFloodFourPanes]' passed (49.627 seconds).
+
+corta-286-measurement-rest.log
+measurement: machine: Mac17,3 / Apple M5; macOS Version 27.0.1 (Build 26A434)
+measurement: build: Release, -O
+measurement: max drawables: default; frame latency: default
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:129: Test Case '-[CortaUITests.MeasurementUITests testFloodOnePane]' measured [CPU Instructions Retired (dev), kI] average: 111813162.687, relative standard deviation: 0.293%, values: [111335467.535000, 111503353.995000, 112018785.106000, 112092855.603000, 112115351.197000], performanceMetricID:com.apple.dt.XCTMetric_CPU-dev.noahqin.Corta.dev.instructions_retired, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:129: Test Case '-[CortaUITests.MeasurementUITests testFloodOnePane]' measured [Absolute Memory Physical (dev), kB] average: 140818.187, relative standard deviation: 0.011%, values: [140788.696000, 140821.464000, 140821.464000, 140821.464000, 140837.848000], performanceMetricID:com.apple.dt.XCTMetric_Memory-dev.noahqin.Corta.dev.physical_absolute, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:129: Test Case '-[CortaUITests.MeasurementUITests testFloodOnePane]' measured [CPU Time (dev), s] average: 4.408, relative standard deviation: 0.063%, values: [4.411970, 4.409136, 4.407668, 4.409681, 4.403599], performanceMetricID:com.apple.dt.XCTMetric_CPU-dev.noahqin.Corta.dev.time, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:129: Test Case '-[CortaUITests.MeasurementUITests testFloodOnePane]' measured [Memory Peak Physical (dev), kB] average: 140831.294, relative standard deviation: 0.009%, values: [140837.848000, 140821.464000, 140821.464000, 140821.464000, 140854.232000], performanceMetricID:com.apple.dt.XCTMetric_Memory-dev.noahqin.Corta.dev.physical_peak, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:129: Test Case '-[CortaUITests.MeasurementUITests testFloodOnePane]' measured [CPU Cycles (dev), kC] average: 16524823.116, relative standard deviation: 0.102%, values: [16504907.014000, 16504105.332000, 16533982.655000, 16542117.282000, 16539003.298000], performanceMetricID:com.apple.dt.XCTMetric_CPU-dev.noahqin.Corta.dev.cycles, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:129: Test Case '-[CortaUITests.MeasurementUITests testFloodOnePane]' measured [Memory Physical (dev), kB] average: 19.661, relative standard deviation: 97.183%, values: [49.152000, 32.768000, 0.000000, 0.000000, 16.384000], performanceMetricID:com.apple.dt.XCTMetric_Memory-dev.noahqin.Corta.dev.physical, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+measurement: 1-pane flood cpuFrame: n=600 avg=0.08ms p50=0.08ms p95=0.10ms p99=0.14ms max=0.36ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 1-pane flood gpu: n=600 avg=0.62ms p50=0.62ms p95=0.62ms p99=0.63ms max=0.64ms rate=0.0/0.0/defaultHz lowPower=false
+Test Case '-[CortaUITests.MeasurementUITests testFloodOnePane]' passed (37.092 seconds).
+measurement: machine: Mac17,3 / Apple M5; macOS Version 27.0.1 (Build 26A434)
+measurement: build: Release, -O
+measurement: max drawables: default; frame latency: default
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:129: Test Case '-[CortaUITests.MeasurementUITests testFloodTwoPanes]' measured [CPU Instructions Retired (dev), kI] average: 56902654.668, relative standard deviation: 0.103%, values: [56903419.949000, 56822632.351000, 56859512.152000, 56989304.488000, 56938404.401000], performanceMetricID:com.apple.dt.XCTMetric_CPU-dev.noahqin.Corta.dev.instructions_retired, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:129: Test Case '-[CortaUITests.MeasurementUITests testFloodTwoPanes]' measured [Absolute Memory Physical (dev), kB] average: 153420.760, relative standard deviation: 0.000%, values: [153420.760000, 153420.760000, 153420.760000, 153420.760000, 153420.760000], performanceMetricID:com.apple.dt.XCTMetric_Memory-dev.noahqin.Corta.dev.physical_absolute, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:129: Test Case '-[CortaUITests.MeasurementUITests testFloodTwoPanes]' measured [CPU Time (dev), s] average: 8.258, relative standard deviation: 0.066%, values: [8.267444, 8.257969, 8.251386, 8.254734, 8.260205], performanceMetricID:com.apple.dt.XCTMetric_CPU-dev.noahqin.Corta.dev.time, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:129: Test Case '-[CortaUITests.MeasurementUITests testFloodTwoPanes]' measured [Memory Peak Physical (dev), kB] average: 153427.314, relative standard deviation: 0.005%, values: [153437.144000, 153420.760000, 153420.760000, 153420.760000, 153437.144000], performanceMetricID:com.apple.dt.XCTMetric_Memory-dev.noahqin.Corta.dev.physical_peak, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:129: Test Case '-[CortaUITests.MeasurementUITests testFloodTwoPanes]' measured [CPU Cycles (dev), kC] average: 33001634.788, relative standard deviation: 0.127%, values: [33064435.952000, 32984331.458000, 32940094.713000, 32991754.395000, 33027557.423000], performanceMetricID:com.apple.dt.XCTMetric_CPU-dev.noahqin.Corta.dev.cycles, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:129: Test Case '-[CortaUITests.MeasurementUITests testFloodTwoPanes]' measured [Memory Physical (dev), kB] average: 0.000, relative standard deviation: 0.000%, values: [0.000000, 0.000000, 0.000000, 0.000000, 0.000000], performanceMetricID:com.apple.dt.XCTMetric_Memory-dev.noahqin.Corta.dev.physical, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+measurement: 2-pane flood cpuFrame: n=600 avg=0.09ms p50=0.09ms p95=0.14ms p99=0.21ms max=0.39ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: 2-pane flood gpu: n=600 avg=0.49ms p50=0.49ms p95=0.51ms p99=0.53ms max=0.62ms rate=0.0/0.0/defaultHz lowPower=false
+Test Case '-[CortaUITests.MeasurementUITests testFloodTwoPanes]' passed (40.999 seconds).
+measurement: machine: Mac17,3 / Apple M5; macOS Version 27.0.1 (Build 26A434)
+measurement: build: Release, -O
+measurement: max drawables: default; frame latency: default
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:183: Test Case '-[CortaUITests.MeasurementUITests testFourPanePromptMemory]' measured [Memory Peak Physical (dev), kB] average: 112100.336, relative standard deviation: 2.996%, values: [118817.776000, 110429.168000, 110412.784000, 110429.168000, 110412.784000], performanceMetricID:com.apple.dt.XCTMetric_Memory-dev.noahqin.Corta.dev.physical_peak, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:183: Test Case '-[CortaUITests.MeasurementUITests testFourPanePromptMemory]' measured [Memory Physical (dev), kB] average: -1677.722, relative standard deviation: -200.000%, values: [-8388.608000, 0.000000, 0.000000, 0.000000, 0.000000], performanceMetricID:com.apple.dt.XCTMetric_Memory-dev.noahqin.Corta.dev.physical, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:183: Test Case '-[CortaUITests.MeasurementUITests testFourPanePromptMemory]' measured [Absolute Memory Physical (dev), kB] average: 110412.784, relative standard deviation: 0.000%, values: [110412.784000, 110412.784000, 110412.784000, 110412.784000, 110412.784000], performanceMetricID:com.apple.dt.XCTMetric_Memory-dev.noahqin.Corta.dev.physical_absolute, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+Test Case '-[CortaUITests.MeasurementUITests testFourPanePromptMemory]' passed (36.635 seconds).
+measurement: machine: Mac17,3 / Apple M5; macOS Version 27.0.1 (Build 26A434)
+measurement: build: Release, -O
+measurement: max drawables: default; frame latency: default
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:84: Test Case '-[CortaUITests.MeasurementUITests testIdleCPU]' measured [CPU Cycles (dev), kC] average: 1054.871, relative standard deviation: 148.690%, values: [775.465000, 4146.339000, 258.113000, 46.495000, 47.941000], performanceMetricID:com.apple.dt.XCTMetric_CPU-dev.noahqin.Corta.dev.cycles, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:84: Test Case '-[CortaUITests.MeasurementUITests testIdleCPU]' measured [CPU Time (dev), s] average: 0.001, relative standard deviation: 145.253%, values: [0.000412, 0.002657, 0.000262, 0.000047, 0.000049], performanceMetricID:com.apple.dt.XCTMetric_CPU-dev.noahqin.Corta.dev.time, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:84: Test Case '-[CortaUITests.MeasurementUITests testIdleCPU]' measured [CPU Instructions Retired (dev), kI] average: 998.969, relative standard deviation: 139.926%, values: [1006.131000, 3702.478000, 181.788000, 52.265000, 52.181000], performanceMetricID:com.apple.dt.XCTMetric_CPU-dev.noahqin.Corta.dev.instructions_retired, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+Test Case '-[CortaUITests.MeasurementUITests testIdleCPU]' passed (30.040 seconds).
+measurement: machine: Mac17,3 / Apple M5; macOS Version 27.0.1 (Build 26A434)
+measurement: build: Release, -O
+measurement: max drawables: default; frame latency: default
+measurement: scripted keypress→glass keypressToPresent: n=200 avg=84.88ms p50=82.92ms p95=112.75ms p99=132.39ms max=132.47ms rate=0.0/0.0/defaultHz lowPower=false
+Test Case '-[CortaUITests.MeasurementUITests testKeypressToGlass]' passed (116.175 seconds).
+measurement: machine: Mac17,3 / Apple M5; macOS Version 27.0.1 (Build 26A434)
+measurement: build: Release, -O
+measurement: max drawables: default; frame latency: default
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:71: Test Case '-[CortaUITests.MeasurementUITests testLaunchToFirstWindow]' measured [Duration (ApplicationFirstFramePresentationResponsive), s] average: 0.421, relative standard deviation: 3.524%, values: [0.439847, 0.414129, 0.436786, 0.405942, 0.406129], performanceMetricID:com.apple.dt.XCTMetric_ApplicationLaunch-ApplicationFirstFramePresentationResponsive.duration, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+Test Case '-[CortaUITests.MeasurementUITests testLaunchToFirstWindow]' passed (14.784 seconds).
+measurement: machine: Mac17,3 / Apple M5; macOS Version 27.0.1 (Build 26A434)
+measurement: build: Release, -O
+measurement: max drawables: default; frame latency: default
+Test Case '-[CortaUITests.MeasurementUITests testMenuPaste]' passed (6.923 seconds).
+measurement: machine: Mac17,3 / Apple M5; macOS Version 27.0.1 (Build 26A434)
+measurement: build: Release, -O
+measurement: max drawables: default; frame latency: default
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:96: Test Case '-[CortaUITests.MeasurementUITests testOccludedCPU]' measured [CPU Cycles (dev), kC] average: 1977.650, relative standard deviation: 87.566%, values: [3596.101000, 4243.730000, 50.602000, 101.414000, 1896.402000], performanceMetricID:com.apple.dt.XCTMetric_CPU-dev.noahqin.Corta.dev.cycles, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:96: Test Case '-[CortaUITests.MeasurementUITests testOccludedCPU]' measured [CPU Time (dev), s] average: 0.002, relative standard deviation: 87.150%, values: [0.002054, 0.003686, 0.000052, 0.000103, 0.001928], performanceMetricID:com.apple.dt.XCTMetric_CPU-dev.noahqin.Corta.dev.time, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:96: Test Case '-[CortaUITests.MeasurementUITests testOccludedCPU]' measured [CPU Instructions Retired (dev), kI] average: 1646.915, relative standard deviation: 83.176%, values: [2772.552000, 3418.426000, 53.099000, 104.355000, 1886.142000], performanceMetricID:com.apple.dt.XCTMetric_CPU-dev.noahqin.Corta.dev.instructions_retired, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+Test Case '-[CortaUITests.MeasurementUITests testOccludedCPU]' passed (34.267 seconds).
+measurement: machine: Mac17,3 / Apple M5; macOS Version 27.0.1 (Build 26A434)
+measurement: build: Release, -O
+measurement: max drawables: default; frame latency: default
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:200: Test Case '-[CortaUITests.MeasurementUITests testOpenAndCloseWindowReturnsMemory]' measured [Memory Peak Physical (dev), kB] average: 207107.899, relative standard deviation: 0.056%, values: [206881.800000, 207111.176000, 207193.096000, 207160.328000, 207193.096000], performanceMetricID:com.apple.dt.XCTMetric_Memory-dev.noahqin.Corta.dev.physical_peak, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:200: Test Case '-[CortaUITests.MeasurementUITests testOpenAndCloseWindowReturnsMemory]' measured [Memory Physical (dev), kB] average: 85.197, relative standard deviation: 99.852%, values: [245.760000, 98.304000, 32.768000, 32.768000, 16.384000], performanceMetricID:com.apple.dt.XCTMetric_Memory-dev.noahqin.Corta.dev.physical, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+/Users/noah/Developer/personal/Corta/CortaUITests/MeasurementUITests.swift:200: Test Case '-[CortaUITests.MeasurementUITests testOpenAndCloseWindowReturnsMemory]' measured [Absolute Memory Physical (dev), kB] average: 103842.800, relative standard deviation: 0.062%, values: [103728.112000, 103826.416000, 103859.184000, 103891.952000, 103908.336000], performanceMetricID:com.apple.dt.XCTMetric_Memory-dev.noahqin.Corta.dev.physical_absolute, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%, maxPercentRelativeStandardDeviation: 10.000%, maxRegression: 0.000, maxStandardDeviation: 0.000
+Test Case '-[CortaUITests.MeasurementUITests testOpenAndCloseWindowReturnsMemory]' passed (49.067 seconds).
+measurement: machine: Mac17,3 / Apple M5; macOS Version 27.0.1 (Build 26A434)
+measurement: build: Release, -O
+measurement: max drawables: default; frame latency: default
+measurement: region scroll cpuFrame: n=600 avg=0.08ms p50=0.08ms p95=0.12ms p99=0.20ms max=0.40ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: region scroll gpu: n=600 avg=0.80ms p50=0.82ms p95=0.86ms p99=0.87ms max=0.90ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: history scroll cpuFrame: n=600 avg=0.29ms p50=0.32ms p95=0.41ms p99=0.55ms max=0.69ms rate=0.0/0.0/defaultHz lowPower=false
+measurement: history scroll gpu: n=600 avg=0.87ms p50=0.79ms p95=1.20ms p99=1.22ms max=1.28ms rate=0.0/0.0/defaultHz lowPower=false
+Test Case '-[CortaUITests.MeasurementUITests testRegionAndHistoryScrolling]' passed (196.749 seconds).
+
+
+Archived final performance: corta-frame-cpu-baseline.txt
+frame CPU time (120x40, full screen, Release, -O): avg 0.358 ms, p50 0.343 ms, p95 0.514 ms, p99 0.950 ms, max 0.950 ms, over 60 iterations
+
+
+Archived final performance: corta-large-grid-gate.txt
+four 400x120 panes, CPU-only, gate 4 ms p50, Release, -O
+one row dirty: p50 0.214917 ms, p95 0.24875 ms, p99 0.255958 ms, max 0.255958 ms
+full rebuild: p50 3.903333 ms, p95 7.357708 ms, p99 10.171458 ms, max 10.171458 ms
+
+
+Archived final performance: corta-instance-upload.txt
+instance stride: 24 bytes; uploads include rectangle table
+blocks: 160584 bytes/frame p50
+flood while scrolled back: 114264 bytes/frame p50
+full rebuild: 111432 bytes/frame p50
+history scroll by 1: 114264 bytes/frame p50
+history scroll by third: 114264 bytes/frame p50
+redraw: 85968 bytes/frame p50
+region scroll: 111432 bytes/frame p50
+scroll: 17184 bytes/frame p50
+typing: 112224 bytes/frame p50
+instance upload benchmark (120x40, full text screen, Menlo 14 @1x, Release, -O)
+typing (1 row dirty)      : p50 0.018 ms, p95 0.023 ms, p99 0.040 ms, max 0.040 ms (n=60)
+scroll (shift + 1 row)    : p50 0.018 ms, p95 0.022 ms, p99 0.024 ms, max 0.024 ms (n=60)
+full rebuild              : p50 0.119 ms, p95 0.125 ms, p99 0.140 ms, max 0.140 ms (n=60)
+every row redrawn         : p50 0.105 ms, p95 0.112 ms, p99 0.120 ms, max 0.120 ms (n=60)
+full rebuild, blocks      : p50 0.128 ms, p95 0.130 ms, p99 0.145 ms, max 0.145 ms (n=60)
+region scroll by 1        : p50 0.030 ms, p95 0.031 ms, p99 0.034 ms, max 0.034 ms (n=60)
+history scroll by 1       : p50 0.014 ms, p95 0.015 ms, p99 0.041 ms, max 0.041 ms (n=60)
+history scroll by third   : p50 0.015 ms, p95 0.016 ms, p99 0.017 ms, max 0.017 ms (n=60)
+flood while scrolled back : p50 0.106 ms, p95 0.116 ms, p99 0.139 ms, max 0.139 ms (n=60)
+
+
+Archived final performance: corta-atlas-storage.txt
+four-pane atlas storage (Menlo 12 @2x, Release, -O)
+MTLStorageMode(rawValue: 1): texture allocated [278656, 278656, 278656, 278656], device delta 1245184, footprint delta 196608, init 2.829125 ms
+MTLStorageMode(rawValue: 0): texture allocated [278656, 278656, 278656, 278656], device delta 1114112, footprint delta 196608, init 2.651 ms
+
+
+Archived final performance: corta-renderer-construction.txt
+renderer construction cost (8 Metal4Backend inits, one device, Release, -O):
+  #1: 75.129 ms
+  #2: 0.115 ms
+  #3: 0.068 ms
+  #4: 0.070 ms
+  #5: 0.070 ms
+  #6: 0.068 ms
+  #7: 0.065 ms
+  #8: 0.059 ms
+p50 0.070 ms, p95 75.129 ms, max 75.129 ms

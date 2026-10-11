@@ -63,29 +63,30 @@ extension Grid {
         text += "cursor: row \(cursor.row) column \(cursor.column)"
         text += pendingWrap ? " wrap-pending\n" : "\n"
 
-        var history: [Line] = []
+        let historyCount = options.includeScrollback ? scrollback.count : 0
         if options.includeScrollback {
-            history = scrollback.lines
             text += "scrollback: \(scrollback.count) lines"
             text += scrollback.isFull ? " (full)\n" : "\n"
         }
 
         // History is numbered backwards from the screen, so the row just
         // above row 0 is -1 whatever the history length is.
-        for (offset, line) in history.enumerated() {
-            text += Self.characterRow(line, number: offset - history.count, columns: columns)
+        for offset in 0..<historyCount {
+            let line = scrollback[offset]
+            text += Self.characterRow(line, number: offset - historyCount, columns: columns)
         }
         for row in 0..<rows {
             text += Self.characterRow(lines[row], number: row, columns: columns)
         }
 
-        for line in history { styles.scan(line, columns: columns) }
+        for index in 0..<historyCount { styles.scan(scrollback[index], columns: columns) }
         for row in 0..<rows { styles.scan(lines[row], columns: columns) }
 
         if !styles.isEmpty {
             text += "styles:\n"
-            for (offset, line) in history.enumerated() {
-                text += styles.row(line, number: offset - history.count, columns: columns)
+            for offset in 0..<historyCount {
+                let line = scrollback[offset]
+                text += styles.row(line, number: offset - historyCount, columns: columns)
             }
             for row in 0..<rows {
                 text += styles.row(lines[row], number: row, columns: columns)

@@ -129,7 +129,7 @@ final class SearchAndTabUITests: XCTestCase {
         let products = Bundle(for: Self.self).bundleURL
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
-        let app = XCUIApplication(url: products.appendingPathComponent("CortaDev.app"))
+        let app = XCUIApplication(url: products.appendingPathComponent("CortaDev.app").resolvingSymlinksInPath())
         app.launchEnvironment["CORTA_STAGE_DIR"] = stage.path
         app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
         app.launchEnvironment["SHELL"] = shell.path

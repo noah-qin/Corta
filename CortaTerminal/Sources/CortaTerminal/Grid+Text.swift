@@ -81,6 +81,7 @@ extension Grid {
         text: inout ContiguousArray<UInt8>,
         rows: inout ContiguousArray<Int32>,
         columns: inout ContiguousArray<Int32>,
+        historyReader: inout Scrollback.ASCIIReader,
         nonASCIIIsOpaque: (UInt32) -> Bool = { _ in false }
     ) -> Bool {
         text.removeAll(keepingCapacity: true)
@@ -88,8 +89,19 @@ extension Grid {
         columns.removeAll(keepingCapacity: true)
         var row = firstRow
         while row <= lastRow {
-            let currentLine = documentLine(row)
             let rowStart = text.count
+            if row < 0 {
+                guard scrollback.appendASCIIRow(at: scrollback.count + row, documentRow: row,
+                    text: &text, rows: &rows, columns: &columns, reader: &historyReader, nonASCIIIsOpaque: nonASCIIIsOpaque) else { return false }
+                if row == lastRow || !scrollback.isWrapped(at: scrollback.count + row) {
+                    while text.count > rowStart, text.last == 0x20 {
+                        text.removeLast(); rows.removeLast(); columns.removeLast()
+                    }
+                }
+                row += 1
+                continue
+            }
+            let currentLine = documentLine(row)
             var column = 0
             while column < currentLine.count {
                 let cell = currentLine[column]
@@ -305,7 +317,7 @@ struct ReversedLogicalLineSpanSequence: Sequence {
             guard nextRow >= lowerBound else { return nil }
             let last = nextRow
             var first = last
-            while grid.documentLine(first - 1).wrapped { first -= 1 }
+            while grid.isDocumentLineWrapped(first - 1) { first -= 1 }
             nextRow = first - 1
             return LogicalLineSpan(firstRow: first, lastRow: last)
         }

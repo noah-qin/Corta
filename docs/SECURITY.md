@@ -327,7 +327,8 @@ zero grace period and verification before mounting/extraction are unchanged.
 ## 5. Data at Rest
 
 **Terminal contents are not automatically persisted.** Scrollback routinely
-contains credentials. Copy/export commands are explicit exceptions: a user
+contains credentials. Cold scrollback compression and search indexes remain
+in memory; neither creates a history file. Copy/export commands are explicit exceptions: a user
 can save selected text, command output, or the whole terminal through a
 Save panel. The file is written owner-only (`0600`); the destination and any
 later sharing are the user's choice.
