@@ -86,6 +86,8 @@ jobs:
 
       # A fresh DerivedData directory and disabled compiler caching prevent
       # an incremental build from producing an incomplete CodeQL database.
+      # A generic destination compiles without resolving a runnable host:
+      # the CodeQL tracer can make Xcode see an x86_64 host for an arm64 app.
       # No signing identity, release environment or repository secrets.
       - name: Build the app and embedded helpers for extraction
         if: matrix.build-mode == 'manual' && (matrix.language != 'c-cpp' || hashFiles('**/*.c', '**/*.cpp', '**/*.cc') != '')
@@ -94,7 +96,7 @@ jobs:
             -project Corta.xcodeproj \
             -scheme Corta \
             -configuration Debug \
-            -destination 'platform=macOS' \
+            -destination 'generic/platform=macOS' \
             -derivedDataPath "$RUNNER_TEMP/codeql-app" \
             -disableAutomaticPackageResolution \
             -onlyUsePackageVersionsFromResolvedFile \
