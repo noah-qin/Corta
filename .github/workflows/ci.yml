@@ -125,7 +125,12 @@ jobs:
       - name: Test
         env:
           CORTA_TEST_TIMEOUT_SCALE: "3"
-        run: swift test --package-path CortaTerminal
+        # Swift Testing runs suites concurrently by default. On a hosted VM,
+        # hundreds of tests contend with real PTY children and SFTP fixtures:
+        # a fixture's blocking wait may expire before its test resumes.
+        # Serialize suites here; tests still exercise their own concurrent
+        # readers/transfers, and the nightly sanitizer lane remains parallel.
+        run: swift test --package-path CortaTerminal --no-parallel
 
       # The step above skips the real-OpenSSH suite: it needs an sshd. This
       # one starts a throwaway sshd on 127.0.0.1 with its own keys and config
