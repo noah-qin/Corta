@@ -86,7 +86,7 @@ jobs:
         run: bash scripts/prepare-release.sh
       - name: Keep the rehearsal source changes
         if: inputs.dry_run
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: rehearsal-source
           path: rehearsal.patch
@@ -223,7 +223,7 @@ jobs:
       # Preserve the evidence on both success and failure.
       - name: Keep the test results
         if: ${{ steps.published.outputs.exists != 'true' && (always()) }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: xcresult-release-${{ steps.version.outputs.tag }}
           path: test-results.xcresult
@@ -402,7 +402,7 @@ jobs:
 
       - name: Keep the rehearsal's signed feed
         if: ${{ steps.published.outputs.exists != 'true' && inputs.dry_run }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: rehearsal-appcast-${{ steps.version.outputs.tag }}
           path: ${{ runner.temp }}/rehearsal-feed/appcast.xml
@@ -457,7 +457,7 @@ jobs:
       # attached to a release.
       - name: Keep the rehearsal's archive
         if: ${{ steps.published.outputs.exists != 'true' && (inputs.dry_run) }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: rehearsal-${{ steps.package.outputs.dmg }}
           path: |
