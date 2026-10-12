@@ -15,7 +15,7 @@ repository root.
 | `app-icon-small.png`, `app-icon-dev-small.png` | 32 pt @2x previews for Dock-size comparison |
 | `export-icons.sh` | Exports both variants with Apple's Icon Composer renderer |
 | `session-ended.png` | Ended session, retained public output and recovery buttons, from an isolated `/bin/sh` fixture |
-| `screenshot.png`            | The README screenshot — light theme, current icon shown via Kitty graphics          |
+| `screenshot.png`            | The README screenshot — light theme, a clean demo shell          |
 | `input-source-indicator.png` | Independent Chinese input-source badge, separated from toolbar action buttons, from an isolated demo shell |
 | `input-source-long-command.png` | Right-edge badge moved below a long command, without changing the grid |
 | `directory-suggestions.png` | Local zsh suggestions and command-status marks from an isolated UI-test demo shell |
@@ -83,12 +83,11 @@ The card is uploaded by hand: repository **Settings** ▸ **General** ▸
 
 ## Taking the screenshot
 
-The current README and About captures were refreshed on 2026-10-12 from
-the new Debug build, using a temporary XCTest capture, English, and an
-isolated zsh stage. The terminal displays the current `app-icon.png` via
-Kitty graphics; the About window displays the compiled `AppIconDev`.
-The temporary capture changes were restored after export. The remaining
-feature screenshots continue to document their original UI checks.
+The About capture was refreshed on 2026-10-12 from the new Debug build,
+using a temporary XCTest capture, English, and an isolated zsh stage; it
+displays the compiled `AppIconDev`. The temporary capture changes were
+restored after export. The README screenshot and the remaining feature
+screenshots continue to document their original UI checks.
 
 Never point the app at the machine's real shell or configuration for this —
 a prompt carries a username and a hostname, and `launchctl setenv SHELL`
