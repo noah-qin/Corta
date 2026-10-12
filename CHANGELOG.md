@@ -43,6 +43,10 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- Automatic focus reports preserve the reader's visibility-based priority;
+  only user input promotes it to interactive priority. Output avoids the
+  render-driver lock when threading is disabled and no longer repeatedly
+  locks a retired cursor presentation.
 - Idle blinking cursors retire their overlay before rendering resumes, avoiding
   duplicate positions and a stale cursor waiting for the main thread.
 - Input and accessibility cell coordinates match bottom-anchored rendering

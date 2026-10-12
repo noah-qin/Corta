@@ -33,6 +33,9 @@ nonisolated final class PaneRenderEngine: @unchecked Sendable {
     private var pendingBell = false
     private let wake: OutputWakeGate
     private let driver = Mutex<ThreadFrameDriver?>(nil)
+    // False skips the driver mutex on the default main-thread output path.
+    // A true value is only a hint: the mutex still resolves detach races.
+    private let hasThreadDriver = Atomic<Bool>(false)
     private let forced = Atomic<Bool>(true)
     private let stopped = Atomic<Bool>(false)
     private var synchronized = false
@@ -82,7 +85,10 @@ nonisolated final class PaneRenderEngine: @unchecked Sendable {
         }
     }
     func setDriver(_ driver: ThreadFrameDriver?) {
-        self.driver.withLock { $0 = driver }
+        self.driver.withLock {
+            $0 = driver
+            hasThreadDriver.store(driver != nil, ordering: .releasing)
+        }
         renderer.setRenderOwner(driver?.owner)
     }
     func requestFrameIfThreaded() -> Bool {
@@ -102,7 +108,8 @@ nonisolated final class PaneRenderEngine: @unchecked Sendable {
         setDriver(nil)
     }
     func noteOutput() -> Bool {
-        driver.withLock { driver in
+        guard hasThreadDriver.load(ordering: .acquiring) else { return false }
+        return driver.withLock { driver in
             guard let driver else { return false }
             InputLatencySignposts.emit(.output)
             RenderMetrics.noteOutputForKeystroke()

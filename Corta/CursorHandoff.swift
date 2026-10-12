@@ -105,6 +105,15 @@ nonisolated final class CursorHandoffMailbox: Sendable {
         var sessionGeneration = 0
         var outputRevision: UInt64 = 0
         var presentation: CursorLayerPresentation?
+
+        mutating func takeBack() {
+            presentation?.retire()
+            // Main keeps the layer until the replacement frame is presented.
+            // Drop only this mailbox's reference so subsequent output batches
+            // do not reacquire the retired presentation's mutex.
+            presentation = nil
+            handoff.takeBack()
+        }
     }
     private let state = Mutex(State())
     var snapshot: Snapshot {
@@ -122,9 +131,8 @@ nonisolated final class CursorHandoffMailbox: Sendable {
     func noteOutput(generation: Int) {
         state.withLock {
             guard generation == $0.sessionGeneration else { return }
-            $0.presentation?.retire()
             $0.outputRevision &+= 1
-            $0.handoff.takeBack()
+            $0.takeBack()
         }
     }
     func handOff(expectedOutputRevision: UInt64, presentation: CursorLayerPresentation? = nil) -> UInt64? {
@@ -138,8 +146,7 @@ nonisolated final class CursorHandoffMailbox: Sendable {
     }
     func takeBack() {
         state.withLock {
-            $0.presentation?.retire()
-            $0.handoff.takeBack()
+            $0.takeBack()
         }
     }
     func presented(_ token: UInt64) -> Bool {

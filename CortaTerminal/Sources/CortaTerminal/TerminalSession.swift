@@ -671,6 +671,14 @@ public final class TerminalSession: @unchecked Sendable {
         return enqueueWrite([bytes])
     }
 
+    /// A fixed focus protocol report, not user input. Preserve the reader's
+    /// visibility policy instead of promoting a hidden session indefinitely.
+    /// Shares input's bounded queue and ordering, including backpressure.
+    @discardableResult
+    public func writeFocusReport(isFocused: Bool) -> WriteOutcome {
+        enqueueWrite([[0x1B, 0x5B, isFocused ? 0x49 : 0x4F]])
+    }
+
     /// Every chunk or none, under one backlog check. Admitted while the
     /// backlog is under the cap, however large — the cap pushes back on a
     /// child that stopped reading. A paste goes through `write(paste:closing:)`

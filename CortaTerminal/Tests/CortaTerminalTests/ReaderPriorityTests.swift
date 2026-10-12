@@ -21,6 +21,35 @@ import Testing
 @testable import CortaTerminal
 
 struct ReaderPriorityTests {
+    @Test(arguments: [true, false])
+    func focusReportsPreserveBackgroundPriority(isFocused: Bool) throws {
+        let session = try TerminalSession(
+            executable: "/bin/sh", arguments: ["-c", "printf ready; exec /bin/cat"],
+            size: TerminalSize(rows: 4, columns: 40))
+        defer { session.stop() }
+        let ready = DispatchSemaphore(value: 0)
+        let echo = DispatchSemaphore(value: 0)
+        let reporting = Atomic<Bool>(false)
+        let observed = Mutex<TerminalSession.ReaderPriority?>(nil)
+        session.onOutput = { [weak session] in
+            guard let session else { return }
+            if reporting.load(ordering: .acquiring) {
+                observed.withLock { $0 = session.readerPriority }
+                echo.signal()
+            } else {
+                ready.signal()
+            }
+        }
+        session.setReaderPriority(.background)
+        session.start()
+        #expect(ready.wait(timeout: .now() + 5) == .success)
+        #expect(session.readerPriority == .background)
+        reporting.store(true, ordering: .releasing)
+        #expect(session.writeFocusReport(isFocused: isFocused) == .accepted)
+        #expect(echo.wait(timeout: .now() + 5) == .success)
+        #expect(observed.withLock { $0 } == .background)
+    }
+
     @Test func inputRaisesTheReaderBeforeItsEchoIsParsed() throws {
         let session = try TerminalSession(
             executable: "/bin/sh",

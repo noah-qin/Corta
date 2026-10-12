@@ -277,9 +277,6 @@ final class PaneFocus: NSObject {
 
     // MARK: - Focus reporting
 
-    private static let focusIn: [UInt8] = [0x1B, 0x5B, 0x49]  // CSI I
-    private static let focusOut: [UInt8] = [0x1B, 0x5B, 0x4F]  // CSI O
-
     /// Reports only real changes; AppKit's key and responder churn would
     /// otherwise stream reports. Two fixed byte strings, no stream text
     /// (`SECURITY.md` §2.1).
@@ -289,7 +286,7 @@ final class PaneFocus: NSObject {
         lastReportedFocus = focused
         // A failed pane (no Metal 4, no shell) has no session to report to.
         guard let session = host?.session, session.isFocusReportingEnabled else { return }
-        session.write(focused ? Self.focusIn : Self.focusOut)
+        session.writeFocusReport(isFocused: focused)
     }
 
     /// Filtered to this pane's window, or every pane reports every window.
