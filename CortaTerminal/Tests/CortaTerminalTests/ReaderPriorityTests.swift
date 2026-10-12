@@ -22,7 +22,7 @@ import Testing
 
 struct ReaderPriorityTests {
     @Test(arguments: [true, false])
-    func focusReportsPreserveBackgroundPriority(isFocused: Bool) throws {
+    func focusReportsPreserveBackgroundPriority(isFocused: Bool) async throws {
         let session = try TerminalSession(
             executable: "/bin/sh", arguments: ["-c", "printf ready; exec /bin/cat"],
             size: TerminalSize(rows: 4, columns: 40))
@@ -42,15 +42,15 @@ struct ReaderPriorityTests {
         }
         session.setReaderPriority(.background)
         session.start()
-        #expect(ready.wait(timeout: .now() + 5) == .success)
+        #expect(await waitForReader(ready) == .success)
         #expect(session.readerPriority == .background)
         reporting.store(true, ordering: .releasing)
         #expect(session.writeFocusReport(isFocused: isFocused) == .accepted)
-        #expect(echo.wait(timeout: .now() + 5) == .success)
+        #expect(await waitForReader(echo) == .success)
         #expect(observed.withLock { $0 } == .background)
     }
 
-    @Test func inputRaisesTheReaderBeforeItsEchoIsParsed() throws {
+    @Test func inputRaisesTheReaderBeforeItsEchoIsParsed() async throws {
         let session = try TerminalSession(
             executable: "/bin/sh",
             arguments: ["-c", "printf ready; read line; printf done"],
@@ -71,11 +71,22 @@ struct ReaderPriorityTests {
         }
         session.setReaderPriority(.background)
         session.start()
-        #expect(ready.wait(timeout: .now() + 5) == .success)
+        #expect(await waitForReader(ready) == .success)
         #expect(session.readerPriority == .background)
         input.store(true, ordering: .releasing)
         session.write(Array("ping\n".utf8))
-        #expect(echo.wait(timeout: .now() + 5) == .success)
+        #expect(await waitForReader(echo) == .success)
         #expect(observed.withLock { $0 } == .interactive)
+    }
+
+    private func waitForReader(_ signal: DispatchSemaphore) async -> DispatchTimeoutResult {
+        await withCheckedContinuation { continuation in
+            let waiter = Thread {
+                continuation.resume(returning:
+                    signal.wait(timeout: .now() + .seconds(5 * testTimeoutScale)))
+            }
+            waiter.qualityOfService = .userInitiated
+            waiter.start()
+        }
     }
 }

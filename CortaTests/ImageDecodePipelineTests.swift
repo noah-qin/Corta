@@ -17,6 +17,7 @@
 import CortaTerminal
 import Foundation
 import Metal
+import Synchronization
 import Testing
 
 @testable import Corta
@@ -34,28 +35,48 @@ struct ImageDecodePipelineTests {
         let entered = DispatchSemaphore(value: 0)
         let release = DispatchSemaphore(value: 0)
         let finished = DispatchSemaphore(value: 0)
+        defer { release.signal() }
         let renderer = KittyImageRenderer(
             device: device,
             makeTexture: { descriptor in
                 entered.signal()
-                _ = release.wait(timeout: .now() + 2)
+                release.wait()
                 return device.makeTexture(descriptor: descriptor)
             })
         var terminal = Terminal(rows: 10, columns: 40)
         Self.placeRGBA(&terminal, id: 1, byte: 255)
         let id = KittyGraphics.ImageID(rawValue: 1)
         let data = try #require(Self.table(of: terminal).image(id))
-        DispatchQueue.global().async {
+        // The test waits synchronously; its worker must not queue behind
+        // other tests occupying the shared executor's worker threads.
+        let upload = Thread {
             _ = renderer.texture(for: id, data: data)
             finished.signal()
         }
-        #expect(entered.wait(timeout: .now() + 5) == .success)
-        let start = DispatchTime.now().uptimeNanoseconds
-        #expect(renderer.texture(for: id) == nil)
-        let milliseconds = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6
+        upload.qualityOfService = .userInitiated
+        upload.start()
+        let enteredResult = entered.wait(timeout: .now() + .seconds(5 * testTimeoutScale))
+        try #require(enteredResult == .success)
+        let lookedUp = DispatchSemaphore(value: 0)
+        let observation = Mutex<(missing: Bool, milliseconds: Double)?>(nil)
+        let lookup = Thread {
+            let start = DispatchTime.now().uptimeNanoseconds
+            let missing = renderer.texture(for: id) == nil
+            let milliseconds = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6
+            observation.withLock { $0 = (missing, milliseconds) }
+            lookedUp.signal()
+        }
+        lookup.qualityOfService = .userInitiated
+        lookup.start()
+        // A real cache-lock regression must fail within a ceiling, then
+        // release the upload; it must not hang or let a timed gate mask it.
+        let lookupResult = lookedUp.wait(timeout: .now() + .seconds(5 * testTimeoutScale))
         release.signal()
-        #expect(finished.wait(timeout: .now() + 5) == .success)
-        #expect(milliseconds < 100)
+        #expect(finished.wait(timeout: .now() + .seconds(5 * testTimeoutScale)) == .success)
+        try #require(lookupResult == .success)
+        let result = try #require(observation.withLock { $0 })
+        #expect(result.missing)
+        #expect(result.milliseconds < 100)
         #expect(renderer.texture(for: id) != nil)
     }
 

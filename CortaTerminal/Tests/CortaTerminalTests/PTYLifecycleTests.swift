@@ -42,7 +42,9 @@ struct PTYLifecycleTests {
         let entered = DispatchSemaphore(value: 0)
         let finished = DispatchSemaphore(value: 0)
         let observed = Mutex((count: Int32(-1), events: Int16(0), heldOpen: false))
-        DispatchQueue.global().async {
+        // This test blocks waiting for entry; use an independent thread so
+        // a saturated shared test executor cannot prevent the poll starting.
+        let pollThread = Thread {
             _ = wakeup.readEnd.withNumber { fd in
                 entered.signal()
                 var request = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
@@ -53,6 +55,8 @@ struct PTYLifecycleTests {
             }
             finished.signal()
         }
+        pollThread.qualityOfService = .userInitiated
+        pollThread.start()
         #expect(entered.wait(timeout: .now() + .seconds(10 * testTimeoutScale)) == .success)
         DispatchQueue.concurrentPerform(iterations: 4) { _ in wakeup.signalAndClose() }
         #expect(finished.wait(timeout: .now() + .seconds(10 * testTimeoutScale)) == .success)

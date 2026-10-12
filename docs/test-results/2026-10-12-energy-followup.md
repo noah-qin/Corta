@@ -51,3 +51,11 @@ The changed build had higher mean/p50 in these pairs, with a substantial first-p
 - `git diff --check` for changed runtime/test files: clean.
 - All 22 previously excluded security/configuration/image files retain their saved SHA-256 hashes.
 - This round did not rerun the complete test suite or TSan. Prior merged-commit results are not substituted for current-patch verification.
+
+## CI scheduling follow-up
+
+The first CI attempt failed the existing image-upload fixture waiting five seconds for its shared-queue worker to enter. The recovered xcresult confirms that entry wait timed out; the production upload remains outside the cache lock. An unrelated SFTP fixture also observed its five-second hold expire before its assertions. The second attempt repeated the image entry timeout and failed an existing PTY fixture waiting thirty scaled seconds for another shared-queue worker to start. The new focus-priority cases passed.
+
+Use dedicated threads for the image fixture's upload/cache lookup and the PTY poll. Keep image upload held until explicit release, rather than letting a two-second timeout accidentally install the texture before the assertion; bound the lookup from the test thread so a genuine lock regression fails and releases the fixture. Assert observations on the owning test rather than in a foreign thread. Reader-priority tests now await their semaphore through a continuation and an independent waiter instead of blocking the shared test executor. Runtime code and global CI settings are unchanged.
+
+Local verification of this follow-up: 19 app tests in two suites passed; 15 core tests in the reader/PTY suites and the targeted same-destination SFTP case passed. Complete CI is required again on the new head before merge. No energy measurement was repeated because this follow-up changes test scheduling only.
