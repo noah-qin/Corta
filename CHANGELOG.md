@@ -12,6 +12,10 @@ Versioning for compatibility changes.
 
 ### Changed
 
+- App icons use the simplified vector pangolin and terminal prompt, with
+  system-rendered shell lighting. The development app uses the same artwork
+  on an orange background. Retired raster icons and mascot animation are removed.
+
 - Kitty PNG decoding writes into anonymous shared pixel memory inherited by
   the sandboxed helper. Metal wraps the mapping without copying and blits it
   into a private texture on the GPU; raw RGB/RGBA pixels are reordered directly

@@ -69,7 +69,7 @@ struct LicenseHeaderRuleTests {
             ("docs/history/ROADMAP-0.1.md", .reuse),
             ("CortaTerminal/Tests/CortaTerminalTests/Golden/sgr.in", .reuse),
             ("CortaTerminal/Tests/Fuzz/corpus/seed-1.bin", .reuse),
-            ("docs/brand/corta-pangolin-mascot.png", .reuse),
+            ("docs/brand/app-icon.png", .reuse),
             ("docs/test-results/issue-228-held.png", .reuse),
             ("docs/test-results/memory-core-2026-10-11/table-light.png", .reuse),
             ("docs/test-results/memory-core-2026-10-11/square-corners.png", .reuse),

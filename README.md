@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/brand/corta-pangolin-mascot.png" width="160" alt="Corta's pangolin mascot, curled into a C with a cyan cursor on its tail">
+<img src="docs/brand/app-icon.png" width="160" alt="Corta's vector pangolin icon with a command prompt and cyan cursor">
 
 # Corta
 
@@ -22,7 +22,7 @@ Metal rendering · AppKit input · A dependency-free terminal core
 [Contribute](CONTRIBUTING.md) ·
 [Report a bug](https://github.com/noah-qin/Corta/issues/new?template=bug_report.yml)
 
-<img src="docs/brand/screenshot.png" width="960" alt="Corta with three split panes: a git log and a Chinese, Japanese, Korean and emoji alignment table; the pangolin mascot shown as an image in the terminal; and 24-bit colour ramps">
+<img src="docs/brand/screenshot.png" width="960" alt="Corta in the light theme displaying the new vector app icon through the Kitty graphics protocol">
 
 </div>
 
@@ -248,5 +248,6 @@ If you would like to support maintenance, [sponsor the project](https://github.c
 
 Source code is licensed under [Apache 2.0](LICENSE). The Corta name,
 pangolin mascot and app icon have separate terms in [NOTICE](NOTICE).
-The pangolin's curled body forms a C; its cyan tail is a terminal cursor.
+The simplified pangolin sits above a command prompt with a cyan cursor.
+The orange development icon uses the same vector artwork and layout.
 [Brand assets](docs/brand/README.md) include the mascot and social preview.

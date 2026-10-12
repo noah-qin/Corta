@@ -9,10 +9,13 @@ repository root.
 | File                        | What it is                                                      |
 | --------------------------- | --------------------------------------------------------------- |
 | `../../AppIcon.icon`        | Production macOS Icon Composer bundle                            |
-| `corta-pangolin-mascot.png` | Transparent mascot master, 1254 × 1254                           |
-| `corta-pangolin-loop.gif`   | Looping README animation, 360 × 360                              |
+| `../../AppIconDev.icon` | Development Icon Composer bundle; identical artwork on an orange background |
+| `app-icon.png`, `app-icon-dark.png` | Official 1024 px production renders |
+| `app-icon-dev.png`, `app-icon-dev-dark.png` | Official 1024 px orange development renders |
+| `app-icon-small.png`, `app-icon-dev-small.png` | 32 pt @2x previews for Dock-size comparison |
+| `export-icons.sh` | Exports both variants with Apple's Icon Composer renderer |
 | `session-ended.png` | Ended session, retained public output and recovery buttons, from an isolated `/bin/sh` fixture |
-| `screenshot.png`            | The README screenshot — light theme, a clean demo shell          |
+| `screenshot.png`            | The README screenshot — light theme, current icon shown via Kitty graphics          |
 | `input-source-indicator.png` | Independent Chinese input-source badge, separated from toolbar action buttons, from an isolated demo shell |
 | `input-source-long-command.png` | Right-edge badge moved below a long command, without changing the grid |
 | `directory-suggestions.png` | Local zsh suggestions and command-status marks from an isolated UI-test demo shell |
@@ -25,28 +28,49 @@ repository root.
 | `table-borders.png` | Connected borders around Latin/CJK text and VS16 emoji, with native tabs, from the isolated #213 UI fixture |
 | `settings.png`              | The Settings window, Appearance page                             |
 | `shortcuts.png`             | Keyboard Shortcuts with aligned bindings and grouped sections    |
-| `about.png`                 | About with separated links (development build)                   |
+| `about.png`                 | Current About window with the orange development icon                   |
 | `compose-screenshot.swift`  | Adds the shadow, margin and poster type to a window capture      |
 | `social-preview.png`        | GitHub social preview card, 1280 × 640                            |
 | `social-preview.swift`      | Renders the card above                                           |
 
-## The README animation
+## Editing and exporting the icons
 
-```html
-<p align="center">
-  <img src="docs/brand/corta-pangolin-loop.gif" width="240" alt="Corta pangolin mascot breathing while its cursor-like tail tip blinks">
-</p>
+Both app bundles contain the selected vector terminal/pangolin design on
+1024 × 1024 artboards. The combined mark occupies about 72% of the tile
+width, with broad shell plates and a clear gap above the terminal prompt.
+Muted cream, champagne and warm gold replace the saturated yellow of the
+concept preview. The production background is near-black blue; the
+Dev background is orange. All other SVG artwork and layer configuration
+are identical. Xcode's Release configuration selects `AppIcon`; Debug
+and Benchmark select `AppIconDev`.
+
+Open either `.icon` document in Apple's Icon Composer (bundled with Xcode).
+The lower shell, middle shell, crown/head, eye, prompt and cursor are SVG
+paths; there are no bitmap foregrounds or baked shell shadows. Four groups
+keep the shell levels distinct, and Icon Composer supplies highlights,
+shadows, masking and platform edge lighting. Eye and prompt layers keep
+glass disabled for legibility. Keep geometry and layer order in sync when
+editing the Dev variant; only the background palette differs.
+
+From the repository root, export the default, dark and small-size previews:
+
+```sh
+docs/brand/export-icons.sh
+# Or export to a scratch directory without changing checked-in renders:
+docs/brand/export-icons.sh /tmp/corta-icon-previews
 ```
 
-The loop is intentionally subtle: the curled pangolin breathes and floats by a
-few pixels while the cyan cursor at the tip of its tail pulses. It is 360 x 360
-pixels and designed to remain legible when displayed at 180–240 pixels wide.
+The render script uses Xcode's bundled `Icon Composer.app/Contents/Executables/ictool`.
+Generated PNGs are documentation previews; `.icon` bundles remain the app's
+source of truth. The old dot-grid backgrounds, detailed raster mascot and
+README mascot animation have been retired. Historical test captures are
+preserved as evidence of the app at the time of those checks.
 
 ## The social preview card
 
 Rendered by a script rather than checked in from a design tool, so the wording
 can change without reopening an editor. Pure AppKit and Core Text — nothing to
-install. Run it from the repository root; the mascot is loaded by a relative
+install. Run it from the repository root; the exported app icon is loaded by a relative
 path.
 
 ```sh
@@ -58,6 +82,13 @@ The card is uploaded by hand: repository **Settings** ▸ **General** ▸
 **Social preview**.
 
 ## Taking the screenshot
+
+The current README and About captures were refreshed on 2026-10-12 from
+the new Debug build, using a temporary XCTest capture, English, and an
+isolated zsh stage. The terminal displays the current `app-icon.png` via
+Kitty graphics; the About window displays the compiled `AppIconDev`.
+The temporary capture changes were restored after export. The remaining
+feature screenshots continue to document their original UI checks.
 
 Never point the app at the machine's real shell or configuration for this —
 a prompt carries a username and a hostname, and `launchctl setenv SHELL`
@@ -77,7 +108,7 @@ touched:
   script, and feeds queued commands to the prompt from a `zle-line-init`
   widget, so every command on screen ran for real.
 - **Public content only** — a local clone of this repository for `git log`,
-  the mascot for `kitten icat`, a demo table for wide characters.
+  `app-icon.png` for `kitten icat`, a demo table for wide characters.
 - **`screencapture -o -l <window id>`** for the window without its shadow,
   found by the process id; the shadow and the margin are added afterwards,
   so every image matches. A popover and an attached sheet are child
@@ -92,7 +123,7 @@ touched:
 - **A short stage path.** Settings prints the config file's path in its
   footer; a symbolic link such as `/tmp/corta-demo` to the scratch stage
   keeps the scratch directory's name out of the picture. Remove it after.
-- **A mascot sized for the pane.** `kitten icat` scales a larger picture
+- **An icon sized for the pane.** `kitten icat` scales a larger picture
   to the pane's width; resizing it first keeps it the size the layout
   wants.
 - **Keys by code.** Synthetic typing goes through the active input
