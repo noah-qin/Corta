@@ -46,6 +46,9 @@ Dependabot 每天检查 Actions 和 Xcode/Sparkle 的依赖版本。
 每天的计划时间为 UTC 21:43，即北京时间次日 05:43。
 Swift 和 C/C++ 用 macos-26、固定 Xcode 26.6.0 和无签名 clean build；
 Python 和 GitHub Actions 用 Linux，无需构建。
+扫描构建使用通用 macOS 目标，且仅排除 CodeQL 不支持的 .metal 着色器；
+这是 macOS CodeQL tracer 的 Metal 工具链兼容问题（codeql-action#3978）的规避方式。
+普通 app CI 仍完整编译 Metal 着色器并执行测试。
 Swift 扫描还构建全部 SwiftPM 产品，包含未被 app scheme 构建的辅助工具。
 C/C++ 在引用包含 C 源码时扫描；较旧引用没有 C 源码时明确记录并跳过该语言。
 

@@ -88,6 +88,9 @@ jobs:
       # an incremental build from producing an incomplete CodeQL database.
       # A generic destination compiles without resolving a runnable host:
       # the CodeQL tracer can make Xcode see an x86_64 host for an arm64 app.
+      # CodeQL does not analyze Metal. Its macOS tracer cannot reliably
+      # find the Metal toolchain (codeql-action#3978), so only this extraction
+      # build excludes shaders; the ordinary app CI still compiles them.
       # No signing identity, release environment or repository secrets.
       - name: Build the app and embedded helpers for extraction
         if: matrix.build-mode == 'manual' && (matrix.language != 'c-cpp' || hashFiles('**/*.c', '**/*.cpp', '**/*.cc') != '')
@@ -103,6 +106,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             DEVELOPMENT_TEAM="" \
+            EXCLUDED_SOURCE_FILE_NAMES="*.metal" \
             COMPILER_INDEX_STORE_ENABLE=NO \
             COMPILATION_CACHE_ENABLE_CACHING=NO \
             -quiet
