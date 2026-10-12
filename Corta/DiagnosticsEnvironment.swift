@@ -40,10 +40,13 @@ nonisolated enum DiagnosticsEnvironment {
         case restoreWindows = "CORTA_RESTORE_WINDOWS"
         case sftpSSH = "CORTA_SFTP_SSH"
         case stageDirectory = "CORTA_STAGE_DIR"
+        case directFullScreen = "CORTA_DIRECT_FULLSCREEN"
 
-        /// Whether a Release build reads it. Program substitution and deliberate main-thread stalls are
-        /// withheld; the remaining switches measure or stage a build.
-        var isHonouredInRelease: Bool { self != .sftpSSH && self != .mainStall }
+        /// Whether a Release build reads it. Program substitution, deliberate main-thread stalls and
+        /// the direct-presentation spike are withheld; the remaining switches measure or stage a build.
+        var isHonouredInRelease: Bool {
+            self != .sftpSSH && self != .mainStall && self != .directFullScreen
+        }
     }
 
     typealias Environment = [String: String]
@@ -72,6 +75,24 @@ nonisolated enum DiagnosticsEnvironment {
             ms.isFinite, period.isFinite, ms > 0, ms <= 1000, period > ms
         else { return nil }
         return MainStall(milliseconds: ms, periodMilliseconds: period)
+    }
+
+    /// `CORTA_DIRECT_FULLSCREEN=1`, or a comma-separated subset of
+    /// `toolbar,mask,overlays,colorspace`: the #285 spike, which removes
+    /// those compositing blockers while a window is full screen with one
+    /// pane, so a Metal System Trace can show which of them matter. Debug /
+    /// Benchmark only; unknown names are ignored.
+    static func directFullScreen(
+        in environment: Environment = ProcessInfo.processInfo.environment,
+        enabled: Bool = DiagnosticsEnvironment.supportsStallInjection
+    ) -> DirectFullScreen {
+        guard enabled, let raw = value(.directFullScreen, in: environment) else { return [] }
+        if raw == "1" { return .all }
+        return raw.split(separator: ",").reduce(into: DirectFullScreen()) { set, name in
+            if let blocker = DirectFullScreen(name: name.trimmingCharacters(in: .whitespaces)) {
+                set.insert(blocker)
+            }
+        }
     }
 
     enum FrameDriver: String, CaseIterable {

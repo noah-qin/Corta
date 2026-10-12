@@ -27,7 +27,12 @@ final class SplitViewController: NSViewController {
     let inputSourceToolbarHost = NSView(frame: CGRect(x: 0, y: 0, width: 28, height: 24))
     var inputSourceToolbarSpacer: NSToolbarItem?
     private var statusBarHeightConstraint: NSLayoutConstraint?
-    var statusBarHeight: CGFloat { ConfigurationStore.shared.configuration.statusBar ? SystemStatusBar.height : 0 }
+    var statusBarHeight: CGFloat {
+        ConfigurationStore.shared.configuration.statusBar && !directPresentation.contains(.overlays)
+            ? SystemStatusBar.height : 0
+    }
+    /// The #285 spike's blockers removed right now (`+DirectFullScreen`).
+    var directPresentation: DirectFullScreen = []
     /// The pane that receives input. Set by `noteFocus` from
     /// `TerminalView.becomeFirstResponder`, so every route to focus funnels
     /// through one place; `SplitViewController+Restore` sets it to rebuild a
@@ -213,6 +218,31 @@ final class SplitViewController: NSViewController {
         window.setFrame(frame, display: true)
     }
 
+    /// Applies the #285 spike (`CORTA_DIRECT_FULLSCREEN`): with the window
+    /// full screen and one pane, removes the requested compositing blockers
+    /// so a Metal System Trace can show whether frames reach the display
+    /// directly. A launch without the switch returns at the first guard.
+    /// Called on entering and leaving full screen and when the root changes,
+    /// which is when the pane count crosses one.
+    func updateDirectPresentation() {
+        let requested = DirectFullScreen.requested
+        guard !requested.isEmpty else { return }
+        let active = requested.active(
+            isFullScreen: view.window?.styleMask.contains(.fullScreen) ?? false,
+            paneCount: panes.count)
+        let changed = active != directPresentation
+        directPresentation = active
+        let hidesOverlays = active.contains(.overlays)
+        for pane in panes {
+            guard let terminalView = pane.terminalView else { continue }
+            terminalView.directPresentation = active
+            terminalView.shellOverlay.isHidden = hidesOverlays
+            if hidesOverlays { pane.inputSourceIndicator.view.isHidden = true }
+        }
+        systemStatusBar.isHidden = hidesOverlays || !ConfigurationStore.shared.configuration.statusBar
+        if changed { updateStatusBarLayout() }
+    }
+
     /// The chrome changed under a window that must keep its frame: a restored
     /// window rejoining its tab group (`AppDelegate.regroupRestoredTabs`),
     /// whose saved frame already includes the tab bar. Records the chrome so
@@ -279,6 +309,7 @@ final class SplitViewController: NSViewController {
             root.topAnchor.constraint(equalTo: view.topAnchor),
             root.bottomAnchor.constraint(equalTo: systemStatusBar.topAnchor),
         ])
+        updateDirectPresentation()
     }
 
     private func updateStatusBarLayout() {

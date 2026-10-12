@@ -353,10 +353,35 @@ final class TerminalView: NSView, CALayerDelegate {
         if let window { onBackingScaleChange?(window.backingScaleFactor) }
     }
 
+    /// The #285 spike's per-pane blockers, set by `SplitViewController`;
+    /// empty unless `CORTA_DIRECT_FULLSCREEN` asks and the window is full
+    /// screen with one pane.
+    var directPresentation: DirectFullScreen = [] {
+        didSet {
+            guard directPresentation != oldValue else { return }
+            applyDirectColorSpace()
+            updateExteriorCornerMask()
+        }
+    }
+
+    /// Spike only: the screen's own colour space, so the window server need
+    /// not convert. Colours are not converted to match, so they render off.
+    func applyDirectColorSpace() {
+        let screenSpace = directPresentation.contains(.colorspace)
+            ? window?.screen?.colorSpace?.cgColorSpace : nil
+        metalLayer.colorspace = screenSpace ?? CGColorSpace(name: CGColorSpace.sRGB)
+    }
+
     /// Rounds only the window top corners this pane touches (see
     /// `commonInit`).
     private func updateExteriorCornerMask() {
-        guard let window else {
+        // An unmasked layer can be presented without composition (#285 spike).
+        let masks = !directPresentation.contains(.mask)
+        if metalLayer.masksToBounds != masks {
+            metalLayer.masksToBounds = masks
+            metalLayer.cornerRadius = masks ? 10 : 0
+        }
+        guard masks, let window else {
             metalLayer.maskedCorners = []
             return
         }

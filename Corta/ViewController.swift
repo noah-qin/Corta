@@ -633,7 +633,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         let configuration = ConfigurationStore.shared.configuration
         splitController?.placeInputSourceIndicator(from: self, configuration: configuration)
         shell.updateShellOverlay(grid: grid)
-        if let inputMetadata {
+        if let inputMetadata, !terminalView.directPresentation.contains(.overlays) {
             let metrics = terminalRenderer.pointMetrics
             inputSourceIndicator.update(
                 grid: grid, hasIntegration: inputMetadata.hasIntegration,

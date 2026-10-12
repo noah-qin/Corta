@@ -353,7 +353,7 @@ final class MeasurementUITests: XCTestCase {
         app.launchEnvironment["SHELL"] = "/bin/sh"
         if renderMetrics { app.launchEnvironment["CORTA_RENDER_METRICS"] = metricsFile.path }
         let runner = ProcessInfo.processInfo.environment
-        for key in ["CORTA_MAX_DRAWABLES", "CORTA_FRAME_LATENCY", "CORTA_RENDER_METRICS_KEYSTROKES", "CORTA_FRAME_DRIVER", "CORTA_RENDER_THREAD", "CORTA_MAIN_STALL",
+        for key in ["CORTA_MAX_DRAWABLES", "CORTA_FRAME_LATENCY", "CORTA_RENDER_METRICS_KEYSTROKES", "CORTA_FRAME_DRIVER", "CORTA_RENDER_THREAD", "CORTA_MAIN_STALL", "CORTA_DIRECT_FULLSCREEN",
         ] {
             if let value = runner[key] { app.launchEnvironment[key] = value }
         }

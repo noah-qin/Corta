@@ -523,6 +523,7 @@ single reader to the code.
 | --- | --- | --- | --- |
 | `CORTA_RENDER_THREAD` | `0` (default), `1` | all | Experimental per-window render run loop; `ondemand` keeps its main-thread driver; default changes only after the #284 acceptance matrix |
 | `CORTA_MAIN_STALL` | `<ms>/<period-ms>`, e.g. `8/33` | Debug / Benchmark only | Repeated bounded main-thread stall for the render-thread A/B; ignored in Release |
+| `CORTA_DIRECT_FULLSCREEN` | `1`, or a comma-separated subset of `toolbar,mask,overlays,colorspace` | Debug / Benchmark only | The #285 spike: while a window is full screen with one pane, auto-hides the toolbar and menu bar, unmasks the canvas, hides the AppKit overlays and status bar, or tags the layer with the screen's colour space (colours then render unconverted); ignored in Release |
 | `CORTA_FRAME_DRIVER` | `displaylink` (default), `ondemand` | all | Experimental echo presentation with separate CADisplayLink pacing; immediate acquisition only while paused; the unaccepted no-sync experiment was removed, so both retained drivers use display synchronization |
 | `CORTA_FRAME_LATENCY` | number ≥ 1 | all | The display link's `preferredFrameLatency` (default 2; `PERFORMANCE.md` §5.7) |
 | `CORTA_MAX_DRAWABLES` | `2` or `3` | all | The Metal layer's drawable count (default 3), for a double-buffering A/B |

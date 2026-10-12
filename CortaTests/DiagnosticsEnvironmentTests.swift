@@ -37,7 +37,27 @@ struct DiagnosticsEnvironmentTests {
     }
 
     @Test func releaseWithholdsProgramSubstitutionAndStallInjection() {
-        #expect(Switch.allCases.filter { !$0.isHonouredInRelease } == [.mainStall, .sftpSSH])
+        #expect(
+            Switch.allCases.filter { !$0.isHonouredInRelease }
+                == [.mainStall, .sftpSSH, .directFullScreen])
+    }
+
+    @Test func directFullScreenParsesBlockersOnlyWhereEnabled() {
+        let name = "CORTA_DIRECT_FULLSCREEN"
+        #expect(DiagnosticsEnvironment.directFullScreen(in: [:], enabled: true).isEmpty)
+        #expect(DiagnosticsEnvironment.directFullScreen(in: [name: "1"], enabled: true) == .all)
+        #expect(DiagnosticsEnvironment.directFullScreen(in: [name: "1"], enabled: false).isEmpty)
+        #expect(
+            DiagnosticsEnvironment.directFullScreen(in: [name: "mask, overlays,bogus"], enabled: true)
+                == [.mask, .overlays])
+        #expect(DiagnosticsEnvironment.directFullScreen(in: [name: "0"], enabled: true).isEmpty)
+    }
+
+    @Test func directFullScreenAppliesOnlyToOneFullScreenPane() {
+        let all = DirectFullScreen.all
+        #expect(all.active(isFullScreen: true, paneCount: 1) == all)
+        #expect(all.active(isFullScreen: false, paneCount: 1).isEmpty)
+        #expect(all.active(isFullScreen: true, paneCount: 2).isEmpty)
     }
 
     @Test func frameDriverDefaultsAndDocumentedValues() {

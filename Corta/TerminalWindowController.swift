@@ -250,6 +250,26 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         secureInputIndicator?.view.isHidden = hidden
     }
 
+    /// The #285 spike: with `toolbar` requested and one pane, nothing of the
+    /// window's chrome stays over the canvas in full screen.
+    func window(
+        _ window: NSWindow,
+        willUseFullScreenPresentationOptions proposedOptions: NSApplication.PresentationOptions
+    ) -> NSApplication.PresentationOptions {
+        let active = DirectFullScreen.requested.active(
+            isFullScreen: true, paneCount: splitController?.panes.count ?? 0)
+        guard active.contains(.toolbar) else { return proposedOptions }
+        return proposedOptions.union([.fullScreen, .autoHideToolbar, .autoHideMenuBar])
+    }
+
+    func windowDidEnterFullScreen(_ notification: Notification) {
+        splitController?.updateDirectPresentation()
+    }
+
+    func windowDidExitFullScreen(_ notification: Notification) {
+        splitController?.updateDirectPresentation()
+    }
+
     /// Asks as a sheet, so the answer comes after this returns: refuse now,
     /// and close once confirmed. `close()` does not ask again.
     func windowShouldClose(_ sender: NSWindow) -> Bool {
