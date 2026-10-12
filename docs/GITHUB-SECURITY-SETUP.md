@@ -32,6 +32,7 @@ Validity checks 可能向服务提供商验证密钥状态。
 发现真实密钥后先撤销/轮换，再清理代码，不能只关闭告警。
 
 Dependabot 每天检查 Actions 和 Xcode/Sparkle 的依赖版本。
+Actions 的版本升级合并成一个 PR，安全更新另成一组，避免每个升级各跑一轮 CI。
 它创建升级 PR，不能绕过检查自动合并。告警覆盖依赖图和 Advisory Database
 能识别的依赖/漏洞，不代表 Sparkle 或所有供应链风险都已覆盖。
 在 Insights → Dependency graph 确认 Sparkle 被识别，在 Dependabot 页面确认两个更新任务成功。
