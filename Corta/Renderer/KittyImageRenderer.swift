@@ -66,16 +66,14 @@ import simd
 nonisolated final class KittyImageRenderer: @unchecked Sendable {
     private let device: MTLDevice
     private let usesSharedPixels: Bool
-    private let uploadQueue: MTLCommandQueue?
+    /// Created on the first shared-pixel upload, under `lock`: a pane that
+    /// never shows an image never owns a queue.
+    private var uploadQueue: MTLCommandQueue?
     private let makeTextureImpl: (MTLTextureDescriptor) -> MTLTexture?
     private let decodeImageImpl: (KittyGraphics.ImageData) -> DecodedImage?
     private let decodeScheduler: (@escaping @Sendable () -> Void) -> Void
     private let textureByteBudget: Int
     private let globalBudget: GlobalTextureBudget
-    private static let physicalTextureBudget = GlobalTextureBudget(
-        limit: KittyGraphics.maximumGlobalTextureBytes)
-    private let physicalPaneBudget = GlobalTextureBudget(
-        limit: KittyGraphics.maximumPaneTextureBytes)
     private let paneBudget: GlobalTextureBudget
     private static let decodeBudget = GlobalTextureBudget(limit: 2)
     private static let decodeFinished = Notification.Name("Corta.imageDecodeFinished")
@@ -146,7 +144,6 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     ) {
         self.device = device
         self.usesSharedPixels = makeTexture == nil
-        self.uploadQueue = makeTexture == nil ? device.makeCommandQueue() : nil
         self.textureByteBudget = textureByteBudget
         self.globalBudget = globalBudget
         self.paneBudget = GlobalTextureBudget(limit: textureByteBudget)
@@ -380,28 +377,9 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
                 generation, globalBudget.generation, paneBudget.generation, visibilityGeneration)
             return nil
         }
-        let physicalBytes = decoded.pixels?.length ?? bytes
-        guard physicalPaneBudget.tryReserve(physicalBytes) else {
-            globalBudget.release(bytes)
-            paneBudget.release(bytes)
-            budgetBlocked[id] = (
-                generation, globalBudget.generation, paneBudget.generation, visibilityGeneration
-            )
-            return nil
-        }
-        guard Self.physicalTextureBudget.tryReserve(physicalBytes) else {
-            physicalPaneBudget.release(physicalBytes)
-            globalBudget.release(bytes)
-            paneBudget.release(bytes)
-            budgetBlocked[id] = (
-                generation, globalBudget.generation, paneBudget.generation, visibilityGeneration
-            )
-            return nil
-        }
-        return TextureLease(
-            bytes: bytes, pane: paneBudget, global: globalBudget,
-            physicalBytes: physicalBytes, physicalPane: physicalPaneBudget,
-            physicalGlobal: Self.physicalTextureBudget)
+        // The shared mapping is not charged here: it is released once its
+        // pixels are copied to the private texture these bytes account for.
+        return TextureLease(bytes: bytes, pane: paneBudget, global: globalBudget)
     }
 
     /// Drops cache ownership; the texture's final owner returns quota.
@@ -540,32 +518,19 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         let bytes: Int
         let pane: GlobalTextureBudget
         let global: GlobalTextureBudget
-        let physicalBytes: Int
-        let physicalPane: GlobalTextureBudget
-        let physicalGlobal: GlobalTextureBudget
         private var retired = false
-        init(bytes: Int, pane: GlobalTextureBudget, global: GlobalTextureBudget,
-            physicalBytes: Int, physicalPane: GlobalTextureBudget,
-            physicalGlobal: GlobalTextureBudget
-        ) {
+        init(bytes: Int, pane: GlobalTextureBudget, global: GlobalTextureBudget) {
             self.bytes = bytes
             self.pane = pane
             self.global = global
-            self.physicalBytes = physicalBytes
-            self.physicalPane = physicalPane
-            self.physicalGlobal = physicalGlobal
         }
         func retire() {
             guard !retired else { return }
             retired = true
-            physicalGlobal.markRetired(physicalBytes)
-            physicalPane.markRetired(physicalBytes)
             pane.markRetired(bytes)
             global.markRetired(bytes)
         }
         deinit {
-            physicalGlobal.release(physicalBytes, retired: retired)
-            physicalPane.release(physicalBytes, retired: retired)
             pane.release(bytes, retired: retired)
             global.release(bytes, retired: retired)
             NotificationCenter.default.post(name: KittyImageRenderer.decodeFinished, object: nil)
@@ -640,6 +605,13 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         return DecodedImage(width: decoded.width, height: decoded.height, pixels: decoded.pixels)
     }
 
+    private func uploadCommandQueue() -> MTLCommandQueue? {
+        lock.lock()
+        defer { lock.unlock() }
+        if uploadQueue == nil { uploadQueue = device.makeCommandQueue() }
+        return uploadQueue
+    }
+
     private func makeTexture(from decoded: DecodedImage, lease: TextureLease) -> MTLTexture? {
         if usesSharedPixels, let pixels = decoded.pixels {
             guard
@@ -654,7 +626,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
             descriptor.storageMode = .private
             descriptor.usage = .shaderRead
             guard let texture = device.makeTexture(descriptor: descriptor),
-                let command = uploadQueue?.makeCommandBuffer(),
+                let command = uploadCommandQueue()?.makeCommandBuffer(),
                 let blit = command.makeBlitCommandEncoder()
             else { return nil }
             objc_setAssociatedObject(

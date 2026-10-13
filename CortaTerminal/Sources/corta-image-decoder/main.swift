@@ -37,6 +37,11 @@ import ImageIO
 /// caps, a decode failure, a sandbox that could not be entered — is a
 /// nonzero exit with nothing written. The app checks the sizes again; it
 /// trusts this process no more than the stream.
+///
+/// `--check-sandbox`, for the app's tests: enter the sandbox and exit 0
+/// only if a file read is then denied. Not checked on every decode — each
+/// decode is a process of its own, and a deliberate denial a decode left a
+/// sandbox violation in the system log for every image shown.
 let maximumInputBytes = 64 * 1024 * 1024
 let maximumDimension = 8192
 let maximumPixels = 16 * 1024 * 1024
@@ -77,11 +82,11 @@ func decode(_ bytes: [UInt8], mapping: UnsafeMutableRawPointer? = nil,
         let context = CGContext(
             data: mapping, width: width, height: height, bitsPerComponent: 8,
             bytesPerRow: stride ?? width * 4, space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
-                    | CGBitmapInfo.byteOrder32Little.rawValue)
-        else { return nil }
-        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        return (width, height)
+            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
+                | CGBitmapInfo.byteOrder32Little.rawValue)
+    else { return nil }
+    context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+    return (width, height)
 }
 
 /// A 1×1 PNG decoded before the sandbox closes, so ImageIO and CoreGraphics
@@ -95,6 +100,14 @@ let warmUp: [UInt8] = [
     0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
 ]
 guard decode(warmUp) != nil else { exit(2) }
+
+if CommandLine.arguments.dropFirst().first == "--check-sandbox" {
+    var error: UnsafeMutablePointer<CChar>?
+    guard sandboxInit("pure-computation", sandboxNamed, &error) == 0 else { exit(3) }
+    let forbidden = open("/etc/passwd", O_RDONLY)
+    guard forbidden < 0 else { exit(5) }
+    exit(0)
+}
 
 // Acquire only the inherited, already unlinked object before entering the sandbox.
 var sharedStat = stat()
@@ -154,13 +167,6 @@ guard width > 0, height > 0, width <= maximumDimension, height <= maximumDimensi
     width <= maximumPixels / height, stride >= width * 4, stride % 4 == 0,
     stride <= mappedLength / height
 else { exit(1) }
-// This check runs after mapping and sandbox entry on every decode. A denied
-// open proves the inherited mapping did not reopen the filesystem boundary.
-let forbidden = open("/etc/passwd", O_RDONLY)
-guard forbidden < 0 else {
-    close(forbidden)
-    exit(5)
-}
 guard
     let decoded = decode(
         Array(input.dropFirst(12)), mapping: mapping,
@@ -171,14 +177,6 @@ for word in [decoded.width, decoded.height] {
     let value = UInt32(word)
     header += (0..<4).map { UInt8(truncatingIfNeeded: value >> ($0 * 8)) }
 }
-var written = 0
-while written < header.count {
-    let count = header.withUnsafeBytes {
-        Darwin.write(1, $0.baseAddress! + written, $0.count - written)
-    }
-    if count < 0, errno == EINTR { continue }
-    guard count > 0 else { exit(1) }
-    written += count
-}
+guard writeAll(header) else { exit(1) }
 munmap(mapping, mappedLength)
 exit(0)

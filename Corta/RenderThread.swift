@@ -64,13 +64,17 @@ nonisolated final class RenderThread: @unchecked Sendable {
     }
     /// Commands execute between frames and never wait for main. Configuration,
     /// capture and teardown use a bounded barrier from the main thread.
-    func barrier(_ body: @escaping @Sendable () -> Void) {
+    /// `false` when the thread did not get to `body` in time — a GPU hang
+    /// holding a frame. `body` still runs, late, once the thread is free:
+    /// the caller carries on rather than taking every window down.
+    @discardableResult
+    func barrier(_ body: @escaping @Sendable () -> Void) -> Bool {
         let done = DispatchSemaphore(value: 0)
         post {
             body()
             done.signal()
         }
-        precondition(done.wait(timeout: .now() + 5) == .success, "Render teardown timed out")
+        return done.wait(timeout: .now() + 5) == .success
     }
     deinit {
         let onOwner = startup.loop.withLock { loop in

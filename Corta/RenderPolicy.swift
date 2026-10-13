@@ -43,7 +43,9 @@ final class RenderPolicy {
     private weak var window: NSWindow?
     private var screenObservers: [NSObjectProtocol] = []
     private var typingExpiry: DispatchWorkItem?
+    private var lastInput: TimeInterval = 0
     private let scheduleTypingExpiry: (TimeInterval, DispatchWorkItem) -> Void
+    private let now: () -> TimeInterval
     static let typingGrace: TimeInterval = 1
 
     nonisolated struct Inputs: Equatable {
@@ -72,19 +74,35 @@ final class RenderPolicy {
             : .default
     }
 
+    /// Per keystroke, so it only notes the time: the rate is applied when
+    /// typing starts and ends, and one expiry at a time re-arms itself for
+    /// whatever grace the latest keystroke left.
     func noteInput() {
-        typingExpiry?.cancel()
-        isTyping = true
-        apply()
+        lastInput = now()
+        if !isTyping {
+            isTyping = true
+            apply()
+        }
+        if typingExpiry == nil { armTypingExpiry(after: Self.typingGrace) }
+    }
+
+    private func armTypingExpiry(after delay: TimeInterval) {
         let expiry = DispatchWorkItem { [weak self] in
-            MainActor.assumeIsolated {
-                self?.isTyping = false
-                self?.typingExpiry = nil
-                self?.apply()
-            }
+            MainActor.assumeIsolated { self?.typingExpiryFired() }
         }
         typingExpiry = expiry
-        scheduleTypingExpiry(Self.typingGrace, expiry)
+        scheduleTypingExpiry(delay, expiry)
+    }
+
+    private func typingExpiryFired() {
+        typingExpiry = nil
+        let remaining = lastInput + Self.typingGrace - now()
+        if remaining > 0 {
+            armTypingExpiry(after: remaining)
+            return
+        }
+        isTyping = false
+        apply()
     }
 
     /// Ceilings, increasingly restrictive; never zero, since a restricted
@@ -97,8 +115,10 @@ final class RenderPolicy {
     init(scheduler: FrameScheduler, window: NSWindow?,
         scheduleTypingExpiry: @escaping (TimeInterval, DispatchWorkItem) -> Void = { delay, work in
             DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
-        }) {
+        },
+        now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }) {
         self.scheduleTypingExpiry = scheduleTypingExpiry
+        self.now = now
         self.scheduler = scheduler
         self.window = window
         self.isWindowActive = window?.isKeyWindow ?? true

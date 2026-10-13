@@ -86,6 +86,9 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     /// Keep resources of old in-flight frames alive while the new queue draws.
     /// At most three replaced queues are retained per renderer.
     private var retiredBackends: [Metal4Backend] = []
+    /// The idle cursor's one-cell captures, kept: a queue and its frame
+    /// slots per capture was a fresh allocation every time a cursor parked.
+    private var captureBackend: Metal4Backend?
     let glyphAtlas: GlyphAtlas
     private struct Geometry: Sendable {
         var metrics: CellMetrics
@@ -315,8 +318,10 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
                 pixelFormat: .bgra8Unorm, width: width, height: height, mipmapped: false)
             descriptor.storageMode = .shared
             descriptor.usage = [.renderTarget, .shaderRead]
+            if captureBackend?.requiresRecovery == true { captureBackend = nil }
+            if captureBackend == nil { captureBackend = try? Metal4Backend(device: backend.device) }
             guard let target = backend.device.makeTexture(descriptor: descriptor),
-                let capture = try? Metal4Backend(device: backend.device)
+                let capture = captureBackend
             else { return nil }
             let previousCursor = blockCursor
             let previousPalette = framePalette
@@ -351,9 +356,11 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
             capture.drawSolidQuads(backgrounds, rect: rect, drawableSize: size)
             capture.drawGlyphQuads(
                 glyphs, atlas: glyphAtlas.texture, atlasRects: glyphAtlas.atlasRects,
+                atlasRectsVersion: glyphAtlas.atlasRectsVersion,
                 rect: rect, drawableSize: size)
             capture.drawColorQuads(
                 colors, atlas: glyphAtlas.colorTexture, atlasRects: glyphAtlas.atlasRects,
+                atlasRectsVersion: glyphAtlas.atlasRectsVersion,
                 rect: rect, drawableSize: size)
             let done = DispatchSemaphore(value: 0)
             let succeeded = Atomic<Bool>(false)
@@ -596,10 +603,12 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
             backend.drawSolidQuads(cachedMarks, rect: markRect(beside: rect), drawableSize: drawableSize)
         }
         backend.drawGlyphQuads(
-            cachedGlyphs, atlas: glyphAtlas.texture, atlasRects: glyphAtlas.atlasRects, rect: rect, drawableSize: drawableSize)
+            cachedGlyphs, atlas: glyphAtlas.texture, atlasRects: glyphAtlas.atlasRects,
+            atlasRectsVersion: glyphAtlas.atlasRectsVersion, rect: rect, drawableSize: drawableSize)
         if !cachedColorGlyphs.isEmpty {
             backend.drawColorQuads(
-                cachedColorGlyphs, atlas: glyphAtlas.colorTexture, atlasRects: glyphAtlas.atlasRects, rect: rect,
+                cachedColorGlyphs, atlas: glyphAtlas.colorTexture, atlasRects: glyphAtlas.atlasRects,
+                atlasRectsVersion: glyphAtlas.atlasRectsVersion, rect: rect,
                 drawableSize: drawableSize)
         }
         if cachedImagePlacements.placementCount > 0 {

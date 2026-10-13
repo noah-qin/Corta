@@ -37,6 +37,37 @@ import Testing
         #expect(q.size == .init(13.125, 27.75))
         #expect(q.rgba == 0x80996633)
     }
+    /// The rectangle table goes to the GPU when it changes, not with every
+    /// draw: a frame over glyphs already in the atlas uploads none of it.
+    @Test func anUnchangedAtlasDoesNotReuploadItsRectangleTable() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let renderer = try TerminalRenderer(
+            device: device, font: CTFontCreateWithName("Menlo" as CFString, 12, nil), scale: 2)
+        var terminal = Terminal(rows: 4, columns: 20)
+        terminal.feed(Array("hello, atlas".utf8))
+        let size = CGSize(width: 400, height: 200)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm, width: 400, height: 200, mipmapped: false)
+        descriptor.usage = [.renderTarget]
+        descriptor.storageMode = .private
+        let target = try #require(device.makeTexture(descriptor: descriptor))
+        func frame() -> Int {
+            let done = DispatchSemaphore(value: 0)
+            renderer.render(
+                grid: terminal.grid, scrollOffset: 0, rect: CGRect(origin: .zero, size: size),
+                drawableSize: size, cursorVisible: false, selection: nil, target: target,
+                clearColor: MTLClearColorMake(0, 0, 0, 1)
+            ) { _ in done.signal() }
+            _ = done.wait(timeout: .now() + 5)
+            return renderer.uploadedRectangleBytes
+        }
+        #expect(frame() > 0)
+        renderer.invalidate()
+        #expect(frame() == 0)
+        terminal.feed(Array(" xyz".utf8))
+        #expect(frame() > 0)
+    }
+
     @Test func lazyColorAndGrowthRetireOldTextures() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let font = CTFontCreateWithName("Menlo" as CFString, 24, nil)

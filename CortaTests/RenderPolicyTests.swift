@@ -115,17 +115,23 @@ struct RenderPolicyTests {
     @Test func typingGraceIsRearmedAndEventuallyExpires() {
         let scheduler = Self.makeScheduler()
         var scheduled: [(TimeInterval, DispatchWorkItem)] = []
+        var clock: TimeInterval = 100
         let policy = RenderPolicy(scheduler: scheduler, window: nil,
-            scheduleTypingExpiry: { scheduled.append(($0, $1)) })
+            scheduleTypingExpiry: { scheduled.append(($0, $1)) }, now: { clock })
         policy.noteInput()
         #expect(policy.isTyping)
+        clock += 0.4
         policy.noteInput()
-        #expect(scheduled.count == 2)
-        #expect(scheduled.allSatisfy { $0.0 == RenderPolicy.typingGrace })
-        #expect(scheduled[0].1.isCancelled)
-        // Executing a cancelled item must not expire the rearmed grace.
+        // One expiry per run of keystrokes, not one per keystroke.
+        #expect(scheduled.count == 1)
+        #expect(scheduled[0].0 == RenderPolicy.typingGrace)
+        // It fires a grace after the first key; the second key's remains.
+        clock += 0.6
         scheduled[0].1.perform()
         #expect(policy.isTyping)
+        #expect(scheduled.count == 2)
+        #expect(abs(scheduled[1].0 - 0.4) < 1e-9)
+        clock += 0.4
         scheduled[1].1.perform()
         #expect(!policy.isTyping)
     }

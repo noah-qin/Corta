@@ -196,6 +196,8 @@ jobs:
             echo "::error::The release environment is missing:$missing"
             exit 1
           fi
+          # A missing secret fails the run here, so later steps need no
+          # guard of their own; only the always() keychain cleanup reads this.
           echo "available=true" >> "$GITHUB_OUTPUT"
 
       - name: Run the tests before shipping anything
@@ -253,7 +255,7 @@ jobs:
               (.testNodes // [])[] | failures(null)'
 
       - name: Import the signing certificate
-        if: ${{ steps.published.outputs.exists != 'true' && (steps.signing.outputs.available == 'true') }}
+        if: steps.published.outputs.exists != 'true'
         env:
           P12: ${{ secrets.DEVELOPER_ID_P12 }}
           P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
@@ -292,7 +294,7 @@ jobs:
       # as a secret: the keychain holds exactly one Developer ID
       # Application certificate, so the name is unambiguous.
       - name: Build (signed)
-        if: ${{ steps.published.outputs.exists != 'true' && (steps.signing.outputs.available == 'true') }}
+        if: steps.published.outputs.exists != 'true'
         run: |
           options="$RUNNER_TEMP/ExportOptions.plist"
           trap 'rm -f "$options"' EXIT
@@ -336,7 +338,7 @@ jobs:
       # Notarise the app first; this ZIP is an Apple submission only and
       # is deleted on every path. Then sign/notarise/staple the final DMG.
       - name: Notarise the app and disk image
-        if: ${{ steps.published.outputs.exists != 'true' && steps.signing.outputs.available == 'true' }}
+        if: steps.published.outputs.exists != 'true'
         id: package
         env:
           REHEARSAL: ${{ inputs.dry_run && '--rehearsal' || '' }}

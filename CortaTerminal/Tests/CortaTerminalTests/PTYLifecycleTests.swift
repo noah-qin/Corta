@@ -182,6 +182,27 @@ struct PTYLifecycleTests {
             "descriptor count grew from \(baseline) to \(after) over 25 spawn/close cycles")
     }
 
+    /// No `close()`: the wakeup pipe's `GuardedDescriptor`s close it as the
+    /// PTY goes, the same as the primary.
+    @Test("a pty dropped without close leaks no wakeup pipe")
+    func droppedPTYClosesItsWakeupPipe() throws {
+        func cycle() throws {
+            let pty = try PTY.spawn(executable: "/usr/bin/true")
+            // The first wait creates the close-wakeup pipe.
+            _ = try pty.waitUntilReadable(timeoutMilliseconds: 0)
+            _ = pty.waitForExit()
+        }
+        for _ in 0..<3 { try cycle() }
+        let baseline = openDescriptorCount()
+        try #require(baseline > 0)
+        for _ in 0..<25 { try cycle() }
+        let after = openDescriptorCount()
+        // A leaked pipe is two descriptors per iteration.
+        #expect(
+            after <= baseline + 2,
+            "descriptor count grew from \(baseline) to \(after) over 25 dropped ptys")
+    }
+
     @Test("a failed spawn leaks no descriptors")
     func failedSpawnLeaksNoDescriptors() throws {
         _ = try? PTY.spawn(executable: "/nonexistent/corta-does-not-exist")

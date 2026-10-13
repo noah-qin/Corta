@@ -19,6 +19,7 @@ import CortaTerminal
 import CoreGraphics
 import CoreText
 import Metal
+import Synchronization
 import simd
 
 /// The device could not allocate the atlas's textures even at the smallest
@@ -181,7 +182,13 @@ nonisolated final class GlyphAtlas {
     /// Premultiplied bgra, as `CTRunDraw` produces and the color pipeline
     /// blends.
     private(set) var colorTexture: MTLTexture
-    private(set) var atlasRects: [SIMD4<UInt16>] = []
+    private(set) var atlasRects: [SIMD4<UInt16>] = [] {
+        didSet { atlasRectsVersion = Self.nextRectsVersion.wrappingAdd(1, ordering: .relaxed).newValue }
+    }
+    /// Changes with every edit of `atlasRects`, unique across atlases, so a
+    /// backend re-uploads the table only when it changed.
+    private(set) var atlasRectsVersion: UInt64 = 0
+    private static let nextRectsVersion = Atomic<UInt64>(0)
     private var freeRectangleIndices: [UInt32] = []
     private func rectangleIndex(page: AtlasPage, x: Int, y: Int, width: Int, height: Int) -> UInt32 {
         let rect = SIMD4<UInt16>(UInt16(x), UInt16(y), UInt16(width), UInt16(height))
@@ -595,9 +602,8 @@ nonisolated final class GlyphAtlas {
             return GlyphInfo(uvRect: .zero, size: .zero, bearing: .zero)
         }
         guard ensureHeight(.grayscale, required: origin.y + height) else {
-            page.evict(reservedFirstRow: page === asciiPage)
-            evictionCount += 1
-            generation += 1
+            // The one eviction path, so the page's rectangle indices return too.
+            evict(page)
             return GlyphInfo(uvRect: .zero, size: .zero, bearing: .zero, isMissing: true)
         }
         texture.replace(
@@ -695,9 +701,7 @@ nonisolated final class GlyphAtlas {
 
         guard let data = context.data else { return empty }
         guard ensureHeight(.color, required: origin.y + height) else {
-            colorPage.evict(reservedFirstRow: false)
-            evictionCount += 1
-            generation += 1
+            evict(colorPage)
             return empty
         }
         colorTexture.replace(

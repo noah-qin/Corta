@@ -44,8 +44,16 @@ nonisolated enum ImageDecoderProcess {
     // The decode worker is the sole writer before publication; Metal only
     // samples immutable pixels and may release ownership on its completion thread.
     final class SharedPixels: @unchecked Sendable {
+        /// Transient: a mapping lives only until its pixels reach a private
+        /// texture, which the renderer's texture budgets account for.
         private static let mappingBudget = GlobalTextureBudget(
             limit: KittyGraphics.maximumGlobalTextureBytes)
+        /// The pixel cap's bytes plus every row's alignment padding (at most
+        /// 4 KiB a row) — the same bound `corta-image-decoder` holds the
+        /// mapping to. The cap itself is on pixels: padding is not the
+        /// image's, and an image at the cap with an unaligned width must fit.
+        static let maximumLength =
+            KittyGraphics.maximumImagePixels * 4 + KittyGraphics.maximumImageDimension * 4096
         let descriptor: Int32
         let address: UnsafeMutableRawPointer
         let length: Int
@@ -53,13 +61,14 @@ nonisolated enum ImageDecoderProcess {
         init?(width: Int, height: Int, alignment: Int) {
             guard width > 0, height > 0, width <= KittyGraphics.maximumImageDimension,
                 height <= KittyGraphics.maximumImageDimension,
-                width <= KittyGraphics.maximumImagePixels / height
+                width <= KittyGraphics.maximumImagePixels / height,
+                alignment <= 4096
             else { return nil }
             let alignment = max(4, alignment)
             bytesPerRow = ((width * 4 + alignment - 1) / alignment) * alignment
             let page = Int(getpagesize())
             length = ((bytesPerRow * height + page - 1) / page) * page
-            guard length <= KittyGraphics.maximumImageBytes, Self.mappingBudget.tryReserve(length)
+            guard length <= Self.maximumLength, Self.mappingBudget.tryReserve(length)
             else {
                 return nil
             }

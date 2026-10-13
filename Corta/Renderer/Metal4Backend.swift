@@ -296,6 +296,31 @@ public nonisolated final class Metal4Backend {
 
     private(set) var uploadedInstanceBytes = 0
     private(set) var uploadedRectangleBytes = 0
+
+    /// The glyph atlas's rectangle table by version: uploaded once per change,
+    /// not copied with every draw of every frame. A change gets a fresh
+    /// buffer, so a queued frame keeps reading the table it recorded.
+    private var rectangleTable: (version: UInt64, buffer: MTLBuffer)?
+
+    private func rectangleTableAddress(_ rects: [SIMD4<UInt16>], version: UInt64) -> MTLGPUAddress? {
+        if let rectangleTable, rectangleTable.version == version {
+            return rectangleTable.buffer.gpuAddress
+        }
+        let byteCount = rects.count * MemoryLayout<SIMD4<UInt16>>.stride
+        guard let buffer = device.makeBuffer(length: max(16, byteCount), options: .storageModeShared)
+        else { return nil }
+        rects.withUnsafeBytes { raw in
+            if let base = raw.baseAddress { buffer.contents().copyMemory(from: base, byteCount: raw.count) }
+        }
+        if let old = rectangleTable?.buffer {
+            retiredBuffers.append((frame: frameNumber, buffer: old))
+        }
+        residencySet.addAllocation(buffer)
+        residencySet.commit()
+        rectangleTable = (version, buffer)
+        uploadedRectangleBytes += byteCount
+        return buffer.gpuAddress
+    }
     private let solidRing = InstanceBufferRing()
     private let glyphRing = InstanceBufferRing()
     private let colorGlyphRing = InstanceBufferRing()
@@ -447,21 +472,28 @@ public nonisolated final class Metal4Backend {
             rect: rect, drawableSize: drawableSize, label: "Corta.solid")
     }
 
+    /// `atlasRectsVersion`: `atlasRects` is the glyph atlas's table at that
+    /// version (`GlyphAtlas.atlasRectsVersion`), kept resident between
+    /// changes. Without it the table is copied with the draw.
     func drawGlyphQuads(
-        _ instances: [QuadInstance], atlas: MTLTexture, atlasRects: [SIMD4<UInt16>] = [], rect: CGRect, drawableSize: CGSize
+        _ instances: [QuadInstance], atlas: MTLTexture, atlasRects: [SIMD4<UInt16>] = [],
+        atlasRectsVersion: UInt64? = nil, rect: CGRect, drawableSize: CGSize
     ) {
         draw(
             instances, ring: glyphRing, pipeline: glyphPipeline, atlas: atlas, atlasRects: atlasRects,
+            atlasRectsVersion: atlasRectsVersion,
             rect: rect, drawableSize: drawableSize, label: "Corta.glyph")
     }
 
     /// Untinted premultiplied sampling: colour glyphs and Kitty images.
     func drawColorQuads(
-        _ instances: [QuadInstance], atlas: MTLTexture, atlasRects: [SIMD4<UInt16>] = [], rect: CGRect, drawableSize: CGSize,
+        _ instances: [QuadInstance], atlas: MTLTexture, atlasRects: [SIMD4<UInt16>] = [],
+        atlasRectsVersion: UInt64? = nil, rect: CGRect, drawableSize: CGSize,
         imageUVRect: SIMD4<Float> = .zero, transient: Bool = false
     ) {
         draw(
-            instances, ring: colorGlyphRing, pipeline: colorGlyphPipeline, atlas: atlas, atlasRects: atlasRects, imageUVRect: imageUVRect,
+            instances, ring: colorGlyphRing, pipeline: colorGlyphPipeline, atlas: atlas, atlasRects: atlasRects,
+            atlasRectsVersion: atlasRectsVersion, imageUVRect: imageUVRect,
             rect: rect, drawableSize: drawableSize, label: "Corta.colorGlyph", transientTexture: transient)
     }
 
@@ -577,6 +609,7 @@ public nonisolated final class Metal4Backend {
         pipeline: MTLRenderPipelineState,
         atlas: MTLTexture?,
         atlasRects: [SIMD4<UInt16>] = [],
+        atlasRectsVersion: UInt64? = nil,
         imageUVRect: SIMD4<Float> = .zero,
         rect: CGRect,
         drawableSize: CGSize,
@@ -603,11 +636,17 @@ public nonisolated final class Metal4Backend {
             imageUVRect: imageUVRect
         )
         let instanceByteCount = MemoryLayout<QuadInstance>.stride * instances.count
+        var tableAddress: MTLGPUAddress?
+        if let atlasRectsVersion, !atlasRects.isEmpty {
+            guard let address = rectangleTableAddress(atlasRects, version: atlasRectsVersion) else { return }
+            tableAddress = address
+        }
+        let copiedRects = tableAddress == nil ? atlasRects : []
         guard
             let addresses = instances.withUnsafeBytes({ raw -> (MTLGPUAddress, MTLGPUAddress, MTLGPUAddress)? in
                 guard let base = raw.baseAddress else { return nil }
                 return ring.append(
-                    instances: base, instanceByteCount: instanceByteCount, uniforms: uniforms, atlasRects: atlasRects,
+                    instances: base, instanceByteCount: instanceByteCount, uniforms: uniforms, atlasRects: copiedRects,
                     slot: currentSlot, device: device, residencySet: residencySet
                 ) { [self] buffer in
                     retiredBuffers.append((frame: frameNumber, buffer: buffer))
@@ -615,10 +654,10 @@ public nonisolated final class Metal4Backend {
             })
         else { return }
         uploadedInstanceBytes += instanceByteCount
-        uploadedRectangleBytes += atlasRects.count * MemoryLayout<SIMD4<UInt16>>.stride
+        uploadedRectangleBytes += copiedRects.count * MemoryLayout<SIMD4<UInt16>>.stride
         argumentTable.setAddress(addresses.0, index: 0)
         argumentTable.setAddress(addresses.1, index: 1)
-        argumentTable.setAddress(addresses.2, index: 2)
+        argumentTable.setAddress(tableAddress ?? addresses.2, index: 2)
         if let atlas {
             makeResident(atlas, transient: transientTexture)
             argumentTable.setTexture(atlas.gpuResourceID, index: 0)
