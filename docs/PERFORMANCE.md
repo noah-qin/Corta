@@ -233,7 +233,7 @@ throughput benchmarks and is the number users actually perceive.
 
 The measurements taken before 1.0.0 with that tool, and why they cannot
 be read against each other, are
-[a record of their own](history/2026-09-09-LATENCY-BEFORE-1.0.md).
+[a record of their own](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/2026-09-09-LATENCY-BEFORE-1.0.md).
 
 **The percentile-shaped view of the render stage.** Between
 `corta-bench` (headless, core-only) and the end-to-end §5.7 number sits
@@ -253,7 +253,7 @@ first priority" is a slogan rather than a constraint.
 Every latency number in this document must carry **p50, p95, p99 and the
 maximum**. `corta-bench` reports all four (`LatencyDistribution`), and so does
 §5.7's in-app measure; the screen-capture figures from before 1.0.0
-(`history/`) predate the rule and are averages, which is exactly the
+([earlier records](https://github.com/noah-qin/Corta/tree/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history)) predate the rule and are averages, which is exactly the
 shape of the problem.
 
 An average is the one statistic a latency measurement should not be
@@ -275,7 +275,7 @@ physical panel refresh rate, alongside the effective requested frame-rate
 range and measured `frameInterval`. The range alone does not prove delivered
 120 Hz. These details were missing from some historical battery runs.
 
-Numbers recorded in this document or in `docs/history/ROADMAP-0.1.md` are only comparable
+Numbers recorded in this document or in the [0.1 roadmap](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/ROADMAP-0.1.md) are only comparable
 against numbers taken the same way. Any run that is quoted must state:
 
 | Variable          | Fixed at                                              |
@@ -317,7 +317,7 @@ compatibility results are not new benchmark measurements.
 | 27.0 / 27A266a | 6.4 (`swiftlang-6.4.0.34.1`, `clang-2100.3.34.1`) | 27.0 / 26A425 | Swift 6 / macOS 26.0 | 615 core / 653 app tests passed; 4 expected known issues |
 
 The host runs macOS 27.0 (26A428). Results and diagnostics are recorded in
-the [dated verification record](test-results/2026-09-19-issues-88-90.md).
+the [dated verification record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-09-19-issues-88-90.md).
 
 **The pin and the measurement are deliberately two different toolchains.**
 `XCODE_PIN` — 26.6.0 in `ci.yml`, `nightly.yml`, `release.yml`,
@@ -517,7 +517,7 @@ frame or a busier machine.
 
 (These two runs' Avg/SD are higher across the board than the pre-1.0
 cross-terminal run's single-run numbers for Corta (its table is in
-`history/2026-10-09-CROSS-TERMINAL-RUN.md`) — 70 ms vs. 45 ms — despite identical
+[the 2026-10-09 cross-terminal run](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/2026-10-09-CROSS-TERMINAL-RUN.md)) — 70 ms vs. 45 ms — despite identical
 capture settings; §5.2's environment table was not fully controlled for
 this pair either, e.g. other background load on the machine varied
 between sessions. The A vs. B *comparison* is still valid, since both
@@ -530,7 +530,7 @@ Corta, Ghostty and iTerm2, current releases, one machine, one day
 (2026-10-09, #279): keypress → glass from Typometer, the external
 screen-capture tool, and throughput from `vtebench` and a 100 MiB `cat`.
 The environment, every run, the calibration and what was not measured are
-in [`history/2026-10-09-CROSS-TERMINAL-RUN.md`](history/2026-10-09-CROSS-TERMINAL-RUN.md),
+in [`history/2026-10-09-CROSS-TERMINAL-RUN.md`](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/2026-10-09-CROSS-TERMINAL-RUN.md),
 which also keeps the pre-1.0 table this replaces. `TESTING.md` →
 *Against other terminals* repeats it.
 
@@ -568,18 +568,18 @@ The Unicode driver measures five samples after one warmup. ASCII feed
 **345.2 → 340.3 MiB/s** has overlapping ranges; it is not an unqualified
 speedup. Warm ASCII history search is approximately **25.6 → 20.8 ms**;
 first-query setup is slower (**27.2 → 44.7 ms**).
-[The dated record](test-results/2026-10-11-memory-core-optimization.md)
+[The dated record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-11-memory-core-optimization.md)
 provides corpora, distributions, stage gates and verification limits.
 
 One column per release, on the machine §5.2 records. A cell says *not
 re-measured* rather than carrying an older figure forward. Each release's
 full run — machine state, every scenario, the energy tables and the
-reading of them — is its record under `history/`:
-[1.0.0](history/2026-09-18-V1.0.0-BENCHMARK-RUN.md),
-[1.0.1](history/2026-09-21-V1.0.1-BENCHMARK-RUN.md),
-[1.1.0](history/2026-10-03-V1.1.0-BENCHMARK-RUN.md),
-[1.1.1](history/2026-10-03-V1.1.1-BENCHMARK-RUN.md),
-[1.1.5](history/2026-10-07-V1.1.5-BENCHMARK-RUN.md).
+reading of them — is its record, preserved at a commit:
+[1.0.0](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/2026-09-18-V1.0.0-BENCHMARK-RUN.md),
+[1.0.1](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/2026-09-21-V1.0.1-BENCHMARK-RUN.md),
+[1.1.0](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/2026-10-03-V1.1.0-BENCHMARK-RUN.md),
+[1.1.1](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/2026-10-03-V1.1.1-BENCHMARK-RUN.md),
+[1.1.5](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/2026-10-07-V1.1.5-BENCHMARK-RUN.md).
 
 | Metric | 1.1.5 (2026-10-07) | 1.1.1 (2026-10-03) | 1.1.0 (2026-10-03) | 1.0.1 (2026-09-21) | 1.0.0 (2026-09-18) | How |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -647,7 +647,7 @@ for paused-link echoes within 50 ms of input, rate-limited to one refresh.
 gate fails. Verified-mains human driver pairs later give median p50 **68.85 → 39.39 ms**
 with every paired p95/p99 lower; full visual/tearing acceptance is still pending; scripted power-mode pairs are recorded below.
 
-[Full environment, decomposition, raw rounds and acceptance limits](test-results/2026-10-09-input-followup.md)
+[Full environment, decomposition, raw rounds and acceptance limits](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-09-input-followup.md)
 also record final full Unit, D17, idle/occluded Activity Monitor counters and
 valid Allocations evidence. No 120 Hz panel was available. Idle process CPU
 was approximately 0.03%. A later explicit PTY close wakeup removes the 250 ms
@@ -677,7 +677,7 @@ and the full raw distributions remain in the linked record. No 120 Hz result or 
 from policy tests.
 
 
-The [later authorized foreground retry](test-results/2026-10-10-foreground-followup.md)
+The [later authorized foreground retry](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-10-foreground-followup.md)
 fixes directory-preview overlap with real Pinyin preedit. Three further
 default-driver four-pane pairs still fail GPU tails: old p99 0.80/0.50/1.42
 ms versus current 1.05/2.80/1.73 ms. CPU/wakeup energy proxies do not
@@ -718,7 +718,7 @@ says which:
 | Kind | Includes | Comparable to |
 | --- | --- | --- |
 | Scripted (`typeKey` from XCTest; `key code` via System Events before 1.1.0) | Corta's whole path plus the compositor and scanout; **not** the keyboard's HID stage (1–8 ms on USB/Bluetooth) | a lower bound on what a finger sees |
-| `--manual` (a person typing) | everything a screen-capture tool saw | the pre-1.0 screen-capture figures (`history/`) |
+| `--manual` (a person typing) | everything a screen-capture tool saw | the [pre-1.0 screen-capture figures](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/2026-09-09-LATENCY-BEFORE-1.0.md) |
 
 Under XCTest (1.1.0 on), more of the echo's frames are replaced before
 they reach the glass than under System Events, so a sample is closed by a
@@ -812,7 +812,7 @@ averages ~0.6 ms, and its p95 is the GPU's scheduling. A change to the
 CPU path is best read on that row; the averaged figure stays the D17
 baseline so the history below remains comparable.
 
-**Mac audit closeout (2026-10-08–09).** The [dated record](test-results/2026-10-09-mac-audit-closeout.md)
+**Mac audit closeout (2026-10-08–09).** The [dated record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-09-mac-audit-closeout.md)
 rebuilds the exact 1.1.8 tree and the audit follow-up on the same Apple M5,
 macOS 27.0.1 (26A434), Xcode 27.0 (27A266a), AC power, Benchmark `-O`.
 Three initial runs averaged 0.630 ms on 1.1.8 and 0.627 ms after #277/#278.
@@ -1112,7 +1112,7 @@ The original October 1 figures (mixed-history search p50 763 ms / p99
 than stable comparative baselines. A 924 MB peak for the long benchmark
 process is not proof of an application leak. Repeat A/B measurements with
 one machine/toolchain and no concurrent builds; record traces and remaining
-limits in the [follow-up record](test-results/2026-10-02-follow-up.md).
+limits in the [follow-up record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-02-follow-up.md).
 
 **The A/B, 2026-10-02.** `origin/main` (`0af9fa9`) against the follow-up
 branch, alternating, on a quiet machine — no build or sanitizer run beside
@@ -1144,7 +1144,7 @@ On the Apple M5 MacBook Air with Xcode 27.0 and macOS 27.0.1, the Release
 frame-CPU baseline after adding optional cursor blinking measured **0.562 ms
 average / 0.821 ms p95** (120×40, Menlo 14 at 1×, 60 iterations). This is a
 post-change measurement, without a paired pre-change comparison. See the
-[verification record](test-results/2026-10-04-cursor-window.md) for scope and
+[verification record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-04-cursor-window.md) for scope and
 limits; blink-enabled idle CPU was not separately measured.
 
 ### Input-source indicator follow-up, 2026-10-04
@@ -1170,7 +1170,7 @@ Menlo 14 at 1×. Instance upload p50/p95: typing **0.020 / 0.047 ms**, scroll
 **0.023 / 0.041 ms**, full rebuild **0.157 / 0.175 ms**. This is an offscreen
 post-change measurement including the earlier working-tree changes; native
 status-bar UI and idle CPU were not separately measured. See the
-[completion record](test-results/2026-10-04-system-status-theme-editor.md).
+[completion record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-04-system-status-theme-editor.md).
 
 ### Terminal recovery verification (#228, 2026-10-06)
 
@@ -1181,7 +1181,7 @@ CPU-only full-rebuild p50 was 0.137 / 0.156 / 0.151 ms before and
 0.143 / 0.142 / 0.146 ms after. The round-trip averages trend higher with
 overlapping ranges; the CPU-only ranges overlap. These offscreen measurements
 exclude the AppKit completion tracker and failure UI. See the
-[repair verification record](test-results/2026-10-06-issue-228-fix.md) for all
+[repair verification record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-06-issue-228-fix.md) for all
 three performance workloads, interactive recovery checks and scope limits.
 
 ### 5.14 Scrolling without per-line screen allocation (#281, #283)
@@ -1241,21 +1241,21 @@ No full-rebuild regression was observed in this run. These measurements do
 not establish displayed flood GPU tails, compositor latency or idle energy.
 The anchored-history regression test asserts 0 rebuilt rows after new output.
 
-[Raw measurements](test-results/2026-10-09-scrolling-raw.md) preserve all
-rounds. [Verification and outstanding gates](test-results/2026-10-09-scrolling.md)
+[Raw measurements](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-09-scrolling-raw.md) preserve all
+rounds. [Verification and outstanding gates](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-09-scrolling.md)
 record the original background tests and limits. The subsequent
-[authorized desktop follow-up](test-results/2026-10-09-input-followup.md)
+[authorized desktop follow-up](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-09-input-followup.md)
 includes a valid steady-state Allocations call tree: no per-line Line allocation,
 with the two reserved history arrays still allocated once per 256-row batch.
 It also records final full Unit and D17, live flood tails and outstanding gates.
 
-October 11 merge follow-up: the [final validation](test-results/2026-10-11-merge-validation.md) corrects flood sampling before teardown, records three passing sustained default-driver pairs and a final-source check, matches scripted input cadence across power modes, withdraws no-sync, and attributes the three-second idle timer to Apple AGX deferred GPU setup. Historical negative results above are retained with their method limits; absolute zero process wakeups and an unperformed human panel observation are not claimed.
+October 11 merge follow-up: the [final validation](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-11-merge-validation.md) corrects flood sampling before teardown, records three passing sustained default-driver pairs and a final-source check, matches scripted input cadence across power modes, withdraws no-sync, and attributes the three-second idle timer to Apple AGX deferred GPU setup. Historical negative results above are retained with their method limits; absolute zero process wakeups and an unperformed human panel observation are not claimed.
 
 ### 5.15 Memory and core optimization (#286–#289, 2026-10-11)
 
 The same-machine before/after record, codec experiment, Unicode corpus,
 parser profile, stage gates and verification limits are in
-[test-results/2026-10-11-memory-core-optimization.md](test-results/2026-10-11-memory-core-optimization.md).
+[test-results/2026-10-11-memory-core-optimization.md](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-11-memory-core-optimization.md).
 Run `corta-bench --unicode`, `--compression`, `--memory-only`,
 `--search-only --compressed`, `--reflow-only --compressed` or `--cold-history`
 for the new drivers. `--unicode` defaults to five measured samples after
@@ -1274,11 +1274,11 @@ failed their benefit gates and were not adopted.
 
 ### 5.16 Shared images, render ownership and idle energy (#291/#284/#290, 2026-10-11)
 
-[Implementation, measurements and acceptance limits](test-results/2026-10-11-render-image-energy.md)
+[Implementation, measurements and acceptance limits](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-11-render-image-energy.md)
 record three large-image decode/texture rounds, full-UV sampling, reader QoS
 throughput/backpressure, real cursor handoffs and a stalled rendering A/B.
 The render thread remains opt-in. The
-[final validation](test-results/2026-10-11-render-final-validation.md)
+[final validation](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-11-render-final-validation.md)
 supersedes the earlier failed latency gate with corrected echo attribution and
 quiet scheduling: the final steady/stalled A/B p50/p95/p99 improved, and
 1/2/4-pane flood interval p99 was 16.67 ms on the 60 Hz display. CPU-energy
@@ -1286,7 +1286,7 @@ and complete hardware adoption criteria remain unverified, so
 `CORTA_RENDER_THREAD=1` is not approved for default use.
 The unchanged helper sandbox now receives an inherited
 anonymous mapping and emits only an eight-byte header. The
-[follow-up measurements](test-results/2026-10-11-followup.md) record actual
+[follow-up measurements](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-11-followup.md) record actual
 Kitty payload-to-glass latency/footprint and real Swift-build/find CPU/wakeup
 proxies. Those proxies do not establish a power saving.
 
@@ -1317,6 +1317,6 @@ so an XCUI run cannot measure this. The copy costs ≈ 0.8 ms of GPU round
 trip a presented full-screen frame (`measurePresentByCopyCost`); D17's
 windowed figure did not move (0.37–0.39 ms against main's 0.40–0.57 ms,
 battery, alternated). The
-[record](test-results/2026-10-13-direct-fullscreen.md) has the method (Metal
+[record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-13-direct-fullscreen.md) has the method (Metal
 System Trace's *Direct to Display* column), the probe that isolated the
 Metal 4 blocker, every run and what was not verified.

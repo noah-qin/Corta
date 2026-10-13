@@ -89,7 +89,7 @@ nonisolated enum Metal4Diagnostics {
 /// stalled GPU costs dropped frames, never a blocked main thread. Feedback
 /// rather than a queue-signalled `MTLSharedEvent`: the event was observed
 /// never to advance against a live `CAMetalDisplayLink` stream
-/// (`history/2026-09-15-B12-METAL4-BACKEND.md`).
+/// (the B12 Metal 4 backend record, 2026-09-15, in the repository's history).
 ///
 /// **Residency.** Ring buffers and every texture bound by resource ID
 /// (`boundTextures`) live in the queue's `MTLResidencySet`: MTL4 neither

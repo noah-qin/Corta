@@ -2,7 +2,7 @@
 
 [Documentation index](README.md) · [Project overview](../README.md)
 
-This reference describes **1.1.6** and the development tree on `main` since
+This reference describes **1.2.0** and the development tree on `main` since
 it; a feature added after the release is listed under `[Unreleased]` in the
 [changelog](../CHANGELOG.md).
 Configuration keys and defaults are maintained in [Configuration](CONFIGURATION.md);
@@ -16,6 +16,25 @@ the [user guide](USER-GUIDE.md) says where each feature lives and how to use it.
   font fallback. AppKit IME composition is drawn outside the terminal grid.
 - Metal 4 rendering — one render pass per frame — with a glyph atlas, instanced quads and line damage tracking. Needs a GPU with Metal 4: every Apple silicon Mac; not a virtual machine's paravirtual GPU.
 - OSC 8 hyperlinks, focus reporting and the Kitty keyboard protocol.
+
+## Speed and efficiency
+
+- Output parsed at over 300 MiB/s end to end, printable runs classified 16
+  bytes at a time with NEON; the screen follows at the display's pace.
+- Scroll regions, history scrolling and inserted or deleted lines shift the
+  rendered rows instead of rebuilding them; scrolling allocates no screen rows.
+- Cold scrollback compressed in memory as it arrives: 100,000 lines of 120
+  columns in about 11 MiB. Search, reflow and copy read it in place.
+- Typing, paste and input-method text request the panel's maximum frame rate
+  (120 Hz on ProMotion); Low Power Mode, an inactive window and thermal
+  pressure lower it otherwise.
+- A full-screen window with one pane presents directly to the display: about
+  a frame less from keypress to glass.
+- An idle blinking cursor is animated by Core Animation; an idle shell causes
+  no periodic wakeups; a hidden pane's reader runs at background priority
+  after two seconds; an occluded window does not draw.
+- Glyph atlases and GPU instance buffers sized to what is on screen: a
+  24-byte quad, atlases that grow on demand.
 - Kitty graphics with direct RGB, RGBA and PNG transmission and placement,
   zlib-compressed or not (`o=z`, what `kitten icat` sends for an image it
   scales to fit). Erasing
@@ -120,10 +139,11 @@ files, remote connections and child-process input.
 - **VT conformance is incomplete.** The 2026-09-17 esctest2 run recorded
   126 passed, 334 known bugs and 107 failed out of 567. The historical 81.1%
   figure combines passes and known bugs; it is not a pass rate.
-  [Raw results](esctest/2026-09-17-results.txt) retain the failing names.
-- **Input latency is above target.** The 2026-09-18 manual measurement was
-  66.3 ms average, p95 78.7 ms. See [the method](PERFORMANCE.md)
-  for what is included and the hardware used.
+  [Raw results](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/esctest/2026-09-17-results.txt) retain the failing names.
+- **Windowed input latency is above target.** Full screen with one pane
+  measured 49.1–50.8 ms p50 and 82.9–84.2 ms p99 for a person typing
+  (2026-10-13); a window goes through the compositor and is a frame slower.
+  See [Performance](PERFORMANCE.md) §5.17 for the method and hardware.
 - **Bundled shell integration covers zsh, bash and fish.** Other shells need
   their own OSC 133 hooks for command boundaries; without them notifications
   use a heuristic.

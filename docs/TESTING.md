@@ -262,50 +262,12 @@ the person running it chooses to. Nothing here asks for it.
 ### Against other terminals
 
 `PERFORMANCE.md` §5.5 compares Corta with Ghostty and iTerm2 on one
-machine. `script/cross-terminal.swift` holds the configuration and
-launches each terminal with it. It changes none of the three's own
-settings: Corta gets a scratch `CORTA_STAGE_DIR`, Ghostty a config file
-for that launch only, and iTerm2 a `corta-bench` dynamic profile that
-`cleanup` removes (D13). Everything else lives in `.build/cross-terminal/`.
-
-```sh
-swift script/cross-terminal.swift prepare   # configs, test program, environment record
-swift script/cross-terminal.swift check     # conditions, and each open pane's grid
-swift script/cross-terminal.swift launch corta|ghostty|iterm2 [--throughput|--metrics]
-swift script/cross-terminal.swift report results.csv     # Typometer export → p50/p95/p99
-swift script/cross-terminal.swift throughput-report      # vtebench and cat
-swift script/cross-terminal.swift cleanup
-```
-
-**Latency** uses Typometer, which needs Java and the person's go-ahead:
-Accessibility and Screen Recording for the app that launches it. Launch
-it from Terminal.app, so those grants go to Terminal. Typometer types
-`.`, so select the ABC layout first; Pinyin turns it into `。`.
-
-Settings: 200 characters, 150 ms delay, synchronous, no pauses. Run
-three rounds, alternating the order. Name each run with the terminal and
-the round number, so `report` can pool them.
-
-Typometer depends on rendering details:
-
-- The test program hides the cursor.
-- Corta and iTerm2 run at 18 pt and Ghostty at 12 pt. At other sizes,
-  Typometer's watched pixel misses the dot and the run waits about 80 s
-  before it times out.
-- If `check` stops seeing captures, a stuck capture has wedged macOS's
-  screen-capture service. Kill the stuck process; if captures still time
-  out, log out and back in.
-
-`launch corta --metrics` writes `keypressToPresent` beside the run, for
-the in-app-to-external offset.
-
-**Throughput** needs `alacritty/vtebench` built into
-`.build/cross-terminal/vtebench-src` (a Rust toolchain; the record names
-the commit). With `--throughput`, each terminal runs the default vtebench
-set and three `cat`s of a generated 100 MiB file, then closes. Keep the
-window frontmost and the machine untouched: a background window is
-throttled. iTerm2 needs Profiles ▸ `corta-bench-throughput` chosen by
-hand for each run.
+machine, with Typometer for keypress-to-glass and `alacritty/vtebench` plus
+a timed `cat` for throughput. The tool that configured and launched the
+three for that run, with its Typometer settings and pitfalls, is
+[`script/cross-terminal.swift` at the commit that last carried it](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/script/cross-terminal.swift);
+it changes none of the three terminals' own settings (D13). Restore it from
+there to repeat the comparison.
 
 ### Which environments can run the render tests
 
@@ -355,7 +317,7 @@ and there are two ways to get there:
   the result.
 - Locally, on any Apple silicon Mac:
   `xcodebuild test -scheme Corta -testPlan Unit`, with the result recorded
-  under `docs/test-results/` before a release. The five-point
+  in the pull request before a release. The five-point
   launched-app check (`CONFORMANCE.md` §4.4) is done on the same machine
   and carries the rest of the guarantee.
 
@@ -643,7 +605,8 @@ Include the commit, macOS and Xcode versions, exact command, test result and
 any skipped checks. Separate build failures, assertion failures, crashes,
 timing failures and fixture/setup problems. Attach an `.xcresult` for app
 failures or the smallest byte stream for parser failures, after removing
-private data. Dated manual records belong in [test-results/](test-results/).
+private data. A manual pass is recorded in the pull request or issue it
+verifies, not as a file in the tree.
 
 The historical esctest2 number that includes “known bugs” is a compatibility
 classification, not an automated-test pass rate. Always report all three
@@ -671,7 +634,7 @@ changes. The October 2 TSAN investigation found an unsynchronized mutable
 interceptor in the test server; its storage is now a Mutex. New tests pin stale
 search status, a blocked directory probe, private copy modes, approval snapshots,
 same-metadata remote replacement and rejected glyphs without atlas thrashing.
-See the [dated results](test-results/2026-10-02-follow-up.md) for actual evidence.
+See the [dated results](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-02-follow-up.md) for actual evidence.
 
 Development builds isolate Corta-owned storage only. A stage path does not
 isolate HOME, SSH_AUTH_SOCK, credentials or external editors. Use the fixture
@@ -698,7 +661,7 @@ host-detail interfaces. CursorAndWindowUITests checks actual idle blinking and
 window constraints. The catalog tests check coverage and format arguments;
 coverage alone does not establish native-speaker quality or VoiceOver usability.
 
-See the [dated feature record](test-results/2026-10-04-system-status-theme-editor.md)
+See the [dated feature record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-04-system-status-theme-editor.md)
 for focused suites, screenshots, benchmark scope and unverified environments.
 macOS 26+ Apple silicon is the target; a newer local test host does not by itself
 prove runtime behavior on every supported macOS release or physical display setup.
@@ -721,11 +684,11 @@ and the app cannot read: the app started with the user’s prompt and an 80×24
 grid, and the tests failed on what they then saw. Each now checks that the
 fixture’s `demo ❯` prompt loaded and reports a setup failure when it did not,
 before any feature assertion. Toolbar and optional prompt placement are covered
-in [the input-source placement record](test-results/2026-10-04-input-source-toolbar.md).
+in [the input-source placement record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-04-input-source-toolbar.md).
 
 ## Mac closeout evidence, October 2026
 
-The [dated Mac closeout](test-results/2026-10-09-mac-audit-closeout.md) records
+The [dated Mac closeout](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-09-mac-audit-closeout.md) records
 actual Metal 4 Unit and PNG-helper tests, TSan, Release measurements, signed
 release/feed rehearsals and native UI checks. It also records the UI plan's
 pre-test automation-mode timeout, exact Swift 6.2 unavailability and the
@@ -788,7 +751,7 @@ history and runs the steady phase for 30 seconds without a snapshotter. Select
 a range after the printed STEADY-begins marker, include All Allocations and
 inspect the complete call tree. The reserved history arena and row-index arrays
 allocate per 256-row batch; a missing per-line Line path is the criterion, not
-zero total allocations. The [October 9 follow-up](test-results/2026-10-09-input-followup.md)
+zero total allocations. The [October 9 follow-up](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-09-input-followup.md)
 records the successful profile and temporary signing method.
 
 ## Memory/core optimization verification (#286–#289)
@@ -808,12 +771,12 @@ The interactive measurement suite checks live producers in each pane and
 reverses keyboard history navigation every 100 events so the 600-frame ring fills before
 the scroll limit clamps. `testFourPanePromptMemory` measures the actual window
 in addition to the offscreen texture-resource figures. Results and hardware
-limitations are in [the dated record](test-results/2026-10-11-memory-core-optimization.md).
+limitations are in [the dated record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-11-memory-core-optimization.md).
 
 
 ### Shared-image and render-owner verification
 
-The #291/#284/#290 [measurement record](test-results/2026-10-11-render-image-energy.md)
+The #291/#284/#290 [measurement record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-11-render-image-energy.md)
 names passing automated checks and outstanding acceptance gates. Use
 `swift run -c release --package-path CortaTerminal corta-bench --reader-qos`
 and add `--utility` for the reader scheduling comparison.
@@ -824,8 +787,10 @@ Measurement tests belong to the **Release** test plan, not the UI plan.
 
 ### Follow-up image and producer measurements (#291/#290)
 
-Generate the owned 4096×4096 PNG using
-`swift script/fixtures/kitty4096.swift`; it writes `/tmp/corta-4096.png`.
+Place any 4096×4096 PNG at `/tmp/corta-4096.png` — for example
+`sips -z 4096 4096 docs/brand/about.png --out /tmp/corta-4096.png`. (The
+generator the recorded run used is
+[at a commit](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/script/fixtures/kitty4096.swift).)
 `stage-ui-fixtures.sh` supplies the measurement stage's executable
 `kitty-shell`. With `/opt/homebrew/bin/kitten` installed, run Release-plan
 `MeasurementUITests/testKitty4096PNGToGlass` under Benchmark. The staged shell
@@ -836,13 +801,13 @@ decode, GPU upload and compositor presentation, and excludes earlier payload
 transmission. `outputToFrame` separates output arrival from frame encoding;
 `frameToGlass` remains independent of a main-thread feedback stamp.
 
-`python3 script/prepare_reader_qos_fixtures.py` prepares an isolated small Swift
-package and 5,000 files. Build the Release `corta-bench`, then use
+Prepare an isolated small Swift package and a directory of 5,000 files
+([the script the recorded run used](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/script/prepare_reader_qos_fixtures.py)). Build the Release `corta-bench`, then use
 `--reader-qos --real-producers` with and without `--utility`. Each launches
 three actual cold-scratch Swift builds and ten-pass find processes through
 PTYs, reporting completion, requested reader priority, wall time and parent
 CPU. These are throughput/CPU proxies, not watts. The
-[follow-up record](test-results/2026-10-11-followup.md) preserves the results
+[follow-up record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-11-followup.md) preserves the results
 and UI automation limits.
 
 The real-producer benchmark also accepts `--repository <package-path>` for

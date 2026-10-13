@@ -18,7 +18,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// The character width table (`docs/history/ROADMAP-0.1.md`, `CONFORMANCE.md`
+/// The character width table (the 0.1 roadmap, `CONFORMANCE.md`
 /// §1.1).
 ///
 /// Every expected width below is derived from the Unicode 17.0.0 data files

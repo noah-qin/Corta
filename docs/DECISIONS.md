@@ -442,7 +442,7 @@ and the four models it still supports are all five or more years old. A
 universal build existed only to carry the classic Metal path, which
 meant two GPU backends to maintain, test and keep pixel-equivalent for a
 shrinking audience, with no measured win for either
-(`history/2026-09-15-B12-METAL4-BACKEND.md`).
+([B12 Metal 4 backend record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/2026-09-15-B12-METAL4-BACKEND.md)).
 
 **What it costs.** 1.0.0 and 1.0.1 shipped universal, and an Intel Mac
 that has one of them gets no further updates. No second feed and no

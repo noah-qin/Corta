@@ -9,7 +9,7 @@ This document describes 1.1.6 and the development tree on `main` since it.
 The B01–B16 implementation batches shipped in 1.0.0, the 1.1.0
 milestone's work in 1.1.0, and the 1.2.0 milestone's work in 1.1.5; the download is linked
 from [the README](../README.md#install). Historical milestone plans live in
-[history/](history/), and current limitations are listed in
+[history/](https://github.com/noah-qin/Corta/tree/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history), and current limitations are listed in
 [Features](FEATURES.md#known-limits).
 
 ---
@@ -257,7 +257,7 @@ by name never consults it.
 ## 5. Milestones
 
 The original M1–M10 plan and its measurements are preserved in
-[the 0.1 roadmap](history/ROADMAP-0.1.md). The completed B01–B16 implementation
+[the 0.1 roadmap](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/ROADMAP-0.1.md). The completed B01–B16 implementation
 batches are in the [v1 milestone](https://github.com/noah-qin/Corta/milestone/1).
 Neither is a list of remaining work; consult open issues for follow-up tasks.
 
@@ -295,7 +295,7 @@ controller drew neither the system sidebar nor steady sidebar icons.
 - **Kitty keyboard:** implemented; see [Conformance](CONFORMANCE.md).
 
 The original ordering decision for Kitty graphics is recorded in
-[the roadmap](history/ROADMAP-0.1.md). The implementation uses `ImagePlacementTable` and the
+[the roadmap](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/ROADMAP-0.1.md). The implementation uses `ImagePlacementTable` and the
 existing colour-quad pipeline. Column resize discards live image placements
 rather than reflowing image geometry; clients can place retained images again.
 
@@ -428,7 +428,7 @@ the controller *for this session* (`sessionGeneration`, bumped by every
 same reaction as a close; `didTeardown` tells the two apart.
 
 The record of the audit that established this table is
-[history/2026-09-10-B03-OWNERSHIP-AUDIT.md](history/2026-09-10-B03-OWNERSHIP-AUDIT.md).
+[history/2026-09-10-B03-OWNERSHIP-AUDIT.md](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/2026-09-10-B03-OWNERSHIP-AUDIT.md).
 
 ### 7.7 Search state is pane-local, all the way
 
@@ -460,7 +460,7 @@ event monitor makes that easy to get wrong:
   discards a build's result; it does not stop the row walk. The file
   write is atomic (`Data.write(options: .atomic)`).
 
-The record: [history/2026-09-11-B05-SEARCH-STATE.md](history/2026-09-11-B05-SEARCH-STATE.md).
+The record: [history/2026-09-11-B05-SEARCH-STATE.md](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/2026-09-11-B05-SEARCH-STATE.md).
 
 ### 7.8 Colour and cursor conformance that has to reach the renderer
 
@@ -488,7 +488,7 @@ The record: [history/2026-09-11-B05-SEARCH-STATE.md](history/2026-09-11-B05-SEAR
   (`cursorStyle`, `reverseWraparoundEnabled`) are carried across
   explicitly.
 
-The record: [history/2026-09-11-B06-CONFORMANCE-GAPS.md](history/2026-09-11-B06-CONFORMANCE-GAPS.md).
+The record: [history/2026-09-11-B06-CONFORMANCE-GAPS.md](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/2026-09-11-B06-CONFORMANCE-GAPS.md).
 
 ### 7.9 SFTP without an SSH library
 

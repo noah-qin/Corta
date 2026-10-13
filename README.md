@@ -26,6 +26,40 @@ Metal rendering · AppKit input · A dependency-free terminal core
 
 </div>
 
+## 1.2: built for speed
+
+Corta 1.2 is a performance release, from the byte the shell writes to the
+pixel on the panel. Measured on one Apple M5 MacBook Air, before and after,
+same toolchain:
+
+- **2.3× the throughput.** The parser and grid take **356 MiB/s**, up
+  from 158; output arriving from a shell, end to end, **317 MiB/s**, up from
+  137. `yes` runs 70% faster, and CJK text 23% faster.
+- **A frame less while you type.** A full-screen pane is presented straight
+  to the display instead of through the window server: keypress to glass
+  drops from 64–68 ms to **49–51 ms** at the median, and the worst cases are
+  **halved**.
+- **ProMotion when your fingers are on the keys.** Typing, paste and input
+  methods ask for the panel's maximum frame rate — 120 Hz on ProMotion —
+  then let it settle.
+- **Scrolling that costs almost nothing.** A scroll region (vim, less,
+  tmux, a status line) shifts what is already drawn: **5×** less CPU a frame,
+  and output arriving while you read history back **10×** less.
+- **Scrollback in a fraction of the memory.** Cold history is compressed as
+  you go: 100,000 lines of 120 columns now take about **11 MiB, not 185**.
+  Glyph atlases grow on demand: four panes at a prompt went from 81 MiB to
+  about 1 MiB.
+- **Quiet when it should be.** An idle blinking cursor is animated by the
+  system instead of redrawn, an idle shell no longer wakes Corta four times
+  a second, and a pane you cannot see drops to background priority after
+  two seconds — and back the moment you type.
+- **Images straight to the GPU.** Inline images are decoded in a sandbox
+  into memory the GPU reads directly, with no copy through the app, and
+  move with the text in vim, less and tmux.
+
+Every figure is in [Performance](docs/PERFORMANCE.md), with its method and
+what it does not show. The [changelog](CHANGELOG.md) has the full list.
+
 ## Made for macOS
 
 Corta brings together a hand-written VT engine, Metal rendering, Core Text
@@ -87,19 +121,8 @@ standards they helped set. It makes a different set of bets.
 - **The numbers are published, including the bad ones.** Frame CPU, idle
   CPU, throughput, keypress-to-glass latency and the esctest2 result are
   measured, dated and recorded [below](#quality-with-evidence), with the
-  method for each — the latency figure is above target and the README says
-  so rather than leaving the row out.
-
-<table>
-<tr>
-<td width="50%"><img src="docs/brand/sftp-browser.png" alt="The SFTP browser: Back and Forward, a breadcrumb path, a sortable file list and the transfers popover with a progress bar, speed and time left"></td>
-<td width="50%"><img src="docs/brand/settings.png" alt="The Settings window: a sidebar of eight categories on coloured tiles, beside the Appearance page's grouped form, with a font preview"></td>
-</tr>
-<tr>
-<td align="center"><sub>The SFTP browser, with a transfer in progress</sub></td>
-<td align="center"><sub>Settings — every key of the config file, in eight categories</sub></td>
-</tr>
-</table>
+  method for each — including where a figure is still short of its target,
+  as windowed keypress-to-glass latency is.
 
 If you need tmux control mode, a Linux build or a scripting API, iTerm2 or
 Ghostty is the better choice today; those are
@@ -196,27 +219,27 @@ are snapshots, not guarantees for every machine or workload.
 
 | Check | Recorded result | Evidence |
 | :--- | :--- | :--- |
-| Frame CPU, 120 × 40 full rebuild, Release | 0.57 ms, three-run mean | [Performance](docs/PERFORMANCE.md#58-the-frame-cpu-baseline-under-release-d17) |
+| Core feed throughput | **317.3 MiB/s** (137.2 before 1.2) | [Performance §5.14](docs/PERFORMANCE.md#514-scrolling-without-per-line-screen-allocation-281-283) |
+| Parser + grid throughput | **355.9 MiB/s** (158.0 before 1.2) | same |
+| Scrollback memory, 100k × 120 lines | **11.4 MiB** (185 MiB before 1.2) | [Performance §5.6](docs/PERFORMANCE.md#56-numbers-by-release) |
+| Region scroll, CPU a frame, p50 | **0.026 ms** (0.130 ms before 1.2) | [Performance §5.14](docs/PERFORMANCE.md#514-scrolling-without-per-line-screen-allocation-281-283) |
+| Frame CPU, 120 × 40 full rebuild, Release | **0.37–0.39 ms** | [Performance §5.17](docs/PERFORMANCE.md#517-full-screen-without-the-compositor-285-2026-10-13) |
+| Keypress to glass, full screen, a person typing | **49.1–50.8 ms** p50, 82.9–84.2 ms p99 | [Performance §5.17](docs/PERFORMANCE.md#517-full-screen-without-the-compositor-285-2026-10-13) |
 | Idle CPU, Release, 20 seconds | 0.05% | [Performance](docs/PERFORMANCE.md) |
-| Scrollback memory, 100k × 120 lines | 185.0 MB | [Performance](docs/PERFORMANCE.md) |
-| Core feed throughput | 143.8 MiB/s | [Performance](docs/PERFORMANCE.md) |
-| Search, 100k-line scrollback, one query | 25.5 ms | [Performance](docs/PERFORMANCE.md) |
-| Keypress to glass | 66.3 ms average, p95 78.7 ms; above target | [Method and limitations](docs/PERFORMANCE.md) |
-| esctest2 | 131 passed, 334 known bugs, 102 failed; 567 total | [Raw results](docs/esctest/2026-10-07-results.txt) |
+| esctest2 | 131 passed, 334 known bugs, 102 failed; 567 total | [Raw results](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/esctest/2026-10-07-results.txt) |
 
-Performance was measured on Apple M5, macOS 27.0.1, for the 1.1.5 release
-on 2026-10-07, on battery; results and measurement limits are in
-[Performance](docs/PERFORMANCE.md#56-numbers-by-release). Idle CPU and
-keypress to glass are the 1.0.0 run's (2026-09-18), not re-measured since.
-The esctest2 run is 1.1.5's too; its 82.0% figure counts passes **plus
-known bugs** and is not a pass rate. See
-[conformance](docs/CONFORMANCE.md) for interpretation.
+Measured on an Apple M5 MacBook Air (macOS 27.0.1) between 2026-10-09 and
+2026-10-13, each before/after pair on the same machine and toolchain; the
+dated sections of [Performance](docs/PERFORMANCE.md) hold the conditions, every run and
+what a figure does not establish. Idle CPU is the 1.0.0 run's (2026-09-18),
+and esctest2 1.1.5's; its 82.0% figure counts passes **plus known bugs** and
+is not a pass rate. See [conformance](docs/CONFORMANCE.md) for interpretation.
 
-Known limitations include above-target input latency, incomplete VT
-conformance, bundled shell integration for zsh, bash and fish only, and direct-transmission-only Kitty
-graphics. Accessibility and input reports still need follow-up. The
-[limitations reference](docs/FEATURES.md#known-limits) and
-[interactive test records](docs/test-results/) preserve the details.
+Known limitations include keypress-to-glass latency above the one-frame
+target in a window (full screen with one pane comes closest), incomplete VT
+conformance, bundled shell integration for zsh, bash and fish only, and
+direct-transmission-only Kitty graphics. The
+[limitations reference](docs/FEATURES.md#known-limits) has the details.
 
 ## Find your way around
 

@@ -66,14 +66,10 @@ struct LicenseHeaderRuleTests {
             (".github/workflows/ci.yml", .header(.hash)),
             (".gitignore", .header(.hash)),
             ("README.md", .reuse),
-            ("docs/history/ROADMAP-0.1.md", .reuse),
+            ("docs/USER-GUIDE.md", .reuse),
             ("CortaTerminal/Tests/CortaTerminalTests/Golden/sgr.in", .reuse),
             ("CortaTerminal/Tests/Fuzz/corpus/seed-1.bin", .reuse),
             ("docs/brand/corta-pangolin-mascot.png", .reuse),
-            ("docs/test-results/issue-228-held.png", .reuse),
-            ("docs/test-results/memory-core-2026-10-11/table-light.png", .reuse),
-            ("docs/test-results/memory-core-2026-10-11/square-corners.png", .reuse),
-            ("docs/test-results/memory-core-2026-10-11/raw-benchmarks.txt", .reuse),
             ("docs/brand/social-preview.swift", .header(.slashes)),
             ("Corta/Acknowledgements/Sparkle-LICENSE.txt", .reuse),
             ("AppIcon.icon/icon.json", .reuse),
@@ -94,7 +90,7 @@ struct LicenseHeaderRuleTests {
     @Test("globs: * stays in a directory, ** crosses them and may match none")
     func globs() {
         #expect(Glob.matches("**/*.md", "README.md"))
-        #expect(Glob.matches("**/*.md", "docs/history/a.md"))
+        #expect(Glob.matches("**/*.md", "docs/guide/a.md"))
         #expect(Glob.matches("TestPlans/*.xctestplan", "TestPlans/Unit.xctestplan"))
         #expect(!Glob.matches("TestPlans/*.xctestplan", "TestPlans/x/Unit.xctestplan"))
         #expect(Glob.matches("docs/brand/**", "docs/brand/a/b.png"))

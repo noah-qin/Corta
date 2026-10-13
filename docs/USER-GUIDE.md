@@ -21,6 +21,7 @@ and Find Previous can be changed ([Keyboard shortcuts](#keyboard-shortcuts)).
 - [The command palette](#the-command-palette)
 - [The Quick Terminal](#the-quick-terminal)
 - [macOS integration](#macos-integration)
+- [Speed and battery](#speed-and-battery)
 - [Settings and the config file](#settings-and-the-config-file)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [When something goes wrong](#when-something-goes-wrong)
@@ -478,6 +479,41 @@ every other application.
   `allow-clipboard-write = true`, a program — including one inside `tmux`
   or over `ssh` — may put text on your clipboard (OSC 52). Nothing may read
   it back.
+
+## Speed and battery
+
+Corta does the fast thing on its own; nothing here needs a setting. This is
+what it does, so you know what to expect.
+
+- **Typing gets the panel's full refresh rate.** While you type, paste or
+  compose with an input method, Corta asks for the display's maximum frame
+  rate — 120 Hz on a ProMotion panel — and lets it settle a second after the
+  last key. Low Power Mode, an inactive window and thermal pressure lower the
+  ceiling again when you are not typing; critical thermal pressure always
+  does.
+- **Full screen with one pane is the lowest-latency layout.** Corta then
+  presents its frames straight to the display, skipping the window server's
+  compositor: about one frame less from keypress to glass. A split, the find
+  bar or anything else drawn over the text brings the compositor back while
+  it shows. (`CORTA_DIRECT_FULLSCREEN=0` in the launch environment turns this
+  off, to compare.)
+- **Floods do not hold up the window.** A build log or `yes` is read and
+  parsed as fast as it arrives — over 300 MiB/s — and the screen shows the
+  latest state at the display's pace instead of every intermediate one.
+- **Scrolling and full-screen programs redraw only what changed.** vim, less,
+  tmux and a status line scroll by shifting what is already drawn.
+- **Long scrollback stays small.** History is compressed in memory as it
+  scrolls away — 100,000 lines of 120 columns take about 11 MiB — and
+  search, copy and resizing work on it directly.
+- **Idle means idle.** A blinking cursor is animated by macOS rather than
+  redrawn by Corta, an idle shell causes no periodic wakeups, and a window
+  that is covered or minimized stops drawing entirely.
+- **Hidden panes yield.** Two seconds after a pane is hidden — another tab,
+  a minimized window — its output is read at background priority, so it
+  does not compete with what you are looking at. Nothing is lost, and
+  typing or pasting into it restores full priority at once.
+
+[Performance](PERFORMANCE.md) has the measurements and how they were made.
 
 ## Settings and the config file
 

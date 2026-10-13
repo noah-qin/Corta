@@ -43,7 +43,6 @@ source of truth; this file is an index. `docs/README.md` is the fuller one.
 | `docs/TESTING.md`          | Which check each kind of change needs, and how to run it   |
 | `docs/RELEASING.md`        | The release checklist, from `[Unreleased]` to a signed feed |
 | `docs/LICENSING.md`        | The license header, which files carry it, `corta-license check`/`fix` |
-| `docs/history/`            | The M1–M10 roadmap and the 0.1.1 audit notes — the record, never edited except to fix a link |
 | `CONTRIBUTING.md`          | Commit convention, branches, pull requests                 |
 
 ## Decisions That Are Settled
@@ -163,9 +162,15 @@ AppKit (`makeFirstResponder`), not `@FocusState`. In UI tests, a toolbar
 `Menu` is a menu button whose *title*, not label, is its name.
 
 **Screenshots follow the UI.** A change to what a window looks like
-updates `docs/brand/` — `screenshot.png`, `sftp-browser.png`,
-`settings.png` — by the recipe in `docs/brand/README.md`: the development
+updates the `docs/brand/` image that shows it — `screenshot.png` and the
+user guide's — by the recipe in `docs/brand/README.md`: the development
 build, a scratch `CORTA_STAGE_DIR` and `ZDOTDIR`, public content only.
+`docs/brand/` holds only images a document shows.
+
+**Evidence lives with the change.** Dated test passes, measurement runs
+and audit notes go in the pull request or issue, not in the tree; the
+durable documents quote the figures that matter. Records up to 1.2.0 are
+preserved at commit `f632d59` and linked from there.
 
 **Packaging has one check.** `corta-release-check` (a SwiftPM executable
 in `CortaTerminal`, its judgements in the `ReleaseCheck` library) is the

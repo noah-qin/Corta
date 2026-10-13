@@ -1,11 +1,9 @@
 # Corta documentation
 
-Two kinds of document live here, kept apart on purpose. The **durable**
-documents describe Corta as it is — what a setting does, why a decision
-was made, how a subsystem is built — and are edited whenever the code
-changes. The **record** under `history/` describes how it got here and is
-not edited except to fix a link. When the two disagree, the durable
-document is right and the record is a record.
+These documents describe Corta as it is — what a setting does, why a
+decision was made, how a subsystem is built, and the numbers that measure
+it — and change with the code. How a change was verified lives with the
+change: in its pull request, and in the release notes.
 
 [Project overview](../README.md) · [Contribute](../CONTRIBUTING.md) · [Testing](TESTING.md)
 
@@ -55,43 +53,16 @@ measurements are `MeasurementUITests` in the `Release` test plan, with
 the two `xctrace` recordings beside them
 ([testing](TESTING.md#measuring-the-app)).
 
-## The record
+## Earlier records
 
-Dated, and not edited except to fix a link.
-
-- [0.1 roadmap](history/ROADMAP-0.1.md) — the M1–M10 plan that produced 0.1.0, with its measurements.
-- [0.1.1 quality plan](history/V0.1.1-QUALITY-PLAN.md) — the 0.1.1 findings and what was done about each.
-- [0.1.1 engineering audit](history/V0.1.1-ENGINEERING-AUDIT.md) — the audit that fed the quality plan.
-- [0.1.1 manual verification](history/V0.1.1-MANUAL-VERIFICATION.md) — what a person checked by hand for 0.1.1.
-- [0.1.1 UI walkthrough](history/V0.1.1-UI-WALKTHROUGH.md) — the native-behaviour walkthrough.
-- [Technology direction](history/TECHNOLOGY-DIRECTION.md) — candidates considered before the v1 roadmap.
-- [Keypress latency before 1.0.0](history/2026-09-09-LATENCY-BEFORE-1.0.md) — the screen-capture figures and why they do not compare.
-- [B01 headless sample, 2026-09-10](history/2026-09-10-B01-HEADLESS-SAMPLE.md) — the first percentile-shaped core numbers.
-- [B03 ownership audit, 2026-09-10](history/2026-09-10-B03-OWNERSHIP-AUDIT.md) — how the synchronization table in `DESIGN.md` §7.6 was established.
-- [B05 search state, 2026-09-11](history/2026-09-11-B05-SEARCH-STATE.md) — the pane-local search fixes behind `DESIGN.md` §7.7.
-- [B06 conformance gaps, 2026-09-11](history/2026-09-11-B06-CONFORMANCE-GAPS.md) — SCOSC/SCORC, OSC 4/5, reverse wraparound, and the measured regression.
-- [B11 hot-path pass, 2026-09-13](history/2026-09-13-B11-HOT-PATH-PASS.md) — CPU, locking and memory.
-- [B12 render diagnostics, 2026-09-13](history/2026-09-13-B12-RENDER-DIAGNOSTICS.md) — diagnostics and a rejected prewarm.
-- [B12 Metal 4 backend, 2026-09-15](history/2026-09-15-B12-METAL4-BACKEND.md) — measured against the MTL3 path.
-- [1.0.0 benchmark run, 2026-09-18](history/2026-09-18-V1.0.0-BENCHMARK-RUN.md) — every scenario, including energy.
-- [1.0.1 benchmark run, 2026-09-21](history/2026-09-21-V1.0.1-BENCHMARK-RUN.md) — the patch release's re-measurement.
-- [1.1.0 benchmark run, 2026-10-03](history/2026-10-03-V1.1.0-BENCHMARK-RUN.md) — the first Release-configuration frame-CPU column, and the search and reflow gains.
-- [1.1.1 benchmark run, 2026-10-03](history/2026-10-03-V1.1.1-BENCHMARK-RUN.md) — scripted core measurements for the emergency patch.
-- [1.1.1 release checks, 2026-10-03](test-results/2026-10-03-1.1.1-checks.md) — empty-Return regression coverage and launched-app confirmation.
-- [1.1.5 benchmark run, 2026-10-07](history/2026-10-07-V1.1.5-BENCHMARK-RUN.md) — scripted core measurements and the Release frame-CPU re-measurement after the render-loop changes.
-- [1.1.5 release checks, 2026-10-07](test-results/2026-10-07-1.1.5-checks.md) — suites, fuzz, the esctest re-run and the resize fixes' evidence.
-- [1.1.6 release checks, 2026-10-07](test-results/2026-10-07-1.1.6-checks.md) — the rounded-corner patch: render tests, the launched app and a frame-CPU A/B.
-- [Local data and hostile-remote audit, 2026-10-08](test-results/2026-10-08-local-data-remote-audit.md) — leak and remote-to-local paths by attacker, the fixes, and the data and entry-point tables.
-- [Crash, concurrency, signing and supply-chain audit, 2026-10-08](test-results/2026-10-08-crash-concurrency-supply-chain-audit.md) — remote crash and hang points, `@unchecked` and unsafe sites, the 1.1.8 signatures, the update and CI chains, TCC, and the unimplemented sequences.
-- [esctest results](esctest/) — result files per release.
-- [Mac audit closeout, 2026-10-08–09](test-results/2026-10-09-mac-audit-closeout.md) — Metal 4 tests, signed release/feed rehearsal, native session checks, rendering and focus fixes, and the remaining verification limits.
-- [Interactive test records](test-results/) — dated passes by a person; findings are worked off in the changelog.
+Dated test passes, benchmark runs and audit notes are not kept in the tree.
+Those up to 1.2.0 are preserved, unchanged, at
+[this commit](https://github.com/noah-qin/Corta/tree/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs): the
+0.1 roadmap and the 0.1.1 audit under `history/`, every release's benchmark
+run and check, and the esctest result files. The documents above quote the
+figures from them that still matter, with a link to each.
 
 The completed v1 implementation plan is recorded in the
 [v1.0.0 milestone](https://github.com/noah-qin/Corta/milestone/1).
 [Open issues](https://github.com/noah-qin/Corta/issues) track follow-up work;
 release availability is recorded on [GitHub Releases](https://github.com/noah-qin/Corta/releases).
-
-The [October 2 follow-up](test-results/2026-10-02-follow-up.md) consolidates
-remaining audit work and records the evidence for this round. Historical
-reports remain unchanged; current security and testing documents govern.

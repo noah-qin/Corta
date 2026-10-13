@@ -75,7 +75,7 @@ import Testing
     }
 
     /// The cold-startup measurement
-    /// (`docs/history/2026-09-13-B12-RENDER-DIAGNOSTICS.md`): records
+    /// (the B12 render diagnostics record, 2026-09-13): records
     /// `GlyphAtlas.init`'s cost and the cost of the first screenful of
     /// ordinary text afterward. A bounded eager ASCII prewarm (every
     /// printable column × all four styles, at `init`) was built and measured

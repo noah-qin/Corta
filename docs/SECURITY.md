@@ -401,13 +401,24 @@ For quick reference during implementation and review:
 ## 7. Change Log
 
 Every security-relevant change, newest first. The numbering continues
-the 0.1.1 quality plan's `S` series (`history/V0.1.1-QUALITY-PLAN.md`,
+the 0.1.1 quality plan's `S` series ([quality plan](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/V0.1.1-QUALITY-PLAN.md),
 which records S01–S04 and S07 in full); the entries below are the ones
 whose write-up belongs with the design rather than with the release that
 made them.
 
+- **S20 — 2026-10-13: the 1.2.0 review.** A review of the release's work
+  (#326) found no exploitable defect, and tightened the image path. The
+  decoder receives one anonymous shared mapping, unlinked before spawn and
+  bounded to the pixel cap plus row padding, and writes nothing but an
+  8-byte header to stdout; its sandbox is proved by a `--check-sandbox` mode
+  the test suite runs, which must be refused a file read. Raw RGB/RGBA
+  images, converted in process, use a private mapping and never create a
+  system-wide object. The decoder is reaped through a kqueue exit event with
+  one SIGKILL at the deadline, so a stalled child cannot keep a thread
+  polling. Every pull request is scanned by CodeQL (Swift, C, Python,
+  workflows) and dependency review (#313).
 - **S19 — 2026-10-08: a crash, concurrency, signing and supply-chain
-  audit** ([record](test-results/2026-10-08-crash-concurrency-supply-chain-audit.md)).
+  audit** ([record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-08-crash-concurrency-supply-chain-audit.md)).
   No byte sequence was found that stably crashes or hangs a pane; the fuzz
   harness now reaches what a mutation of raw output rarely did —
   `corta-fuzz --target osc|kitty|sftp` frames each input as one OSC
@@ -654,7 +665,7 @@ Directory proxy probes run away from the main actor, with at most two
 filesystem checks process-wide and no pending queue. Under a hung mount the
 proxy icon can remain absent; cancellation cannot interrupt a kernel stat.
 
-The dated [follow-up verification record](test-results/2026-10-02-follow-up.md)
+The dated [follow-up verification record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-02-follow-up.md)
 separates repairs from available runtime evidence and environment limits.
 It is not a claim that every supported machine or dependency path was tested.
 

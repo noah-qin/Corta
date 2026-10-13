@@ -10,94 +10,93 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+Corta 1.2 is a performance release: faster from the byte a program writes
+to the pixel on the panel, lighter in memory, and quieter when nothing is
+happening. Figures are from one Apple M5 MacBook Air, before and after on
+the same machine and toolchain; [Performance](docs/PERFORMANCE.md) has each
+method and what it does not show.
+
 ### Changed
 
-- A full-screen window with one pane presents its frames directly to the
-  display instead of through the window server's compositor: about one frame
-  less from keypress to glass, and roughly half the worst-case delay, while
-  typing. Nothing visible changes. `CORTA_DIRECT_FULLSCREEN=0` turns it off
-  for a comparison.
-
-- Changing the font size (⌘= / ⌘− / ⌘0, a pinch or Settings) no longer
-  nudges a single-pane window to whole cells; the window keeps its frame
-  and only the rows and columns refit, as in full screen and with splits.
-
+- **2.3× the output throughput.** The parser and grid take 355.9 MiB/s,
+  up from 158.0, and output arriving from a shell 317.3 MiB/s, up from
+  137.2. Runs of printable text are classified 16 bytes at a time with NEON;
+  common CJK text skips the width table (+23%), and `yes` runs 70% faster.
+- **A frame less from keypress to glass in full screen.** A full-screen
+  window with one pane presents its frames directly to the display instead
+  of through the window server's compositor. A person typing sees the median
+  drop from 64–68 ms to 49–51 ms and the worst cases halve (p99 154–180 →
+  83–84 ms). Nothing visible changes; `CORTA_DIRECT_FULLSCREEN=0` turns it
+  off for a comparison.
+- **The panel's full refresh rate while you type.** Typing, committed
+  input-method text, paste and mouse reports lift the frame-rate ceiling to
+  the panel's maximum — 120 Hz on ProMotion — and it settles a second after
+  the last key. Critical thermal pressure still limits it.
+- **Scrolling reuses what is already drawn.** Scroll regions, history and
+  inserted or deleted lines shift the rendered rows instead of rebuilding
+  them: a one-line region scroll takes 0.026 ms of CPU a frame instead of
+  0.130, and output arriving while you read history 0.010 ms instead of
+  0.096. Screen rows keep their memory as they scroll.
+- **Scrollback in a fraction of the memory.** Cold history is compressed in
+  memory as it arrives, off the terminal lock: 100,000 lines of 120 columns
+  take 11.4 MiB instead of 185. Search, resize and reflow read it in place.
+- **Smaller GPU footprint.** A rendered quad is 24 bytes instead of 48, and
+  glyph atlases grow on demand: four panes at a prompt hold about 1 MiB of
+  atlas instead of 81 MiB. The atlas's rectangle table is uploaded only when
+  it changes.
+- **Quieter at rest.** An idle blinking cursor is animated by Core Animation
+  instead of redrawn every half second; an idle shell no longer wakes its
+  reader four times a second; a pane you cannot see drops its reader to
+  background priority after two seconds, and returns to interactive
+  priority the moment you type or paste.
+- Kitty images are decoded by the sandboxed helper straight into memory the
+  GPU reads, with no copy through the app, then moved into GPU-private
+  storage; raw RGB/RGBA images are converted in place.
 - The disk image is an APFS volume compressed with lzma, about 15% smaller
-  to download than the zlib-compressed image 1.1.9 shipped. Opening it
-  shows a fixed window with Corta, an arrow and the Applications folder.
-
-- Kitty PNG decoding writes into anonymous shared pixel memory inherited by
-  the sandboxed helper. Metal wraps the mapping without copying and blits it
-  into a private texture on the GPU; raw RGB/RGBA pixels are reordered directly
-  into shared storage.
-- Hidden panes request utility reader QoS after a two-second grace; keyboard
-  input and paste restore interactive priority before queuing bytes.
-- Idle blinking cursors hand off to Core Animation after a presented
-  cursorless frame, and return to Metal through versioned presentation callbacks.
-- Native shell and input-source overlays update only when their presentation
-  changes. An opt-in per-window render thread is available for acceptance
-  testing through `CORTA_RENDER_THREAD=1`.
-
-- Render instances use half the upload bytes, with exact floating-point glyph
-  geometry and image crops. Glyph atlases allocate grayscale height on demand
-  and keep color storage small until color glyphs appear.
-- Cold scrollback compresses in memory outside the terminal lock. Resize,
-  dumps and search stream history; repeated ASCII searches share a bounded
-  index. ASCII parsing and common CJK grid writes use measured fast paths.
-
-- Scrolling output reuses screen row buffers and avoids a trim-induced copy
-  when pushing rows into history. Region and history scrolling reuse retained
-  render instances; output while anchored in history no longer rebuilds the
-  entire visible screen.
-- Typing, committed IME text, paste and mouse reports temporarily lift frame
-  throttles and request the panel's maximum refresh rate. Critical thermal
-  pressure still limits both typing and scrolling; actual 120 Hz cadence and
-  energy impact require a panel unavailable in this validation. The 60 Hz
-  power-mode measurements and idle/flood CPU checks are recorded.
+  to download than 1.1.9's. Opening it shows a fixed window with Corta, an
+  arrow and the Applications folder.
+- Changing the font size (⌘= / ⌘− / ⌘0, a pinch or Settings) keeps the
+  window's frame; only the rows and columns refit, as in full screen and
+  with splits.
+- An ended session shows a compact, centred card with accessible
+  **New Session** and **Close Pane** buttons that fit narrow panes.
+- An opt-in per-window render thread (`CORTA_RENDER_THREAD=1`) is available
+  for testing; it stays off by default.
 
 ### Fixed
 
-- Automatic focus reports preserve the reader's visibility-based priority;
-  only user input promotes it to interactive priority. Output avoids the
-  render-driver lock when threading is disabled and no longer repeatedly
-  locks a retired cursor presentation.
-- Idle blinking cursors retire their overlay before rendering resumes, avoiding
-  duplicate positions and a stale cursor waiting for the main thread.
-- Input and accessibility cell coordinates match bottom-anchored rendering
-  while a live resize temporarily makes the grid taller than its pane.
-- Ended sessions show a compact centered card with accessible restart and
-  close actions that fit narrow panes.
-
-- Square table corners stop at the joined strokes instead of protruding past
-  the border. Square and rounded corners are verified at fractional scales.
-
-- Directory completion hints are hidden while an input method composes text,
-  so they no longer overlap the preedit text or candidate panel.
-- Idle PTY readers wait for data or an explicit close signal instead of waking
-  every 250 ms. Closing still interrupts a silent reader without releasing a
-  descriptor while it is in use.
-- Kitty images contained in scroll regions move with the text and retain only
-  their visible source pixels when clipped by a margin. This also applies to
-  full-screen scrolling in the alternate screen or with scrollback disabled.
-- A Kitty image near the 16-million-pixel cap whose width needed row padding
-  for the GPU was refused; it now shows. Narrow images and many small ones no
-  longer fill the image texture budget early, and an image that did wait for
-  room no longer started a new decoder process each time any image was freed.
-- The image decoder no longer logs a sandbox violation for every image shown.
-- An image whose upload met a busy GPU stayed blank until the program sent it
-  again; it is now retried. In full screen, a frame whose rendering failed is
-  redrawn instead of being presented as drawn.
-- Inserting or deleting lines (`CSI L` / `CSI M`, as vim, less and tmux do)
-  moves images inside the affected rows with their text, as scrolling does,
-  and redraws only the rows that changed.
-- With `CORTA_RENDER_THREAD=1`, a GPU that stopped answering no longer
-  crashes the app when a pane closes or the font changes.
-- Typing no longer schedules and cancels a timer per keystroke, and an idle
-  blinking cursor no longer creates a GPU queue each time it parks; glyph
-  draws stop copying the atlas's rectangle table into every frame.
 - With View ▸ Show Tab Bar on, a new window opens at the configured `rows`
-  instead of two or three rows short: the tab bar is now counted in the
-  window's height before the window appears.
+  instead of two or three rows short.
+- Kitty images inside a scroll region — and lines inserted or deleted around
+  them, as vim, less and tmux do — move with their text and are cropped at
+  the region's edge, including in the alternate screen and with scrollback
+  off.
+- A Kitty image near the 16-million-pixel limit whose width needed padding
+  for the GPU was refused; it now shows. Narrow images and many small ones
+  no longer fill the image budget early, and an image whose upload met a
+  busy GPU is retried instead of staying blank.
+- In full screen, a frame whose rendering failed is redrawn instead of
+  being presented as drawn.
+- Square table corners stop at the strokes they join instead of protruding
+  past the border, at every display scale.
+- Directory suggestions hide while an input method composes text, so they
+  no longer overlap the preedit or the candidate window.
+- Input-method and accessibility cell positions match what is drawn while a
+  live resize briefly makes the grid taller than its pane.
+- Idle blinking cursors give way to the drawn cursor before new output
+  renders, so a cursor is never shown twice.
+- Automatic focus reports no longer raise a hidden pane's reader priority;
+  only your input does.
+- With `CORTA_RENDER_THREAD=1`, a GPU that stops responding no longer takes
+  the app down when a pane closes or the font changes.
+
+### Security
+
+- The image decoder's sandbox is verified by the test suite instead of by a
+  deliberate denied file read on every image, which logged a sandbox
+  violation for each picture shown.
+- Every pull request is scanned by CodeQL (Swift, C, Python and workflows)
+  and dependency review before it can merge.
 
 ## [1.1.9] - 2026-10-09
 
@@ -1169,7 +1168,7 @@ file for everything, a Metal 4 backend, remote context with SFTP and
 remote editing, open-source packaging, and system entry points. esctest2:
 126 passed, 334 known bugs, 107 failed of 567 (81.1%), every failure a
 subset of 0.1.1's. The entry as released, with the evidence behind each
-line, is in [the record](docs/history/2026-09-19-V1.0.0-CHANGELOG-FULL.md).
+line, is in [the record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/2026-09-19-V1.0.0-CHANGELOG-FULL.md).
 
 **Known at this release:**
 

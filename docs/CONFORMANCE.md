@@ -108,7 +108,7 @@ properly or it is a wrong number dressed as a right one. Refusing is also
 the safe direction: a program that sets a colour and sees no change keeps
 legible text, whereas a mis-converted `CIELab` black-on-black is a
 terminal you cannot read. The corresponding esctest cases are recorded as
-expected failures for this reason (`docs/history/ROADMAP-0.1.md`), and
+expected failures for this reason ([0.1 roadmap](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/ROADMAP-0.1.md)), and
 `Performer+Query.parseColorSpecification` carries the policy in full.
 
 **DECSCL gates DECRQM.** A program that announced VT200 with
@@ -218,16 +218,16 @@ whose record is a roadmap tick has not been re-run since it landed.
 
 | # | Holds when | Last verified by hand | Pinned by |
 | --- | --- | --- | --- |
-| 1 | Opens to a working shell with correct colour output | 2026-09-17 pass, H31 and G29 ([record](test-results/2026-09-17-interactive.md)) | §4.4's five-point check |
+| 1 | Opens to a working shell with correct colour output | 2026-09-17 pass, H31 and G29 ([record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-09-17-interactive.md)) | §4.4's five-point check |
 | 2 | `vim` / `less` / `htop` render without artifacts | 2026-09-17 pass: `less` and `git log` clean (G29); `tmux` + `htop` left residue after a window shrink (G25) — ECH was unimplemented, fixed the same day (§4.4.2) | `EditingTests`, golden fixtures |
 | 3 | Chinese input works, displays, and never drifts out of alignment | 2026-09-17 pass, A1 on a physical keyboard, both panes of a split | `TerminalViewIMETests`, `WideGlyphRenderTests` |
 | 4 | Copy and paste work; pasting multi-line code does not auto-execute | 2026-09-17 pass, G28 (the multi-line warning appeared for a REPL without bracketed paste) and 2026-09-19 (Option-drag selection to the clipboard) | `PasteTests`, `MouseReportingTests` |
 | 5 | Scrollback holds a long training run and scrolls smoothly | 2026-09-17 pass, G27: 120 s of continuous output, the other window still responsive; the top of the run was past the 10,000-line default cap, as documented | `corta-bench` write-backpressure |
-| 6 | ⌘F searches scrollback | M4.4 roadmap tick ([record](history/ROADMAP-0.1.md)); not re-run by hand since | `SearchTests`, `SearchAndTabUITests` |
+| 6 | ⌘F searches scrollback | M4.4 roadmap tick ([record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/ROADMAP-0.1.md)); not re-run by hand since | `SearchTests`, `SearchAndTabUITests` |
 | 7 | New tab and split pane | 2026-09-17 pass, C11: a restored two-pane window and a three-tab group | `SplitPaneUITests`, `SearchAndTabUITests` |
 | 8 | ⌘+ / ⌘− resize the font | 2026-09-17 pass, C12 and H31 | `FontSizeZoomTests` |
 | 9 | Resizing the window resizes the program inside it | 2026-09-17 pass, D16: `vim` through full screen and back, 120×30 → 207×62 → 120×30 | `PTYWindowSizeTests`, `ResizeDebouncerTests` |
-| 10 | ⌘-clicking a `localhost:` URL opens the browser | M4.6 roadmap tick ([record](history/ROADMAP-0.1.md)); not re-run by hand since | `LinkDetectionTests` |
+| 10 | ⌘-clicking a `localhost:` URL opens the browser | M4.6 roadmap tick ([record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/ROADMAP-0.1.md)); not re-run by hand since | `LinkDetectionTests` |
 
 ---
 
@@ -276,35 +276,35 @@ SHELL=/tmp/corta-esctest.sh Corta.app/Contents/MacOS/Corta
 **Results, one row per run.** "xterm-compatibility" is passes plus
 "known bugs" — the number esctest reports and the one comparable across
 terminals; it is **not** a pass rate, and every row states all three
-counts. The failing names of each run are kept in [`esctest/`](esctest/)
+counts. The failing names of each run are kept in [`esctest/`](https://github.com/noah-qin/Corta/tree/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/esctest)
 so the next run is a diff rather than a re-reading.
 
 | Run | Build | Passed | Known bugs | Failed | Total | xterm-compat. | Against the previous row |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
 | M2 (2026-09-02) | M2 closeout | 50 | 334 | 184 | 568 | 67.6% | Baseline |
 | M6 (2026-09-03) | M6 closeout | 106 | 335 | 127 | 568 | 77.6% | 57 failures fixed, none introduced: programmable tabs, CNL/CPL/CHT/CBT, IND/NEL/RI, RIS and DECSTR, including the soft-reset isolation esctest itself relies on |
-| 0.1.1 (2026-09-08) | v0.1.1 | 112 | 335 | 121 | 568 | 78.7% | Six more passing, none regressed; classified by application impact in [the quality plan](history/V0.1.1-QUALITY-PLAN.md) Q01; names in [`esctest/0.1.1-results.txt`](esctest/0.1.1-results.txt). 45 of the 121 were OSC 4/5 palette set and query, then unimplemented |
-| 2026-09-17 | `main`, esctest2 `2798f12` | 126 | 334 | 107 | 567 | 81.1% | 14 tests moved to pass — B06's OSC 4/104 and 5/105 set/query/reset, SCORC, and the multi-column reverse-wraparound case — none regressed; the suite itself lost one test and one known bug, so the totals are not identical columns. Names in [`esctest/2026-09-17-results.txt`](esctest/2026-09-17-results.txt); XtermWinops (28) is still the largest class and still deliberate |
-| 1.1.0 (2026-10-03) | `main` at `ef11a93`, esctest2 `2798f12` | 126 | 334 | 107 | 567 | 81.1% | Identical failing list, name for name: nothing regressed through the 1.1.0 milestone and nothing moved — its terminal-side changes (Kitty `o=z`, emoji drawing, bounded glyph clusters) have no esctest case. Names in [`esctest/2026-10-03-results.txt`](esctest/2026-10-03-results.txt) |
-| 1.1.5 (2026-10-07) | `main` at `c9432a9`, esctest2 `2798f12` | 131 | 334 | 102 | 567 | 82.0% | Six moved to pass: #244 made autowrap off (`CSI ? 7 l`) overwrite the last column instead of wrapping, origin mode address from the region's top, and DECRQM report DECAWM, DECOM and DECTCEM as they are. One moved to fail without regressing: `XtermSave_SaveSetState` had passed only because ASCII text wrapped with autowrap off — XTSAVE/XTRESTORE are still not implemented. Names in [`esctest/2026-10-07-results.txt`](esctest/2026-10-07-results.txt) |
+| 0.1.1 (2026-09-08) | v0.1.1 | 112 | 335 | 121 | 568 | 78.7% | Six more passing, none regressed; classified by application impact in [the quality plan](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/V0.1.1-QUALITY-PLAN.md) Q01; names in [`esctest/0.1.1-results.txt`](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/esctest/0.1.1-results.txt). 45 of the 121 were OSC 4/5 palette set and query, then unimplemented |
+| 2026-09-17 | `main`, esctest2 `2798f12` | 126 | 334 | 107 | 567 | 81.1% | 14 tests moved to pass — B06's OSC 4/104 and 5/105 set/query/reset, SCORC, and the multi-column reverse-wraparound case — none regressed; the suite itself lost one test and one known bug, so the totals are not identical columns. Names in [`esctest/2026-09-17-results.txt`](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/esctest/2026-09-17-results.txt); XtermWinops (28) is still the largest class and still deliberate |
+| 1.1.0 (2026-10-03) | `main` at `ef11a93`, esctest2 `2798f12` | 126 | 334 | 107 | 567 | 81.1% | Identical failing list, name for name: nothing regressed through the 1.1.0 milestone and nothing moved — its terminal-side changes (Kitty `o=z`, emoji drawing, bounded glyph clusters) have no esctest case. Names in [`esctest/2026-10-03-results.txt`](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/esctest/2026-10-03-results.txt) |
+| 1.1.5 (2026-10-07) | `main` at `c9432a9`, esctest2 `2798f12` | 131 | 334 | 102 | 567 | 82.0% | Six moved to pass: #244 made autowrap off (`CSI ? 7 l`) overwrite the last column instead of wrapping, origin mode address from the region's top, and DECRQM report DECAWM, DECOM and DECTCEM as they are. One moved to fail without regressing: `XtermSave_SaveSetState` had passed only because ASCII text wrapped with autowrap off — XTSAVE/XTRESTORE are still not implemented. Names in [`esctest/2026-10-07-results.txt`](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/esctest/2026-10-07-results.txt) |
 
 **1.1.1 (2026-10-03):** the empty-Return patch adds real-shell PTY regression
 coverage and was confirmed in the launched development app after updating
 the installed integration. Full core and Unit suites passed; esctest2 was
 not re-run because this patch changes shell hooks rather than terminal
-escape-sequence handling. Evidence: [1.1.1 release checks](test-results/2026-10-03-1.1.1-checks.md).
+escape-sequence handling. Evidence: [1.1.1 release checks](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-03-1.1.1-checks.md).
 
 **1.1.5 (2026-10-07):** esctest2 re-run on the release tree: 131 passed, 334
 known bugs, 102 failed (82.0%); the row above has the per-test difference.
 The scroll-region-on-resize (#256) and reflow-cursor (#257) fixes have no
 esctest case; their own core tests and a replay of Claude Code's recorded
-output cover them. Evidence: [1.1.5 release checks](test-results/2026-10-07-1.1.5-checks.md).
+output cover them. Evidence: [1.1.5 release checks](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-07-1.1.5-checks.md).
 
 **1.1.6 (2026-10-07):** draws the rounded box corners (`╭ ╮ ╰ ╯`) as geometry
 joined to the grid-drawn borders (#264). A renderer change with no escape-
 sequence handling in it, so esctest2 was not re-run; render tests, the
 launched app and a Release frame-CPU A/B cover it. Evidence:
-[1.1.6 release checks](test-results/2026-10-07-1.1.6-checks.md).
+[1.1.6 release checks](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-07-1.1.6-checks.md).
 
 ### 4.3 Fuzzing
 
@@ -436,7 +436,7 @@ which is how the summon/dismiss half and the titlebar lock were
 exercised when B16 landed — over a single display, with the panel
 opening as a top band and hiding when another app came forward.
 The 2026-09-18 run of these four checks, one failure and its fix, are in
-[`test-results/2026-09-18-release-checks.md`](test-results/2026-09-18-release-checks.md).
+[`test-results/2026-09-18-release-checks.md`](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-09-18-release-checks.md).
 
 **Remote workflows (B13/B14) have a launched-app check of their own**,
 `CortaUITests/RemoteWorkflowUITests`, which is the shape every
@@ -551,7 +551,7 @@ Run at every milestone, because these are the actual workload:
 ssh, tmux, Neovim, fzf, CJK input, long output, sleep/wake, restoration and
 AI CLI applications. zsh/tmux/Neovim/ssh/long-output are items 1–4 above;
 fzf and fish were covered by the 0.1.1 audit's real-program harness
-(U10 in [the quality plan](history/V0.1.1-QUALITY-PLAN.md), which records
+(U10 in [the quality plan](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/V0.1.1-QUALITY-PLAN.md), which records
 what it proved and what it could not); it was a one-time verification and
 was removed in 1.1.0. The remainder, added here rather than
 to the scriptable harness because none of them are drivable through a PTY
@@ -581,7 +581,7 @@ alone:
 
 Items 7, 8 and 10 above have no automated substitute and are recorded with
 an explicit **not judged** state when a pass has not actually run one
-(precedent: `docs/history/V0.1.1-MANUAL-VERIFICATION.md`'s VoiceOver read-through, marked
+(precedent: the [0.1.1 manual verification](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/V0.1.1-MANUAL-VERIFICATION.md)'s VoiceOver read-through, marked
 "not judged" rather than silently skipped when the tester could not follow
 spoken English closely enough to have an opinion). "Not judged" means
 exactly that — no automated check stands in for it, and no claim of success
@@ -590,23 +590,23 @@ is made in its place.
 ### 4.7 The records
 
 Every pass of §4.4, §4.4.2 and §4.6 is written up under
-[`test-results/`](test-results/) as a dated file — what was checked, what
+[`test-results/`](https://github.com/noah-qin/Corta/tree/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results) as a dated file — what was checked, what
 passed, what failed and what was *not judged* — and the findings are worked
 off in the CHANGELOG. The record stays as written.
 
 | Record | What it covers |
 | --- | --- |
-| [2026-09-02 — M2 closeout](test-results/2026-09-02-m2-closeout.md) | §4.6 items 1 and 3: `tmux` + `htop` under resize; no reachable ssh host |
-| [2026-09-03 — M6 closeout](test-results/2026-09-03-m6-closeout.md) | Tabs, the settings page and theme switching live; focus reporting end to end; the esctest re-run; the gesture items left to a human |
-| [2026-09-12 — B10 pass](test-results/2026-09-12-b10-pass.md) | The text-selection API decision, the accessibility tree audit, the translation audit, and what stayed *not judged* |
-| [2026-09-16/17 — interactive pass](test-results/2026-09-17-interactive.md) | The first full sweep of §4.6 since 0.1.1, by tool and then by hand |
-| [2026-09-18 — release checks](test-results/2026-09-18-release-checks.md) | What the 09-17 pass changed; the six human and hardware items for 1.0.0, including the Quick Terminal probe |
-| [2026-09-18/19 — issues #88–#90](test-results/2026-09-19-issues-88-90.md) | Mouse tracking, shared coordinates and the toolchain decision |
-| [2026-09-21 — 1.0.1 release checks](test-results/2026-09-21-1.0.1-checks.md) | §4.4 points 1–5 for the patch release, the themed cursor on screen, what was not re-run and why |
-| [2026-10-01 — 1.1.0 audit closeout](test-results/2026-10-01-audit-closeout.md) | The 27-finding review accounted for by #189–#194, with its automated and launched-app evidence |
-| [2026-10-02 — audit follow-up](test-results/2026-10-02-follow-up.md) | Search, SFTP lifecycle, local storage and reflow follow-ups, with the A/B measurements |
-| [2026-10-03 — 1.1.0 release checks](test-results/2026-10-03-1.1.0-checks.md) | §4.4 points 1–5 and 7 on the merged tree, the esctest re-run, what was not judged |
-| [2026-10-03 — 1.1.1 release checks](test-results/2026-10-03-1.1.1-checks.md) | Real-shell empty-Return regression tests, full core/Unit suites and user-confirmed launched-app check |
-| [2026-10-07 — 1.1.5 release checks](test-results/2026-10-07-1.1.5-checks.md) | Full core/Unit suites, fuzz, esctest re-run, core benchmark and Release frame CPU, and the user-confirmed resize check |
-| [2026-10-09 — Mac audit closeout](test-results/2026-10-09-mac-audit-closeout.md) | §4.4 points 1–5, native session lifecycle, Quick Terminal and paste checks; explicit UI, VoiceOver, Shortcuts and remote limits |
-| [2026-10-07 — 1.1.6 release checks](test-results/2026-10-07-1.1.6-checks.md) | Rounded box corners: render tests failing on 1.1.5, the launched app, and a Release frame-CPU A/B |
+| [2026-09-02 — M2 closeout](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-09-02-m2-closeout.md) | §4.6 items 1 and 3: `tmux` + `htop` under resize; no reachable ssh host |
+| [2026-09-03 — M6 closeout](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-09-03-m6-closeout.md) | Tabs, the settings page and theme switching live; focus reporting end to end; the esctest re-run; the gesture items left to a human |
+| [2026-09-12 — B10 pass](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-09-12-b10-pass.md) | The text-selection API decision, the accessibility tree audit, the translation audit, and what stayed *not judged* |
+| [2026-09-16/17 — interactive pass](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-09-17-interactive.md) | The first full sweep of §4.6 since 0.1.1, by tool and then by hand |
+| [2026-09-18 — release checks](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-09-18-release-checks.md) | What the 09-17 pass changed; the six human and hardware items for 1.0.0, including the Quick Terminal probe |
+| [2026-09-18/19 — issues #88–#90](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-09-19-issues-88-90.md) | Mouse tracking, shared coordinates and the toolchain decision |
+| [2026-09-21 — 1.0.1 release checks](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-09-21-1.0.1-checks.md) | §4.4 points 1–5 for the patch release, the themed cursor on screen, what was not re-run and why |
+| [2026-10-01 — 1.1.0 audit closeout](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-01-audit-closeout.md) | The 27-finding review accounted for by #189–#194, with its automated and launched-app evidence |
+| [2026-10-02 — audit follow-up](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-02-follow-up.md) | Search, SFTP lifecycle, local storage and reflow follow-ups, with the A/B measurements |
+| [2026-10-03 — 1.1.0 release checks](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-03-1.1.0-checks.md) | §4.4 points 1–5 and 7 on the merged tree, the esctest re-run, what was not judged |
+| [2026-10-03 — 1.1.1 release checks](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-03-1.1.1-checks.md) | Real-shell empty-Return regression tests, full core/Unit suites and user-confirmed launched-app check |
+| [2026-10-07 — 1.1.5 release checks](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-07-1.1.5-checks.md) | Full core/Unit suites, fuzz, esctest re-run, core benchmark and Release frame CPU, and the user-confirmed resize check |
+| [2026-10-09 — Mac audit closeout](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-09-mac-audit-closeout.md) | §4.4 points 1–5, native session lifecycle, Quick Terminal and paste checks; explicit UI, VoiceOver, Shortcuts and remote limits |
+| [2026-10-07 — 1.1.6 release checks](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-07-1.1.6-checks.md) | Rounded box corners: render tests failing on 1.1.5, the launched app, and a Release frame-CPU A/B |

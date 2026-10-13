@@ -38,7 +38,7 @@ first so contributors do not duplicate effort.
 | `TestPlans/` | `Unit` (the default), `UI` (interactive sessions only) and `Release` (the Release measurements) |
 | `scripts/` | Metal capability and update-feed checks, release preparation helpers and tests, and `report-ci-statuses.sh` for automation PR checks |
 | `script/` | Local build helpers and the isolated-sshd fixture |
-| `.github/` | Issue and discussion forms, community files, and five workflows: `ci.yml`, `nightly.yml`, `render.yml`, `release.yml`, `appcast.yml` |
+| `.github/` | Issue and discussion forms, community files, Dependabot, and six workflows: `ci.yml`, `codeql.yml`, `nightly.yml`, `render.yml`, `release.yml`, `appcast.yml` |
 
 ## Tests and documentation
 
@@ -55,7 +55,7 @@ recipe, which never touches your own shell or configuration.
 Keep public guides in English and use relative links within the repository.
 Document defaults, units, prerequisites and limitations alongside examples.
 Keep release snapshots dated; do not present planned behaviour as shipped.
-Historical records under `docs/history/` retain their original findings.
+Records from before 1.2.0 are preserved [at a commit](https://github.com/noah-qin/Corta/tree/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs) with their original findings; new evidence goes in the pull request.
 
 Use `///` comments for API contracts: units, coordinate systems, ownership,
 threading and failure behaviour. Use `//` for a non-obvious implementation
@@ -234,7 +234,7 @@ translation `translated`. The zh-Hans catalog is an explicit exception: its
 strings were marked `translated` after an assistant review on 2026-09-18,
 not a native-speaker sign-off, and strings added since are `needs_review`
 until reviewed. That record is in
-[the 1.0.0 release checks](docs/test-results/2026-09-18-release-checks.md).
+[the 1.0.0 release checks](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-09-18-release-checks.md).
 Do not infer native-speaker verification from catalog state alone; describe
 the reviewer and scope in the PR, and record any human-only gaps.
 
